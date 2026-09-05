@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { PostgresGovernanceAdapter } from "../../adapters/postgres.governance.adapter";
-import { GovernanceEncryptionPort } from "../../ports/governance-encryption.port";
-import { CostAttributionPolicyRepository } from "../../repositories/cost-attribution-policy.repository";
-import { CanonicalCostExtractorService } from "../canonical-cost-extractor.service";
-import { PostgresGovernancePolicyService } from "../governance-policy.service";
-import { IngestionCredentialsService } from "../ingestion-credentials.service";
-import { PullDestinationService } from "../pull-destination.service";
+import { PostgresGovernanceAdapter } from "../adapters/postgres.governance.adapter";
+import { GovernanceEncryptionPort } from "../ports/governance-encryption.port";
+import { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository";
+import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service";
+import { PostgresGovernancePolicyService } from "../services/governance-policy.service";
+import { IngestionCredentialsService } from "../services/ingestion-credentials.service";
+import { PullDestinationService } from "../services/pull-destination.service";
 
 class MemoryPolicyRepository extends CostAttributionPolicyRepository {
   constructor(private readonly configs: unknown[]) {

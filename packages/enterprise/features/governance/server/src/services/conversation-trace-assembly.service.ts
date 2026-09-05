@@ -164,7 +164,11 @@ export type OtlpJsonSpan = z.input<typeof spanSchema>;
  * and the second pull updates the first. Two pullers deriving them differently
  * would each own half the conversations and neither would ever restate.
  */
-export class ConversationTraceAssembly {
+export class ConversationTraceAssemblyService {
+  static create(): ConversationTraceAssemblyService {
+    return new ConversationTraceAssemblyService();
+  }
+
   /**
    * Named rather than positional because both halves are strings. Given two
    * positional arguments, a transposed call compiles and emits a
@@ -182,23 +186,23 @@ export class ConversationTraceAssembly {
 
   static originAttrs(origin: RoutingOrigin): OtlpJsonAttr[] {
     return [
-      ConversationTraceAssembly.stringAttr({
+      ConversationTraceAssemblyService.stringAttr({
         key: "langwatch.origin.kind",
         value: "ingestion_source",
       }),
-      ConversationTraceAssembly.stringAttr({
+      ConversationTraceAssemblyService.stringAttr({
         key: "langwatch.ingestion_source.id",
         value: origin.ingestionSourceId,
       }),
-      ConversationTraceAssembly.stringAttr({
+      ConversationTraceAssemblyService.stringAttr({
         key: "langwatch.ingestion_source.organization_id",
         value: origin.organizationId,
       }),
-      ConversationTraceAssembly.stringAttr({
+      ConversationTraceAssemblyService.stringAttr({
         key: "langwatch.ingestion_source.source_type",
         value: origin.sourceType,
       }),
-      ConversationTraceAssembly.stringAttr({
+      ConversationTraceAssemblyService.stringAttr({
         key: PROVENANCE_ATTR_SOURCE,
         value: origin.profile.provenanceSource,
       }),
@@ -222,10 +226,10 @@ export class ConversationTraceAssembly {
     const join = (fields: IdentityField[]) => fields.map(String).join(":");
     const spanSeed = `${namespace}:${join(seeds.span)}`;
     return {
-      traceId: ConversationTraceAssembly.hashId(`${namespace}:${join(seeds.trace)}`, 32),
+      traceId: ConversationTraceAssemblyService.hashId(`${namespace}:${join(seeds.trace)}`, 32),
       threadId: `${origin.ingestionSourceId}:${join(seeds.thread)}`,
       spanSeed,
-      rootSpanId: ConversationTraceAssembly.hashId(`${spanSeed}:root`, 16),
+      rootSpanId: ConversationTraceAssemblyService.hashId(`${spanSeed}:root`, 16),
     };
   }
 

@@ -8,8 +8,12 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BetterAuthSsoAdapter } from "../../adapters/better-auth.better-auth.adapter";
-import { SsoGateLogger, SsoGateService, SsoProviderMountInspector } from "../sso-gate.service";
+import { BetterAuthSsoAdapter } from "../adapters/better-auth.better-auth.adapter";
+import {
+  SsoGateLogger,
+  SsoGateService,
+  SsoProviderMountInspector,
+} from "../services/sso-gate.service";
 
 class FakeLicensingService extends LicensingService {
   readonly inspectPlatformAccess =

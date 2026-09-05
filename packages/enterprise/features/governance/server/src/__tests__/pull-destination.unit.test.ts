@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { GovernanceValidationError } from "@langwatch/enterprise-governance-contract";
-import { PullDestinationService } from "../pull-destination.service";
-import { DATABRICKS_GENIE_ADAPTER_ID } from "../../adapters/databricks-genie-puller.adapter";
+import {
+  DATABRICKS_GENIE_ADAPTER_ID,
+  PullDestinationService,
+} from "../services/pull-destination.service";
 
 const pullDestination = PullDestinationService.create();
 

@@ -9,7 +9,7 @@ import type {
   BillingSubscriptionRecord,
   BillingSubscriptionRepository,
 } from "../../ports/subscription.port";
-import { deploymentPlanSources } from "../deployment-plan-sources.service";
+import { DeploymentPlanSourcesService } from "../deployment-plan-sources.service";
 
 /**
  * Spec: packages/enterprise/features/billing/specs/deployment-plan-sources.feature
@@ -47,7 +47,7 @@ describe("given the plan sources a deployment resolves through", () => {
   describe("when the deployment is hosted", () => {
     /** @scenario "A hosted deployment starts every organization on the free plan" */
     it("starts every organization on the hosted free plan", () => {
-      const sources = deploymentPlanSources({ isSaas: true });
+      const sources = DeploymentPlanSourcesService.create({ isSaas: true }).sources();
 
       expect(sources.baseline.type).toBe(PlanTypes.FREE);
       expect(sources.baseline.free).toBe(true);
@@ -57,10 +57,10 @@ describe("given the plan sources a deployment resolves through", () => {
 
     /** @scenario "A paid source exists only where the subscription rows do" */
     it("resolves a paying organization onto the plan its subscription names", async () => {
-      const sources = deploymentPlanSources({
+      const sources = DeploymentPlanSourcesService.create({
         isSaas: true,
         subscriptions: subscriptions(subscription()),
-      });
+      }).sources();
 
       const plan = await sources.subscription?.resolve({ organizationId: "org-1" });
 
@@ -70,10 +70,10 @@ describe("given the plan sources a deployment resolves through", () => {
 
     /** @scenario "A paid source exists only where the subscription rows do" */
     it("answers the free plan through the paid source for an organization holding no row", async () => {
-      const sources = deploymentPlanSources({
+      const sources = DeploymentPlanSourcesService.create({
         isSaas: true,
         subscriptions: subscriptions(null),
-      });
+      }).sources();
 
       const plan = await sources.subscription?.resolve({ organizationId: "org-1" });
 
@@ -89,8 +89,12 @@ describe("given the plan sources a deployment resolves through", () => {
      */
     /** @scenario "A paid source exists only where the subscription rows do" */
     it("returns no paid source at all", () => {
-      expect(deploymentPlanSources({ isSaas: true }).subscription).toBeUndefined();
-      expect(deploymentPlanSources({ isSaas: false }).subscription).toBeUndefined();
+      expect(
+        DeploymentPlanSourcesService.create({ isSaas: true }).sources().subscription,
+      ).toBeUndefined();
+      expect(
+        DeploymentPlanSourcesService.create({ isSaas: false }).sources().subscription,
+      ).toBeUndefined();
     });
   });
 
@@ -103,7 +107,7 @@ describe("given the plan sources a deployment resolves through", () => {
      */
     /** @scenario "A self-hosted deployment starts unlimited" */
     it("starts unlimited rather than on the hosted free plan", () => {
-      const sources = deploymentPlanSources({ isSaas: false });
+      const sources = DeploymentPlanSourcesService.create({ isSaas: false }).sources();
 
       expect(sources.baseline.type).toBe("OPEN_SOURCE");
       expect(sources.baseline.visibilityDays ?? null).toBeNull();
@@ -112,10 +116,10 @@ describe("given the plan sources a deployment resolves through", () => {
 
     /** @scenario "A self-hosted deployment starts unlimited" */
     it("answers a free plan from the paid source, which never lifts the baseline", async () => {
-      const sources = deploymentPlanSources({
+      const sources = DeploymentPlanSourcesService.create({
         isSaas: false,
         subscriptions: subscriptions(subscription()),
-      });
+      }).sources();
 
       const plan = await sources.subscription?.resolve({ organizationId: "org-1" });
 
@@ -137,10 +141,10 @@ describe("given the plan sources a deployment resolves through", () => {
       expect(Object.keys(ENTITLEMENTS_BY_PLAN_TYPE).length).toBeGreaterThan(0);
 
       for (const [type, entitlements] of Object.entries(ENTITLEMENTS_BY_PLAN_TYPE)) {
-        const sources = deploymentPlanSources({
+        const sources = DeploymentPlanSourcesService.create({
           isSaas: true,
           subscriptions: subscriptions(subscription({ plan: type })),
-        });
+        }).sources();
 
         const plan = await sources.subscription?.resolve({ organizationId: "org-1" });
 
@@ -153,8 +157,8 @@ describe("given the plan sources a deployment resolves through", () => {
 
     /** @scenario "Every tier entitlement is carried by the plan itself" */
     it("names neither baseline, so a baseline plan has nothing to fill either", () => {
-      const hosted = deploymentPlanSources({ isSaas: true }).baseline;
-      const selfHosted = deploymentPlanSources({ isSaas: false }).baseline;
+      const hosted = DeploymentPlanSourcesService.create({ isSaas: true }).sources().baseline;
+      const selfHosted = DeploymentPlanSourcesService.create({ isSaas: false }).sources().baseline;
 
       expect(ENTITLEMENTS_BY_PLAN_TYPE[hosted.type]).toBeUndefined();
       expect(ENTITLEMENTS_BY_PLAN_TYPE[selfHosted.type]).toBeUndefined();
@@ -186,10 +190,10 @@ function licence(plan: Plan): EntitlementSource {
 describe("given a deployment that composed a licence source", () => {
   /** @scenario "A licensed deployment resolves through its licence" */
   it("returns it, so the entitlement service consults it before any other paid source", async () => {
-    const sources = deploymentPlanSources({
+    const sources = DeploymentPlanSourcesService.create({
       isSaas: false,
       license: licence(licensedEnterprise),
-    });
+    }).sources();
 
     await expect(sources.license?.resolve({ organizationId: "org-1" })).resolves.toMatchObject({
       type: PlanTypes.ENTERPRISE,
@@ -205,10 +209,10 @@ describe("given a deployment that composed a licence source", () => {
    */
   /** @scenario "A licence predating a tier entitlement still carries it" */
   it("threads the tier enricher, which fills what the licence left unanswered", async () => {
-    const sources = deploymentPlanSources({
+    const sources = DeploymentPlanSourcesService.create({
       isSaas: false,
       license: licence(licensedEnterprise),
-    });
+    }).sources();
 
     expect(sources.enrichers).toHaveLength(1);
     const enriched = await sources.enrichers?.[0]?.enrich(licensedEnterprise, {
@@ -220,20 +224,24 @@ describe("given a deployment that composed a licence source", () => {
 
   /** @scenario "A licence predating a tier entitlement still carries it" */
   it("threads no enricher where no licence source was composed, because no other leg needs one", () => {
-    expect(deploymentPlanSources({ isSaas: false }).enrichers).toBeUndefined();
     expect(
-      deploymentPlanSources({ isSaas: true, subscriptions: subscriptions(subscription()) })
-        .enrichers,
+      DeploymentPlanSourcesService.create({ isSaas: false }).sources().enrichers,
+    ).toBeUndefined();
+    expect(
+      DeploymentPlanSourcesService.create({
+        isSaas: true,
+        subscriptions: subscriptions(subscription()),
+      }).sources().enrichers,
     ).toBeUndefined();
   });
 
   /** @scenario "A licensed deployment resolves through its licence" */
   it("keeps the subscription source beside it on a hosted deployment", async () => {
-    const sources = deploymentPlanSources({
+    const sources = DeploymentPlanSourcesService.create({
       isSaas: true,
       license: licence(licensedEnterprise),
       subscriptions: subscriptions(subscription()),
-    });
+    }).sources();
 
     expect(sources.license).toBeDefined();
     await expect(sources.subscription?.resolve({ organizationId: "org-1" })).resolves.toMatchObject(

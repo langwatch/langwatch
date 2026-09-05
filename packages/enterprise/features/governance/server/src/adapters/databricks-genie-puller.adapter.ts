@@ -59,6 +59,11 @@ import { z } from "zod";
 
 import type { GovernanceHttpPort } from "../ports/governance-http.port";
 import {
+  DATABRICKS_GENIE_ADAPTER_ID,
+  PullDestinationService,
+} from "../services/pull-destination.service";
+import { TERMINAL_MESSAGE_STATUSES } from "../services/genie-trace-mapper.service";
+import {
   DatabricksWarehouseCostService,
   GENIE_CLIENT_APPLICATION,
   WAREHOUSE_COST_MAX_HOLD_MS,
@@ -89,71 +94,6 @@ const MAX_REQUESTS_PER_RUN = 400;
 
 /** The ledger's model label. Genie is one product, not a family of models. */
 const GENIE_MODEL = "databricks/genie" as const;
-
-export const DATABRICKS_GENIE_ADAPTER_ID = "databricks_genie" as const;
-
-/**
- * The only hosts a Genie workspace is ever served from, one per cloud.
- *
- * Databricks owns all three, so a customer cannot register a lookalike inside
- * them and no config can name one that is not theirs.
- */
-export const DATABRICKS_WORKSPACE_HOST_SUFFIXES = [
-  ".azuredatabricks.net",
-  ".cloud.databricks.com",
-  ".gcp.databricks.com",
-] as const;
-
-/**
- * Whether a URL is a Databricks workspace origin we may attach a token to.
- *
- * This is an egress restriction, not a formatting check, and it exists because
- * of what `get()` does one line later: the decrypted workspace token goes out
- * as `Authorization: Bearer` to whatever host this string names. A plain
- * `z.string().url()` accepts `https://attacker.example.com`, and `ssrfSafeFetch`
- * will happily reach it — that helper rejects PRIVATE destinations, which is a
- * different threat and no defence against an attacker-owned public host.
- *
- * The reachable path needs no knowledge of the secret: the source's config is
- * readable, the credential travels in it as an opaque encrypted envelope, and
- * re-encryption is deliberately idempotent. So a principal who can edit a
- * source could hand the envelope back unchanged with a different
- * `workspaceUrl`, and the next scheduled run would decrypt a token they never
- * saw and post it to their host.
- *
- * Enforced on the write path (`PullDestinationService`) rather than in
- * the schema below, so the rejection reaches whoever is making the change —
- * and so the adapter can still be pointed at a local fixture by its tests.
- * That service calls THIS function: the rule and the reasoning for it have to
- * be the same object, or the copy carrying the explanation is the one that
- * stops running.
- */
-export function isDatabricksWorkspaceOrigin(value: string): boolean {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return false;
-  }
-  // Plain http would put the token on the wire in clear even for a real
-  // workspace, and credentials in the URL are never part of a legitimate one.
-  if (url.protocol !== "https:") return false;
-  if (url.username !== "" || url.password !== "") return false;
-  // A bare origin and nothing else. A workspace URL is a base that the puller
-  // appends its own paths to, so anything past the host is not part of a
-  // legitimate one — and a port or a path is how a matching host gets pointed
-  // at something other than the workspace API.
-  if (url.port !== "" || url.pathname !== "/" || url.search !== "" || url.hash !== "") {
-    return false;
-  }
-  const host = url.hostname.toLowerCase();
-  // The host as a hostname is spelt: rejecting anything else keeps this at
-  // least as strict as the character check it replaces, so consolidating the
-  // two copies cannot have widened what is accepted.
-  if (!/^[a-z0-9.-]+$/.test(host)) return false;
-
-  return DATABRICKS_WORKSPACE_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
-}
 
 export const databricksGeniePullConfigSchema = z.object({
   adapter: z.literal(DATABRICKS_GENIE_ADAPTER_ID),
@@ -616,30 +556,6 @@ const EPOCH_SECONDS_CEILING = 1e11;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
 /**
- * Statuses that mean the message will not change again.
- *
- * Genie populates `attachments` PROGRESSIVELY: a message is answerable while it
- * is still `PENDING_WAREHOUSE` or `EXECUTING_QUERY`, and the generated SQL —
- * the artefact this adapter exists to capture — may not be there yet. Reading
- * one mid-flight and letting the watermark move past it loses that SQL
- * permanently, because nothing ever asks for the message again.
- *
- * An UNRECOGNISED non-empty status counts as non-terminal on purpose. A status
- * Databricks adds later is far more likely to be another in-flight state than a
- * new way of being finished, and being wrong in this direction costs a re-read
- * where the other direction costs the record.
- *
- * A message with no status at all is left alone: some responses omit it, and
- * treating absent as in-flight would hold the watermark on every sweep forever.
- */
-export const TERMINAL_MESSAGE_STATUSES: ReadonlySet<string> = new Set([
-  "COMPLETED",
-  "FAILED",
-  "CANCELLED",
-  "QUERY_RESULT_EXPIRED",
-]);
-
-/**
  * How long a message is given to settle before the sweep stops waiting for it.
  *
  * Holding the watermark is what makes an in-flight message get re-read, and a
@@ -975,7 +891,7 @@ class GenieHttpError extends Error {
   }
 }
 
-export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullConfig> {
+export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGeniePullConfig> {
   readonly id: string = DATABRICKS_GENIE_ADAPTER_ID;
 
   /**
@@ -1002,8 +918,8 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     http: GovernanceHttpPort,
     options?: { maxRequests?: number },
     warehouseCosts: DatabricksWarehouseCostService = DatabricksWarehouseCostService.create(),
-  ): DatabricksGeniePuller {
-    return new DatabricksGeniePuller(http, warehouseCosts, options);
+  ): DatabricksGeniePullerAdapter {
+    return new DatabricksGeniePullerAdapter(http, warehouseCosts, options);
   }
 
   validateConfig(config: unknown): DatabricksGeniePullConfig {
@@ -1011,14 +927,14 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
   }
 
   async runOnce(options: PullRunOptions, config: DatabricksGeniePullConfig): Promise<PullResult> {
-    const token = await DatabricksGeniePuller.resolveWorkspaceToken({
+    const token = await DatabricksGeniePullerAdapter.resolveWorkspaceToken({
       credentials: options.credentials,
       workspaceUrl: config.workspaceUrl,
       signal: options.signal,
       http: this.http,
     });
 
-    const cursor = DatabricksGeniePuller.parseCursor(options.cursor, config);
+    const cursor = DatabricksGeniePullerAdapter.parseCursor(options.cursor, config);
     const budget = new RunBudget(options.deadlineMs, this.maxRequests);
     // Stamped BEFORE the first request when a FRESH sweep begins, and carried
     // unchanged through every run that resumes it. The next watermark is
@@ -1069,17 +985,17 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     });
 
     return {
-      events: DatabricksGeniePuller.withWarehouseCost({
+      events: DatabricksGeniePullerAdapter.withWarehouseCost({
         events: sweep.events,
         costByStatementId,
         costEnabled: config.warehouseId !== undefined,
         watermarkMs: cursor.sinceMs,
       }),
-      cursor: DatabricksGeniePuller.encode(
+      cursor: DatabricksGeniePullerAdapter.encode(
         // The cost read is part of what this run knows, so the watermark answers
         // to it as well as to the sweep. Without that, a window whose bill could
         // not be read is still recorded, still advanced past, and never revisited.
-        DatabricksGeniePuller.nextCursor({
+        DatabricksGeniePullerAdapter.nextCursor({
           previous: cursor,
           sweep,
           sweepStartedAtMs,
@@ -1128,7 +1044,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     const spaces = await this.resolveSpaces({ config, token, options, budget });
     let complete = spaces.complete;
 
-    const spacePlan = DatabricksGeniePuller.spaceWalkPlan({
+    const spacePlan = DatabricksGeniePullerAdapter.spaceWalkPlan({
       spaces,
       resumeSpaceId: cursor.spaceId,
       resumeFingerprint: cursor.spaceSetFingerprint,
@@ -1152,7 +1068,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
         // conversation position is handed back rather than dropped, so a run
         // that ends before it could touch this space does not undo the progress
         // an earlier run already made inside it.
-        return DatabricksGeniePuller.sweptUpTo({
+        return DatabricksGeniePullerAdapter.sweptUpTo({
           events,
           space,
           at: resumeConversationId,
@@ -1190,14 +1106,17 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
       // A gap inside the space, or this whole space unreadable. Either way the
       // sweep is about to move past something it never saw.
       hadGap = hadGap || read.hadGap;
-      oldestPendingMs = DatabricksGeniePuller.earliest(oldestPendingMs, read.oldestPendingMs);
+      oldestPendingMs = DatabricksGeniePullerAdapter.earliest(
+        oldestPendingMs,
+        read.oldestPendingMs,
+      );
 
       // Out of budget with this space unfinished — resume ON it, so its tail is
       // re-read rather than half-skipped. `read.resumeConversationId` narrows
       // that re-read to where it stopped, which is what lets a space bigger
       // than one run's whole budget finish across several runs.
       if (!read.complete && budget.exhausted()) {
-        return DatabricksGeniePuller.sweptUpTo({
+        return DatabricksGeniePullerAdapter.sweptUpTo({
           events,
           space,
           at: read.resumeConversationId,
@@ -1280,7 +1199,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
         oldestPendingMs: null,
       };
 
-    const conversationPlan = DatabricksGeniePuller.conversationWalkPlan({
+    const conversationPlan = DatabricksGeniePullerAdapter.conversationWalkPlan({
       conversations,
       resumeConversationId,
     });
@@ -1329,7 +1248,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     space: z.infer<typeof spaceSchema>;
     sinceMs: number;
     identities: Map<number, GenieIdentity>;
-    conversationPlan: ReturnType<typeof DatabricksGeniePuller.conversationWalkPlan>;
+    conversationPlan: ReturnType<typeof DatabricksGeniePullerAdapter.conversationWalkPlan>;
   }): Promise<SpaceRead> {
     const events: NormalizedPullEvent[] = [];
     let complete = true;
@@ -1340,7 +1259,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     for (let i = conversationPlan.startAt; i < conversationPlan.ordered.length; i += 1) {
       const conversation = conversationPlan.ordered[i]!;
       if (budget.exhausted()) {
-        return DatabricksGeniePuller.stoppedAt({
+        return DatabricksGeniePullerAdapter.stoppedAt({
           items: events,
           conversation,
           hadGap,
@@ -1365,14 +1284,17 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
       hadGap = hadGap || step.failed;
       // Not a gap: nothing was skipped. It only keeps the watermark behind this
       // message so the sweep comes back once the warehouse has answered.
-      oldestPendingMs = DatabricksGeniePuller.earliest(oldestPendingMs, step.oldestPendingMs);
+      oldestPendingMs = DatabricksGeniePullerAdapter.earliest(
+        oldestPendingMs,
+        step.oldestPendingMs,
+      );
 
       // Out of budget with this conversation unfinished — resume ON it so its
       // tail is re-read. An isolated failure with budget still left falls
       // through and keeps going, so one broken conversation cannot wedge the
       // space; `hadGap` is what stops the watermark for it instead.
       if (step.unfinished && budget.exhausted()) {
-        return DatabricksGeniePuller.stoppedAt({
+        return DatabricksGeniePullerAdapter.stoppedAt({
           items: events,
           conversation,
           hadGap,
@@ -1609,7 +1531,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
         );
         continue;
       }
-      const createdMs = DatabricksGeniePuller.toEpochMs(raw);
+      const createdMs = DatabricksGeniePullerAdapter.toEpochMs(raw);
       if (createdMs <= sinceMs) continue;
 
       // Emitted either way — a question asked is a governance fact the moment
@@ -1617,8 +1539,8 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
       // version overwrites this one. What this buys is the guarantee that there
       // IS a next look: the watermark is kept behind the oldest message that
       // could still change, so the sweep comes back for it.
-      if (DatabricksGeniePuller.isSettling(message.status, createdMs)) {
-        oldestPendingMs = DatabricksGeniePuller.earliest(oldestPendingMs, createdMs);
+      if (DatabricksGeniePullerAdapter.isSettling(message.status, createdMs)) {
+        oldestPendingMs = DatabricksGeniePullerAdapter.earliest(oldestPendingMs, createdMs);
       }
 
       events.push(
@@ -1782,7 +1704,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
           path: `/api/2.0/preview/scim/v2/Users/${encodeURIComponent(String(userId))}`,
         }),
       );
-      const identity = DatabricksGeniePuller.genieIdentityFromScimUser(user, userId);
+      const identity = DatabricksGeniePullerAdapter.genieIdentityFromScimUser(user, userId);
       identities.set(userId, identity);
       return identity;
     } catch (error) {
@@ -1998,7 +1920,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
         },
         "databricks warehouse cost has no room left in this run; holding the watermark at the last priced day",
       );
-      return { done: true, pricedThroughMs: DatabricksGeniePuller.unpricedFloor(chunk) };
+      return { done: true, pricedThroughMs: DatabricksGeniePullerAdapter.unpricedFloor(chunk) };
     }
 
     const read = await this.warehouseCostChunk({
@@ -2037,7 +1959,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
       // same figure. The hold is bounded by `WAREHOUSE_COST_MAX_HOLD_MS`, so a
       // statement that is never billed stops holding the source after that.
       if (read.owed) {
-        return { done: true, pricedThroughMs: DatabricksGeniePuller.unpricedFloor(chunk) };
+        return { done: true, pricedThroughMs: DatabricksGeniePullerAdapter.unpricedFloor(chunk) };
       }
       return { done: false };
     }
@@ -2134,7 +2056,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
         },
         "databricks warehouse cost could not price a period even in pieces; holding the watermark so it is asked again",
       );
-      return { done: true, pricedThroughMs: DatabricksGeniePuller.unpricedFloor(refused) };
+      return { done: true, pricedThroughMs: DatabricksGeniePullerAdapter.unpricedFloor(refused) };
     }
 
     return { done: false };
@@ -2221,7 +2143,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     chunk: { fromMs: number; toMs: number };
   }): Promise<WarehouseCostRead> {
     const askedAtMs = Date.now();
-    const observed = DatabricksGeniePuller.warehouseCostObserved({
+    const observed = DatabricksGeniePullerAdapter.warehouseCostObserved({
       adapter: this.id,
       warehouseId,
       chunk,
@@ -2256,11 +2178,11 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
           on_wait_timeout: "CANCEL",
           format: "JSON_ARRAY",
           disposition: "INLINE",
-          parameters: DatabricksGeniePuller.warehouseCostParameters(chunk),
+          parameters: DatabricksGeniePullerAdapter.warehouseCostParameters(chunk),
         },
       });
 
-      const read = DatabricksGeniePuller.readWarehouseCost({
+      const read = DatabricksGeniePullerAdapter.readWarehouseCost({
         payload,
         adapter: this.id,
         warehouseId,
@@ -2488,7 +2410,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
       // correctly.
       {
         name: "from_ts",
-        value: new Date(DatabricksGeniePuller.startOfHourMs(chunk.fromMs)).toISOString(),
+        value: new Date(DatabricksGeniePullerAdapter.startOfHourMs(chunk.fromMs)).toISOString(),
         type: "TIMESTAMP",
       },
       // Where the SCAN starts, which is earlier than where the answer starts.
@@ -2498,13 +2420,14 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
       {
         name: "scan_from_ts",
         value: new Date(
-          DatabricksGeniePuller.startOfHourMs(chunk.fromMs) - WAREHOUSE_COST_STRADDLE_LOOKBACK_MS,
+          DatabricksGeniePullerAdapter.startOfHourMs(chunk.fromMs) -
+            WAREHOUSE_COST_STRADDLE_LOOKBACK_MS,
         ).toISOString(),
         type: "TIMESTAMP",
       },
       {
         name: "to_ts",
-        value: new Date(DatabricksGeniePuller.endOfHourMs(chunk.toMs)).toISOString(),
+        value: new Date(DatabricksGeniePullerAdapter.endOfHourMs(chunk.toMs)).toISOString(),
         type: "TIMESTAMP",
       },
       {
@@ -2555,11 +2478,11 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     return {
       adapter,
       warehouseId,
-      askedFrom: new Date(DatabricksGeniePuller.startOfHourMs(chunk.fromMs)).toISOString(),
-      askedTo: new Date(DatabricksGeniePuller.endOfHourMs(chunk.toMs)).toISOString(),
+      askedFrom: new Date(DatabricksGeniePullerAdapter.startOfHourMs(chunk.fromMs)).toISOString(),
+      askedTo: new Date(DatabricksGeniePullerAdapter.endOfHourMs(chunk.toMs)).toISOString(),
       askedHours: Math.round(
-        (DatabricksGeniePuller.endOfHourMs(chunk.toMs) -
-          DatabricksGeniePuller.startOfHourMs(chunk.fromMs)) /
+        (DatabricksGeniePullerAdapter.endOfHourMs(chunk.toMs) -
+          DatabricksGeniePullerAdapter.startOfHourMs(chunk.fromMs)) /
           ONE_HOUR_MS,
       ),
     };
@@ -2646,7 +2569,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     const log = { adapter, executorWarehouseId: warehouseId };
 
     if (statement.status.state !== "SUCCEEDED") {
-      return DatabricksGeniePuller.readUnsuccessfulWarehouseCost({ statement, log });
+      return DatabricksGeniePullerAdapter.readUnsuccessfulWarehouseCost({ statement, log });
     }
 
     // No manifest is a refusal, not a pass. The rows are positional and every
@@ -2666,7 +2589,9 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
 
     const data = statement.result?.data_array ?? [];
 
-    if (DatabricksGeniePuller.warehouseAnswerCutShort({ statement, dataLength: data.length })) {
+    if (
+      DatabricksGeniePullerAdapter.warehouseAnswerCutShort({ statement, dataLength: data.length })
+    ) {
       logger.error(
         {
           ...log,
@@ -2898,7 +2823,9 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
   ): GenieCursor {
     if (cursor) {
       try {
-        return DatabricksGeniePuller.withoutOrphanedResume(cursorSchema.parse(JSON.parse(cursor)));
+        return DatabricksGeniePullerAdapter.withoutOrphanedResume(
+          cursorSchema.parse(JSON.parse(cursor)),
+        );
       } catch {
         logger.warn(
           { cursor },
@@ -2908,9 +2835,9 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     }
     const sinceMs = config.startingAt
       ? Date.parse(config.startingAt)
-      : DatabricksGeniePuller.defaultSinceMs();
+      : DatabricksGeniePullerAdapter.defaultSinceMs();
     return {
-      sinceMs: Number.isFinite(sinceMs) ? sinceMs : DatabricksGeniePuller.defaultSinceMs(),
+      sinceMs: Number.isFinite(sinceMs) ? sinceMs : DatabricksGeniePullerAdapter.defaultSinceMs(),
       spaceId: null,
       conversationId: null,
       sweepHadGap: false,
@@ -3140,7 +3067,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     if (!costEnabled) return events;
 
     return events.map((event) =>
-      DatabricksGeniePuller.withCost({ event, costByStatementId, watermarkMs }),
+      DatabricksGeniePullerAdapter.withCost({ event, costByStatementId, watermarkMs }),
     );
   }
 
@@ -3242,7 +3169,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
       // how tidily it finished. Holding the window costs a re-read of the same
       // period next sweep; advancing it would drop whatever was in the hole,
       // permanently.
-      sinceMs: DatabricksGeniePuller.nextWatermark({
+      sinceMs: DatabricksGeniePullerAdapter.nextWatermark({
         previousMs: previous.sinceMs,
         sweepStartedAtMs,
         complete: sweep.complete && !sweep.hadGap,

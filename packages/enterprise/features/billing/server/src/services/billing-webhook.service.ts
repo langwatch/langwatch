@@ -17,14 +17,13 @@ import {
 import { AnnualEventsBillingThresholdService } from "./annual-events-billing-threshold.service";
 import { BestEffortService } from "./best-effort.service";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service";
-import { PostgresBillingAdapter } from "../adapters/postgres.postgres.adapter";
 import type { BillingWebhookHostPort } from "../ports/billing-webhook-host.port";
 import type { BillingWebhookOrganizationPort } from "../ports/billing-webhook-organization.port";
 import type {
-  SubscriptionRepository,
+  BillingWebhookSubscriptionPort,
   SubscriptionWithOrg,
 } from "../ports/billing-webhook-subscription.port";
-import { fireSubscriptionSyncNurturing } from "./nurturing-subscription-sync.service";
+import { NurturingSubscriptionSyncService } from "./nurturing-subscription-sync.service";
 
 const logger = createLogger("langwatch:billing:webhookService");
 
@@ -102,7 +101,7 @@ export type WebhookService = {
 };
 
 export class EEWebhookService implements WebhookService {
-  private readonly subscriptionRepository: SubscriptionRepository;
+  private readonly subscriptionRepository: BillingWebhookSubscriptionPort;
   private readonly organizationRepository: BillingWebhookOrganizationPort;
   private readonly stripe: Stripe;
   private readonly itemCalculator: ItemCalculator;
@@ -127,7 +126,7 @@ export class EEWebhookService implements WebhookService {
     getPostHog,
     host,
   }: {
-    subscriptionRepository: SubscriptionRepository;
+    subscriptionRepository: BillingWebhookSubscriptionPort;
     organizationRepository: BillingWebhookOrganizationPort;
     stripe: Stripe;
     itemCalculator: ItemCalculator;
@@ -154,8 +153,8 @@ export class EEWebhookService implements WebhookService {
     });
   }
 
-  static createWithDependencies(options: {
-    subscriptionRepository: SubscriptionRepository;
+  static create(options: {
+    subscriptionRepository: BillingWebhookSubscriptionPort;
     organizationRepository: BillingWebhookOrganizationPort;
     stripe: Stripe;
     itemCalculator: ItemCalculator;
@@ -167,45 +166,6 @@ export class EEWebhookService implements WebhookService {
     host: BillingWebhookHostPort;
   }): EEWebhookService {
     return new EEWebhookService(options);
-  }
-
-  static create({
-    db,
-    stripe,
-    itemCalculator,
-    inviteApprover,
-    licensePurchaseHandler,
-    licensePaymentLinkId,
-    licensePrivateKey,
-    getPostHog,
-    host,
-    organizationRepository,
-  }: {
-    db: PrismaClient;
-    /** The organization reads a webhook makes; core owns the aggregate. */
-    organizationRepository: BillingWebhookOrganizationPort;
-    host: BillingWebhookHostPort;
-    stripe: Stripe;
-    itemCalculator: ItemCalculator;
-    inviteApprover?: InviteApprover;
-    licensePurchaseHandler?: LicensePurchaseHandler;
-    licensePaymentLinkId?: string;
-    licensePrivateKey?: string;
-    getPostHog?: () => PostHog | null;
-  }): WebhookService {
-    return EEWebhookService.createWithDependencies({
-      subscriptionRepository: PostgresBillingAdapter.create(db).build()
-        .subscriptions as unknown as SubscriptionRepository,
-      organizationRepository,
-      host,
-      stripe,
-      itemCalculator,
-      inviteApprover,
-      licensePurchaseHandler,
-      licensePaymentLinkId,
-      licensePrivateKey,
-      getPostHog,
-    });
   }
 
   async handleEvent(event: Stripe.Event): Promise<HandleEventResult> {
@@ -685,7 +645,7 @@ export class EEWebhookService implements WebhookService {
     const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
       existingSubscription.organizationId,
     );
-    fireSubscriptionSyncNurturing({
+    NurturingSubscriptionSyncService.fireSubscriptionSync({
       organizationId: existingSubscription.organizationId,
       hasSubscription: !!remainingActive,
     });
@@ -723,7 +683,7 @@ export class EEWebhookService implements WebhookService {
       const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
         existingSubForUpdate.organizationId,
       );
-      fireSubscriptionSyncNurturing({
+      NurturingSubscriptionSyncService.fireSubscriptionSync({
         organizationId: existingSubForUpdate.organizationId,
         hasSubscription: !!remainingActive,
       });
@@ -910,7 +870,7 @@ export class EEWebhookService implements WebhookService {
           }),
       });
 
-      fireSubscriptionSyncNurturing({
+      NurturingSubscriptionSyncService.fireSubscriptionSync({
         organizationId: updatedSubscription.organizationId,
         hasSubscription: true,
       });

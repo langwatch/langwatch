@@ -109,17 +109,17 @@ export { createScimTokensRestApp, ScimApp } from "@langwatch/enterprise-scim-ser
  * routes are Enterprise behaviour an api-role application mounts, and the only
  * Enterprise module it may name is this one. `PostgresScimAdapter` is the
  * feature's own composition seam — one build, one service — and
- * `ScimSyncLifecycle` is the directory-sync history that service states its
+ * `ScimSyncLifecycleAdapter` is the directory-sync history that service states its
  * facts through, which the process supplies over identity's guards and ledger.
  */
 export {
   createScimProtocolRestApp,
   createScimWebhookRestApp,
   PostgresScimAdapter,
-  ScimSyncLifecycle,
+  ScimSyncLifecycleAdapter,
   ScimSyncLifecyclePort,
   type PostgresScimAdapterOptions,
-  type ScimSyncLifecycleDeps,
+  type ScimSyncLifecycleAdapterDeps,
   type ScimWebhookRestPorts,
 } from "@langwatch/enterprise-scim-server";
 export type { ScimService } from "@langwatch/enterprise-scim-contract";

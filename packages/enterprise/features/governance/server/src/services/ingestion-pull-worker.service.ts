@@ -4,7 +4,7 @@ import type {
   PullResult,
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND } from "@langwatch/project-contract";
-import type { GovernanceInternalProjectPort } from "@langwatch/project-server";
+import type { GovernanceProjectPort } from "../ports/governance-project.port";
 import type {
   GovernanceOcsfEventInput,
   GovernanceOcsfEventSinkPort,
@@ -17,13 +17,13 @@ import type {
 } from "../ports/ingestion-pull-worker.port";
 import {
   COPILOT_ROUTING_PROFILE,
-  CopilotStudioTraceMapper,
-} from "../adapters/copilot-studio-trace-mapper.adapter";
-import { GENIE_ROUTING_PROFILE, GenieTraceMapper } from "../adapters/genie-trace-mapper.adapter";
+  CopilotStudioTraceMapperService,
+} from "./copilot-studio-trace-mapper.service";
+import { GENIE_ROUTING_PROFILE, GenieTraceMapperService } from "./genie-trace-mapper.service";
 import type {
   ConversationRoutingProfile,
   RoutingOrigin,
-} from "../adapters/conversation-trace-assembly.adapter";
+} from "./conversation-trace-assembly.service";
 import type { IngestionCredentialsService } from "./ingestion-credentials.service";
 import type { PulledUsageRecordService } from "./pulled-usage-record.service";
 import type { PullerRegistryService } from "./puller-registry.service";
@@ -42,18 +42,15 @@ type ConversationRouting = {
 };
 
 const CONVERSATION_ROUTING = new Map<string, ConversationRouting>([
-  ["databricks_genie", { profile: GENIE_ROUTING_PROFILE, map: GenieTraceMapper.toTraceRequest }],
+  [
+    "databricks_genie",
+    { profile: GENIE_ROUTING_PROFILE, map: GenieTraceMapperService.toTraceRequest },
+  ],
   [
     "copilot_studio_dataverse",
-    { profile: COPILOT_ROUTING_PROFILE, map: CopilotStudioTraceMapper.toTraceRequest },
+    { profile: COPILOT_ROUTING_PROFILE, map: CopilotStudioTraceMapperService.toTraceRequest },
   ],
 ]);
-
-export function conversationRoutingProfileFor(
-  sourceType: string,
-): ConversationRoutingProfile | undefined {
-  return CONVERSATION_ROUTING.get(sourceType)?.profile;
-}
 
 export class IngestionPullDeadlineExceededError extends Error {
   constructor(deadlineMs: number) {
@@ -75,11 +72,16 @@ export class IngestionPullWorkerConfiguration {
 }
 
 export class IngestionPullWorkerService {
+  /** The routing profile a pulled source's conversations are assembled under. */
+  static conversationRoutingProfileFor(sourceType: string): ConversationRoutingProfile | undefined {
+    return CONVERSATION_ROUTING.get(sourceType)?.profile;
+  }
+
   private constructor(
     private readonly sources: IngestionPullSourcePort,
     private readonly registry: PullerRegistryService,
     private readonly credentials: IngestionCredentialsService,
-    private readonly projects: GovernanceInternalProjectPort,
+    private readonly projects: GovernanceProjectPort,
     private readonly sink: GovernanceOcsfEventSinkPort,
     private readonly usageEntitlement: PulledUsageEntitlementPort,
     private readonly usageRecords: PulledUsageRecordService,
@@ -93,7 +95,7 @@ export class IngestionPullWorkerService {
     sources: IngestionPullSourcePort;
     registry: PullerRegistryService;
     credentials: IngestionCredentialsService;
-    projects: GovernanceInternalProjectPort;
+    projects: GovernanceProjectPort;
     sink: GovernanceOcsfEventSinkPort;
     usageEntitlement: PulledUsageEntitlementPort;
     usageRecords: PulledUsageRecordService;

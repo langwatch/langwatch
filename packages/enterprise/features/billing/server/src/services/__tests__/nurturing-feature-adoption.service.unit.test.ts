@@ -3,12 +3,7 @@
  * @see specs/features/customer-io-nurturing-integration.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  fireExperimentRanNurturing,
-  fireScenarioCreatedNurturing,
-  fireTeamMemberInvitedNurturing,
-  fireWorkflowCreatedNurturing,
-} from "../nurturing-feature-adoption.service";
+import { NurturingFeatureAdoptionService } from "../nurturing-feature-adoption.service";
 import {
   registerNoNurturingSink,
   registerNurturingSink,
@@ -29,7 +24,11 @@ describe("feature adoption signals", () => {
       it("raises the team member count and tracks the invitation", async () => {
         const sink = registerNurturingSink();
 
-        fireTeamMemberInvitedNurturing({ userId: "user-1", teamMemberCount: 4, role: "member" });
+        NurturingFeatureAdoptionService.fireTeamMemberInvited({
+          userId: "user-1",
+          teamMemberCount: 4,
+          role: "member",
+        });
         await settle();
 
         expect(sink.sentTo("/identify")[0]).toMatchObject({
@@ -51,7 +50,7 @@ describe("feature adoption signals", () => {
       it("raises the workflow count and tracks the workflow and project", async () => {
         const sink = registerNurturingSink();
 
-        fireWorkflowCreatedNurturing({
+        NurturingFeatureAdoptionService.fireWorkflowCreated({
           userId: "user-1",
           workflowCount: 2,
           workflowId: "workflow-1",
@@ -74,7 +73,7 @@ describe("feature adoption signals", () => {
       it("raises the scenario count and tracks the scenario and project", async () => {
         const sink = registerNurturingSink();
 
-        fireScenarioCreatedNurturing({
+        NurturingFeatureAdoptionService.fireScenarioCreated({
           userId: "user-1",
           scenarioCount: 3,
           scenarioId: "scenario-1",
@@ -97,7 +96,7 @@ describe("feature adoption signals", () => {
       it("tracks the experiment and its project", async () => {
         const sink = registerNurturingSink();
 
-        fireExperimentRanNurturing({
+        NurturingFeatureAdoptionService.fireExperimentRan({
           userId: "user-1",
           experimentId: "experiment-1",
           projectId: "project-1",
@@ -119,7 +118,7 @@ describe("feature adoption signals", () => {
         const sink = registerNurturingSink({ failing: true });
 
         expect(() =>
-          fireWorkflowCreatedNurturing({
+          NurturingFeatureAdoptionService.fireWorkflowCreated({
             userId: "user-1",
             workflowCount: 1,
             workflowId: "workflow-1",

@@ -56,7 +56,11 @@ export class UsageWarningService {
   private readonly emails: NotificationService;
   private readonly baseHost: string;
 
-  constructor(options: UsageWarningServiceOptions) {
+  static create(options: UsageWarningServiceOptions): UsageWarningService {
+    return new UsageWarningService(options);
+  }
+
+  private constructor(options: UsageWarningServiceOptions) {
     this.records = options.records;
     this.organizations = options.organizations;
     this.usageCounts = options.usageCounts;

@@ -12,7 +12,7 @@ import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { eventMatches, type WebhookEndpointView } from "@langwatch/enterprise-webhook-contract";
-import { WebhookBatchPlanner, type PendingEnvelope } from "./webhook-batch-planner.service";
+import { WebhookBatchPlannerService, type PendingEnvelope } from "./webhook-batch-planner.service";
 import { WebhookEnvelopeService, type WebhookSpendEventRow } from "./webhook-envelope.service";
 import type { WebhookDestinationConfig } from "./webhook-destination.service";
 import { nanoUsdToDecimalString } from "@langwatch/gateway-contract";
@@ -671,7 +671,7 @@ export class WebhookDeliveryService {
       (m) => m.intentType === "sendBatch" && m.status === "pending",
     ).length;
 
-    const planner = WebhookBatchPlanner.for(endpoint);
+    const planner = WebhookBatchPlannerService.create({ endpoint });
     const { messages, remaining, inFlight } = planner.plan({
       organizationId,
       pending,

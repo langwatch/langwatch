@@ -19,8 +19,8 @@ import {
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { DepartmentAssignmentTargetNotFoundError } from "@langwatch/enterprise-governance-contract";
-import { PrismaDepartmentRepository } from "../../repositories/prisma/prisma.department.repository";
-import { DepartmentService } from "../department.service";
+import { PrismaDepartmentRepository } from "../repositories/prisma/prisma.department.repository";
+import { DepartmentService } from "../services/department.service";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

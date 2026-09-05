@@ -41,7 +41,7 @@
  *
  * ## The directory-sync history, and where each half of it runs
  *
- * `ScimSyncLifecycle` states what a push did on the connection's `ScimSync`
+ * `ScimSyncLifecycleAdapter` states what a push did on the connection's `ScimSync`
  * aggregate. Its guards are REAL here — they read the Postgres projection head
  * this process's connection already holds — and so is the ledger writer, which
  * stages its command and lets the queued run append (ADR-110). The sender it
@@ -71,7 +71,7 @@ import type { AuthService } from "@langwatch/auth-contract";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import {
   PostgresScimAdapter,
-  ScimSyncLifecycle,
+  ScimSyncLifecycleAdapter,
   type ScimService,
 } from "@langwatch/enterprise-api";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
@@ -202,7 +202,7 @@ export function composeApiScimRest(
     auth,
     governance,
     entitlements: plans,
-    lifecycle: ScimSyncLifecycle.create({
+    lifecycle: ScimSyncLifecycleAdapter.create({
       guards: new ScimSyncGuards({ syncs: new PrismaScimSyncProjectionRepository(prisma) }),
       ledger: new ScimSyncLedgerWriter({ eventing }),
       newCommandId: newScimSyncCommandId,

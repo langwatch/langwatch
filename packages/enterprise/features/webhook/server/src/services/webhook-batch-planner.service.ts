@@ -21,9 +21,9 @@ export interface PendingEnvelope {
  * limits, and one flush asks several questions of them: what ships now, what
  * stays buffered, and when to wake for the rest.
  */
-export class WebhookBatchPlanner {
-  static for(endpoint: WebhookEndpointView): WebhookBatchPlanner {
-    return new WebhookBatchPlanner(endpoint);
+export class WebhookBatchPlannerService {
+  static create({ endpoint }: { endpoint: WebhookEndpointView }): WebhookBatchPlannerService {
+    return new WebhookBatchPlannerService(endpoint);
   }
 
   private constructor(private readonly endpoint: WebhookEndpointView) {}

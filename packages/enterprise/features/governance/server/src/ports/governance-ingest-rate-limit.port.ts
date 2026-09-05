@@ -17,6 +17,28 @@
  */
 export abstract class GovernanceIngestRateLimitPort {
   /**
+   * Best-effort caller-IP extraction from the request's headers.
+   *
+   * The forwarded chain first, because the deployments this throttle matters on
+   * sit behind a load balancer; the vendor header second. Falls back to
+   * `unknown` rather than to nothing, so a proxy that forwards neither still
+   * meters — as one bucket, which is the honest reading of "we cannot tell these
+   * callers apart".
+   */
+  static extractClientIp(headers: Headers): string {
+    // RFC 7239 supersedes it, but X-Forwarded-For is what is universally set.
+    const forwarded = headers.get("x-forwarded-for");
+    if (forwarded) {
+      // The first entry is the client; the rest are intermediate proxies.
+      const first = forwarded.split(",")[0]?.trim();
+      if (first) return first;
+    }
+    const realIp = headers.get("x-real-ip");
+    if (realIp) return realIp.trim();
+    return "unknown";
+  }
+
+  /**
    * Whether this caller may proceed, and how long to wait when not.
    *
    * `retryAfterSec` is what the receiver puts on `Retry-After`, so it must be
@@ -25,28 +47,6 @@ export abstract class GovernanceIngestRateLimitPort {
   abstract check(input: {
     ip: string;
   }): Promise<Readonly<{ allowed: boolean; retryAfterSec: number }>>;
-}
-
-/**
- * Best-effort caller-IP extraction from the request's headers.
- *
- * The forwarded chain first, because the deployments this throttle matters on
- * sit behind a load balancer; the vendor header second. Falls back to
- * `unknown` rather than to nothing, so a proxy that forwards neither still
- * meters — as one bucket, which is the honest reading of "we cannot tell these
- * callers apart".
- */
-export function extractIngestClientIp(headers: Headers): string {
-  // RFC 7239 supersedes it, but X-Forwarded-For is what is universally set.
-  const forwarded = headers.get("x-forwarded-for");
-  if (forwarded) {
-    // The first entry is the client; the rest are intermediate proxies.
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  const realIp = headers.get("x-real-ip");
-  if (realIp) return realIp.trim();
-  return "unknown";
 }
 
 /** The window this throttle counts in, in seconds. */

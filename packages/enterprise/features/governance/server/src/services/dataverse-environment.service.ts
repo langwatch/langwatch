@@ -49,35 +49,38 @@ const DATAVERSE_ENVIRONMENT_HOST_SUFFIXES = [
  * environment is a Microsoft address, and forwarding the credential there is
  * still forwarding it to a stranger.
  */
-export function isSameDataverseEnvironment(params: {
-  value: string;
-  environmentUrl: string;
-}): boolean {
-  const { value, environmentUrl } = params;
-  if (!isDataverseEnvironmentOrigin(value)) return false;
-  try {
-    // `origin` normalises scheme, host case and default ports, so a link that
-    // differs from the configured address only in those respects still counts
-    // as the same environment.
-    return new URL(value).origin === new URL(environmentUrl).origin;
-  } catch {
-    return false;
+export class DataverseEnvironmentService {
+  static create(): DataverseEnvironmentService {
+    return new DataverseEnvironmentService();
   }
-}
 
-export function isDataverseEnvironmentOrigin(value: string): boolean {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return false;
+  static isSameEnvironment(params: { value: string; environmentUrl: string }): boolean {
+    const { value, environmentUrl } = params;
+    if (!DataverseEnvironmentService.isEnvironmentOrigin(value)) return false;
+    try {
+      // `origin` normalises scheme, host case and default ports, so a link that
+      // differs from the configured address only in those respects still counts
+      // as the same environment.
+      return new URL(value).origin === new URL(environmentUrl).origin;
+    } catch {
+      return false;
+    }
   }
-  // Plain http would put the token on the wire in clear even for a real
-  // environment, and credentials in the URL are never part of a legitimate one.
-  if (url.protocol !== "https:") return false;
-  if (url.username !== "" || url.password !== "") return false;
-  const host = url.hostname.toLowerCase();
-  // `endsWith` on a leading-dot suffix, so `evildynamics.com` cannot pass as
-  // `.dynamics.com` and the bare apex is not an environment either.
-  return DATAVERSE_ENVIRONMENT_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
+
+  static isEnvironmentOrigin(value: string): boolean {
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      return false;
+    }
+    // Plain http would put the token on the wire in clear even for a real
+    // environment, and credentials in the URL are never part of a legitimate one.
+    if (url.protocol !== "https:") return false;
+    if (url.username !== "" || url.password !== "") return false;
+    const host = url.hostname.toLowerCase();
+    // `endsWith` on a leading-dot suffix, so `evildynamics.com` cannot pass as
+    // `.dynamics.com` and the bare apex is not an environment either.
+    return DATAVERSE_ENVIRONMENT_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
+  }
 }

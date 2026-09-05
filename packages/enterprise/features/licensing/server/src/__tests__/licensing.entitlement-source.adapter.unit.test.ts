@@ -5,7 +5,7 @@ import {
   UNLIMITED_PLAN,
 } from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it, vi } from "vitest";
-import { LicensingEntitlementSource } from "../index";
+import { LicensingEntitlementSourceAdapter } from "../index";
 
 const paidLicense: PlanInfo = {
   ...UNLIMITED_PLAN,
@@ -56,10 +56,10 @@ function licensingFor({
   return new StubLicensingService(cloud, selfHosted);
 }
 
-describe("LicensingEntitlementSource", () => {
+describe("LicensingEntitlementSourceAdapter", () => {
   it("lets an expired Cloud license step aside for the next entitlement source", async () => {
     const licensing = licensingFor();
-    const source = LicensingEntitlementSource.create({ licensing, mode: "cloud" });
+    const source = LicensingEntitlementSourceAdapter.create({ licensing, mode: "cloud" });
 
     await expect(source.resolve({ organizationId: "organization-1" })).resolves.toBe(
       UNLIMITED_PLAN,
@@ -69,7 +69,7 @@ describe("LicensingEntitlementSource", () => {
 
   it("preserves a genuine lapsed self-hosted license and applies its OSS floor", async () => {
     const licensing = licensingFor({ selfHosted: paidLicense });
-    const source = LicensingEntitlementSource.create({ licensing, mode: "self-hosted" });
+    const source = LicensingEntitlementSourceAdapter.create({ licensing, mode: "self-hosted" });
 
     await expect(source.resolve({ organizationId: "organization-1" })).resolves.toMatchObject({
       type: "ENTERPRISE",

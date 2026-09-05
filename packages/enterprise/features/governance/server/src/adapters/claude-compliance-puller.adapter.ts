@@ -59,7 +59,7 @@ export const CLAUDE_COMPLIANCE_PULL_CONFIG: HttpPollingConfig = {
   },
 };
 
-export class ClaudeComplianceReferencePuller extends HttpPollingPullerAdapter {
+export class ClaudeComplianceReferencePullerAdapter extends HttpPollingPullerAdapter {
   override readonly id: string = "claude_compliance";
 
   private constructor(options: {
@@ -72,8 +72,8 @@ export class ClaudeComplianceReferencePuller extends HttpPollingPullerAdapter {
   static override create(options: {
     http: GovernanceHttpPort;
     diagnostics?: IngestionPullDiagnosticsPort;
-  }): ClaudeComplianceReferencePuller {
-    return new ClaudeComplianceReferencePuller(options);
+  }): ClaudeComplianceReferencePullerAdapter {
+    return new ClaudeComplianceReferencePullerAdapter(options);
   }
 
   override validateConfig(_config: unknown): HttpPollingConfig {

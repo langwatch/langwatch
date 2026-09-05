@@ -32,21 +32,21 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
 
-import { GovernanceDiagnosticsPort } from "../../ports/governance-diagnostics.port";
-import { GovernanceEncryptionPort } from "../../ports/governance-encryption.port";
+import { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port";
+import { GovernanceEncryptionPort } from "../ports/governance-encryption.port";
 import {
   IngestionSourceEntitlementsPort,
   IngestionSourceLifecyclePort,
-} from "../../ports/ingestion-source.port";
-import { TestProjectService } from "../../ports/__tests__/support/test-project-service";
-import { PrismaIngestionSourceRepository } from "../../repositories/prisma/prisma.ingestion-source.repository";
-import { IngestionCredentialsService } from "../ingestion-credentials.service";
+} from "../ports/ingestion-source.port";
+import { TestProjectService } from "../ports/__tests__/support/test-project-service";
+import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository";
+import { IngestionCredentialsService } from "../services/ingestion-credentials.service";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
-} from "../ingestion-source-secret.service";
-import { IngestionSourceService } from "../ingestion-source.service";
-import { PullDestinationService } from "../pull-destination.service";
+} from "../services/ingestion-source-secret.service";
+import { IngestionSourceService } from "../services/ingestion-source.service";
+import { PullDestinationService } from "../services/pull-destination.service";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

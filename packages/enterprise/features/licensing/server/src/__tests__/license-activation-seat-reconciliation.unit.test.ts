@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { NodeLicenseCryptographyAdapter } from "../../adapters/node.license-cryptography.adapter";
-import { TEST_PUBLIC_KEY, ENTERPRISE_LICENSE_KEY } from "../../testing";
-import { LicenseService } from "../license.service";
-import { LicenseStoragePort, type StoredLicense } from "../../ports/license-storage.port";
+import { NodeLicenseCryptographyAdapter } from "../adapters/node.license-cryptography.adapter";
+import { TEST_PUBLIC_KEY, ENTERPRISE_LICENSE_KEY } from "../testing";
+import { LicenseService } from "../services/license.service";
+import { LicenseStoragePort, type StoredLicense } from "../ports/license-storage.port";
 
 /**
  * @see specs/licensing/seat-reconciliation.feature

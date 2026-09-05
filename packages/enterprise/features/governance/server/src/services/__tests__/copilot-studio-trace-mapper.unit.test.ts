@@ -23,8 +23,8 @@ import {
   COPILOT_CONVERSATION_ACTION,
   COPILOT_ROUTING_PROFILE,
   COPILOT_TURN_SPAN_NAME,
-  CopilotStudioTraceMapper,
-} from "../copilot-studio-trace-mapper.adapter";
+  CopilotStudioTraceMapperService,
+} from "../copilot-studio-trace-mapper.service";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
 const ORIGIN = {
@@ -147,7 +147,7 @@ function copilotEvent(
 }
 
 function spansOf(events: NormalizedPullEvent[]) {
-  const request = CopilotStudioTraceMapper.toTraceRequest({ events, origin: ORIGIN });
+  const request = CopilotStudioTraceMapperService.toTraceRequest({ events, origin: ORIGIN });
   return request?.resourceSpans?.[0]?.scopeSpans?.[0]?.spans ?? [];
 }
 
@@ -263,7 +263,7 @@ describe("given two sources reading the same environment", () => {
     const other = { ...ORIGIN, ingestionSourceId: "source-2" };
     const mine = spansOf([copilotEvent(transcriptRow({ activities: CHAT }))]);
     const theirs =
-      CopilotStudioTraceMapper.toTraceRequest({
+      CopilotStudioTraceMapperService.toTraceRequest({
         events: [copilotEvent(transcriptRow({ activities: CHAT }))],
         origin: other,
       })?.resourceSpans?.[0]?.scopeSpans?.[0]?.spans ?? [];
@@ -1049,7 +1049,7 @@ describe("given events that are not Copilot conversations", () => {
       action: "anthropic_admin_usage_report",
     };
     expect(
-      CopilotStudioTraceMapper.toTraceRequest({ events: [foreign], origin: ORIGIN }),
+      CopilotStudioTraceMapperService.toTraceRequest({ events: [foreign], origin: ORIGIN }),
     ).toBeNull();
   });
 

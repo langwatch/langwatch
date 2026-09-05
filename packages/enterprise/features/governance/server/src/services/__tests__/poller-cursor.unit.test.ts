@@ -18,28 +18,28 @@
 
 import { describe, expect, it } from "vitest";
 
-import { hasPollerCursor } from "../poller-cursor.adapter";
+import { IngestionSourceService } from "../ingestion-source.service";
 
-describe("hasPollerCursor", () => {
+describe("IngestionSourceService.hasPollerCursor", () => {
   describe("given a source that has never pulled", () => {
     it("treats SQL NULL as no cursor", () => {
-      expect(hasPollerCursor(null)).toBe(false);
+      expect(IngestionSourceService.hasPollerCursor(null)).toBe(false);
     });
 
     it("treats a missing column as no cursor", () => {
-      expect(hasPollerCursor(undefined)).toBe(false);
+      expect(IngestionSourceService.hasPollerCursor(undefined)).toBe(false);
     });
 
     it("treats JSON null that arrived as a string as no cursor", () => {
-      expect(hasPollerCursor("null")).toBe(false);
+      expect(IngestionSourceService.hasPollerCursor("null")).toBe(false);
     });
 
     it("treats an empty string as no cursor", () => {
-      expect(hasPollerCursor("")).toBe(false);
+      expect(IngestionSourceService.hasPollerCursor("")).toBe(false);
     });
 
     it("treats an object with no content as no cursor", () => {
-      expect(hasPollerCursor({})).toBe(false);
+      expect(IngestionSourceService.hasPollerCursor({})).toBe(false);
     });
 
     /**
@@ -48,13 +48,15 @@ describe("hasPollerCursor", () => {
      * backfill start on one path and leaves it editable on the other.
      */
     it("treats a serialised empty object as no cursor", () => {
-      expect(hasPollerCursor("{}")).toBe(false);
+      expect(IngestionSourceService.hasPollerCursor("{}")).toBe(false);
     });
   });
 
   describe("given a source that has pulled", () => {
     it("reads a cursor stored as a JSON object", () => {
-      expect(hasPollerCursor({ startingAt: "2026-08-20T00:00:00Z", page: null })).toBe(true);
+      expect(
+        IngestionSourceService.hasPollerCursor({ startingAt: "2026-08-20T00:00:00Z", page: null }),
+      ).toBe(true);
     });
 
     /**
@@ -62,11 +64,13 @@ describe("hasPollerCursor", () => {
      * commits to neither.
      */
     it("reads a cursor stored as serialised JSON", () => {
-      expect(hasPollerCursor('{"startingAt":"2026-08-20T00:00:00Z"}')).toBe(true);
+      expect(IngestionSourceService.hasPollerCursor('{"startingAt":"2026-08-20T00:00:00Z"}')).toBe(
+        true,
+      );
     });
 
     it("reads a cursor whose only content is a falsy value", () => {
-      expect(hasPollerCursor({ page: 0 })).toBe(true);
+      expect(IngestionSourceService.hasPollerCursor({ page: 0 })).toBe(true);
     });
 
     /**
@@ -74,7 +78,7 @@ describe("hasPollerCursor", () => {
      * Reading content out of the parse must not cost it its answer.
      */
     it("reads an opaque page token that is not JSON", () => {
-      expect(hasPollerCursor("eyJwYWdlIjoyfQ")).toBe(true);
+      expect(IngestionSourceService.hasPollerCursor("eyJwYWdlIjoyfQ")).toBe(true);
     });
   });
 });

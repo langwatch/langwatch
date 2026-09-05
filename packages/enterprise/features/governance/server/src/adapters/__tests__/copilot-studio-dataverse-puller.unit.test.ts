@@ -258,9 +258,9 @@ afterEach(() => {
 });
 
 async function newAdapter() {
-  const { CopilotStudioDataversePuller } =
+  const { CopilotStudioDataversePullerAdapter } =
     await import("../copilot-studio-dataverse-puller.adapter");
-  return CopilotStudioDataversePuller.create(new StubHttp());
+  return CopilotStudioDataversePullerAdapter.create(new StubHttp());
 }
 
 class StubHttp extends GovernanceHttpPort {

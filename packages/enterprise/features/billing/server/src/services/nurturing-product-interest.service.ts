@@ -10,57 +10,63 @@ import type { CioPersonTraits } from "@langwatch/enterprise-billing-contract";
  */
 export type IntegrationMethodValue = "coding_agent" | "platform" | "mcp" | "manual_sdk";
 
-/**
- * Maps the UI product selection key to the Customer.io integration_method trait value.
- *
- * The onboarding "Pick your flavour" screen asks HOW the user wants to
- * integrate. We map the integration method UI key to the CIO trait:
- *
- * - "via-claude-code"    -> "coding_agent"
- * - "via-platform"       -> "platform"
- * - "via-claude-desktop" -> "mcp"
- * - "manually"           -> "manual_sdk"
- */
-export function mapProductSelectionToIntegrationMethod(selection: string): IntegrationMethodValue {
-  const mapping: Record<string, IntegrationMethodValue> = {
-    "via-claude-code": "coding_agent",
-    "via-platform": "platform",
-    "via-claude-desktop": "mcp",
-    manually: "manual_sdk",
-  };
-
-  if (!Object.hasOwn(mapping, selection)) {
-    throw new Error(`Unknown product selection: ${selection}`);
+export class NurturingProductInterestService {
+  static create(): NurturingProductInterestService {
+    return new NurturingProductInterestService();
   }
 
-  return mapping[selection]!;
-}
+  /**
+   * Maps the UI product selection key to the Customer.io integration_method trait value.
+   *
+   * The onboarding "Pick your flavour" screen asks HOW the user wants to
+   * integrate. We map the integration method UI key to the CIO trait:
+   *
+   * - "via-claude-code"    -> "coding_agent"
+   * - "via-platform"       -> "platform"
+   * - "via-claude-desktop" -> "mcp"
+   * - "manually"           -> "manual_sdk"
+   */
+  static integrationMethodFor(selection: string): IntegrationMethodValue {
+    const mapping: Record<string, IntegrationMethodValue> = {
+      "via-claude-code": "coding_agent",
+      "via-platform": "platform",
+      "via-claude-desktop": "mcp",
+      manually: "manual_sdk",
+    };
 
-/**
- * Fires a separate identifyUser call to set the integration_method trait.
- *
- * Called from the "Pick your flavour" onboarding screen AFTER the initial
- * signup identification (initializeOrganization fires before flavour selection).
- * Fire-and-forget -- does not block navigation.
- */
-export function fireIntegrationMethodNurturing({
-  userId,
-  integrationMethod,
-}: {
-  userId: string;
-  integrationMethod: IntegrationMethodValue;
-}): void {
-  const nurturing = tryNurturingSink();
-  if (!nurturing) {
-    return;
+    if (!Object.hasOwn(mapping, selection)) {
+      throw new Error(`Unknown product selection: ${selection}`);
+    }
+
+    return mapping[selection]!;
   }
 
-  void nurturing
-    .identifyUser({
-      userId,
-      traits: {
-        integration_method: integrationMethod,
-      } as Partial<CioPersonTraits>,
-    })
-    .catch(reportNurturingFailure);
+  /**
+   * Fires a separate identifyUser call to set the integration_method trait.
+   *
+   * Called from the "Pick your flavour" onboarding screen AFTER the initial
+   * signup identification (initializeOrganization fires before flavour selection).
+   * Fire-and-forget -- does not block navigation.
+   */
+  static fireIntegrationMethod({
+    userId,
+    integrationMethod,
+  }: {
+    userId: string;
+    integrationMethod: IntegrationMethodValue;
+  }): void {
+    const nurturing = tryNurturingSink();
+    if (!nurturing) {
+      return;
+    }
+
+    void nurturing
+      .identifyUser({
+        userId,
+        traits: {
+          integration_method: integrationMethod,
+        } as Partial<CioPersonTraits>,
+      })
+      .catch(reportNurturingFailure);
+  }
 }

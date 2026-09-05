@@ -26,14 +26,14 @@ import {
   type PulledUsageRateInput,
 } from "@langwatch/enterprise-governance-server";
 import {
-  AnthropicAdminPuller,
-  ClaudeComplianceReferencePuller,
-  CopilotStudioReferencePuller,
-  CopilotStudioDataversePuller,
-  DatabricksGeniePuller,
+  AnthropicAdminPullerAdapter,
+  ClaudeComplianceReferencePullerAdapter,
+  CopilotStudioReferencePullerAdapter,
+  CopilotStudioDataversePullerAdapter,
+  DatabricksGeniePullerAdapter,
   HttpPollingPullerAdapter,
-  OpenAiComplianceReferencePuller,
-  OpenAiAdminPuller,
+  OpenAiComplianceReferencePullerAdapter,
+  OpenAiAdminPullerAdapter,
   PullerRegistryService,
   S3PollingPullerAdapter,
 } from "@langwatch/enterprise-governance-server";
@@ -323,13 +323,13 @@ export class AppIngestionPullWorkerAdapter {
     const pullers = PullerRegistryService.create();
     pullers.register(HttpPollingPullerAdapter.create({ http, diagnostics }));
     pullers.register(S3PollingPullerAdapter.create({ objects, diagnostics }));
-    pullers.register(CopilotStudioReferencePuller.create({ http, diagnostics }));
-    pullers.register(CopilotStudioDataversePuller.create(http));
-    pullers.register(OpenAiComplianceReferencePuller.create({ objects, diagnostics }));
-    pullers.register(OpenAiAdminPuller.create(http));
-    pullers.register(ClaudeComplianceReferencePuller.create({ http, diagnostics }));
-    pullers.register(AnthropicAdminPuller.create(http));
-    pullers.register(DatabricksGeniePuller.create(http));
+    pullers.register(CopilotStudioReferencePullerAdapter.create({ http, diagnostics }));
+    pullers.register(CopilotStudioDataversePullerAdapter.create(http));
+    pullers.register(OpenAiComplianceReferencePullerAdapter.create({ objects, diagnostics }));
+    pullers.register(OpenAiAdminPullerAdapter.create(http));
+    pullers.register(ClaudeComplianceReferencePullerAdapter.create({ http, diagnostics }));
+    pullers.register(AnthropicAdminPullerAdapter.create(http));
+    pullers.register(DatabricksGeniePullerAdapter.create(http));
     const registry = BuiltInPullerRegistryService.create(pullers).build();
     const credentials = IngestionCredentialsService.create(
       AppGovernanceEncryptionPort.create(this.host.encryption),

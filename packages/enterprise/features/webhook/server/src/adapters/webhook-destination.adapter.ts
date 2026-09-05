@@ -1,9 +1,12 @@
 import type { WebhookDispatchRateLimiterPort, WebhookEgressService } from "@langwatch/egress";
 
-import type { WebhookDestination } from "../ports/webhook-destination.port";
+import type { WebhookDestinationPort } from "../ports/webhook-destination.port";
 import type { WebhookDestinationConfig } from "../services/webhook-destination.service";
-import { httpWebhookDestination } from "./http.webhook-destination.adapter";
-import { type AwsClientConfigPort, sqsWebhookDestination } from "./sqs.webhook-destination.adapter";
+import { HttpWebhookDestinationAdapter } from "./http.webhook-destination.adapter";
+import {
+  type AwsClientConfigPort,
+  SqsWebhookDestinationAdapter,
+} from "./sqs.webhook-destination.adapter";
 
 /**
  * What a process must hold before it can deliver to either transport.
@@ -26,27 +29,35 @@ export type WebhookDestinationDeps = Readonly<{
   rateLimiter?: WebhookDispatchRateLimiterPort | undefined;
 }>;
 
-/** The transport for one endpoint. */
-export function webhookDestinationFor(
-  config: WebhookDestinationConfig,
-  deps: WebhookDestinationDeps,
-): WebhookDestination {
-  switch (config.kind) {
-    case "http":
-      return httpWebhookDestination({
-        url: config.url,
-        egress: deps.egress,
-        allowInsecureLocal: deps.allowInsecureLocal,
-      });
-    case "sqs":
-      return sqsWebhookDestination({
-        queueUrl: config.queueUrl,
-        roleArn: config.roleArn,
-        externalId: config.externalId,
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
-        awsClientConfig: deps.awsClientConfig,
-        ...(deps.rateLimiter ? { rateLimiter: deps.rateLimiter } : {}),
-      });
+/** Picks the transport one endpoint's configuration names. */
+export class WebhookDestinationAdapter {
+  private constructor(private readonly deps: WebhookDestinationDeps) {}
+
+  static create(deps: WebhookDestinationDeps): WebhookDestinationAdapter {
+    return new WebhookDestinationAdapter(deps);
+  }
+
+  /** The transport for one endpoint. */
+  destinationFor(config: WebhookDestinationConfig): WebhookDestinationPort {
+    switch (config.kind) {
+      case "http":
+        return HttpWebhookDestinationAdapter.create({
+          url: config.url,
+          egress: this.deps.egress,
+          allowInsecureLocal: this.deps.allowInsecureLocal,
+        });
+      case "sqs":
+        return SqsWebhookDestinationAdapter.create({
+          config: {
+            queueUrl: config.queueUrl,
+            roleArn: config.roleArn,
+            externalId: config.externalId,
+            accessKeyId: config.accessKeyId,
+            secretAccessKey: config.secretAccessKey,
+            awsClientConfig: this.deps.awsClientConfig,
+            ...(this.deps.rateLimiter ? { rateLimiter: this.deps.rateLimiter } : {}),
+          },
+        });
+    }
   }
 }

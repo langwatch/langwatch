@@ -20,8 +20,8 @@ import {
   planLimitInFlight,
   resourceLimitCooldown,
   type BillingCooldownCache,
-} from "../adapters/memory.cooldown-cache.adapter";
-import { NullNotificationRecordAdapter } from "../adapters/null-notification-record.adapter";
+} from "./billing-alert-cooldown.service";
+import { NullNotificationRecordService } from "./null-notification-record.service";
 
 const logger = createLogger("langwatch:notifications:usageLimit");
 
@@ -87,7 +87,7 @@ export class UsageLimitService {
     this.planCooldown = planCooldown ?? planLimitCooldown;
     this.isSaas = isSaas;
     this.baseHost = baseHost;
-    this.warnings = new UsageWarningService({
+    this.warnings = UsageWarningService.create({
       records: notificationRecords,
       organizations: organizationService,
       usageCounts: usageService,
@@ -141,7 +141,7 @@ export class UsageLimitService {
    * Use in tests or non-SaaS deployments where no notifications are needed.
    */
   static createNull(): UsageLimitService {
-    const noopRecords = new NullNotificationRecordAdapter();
+    const noopRecords = NullNotificationRecordService.create();
     const noopOrg: BillingUsageLimitOrganization = {
       findWithAdmins: async () => null,
       updateSentPlanLimitAlert: async () => {},

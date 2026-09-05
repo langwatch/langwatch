@@ -10,7 +10,7 @@ import {
   EEWebhookService,
   type BillingWebhookHostPort,
   type BillingWebhookOrganizationPort,
-  type SubscriptionRepository,
+  type BillingWebhookSubscriptionPort,
   type SubscriptionWithOrg,
 } from "../../index";
 
@@ -32,7 +32,7 @@ const createMockHost = (): {
 });
 
 const createMockSubscriptionRepository = (): {
-  [K in keyof SubscriptionRepository]: ReturnType<typeof vi.fn>;
+  [K in keyof BillingWebhookSubscriptionPort]: ReturnType<typeof vi.fn>;
 } => ({
   findLastNonCancelled: vi.fn(),
   createPending: vi.fn(),
@@ -145,8 +145,8 @@ describe("EEWebhookService", () => {
     itemCalculator = createMockItemCalculator();
     mockStripeInstance = createMockStripe();
     host = createMockHost();
-    service = EEWebhookService.createWithDependencies({
-      subscriptionRepository: subRepo as unknown as SubscriptionRepository,
+    service = EEWebhookService.create({
+      subscriptionRepository: subRepo as unknown as BillingWebhookSubscriptionPort,
       organizationRepository: orgRepo as unknown as BillingWebhookOrganizationPort,
       stripe: mockStripeInstance as any,
       itemCalculator,
@@ -267,8 +267,8 @@ describe("EEWebhookService", () => {
       describe("when the service is published as the app publishes it", () => {
         const published = () =>
           traced(
-            EEWebhookService.createWithDependencies({
-              subscriptionRepository: subRepo as unknown as SubscriptionRepository,
+            EEWebhookService.create({
+              subscriptionRepository: subRepo as unknown as BillingWebhookSubscriptionPort,
               organizationRepository: orgRepo as unknown as BillingWebhookOrganizationPort,
               stripe: mockStripeInstance as any,
               itemCalculator,
@@ -316,8 +316,8 @@ describe("EEWebhookService", () => {
         const mockInviteApprover = {
           approvePaymentPendingInvites: vi.fn().mockRejectedValue(new Error("invite error")),
         };
-        service = EEWebhookService.createWithDependencies({
-          subscriptionRepository: subRepo as unknown as SubscriptionRepository,
+        service = EEWebhookService.create({
+          subscriptionRepository: subRepo as unknown as BillingWebhookSubscriptionPort,
           organizationRepository: orgRepo as unknown as BillingWebhookOrganizationPort,
           stripe: mockStripeInstance as any,
           itemCalculator,
@@ -603,8 +603,8 @@ describe("EEWebhookService", () => {
       /** @scenario Upgrade to a seat-event plan migrates old subscriptions */
       it("migrates tiered subscriptions and cancels old Stripe subs", async () => {
         const localStripe = createMockStripe();
-        service = EEWebhookService.createWithDependencies({
-          subscriptionRepository: subRepo as unknown as SubscriptionRepository,
+        service = EEWebhookService.create({
+          subscriptionRepository: subRepo as unknown as BillingWebhookSubscriptionPort,
           organizationRepository: orgRepo as unknown as BillingWebhookOrganizationPort,
           stripe: localStripe as any,
           itemCalculator,
@@ -650,8 +650,8 @@ describe("EEWebhookService", () => {
       it("logs but does not fail when Stripe cancellation fails", async () => {
         const localStripe = createMockStripe();
         localStripe.subscriptions.cancel.mockRejectedValue(new Error("Stripe error"));
-        service = EEWebhookService.createWithDependencies({
-          subscriptionRepository: subRepo as unknown as SubscriptionRepository,
+        service = EEWebhookService.create({
+          subscriptionRepository: subRepo as unknown as BillingWebhookSubscriptionPort,
           organizationRepository: orgRepo as unknown as BillingWebhookOrganizationPort,
           stripe: localStripe as any,
           itemCalculator,

@@ -35,6 +35,11 @@ import {
   RECORD_SCIM_GROUP_MAPPING_COMMAND_TYPE,
   RECORD_SCIM_USER_PUSH_COMMAND_TYPE,
   REVOKE_SCIM_SYNC_COMMAND_TYPE,
+  type IssueScimTokenCommandData,
+  type RecordScimApplyFailureCommandData,
+  type RecordScimGroupMappingCommandData,
+  type RecordScimUserPushCommandData,
+  type RevokeScimSyncCommandData,
   type ScimApplyOp,
   type ScimRevokeCause,
   type ScimSyncCommand,
@@ -42,7 +47,23 @@ import {
   type ScimUserOp,
   scimSyncIdFor,
 } from "@langwatch/identity-contract";
-import type { ScimSyncGuards, ScimSyncLedger } from "@langwatch/identity-server";
+
+/**
+ * The identity guards and ledger this adapter drives, named by their shape.
+ * Identity's server package owns the implementations; this package may only
+ * take the contract, so the collaboration is stated here in contract types.
+ */
+export interface ScimSyncLifecycleGuards {
+  issueScimToken(data: IssueScimTokenCommandData): Promise<ScimSyncFactInput[]>;
+  recordScimUserPush(data: RecordScimUserPushCommandData): Promise<ScimSyncFactInput[]>;
+  recordScimGroupMapping(data: RecordScimGroupMappingCommandData): Promise<ScimSyncFactInput[]>;
+  recordScimApplyFailure(data: RecordScimApplyFailureCommandData): Promise<ScimSyncFactInput[]>;
+  revokeScimSync(data: RevokeScimSyncCommandData): Promise<ScimSyncFactInput[]>;
+}
+
+export interface ScimSyncLifecycleLedger {
+  commit(args: { command: ScimSyncCommand; facts: ScimSyncFactInput[] }): Promise<void>;
+}
 
 /**
  * The durable record's actor. One principal for every connection an
@@ -51,9 +72,9 @@ import type { ScimSyncGuards, ScimSyncLedger } from "@langwatch/identity-server"
  */
 const SCIM_SYNC_ACTOR = { type: "system", id: SYSTEM_ACTORS.scim } as const;
 
-export interface ScimSyncLifecycleDeps {
-  guards: ScimSyncGuards;
-  ledger: ScimSyncLedger;
+export interface ScimSyncLifecycleAdapterDeps {
+  guards: ScimSyncLifecycleGuards;
+  ledger: ScimSyncLifecycleLedger;
   /**
    * Mints one command id per call. Supplied rather than imported: the id
    * generator is identity's, and this package may not take a value off a core
@@ -64,13 +85,13 @@ export interface ScimSyncLifecycleDeps {
   now?: () => number;
 }
 
-export class ScimSyncLifecycle extends ScimSyncLifecyclePort {
-  private readonly guards: ScimSyncGuards;
-  private readonly ledger: ScimSyncLedger;
+export class ScimSyncLifecycleAdapter extends ScimSyncLifecyclePort {
+  private readonly guards: ScimSyncLifecycleGuards;
+  private readonly ledger: ScimSyncLifecycleLedger;
   private readonly newCommandId: () => string;
   private readonly now: () => number;
 
-  constructor(deps: ScimSyncLifecycleDeps) {
+  constructor(deps: ScimSyncLifecycleAdapterDeps) {
     super();
     this.guards = deps.guards;
     this.ledger = deps.ledger;
@@ -78,8 +99,8 @@ export class ScimSyncLifecycle extends ScimSyncLifecyclePort {
     this.now = deps.now ?? (() => Date.now());
   }
 
-  static create(deps: ScimSyncLifecycleDeps): ScimSyncLifecycle {
-    return new ScimSyncLifecycle(deps);
+  static create(deps: ScimSyncLifecycleAdapterDeps): ScimSyncLifecycleAdapter {
+    return new ScimSyncLifecycleAdapter(deps);
   }
 
   /** A token was minted for this connection: its sync begins. */

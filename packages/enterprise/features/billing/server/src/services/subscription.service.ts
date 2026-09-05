@@ -15,7 +15,7 @@ import {
   SubscriptionStatus,
   type BillingInterval,
 } from "@langwatch/enterprise-billing-contract";
-import { StripeErrorAdapter } from "../adapters/stripe-error.stripe-error.adapter";
+import type { StripeErrorTranslatorPort } from "../ports/stripe-error-translator.port";
 import type { BillingOrganizationPort } from "../ports/organization.port";
 import type { BillingSubscriptionNotifierPort } from "../ports/subscription-notifier.port";
 import type {
@@ -49,8 +49,6 @@ export type BillingDisplayInvoice = {
  * never creates clients, reads configuration, or touches application globals.
  */
 export class BillingSubscriptionService {
-  private readonly stripeErrors = StripeErrorAdapter.create();
-
   private constructor(
     private readonly repository: BillingSubscriptionRepository,
     private readonly organizationRepository: BillingOrganizationPort,
@@ -58,6 +56,7 @@ export class BillingSubscriptionService {
     private readonly itemCalculator: SubscriptionItemCalculatorService,
     private readonly seatEventService: SeatEventSubscriptionService | undefined,
     private readonly notifier: BillingSubscriptionNotifierPort,
+    private readonly stripeErrors: StripeErrorTranslatorPort,
   ) {}
 
   static create(options: {
@@ -67,6 +66,8 @@ export class BillingSubscriptionService {
     itemCalculator: SubscriptionItemCalculatorService;
     seatEventService?: SeatEventSubscriptionService;
     notifier: BillingSubscriptionNotifierPort;
+    /** Classifies a payment-provider failure; the process supplies Stripe's. */
+    stripeErrors: StripeErrorTranslatorPort;
   }): BillingSubscriptionService {
     return new BillingSubscriptionService(
       options.repository,
@@ -75,6 +76,7 @@ export class BillingSubscriptionService {
       options.itemCalculator,
       options.seatEventService,
       options.notifier,
+      options.stripeErrors,
     );
   }
 

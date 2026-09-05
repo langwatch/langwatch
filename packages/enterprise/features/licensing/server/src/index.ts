@@ -12,9 +12,9 @@ export {
   type LicenseEnforcementTrpcContext,
 } from "./transport/api-trpc/license-enforcement.api";
 export {
-  LicensingEntitlementSource,
+  LicensingEntitlementSourceAdapter,
   type LicensePlanReader,
-  type LicensingEntitlementSourceMode,
+  type LicensingEntitlementSourceAdapterMode,
 } from "./adapters/licensing.entitlement-source.adapter";
 export { PostgresOrganizationLicenseAdapter } from "./adapters/postgres.organization-license.adapter";
 export { LicenseCryptographyPort } from "./ports/license-cryptography.port";

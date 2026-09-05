@@ -97,7 +97,7 @@ export {
   planLimitInFlight,
   resourceLimitCooldown,
   type BillingCooldownCache,
-} from "./adapters/memory.cooldown-cache.adapter";
+} from "./services/billing-alert-cooldown.service";
 export { UsageLimitService } from "./services/usage-limit.service";
 export { UsageWarningService } from "./services/usage-warning.service";
 export {
@@ -117,7 +117,7 @@ export { NotificationService, type UsageLimitEmailData } from "./services/notifi
 export { NurturingService, type NurturingServiceOptions } from "./services/nurturing.service";
 export { NUMERIC_OVERRIDE_FIELDS, SaaSPlanProviderService } from "./services/plan-provider.service";
 export {
-  deploymentPlanSources,
+  DeploymentPlanSourcesService,
   type DeploymentPlanSources,
   type DeploymentPlanSourcesOptions,
 } from "./services/deployment-plan-sources.service";
@@ -152,9 +152,9 @@ export {
   SilentBillingWebhookHost,
 } from "./ports/billing-webhook-host.port";
 export {
-  NullSubscriptionRepository,
+  BillingWebhookSubscriptionPort,
+  NullBillingWebhookSubscriptionAdapter,
   type CancelledSubscription,
-  type SubscriptionRepository,
   type SubscriptionWithOrg,
 } from "./ports/billing-webhook-subscription.port";
 export {
@@ -166,34 +166,17 @@ export {
   tryNurturingSink,
   type OrganizationAdminResolver,
 } from "./services/nurturing-sink";
+export { NurturingActivityTrackingService } from "./services/nurturing-activity-tracking.service";
+export { NurturingFeatureAdoptionService } from "./services/nurturing-feature-adoption.service";
 export {
-  fireActivityTrackingNurturing,
-  getActivityTrackingCacheSize,
-  resetActivityTrackingCache,
-} from "./services/nurturing-activity-tracking.service";
-export {
-  fireExperimentRanNurturing,
-  fireScenarioCreatedNurturing,
-  fireTeamMemberInvitedNurturing,
-  fireWorkflowCreatedNurturing,
-} from "./services/nurturing-feature-adoption.service";
-export {
-  fireIntegrationMethodNurturing,
-  mapProductSelectionToIntegrationMethod,
+  NurturingProductInterestService,
   type IntegrationMethodValue,
 } from "./services/nurturing-product-interest.service";
-export {
-  afterPromptCreated,
-  firePromptCreatedNurturing,
-} from "./services/nurturing-prompt-creation.service";
-export { fireSignupNurturingCalls } from "./services/nurturing-signup-identification.service";
-export { fireSsoAutoAddNurturingCalls } from "./services/nurturing-sso-auto-add.service";
-export { fireSubscriptionSyncNurturing } from "./services/nurturing-subscription-sync.service";
-export {
-  ensureUserSyncedToCio,
-  getUserSyncCacheSize,
-  resetUserSyncCache,
-} from "./services/nurturing-user-sync.service";
+export { NurturingPromptCreationService } from "./services/nurturing-prompt-creation.service";
+export { NurturingSignupIdentificationService } from "./services/nurturing-signup-identification.service";
+export { NurturingSsoAutoAddService } from "./services/nurturing-sso-auto-add.service";
+export { NurturingSubscriptionSyncService } from "./services/nurturing-subscription-sync.service";
+export { NurturingUserSyncService } from "./services/nurturing-user-sync.service";
 export {
   createStripeWebhookRestApp,
   type StripeWebhookRestPorts,

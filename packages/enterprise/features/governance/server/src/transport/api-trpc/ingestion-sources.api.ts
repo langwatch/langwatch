@@ -32,7 +32,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import { hasPollerCursor } from "../../adapters/poller-cursor.adapter";
+import { IngestionSourceService } from "../../services/ingestion-source.service";
 
 export type IngestionSourcesTrpcContext = Readonly<{
   app: Readonly<{ governance: GovernanceService }>;
@@ -141,7 +141,7 @@ export function toIngestionSourceDto({
     name: row.name,
     description: row.description,
     parserConfig: safeParser,
-    hasPollerCursor: hasPollerCursor(row.pollerCursor),
+    hasPollerCursor: IngestionSourceService.hasPollerCursor(row.pollerCursor),
     pullSchedule: row.pullSchedule,
     status: row.status,
     traceProjectId: row.traceProjectId ?? null,

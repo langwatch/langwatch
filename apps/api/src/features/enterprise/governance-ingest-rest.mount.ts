@@ -38,7 +38,10 @@ import type {
   GovernanceIngestRestPorts,
   GovernanceIngestTraceCollectionPort,
 } from "@langwatch/enterprise-governance-server";
-import { GovernanceIngestRateLimitPort } from "@langwatch/enterprise-governance-server";
+import {
+  GovernanceIngestKeyProvenancePort,
+  GovernanceIngestRateLimitPort,
+} from "@langwatch/enterprise-governance-server";
 import {
   INGEST_RATE_LIMIT_MAX_REQUESTS,
   INGEST_RATE_LIMIT_WINDOW_SECONDS,
@@ -46,6 +49,11 @@ import {
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GovernanceInternalProjectPort } from "@langwatch/project-server";
+import {
+  enforceApiKeyIdOnLogRequest,
+  enforceApiKeyIdOnMetricRequest,
+  enforceApiKeyIdOnTraceRequest,
+} from "@langwatch/trace-server";
 
 /** The process's ONE fixed-window counter, as the ingest throttle. */
 export class ApiGovernanceIngestRateLimit extends GovernanceIngestRateLimitPort {
@@ -89,6 +97,40 @@ export class ApiGovernanceIngestRateLimit extends GovernanceIngestRateLimitPort 
       allowed: false,
       retryAfterSec: Math.max(1, Math.ceil(remainingMs / 1000)),
     };
+  }
+}
+
+/**
+ * The trace receiver's own API-key attribution rule, handed to the governance
+ * receivers rather than restated by them.
+ *
+ * These endpoints authenticate with an ingestion-source secret, so there is no
+ * ApiKey row to attribute a payload to and `null` is the whole of what is ever
+ * written. What matters is the DROP: a payload-supplied copy of the attribute
+ * is removed at every level a caller can reach, because redaction exempts that
+ * name from the secret-name deny-list.
+ */
+export class ApiGovernanceIngestKeyProvenance extends GovernanceIngestKeyProvenancePort {
+  static create(): ApiGovernanceIngestKeyProvenance {
+    return new ApiGovernanceIngestKeyProvenance();
+  }
+
+  dropOnTraceRequest(request: unknown): void {
+    enforceApiKeyIdOnTraceRequest(
+      request as Parameters<typeof enforceApiKeyIdOnTraceRequest>[0],
+      null,
+    );
+  }
+
+  dropOnLogRequest(request: unknown): void {
+    enforceApiKeyIdOnLogRequest(request as Parameters<typeof enforceApiKeyIdOnLogRequest>[0], null);
+  }
+
+  dropOnMetricRequest(request: unknown): void {
+    enforceApiKeyIdOnMetricRequest(
+      request as Parameters<typeof enforceApiKeyIdOnMetricRequest>[0],
+      null,
+    );
   }
 }
 
@@ -136,5 +178,6 @@ export function composeApiGovernanceIngestRest(
     traceCollection,
     database: () => prisma,
     rateLimit: ApiGovernanceIngestRateLimit.create(options.rateLimit),
+    keyProvenance: ApiGovernanceIngestKeyProvenance.create(),
   };
 }

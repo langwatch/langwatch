@@ -20,9 +20,9 @@ import http from "http";
 import type { AddressInfo } from "net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { DATABRICKS_GENIE_ADAPTER_ID } from "../../services/pull-destination.service";
 import {
-  DATABRICKS_GENIE_ADAPTER_ID,
-  DatabricksGeniePuller,
+  DatabricksGeniePullerAdapter,
   WAREHOUSE_COST_ROW_LIMIT,
 } from "../databricks-genie-puller.adapter";
 import {
@@ -257,8 +257,8 @@ async function pull({ warehouseId, deadlineMs }: { warehouseId?: string; deadlin
   );
 }
 
-function makePuller(options?: { maxRequests?: number }): DatabricksGeniePuller {
-  return DatabricksGeniePuller.create(new FetchHttpPort(), options);
+function makePuller(options?: { maxRequests?: number }): DatabricksGeniePullerAdapter {
+  return DatabricksGeniePullerAdapter.create(new FetchHttpPort(), options);
 }
 
 /** The `pulled_usage` hint on the one message the fixture serves. */

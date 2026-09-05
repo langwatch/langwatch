@@ -3,14 +3,9 @@ import type { AwsClientConfig, AwsClientConfigInput } from "@langwatch/aws-clien
 import { WEBHOOK_SIGNATURE_HEADER, type WebhookDispatchRateLimiterPort } from "@langwatch/egress";
 import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../services/sqs-queue-url.rules";
 import {
-  classifySqsFailure,
-  resetSqsClientCache,
   SQS_MAX_MESSAGE_BYTES,
   type SqsDestinationConfig,
-  sqsClientFor,
-  sqsMessageAttributes,
-  sqsMessageBytes,
-  sqsWebhookDestination,
+  SqsWebhookDestinationAdapter,
 } from "../sqs.webhook-destination.adapter";
 import type { WebhookDispatchRequest } from "../../ports/webhook-destination.port";
 
@@ -27,7 +22,8 @@ const awsClientConfig = (input: AwsClientConfigInput): AwsClientConfig => ({
   requestHandler: {} as never,
 });
 
-const clientFor = (config: SqsDestinationConfig) => sqsClientFor(config, awsClientConfig);
+const clientFor = (config: SqsDestinationConfig) =>
+  SqsWebhookDestinationAdapter.clientFor({ config, awsClientConfig });
 
 const QUEUE_URL = "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-dev-billing-webhooks";
 
@@ -69,7 +65,7 @@ function fakeQueue(behavior?: { rejectWith?: unknown }) {
   return { sent, client };
 }
 
-describe("sqsWebhookDestination", () => {
+describe("SqsWebhookDestinationAdapter", () => {
   beforeEach(() => {
     limitMock.mockResolvedValue({
       allowed: true,
@@ -86,16 +82,16 @@ describe("sqsWebhookDestination", () => {
     /** @scenario A queue message carries the same bytes as the HTTP body */
     it("puts the exact HTTP body on the queue with no wrapper around it", async () => {
       const { sent, client } = fakeQueue();
-      const destination = sqsWebhookDestination(
-        {
+      const destination = SqsWebhookDestinationAdapter.create({
+        config: {
           awsClientConfig,
           rateLimiter,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
         },
-        { createClient: () => client as never },
-      );
+        createClient: () => client as never,
+      });
 
       await destination.send(request());
 
@@ -112,16 +108,16 @@ describe("sqsWebhookDestination", () => {
     /** @scenario Signature, delivery id and attempt ride as message attributes */
     it("carries the signature, delivery id and attempt under their header names", async () => {
       const { sent, client } = fakeQueue();
-      const destination = sqsWebhookDestination(
-        {
+      const destination = SqsWebhookDestinationAdapter.create({
+        config: {
           awsClientConfig,
           rateLimiter,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
         },
-        { createClient: () => client as never },
-      );
+        createClient: () => client as never,
+      });
 
       await destination.send(request({ attempt: 3 }));
 
@@ -138,16 +134,16 @@ describe("sqsWebhookDestination", () => {
     /** @scenario Signature, delivery id and attempt ride as message attributes */
     it("marks a test fire under its own header name", async () => {
       const { sent, client } = fakeQueue();
-      const destination = sqsWebhookDestination(
-        {
+      const destination = SqsWebhookDestinationAdapter.create({
+        config: {
           awsClientConfig,
           rateLimiter,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
         },
-        { createClient: () => client as never },
-      );
+        createClient: () => client as never,
+      });
 
       await destination.send(request({ isTestFire: true }));
 
@@ -158,16 +154,16 @@ describe("sqsWebhookDestination", () => {
     /** @scenario A queue delivery is recorded with no response status */
     it("answers success with a message id and no status", async () => {
       const { client } = fakeQueue();
-      const destination = sqsWebhookDestination(
-        {
+      const destination = SqsWebhookDestinationAdapter.create({
+        config: {
           awsClientConfig,
           rateLimiter,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
         },
-        { createClient: () => client as never },
-      );
+        createClient: () => client as never,
+      });
 
       const result = await destination.send(request());
 
@@ -184,16 +180,16 @@ describe("sqsWebhookDestination", () => {
     /** @scenario A batch too large for one queue message is refused terminally */
     it("refuses terminally and names the batch-size control", async () => {
       const { client, sent } = fakeQueue();
-      const destination = sqsWebhookDestination(
-        {
+      const destination = SqsWebhookDestinationAdapter.create({
+        config: {
           awsClientConfig,
           rateLimiter,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
         },
-        { createClient: () => client as never },
-      );
+        createClient: () => client as never,
+      });
 
       const result = await destination.send(
         request({ body: "x".repeat(SQS_MAX_MESSAGE_BYTES + 1) }),
@@ -207,13 +203,13 @@ describe("sqsWebhookDestination", () => {
     });
 
     it("counts attribute names, types and values against the limit", () => {
-      const attributes = sqsMessageAttributes({
+      const attributes = SqsWebhookDestinationAdapter.messageAttributes({
         batchId: "wh_1:abc",
         attempt: 1,
         signature: "t=1,v1=deadbeef",
       });
-      const bodyOnly = sqsMessageBytes({ body: "{}", attributes: {} });
-      const withAttributes = sqsMessageBytes({ body: "{}", attributes });
+      const bodyOnly = SqsWebhookDestinationAdapter.messageBytes({ body: "{}", attributes: {} });
+      const withAttributes = SqsWebhookDestinationAdapter.messageBytes({ body: "{}", attributes });
       expect(withAttributes).toBeGreaterThan(bodyOnly);
     });
   });
@@ -227,16 +223,16 @@ describe("sqsWebhookDestination", () => {
         resetAt: Date.now() + 60_000,
       } as never);
       const { client, sent } = fakeQueue();
-      const destination = sqsWebhookDestination(
-        {
+      const destination = SqsWebhookDestinationAdapter.create({
+        config: {
           awsClientConfig,
           rateLimiter,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
         },
-        { createClient: () => client as never },
-      );
+        createClient: () => client as never,
+      });
 
       await expect(destination.send(request())).rejects.toMatchObject({
         retryable: true,
@@ -254,16 +250,16 @@ describe("sqsWebhookDestination", () => {
         resetAt: Date.now() + 60_000,
       } as never);
       const { client, sent } = fakeQueue();
-      const destination = sqsWebhookDestination(
-        {
+      const destination = SqsWebhookDestinationAdapter.create({
+        config: {
           awsClientConfig,
           rateLimiter,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
         },
-        { createClient: () => client as never },
-      );
+        createClient: () => client as never,
+      });
 
       const result = await destination.send(request({ isTestFire: true }));
 
@@ -279,30 +275,49 @@ describe("sqsWebhookDestination", () => {
     /** @scenario A missing or forbidden queue is terminal, a throttled one retries */
     it("classifies a missing queue and a refused permission as terminal", () => {
       expect(
-        classifySqsFailure({
+        SqsWebhookDestinationAdapter.classifyFailure({
           name: "AWS.SimpleQueueService.NonExistentQueue",
         }).verdict,
       ).toBe("terminal");
-      expect(classifySqsFailure({ name: "QueueDoesNotExist" }).verdict).toBe("terminal");
-      expect(classifySqsFailure({ name: "AccessDenied" }).verdict).toBe("terminal");
-      expect(classifySqsFailure({ name: "AccessDeniedException" }).verdict).toBe("terminal");
+      expect(
+        SqsWebhookDestinationAdapter.classifyFailure({ name: "QueueDoesNotExist" }).verdict,
+      ).toBe("terminal");
+      expect(SqsWebhookDestinationAdapter.classifyFailure({ name: "AccessDenied" }).verdict).toBe(
+        "terminal",
+      );
+      expect(
+        SqsWebhookDestinationAdapter.classifyFailure({ name: "AccessDeniedException" }).verdict,
+      ).toBe("terminal");
     });
 
     /** @scenario A missing or forbidden queue is terminal, a throttled one retries */
     it("classifies throttling, server errors and network failures as retryable", () => {
-      expect(classifySqsFailure({ name: "ThrottlingException" }).verdict).toBe("retryable");
-      expect(classifySqsFailure({ $metadata: { httpStatusCode: 503 } }).verdict).toBe("retryable");
-      expect(classifySqsFailure({ code: "ECONNRESET" }).verdict).toBe("retryable");
+      expect(
+        SqsWebhookDestinationAdapter.classifyFailure({ name: "ThrottlingException" }).verdict,
+      ).toBe("retryable");
+      expect(
+        SqsWebhookDestinationAdapter.classifyFailure({ $metadata: { httpStatusCode: 503 } })
+          .verdict,
+      ).toBe("retryable");
+      expect(SqsWebhookDestinationAdapter.classifyFailure({ code: "ECONNRESET" }).verdict).toBe(
+        "retryable",
+      );
     });
 
     /** @scenario A missing or forbidden queue is terminal, a throttled one retries */
     it("keeps an expired credential retryable, so an expiring session is not a dead queue", () => {
-      expect(classifySqsFailure({ name: "ExpiredToken" }).verdict).toBe("retryable");
-      expect(classifySqsFailure({ name: "ExpiredTokenException" }).verdict).toBe("retryable");
+      expect(SqsWebhookDestinationAdapter.classifyFailure({ name: "ExpiredToken" }).verdict).toBe(
+        "retryable",
+      );
+      expect(
+        SqsWebhookDestinationAdapter.classifyFailure({ name: "ExpiredTokenException" }).verdict,
+      ).toBe("retryable");
     });
 
     it("treats a failure it has never seen as retryable, since the ladder gives up on its own", () => {
-      expect(classifySqsFailure({ name: "SomethingNewFromAws" }).verdict).toBe("retryable");
+      expect(
+        SqsWebhookDestinationAdapter.classifyFailure({ name: "SomethingNewFromAws" }).verdict,
+      ).toBe("retryable");
     });
 
     it("returns the classified verdict rather than throwing", async () => {
@@ -311,16 +326,16 @@ describe("sqsWebhookDestination", () => {
           name: "QueueDoesNotExist",
         }),
       });
-      const destination = sqsWebhookDestination(
-        {
+      const destination = SqsWebhookDestinationAdapter.create({
+        config: {
           awsClientConfig,
           rateLimiter,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
         },
-        { createClient: () => client as never },
-      );
+        createClient: () => client as never,
+      });
 
       const result = await destination.send(request());
 
@@ -340,8 +355,8 @@ describe("sqsWebhookDestination", () => {
    * and external id at the same moment.
    */
   describe("given a cached queue client", () => {
-    beforeEach(() => resetSqsClientCache());
-    afterEach(() => resetSqsClientCache());
+    beforeEach(() => SqsWebhookDestinationAdapter.resetClientCache());
+    afterEach(() => SqsWebhookDestinationAdapter.resetClientCache());
 
     describe("when the identity we send with is refused", () => {
       /** @scenario A repaired credential takes effect without a restart */
@@ -359,12 +374,10 @@ describe("sqsWebhookDestination", () => {
             name: "AccessDenied",
           }),
         });
-        await sqsWebhookDestination(
-          { ...config, awsClientConfig, rateLimiter },
-          {
-            createClient: () => client as never,
-          },
-        ).send(request());
+        await SqsWebhookDestinationAdapter.create({
+          config: { ...config, awsClientConfig, rateLimiter },
+          createClient: () => client as never,
+        }).send(request());
 
         expect(clientFor(config)).not.toBe(first);
       });
@@ -385,12 +398,10 @@ describe("sqsWebhookDestination", () => {
             name: "ThrottlingException",
           }),
         });
-        await sqsWebhookDestination(
-          { ...config, awsClientConfig, rateLimiter },
-          {
-            createClient: () => client as never,
-          },
-        ).send(request());
+        await SqsWebhookDestinationAdapter.create({
+          config: { ...config, awsClientConfig, rateLimiter },
+          createClient: () => client as never,
+        }).send(request());
 
         // Rebuilding on a throttle would re-assume the role on every delivery,
         // which is the cost the cache exists to avoid.
@@ -460,7 +471,7 @@ describe("queue URL admission", () => {
 });
 
 describe("the queue client", () => {
-  afterEach(() => resetSqsClientCache());
+  afterEach(() => SqsWebhookDestinationAdapter.resetClientCache());
 
   /**
    * A client per delivery would re-assume the role on every attempt, because

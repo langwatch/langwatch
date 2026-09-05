@@ -27,7 +27,11 @@ export interface BillingCooldownCache {
   claim?(key: string, value: true): Promise<boolean>;
 }
 
-export class MemoryCooldownCache implements BillingCooldownCache {
+export class BillingAlertCooldownService implements BillingCooldownCache {
+  static create({ ttlMs }: { ttlMs: number }): BillingAlertCooldownService {
+    return new BillingAlertCooldownService(ttlMs);
+  }
+
   private readonly values = new Map<string, number>();
 
   constructor(private readonly ttlMs: number) {}
@@ -60,7 +64,7 @@ export class MemoryCooldownCache implements BillingCooldownCache {
   }
 }
 
-export const resourceLimitCooldown = new MemoryCooldownCache(DAY_MS);
+export const resourceLimitCooldown = BillingAlertCooldownService.create({ ttlMs: DAY_MS });
 
 /**
  * The plan-limit alert is guarded in two layers, because the two races are
@@ -69,4 +73,6 @@ export const resourceLimitCooldown = new MemoryCooldownCache(DAY_MS);
  * `planLimitCooldown` is what stops the ticks that follow.
  */
 export const planLimitInFlight = new Set<string>();
-export const planLimitCooldown = new MemoryCooldownCache(MIN_DAYS_BETWEEN_ALERTS * DAY_MS);
+export const planLimitCooldown = BillingAlertCooldownService.create({
+  ttlMs: MIN_DAYS_BETWEEN_ALERTS * DAY_MS,
+});

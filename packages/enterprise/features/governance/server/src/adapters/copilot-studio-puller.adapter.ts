@@ -71,7 +71,7 @@ export const COPILOT_STUDIO_PULL_CONFIG: HttpPollingConfig = {
  * Microsoft Graph credentials (typically via OAuth2 device flow); the
  * worker dispatches via the registry.
  */
-export class CopilotStudioReferencePuller extends HttpPollingPullerAdapter {
+export class CopilotStudioReferencePullerAdapter extends HttpPollingPullerAdapter {
   override readonly id: string = "copilot_studio";
 
   private constructor(options: {
@@ -84,8 +84,8 @@ export class CopilotStudioReferencePuller extends HttpPollingPullerAdapter {
   static override create(options: {
     http: GovernanceHttpPort;
     diagnostics?: IngestionPullDiagnosticsPort;
-  }): CopilotStudioReferencePuller {
-    return new CopilotStudioReferencePuller(options);
+  }): CopilotStudioReferencePullerAdapter {
+    return new CopilotStudioReferencePullerAdapter(options);
   }
 
   /**

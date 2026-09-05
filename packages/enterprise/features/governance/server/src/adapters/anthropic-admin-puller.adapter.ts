@@ -43,7 +43,7 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
 import type { GovernanceHttpPort } from "../ports/governance-http.port";
-import { AdminUsageReport } from "./admin-usage-report.adapter";
+import { AdminUsageReportAdapter } from "./admin-usage-report.adapter";
 import type {
   GovernancePuller as PullerAdapter,
   NormalizedPullEvent,
@@ -198,13 +198,13 @@ const pageSchema = z.object({
   next_page: z.string().nullable().default(null),
 });
 
-export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullConfig> {
+export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdminPullConfig> {
   readonly id: string = ANTHROPIC_ADMIN_ADAPTER_ID;
 
   private constructor(private readonly http: GovernanceHttpPort) {}
 
-  static create(http: GovernanceHttpPort): AnthropicAdminPuller {
-    return new AnthropicAdminPuller(http);
+  static create(http: GovernanceHttpPort): AnthropicAdminPullerAdapter {
+    return new AnthropicAdminPullerAdapter(http);
   }
 
   validateConfig(config: unknown): AnthropicAdminPullConfig {
@@ -220,9 +220,9 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
     // actually emitted, so a cut-off run records how far it really got —
     // that record is what lets a later identity mismatch resume near the
     // token instead of re-reading the window (see `cursorSchema`).
-    const cursor = AnthropicAdminPuller.parseCursor({ cursor: options.cursor, config });
+    const cursor = AnthropicAdminPullerAdapter.parseCursor({ cursor: options.cursor, config });
     const startingAt = cursor.startingAt;
-    const query = AnthropicAdminPuller.queryIdentity(config);
+    const query = AnthropicAdminPullerAdapter.queryIdentity(config);
     let page = cursor.page;
     let watermark = cursor.watermark;
 
@@ -232,7 +232,7 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
         // so a deadline costs latency rather than a window.
         return {
           events,
-          cursor: AnthropicAdminPuller.encodeCursor({ startingAt, page, query, watermark }),
+          cursor: AnthropicAdminPullerAdapter.encodeCursor({ startingAt, page, query, watermark }),
           errorCount: 0,
         };
       }
@@ -252,7 +252,7 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
         // retired: `startingAt` itself is now the resume point.
         return {
           events,
-          cursor: AnthropicAdminPuller.encodeCursor({
+          cursor: AnthropicAdminPullerAdapter.encodeCursor({
             startingAt: watermark ?? startingAt,
             page: null,
             query,
@@ -270,7 +270,7 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
     );
     return {
       events,
-      cursor: AnthropicAdminPuller.encodeCursor({ startingAt, page, query, watermark }),
+      cursor: AnthropicAdminPullerAdapter.encodeCursor({ startingAt, page, query, watermark }),
       errorCount: 0,
     };
   }
@@ -354,7 +354,7 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
       throw new Error("anthropic admin puller requires an admin API key in credentials.token");
     }
 
-    const url = AnthropicAdminPuller.reportUrl({ config, startingAt, page });
+    const url = AnthropicAdminPullerAdapter.reportUrl({ config, startingAt, page });
     const signal = options.signal
       ? AbortSignal.any([options.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
       : AbortSignal.timeout(REQUEST_TIMEOUT_MS);
@@ -373,7 +373,7 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
       followRedirects: false,
     });
     if (!response.ok) {
-      throw await AnthropicAdminPuller.fetchPageError(response, config.report);
+      throw await AnthropicAdminPullerAdapter.fetchPageError(response, config.report);
     }
     return await response.json();
   }
@@ -420,18 +420,18 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
     const dimensions = {
       report: "usage",
       bucketWidth: config.bucketWidth,
-      model: AdminUsageReport.dimension(result.model),
-      workspaceId: AdminUsageReport.dimension(result.workspace_id),
-      apiKeyId: AdminUsageReport.dimension(result.api_key_id),
-      serviceTier: AdminUsageReport.dimension(result.service_tier),
-      contextWindow: AdminUsageReport.dimension(result.context_window),
+      model: AdminUsageReportAdapter.dimension(result.model),
+      workspaceId: AdminUsageReportAdapter.dimension(result.workspace_id),
+      apiKeyId: AdminUsageReportAdapter.dimension(result.api_key_id),
+      serviceTier: AdminUsageReportAdapter.dimension(result.service_tier),
+      contextWindow: AdminUsageReportAdapter.dimension(result.context_window),
     };
     return {
-      source_event_id: `usage:${startingAt}:${AdminUsageReport.dimensionPath(dimensions)}`,
+      source_event_id: `usage:${startingAt}:${AdminUsageReportAdapter.dimensionPath(dimensions)}`,
       event_timestamp: startingAt,
       actor: "",
       action: "usage_report",
-      target: AdminUsageReport.dimension(result.model),
+      target: AdminUsageReportAdapter.dimension(result.model),
       // Anthropic reports no cost on this report; we price the quantities.
       cost_usd: "0",
       tokens_input: result.uncached_input_tokens,
@@ -441,9 +441,9 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
         [PULLED_USAGE_HINT_KEY]: {
           costBasis: "computed",
           dimensions,
-          model: AdminUsageReport.dimension(result.model),
+          model: AdminUsageReportAdapter.dimension(result.model),
           tokensCacheRead: result.cache_read_input_tokens,
-          tokensCacheWrite: AnthropicAdminPuller.cacheWriteTokens(result),
+          tokensCacheWrite: AnthropicAdminPullerAdapter.cacheWriteTokens(result),
         },
       },
     };
@@ -463,9 +463,9 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
       // let an operator's edit re-key every unchanged cost bucket and record
       // the same spend a second time.
       bucketWidth: COST_REPORT_BUCKET_WIDTH,
-      workspaceId: AdminUsageReport.dimension(result.workspace_id),
-      description: AdminUsageReport.dimension(result.description),
-      costType: AdminUsageReport.dimension(result.cost_type),
+      workspaceId: AdminUsageReportAdapter.dimension(result.workspace_id),
+      description: AdminUsageReportAdapter.dimension(result.description),
+      costType: AdminUsageReportAdapter.dimension(result.cost_type),
     };
     if (result.currency !== "USD") {
       // The ledger is nano-USD. Converting here would need a rate and a date,
@@ -483,7 +483,7 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
       );
       return null;
     }
-    const amountUsd = AnthropicAdminPuller.centsToUsd(result.amount);
+    const amountUsd = AnthropicAdminPullerAdapter.centsToUsd(result.amount);
     if (amountUsd === null) {
       // Same reasoning as the non-USD skip above: one permanently malformed
       // row must cost one row, not the whole source. No raw amount in the
@@ -495,11 +495,11 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
       return null;
     }
     return {
-      source_event_id: `cost:${startingAt}:${AdminUsageReport.dimensionPath(dimensions)}`,
+      source_event_id: `cost:${startingAt}:${AdminUsageReportAdapter.dimensionPath(dimensions)}`,
       event_timestamp: startingAt,
       actor: "",
       action: "cost_report",
-      target: AdminUsageReport.dimension(result.model),
+      target: AdminUsageReportAdapter.dimension(result.model),
       // Decimal string — no Number() coercion. The exact value rides through
       // to the pricing service via the hint below.
       cost_usd: amountUsd,
@@ -514,7 +514,7 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
           costStatus: "estimate",
           costUsd: amountUsd,
           dimensions,
-          model: AdminUsageReport.dimension(result.model),
+          model: AdminUsageReportAdapter.dimension(result.model),
         },
       },
     };
@@ -550,7 +550,7 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
     if (cursor) {
       try {
         const parsed = cursorSchema.parse(JSON.parse(cursor));
-        if (parsed.query === AnthropicAdminPuller.queryIdentity(config)) {
+        if (parsed.query === AnthropicAdminPullerAdapter.queryIdentity(config)) {
           return {
             startingAt: parsed.startingAt,
             page: parsed.page,
@@ -561,7 +561,7 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
         // null): this change itself widened the group_by set and fixed the
         // cents→USD conversion, so everything those cursors certify was
         // written by the old code.
-        return AnthropicAdminPuller.staleCursorRestart({ parsed, config });
+        return AnthropicAdminPullerAdapter.staleCursorRestart({ parsed, config });
       } catch {
         logger.warn(
           { cursor },
@@ -570,7 +570,7 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
       }
     }
     return {
-      startingAt: config.startingAt ?? AnthropicAdminPuller.defaultStartingAt(config.report),
+      startingAt: config.startingAt ?? AnthropicAdminPullerAdapter.defaultStartingAt(config.report),
       page: null,
       watermark: null,
     };
@@ -608,7 +608,9 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
       );
       return {
         startingAt:
-          resumeFrom ?? config.startingAt ?? AnthropicAdminPuller.defaultStartingAt(config.report),
+          resumeFrom ??
+          config.startingAt ??
+          AnthropicAdminPullerAdapter.defaultStartingAt(config.report),
         page: null,
         watermark: null,
       };
@@ -618,7 +620,7 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
       "anthropic admin cost cursor was minted under a different query or repair window; discarding it and re-reading from the start",
     );
     const configuredStart =
-      config.startingAt ?? AnthropicAdminPuller.defaultStartingAt(config.report);
+      config.startingAt ?? AnthropicAdminPullerAdapter.defaultStartingAt(config.report);
     // The EARLIER of the stored watermark and the configured start: the
     // rewind must never move the watermark FORWARD. A source that fell
     // behind (paused, erroring) holds a watermark older than the default
@@ -667,7 +669,7 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
     response: { status: number; text(): Promise<string> },
     report: string,
   ): Promise<Error> {
-    const detail = await AdminUsageReport.safeResponseText(response);
+    const detail = await AdminUsageReportAdapter.safeResponseText(response);
     const suffix = detail ? `: ${detail}` : "";
     return new Error(`HTTP ${response.status} (anthropic ${report}_report)${suffix}`);
   }

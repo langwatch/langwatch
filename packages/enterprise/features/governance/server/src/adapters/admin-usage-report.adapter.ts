@@ -15,7 +15,11 @@
  * row's identity, and two pullers disagreeing about identity is double-counted
  * spend rather than a formatting difference.
  */
-export class AdminUsageReport {
+export class AdminUsageReportAdapter {
+  static create(): AdminUsageReportAdapter {
+    return new AdminUsageReportAdapter();
+  }
+
   /**
    * How much of a failed response body is kept for the error message. Enough
    * to carry a provider's own explanation, bounded because the body on a
@@ -59,9 +63,9 @@ export class AdminUsageReport {
   static async safeResponseText(response: { text(): Promise<string> }): Promise<string> {
     try {
       const raw = await response.text();
-      if (raw.length <= AdminUsageReport.MAX_ERROR_BODY_BYTES) return raw;
+      if (raw.length <= AdminUsageReportAdapter.MAX_ERROR_BODY_BYTES) return raw;
 
-      return `${raw.slice(0, AdminUsageReport.MAX_ERROR_BODY_BYTES)}… [truncated]`;
+      return `${raw.slice(0, AdminUsageReportAdapter.MAX_ERROR_BODY_BYTES)}… [truncated]`;
     } catch {
       return "";
     }

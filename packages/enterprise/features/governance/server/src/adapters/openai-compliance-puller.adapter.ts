@@ -67,7 +67,7 @@ interface OpenAiAdminInput {
   region: string;
 }
 
-export class OpenAiComplianceReferencePuller extends S3PollingPullerAdapter {
+export class OpenAiComplianceReferencePullerAdapter extends S3PollingPullerAdapter {
   override readonly id: string = "openai_compliance";
 
   private constructor(options: {
@@ -80,8 +80,8 @@ export class OpenAiComplianceReferencePuller extends S3PollingPullerAdapter {
   static override create(options: {
     objects: GovernanceObjectStoragePort;
     diagnostics?: IngestionPullDiagnosticsPort;
-  }): OpenAiComplianceReferencePuller {
-    return new OpenAiComplianceReferencePuller(options);
+  }): OpenAiComplianceReferencePullerAdapter {
+    return new OpenAiComplianceReferencePullerAdapter(options);
   }
 
   /**

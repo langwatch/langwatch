@@ -28,12 +28,11 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import type { GovernanceHttpPort } from "../ports/governance-http.port";
-import { COPILOT_CONVERSATION_ACTION } from "./copilot-studio-trace-mapper.adapter";
+import { COPILOT_CONVERSATION_ACTION } from "../services/copilot-studio-trace-mapper.service";
 import {
   COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
-  isDataverseEnvironmentOrigin,
-  isSameDataverseEnvironment,
-} from "./dataverse-environment.adapter";
+  DataverseEnvironmentService,
+} from "../services/dataverse-environment.service";
 import type {
   GovernancePuller as PullerAdapter,
   NormalizedPullEvent,
@@ -223,13 +222,13 @@ interface TranscriptWalk {
   last: Cursor | null;
 }
 
-export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudioDataverseConfig> {
+export class CopilotStudioDataversePullerAdapter implements PullerAdapter<CopilotStudioDataverseConfig> {
   readonly id: string = COPILOT_STUDIO_DATAVERSE_ADAPTER_ID;
 
   private constructor(private readonly http: GovernanceHttpPort) {}
 
-  static create(http: GovernanceHttpPort): CopilotStudioDataversePuller {
-    return new CopilotStudioDataversePuller(http);
+  static create(http: GovernanceHttpPort): CopilotStudioDataversePullerAdapter {
+    return new CopilotStudioDataversePullerAdapter(http);
   }
 
   validateConfig(config: unknown): CopilotStudioDataverseConfig {
@@ -237,7 +236,7 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
     // The same check the write path runs, repeated here so a config that
     // reached the adapter by any other route still cannot send the secret
     // somewhere Microsoft does not serve.
-    if (!isDataverseEnvironmentOrigin(parsed.environmentUrl)) {
+    if (!DataverseEnvironmentService.isEnvironmentOrigin(parsed.environmentUrl)) {
       throw new Error("environmentUrl must be an https Power Platform environment address");
     }
     return parsed;
@@ -250,7 +249,7 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
     const walk: TranscriptWalk = { events: [], errorCount: 0, last: null };
 
     try {
-      const token = await CopilotStudioDataversePuller.resolveEnvironmentToken({
+      const token = await CopilotStudioDataversePullerAdapter.resolveEnvironmentToken({
         credentials: options.credentials,
         environmentUrl: config.environmentUrl,
         signal: options.signal,
@@ -311,24 +310,24 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
   }): Promise<void> {
     const { walk, options, config, token, bots } = params;
 
-    let url: string | null = CopilotStudioDataversePuller.buildFirstPageUrl({
+    let url: string | null = CopilotStudioDataversePullerAdapter.buildFirstPageUrl({
       environmentUrl: config.environmentUrl,
       config,
-      cursor: CopilotStudioDataversePuller.parseCursor(options.cursor),
+      cursor: CopilotStudioDataversePullerAdapter.parseCursor(options.cursor),
       now: Date.now(),
     });
     let pageCount = 0;
 
     while (url && pageCount < MAX_PAGES_PER_RUN) {
       pageCount += 1;
-      if (CopilotStudioDataversePuller.runIsOver(options)) break;
+      if (CopilotStudioDataversePullerAdapter.runIsOver(options)) break;
 
       const page = await this.fetchPage({ url, token, signal: options.signal });
-      CopilotStudioDataversePuller.readPageRows({ page, walk, bots });
+      CopilotStudioDataversePullerAdapter.readPageRows({ page, walk, bots });
 
       const nextLink = page["@odata.nextLink"] ?? null;
       if (
-        CopilotStudioDataversePuller.refusesNextLink({
+        CopilotStudioDataversePullerAdapter.refusesNextLink({
           link: nextLink,
           environmentUrl: config.environmentUrl,
           walk,
@@ -371,8 +370,8 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
       const page = await this.fetchBotsPage({ environmentUrl, token, signal });
       if (!page) return new Map();
 
-      const bots = CopilotStudioDataversePuller.readBotRows(page.value);
-      CopilotStudioDataversePuller.warnAboutIncompleteBotList({
+      const bots = CopilotStudioDataversePullerAdapter.readBotRows(page.value);
+      CopilotStudioDataversePullerAdapter.warnAboutIncompleteBotList({
         botCount: bots.size,
         hasMorePages: Boolean(page["@odata.nextLink"]),
       });
@@ -405,7 +404,7 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
 
     const response = await this.http.fetch(`${base}?${query}`, {
       method: "GET",
-      headers: CopilotStudioDataversePuller.dataverseHeaders(token),
+      headers: CopilotStudioDataversePullerAdapter.dataverseHeaders(token),
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       // Same reasoning as the transcript read: this request carries the
       // token, and a redirect would hand it to whoever answers.
@@ -431,7 +430,7 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
     const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
     const response = await this.http.fetch(url, {
       method: "GET",
-      headers: CopilotStudioDataversePuller.dataverseHeaders(token),
+      headers: CopilotStudioDataversePullerAdapter.dataverseHeaders(token),
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       // The header above carries the token minted from the customer's secret.
       // The helper follows up to ten redirects by default and re-sends
@@ -562,7 +561,7 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
     const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${API_VERSION}/conversationtranscripts`;
 
     const filters = cursor
-      ? CopilotStudioDataversePuller.continuationFilters(cursor)
+      ? CopilotStudioDataversePullerAdapter.continuationFilters(cursor)
       : [`createdon ge ${new Date(now - FIRST_RUN_LOOKBACK_MS).toISOString()}`];
     if (config.botIds.length > 0) {
       // Bare, not quoted. The lookup column is an `Edm.Guid`, and Dataverse
@@ -617,7 +616,7 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
       const parsed = botRowSchema.safeParse(raw);
       if (!parsed.success) continue;
       const row = parsed.data;
-      bots.set(CopilotStudioDataversePuller.botKey(row.botid), {
+      bots.set(CopilotStudioDataversePullerAdapter.botKey(row.botid), {
         botName: row.name ?? undefined,
         botModifiedOn: row.modifiedon ?? undefined,
       });
@@ -665,7 +664,7 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
     const { row, bots } = params;
     const id = row._bot_conversationtranscriptid_value;
     if (!id) return {};
-    const record = bots.get(CopilotStudioDataversePuller.botKey(id));
+    const record = bots.get(CopilotStudioDataversePullerAdapter.botKey(id));
     if (!record) return {};
     const facts: Record<string, string> = {};
     if (record.botName) facts.botName = record.botName;
@@ -691,7 +690,7 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
     if (!parsed.success) return null;
 
     const row = parsed.data;
-    const facts = CopilotStudioDataversePuller.botFactsOf({ row, bots });
+    const facts = CopilotStudioDataversePullerAdapter.botFactsOf({ row, bots });
     // A row with no `createdon` keeps the previous row's, so the cursor never
     // goes backwards and never lands on an empty timestamp that the next run's
     // filter would read as "everything".
@@ -769,7 +768,7 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
         walk.errorCount += 1;
         continue;
       }
-      const read = CopilotStudioDataversePuller.readTranscriptRow({
+      const read = CopilotStudioDataversePullerAdapter.readTranscriptRow({
         raw,
         previous: walk.last,
         bots,
@@ -783,8 +782,10 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
         // fails it as no progress — every run, until some later row happens to
         // arrive and drag the window past it.
         walk.last =
-          CopilotStudioDataversePuller.cursorPastUnreadableRow({ raw, previous: walk.last }) ??
-          walk.last;
+          CopilotStudioDataversePullerAdapter.cursorPastUnreadableRow({
+            raw,
+            previous: walk.last,
+          }) ?? walk.last;
         continue;
       }
       walk.last = read.cursor;
@@ -824,7 +825,8 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
     walk: TranscriptWalk;
   }): boolean {
     const { link, environmentUrl, walk } = params;
-    if (!link || isSameDataverseEnvironment({ value: link, environmentUrl })) return false;
+    if (!link || DataverseEnvironmentService.isSameEnvironment({ value: link, environmentUrl }))
+      return false;
     walk.errorCount += 1;
     // The host, not the URL: the refused link carries a skip token and query
     // shape that add nothing here, and the host is the whole of what an
@@ -833,8 +835,8 @@ export class CopilotStudioDataversePuller implements PullerAdapter<CopilotStudio
     // permissions problem and gets debugged as one.
     logger.error(
       {
-        refusedHost: CopilotStudioDataversePuller.hostOf(link),
-        environmentHost: CopilotStudioDataversePuller.hostOf(environmentUrl),
+        refusedHost: CopilotStudioDataversePullerAdapter.hostOf(link),
+        environmentHost: CopilotStudioDataversePullerAdapter.hostOf(environmentUrl),
       },
       "copilot studio dataverse: refusing a next-page link that is not the configured environment",
     );

@@ -51,7 +51,7 @@ import type {
   PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
 import type { GovernanceHttpPort } from "../ports/governance-http.port";
-import { AdminUsageReport } from "./admin-usage-report.adapter";
+import { AdminUsageReportAdapter } from "./admin-usage-report.adapter";
 
 const logger = createLogger("langwatch:governance:openai-admin-puller");
 
@@ -206,13 +206,13 @@ const pageSchema = z.object({
   next_page: z.string().nullable().default(null),
 });
 
-export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
+export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullConfig> {
   readonly id: string = OPENAI_ADMIN_ADAPTER_ID;
 
   private constructor(private readonly http: GovernanceHttpPort) {}
 
-  static create(http: GovernanceHttpPort): OpenAiAdminPuller {
-    return new OpenAiAdminPuller(http);
+  static create(http: GovernanceHttpPort): OpenAiAdminPullerAdapter {
+    return new OpenAiAdminPullerAdapter(http);
   }
 
   validateConfig(config: unknown): OpenAiAdminPullConfig {
@@ -221,11 +221,11 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
 
   async runOnce(options: PullRunOptions, config: OpenAiAdminPullConfig): Promise<PullResult> {
     const events: NormalizedPullEvent[] = [];
-    const cursor = OpenAiAdminPuller.parseCursor({ cursor: options.cursor, config });
+    const cursor = OpenAiAdminPullerAdapter.parseCursor({ cursor: options.cursor, config });
     // The window start does not move within a run; only the page token, the
     // watermark and the key-grouping fallback do.
     const startingAt = cursor.windowStart;
-    const query = OpenAiAdminPuller.queryIdentity(config);
+    const query = OpenAiAdminPullerAdapter.queryIdentity(config);
     let page = cursor.page;
     let watermark = cursor.watermark;
     let hasKeyGrouping = cursor.hasKeyGrouping;
@@ -244,7 +244,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         // so a deadline costs latency rather than a window.
         return {
           events,
-          cursor: OpenAiAdminPuller.encodeCursor({
+          cursor: OpenAiAdminPullerAdapter.encodeCursor({
             startingAt: resumeStart(),
             page,
             query,
@@ -269,13 +269,13 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       }
       events.push(...read.events);
       hasKeyGrouping = read.hasKeyGrouping;
-      watermark = OpenAiAdminPuller.laterOf(watermark, read.watermark);
+      watermark = OpenAiAdminPullerAdapter.laterOf(watermark, read.watermark);
 
       if (read.nextPage === null) {
         return {
           events,
-          cursor: OpenAiAdminPuller.encodeCursor(
-            OpenAiAdminPuller.drainCursor({
+          cursor: OpenAiAdminPullerAdapter.encodeCursor(
+            OpenAiAdminPullerAdapter.drainCursor({
               watermark,
               storedStart: cursor.storedStart,
               hasKeyGrouping,
@@ -294,7 +294,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     );
     return {
       events,
-      cursor: OpenAiAdminPuller.encodeCursor({
+      cursor: OpenAiAdminPullerAdapter.encodeCursor({
         startingAt: resumeStart(),
         page,
         query,
@@ -376,7 +376,10 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     // order cannot rewind the source.
     const newest = parsed.data.reduce<string | null>(
       (acc, bucket) =>
-        OpenAiAdminPuller.laterOf(acc, OpenAiAdminPuller.bucketStartIso(bucket.start_time)),
+        OpenAiAdminPullerAdapter.laterOf(
+          acc,
+          OpenAiAdminPullerAdapter.bucketStartIso(bucket.start_time),
+        ),
       null,
     );
     return {
@@ -450,7 +453,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       throw new Error("openai admin puller requires an admin API key in credentials.token");
     }
 
-    const url = OpenAiAdminPuller.reportUrl({ startingAt, page, hasKeyGrouping });
+    const url = OpenAiAdminPullerAdapter.reportUrl({ startingAt, page, hasKeyGrouping });
     const signal = options.signal
       ? AbortSignal.any([options.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
       : AbortSignal.timeout(REQUEST_TIMEOUT_MS);
@@ -465,8 +468,8 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       followRedirects: false,
     });
     if (!response.ok) {
-      const detail = await AdminUsageReport.safeResponseText(response);
-      if (response.status === 400 && OpenAiAdminPuller.isKeyGroupingRefusal(detail)) {
+      const detail = await AdminUsageReportAdapter.safeResponseText(response);
+      if (response.status === 400 && OpenAiAdminPullerAdapter.isKeyGroupingRefusal(detail)) {
         return { ok: false };
       }
       // The body can echo the request but never the credential — the key rides
@@ -491,7 +494,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     bucket: z.infer<typeof bucketSchema>;
     hasKeyGrouping: boolean;
   }): NormalizedPullEvent[] {
-    const startingAt = OpenAiAdminPuller.bucketStartIso(bucket.start_time);
+    const startingAt = OpenAiAdminPullerAdapter.bucketStartIso(bucket.start_time);
     return bucket.results.flatMap((result) => {
       const parsed = costResultSchema.safeParse(result);
       if (!parsed.success) {
@@ -522,14 +525,14 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     const dimensions: Record<string, string> = {
       report: "cost",
       bucketWidth: COST_REPORT_BUCKET_WIDTH,
-      projectId: AdminUsageReport.dimension(result.project_id),
-      lineItem: AdminUsageReport.dimension(result.line_item),
-      userId: AdminUsageReport.dimension(result.user_id),
+      projectId: AdminUsageReportAdapter.dimension(result.project_id),
+      lineItem: AdminUsageReportAdapter.dimension(result.line_item),
+      userId: AdminUsageReportAdapter.dimension(result.user_id),
       // Present only when the window was read with the key dimension. Below
       // the provider's floor the coordinate is absent rather than empty: a
       // stable "" would be a claim about a key, and the map for a given bucket
       // is read one way or the other, never both.
-      ...(hasKeyGrouping ? { apiKeyId: AdminUsageReport.dimension(result.api_key_id) } : {}),
+      ...(hasKeyGrouping ? { apiKeyId: AdminUsageReportAdapter.dimension(result.api_key_id) } : {}),
     };
 
     if (result.amount.currency.toLowerCase() !== "usd") {
@@ -550,12 +553,12 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     const amountUsd = result.amount.value;
 
     return {
-      source_event_id: `cost:${startingAt}:${AdminUsageReport.dimensionPath(dimensions)}`,
+      source_event_id: `cost:${startingAt}:${AdminUsageReportAdapter.dimensionPath(dimensions)}`,
       event_timestamp: startingAt,
       // The provider names the person on every row, so no directory is asked.
-      actor: AdminUsageReport.dimension(result.user_email),
+      actor: AdminUsageReportAdapter.dimension(result.user_email),
       action: "cost_report",
-      target: AdminUsageReport.dimension(result.line_item),
+      target: AdminUsageReportAdapter.dimension(result.line_item),
       cost_usd: amountUsd,
       tokens_input: 0,
       tokens_output: 0,
@@ -565,8 +568,8 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         // spreads `extra` into the audit row's metadata extension, which is
         // where the shipped Genie attribution puts the same thing — so this
         // needs no change to the published event contract.
-        actorUserId: AdminUsageReport.dimension(result.user_id),
-        apiKeyId: AdminUsageReport.dimension(result.api_key_id),
+        actorUserId: AdminUsageReportAdapter.dimension(result.user_id),
+        apiKeyId: AdminUsageReportAdapter.dimension(result.api_key_id),
         [PULLED_USAGE_HINT_KEY]: {
           costBasis: "provider_reported",
           // The provider's figure, but not the invoice: nothing establishes
@@ -575,7 +578,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
           costStatus: "estimate",
           costUsd: amountUsd,
           dimensions,
-          model: AdminUsageReport.dimension(result.line_item),
+          model: AdminUsageReportAdapter.dimension(result.line_item),
         },
       },
     };
@@ -611,7 +614,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     if (cursor) {
       try {
         const parsed = cursorSchema.parse(JSON.parse(cursor));
-        if (parsed.query === OpenAiAdminPuller.queryIdentity(config)) {
+        if (parsed.query === OpenAiAdminPullerAdapter.queryIdentity(config)) {
           return {
             // Mid-window (a page token in hand) the start must stay exactly what
             // the token was minted against. Only a cursor with no token in hand
@@ -620,7 +623,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
             // first keyed window cannot overlap with user-only data.
             windowStart:
               parsed.page === null && !parsed.keyGroupingUpgrade
-                ? OpenAiAdminPuller.windowStartFor({ stored: parsed.startingAt, config })
+                ? OpenAiAdminPullerAdapter.windowStartFor({ stored: parsed.startingAt, config })
                 : parsed.startingAt,
             storedStart: parsed.startingAt,
             page: parsed.page,
@@ -628,7 +631,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
             hasKeyGrouping: parsed.hasKeyGrouping,
           };
         }
-        return OpenAiAdminPuller.staleCursorRestart({ parsed, config });
+        return OpenAiAdminPullerAdapter.staleCursorRestart({ parsed, config });
       } catch {
         logger.warn(
           { adapter: OPENAI_ADMIN_ADAPTER_ID },
@@ -636,7 +639,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         );
       }
     }
-    const fresh = config.startingAt ?? OpenAiAdminPuller.defaultStartingAt();
+    const fresh = config.startingAt ?? OpenAiAdminPullerAdapter.defaultStartingAt();
     return {
       windowStart: fresh,
       storedStart: fresh,
@@ -666,7 +669,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       { adapter: OPENAI_ADMIN_ADAPTER_ID },
       "openai admin cursor was minted under a different query or repair window; discarding it and re-reading from the start",
     );
-    const configuredStart = config.startingAt ?? OpenAiAdminPuller.defaultStartingAt();
+    const configuredStart = config.startingAt ?? OpenAiAdminPullerAdapter.defaultStartingAt();
     // The EARLIER of the stored watermark and the configured start: a rewind
     // must never move the watermark FORWARD. A source that fell behind holds a
     // watermark older than the default window, and snapping it forward would
@@ -698,9 +701,10 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     config: OpenAiAdminPullConfig;
   }): string {
     const storedMs = Date.parse(stored);
-    if (Number.isNaN(storedMs)) return config.startingAt ?? OpenAiAdminPuller.defaultStartingAt();
+    if (Number.isNaN(storedMs))
+      return config.startingAt ?? OpenAiAdminPullerAdapter.defaultStartingAt();
 
-    const floorMs = Date.parse(config.startingAt ?? OpenAiAdminPuller.defaultStartingAt());
+    const floorMs = Date.parse(config.startingAt ?? OpenAiAdminPullerAdapter.defaultStartingAt());
     const lookedBack = storedMs - RESTATEMENT_LOOKBACK_DAYS * MS_PER_DAY;
     const notBeforeConfigured = Number.isNaN(floorMs) ? lookedBack : Math.max(lookedBack, floorMs);
     return new Date(Math.min(notBeforeConfigured, storedMs)).toISOString();
@@ -810,10 +814,10 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     storedStart: string;
     hasKeyGrouping: boolean;
     query: string;
-  }): Parameters<typeof OpenAiAdminPuller.encodeCursor>[0] {
+  }): Parameters<typeof OpenAiAdminPullerAdapter.encodeCursor>[0] {
     // The stored start never moves backwards: a retracted window whose newest
     // bucket predates the stored start must not rewind the source.
-    const start = OpenAiAdminPuller.laterOf(watermark, storedStart) ?? storedStart;
+    const start = OpenAiAdminPullerAdapter.laterOf(watermark, storedStart) ?? storedStart;
     return {
       // When upgrading from user-only to keyed grouping, advance one bucket past
       // the watermark: that day was already emitted with user-only dimensions,

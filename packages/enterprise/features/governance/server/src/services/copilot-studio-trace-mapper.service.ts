@@ -38,12 +38,12 @@ import type { z } from "zod";
 import {
   type ConversationRoutingProfile,
   type ConversationSeeds,
-  ConversationTraceAssembly,
+  ConversationTraceAssemblyService,
   type OtlpJsonAttr,
   type OtlpJsonSpan,
   type RoutingOrigin,
-} from "./conversation-trace-assembly.adapter";
-import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "./dataverse-environment.adapter";
+} from "./conversation-trace-assembly.service";
+import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "./dataverse-environment.service";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
 type ExportTraceServiceRequest = z.input<typeof exportTraceServiceRequestSchema>;
@@ -254,7 +254,11 @@ interface ToolCallTrace {
  * is what makes the entry point findable and the rest plainly internal —
  * three of them used to be exported to nobody at all.
  */
-export class CopilotStudioTraceMapper {
+export class CopilotStudioTraceMapperService {
+  static create(): CopilotStudioTraceMapperService {
+    return new CopilotStudioTraceMapperService();
+  }
+
   /**
    * Both spellings of the role, because Bot Framework has two.
    *
@@ -302,7 +306,7 @@ export class CopilotStudioTraceMapper {
   }
 
   private static parseRow(event: NormalizedPullEvent): TranscriptRow | null {
-    const row = CopilotStudioTraceMapper.asObject(event.raw_payload);
+    const row = CopilotStudioTraceMapperService.asObject(event.raw_payload);
     return row ? (row as TranscriptRow) : null;
   }
 
@@ -316,7 +320,7 @@ export class CopilotStudioTraceMapper {
    * reorders a conversation.
    */
   private static batchIdOf(row: TranscriptRow): number | null {
-    const metadata = CopilotStudioTraceMapper.asObject(row.metadata);
+    const metadata = CopilotStudioTraceMapperService.asObject(row.metadata);
     const raw = metadata?.BatchId;
     if (typeof raw === "number" && Number.isInteger(raw) && raw >= 0) return raw;
     if (typeof raw === "string" && /^\d+$/.test(raw)) return Number(raw);
@@ -377,13 +381,16 @@ export class CopilotStudioTraceMapper {
   ): Map<string, ConversationBucket> {
     const byKey = new Map<string, ConversationBucket>();
     for (const event of events) {
-      const row = CopilotStudioTraceMapper.parseRow(event);
+      const row = CopilotStudioTraceMapperService.parseRow(event);
       if (!row) continue;
-      const key = CopilotStudioTraceMapper.conversationKeyOf(row);
+      const key = CopilotStudioTraceMapperService.conversationKeyOf(row);
       if (!key) continue;
       const existing = byKey.get(key) ?? { rows: [], bot: {} };
-      existing.rows.push({ batchId: CopilotStudioTraceMapper.batchIdOf(row), row });
-      CopilotStudioTraceMapper.rememberBotFacts({ bot: existing.bot, extra: event.extra ?? {} });
+      existing.rows.push({ batchId: CopilotStudioTraceMapperService.batchIdOf(row), row });
+      CopilotStudioTraceMapperService.rememberBotFacts({
+        bot: existing.bot,
+        extra: event.extra ?? {},
+      });
       byKey.set(key, existing);
     }
     return byKey;
@@ -422,10 +429,10 @@ export class CopilotStudioTraceMapper {
   private static activitiesOf(rows: IndexedRow[]): Activity[] {
     const activities: Activity[] = [];
     for (const { row } of rows) {
-      const list = CopilotStudioTraceMapper.asObject(row.content)?.activities;
+      const list = CopilotStudioTraceMapperService.asObject(row.content)?.activities;
       if (!Array.isArray(list)) continue;
       for (const entry of list) {
-        if (CopilotStudioTraceMapper.isActivityObject(entry)) activities.push(entry);
+        if (CopilotStudioTraceMapperService.isActivityObject(entry)) activities.push(entry);
       }
     }
     return activities;
@@ -447,7 +454,7 @@ export class CopilotStudioTraceMapper {
     const sortable = activities.map((activity, index) => ({
       activity,
       index,
-      ms: CopilotStudioTraceMapper.activityMs(activity),
+      ms: CopilotStudioTraceMapperService.activityMs(activity),
     }));
     const dated: { activity: Activity; index: number; ms: number }[] = [];
     for (const item of sortable) {
@@ -467,7 +474,7 @@ export class CopilotStudioTraceMapper {
     return activities.some(
       (a) =>
         a.valueType === "ConversationInfo" &&
-        CopilotStudioTraceMapper.asObject(a.value)?.isDesignMode === true,
+        CopilotStudioTraceMapperService.asObject(a.value)?.isDesignMode === true,
     );
   }
 
@@ -479,9 +486,9 @@ export class CopilotStudioTraceMapper {
     const { key, bucket } = params;
     const ordered = bucket.rows
       .map((row, index) => ({ ...row, index }))
-      .sort((a, b) => CopilotStudioTraceMapper.byBatchThenArrival(a, b));
+      .sort((a, b) => CopilotStudioTraceMapperService.byBatchThenArrival(a, b));
     const batches = ordered.map((r) => r.batchId).filter((b): b is number => b !== null);
-    const activities = CopilotStudioTraceMapper.activitiesOf(ordered);
+    const activities = CopilotStudioTraceMapperService.activitiesOf(ordered);
 
     return {
       key,
@@ -489,7 +496,7 @@ export class CopilotStudioTraceMapper {
       // arrive as written, and this is what makes it right when they do not:
       // turns are paired by walking this list, so one out-of-order message
       // attaches an answer to the wrong question.
-      activities: CopilotStudioTraceMapper.timeOrderActivities(activities),
+      activities: CopilotStudioTraceMapperService.timeOrderActivities(activities),
       bot: bucket.bot,
       batches,
       // A hole in the batch numbers we hold — 0 and 2 with no 1 — is a piece
@@ -505,8 +512,8 @@ export class CopilotStudioTraceMapper {
       // that a conversation truncated at the front by the 30-day cleanup
       // reads as complete; `transcript_batches` still shows how many pieces
       // this is built from.
-      isIncomplete: CopilotStudioTraceMapper.hasBatchGap(batches),
-      isDesignMode: CopilotStudioTraceMapper.isDesignModeConversation(activities),
+      isIncomplete: CopilotStudioTraceMapperService.hasBatchGap(batches),
+      isDesignMode: CopilotStudioTraceMapperService.isDesignModeConversation(activities),
     };
   }
 
@@ -520,8 +527,8 @@ export class CopilotStudioTraceMapper {
    */
   private static groupTranscriptRows(events: NormalizedPullEvent[]): ConversationGroup[] {
     const groups: ConversationGroup[] = [];
-    for (const [key, bucket] of CopilotStudioTraceMapper.bucketRowsByConversation(events)) {
-      groups.push(CopilotStudioTraceMapper.conversationGroupOf({ key, bucket }));
+    for (const [key, bucket] of CopilotStudioTraceMapperService.bucketRowsByConversation(events)) {
+      groups.push(CopilotStudioTraceMapperService.conversationGroupOf({ key, bucket }));
     }
     return groups;
   }
@@ -538,8 +545,8 @@ export class CopilotStudioTraceMapper {
    */
   private static readableMessage(activity: Activity): ReadableMessage | null {
     const id = typeof activity.id === "string" ? activity.id : "";
-    const ms = CopilotStudioTraceMapper.activityMs(activity);
-    const text = CopilotStudioTraceMapper.textOf(activity);
+    const ms = CopilotStudioTraceMapperService.activityMs(activity);
+    const text = CopilotStudioTraceMapperService.textOf(activity);
     if (!GUID.test(id) || ms === null || !text) return null;
 
     const aad = activity.from?.aadObjectId;
@@ -547,7 +554,7 @@ export class CopilotStudioTraceMapper {
       id,
       ms,
       text,
-      role: CopilotStudioTraceMapper.roleOf(activity.from?.role),
+      role: CopilotStudioTraceMapperService.roleOf(activity.from?.role),
       // `from.id` is deliberately not consulted. It is GUID-shaped and looks
       // like an account, but it is per-conversation and naming a person by it
       // would invent one person per conversation.
@@ -572,7 +579,7 @@ export class CopilotStudioTraceMapper {
     const { state, message } = params;
 
     if (message.role === ROLE_USER) {
-      CopilotStudioTraceMapper.closeTurn(state);
+      CopilotStudioTraceMapperService.closeTurn(state);
       state.open = {
         seedActivityId: message.id,
         question: message.text,
@@ -625,18 +632,18 @@ export class CopilotStudioTraceMapper {
 
     for (const activity of activities) {
       if (activity.type !== "message") continue;
-      const message = CopilotStudioTraceMapper.readableMessage(activity);
+      const message = CopilotStudioTraceMapperService.readableMessage(activity);
       if (!message) {
         // A message with nothing said is not a skip worth counting — there is
         // no turn being lost. A message that said something but cannot be
         // identified or dated is.
-        if (CopilotStudioTraceMapper.textOf(activity)) state.skipped += 1;
+        if (CopilotStudioTraceMapperService.textOf(activity)) state.skipped += 1;
         continue;
       }
-      CopilotStudioTraceMapper.applyMessage({ state, message });
+      CopilotStudioTraceMapperService.applyMessage({ state, message });
     }
 
-    CopilotStudioTraceMapper.closeTurn(state);
+    CopilotStudioTraceMapperService.closeTurn(state);
     return { turns: state.turns, skipped: state.skipped };
   }
 
@@ -668,14 +675,14 @@ export class CopilotStudioTraceMapper {
     if (!(activity.name ?? "").startsWith("ToolCallTrace:")) return null;
 
     const id = typeof activity.id === "string" ? activity.id : "";
-    const ms = CopilotStudioTraceMapper.activityMs(activity);
+    const ms = CopilotStudioTraceMapperService.activityMs(activity);
     if (!GUID.test(id) || ms === null) return null;
 
-    const value = (CopilotStudioTraceMapper.asObject(activity.value) ?? {}) as ToolCallValue;
+    const value = (CopilotStudioTraceMapperService.asObject(activity.value) ?? {}) as ToolCallValue;
     return {
-      callId: CopilotStudioTraceMapper.callIdOf({ value, activityId: id }),
+      callId: CopilotStudioTraceMapperService.callIdOf({ value, activityId: id }),
       seedActivityId: id,
-      name: CopilotStudioTraceMapper.toolNameOf(value),
+      name: CopilotStudioTraceMapperService.toolNameOf(value),
       arguments: value.filledParameters ? JSON.stringify(value.filledParameters) : null,
       ms,
       isCompleted: (value.toolCallStatus ?? "").toLowerCase() === "completed",
@@ -685,7 +692,7 @@ export class CopilotStudioTraceMapper {
   private static toolCallsOf(activities: Activity[]): ToolCall[] {
     const byCallId = new Map<string, ToolCall>();
     for (const activity of activities) {
-      const trace = CopilotStudioTraceMapper.toolCallTraceOf(activity);
+      const trace = CopilotStudioTraceMapperService.toolCallTraceOf(activity);
       if (!trace) continue;
 
       const existing = byCallId.get(trace.callId);
@@ -743,20 +750,20 @@ export class CopilotStudioTraceMapper {
   }): OtlpJsonAttr[] {
     const { origin, group, endMs, skipped, threadId } = params;
     const attrs: OtlpJsonAttr[] = [
-      ConversationTraceAssembly.stringAttr({ key: "langwatch.thread.id", value: threadId }),
-      ...ConversationTraceAssembly.originAttrs(origin),
+      ConversationTraceAssemblyService.stringAttr({ key: "langwatch.thread.id", value: threadId }),
+      ...ConversationTraceAssemblyService.originAttrs(origin),
     ];
     if (group.bot.botName) {
       attrs.push(
-        ConversationTraceAssembly.stringAttr({
+        ConversationTraceAssemblyService.stringAttr({
           key: "copilot_studio.agent_name",
           value: group.bot.botName,
         }),
       );
     }
-    if (CopilotStudioTraceMapper.agentChangedSince(group.bot, endMs)) {
+    if (CopilotStudioTraceMapperService.agentChangedSince(group.bot, endMs)) {
       attrs.push(
-        ConversationTraceAssembly.stringAttr({
+        ConversationTraceAssemblyService.stringAttr({
           key: "copilot_studio.agent_changed_since",
           value: "true",
         }),
@@ -764,7 +771,7 @@ export class CopilotStudioTraceMapper {
     }
     if (group.batches.length > 0) {
       attrs.push(
-        ConversationTraceAssembly.stringAttr({
+        ConversationTraceAssemblyService.stringAttr({
           key: "copilot_studio.transcript_batches",
           value: group.batches.join(","),
         }),
@@ -772,7 +779,7 @@ export class CopilotStudioTraceMapper {
     }
     if (group.isIncomplete) {
       attrs.push(
-        ConversationTraceAssembly.stringAttr({
+        ConversationTraceAssemblyService.stringAttr({
           key: "copilot_studio.conversation_incomplete",
           value: "true",
         }),
@@ -783,12 +790,15 @@ export class CopilotStudioTraceMapper {
       // than using it. Recorded and labelled instead of filtered, because the
       // person testing their agent is exactly who wants to read the transcript.
       attrs.push(
-        ConversationTraceAssembly.stringAttr({ key: "copilot_studio.design_mode", value: "true" }),
+        ConversationTraceAssemblyService.stringAttr({
+          key: "copilot_studio.design_mode",
+          value: "true",
+        }),
       );
     }
     if (skipped > 0) {
       attrs.push(
-        ConversationTraceAssembly.intAttr({
+        ConversationTraceAssemblyService.intAttr({
           key: "copilot_studio.activities_skipped",
           value: skipped,
         }),
@@ -809,32 +819,32 @@ export class CopilotStudioTraceMapper {
   }): OtlpJsonSpan {
     const { origin, group, turn, traceId, spanId, threadId, skipped, conversationEndMs } = params;
     const attrs: OtlpJsonAttr[] = [
-      ConversationTraceAssembly.stringAttr({ key: "langwatch.span.type", value: "llm" }),
-      ...CopilotStudioTraceMapper.conversationAttrs({
+      ConversationTraceAssemblyService.stringAttr({ key: "langwatch.span.type", value: "llm" }),
+      ...CopilotStudioTraceMapperService.conversationAttrs({
         origin,
         group,
         endMs: conversationEndMs,
         skipped,
         threadId,
       }),
-      ConversationTraceAssembly.stringAttr({
+      ConversationTraceAssemblyService.stringAttr({
         key: "gen_ai.request.model",
         value: origin.profile.agentModel,
       }),
     ];
     if (turn.question !== null) {
       attrs.push(
-        ConversationTraceAssembly.stringAttr({
+        ConversationTraceAssemblyService.stringAttr({
           key: "langwatch.input",
-          value: CopilotStudioTraceMapper.chatValue("user", turn.question),
+          value: CopilotStudioTraceMapperService.chatValue("user", turn.question),
         }),
       );
     }
     if (turn.answer !== null) {
       attrs.push(
-        ConversationTraceAssembly.stringAttr({
+        ConversationTraceAssemblyService.stringAttr({
           key: "langwatch.output",
-          value: CopilotStudioTraceMapper.chatValue("assistant", turn.answer),
+          value: CopilotStudioTraceMapperService.chatValue("assistant", turn.answer),
         }),
       );
     }
@@ -843,7 +853,7 @@ export class CopilotStudioTraceMapper {
       // Resolving it would mean asking for a directory permission this source
       // otherwise does not need.
       attrs.push(
-        ConversationTraceAssembly.stringAttr({
+        ConversationTraceAssemblyService.stringAttr({
           key: "langwatch.user.id",
           value: turn.authorAadObjectId,
         }),
@@ -854,8 +864,10 @@ export class CopilotStudioTraceMapper {
       spanId,
       name: COPILOT_TURN_SPAN_NAME,
       kind: 1,
-      startTimeUnixNano: ConversationTraceAssembly.msToNano(turn.startMs),
-      endTimeUnixNano: ConversationTraceAssembly.msToNano(Math.max(turn.endMs, turn.startMs)),
+      startTimeUnixNano: ConversationTraceAssemblyService.msToNano(turn.startMs),
+      endTimeUnixNano: ConversationTraceAssemblyService.msToNano(
+        Math.max(turn.endMs, turn.startMs),
+      ),
       attributes: attrs,
       status: { code: 1 },
     };
@@ -870,13 +882,13 @@ export class CopilotStudioTraceMapper {
   }): OtlpJsonSpan {
     const { origin, call, traceId, parentSpanId, spanSeed } = params;
     const attrs: OtlpJsonAttr[] = [
-      ConversationTraceAssembly.stringAttr({ key: "langwatch.span.type", value: "tool" }),
-      ConversationTraceAssembly.stringAttr({ key: "tool_name", value: call.name }),
-      ...ConversationTraceAssembly.originAttrs(origin),
+      ConversationTraceAssemblyService.stringAttr({ key: "langwatch.span.type", value: "tool" }),
+      ConversationTraceAssemblyService.stringAttr({ key: "tool_name", value: call.name }),
+      ...ConversationTraceAssemblyService.originAttrs(origin),
     ];
     if (call.arguments) {
       attrs.push(
-        ConversationTraceAssembly.stringAttr({ key: "full_command", value: call.arguments }),
+        ConversationTraceAssemblyService.stringAttr({ key: "full_command", value: call.arguments }),
       );
     }
     if (!call.isFinished) {
@@ -884,7 +896,7 @@ export class CopilotStudioTraceMapper {
       // validation script calls it normal, so it renders marked rather than
       // being held back or dropped.
       attrs.push(
-        ConversationTraceAssembly.stringAttr({
+        ConversationTraceAssemblyService.stringAttr({
           key: "copilot_studio.tool_call_unfinished",
           value: "true",
         }),
@@ -892,12 +904,14 @@ export class CopilotStudioTraceMapper {
     }
     return {
       traceId,
-      spanId: ConversationTraceAssembly.hashId(`${spanSeed}:${call.seedActivityId}`, 16),
+      spanId: ConversationTraceAssemblyService.hashId(`${spanSeed}:${call.seedActivityId}`, 16),
       parentSpanId,
       name: COPILOT_TOOL_SPAN_NAME,
       kind: 1,
-      startTimeUnixNano: ConversationTraceAssembly.msToNano(call.startMs),
-      endTimeUnixNano: ConversationTraceAssembly.msToNano(Math.max(call.endMs, call.startMs)),
+      startTimeUnixNano: ConversationTraceAssemblyService.msToNano(call.startMs),
+      endTimeUnixNano: ConversationTraceAssemblyService.msToNano(
+        Math.max(call.endMs, call.startMs),
+      ),
       attributes: attrs,
       status: { code: 1 },
     };
@@ -930,10 +944,10 @@ export class CopilotStudioTraceMapper {
     group: ConversationGroup;
   }): OtlpJsonSpan[] {
     const { origin, group } = params;
-    const { turns, skipped } = CopilotStudioTraceMapper.turnsOf(group.activities);
+    const { turns, skipped } = CopilotStudioTraceMapperService.turnsOf(group.activities);
     if (turns.length === 0) return [];
 
-    const calls = CopilotStudioTraceMapper.toolCallsOf(group.activities);
+    const calls = CopilotStudioTraceMapperService.toolCallsOf(group.activities);
     const conversationEndMs = turns.reduce(
       (latest, turn) => Math.max(latest, turn.endMs),
       turns[0]!.startMs,
@@ -949,7 +963,7 @@ export class CopilotStudioTraceMapper {
       };
       return {
         turn,
-        identity: ConversationTraceAssembly.deriveConversationIdentity(origin, seeds),
+        identity: ConversationTraceAssemblyService.deriveConversationIdentity(origin, seeds),
       };
     });
 
@@ -957,7 +971,7 @@ export class CopilotStudioTraceMapper {
 
     for (const { turn, identity } of turnIdentities) {
       spans.push(
-        CopilotStudioTraceMapper.turnSpan({
+        CopilotStudioTraceMapperService.turnSpan({
           origin,
           group,
           turn,
@@ -970,7 +984,7 @@ export class CopilotStudioTraceMapper {
       );
     }
 
-    spans.push(...CopilotStudioTraceMapper.toolSpansOf({ origin, calls, turnIdentities }));
+    spans.push(...CopilotStudioTraceMapperService.toolSpansOf({ origin, calls, turnIdentities }));
 
     return spans;
   }
@@ -985,7 +999,7 @@ export class CopilotStudioTraceMapper {
     calls: ToolCall[];
     turnIdentities: {
       turn: Turn;
-      identity: ReturnType<typeof ConversationTraceAssembly.deriveConversationIdentity>;
+      identity: ReturnType<typeof ConversationTraceAssemblyService.deriveConversationIdentity>;
     }[];
   }): OtlpJsonSpan[] {
     const { origin, calls, turnIdentities } = params;
@@ -993,7 +1007,7 @@ export class CopilotStudioTraceMapper {
       const parent =
         [...turnIdentities].reverse().find(({ turn }) => turn.startMs <= call.startMs) ??
         turnIdentities[0]!;
-      return CopilotStudioTraceMapper.toolSpan({
+      return CopilotStudioTraceMapperService.toolSpan({
         origin,
         call,
         traceId: parent.identity.traceId,
@@ -1015,10 +1029,10 @@ export class CopilotStudioTraceMapper {
       (event) => !!event.action && event.action === wanted,
     );
 
-    const spans = CopilotStudioTraceMapper.groupTranscriptRows(conversationEvents).flatMap(
-      (group) => CopilotStudioTraceMapper.conversationSpans({ origin, group }),
+    const spans = CopilotStudioTraceMapperService.groupTranscriptRows(conversationEvents).flatMap(
+      (group) => CopilotStudioTraceMapperService.conversationSpans({ origin, group }),
     );
 
-    return ConversationTraceAssembly.assembleTraceRequest(spans, origin.profile);
+    return ConversationTraceAssemblyService.assembleTraceRequest(spans, origin.profile);
   }
 }

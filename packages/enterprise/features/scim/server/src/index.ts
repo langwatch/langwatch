@@ -40,6 +40,6 @@ export { ScimDirectoryIdentityService } from "./services/scim-directory-identity
  * `platform/app/src/server/app-layer/identity/scim-sync-lifecycle.ts`.
  */
 export {
-  ScimSyncLifecycle,
-  type ScimSyncLifecycleDeps,
+  ScimSyncLifecycleAdapter,
+  type ScimSyncLifecycleAdapterDeps,
 } from "./adapters/identity.scim-sync-lifecycle.adapter";

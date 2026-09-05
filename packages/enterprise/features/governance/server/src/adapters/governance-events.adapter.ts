@@ -113,21 +113,29 @@ export class RecordBudgetCrossingCommand implements CommandHandler<
 }
 
 /** Ordered per governed subject; durable command keys enforce idempotency. */
-export function createGovernanceEventsPipeline(deps: GovernanceEventsPipelineDeps) {
-  let pipeline = definePipeline<GovernanceEventsProcessingEvent>({
-    name: GOVERNANCE_EVENTS_PIPELINE_NAME,
-    aggregate: defineAggregate({
-      type: GOVERNANCE_EVENTS_AGGREGATE_TYPE,
-      events: defineEvents(GOVERNANCE_EVENTS_EVENT_TYPES),
-    }),
-  })
-    .withCommand("recordVkLifecycle", RecordVkLifecycleCommand)
-    .withCommand("recordBudgetCrossing", RecordBudgetCrossingCommand);
-  if (deps.webhookDelivery) {
-    pipeline = pipeline.withProcessManager(
-      GOVERNANCE_EVENTS_PROCESS_NAME,
-      deps.webhookDelivery.processManager(),
-    );
+export class GovernanceEventsAdapter {
+  private constructor(private readonly deps: GovernanceEventsPipelineDeps) {}
+
+  static create(deps: GovernanceEventsPipelineDeps): GovernanceEventsAdapter {
+    return new GovernanceEventsAdapter(deps);
   }
-  return pipeline.build();
+
+  pipeline() {
+    let pipeline = definePipeline<GovernanceEventsProcessingEvent>({
+      name: GOVERNANCE_EVENTS_PIPELINE_NAME,
+      aggregate: defineAggregate({
+        type: GOVERNANCE_EVENTS_AGGREGATE_TYPE,
+        events: defineEvents(GOVERNANCE_EVENTS_EVENT_TYPES),
+      }),
+    })
+      .withCommand("recordVkLifecycle", RecordVkLifecycleCommand)
+      .withCommand("recordBudgetCrossing", RecordBudgetCrossingCommand);
+    if (this.deps.webhookDelivery) {
+      pipeline = pipeline.withProcessManager(
+        GOVERNANCE_EVENTS_PROCESS_NAME,
+        this.deps.webhookDelivery.processManager(),
+      );
+    }
+    return pipeline.build();
+  }
 }

@@ -9,10 +9,10 @@ import {
   type WebhookDispatchRateLimiterPort,
 } from "@langwatch/egress";
 
-import type {
-  WebhookDestination,
-  WebhookDispatchRequest,
-  WebhookDispatchResult,
+import {
+  WebhookDestinationPort,
+  type WebhookDispatchRequest,
+  type WebhookDispatchResult,
 } from "../ports/webhook-destination.port";
 import { parseSqsQueueUrl, sqsHostFor } from "../services/sqs-queue-url.rules";
 
@@ -68,7 +68,7 @@ const TEST_FIRE_ATTRIBUTE = "X-LangWatch-Test-Fire";
  * the send, because there is nothing about the next attempt that would make
  * the same bytes fit.
  */
-export function sqsMessageBytes({
+function sqsMessageBytes({
   body,
   attributes,
 }: {
@@ -88,7 +88,7 @@ export function sqsMessageBytes({
  * The message attributes one delivery carries. Names carry over from the
  * HTTP headers verbatim, so the same receiver logic reads either transport.
  */
-export function sqsMessageAttributes({
+function sqsMessageAttributes({
   batchId,
   attempt,
   signature,
@@ -233,12 +233,12 @@ const STALE_CREDENTIAL_ERROR_NAMES = new Set([
 ]);
 
 /** Whether this failure means the cached client's identity is worth rebuilding. */
-export function isStaleCredentialFailure(error: unknown): boolean {
+function isStaleCredentialFailure(error: unknown): boolean {
   const { name, code } = failureShape(error);
   return STALE_CREDENTIAL_ERROR_NAMES.has(name) || STALE_CREDENTIAL_ERROR_NAMES.has(code);
 }
 
-export function classifySqsFailure(error: unknown): {
+function classifySqsFailure(error: unknown): {
   verdict: "retryable" | "terminal";
   reason: string;
 } {
@@ -368,55 +368,6 @@ async function putOnQueue({
   }
 }
 
-export function sqsWebhookDestination(
-  config: SqsDestinationConfig & {
-    /** How this process builds an AWS transport. */
-    awsClientConfig: AwsClientConfigPort;
-    /**
-     * Where the hourly dispatch cap is counted. Optional only because the
-     * cap is a limit, not a gate: a process without a shared counter delivers
-     * uncapped rather than refusing every queue endpoint it holds.
-     */
-    rateLimiter?: WebhookDispatchRateLimiterPort | undefined;
-  },
-  deps: { createClient?: (config: SqsDestinationConfig) => SQSClient } = {},
-): WebhookDestination {
-  const { awsClientConfig, rateLimiter } = config;
-  return {
-    kind: "sqs",
-    async send(request: WebhookDispatchRequest): Promise<WebhookDispatchResult> {
-      // The same cap the HTTPS transport answers to, called here directly
-      // because a queue send never passes through the HTTP sender that used
-      // to own it. Without this line a queue endpoint would be uncapped. A
-      // test fire is exempt, exactly as it is on the HTTPS side.
-      if (!request.isTestFire && rateLimiter) {
-        await assertDispatchBudget({
-          rateLimiter,
-          scopeId: request.organizationId,
-          label: `Webhook endpoint ${request.endpointId}`,
-        });
-      }
-
-      const attributes = attributesFor(request);
-      const refusal = oversizeRefusal({
-        bytes: sqsMessageBytes({ body: request.body, attributes }),
-        batchId: request.batchId,
-      });
-      if (refusal) return refusal;
-
-      return await putOnQueue({
-        client: deps.createClient
-          ? deps.createClient(config)
-          : sqsClientFor(config, awsClientConfig),
-        queueUrl: config.queueUrl,
-        body: request.body,
-        attributes,
-        batchId: request.batchId,
-      });
-    },
-  };
-}
-
 /**
  * The client for one endpoint's queue, cached and reused.
  *
@@ -450,7 +401,7 @@ function clientCacheKey(config: SqsDestinationConfig): string {
   ].join(KEY_SEPARATOR);
 }
 
-export function sqsClientFor(
+function sqsClientFor(
   config: SqsDestinationConfig,
   awsClientConfig: AwsClientConfigPort,
 ): SQSClient {
@@ -494,7 +445,7 @@ export function sqsClientFor(
  * the caller is reacting to a rejection and does not know which of the cached
  * identities for that queue is the stale one. There is normally exactly one.
  */
-export function dropSqsClient(queueUrl: string): void {
+function dropSqsClient(queueUrl: string): void {
   for (const [key, client] of clients) {
     if (key.split(KEY_SEPARATOR)[0] === queueUrl) {
       client.destroy();
@@ -504,7 +455,120 @@ export function dropSqsClient(queueUrl: string): void {
 }
 
 /** Drop every cached client. For tests, and for a process winding down. */
-export function resetSqsClientCache(): void {
+function resetSqsClientCache(): void {
   for (const client of clients.values()) client.destroy();
   clients.clear();
+}
+
+export interface SqsWebhookDestinationAdapterOptions extends SqsDestinationConfig {
+  /** How this process builds an AWS transport. */
+  awsClientConfig: AwsClientConfigPort;
+  /**
+   * Where the hourly dispatch cap is counted. Optional only because the
+   * cap is a limit, not a gate: a process without a shared counter delivers
+   * uncapped rather than refusing every queue endpoint it holds.
+   */
+  rateLimiter?: WebhookDispatchRateLimiterPort | undefined;
+}
+
+export class SqsWebhookDestinationAdapter extends WebhookDestinationPort {
+  readonly kind = "sqs" as const;
+
+  private constructor(
+    private readonly config: SqsWebhookDestinationAdapterOptions,
+    private readonly createClient?: (config: SqsDestinationConfig) => SQSClient,
+  ) {
+    super();
+  }
+
+  static create({
+    config,
+    createClient,
+  }: {
+    config: SqsWebhookDestinationAdapterOptions;
+    createClient?: (config: SqsDestinationConfig) => SQSClient;
+  }): SqsWebhookDestinationAdapter {
+    return new SqsWebhookDestinationAdapter(config, createClient);
+  }
+
+  /** How large one delivery is, body and attributes together. */
+  static messageBytes(args: {
+    body: string;
+    attributes: Record<string, MessageAttributeValue>;
+  }): number {
+    return sqsMessageBytes(args);
+  }
+
+  /** The message attributes one delivery carries. */
+  static messageAttributes(args: {
+    batchId: string;
+    attempt: number;
+    signature: string | null;
+    isTestFire?: boolean;
+  }): Record<string, MessageAttributeValue> {
+    return sqsMessageAttributes(args);
+  }
+
+  /** Retry or retire, from what the SDK threw. */
+  static classifyFailure(error: unknown): { verdict: "retryable" | "terminal"; reason: string } {
+    return classifySqsFailure(error);
+  }
+
+  /** Whether this failure means the cached client's identity is worth rebuilding. */
+  static isStaleCredentialFailure(error: unknown): boolean {
+    return isStaleCredentialFailure(error);
+  }
+
+  /** The client for one endpoint's queue, cached and reused. */
+  static clientFor({
+    config,
+    awsClientConfig,
+  }: {
+    config: SqsDestinationConfig;
+    awsClientConfig: AwsClientConfigPort;
+  }): SQSClient {
+    return sqsClientFor(config, awsClientConfig);
+  }
+
+  /** Drop every cached client for one queue, whatever credentials they hold. */
+  static dropClient(queueUrl: string): void {
+    dropSqsClient(queueUrl);
+  }
+
+  /** Drop every cached client. For tests, and for a process winding down. */
+  static resetClientCache(): void {
+    resetSqsClientCache();
+  }
+
+  async send(request: WebhookDispatchRequest): Promise<WebhookDispatchResult> {
+    const { awsClientConfig, rateLimiter } = this.config;
+    // The same cap the HTTPS transport answers to, called here directly
+    // because a queue send never passes through the HTTP sender that used
+    // to own it. Without this line a queue endpoint would be uncapped. A
+    // test fire is exempt, exactly as it is on the HTTPS side.
+    if (!request.isTestFire && rateLimiter) {
+      await assertDispatchBudget({
+        rateLimiter,
+        scopeId: request.organizationId,
+        label: `Webhook endpoint ${request.endpointId}`,
+      });
+    }
+
+    const attributes = attributesFor(request);
+    const refusal = oversizeRefusal({
+      bytes: sqsMessageBytes({ body: request.body, attributes }),
+      batchId: request.batchId,
+    });
+    if (refusal) return refusal;
+
+    return await putOnQueue({
+      client: this.createClient
+        ? this.createClient(this.config)
+        : sqsClientFor(this.config, awsClientConfig),
+      queueUrl: this.config.queueUrl,
+      body: request.body,
+      attributes,
+      batchId: request.batchId,
+    });
+  }
 }

@@ -47,84 +47,90 @@ function pickDefined<T extends Record<string, unknown>>(
   return result as { [K in keyof T]?: NonNullable<T[K]> };
 }
 
-/**
- * Identifies a new user in Customer.io during onboarding.
- *
- * Fires three calls — identifyUser, groupUser, trackEvent —
- * all fire-and-forget so that Customer.io failures never block onboarding.
- */
-export function fireSignupNurturingCalls({
-  userId,
-  email,
-  name,
-  organizationId,
-  organizationName,
-  signUpData,
-  primaryIntent,
-}: {
-  userId: string;
-  email: string | null | undefined;
-  name: string | null | undefined;
-  organizationId: string;
-  organizationName: string;
-  signUpData?: SignUpData | null;
-  /** ADR-038 org intent — explicit trait; deliberately NOT part of signupData. */
-  primaryIntent?: OrganizationIntent | null;
-}): void {
-  const nurturing = tryNurturingSink();
-  if (!nurturing) {
-    return;
+export class NurturingSignupIdentificationService {
+  static create(): NurturingSignupIdentificationService {
+    return new NurturingSignupIdentificationService();
   }
 
-  const traits: Partial<CioPersonTraits> = {
-    ...pickDefined({
-      email,
-      name,
-      role: signUpData?.yourRole,
-      company_size: signUpData?.companySize,
-      signup_usage: signUpData?.usage,
-      signup_solution: signUpData?.solution,
-      signup_feature_usage: signUpData?.featureUsage,
-      utm_campaign: signUpData?.utmCampaign,
-      how_heard: signUpData?.howDidYouHearAboutUs,
-      lead_source: signUpData?.leadSource,
-      utm_source: signUpData?.utmSource,
-      utm_medium: signUpData?.utmMedium,
-      utm_term: signUpData?.utmTerm,
-      utm_content: signUpData?.utmContent,
-      referrer: signUpData?.referrer,
-      primary_intent: primaryIntent?.toLowerCase(),
-    }),
-    has_traces: false,
-    has_evaluations: false,
-    has_prompts: false,
-    has_simulations: false,
-    has_subscription: false,
-    createdAt: new Date().toISOString(),
-  };
+  /**
+   * Identifies a new user in Customer.io during onboarding.
+   *
+   * Fires three calls — identifyUser, groupUser, trackEvent —
+   * all fire-and-forget so that Customer.io failures never block onboarding.
+   */
+  static fireSignup({
+    userId,
+    email,
+    name,
+    organizationId,
+    organizationName,
+    signUpData,
+    primaryIntent,
+  }: {
+    userId: string;
+    email: string | null | undefined;
+    name: string | null | undefined;
+    organizationId: string;
+    organizationName: string;
+    signUpData?: SignUpData | null;
+    /** ADR-038 org intent — explicit trait; deliberately NOT part of signupData. */
+    primaryIntent?: OrganizationIntent | null;
+  }): void {
+    const nurturing = tryNurturingSink();
+    if (!nurturing) {
+      return;
+    }
 
-  void nurturing.identifyUser({ userId, traits }).catch(reportNurturingFailure);
-
-  void nurturing
-    .groupUser({
-      userId,
-      groupId: organizationId,
-      traits: {
-        name: organizationName,
-        ...pickDefined({ company_size: signUpData?.companySize }),
-        plan: "free",
-      },
-    })
-    .catch(reportNurturingFailure);
-
-  void nurturing
-    .trackEvent({
-      userId,
-      event: "signed_up",
-      properties: pickDefined({
-        ...signUpData,
+    const traits: Partial<CioPersonTraits> = {
+      ...pickDefined({
+        email,
+        name,
+        role: signUpData?.yourRole,
+        company_size: signUpData?.companySize,
+        signup_usage: signUpData?.usage,
+        signup_solution: signUpData?.solution,
+        signup_feature_usage: signUpData?.featureUsage,
+        utm_campaign: signUpData?.utmCampaign,
+        how_heard: signUpData?.howDidYouHearAboutUs,
+        lead_source: signUpData?.leadSource,
+        utm_source: signUpData?.utmSource,
+        utm_medium: signUpData?.utmMedium,
+        utm_term: signUpData?.utmTerm,
+        utm_content: signUpData?.utmContent,
+        referrer: signUpData?.referrer,
         primary_intent: primaryIntent?.toLowerCase(),
       }),
-    })
-    .catch(reportNurturingFailure);
+      has_traces: false,
+      has_evaluations: false,
+      has_prompts: false,
+      has_simulations: false,
+      has_subscription: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    void nurturing.identifyUser({ userId, traits }).catch(reportNurturingFailure);
+
+    void nurturing
+      .groupUser({
+        userId,
+        groupId: organizationId,
+        traits: {
+          name: organizationName,
+          ...pickDefined({ company_size: signUpData?.companySize }),
+          plan: "free",
+        },
+      })
+      .catch(reportNurturingFailure);
+
+    void nurturing
+      .trackEvent({
+        userId,
+        event: "signed_up",
+        properties: pickDefined({
+          ...signUpData,
+          primary_intent: primaryIntent?.toLowerCase(),
+        }),
+      })
+      .catch(reportNurturingFailure);
+  }
 }

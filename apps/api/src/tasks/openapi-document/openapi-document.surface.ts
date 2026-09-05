@@ -30,6 +30,7 @@
  * process rather than as a gap in this file.
  */
 import { Hono } from "hono";
+import { ApiGovernanceIngestKeyProvenance } from "../../features/enterprise/governance-ingest-rest.mount";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
@@ -346,6 +347,7 @@ function processPorts(): ApiProcessRestPorts {
       // only `repositories/prisma/**` and the Postgres adapters may spell
       // `PrismaClient`, and a description task is neither.
       database: refuse("The member directory") as GovernanceIngestRestPorts["database"],
+      keyProvenance: ApiGovernanceIngestKeyProvenance.create(),
     },
     publicBaseUrl: PUBLIC_BASE_URL,
     healthProbes: opaque(),

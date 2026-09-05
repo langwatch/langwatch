@@ -16,7 +16,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  WebhookBatchPlanner,
+  WebhookBatchPlannerService,
   WEBHOOK_FLUSH_RECHECK_MS,
   type PendingEnvelope,
 } from "../webhook-batch-planner.service";
@@ -50,7 +50,7 @@ function plan(
   over: Record<string, unknown>,
   input: { pending: PendingEnvelope[]; outstanding?: number; now?: number },
 ) {
-  return WebhookBatchPlanner.for(endpoint(over)).plan({
+  return WebhookBatchPlannerService.create({ endpoint: endpoint(over) }).plan({
     organizationId: "organization-1",
     pending: input.pending,
     outstanding: input.outstanding ?? 0,
@@ -63,7 +63,7 @@ function envelopeIdsIn(message: { payload: unknown }): string[] {
   return payload.envelopes.map((envelope) => envelope.id);
 }
 
-describe("WebhookBatchPlanner.plan", () => {
+describe("WebhookBatchPlannerService.plan", () => {
   describe("given a buffer that has reached the batch size", () => {
     it("ships it now, without waiting out the delay", () => {
       const result = plan({}, { pending: pending(3) });
@@ -180,8 +180,8 @@ describe("WebhookBatchPlanner.plan", () => {
   });
 });
 
-describe("WebhookBatchPlanner.tryNextWakeAt", () => {
-  const planner = () => WebhookBatchPlanner.for(endpoint());
+describe("WebhookBatchPlannerService.tryNextWakeAt", () => {
+  const planner = () => WebhookBatchPlannerService.create({ endpoint: endpoint() });
 
   describe("given nothing left buffered", () => {
     it("arms no wake", () => {

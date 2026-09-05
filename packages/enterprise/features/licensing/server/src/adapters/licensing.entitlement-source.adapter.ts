@@ -8,7 +8,7 @@ import type { LicenseCryptographyPort } from "../ports/license-cryptography.port
 import type { OrganizationLicensePort } from "../ports/organization-license.port";
 import { LicensePlanSourceService } from "../services/license-plan-source.service";
 
-export type LicensingEntitlementSourceMode = "cloud" | "self-hosted";
+export type LicensingEntitlementSourceAdapterMode = "cloud" | "self-hosted";
 
 /**
  * The two plan questions this source asks, and the whole of what it needs.
@@ -26,12 +26,12 @@ export type LicensePlanReader = Pick<LicensingService, "getActivePlan" | "getSel
  * port. Deployment mode is composition, while signature verification remains
  * wholly in the shared Licensing capability.
  */
-export class LicensingEntitlementSource implements EntitlementSource {
+export class LicensingEntitlementSourceAdapter implements EntitlementSource {
   static create(options: {
     licensing: LicensePlanReader;
-    mode: LicensingEntitlementSourceMode;
-  }): LicensingEntitlementSource {
-    return new LicensingEntitlementSource(options.licensing, options.mode);
+    mode: LicensingEntitlementSourceAdapterMode;
+  }): LicensingEntitlementSourceAdapter {
+    return new LicensingEntitlementSourceAdapter(options.licensing, options.mode);
   }
 
   /**
@@ -54,8 +54,8 @@ export class LicensingEntitlementSource implements EntitlementSource {
     licenses: OrganizationLicensePort;
     cryptography: LicenseCryptographyPort;
     isSaas: boolean;
-  }): LicensingEntitlementSource {
-    return LicensingEntitlementSource.create({
+  }): LicensingEntitlementSourceAdapter {
+    return LicensingEntitlementSourceAdapter.create({
       licensing: LicensePlanSourceService.create({
         licenses: options.licenses,
         cryptography: options.cryptography,
@@ -66,7 +66,7 @@ export class LicensingEntitlementSource implements EntitlementSource {
 
   private constructor(
     private readonly licensing: LicensePlanReader,
-    private readonly mode: LicensingEntitlementSourceMode,
+    private readonly mode: LicensingEntitlementSourceAdapterMode,
   ) {}
 
   async resolve(input: ResolvePlanInput) {

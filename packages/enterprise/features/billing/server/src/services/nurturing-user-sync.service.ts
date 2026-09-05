@@ -14,47 +14,6 @@ import type { CioOrgTraits, CioPersonTraits } from "@langwatch/enterprise-billin
 const syncedUserIds = new Set<string>();
 
 /**
- * Ensures a user's full profile is synced to Customer.io at least once
- * per process lifetime.
- *
- * On first login after server restart: queries Prisma for user + org + project
- * data, then calls identifyUser with full traits and groupUser for org
- * association. Subsequent logins skip entirely.
- *
- * Fire-and-forget: never throws, never blocks the session callback.
- */
-export function ensureUserSyncedToCio({
-  userId,
-  hasOrganization,
-}: {
-  userId: string;
-  hasOrganization: boolean;
-}): void {
-  const nurturing = tryNurturingSink();
-  if (!nurturing) {
-    return;
-  }
-
-  if (!hasOrganization) {
-    return;
-  }
-
-  if (syncedUserIds.has(userId)) {
-    return;
-  }
-
-  // Optimistic: mark as synced BEFORE async work to prevent concurrent
-  // logins from both triggering a full sync. Removed on failure so the
-  // next login can retry.
-  syncedUserIds.add(userId);
-
-  void performFullSync({ userId }).catch((error) => {
-    syncedUserIds.delete(userId);
-    reportNurturingFailure(error);
-  });
-}
-
-/**
  * Queries the database for the user's full profile and sends it to Customer.io.
  * Only called on first login per process lifetime.
  */
@@ -139,18 +98,65 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
   ]);
 }
 
-/**
- * Resets the sync cache. Only exposed for testing.
- * @internal
- */
-export function resetUserSyncCache(): void {
-  syncedUserIds.clear();
-}
+export class NurturingUserSyncService {
+  static create(): NurturingUserSyncService {
+    return new NurturingUserSyncService();
+  }
 
-/**
- * Returns the size of the sync cache for testing.
- * @internal
- */
-export function getUserSyncCacheSize(): number {
-  return syncedUserIds.size;
+  /**
+   * Ensures a user's full profile is synced to Customer.io at least once
+   * per process lifetime.
+   *
+   * On first login after server restart: queries Prisma for user + org + project
+   * data, then calls identifyUser with full traits and groupUser for org
+   * association. Subsequent logins skip entirely.
+   *
+   * Fire-and-forget: never throws, never blocks the session callback.
+   */
+  static ensureUserSynced({
+    userId,
+    hasOrganization,
+  }: {
+    userId: string;
+    hasOrganization: boolean;
+  }): void {
+    const nurturing = tryNurturingSink();
+    if (!nurturing) {
+      return;
+    }
+
+    if (!hasOrganization) {
+      return;
+    }
+
+    if (syncedUserIds.has(userId)) {
+      return;
+    }
+
+    // Optimistic: mark as synced BEFORE async work to prevent concurrent
+    // logins from both triggering a full sync. Removed on failure so the
+    // next login can retry.
+    syncedUserIds.add(userId);
+
+    void performFullSync({ userId }).catch((error) => {
+      syncedUserIds.delete(userId);
+      reportNurturingFailure(error);
+    });
+  }
+
+  /**
+   * Resets the sync cache. Only exposed for testing.
+   * @internal
+   */
+  static resetCache(): void {
+    syncedUserIds.clear();
+  }
+
+  /**
+   * Returns the size of the sync cache for testing.
+   * @internal
+   */
+  static cacheSize(): number {
+    return syncedUserIds.size;
+  }
 }

@@ -15,7 +15,11 @@ import {
   type NotificationRecentQuery,
 } from "@langwatch/notification-contract";
 
-export class NullNotificationRecordAdapter extends NotificationRecordService {
+export class NullNotificationRecordService extends NotificationRecordService {
+  static create(): NullNotificationRecordService {
+    return new NullNotificationRecordService();
+  }
+
   listRecentByOrganization(_input: NotificationRecentQuery): Promise<Notification[]> {
     return Promise.resolve([]);
   }

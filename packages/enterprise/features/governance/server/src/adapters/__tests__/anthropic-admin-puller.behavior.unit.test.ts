@@ -12,7 +12,7 @@
 import type { PulledUsageRateInput } from "../../ports/pulled-usage-rate.port";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
-import { AnthropicAdminPuller } from "../anthropic-admin-puller.adapter";
+import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.adapter";
 import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port";
 import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service";
 import { PulledUsageRecordService } from "../../services/pulled-usage-record.service";
@@ -42,8 +42,8 @@ const pulledUsageRecords = PulledUsageRecordService.create(
 );
 const buildPulledUsageRecord = pulledUsageRecords.tryBuild.bind(pulledUsageRecords);
 
-function makePuller(): AnthropicAdminPuller {
-  return AnthropicAdminPuller.create(new TestHttpPort());
+function makePuller(): AnthropicAdminPullerAdapter {
+  return AnthropicAdminPullerAdapter.create(new TestHttpPort());
 }
 
 const SOURCE = {
@@ -532,7 +532,7 @@ describe("the Anthropic Admin puller", () => {
      * claims another, so the run exhausts MAX_PAGES_PER_RUN and returns with
      * the token still in hand.
      */
-    async function midWindowCursor(puller: AnthropicAdminPuller) {
+    async function midWindowCursor(puller: AnthropicAdminPullerAdapter) {
       fetchMock.mockResolvedValue(
         jsonResponse({ ...USAGE_PAGE, has_more: true, next_page: "page_2" }),
       );

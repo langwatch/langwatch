@@ -2,7 +2,7 @@ import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { AnthropicAdminPuller } from "../anthropic-admin-puller.adapter";
+import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.adapter";
 import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port";
 
 const options = { cursor: null, credentials: { token: "admin-key" } };
@@ -92,8 +92,8 @@ class FakeHttp extends GovernanceHttpPort {
   }
 }
 
-function puller(http: FakeHttp): AnthropicAdminPuller {
-  return AnthropicAdminPuller.create(http);
+function puller(http: FakeHttp): AnthropicAdminPullerAdapter {
+  return AnthropicAdminPullerAdapter.create(http);
 }
 
 const hintSchema = z.object({

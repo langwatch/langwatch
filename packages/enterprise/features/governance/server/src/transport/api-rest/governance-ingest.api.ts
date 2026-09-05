@@ -49,12 +49,8 @@ import { usdToNanoUsd } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import { parseOtlpLogs, parseOtlpMetrics, parseOtlpTraces, readOtlpBody } from "@langwatch/otlp";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { GovernanceInternalProjectPort } from "@langwatch/project-server";
-import {
-  enforceApiKeyIdOnLogRequest,
-  enforceApiKeyIdOnMetricRequest,
-  enforceApiKeyIdOnTraceRequest,
-} from "@langwatch/trace-server";
+import type { GovernanceIngestKeyProvenancePort } from "../../ports/governance-ingest-key-provenance.port";
+import type { GovernanceProjectPort } from "../../ports/governance-project.port";
 import type {
   IExportLogsServiceRequest,
   IExportMetricsServiceRequest,
@@ -63,10 +59,7 @@ import type {
 } from "@opentelemetry/otlp-transformer";
 import type { Context } from "hono";
 
-import {
-  extractIngestClientIp,
-  type GovernanceIngestRateLimitPort,
-} from "../../ports/governance-ingest-rate-limit.port";
+import { GovernanceIngestRateLimitPort } from "../../ports/governance-ingest-rate-limit.port";
 
 const logger = createLogger("langwatch:ingest");
 
@@ -154,7 +147,7 @@ export type GovernanceIngestRestPorts = Readonly<{
    * Lazily ensured and idempotent, so a race-created project resolves cleanly
    * rather than splitting one organization's ingestion across two tenants.
    */
-  projects: () => Pick<GovernanceInternalProjectPort, "ensureInternal">;
+  projects: () => Pick<GovernanceProjectPort, "ensureInternal">;
   /** The trace pipeline. Required — without it there is no receiver at all. */
   traceCollection: GovernanceIngestTraceCollectionPort;
   /** The log pipeline, where this process folds logs. */
@@ -174,6 +167,8 @@ export type GovernanceIngestRestPorts = Readonly<{
   database: () => PrismaClient;
   /** The per-caller throttle, where this deployment composed a counter. */
   rateLimit?: GovernanceIngestRateLimitPort | undefined;
+  /** Drops a payload-supplied API-key attribution before anything folds it. */
+  keyProvenance: GovernanceIngestKeyProvenancePort;
 }>;
 
 /**
@@ -423,7 +418,7 @@ export function createGovernanceIngestRestApp(options: {
   const refuseRateLimited = async (c: Context): Promise<Response | null> => {
     const limiter = ports.rateLimit;
     if (!limiter) return null;
-    const ip = extractIngestClientIp(c.req.raw.headers);
+    const ip = GovernanceIngestRateLimitPort.extractClientIp(c.req.raw.headers);
     const decision = await limiter.check({ ip });
     if (decision.allowed) return null;
     logger.warn(
@@ -509,15 +504,7 @@ export function createGovernanceIngestRestApp(options: {
             kind: "internal_governance",
           });
           stampOriginAttrs(parsed.request, source);
-          // These endpoints authenticate with an ingestion-source secret, so
-          // there is no API-key row to attribute the payload to. The attribute
-          // is still ENFORCED rather than left alone: a payload-supplied copy
-          // has to be dropped, because redaction exempts that name from the
-          // secret-name deny-list.
-          enforceApiKeyIdOnTraceRequest(
-            parsed.request as unknown as Parameters<typeof enforceApiKeyIdOnTraceRequest>[0],
-            null,
-          );
+          ports.keyProvenance.dropOnTraceRequest(parsed.request);
           const result = await ports.traceCollection({
             tenantId: govProject.id,
             traceRequest: parsed.request,
@@ -669,10 +656,7 @@ export function createGovernanceIngestRestApp(options: {
               kind: "internal_governance",
             });
             stampLogOriginAttrs(parsed.request, source);
-            enforceApiKeyIdOnLogRequest(
-              parsed.request as unknown as Parameters<typeof enforceApiKeyIdOnLogRequest>[0],
-              null,
-            );
+            ports.keyProvenance.dropOnLogRequest(parsed.request);
             try {
               await logCollection({
                 tenantId: govProject.id,
@@ -783,10 +767,7 @@ export function createGovernanceIngestRestApp(options: {
                 kind: "internal_governance",
               });
               stampMetricOriginAttrs({ request: parsed.request, source });
-              enforceApiKeyIdOnMetricRequest(
-                parsed.request as unknown as Parameters<typeof enforceApiKeyIdOnMetricRequest>[0],
-                null,
-              );
+              ports.keyProvenance.dropOnMetricRequest(parsed.request);
               const result = await metricCollection({
                 tenantId: govProject.id,
                 organizationId: source.organizationId,

@@ -66,8 +66,8 @@ export interface WebhookDispatchRequest {
   isTestFire?: boolean;
 }
 
-export interface WebhookDestination {
-  readonly kind: WebhookDestinationKind;
+export abstract class WebhookDestinationPort {
+  abstract readonly kind: WebhookDestinationKind;
   /**
    * Deliver one batch and say what happened.
    *
@@ -76,5 +76,5 @@ export interface WebhookDestination {
    * all (DNS, a blocked address, a timeout), which is what the caller's
    * existing catch records and re-raises.
    */
-  send(request: WebhookDispatchRequest): Promise<WebhookDispatchResult>;
+  abstract send(request: WebhookDispatchRequest): Promise<WebhookDispatchResult>;
 }

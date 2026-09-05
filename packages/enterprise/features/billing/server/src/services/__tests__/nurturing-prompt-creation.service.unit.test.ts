@@ -4,10 +4,7 @@
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  afterPromptCreated,
-  firePromptCreatedNurturing,
-} from "../nurturing-prompt-creation.service";
+import { NurturingPromptCreationService } from "../nurturing-prompt-creation.service";
 import { setNurturingOrganizationAdminResolver } from "../nurturing-sink";
 import {
   registerNoNurturingSink,
@@ -19,7 +16,7 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));
 
-/** The two reads `afterPromptCreated` makes on its own, and nothing else. */
+/** The two reads `NurturingPromptCreationService.afterPromptCreated` makes on its own, and nothing else. */
 function prismaCounting(orgPromptCount: number) {
   return {
     project: { findUnique: vi.fn(async () => ({ team: { organizationId: "org-1" } })) },
@@ -33,14 +30,18 @@ afterEach(() => {
   setNurturingOrganizationAdminResolver(null);
 });
 
-describe("firePromptCreatedNurturing", () => {
+describe("NurturingPromptCreationService.firePromptCreated", () => {
   describe("given an organization with no prompts across any project", () => {
     describe("when the first prompt is created", () => {
       /** @scenario "First prompt creation identifies user with has_prompts true" */
       it("identifies them with has_prompts and an org-wide count of one", async () => {
         const sink = registerNurturingSink();
 
-        firePromptCreatedNurturing({ userId: "user-1", projectId: "project-1", orgPromptCount: 1 });
+        NurturingPromptCreationService.firePromptCreated({
+          userId: "user-1",
+          projectId: "project-1",
+          orgPromptCount: 1,
+        });
         await settle();
 
         expect(sink.sentTo("/identify")[0]).toMatchObject({
@@ -53,7 +54,11 @@ describe("firePromptCreatedNurturing", () => {
       it("tracks first_prompt_created against the project", async () => {
         const sink = registerNurturingSink();
 
-        firePromptCreatedNurturing({ userId: "user-1", projectId: "project-1", orgPromptCount: 1 });
+        NurturingPromptCreationService.firePromptCreated({
+          userId: "user-1",
+          projectId: "project-1",
+          orgPromptCount: 1,
+        });
         await settle();
 
         expect(sink.sentTo("/track")[0]).toMatchObject({
@@ -70,7 +75,11 @@ describe("firePromptCreatedNurturing", () => {
       it("updates the org-wide count and tracks nothing", async () => {
         const sink = registerNurturingSink();
 
-        firePromptCreatedNurturing({ userId: "user-1", projectId: "project-2", orgPromptCount: 4 });
+        NurturingPromptCreationService.firePromptCreated({
+          userId: "user-1",
+          projectId: "project-2",
+          orgPromptCount: 4,
+        });
         await settle();
 
         expect(sink.sentTo("/identify")[0]).toMatchObject({
@@ -82,7 +91,7 @@ describe("firePromptCreatedNurturing", () => {
   });
 });
 
-describe("afterPromptCreated", () => {
+describe("NurturingPromptCreationService.afterPromptCreated", () => {
   describe("given an organization with no prompts and a prompt written through the REST API", () => {
     describe("when the prompt is saved without an actor in hand", () => {
       /** @scenario "Prompt creation tracked regardless of whether created via platform UI or API" */
@@ -93,7 +102,10 @@ describe("afterPromptCreated", () => {
           organizationId: "org-1",
         }));
 
-        afterPromptCreated({ prisma: prismaCounting(1), projectId: "project-1" });
+        NurturingPromptCreationService.afterPromptCreated({
+          prisma: prismaCounting(1),
+          projectId: "project-1",
+        });
         await settle();
 
         expect(sink.sentTo("/identify")[0]).toMatchObject({
@@ -112,7 +124,7 @@ describe("afterPromptCreated", () => {
         const sink = registerNurturingSink({ failing: true });
 
         expect(() =>
-          afterPromptCreated({
+          NurturingPromptCreationService.afterPromptCreated({
             prisma: prismaCounting(1),
             projectId: "project-1",
             userId: "user-1",

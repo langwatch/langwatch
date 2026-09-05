@@ -104,16 +104,14 @@ export { PulledUsageLedgerProcess } from "./processes/pulled-usage-ledger.proces
 
 export { BuiltInPullerRegistryService } from "./services/built-in-puller-registry.service";
 export { PullerRegistryService } from "./services/puller-registry.service";
-export { AnthropicAdminPuller } from "./adapters/anthropic-admin-puller.adapter";
-export { ClaudeComplianceReferencePuller } from "./adapters/claude-compliance-puller.adapter";
-export { CopilotStudioReferencePuller } from "./adapters/copilot-studio-puller.adapter";
-export { CopilotStudioDataversePuller } from "./adapters/copilot-studio-dataverse-puller.adapter";
-export { DatabricksGeniePuller } from "./adapters/databricks-genie-puller.adapter";
+export { AnthropicAdminPullerAdapter } from "./adapters/anthropic-admin-puller.adapter";
+export { ClaudeComplianceReferencePullerAdapter } from "./adapters/claude-compliance-puller.adapter";
+export { CopilotStudioReferencePullerAdapter } from "./adapters/copilot-studio-puller.adapter";
+export { CopilotStudioDataversePullerAdapter } from "./adapters/copilot-studio-dataverse-puller.adapter";
+export { DatabricksGeniePullerAdapter } from "./adapters/databricks-genie-puller.adapter";
 export { HttpPollingPullerAdapter } from "./adapters/http-poller.adapter";
-export { OpenAiComplianceReferencePuller } from "./adapters/openai-compliance-puller.adapter";
-export { OpenAiAdminPuller } from "./adapters/openai-admin-puller.adapter";
-export { hasPollerCursor } from "./adapters/poller-cursor.adapter";
-export { conversationRoutingProfileFor } from "./services/ingestion-pull-worker.service";
+export { OpenAiComplianceReferencePullerAdapter } from "./adapters/openai-compliance-puller.adapter";
+export { OpenAiAdminPullerAdapter } from "./adapters/openai-admin-puller.adapter";
 export { S3PollingPullerAdapter } from "./adapters/s3-puller.adapter";
 export { AnomalyRuleService } from "./services/anomaly-rule.service";
 export { DepartmentService } from "./services/department.service";
@@ -227,16 +225,14 @@ export {
   type GovernanceIngestSpendPort,
   type GovernanceIngestTraceCollectionPort,
 } from "./transport/api-rest/governance-ingest.api";
+export { GovernanceIngestKeyProvenancePort } from "./ports/governance-ingest-key-provenance.port";
+export { GovernanceProjectPort } from "./ports/governance-project.port";
 export {
-  extractIngestClientIp,
   GovernanceIngestRateLimitPort,
   INGEST_RATE_LIMIT_MAX_REQUESTS,
   INGEST_RATE_LIMIT_WINDOW_SECONDS,
 } from "./ports/governance-ingest-rate-limit.port";
-export {
-  resolveOrgAdminEmail,
-  resolveSupportContact,
-} from "./services/organization-support-contact.service";
+export { OrganizationSupportContactService } from "./services/organization-support-contact.service";
 
 /**
  * The governance tools installed on a hosted MCP session.

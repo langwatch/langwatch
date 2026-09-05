@@ -29,6 +29,7 @@
  * honestly does not serve them beats a 500 from one that pretends to.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
+import { ApiGovernanceIngestKeyProvenance } from "../governance-ingest-rest.mount";
 import type { GovernanceIngestRestPorts } from "@langwatch/enterprise-governance-server";
 import { decodeBase64OpenTelemetryId } from "@langwatch/otlp";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
@@ -191,6 +192,7 @@ function ingestWorld(options: { sourceType?: string } = {}) {
       }) as never,
     traceCollection: ingest.otlp.traces!,
     database: () => ({}) as never,
+    keyProvenance: ApiGovernanceIngestKeyProvenance.create(),
   };
 
   return { commands, recordedEvents, ports };

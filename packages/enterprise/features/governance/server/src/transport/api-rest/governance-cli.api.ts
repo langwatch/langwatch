@@ -63,7 +63,7 @@ import { randomBytes } from "node:crypto";
 import type { Context } from "hono";
 import { z } from "zod";
 
-import { resolveSupportContact } from "../../services/organization-support-contact.service";
+import { OrganizationSupportContactService } from "../../services/organization-support-contact.service";
 
 const logger = createLogger("langwatch:governance-cli");
 
@@ -476,10 +476,9 @@ export function createGovernanceCliRestApp(options: {
     // The most restrictive blocker. The check result orders by strictness, so
     // the first entry is the binding one.
     const blocker = decision.blockedBy[0]!;
-    const adminEmail = await resolveSupportContact({
+    const adminEmail = await OrganizationSupportContactService.create({
       prisma: ports.database(),
-      organizationId: caller.organization_id,
-    });
+    }).resolveSupportContact({ organizationId: caller.organization_id });
     const params = new URLSearchParams({
       scope: blocker.scope.toLowerCase(),
       scope_id: blocker.scopeId,

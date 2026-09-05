@@ -35,7 +35,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { CliAdminContactPort, CliBudgetOverviewPort } from "../../ports/cli-bootstrap.port";
 import { DefaultGovernanceCliBootstrapService } from "../cli-bootstrap.service";
-import { resolveOrgAdminEmail } from "../organization-support-contact.service";
+import { OrganizationSupportContactService } from "../organization-support-contact.service";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -66,7 +66,9 @@ const HEALTHY_CREATED_AT = new Date("2021-01-01T00:00:00.000Z");
 
 class PrismaContacts extends CliAdminContactPort {
   tryResolveAdminEmail(organizationId: string): Promise<string | null> {
-    return resolveOrgAdminEmail({ prisma, organizationId });
+    return OrganizationSupportContactService.create({ prisma }).resolveOrgAdminEmail({
+      organizationId,
+    });
   }
 }
 

@@ -4,9 +4,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  fireIntegrationMethodNurturing,
+  NurturingProductInterestService,
   type IntegrationMethodValue,
-  mapProductSelectionToIntegrationMethod,
 } from "../nurturing-product-interest.service";
 import {
   registerNoNurturingSink,
@@ -21,7 +20,7 @@ vi.mock("@langwatch/observability", () => ({
 beforeEach(() => vi.clearAllMocks());
 afterEach(() => registerNoNurturingSink());
 
-describe("mapProductSelectionToIntegrationMethod", () => {
+describe("NurturingProductInterestService.integrationMethodFor", () => {
   describe("given the integration-method onboarding screen", () => {
     describe("when a selection is made", () => {
       /** @scenario "Integration-method selection maps to canonical trait value" */
@@ -33,21 +32,21 @@ describe("mapProductSelectionToIntegrationMethod", () => {
       ] as [string, IntegrationMethodValue][])(
         "maps %s to the %s trait value",
         (selection, traitValue) => {
-          expect(mapProductSelectionToIntegrationMethod(selection)).toBe(traitValue);
+          expect(NurturingProductInterestService.integrationMethodFor(selection)).toBe(traitValue);
         },
       );
     });
   });
 });
 
-describe("fireIntegrationMethodNurturing", () => {
+describe("NurturingProductInterestService.fireIntegrationMethod", () => {
   describe("given a person on the integration-method screen", () => {
     describe("when they choose how they want to integrate", () => {
       /** @scenario "Integration-method identify call is fire-and-forget" */
       it("hands control back without waiting for Customer.io to answer", async () => {
         const sink = registerNurturingSink({ hanging: true });
 
-        const answer = fireIntegrationMethodNurturing({
+        const answer = NurturingProductInterestService.fireIntegrationMethod({
           userId: "user-1",
           integrationMethod: "platform",
         });
@@ -68,7 +67,10 @@ describe("fireIntegrationMethodNurturing", () => {
         const sink = registerNurturingSink({ failing: true });
 
         expect(() =>
-          fireIntegrationMethodNurturing({ userId: "user-1", integrationMethod: "platform" }),
+          NurturingProductInterestService.fireIntegrationMethod({
+            userId: "user-1",
+            integrationMethod: "platform",
+          }),
         ).not.toThrow();
         await settle();
 

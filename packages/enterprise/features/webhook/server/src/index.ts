@@ -79,7 +79,7 @@ export {
   type WebhookDispatchResult,
 } from "./services/webhook-delivery.service";
 export {
-  WebhookBatchPlanner,
+  WebhookBatchPlannerService,
   WEBHOOK_FLUSH_RECHECK_MS,
   type PendingEnvelope,
 } from "./services/webhook-batch-planner.service";
@@ -137,28 +137,21 @@ export { createWebhookRestApp } from "./transport/api-rest/webhook.api";
 // Everything above the destination interface is one machinery no matter where
 // an endpoint delivers — the same coalescing buffer, the same retry ladder, the
 // same delivery log, the same signature over the same bytes. Only the hop
-// differs, and it differs behind `WebhookDestination`.
+// differs, and it differs behind `WebhookDestinationPort`.
 // ---------------------------------------------------------------------------
-export type {
-  WebhookDestination,
-  WebhookDispatchRequest,
-  WebhookDispatchVerdict,
+export {
+  WebhookDestinationPort,
+  type WebhookDispatchRequest,
+  type WebhookDispatchVerdict,
 } from "./ports/webhook-destination.port";
 export {
-  webhookDestinationFor,
+  WebhookDestinationAdapter,
   type WebhookDestinationDeps,
 } from "./adapters/webhook-destination.adapter";
-export { httpWebhookDestination } from "./adapters/http.webhook-destination.adapter";
+export { HttpWebhookDestinationAdapter } from "./adapters/http.webhook-destination.adapter";
 export {
-  classifySqsFailure,
-  dropSqsClient,
-  isStaleCredentialFailure,
-  resetSqsClientCache,
   SQS_MAX_MESSAGE_BYTES,
-  sqsClientFor,
-  sqsMessageAttributes,
-  sqsMessageBytes,
-  sqsWebhookDestination,
+  SqsWebhookDestinationAdapter,
   type AwsClientConfigPort,
   type SqsDestinationConfig,
 } from "./adapters/sqs.webhook-destination.adapter";
@@ -170,7 +163,6 @@ export {
   type SqsQueueUrlProblem,
 } from "./services/sqs-queue-url.rules";
 export {
-  pruneExpiredIdempotencyReceipts,
-  pruneWebhookDeliveries,
+  PrismaWebhookRetentionRepository,
   WEBHOOK_DELIVERY_RETENTION_MS,
 } from "./repositories/prisma/prisma.webhook-retention.repository";

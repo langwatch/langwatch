@@ -5,42 +5,51 @@ import type { Organization, Subscription } from "@langwatch/prisma-client/genera
 export type SubscriptionWithOrg = Subscription & { organization: Organization };
 export type CancelledSubscription = { stripeSubscriptionId: string | null };
 
-export interface SubscriptionRepository {
-  findLastNonCancelled(organizationId: string): Promise<Subscription | null>;
+export abstract class BillingWebhookSubscriptionPort {
+  abstract findLastNonCancelled(organizationId: string): Promise<Subscription | null>;
 
-  createPending(input: { organizationId: string; plan: string }): Promise<Subscription | null>;
+  abstract createPending(input: {
+    organizationId: string;
+    plan: string;
+  }): Promise<Subscription | null>;
 
-  updateStatus(input: { id: string; status: string }): Promise<Subscription | null>;
+  abstract updateStatus(input: { id: string; status: string }): Promise<Subscription | null>;
 
-  updatePlan(input: { id: string; plan: string }): Promise<Subscription | null>;
+  abstract updatePlan(input: { id: string; plan: string }): Promise<Subscription | null>;
 
   // --- Webhook handler methods ---
 
-  findByStripeId(stripeSubscriptionId: string): Promise<Subscription | null>;
+  abstract findByStripeId(stripeSubscriptionId: string): Promise<Subscription | null>;
 
-  linkStripeId(input: { id: string; stripeSubscriptionId: string }): Promise<{ count: number }>;
+  abstract linkStripeId(input: {
+    id: string;
+    stripeSubscriptionId: string;
+  }): Promise<{ count: number }>;
 
-  activate(input: { id: string; previousStatus: string }): Promise<SubscriptionWithOrg | null>;
+  abstract activate(input: {
+    id: string;
+    previousStatus: string;
+  }): Promise<SubscriptionWithOrg | null>;
 
-  recordPaymentFailure(input: { id: string; currentStatus: string }): Promise<void>;
+  abstract recordPaymentFailure(input: { id: string; currentStatus: string }): Promise<void>;
 
-  cancel(input: { id: string }): Promise<void>;
+  abstract cancel(input: { id: string }): Promise<void>;
 
-  cancelTrialSubscriptions(organizationId: string): Promise<void>;
+  abstract cancelTrialSubscriptions(organizationId: string): Promise<void>;
 
-  migrateToSeatEvent(input: {
+  abstract migrateToSeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
   }): Promise<CancelledSubscription[]>;
 
-  updateQuantities(input: {
+  abstract updateQuantities(input: {
     id: string;
     maxMembers: number | null;
     maxMessagesPerMonth: number | null;
   }): Promise<SubscriptionWithOrg | null>;
 }
 
-export class NullSubscriptionRepository implements SubscriptionRepository {
+export class NullBillingWebhookSubscriptionAdapter extends BillingWebhookSubscriptionPort {
   async findLastNonCancelled(_organizationId: string): Promise<Subscription | null> {
     return null;
   }

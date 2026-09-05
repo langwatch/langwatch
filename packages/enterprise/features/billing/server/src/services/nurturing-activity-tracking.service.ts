@@ -36,63 +36,69 @@ function sweepExpiredEntries({ now }: { now: number }): void {
   lastSweepAt = now;
 }
 
-/**
- * Pushes last_active_at to Customer.io for inactivity detection.
- *
- * Debounced to at most once per hour per user to avoid excessive API calls.
- * Fire-and-forget: never throws, never blocks the session callback.
- */
-export function fireActivityTrackingNurturing({
-  userId,
-  hasOrganization = true,
-}: {
-  userId: string;
-  /** When false, the user hasn't completed onboarding yet — skip identify to avoid ghost people in Customer.io. */
-  hasOrganization?: boolean;
-}): void {
-  const nurturing = tryNurturingSink();
-  if (!nurturing) {
-    return;
+export class NurturingActivityTrackingService {
+  static create(): NurturingActivityTrackingService {
+    return new NurturingActivityTrackingService();
   }
 
-  if (!hasOrganization) {
-    return;
+  /**
+   * Pushes last_active_at to Customer.io for inactivity detection.
+   *
+   * Debounced to at most once per hour per user to avoid excessive API calls.
+   * Fire-and-forget: never throws, never blocks the session callback.
+   */
+  static fire({
+    userId,
+    hasOrganization = true,
+  }: {
+    userId: string;
+    /** When false, the user hasn't completed onboarding yet — skip identify to avoid ghost people in Customer.io. */
+    hasOrganization?: boolean;
+  }): void {
+    const nurturing = tryNurturingSink();
+    if (!nurturing) {
+      return;
+    }
+
+    if (!hasOrganization) {
+      return;
+    }
+
+    const now = Date.now();
+    sweepExpiredEntries({ now });
+    const lastSent = lastActivitySentAt.get(userId);
+
+    if (lastSent !== undefined && now - lastSent < ONE_HOUR_MS) {
+      return;
+    }
+
+    lastActivitySentAt.set(userId, now);
+
+    void nurturing
+      .identifyUser({
+        userId,
+        traits: { last_active_at: new Date(now).toISOString() },
+      })
+      .catch((error) => {
+        lastActivitySentAt.delete(userId);
+        reportNurturingFailure(error);
+      });
   }
 
-  const now = Date.now();
-  sweepExpiredEntries({ now });
-  const lastSent = lastActivitySentAt.get(userId);
-
-  if (lastSent !== undefined && now - lastSent < ONE_HOUR_MS) {
-    return;
+  /**
+   * Resets the debounce cache. Only exposed for testing.
+   * @internal
+   */
+  static resetCache(): void {
+    lastActivitySentAt.clear();
+    lastSweepAt = 0;
   }
 
-  lastActivitySentAt.set(userId, now);
-
-  void nurturing
-    .identifyUser({
-      userId,
-      traits: { last_active_at: new Date(now).toISOString() },
-    })
-    .catch((error) => {
-      lastActivitySentAt.delete(userId);
-      reportNurturingFailure(error);
-    });
-}
-
-/**
- * Resets the debounce cache. Only exposed for testing.
- * @internal
- */
-export function resetActivityTrackingCache(): void {
-  lastActivitySentAt.clear();
-  lastSweepAt = 0;
-}
-
-/**
- * Returns a snapshot of the cache for testing.
- * @internal
- */
-export function getActivityTrackingCacheSize(): number {
-  return lastActivitySentAt.size;
+  /**
+   * Returns a snapshot of the cache for testing.
+   * @internal
+   */
+  static cacheSize(): number {
+    return lastActivitySentAt.size;
+  }
 }

@@ -41,21 +41,42 @@ import type { z } from "zod";
 import {
   type ConversationRoutingProfile,
   type ConversationSeeds,
-  ConversationTraceAssembly,
+  ConversationTraceAssemblyService,
   KNOWN_AGENT_IDENTITIES,
   type KnownAgentIdentity,
   type OtlpJsonAttr,
   type OtlpJsonSpan,
   type RoutingOrigin,
-} from "./conversation-trace-assembly.adapter";
-import { TERMINAL_MESSAGE_STATUSES } from "./databricks-genie-puller.adapter";
+} from "./conversation-trace-assembly.service";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
 type ExportTraceServiceRequest = z.input<typeof exportTraceServiceRequestSchema>;
 
-export { type ConversationRoutingProfile, KNOWN_AGENT_IDENTITIES, type KnownAgentIdentity };
-
 /** Root span (the turn itself, `llm`-typed so the estimator runs). */
+/**
+ * Statuses that mean the message will not change again.
+ *
+ * Genie populates `attachments` PROGRESSIVELY: a message is answerable while it
+ * is still `PENDING_WAREHOUSE` or `EXECUTING_QUERY`, and the generated SQL —
+ * the artefact this adapter exists to capture — may not be there yet. Reading
+ * one mid-flight and letting the watermark move past it loses that SQL
+ * permanently, because nothing ever asks for the message again.
+ *
+ * An UNRECOGNISED non-empty status counts as non-terminal on purpose. A status
+ * Databricks adds later is far more likely to be another in-flight state than a
+ * new way of being finished, and being wrong in this direction costs a re-read
+ * where the other direction costs the record.
+ *
+ * A message with no status at all is left alone: some responses omit it, and
+ * treating absent as in-flight would hold the watermark on every sweep forever.
+ */
+export const TERMINAL_MESSAGE_STATUSES: ReadonlySet<string> = new Set([
+  "COMPLETED",
+  "FAILED",
+  "CANCELLED",
+  "QUERY_RESULT_EXPIRED",
+]);
+
 export const GENIE_MESSAGE_SPAN_NAME = "databricks_genie.message" as const;
 /** One per generated-query attachment; listed by the TurnSteps strip. */
 export const GENIE_QUERY_SPAN_NAME = "databricks_genie.query" as const;
@@ -152,12 +173,16 @@ interface GenieMessageFrame {
 /**
  * Databricks Genie conversations mapped to traces.
  *
- * The sibling of {@link CopilotStudioTraceMapper} and the same shape: one job
+ * The sibling of {@link CopilotStudioTraceMapperService} and the same shape: one job
  * with many steps, of which exactly one — `toTraceRequest` — is anybody
  * else's business. `flattenThoughts` used to be exported alongside it with no
  * caller anywhere.
  */
-export class GenieTraceMapper {
+export class GenieTraceMapperService {
+  static create(): GenieTraceMapperService {
+    return new GenieTraceMapperService();
+  }
+
   /** "THOUGHT_TYPE_UNDERSTANDING" and "UNDERSTANDING" both → "UNDERSTANDING". */
   private static thoughtTypeOf(thought: GenieThought): string {
     const raw = thought.thought_type ?? thought.type ?? "";
@@ -185,14 +210,14 @@ export class GenieTraceMapper {
     const known: string[] = [];
     for (const wanted of THOUGHT_ORDER) {
       for (const thought of thoughts) {
-        if (GenieTraceMapper.thoughtTypeOf(thought) === wanted && textOf(thought)) {
+        if (GenieTraceMapperService.thoughtTypeOf(thought) === wanted && textOf(thought)) {
           known.push(textOf(thought));
         }
       }
     }
     const unknown = thoughts
       .filter((thought) => {
-        const type = GenieTraceMapper.thoughtTypeOf(thought);
+        const type = GenieTraceMapperService.thoughtTypeOf(thought);
         return (
           type !== DROPPED_THOUGHT_TYPE &&
           !THOUGHT_ORDER.includes(type as (typeof THOUGHT_ORDER)[number]) &&
@@ -239,8 +264,12 @@ export class GenieTraceMapper {
    * here would drop it from the trace sink outright.
    */
   private static isSettledForRouting(event: NormalizedPullEvent): boolean {
-    const payload = GenieTraceMapper.parsePayload(event);
-    const status = (payload.status ?? GenieTraceMapper.extraString(event, "status") ?? "").trim();
+    const payload = GenieTraceMapperService.parsePayload(event);
+    const status = (
+      payload.status ??
+      GenieTraceMapperService.extraString(event, "status") ??
+      ""
+    ).trim();
     return status === "" || TERMINAL_MESSAGE_STATUSES.has(status);
   }
 
@@ -248,14 +277,14 @@ export class GenieTraceMapper {
     event: NormalizedPullEvent,
     origin: GenieRoutingOrigin,
   ): GenieMessageFrame {
-    const payload = GenieTraceMapper.parsePayload(event);
+    const payload = GenieTraceMapperService.parsePayload(event);
     const conversationId =
       payload.conversation_id ??
-      GenieTraceMapper.extraString(event, "conversationId") ??
+      GenieTraceMapperService.extraString(event, "conversationId") ??
       "unknown_conversation";
     const messageId =
       payload.message_id ??
-      GenieTraceMapper.extraString(event, "messageId") ??
+      GenieTraceMapperService.extraString(event, "messageId") ??
       event.source_event_id;
     const regenCount =
       typeof payload.auto_regenerate_count === "number" && payload.auto_regenerate_count > 0
@@ -273,15 +302,19 @@ export class GenieTraceMapper {
       thread: [conversationId],
       span: [conversationId, messageId, regenCount],
     };
-    const identity = ConversationTraceAssembly.deriveConversationIdentity(origin, seeds);
+    const identity = ConversationTraceAssemblyService.deriveConversationIdentity(origin, seeds);
     // Both timestamp sources can be garbage (mapToOcsfRow guards the same
     // field). NaN here would serialize as "NaN000000" and fail spanSchema,
     // dropping the whole conversation — degrade to pull time instead.
     const eventMs = Date.parse(event.event_timestamp);
     const startMs =
-      GenieTraceMapper.toMs(payload.created_timestamp) ??
+      GenieTraceMapperService.toMs(payload.created_timestamp) ??
       (Number.isFinite(eventMs) ? eventMs : Date.now());
-    const status = (payload.status ?? GenieTraceMapper.extraString(event, "status") ?? "").trim();
+    const status = (
+      payload.status ??
+      GenieTraceMapperService.extraString(event, "status") ??
+      ""
+    ).trim();
     return {
       payload,
       origin,
@@ -293,7 +326,10 @@ export class GenieTraceMapper {
       spanSeed: identity.spanSeed,
       rootSpanId: identity.rootSpanId,
       startMs,
-      endMs: Math.max(GenieTraceMapper.toMs(payload.last_updated_timestamp) ?? startMs, startMs),
+      endMs: Math.max(
+        GenieTraceMapperService.toMs(payload.last_updated_timestamp) ?? startMs,
+        startMs,
+      ),
       status,
       isCompleted: status === "COMPLETED",
     };
@@ -330,24 +366,28 @@ export class GenieTraceMapper {
     frame: GenieMessageFrame,
   ): OtlpJsonAttr[] {
     const attachments = frame.payload.attachments ?? [];
-    const question = frame.payload.content ?? GenieTraceMapper.extraString(event, "question") ?? "";
+    const question =
+      frame.payload.content ?? GenieTraceMapperService.extraString(event, "question") ?? "";
     const assistantMessage: Record<string, string> = {
       role: "assistant",
-      content: GenieTraceMapper.assistantContentOf(frame, attachments),
+      content: GenieTraceMapperService.assistantContentOf(frame, attachments),
     };
-    const reasoning = GenieTraceMapper.flattenThoughts(attachments);
+    const reasoning = GenieTraceMapperService.flattenThoughts(attachments);
     if (reasoning) assistantMessage.reasoning_content = reasoning;
     return [
-      ConversationTraceAssembly.stringAttr({ key: "langwatch.span.type", value: "llm" }),
-      ConversationTraceAssembly.stringAttr({ key: "langwatch.thread.id", value: frame.threadId }),
-      ConversationTraceAssembly.stringAttr({
+      ConversationTraceAssemblyService.stringAttr({ key: "langwatch.span.type", value: "llm" }),
+      ConversationTraceAssemblyService.stringAttr({
+        key: "langwatch.thread.id",
+        value: frame.threadId,
+      }),
+      ConversationTraceAssemblyService.stringAttr({
         key: "langwatch.input",
         value: JSON.stringify({
           type: "chat_messages",
           value: [{ role: "user", content: question }],
         }),
       }),
-      ConversationTraceAssembly.stringAttr({
+      ConversationTraceAssemblyService.stringAttr({
         key: "langwatch.output",
         value: JSON.stringify({
           type: "chat_messages",
@@ -358,20 +398,20 @@ export class GenieTraceMapper {
       // Now that the value varies, `KNOWN_AGENT_IDENTITIES` is what keeps it
       // true — at compile time only. Every profile is a code literal the
       // compiler checks, so nothing re-checks this at runtime.
-      ConversationTraceAssembly.stringAttr({
+      ConversationTraceAssemblyService.stringAttr({
         key: "gen_ai.request.model",
         value: frame.origin.profile.agentModel,
       }),
-      ConversationTraceAssembly.stringAttr({
+      ConversationTraceAssemblyService.stringAttr({
         key: "databricks.genie.message_id",
         value: frame.messageId,
       }),
-      ConversationTraceAssembly.stringAttr({
+      ConversationTraceAssemblyService.stringAttr({
         key: "databricks.genie.conversation_id",
         value: frame.conversationId,
       }),
-      ...ConversationTraceAssembly.originAttrs(frame.origin),
-      ...GenieTraceMapper.optionalRootAttributes(event, frame),
+      ...ConversationTraceAssemblyService.originAttrs(frame.origin),
+      ...GenieTraceMapperService.optionalRootAttributes(event, frame),
     ];
   }
 
@@ -386,14 +426,14 @@ export class GenieTraceMapper {
     const rawUserId =
       frame.payload.user_id != null
         ? String(frame.payload.user_id)
-        : GenieTraceMapper.extraString(event, "actorUserId");
+        : GenieTraceMapperService.extraString(event, "actorUserId");
     if (rawUserId)
       attributes.push(
-        ConversationTraceAssembly.stringAttr({ key: "langwatch.user.id", value: rawUserId }),
+        ConversationTraceAssemblyService.stringAttr({ key: "langwatch.user.id", value: rawUserId }),
       );
     if (frame.status) {
       attributes.push(
-        ConversationTraceAssembly.stringAttr({
+        ConversationTraceAssemblyService.stringAttr({
           key: "databricks.genie.status",
           value: frame.status,
         }),
@@ -401,26 +441,29 @@ export class GenieTraceMapper {
     }
     if (frame.regenCount > 0) {
       attributes.push(
-        ConversationTraceAssembly.intAttr({
+        ConversationTraceAssemblyService.intAttr({
           key: "databricks.genie.auto_regenerate_count",
           value: frame.regenCount,
         }),
       );
     }
-    const spaceId = GenieTraceMapper.extraString(event, "spaceId");
+    const spaceId = GenieTraceMapperService.extraString(event, "spaceId");
     if (spaceId) {
       attributes.push(
-        ConversationTraceAssembly.stringAttr({ key: "databricks.genie.space_id", value: spaceId }),
+        ConversationTraceAssemblyService.stringAttr({
+          key: "databricks.genie.space_id",
+          value: spaceId,
+        }),
       );
     }
-    const statementIds = GenieTraceMapper.queryAttachmentsOf(attachments)
+    const statementIds = GenieTraceMapperService.queryAttachmentsOf(attachments)
       .map((attachment) => attachment.query?.statement_id)
       .filter((id): id is string => typeof id === "string" && id.length > 0);
     if (statementIds.length > 0) {
       // ALL statement ids (Decision 12): the display-time join key to the
       // warehouse spend ledger — a multi-statement answer never undercounts.
       attributes.push(
-        ConversationTraceAssembly.stringAttr({
+        ConversationTraceAssemblyService.stringAttr({
           key: "databricks.genie.statement_ids",
           value: JSON.stringify(statementIds),
         }),
@@ -432,7 +475,7 @@ export class GenieTraceMapper {
     if (vizPointers.length > 0) {
       // A pointer, not chart data — stored, never rendered (Decision 12).
       attributes.push(
-        ConversationTraceAssembly.stringAttr({
+        ConversationTraceAssemblyService.stringAttr({
           key: "databricks.genie.viz_query_attachment_ids",
           value: JSON.stringify(vizPointers),
         }),
@@ -464,38 +507,40 @@ export class GenieTraceMapper {
     // A JSON blob under `langwatch.params` gets dot-flattened at the trace door
     // and lands at `params.langwatch.params.*`, where no reader looks.
     const stepAttrs = [
-      ConversationTraceAssembly.stringAttr({
+      ConversationTraceAssemblyService.stringAttr({
         key: "tool_name",
         value: attachment.query?.description || "SQL query",
       }),
-      ConversationTraceAssembly.stringAttr({
+      ConversationTraceAssemblyService.stringAttr({
         key: "full_command",
         value: attachment.query?.query ?? "",
       }),
     ];
     if (attachment.query?.statement_id) {
       stepAttrs.push(
-        ConversationTraceAssembly.stringAttr({
+        ConversationTraceAssemblyService.stringAttr({
           key: "statement_id",
           value: attachment.query.statement_id,
         }),
       );
     }
     if (typeof rowCount === "number") {
-      stepAttrs.push(ConversationTraceAssembly.intAttr({ key: "row_count", value: rowCount }));
+      stepAttrs.push(
+        ConversationTraceAssemblyService.intAttr({ key: "row_count", value: rowCount }),
+      );
     }
     return {
       traceId: frame.traceId,
-      spanId: ConversationTraceAssembly.hashId(`${frame.spanSeed}:query:${stepKey}`, 16),
+      spanId: ConversationTraceAssemblyService.hashId(`${frame.spanSeed}:query:${stepKey}`, 16),
       parentSpanId: frame.rootSpanId,
       name: GENIE_QUERY_SPAN_NAME,
       kind: "SPAN_KIND_INTERNAL",
-      startTimeUnixNano: ConversationTraceAssembly.msToNano(frame.startMs),
-      endTimeUnixNano: ConversationTraceAssembly.msToNano(frame.endMs),
+      startTimeUnixNano: ConversationTraceAssemblyService.msToNano(frame.startMs),
+      endTimeUnixNano: ConversationTraceAssemblyService.msToNano(frame.endMs),
       attributes: [
-        ConversationTraceAssembly.stringAttr({ key: "langwatch.span.type", value: "tool" }),
+        ConversationTraceAssemblyService.stringAttr({ key: "langwatch.span.type", value: "tool" }),
         ...stepAttrs,
-        ...ConversationTraceAssembly.originAttrs(frame.origin),
+        ...ConversationTraceAssemblyService.originAttrs(frame.origin),
       ],
       status: { code: frame.isCompleted ? 1 : 2 },
     } satisfies OtlpJsonSpan;
@@ -505,20 +550,20 @@ export class GenieTraceMapper {
     event: NormalizedPullEvent,
     origin: GenieRoutingOrigin,
   ): OtlpJsonSpan[] {
-    const frame = GenieTraceMapper.frameOf(event, origin);
+    const frame = GenieTraceMapperService.frameOf(event, origin);
     const attachments = frame.payload.attachments ?? [];
     const rootSpan: OtlpJsonSpan = {
       traceId: frame.traceId,
       spanId: frame.rootSpanId,
       name: GENIE_MESSAGE_SPAN_NAME,
       kind: "SPAN_KIND_INTERNAL",
-      startTimeUnixNano: ConversationTraceAssembly.msToNano(frame.startMs),
-      endTimeUnixNano: ConversationTraceAssembly.msToNano(frame.endMs),
-      attributes: GenieTraceMapper.rootAttributesOf(event, frame),
+      startTimeUnixNano: ConversationTraceAssemblyService.msToNano(frame.startMs),
+      endTimeUnixNano: ConversationTraceAssemblyService.msToNano(frame.endMs),
+      attributes: GenieTraceMapperService.rootAttributesOf(event, frame),
       status: frame.isCompleted ? { code: 1 } : { code: 2, message: frame.status || "unknown" },
     };
-    const stepSpans = GenieTraceMapper.queryAttachmentsOf(attachments).map((attachment, index) =>
-      GenieTraceMapper.queryStepSpan(attachment, index, frame),
+    const stepSpans = GenieTraceMapperService.queryAttachmentsOf(attachments).map(
+      (attachment, index) => GenieTraceMapperService.queryStepSpan(attachment, index, frame),
     );
     return [rootSpan, ...stepSpans];
   }
@@ -548,8 +593,8 @@ export class GenieTraceMapper {
     const wanted = origin.profile.conversationAction;
     const spans = (wanted ? events : [])
       .filter((event) => !!event.action && event.action === wanted)
-      .filter((event) => GenieTraceMapper.isSettledForRouting(event))
-      .flatMap((event) => GenieTraceMapper.mapMessage(event, origin));
-    return ConversationTraceAssembly.assembleTraceRequest(spans, origin.profile);
+      .filter((event) => GenieTraceMapperService.isSettledForRouting(event))
+      .flatMap((event) => GenieTraceMapperService.mapMessage(event, origin));
+    return ConversationTraceAssemblyService.assembleTraceRequest(spans, origin.profile);
   }
 }

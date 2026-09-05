@@ -26,10 +26,10 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { NormalizedPullEvent, PullResult } from "@langwatch/enterprise-governance-contract";
 import { FetchHttpPort } from "../../__tests__/support/puller-test-ports";
+import { DATABRICKS_GENIE_ADAPTER_ID } from "../../services/pull-destination.service";
 import {
-  DATABRICKS_GENIE_ADAPTER_ID,
   type DatabricksGeniePullConfig,
-  DatabricksGeniePuller,
+  DatabricksGeniePullerAdapter,
 } from "../databricks-genie-puller.adapter";
 
 /** Mirrors the adapter's own constant; asserted against, not imported by it. */
@@ -384,7 +384,7 @@ function genieConfig(params: {
   startingAt: string;
   credentials?: Record<string, string>;
 }): DatabricksGeniePullConfig {
-  return DatabricksGeniePuller.create(new FetchHttpPort()).validateConfig({
+  return DatabricksGeniePullerAdapter.create(new FetchHttpPort()).validateConfig({
     adapter: DATABRICKS_GENIE_ADAPTER_ID,
     workspaceUrl: params.baseUrl,
     spaceIds: params.spaceIds,
@@ -414,7 +414,7 @@ async function sweep(params: {
     ...params.fixtureOptions,
   });
   closers.push(fixture.close);
-  const adapter = DatabricksGeniePuller.create(new FetchHttpPort());
+  const adapter = DatabricksGeniePullerAdapter.create(new FetchHttpPort());
   const config = genieConfig({
     baseUrl: fixture.baseUrl,
     spaceIds: params.spaceIds,
@@ -518,7 +518,7 @@ describe("given someone asks a question while a sweep is running", () => {
       },
     });
     closers.push(fixture.close);
-    const adapter = DatabricksGeniePuller.create(new FetchHttpPort());
+    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttpPort());
     const config = genieConfig({
       baseUrl: fixture.baseUrl,
       spaceIds: ["space-alpha", "space-beta"],
@@ -602,7 +602,7 @@ describe("given a list endpoint whose page token never advances", () => {
     const workspace = createFixtureWorkspace();
     const fixture = await startFixtureServer({ workspace });
     closers.push(fixture.close);
-    const adapter = DatabricksGeniePuller.create(new FetchHttpPort(), { maxRequests: 5 });
+    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttpPort(), { maxRequests: 5 });
     const config = genieConfig({
       baseUrl: fixture.baseUrl,
       spaceIds: ["space-loop"],
@@ -647,7 +647,7 @@ describe("given a sweep too large for one run's budget", () => {
     const workspace = createFixtureWorkspace();
     const fixture = await startFixtureServer({ workspace });
     closers.push(fixture.close);
-    const adapter = DatabricksGeniePuller.create(new FetchHttpPort());
+    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttpPort());
     const config = genieConfig({
       baseUrl: fixture.baseUrl,
       spaceIds: ["space-alpha", "space-beta"],
@@ -696,7 +696,7 @@ describe("given a sweep too large for one run's budget", () => {
     });
     closers.push(fixture.close);
 
-    const adapter = DatabricksGeniePuller.create(new FetchHttpPort());
+    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttpPort());
     const config = genieConfig({
       baseUrl: fixture.baseUrl,
       spaceIds: ["space-alpha", "space-beta"],
@@ -742,7 +742,7 @@ describe("given the directory fails while the sweep is running", () => {
     });
     closers.push(fixture.close);
 
-    const adapter = DatabricksGeniePuller.create(new FetchHttpPort());
+    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttpPort());
     const config = genieConfig({
       baseUrl: fixture.baseUrl,
       spaceIds: ["space-alpha"],
@@ -778,7 +778,7 @@ describe("given a source that signs in with a service principal", () => {
       oauth: { accessToken: "minted-token" },
     });
     closers.push(fixture.close);
-    const adapter = DatabricksGeniePuller.create(new FetchHttpPort());
+    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttpPort());
     const credentials = { clientId: "sp-client-id", clientSecret: "sp-client-secret" };
     const config = genieConfig({
       baseUrl: fixture.baseUrl,
@@ -812,7 +812,7 @@ describe("given a source holding a pasted token", () => {
     // No `oauth` block at all: a sign-in would 404 and be impossible to miss.
     const fixture = await startFixtureServer({ workspace });
     closers.push(fixture.close);
-    const adapter = DatabricksGeniePuller.create(new FetchHttpPort());
+    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttpPort());
     const config = genieConfig({
       baseUrl: fixture.baseUrl,
       spaceIds: ["space-alpha"],
@@ -828,7 +828,7 @@ describe("given a source holding a pasted token", () => {
     const workspace = createFixtureWorkspace();
     const fixture = await startFixtureServer({ workspace });
     closers.push(fixture.close);
-    const adapter = DatabricksGeniePuller.create(new FetchHttpPort());
+    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttpPort());
     const config = genieConfig({
       baseUrl: fixture.baseUrl,
       spaceIds: ["space-alpha"],
@@ -858,7 +858,7 @@ describe("given a source that cannot sign in", () => {
     const workspace = createFixtureWorkspace();
     const fixture = await startFixtureServer({ workspace, oauth: params.oauth });
     closers.push(fixture.close);
-    const adapter = DatabricksGeniePuller.create(new FetchHttpPort());
+    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttpPort());
     const config = genieConfig({
       baseUrl: fixture.baseUrl,
       spaceIds: ["space-alpha"],

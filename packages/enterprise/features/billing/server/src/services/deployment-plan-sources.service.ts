@@ -31,7 +31,7 @@ export type DeploymentPlanSourcesOptions = Readonly<{
    * It arrives BUILT rather than as the licence store, because verification
    * lives in `@langwatch/enterprise-licensing-server` and a feature package may
    * not import another feature's implementation — the same boundary that keeps
-   * `EntitlementService` itself at each root. `LicensingEntitlementSource.forDeployment`
+   * `EntitlementService` itself at each root. `LicensingEntitlementSourceAdapter.forDeployment`
    * is the one call that builds it, so the deployment mode it reads is derived
    * once rather than at each process.
    *
@@ -125,28 +125,35 @@ export type DeploymentPlanSources = Readonly<{
  * Prisma is nowhere in this module: the subscription rows arrive as the
  * repository port the calling process already composed.
  */
-export function deploymentPlanSources(
-  options: DeploymentPlanSourcesOptions,
-): DeploymentPlanSources {
-  const baseline = options.isSaas ? getFreePlanLimits() : UNLIMITED_PLAN;
-  // The enricher travels WITH the licence and only with it, because that is
-  // the one leg whose plan can leave a tier entitlement unanswered.
-  const license = options.license
-    ? { license: options.license, enrichers: [{ enrich: applyPlanTypeEntitlements }] }
-    : {};
-  if (!options.subscriptions) {
-    return { baseline, ...license };
+export class DeploymentPlanSourcesService {
+  private constructor(private readonly options: DeploymentPlanSourcesOptions) {}
+
+  static create(options: DeploymentPlanSourcesOptions): DeploymentPlanSourcesService {
+    return new DeploymentPlanSourcesService(options);
   }
 
-  return {
-    baseline,
-    ...license,
-    subscription: SubscriptionEntitlementSource.create({
-      subscriptions: options.subscriptions,
-      isSaas: options.isSaas,
-      adminEmails: options.adminEmails ?? [],
-    }),
-  };
+  sources(): DeploymentPlanSources {
+    const { options } = this;
+    const baseline = options.isSaas ? getFreePlanLimits() : UNLIMITED_PLAN;
+    // The enricher travels WITH the licence and only with it, because that is
+    // the one leg whose plan can leave a tier entitlement unanswered.
+    const license = options.license
+      ? { license: options.license, enrichers: [{ enrich: applyPlanTypeEntitlements }] }
+      : {};
+    if (!options.subscriptions) {
+      return { baseline, ...license };
+    }
+
+    return {
+      baseline,
+      ...license,
+      subscription: SubscriptionEntitlementSource.create({
+        subscriptions: options.subscriptions,
+        isSaas: options.isSaas,
+        adminEmails: options.adminEmails ?? [],
+      }),
+    };
+  }
 }
 
 /**

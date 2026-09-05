@@ -1334,10 +1334,10 @@ export class WorkerProductionComposition {
       }),
       eventing,
     });
-    const experimentIdLookup = ExperimentEventingAdapter.createIdLookup({
+    const experimentIdLookup = ExperimentEventingAdapter.create({
       resolveClient: options.eventing.resolveClickHouseClient,
       clickhouseEnabled: true,
-    });
+    }).idLookup();
     const traceProducers = WorkerProductionComposition.requireTraceProducers({
       automation,
       evaluation,

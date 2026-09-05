@@ -1,9 +1,9 @@
 import {
-  deploymentPlanSources,
+  DeploymentPlanSourcesService,
   type BillingSubscriptionRepository,
 } from "@langwatch/enterprise-billing-server";
 import {
-  LicensingEntitlementSource,
+  LicensingEntitlementSourceAdapter,
   NodeLicenseCryptographyAdapter,
   type OrganizationLicensePort,
 } from "@langwatch/enterprise-licensing-server";
@@ -130,7 +130,7 @@ export function createWorkerPlanProvider(options: WorkerPlanProviderOptions): Pl
   // at this root. `forDeployment` is one call, so the mode it derives from
   // `isSaas` is decided once for both processes rather than twice.
   const license = options.licenses
-    ? LicensingEntitlementSource.forDeployment({
+    ? LicensingEntitlementSourceAdapter.forDeployment({
         licenses: options.licenses,
         cryptography: NodeLicenseCryptographyAdapter.create(
           options.licensePublicKey ? { publicKey: options.licensePublicKey } : {},
@@ -140,11 +140,11 @@ export function createWorkerPlanProvider(options: WorkerPlanProviderOptions): Pl
     : undefined;
   if (!license) options.report?.absent("licence");
 
-  const sources = deploymentPlanSources({
+  const sources = DeploymentPlanSourcesService.create({
     isSaas: options.isSaas,
     ...(license ? { license } : {}),
     ...(options.subscriptions ? { subscriptions: options.subscriptions } : {}),
-  });
+  }).sources();
   if (options.isSaas && !sources.subscription) options.report?.absent("subscription");
 
   return EntitlementService.create(sources);

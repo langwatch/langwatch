@@ -29,7 +29,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
 }));
 
 import { OPENAI_ADMIN_ADAPTER_ID } from "@langwatch/enterprise-governance-contract";
-import { OpenAiAdminPuller } from "../openai-admin-puller.adapter";
+import { OpenAiAdminPullerAdapter } from "../openai-admin-puller.adapter";
 import { PulledUsageRecordService } from "../../services/pulled-usage-record.service";
 
 class StubHttp extends GovernanceHttpPort {
@@ -50,8 +50,8 @@ class TestRatePort {
   }
 }
 
-function makePuller(): OpenAiAdminPuller {
-  return OpenAiAdminPuller.create(new StubHttp());
+function makePuller(): OpenAiAdminPullerAdapter {
+  return OpenAiAdminPullerAdapter.create(new StubHttp());
 }
 
 const usageRecords = PulledUsageRecordService.create(

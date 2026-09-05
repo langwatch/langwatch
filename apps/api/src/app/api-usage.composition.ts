@@ -61,7 +61,7 @@
 import {
   BillableEventsQueryService,
   ClickHouseBillingAdapter,
-  deploymentPlanSources,
+  DeploymentPlanSourcesService,
   NotificationService as BillingNotificationService,
   UsageLimitEmailAdapter,
   UsageWarningService,
@@ -74,7 +74,7 @@ import type {
 } from "@langwatch/enterprise-billing-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
-  LicensingEntitlementSource,
+  LicensingEntitlementSourceAdapter,
   NodeLicenseCryptographyAdapter,
   type OrganizationLicensePort,
 } from "@langwatch/enterprise-licensing-server";
@@ -209,7 +209,7 @@ export function composeApiPlanProvider(options: ApiPlanProviderOptions): PlanPro
   // at this root. `forDeployment` is one call, so the mode it derives from
   // `isSaas` is decided once for both processes rather than twice.
   const license = options.licenses
-    ? LicensingEntitlementSource.forDeployment({
+    ? LicensingEntitlementSourceAdapter.forDeployment({
         licenses: options.licenses,
         cryptography: NodeLicenseCryptographyAdapter.create(
           options.licensePublicKey ? { publicKey: options.licensePublicKey } : {},
@@ -219,12 +219,12 @@ export function composeApiPlanProvider(options: ApiPlanProviderOptions): PlanPro
     : undefined;
   if (!license) options.report?.absent("licence");
 
-  const sources = deploymentPlanSources({
+  const sources = DeploymentPlanSourcesService.create({
     isSaas: options.isSaas,
     ...(license ? { license } : {}),
     ...(options.subscriptions ? { subscriptions: options.subscriptions } : {}),
     ...(options.adminEmails ? { adminEmails: options.adminEmails } : {}),
-  });
+  }).sources();
   if (options.isSaas && !sources.subscription) options.report?.absent("subscription");
 
   return EntitlementService.create(sources);
@@ -379,7 +379,7 @@ function composeApiUsageWarnings(
   const mail = options.mail;
   if (!mail) return undefined;
 
-  return new UsageWarningService({
+  return UsageWarningService.create({
     records: PostgresNotificationAdapter.create({ database: options.prisma }).build(),
     organizations: ApiUsageWarningDirectory.create(options.prisma),
     usageCounts: ApiUsageBreakdownAdapter.create(counter, options.clickhouse !== null),

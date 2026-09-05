@@ -10,11 +10,11 @@ import type {
   GovernanceBudgetCrossingData,
   GovernanceVkLifecycleData,
 } from "@langwatch/enterprise-governance-server";
-import { createGovernanceEventsPipeline } from "@langwatch/enterprise-governance-server";
+import { GovernanceEventsAdapter } from "@langwatch/enterprise-governance-server";
 import {
-  httpWebhookDestination,
-  webhookDestinationFor,
+  HttpWebhookDestinationAdapter,
   WebhookDeliveryService,
+  WebhookDestinationAdapter,
   WebhookEndpointAdapter,
   WebhookEndpointConfiguration,
   WebhookIdPort,
@@ -154,7 +154,7 @@ export type WorkerGatewaySpendComposition = Readonly<{
  * without spend. Splitting them would make "spend without governance"
  * expressible, and that graph silently drops every debit.
  *
- *     createGovernanceEventsPipeline           3 keys
+ *     GovernanceEventsAdapter.pipeline()       3 keys
  *       |- recordVkLifecycle, recordBudgetCrossing   pure appends
  *       `- governanceEventsDelivery            ADR-073, over the shared deps
  *     EventingGatewaySpendAdapter              7 keys
@@ -188,9 +188,9 @@ export function createWorkerGatewaySpend(
 
   const governance: GovernanceEventsWorkerCapability = {
     buildProcessing: () =>
-      createGovernanceEventsPipeline({
+      GovernanceEventsAdapter.create({
         webhookDelivery: AppGovernanceWebhookAdapter.create(webhookDelivery).build(),
-      }) as never,
+      }).pipeline() as never,
   };
 
   const spend = EventingGatewaySpendAdapter.create({
@@ -296,19 +296,21 @@ export function dispatchWebhookThrough(
           error: "This process composes no AWS transport for queue webhook destinations.",
         };
       }
-      return httpWebhookDestination({
+      return HttpWebhookDestinationAdapter.create({
         url: input.destination.url,
         egress: options.egress,
         allowInsecureLocal,
       }).send(dispatchRequestFor(input));
     }
 
-    return webhookDestinationFor(input.destination, {
+    return WebhookDestinationAdapter.create({
       egress: options.egress,
       allowInsecureLocal,
       awsClientConfig,
       ...(options.dispatchRateLimiter ? { rateLimiter: options.dispatchRateLimiter } : {}),
-    }).send(dispatchRequestFor(input));
+    })
+      .destinationFor(input.destination)
+      .send(dispatchRequestFor(input));
   };
 }
 

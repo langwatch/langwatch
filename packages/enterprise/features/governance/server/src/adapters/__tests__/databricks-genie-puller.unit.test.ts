@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
-  DatabricksGeniePuller,
+  DatabricksGeniePullerAdapter,
   WAREHOUSE_COST_ROW_LIMIT,
 } from "../databricks-genie-puller.adapter";
 import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port";
@@ -144,7 +144,7 @@ function run(
   cursor: string | null = null,
   credentials: Record<string, string> = { token: "dapi-token" },
 ) {
-  const adapter = DatabricksGeniePuller.create(workspace);
+  const adapter = DatabricksGeniePullerAdapter.create(workspace);
   return adapter.runOnce({ cursor, credentials }, adapter.validateConfig(config(overrides)));
 }
 
