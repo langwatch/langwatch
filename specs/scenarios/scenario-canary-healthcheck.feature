@@ -240,3 +240,11 @@ Feature: A scenario canary health check that fires a real run and says what brok
     Given a request carrying the correct internal secret
     When the scenario canary endpoint returns any response
     Then the response carries Cache-Control no-store
+
+  @unit
+  Scenario: A wedged run plan lookup reports unhealthy timeout without launching a run
+    Given a run plan lookup that never settles
+    When the probe resolves the run plan against a deadline that fires
+    Then the outcome is unhealthy with reason "timeout"
+    And no run is launched
+    And a following call for the same run plan is not told the probe is busy

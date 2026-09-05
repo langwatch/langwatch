@@ -41,6 +41,7 @@ import {
   type CanaryConfig,
   classifyCanaryOutcome,
   createSingleFlightScenarioCanary,
+  type DeadlineRace,
   parseRunPlanConfig,
   raceAgainstRealDeadline,
   runScenarioCanary,
@@ -841,6 +842,56 @@ describe("runScenarioHealthCanary", () => {
         projectId: "plan-project",
         scenarioId: "plan-scenario",
         target: { type: "prompt", referenceId: "plan-prompt" },
+      });
+    });
+  });
+
+  describe("given the run plan lookup never settles", () => {
+    /** @scenario "A wedged run plan lookup reports unhealthy timeout without launching a run" */
+    it("reports timeout via a fired raceDeadline, launches nothing, and leaves a following call not busy", async () => {
+      // The lookup itself never resolves, standing in for a wedged datastore
+      // read; a fake `raceDeadline` fires immediately instead of relying on
+      // vitest's real-timer fake-timer dance, since the interesting behaviour
+      // here is what `runScenarioHealthCanary` does with a fired deadline, not
+      // whether `raceAgainstRealDeadline` itself fires one (that is covered
+      // separately).
+      vi.mocked(prisma.simulationSuite.findFirst).mockReturnValue(
+        new Promise(() => undefined) as unknown as ReturnType<
+          typeof prisma.simulationSuite.findFirst
+        >,
+      );
+      const firedDeadline: DeadlineRace = async ({ ms }) => {
+        expect(ms).toBe(SCENARIO_CANARY_TOTAL_BUDGET_MS);
+        return { timedOut: true };
+      };
+
+      const first = await runScenarioHealthCanary({
+        projectId: "canary-project",
+        runPlanId: "wedged-plan",
+        raceDeadline: firedDeadline,
+      });
+
+      expect(first).toEqual({
+        healthy: false,
+        reason: "timeout",
+        durationMs: 0,
+      });
+      expect(launchScenarioRun).not.toHaveBeenCalled();
+
+      // No single-flight lock was ever taken for a lookup that timed out
+      // before a run was ever launched, so a following call for the same
+      // runPlanId is not told the probe is busy.
+      const second = await runScenarioHealthCanary({
+        projectId: "canary-project",
+        runPlanId: "wedged-plan",
+        raceDeadline: firedDeadline,
+      });
+
+      expect(second).not.toEqual({ busy: true });
+      expect(second).toEqual({
+        healthy: false,
+        reason: "timeout",
+        durationMs: 0,
       });
     });
   });

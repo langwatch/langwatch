@@ -359,25 +359,44 @@ export function parseRunPlanConfig(
  * datastore outage is another), and a probe that answers `run_failed` on any
  * lookup failure is strictly better than one that leaks a 500 outside the
  * documented 200/503/429 contract.
+ *
+ * The read is also raced against `raceDeadline` (defaulting to
+ * {@link raceAgainstRealDeadline}) so a wedged `findFirst` cannot wedge the
+ * endpoint forever: this happens before the total budget in
+ * {@link runScenarioCanary} would otherwise start, so without this race a
+ * hung read never reaches — and never releases — anything. See the module
+ * doc.
  */
 async function resolveCanaryConfigFromRunPlan({
   projectId,
   runPlanId,
+  raceDeadline = raceAgainstRealDeadline,
 }: {
   projectId: string;
   runPlanId: string;
-}): Promise<CanaryConfig | { invalid: string }> {
+  raceDeadline?: DeadlineRace;
+}): Promise<CanaryConfig | { invalid: string } | { timedOut: true }> {
   try {
-    const suite = await prisma.simulationSuite.findFirst({
+    const raced = await raceDeadline({
+      ms: SCENARIO_CANARY_TOTAL_BUDGET_MS,
       // `projectId` scopes the read to a plan the caller's project owns and
       // satisfies the multitenancy guard. `kind: "run_plan"` and
       // `archivedAt: null` are load-bearing too: a 1×1 `test_suite` or an
       // archived plan would otherwise launch a real run the operator meant to
       // retire. Filtering in the query keeps every one of those decisions in a
       // single place instead of re-checking them after the read.
-      where: { id: runPlanId, projectId, archivedAt: null, kind: "run_plan" },
+      work: prisma.simulationSuite.findFirst({
+        where: { id: runPlanId, projectId, archivedAt: null, kind: "run_plan" },
+      }),
     });
-    return parseRunPlanConfig(suite);
+    if ("timedOut" in raced) {
+      logger.error(
+        { projectId, runPlanId },
+        "Scenario canary run plan lookup timed out; reporting unhealthy without launching a run",
+      );
+      return { timedOut: true };
+    }
+    return parseRunPlanConfig(raced.value);
   } catch (error) {
     logger.error(
       { error, projectId, runPlanId },
@@ -433,14 +452,21 @@ const singleFlightCanary = createSingleFlightScenarioCanary(runScenarioCanary);
  * a plan the project owns), and the canary's own scenario and target come from
  * that plan's row — so a runPlanId that does not belong to `projectId`, or a
  * plan that does not resolve to exactly one scenario and one target, reports
- * unhealthy `run_failed` without launching anything.
+ * unhealthy `run_failed` without launching anything. A run plan lookup that
+ * does not settle before `raceDeadline` fires reports unhealthy `timeout`
+ * instead, also without launching anything — see
+ * {@link resolveCanaryConfigFromRunPlan}. `raceDeadline` defaults to
+ * {@link raceAgainstRealDeadline} and is exposed only so unit tests can fake
+ * a wedged lookup deterministically.
  */
 export async function runScenarioHealthCanary({
   projectId,
   runPlanId,
+  raceDeadline,
 }: {
   projectId: string;
   runPlanId: string;
+  raceDeadline?: DeadlineRace;
 }): Promise<CanaryResult> {
   logger.info({ projectId, runPlanId }, "Running scenario canary health check");
   if (!runPlanId || !projectId) {
@@ -450,7 +476,14 @@ export async function runScenarioHealthCanary({
     );
     return { healthy: false, reason: "run_failed", durationMs: 0 };
   }
-  const config = await resolveCanaryConfigFromRunPlan({ projectId, runPlanId });
+  const config = await resolveCanaryConfigFromRunPlan({
+    projectId,
+    runPlanId,
+    raceDeadline,
+  });
+  if ("timedOut" in config) {
+    return { healthy: false, reason: "timeout", durationMs: 0 };
+  }
   if ("invalid" in config) {
     logger.error(
       { projectId, runPlanId, reason: config.invalid },

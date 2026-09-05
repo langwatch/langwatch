@@ -540,20 +540,12 @@ secured
 
 // ── GET /scenarios ───────────────────────────────────────────────────
 
-// Fires a real scenario run for the run plan named by
-// `?projectId=<project id>&runPlanId=<SimulationSuite id>` (a `run_plan` suite
-// holding exactly one scenario and one target) and reports what broke. The plan
-// is looked up scoped to `projectId` (the multitenancy guard rejects an
-// unscoped read), and the plan's own row supplies the scenario and target — a
-// runPlanId that does not belong to `projectId` resolves to nothing and reports
-// `run_failed`. Authenticated by the shared internal secret (a status-page
-// poller has no user session and no project API key), checked BEFORE the run
-// plan is read or any run is queued.
-//
-//   400 { message }                              projectId or runPlanId missing
-//   200 { status: "ok", scenarioRunId, durationMs }         healthy
-//   503 { status: "unhealthy", reason, scenarioRunId?, durationMs }
-//   429 { status: "busy" }                                  already in flight
+// The plan is looked up scoped to `projectId` (the multitenancy guard rejects
+// an unscoped read), and the plan's own row supplies the scenario and target —
+// a runPlanId that does not belong to `projectId` resolves to nothing and
+// reports `run_failed`. Authenticated by the shared internal secret (a
+// status-page poller has no user session and no project API key), checked
+// BEFORE the run plan is read or any run is queued.
 //
 // Every response carries `Cache-Control: no-store` — a monitor must see each
 // run's real result, never a cached one.
@@ -581,10 +573,13 @@ function readCanaryQuery(
 
 // Maps the canary's result union to its HTTP response so the handler itself
 // only has to call it — keeps the branching out of the handler's complexity.
-function canaryResultToResponse(
-  c: Context,
-  result: Awaited<ReturnType<typeof runScenarioHealthCanary>>,
-) {
+function canaryResultToResponse({
+  c,
+  result,
+}: {
+  c: Context;
+  result: Awaited<ReturnType<typeof runScenarioHealthCanary>>;
+}) {
   if ("busy" in result) {
     return c.json({ status: "busy" }, { status: 429 });
   }
@@ -646,7 +641,7 @@ secured
     }
 
     const result = await runScenarioHealthCanary(query);
-    return canaryResultToResponse(c, result);
+    return canaryResultToResponse({ c, result });
   });
 
 export const app = secured.hono;
