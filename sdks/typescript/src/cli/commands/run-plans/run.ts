@@ -10,6 +10,7 @@ import { createCliTestSuitesService } from "../test-suites/cli-test-suites-servi
 import {
   buildScope,
   parseRepeat,
+  parseWait,
   parseTargets,
   type ScopeOptions,
 } from "./scopeFlags";
@@ -24,7 +25,7 @@ export interface RunPlanRunOptions extends ScopeOptions, RawOutputFlags {
   param?: string[];
   note?: string;
   idempotencyKey?: string;
-  wait?: boolean;
+  wait?: boolean | string;
 }
 
 /**
@@ -47,6 +48,7 @@ export const runRunPlanCommand = async (
   const note = parseRunNoteFlag({ note: options.note });
   const targets = parseTargets(options.target);
   const repeatCount = parseRepeat(options.repeat);
+  const wait = parseWait(options.wait);
   const { scope, scenarioIds } = await buildScope(
     options,
     createCliTestSuitesService(),
@@ -81,7 +83,7 @@ export const runRunPlanCommand = async (
       `Run scheduled under "${result.planName}": ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} (batch: ${result.batchRunId}${note ? `, note: "${note}"` : ""})`,
     );
 
-    await emitRunResult({ result, note, options, subject: "run" });
+    await emitRunResult({ result, note, options, wait, subject: "run" });
   } catch (error) {
     failSpinner({ spinner, error, action: "run the plan" });
     process.exit(1);

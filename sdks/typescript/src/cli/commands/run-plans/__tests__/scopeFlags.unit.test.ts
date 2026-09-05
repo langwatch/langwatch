@@ -11,7 +11,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { parseTargets } from "../scopeFlags";
+import { DEFAULT_WAIT_MINUTES, parseTargets, parseWait } from "../scopeFlags";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -50,6 +50,13 @@ describe("parseTargets()", () => {
     it("reads a connected target by agent id", () => {
       expect(parseTargets(["connected:agent_abc"])).toEqual([
         { type: "connected", referenceId: "agent_abc" },
+      ]);
+    });
+
+    /** @scenario "Run against a connected agent by name alone" */
+    it("passes a connected name with no environment through as the reference id", () => {
+      expect(parseTargets(["connected:support-agent"])).toEqual([
+        { type: "connected", referenceId: "support-agent" },
       ]);
     });
 
@@ -261,5 +268,62 @@ describe("parseTargets()", () => {
       expect(() => parseTargets([])).toThrow(ProcessExitError);
       expect(reported()).toContain("--target is required");
     });
+  });
+});
+
+describe("parseWait()", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(noop);
+    vi.spyOn(process, "exit").mockImplementation((code) => {
+      throw new ProcessExitError(code as number);
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("when --wait is not on the command line", () => {
+    it("asks for no wait", () => {
+      expect(parseWait(undefined)).toBeUndefined();
+    });
+  });
+
+  describe("when --wait is bare", () => {
+    /** @scenario "The wait gives up after 45 minutes by default" */
+    it("waits 45 minutes", () => {
+      expect(parseWait(true)).toEqual({
+        timeoutMs: DEFAULT_WAIT_MINUTES * 60 * 1000,
+      });
+      expect(DEFAULT_WAIT_MINUTES).toBe(45);
+    });
+  });
+
+  describe("when --wait names a number of minutes", () => {
+    /** @scenario "Wait for a number of minutes" */
+    it("waits that long", () => {
+      expect(parseWait("90")).toEqual({ timeoutMs: 90 * 60 * 1000 });
+      expect(parseWait("0.5")).toEqual({ timeoutMs: 30 * 1000 });
+    });
+  });
+
+  describe("when --wait names something else", () => {
+    /** @scenario "Wait with a value that is not a number of minutes" */
+    it.each(["soon", "", "0", "-5", "10m"])("refuses %j by name", (value) => {
+      expect(() => parseWait(value)).toThrow(ProcessExitError);
+      expect(reported()).toContain("--wait takes a number of minutes");
+      expect(reported()).toContain(value);
+    });
+  });
+
+  describe("when the minutes overflow the millisecond timeout", () => {
+    /** @scenario "Wait with a value that is not a number of minutes" */
+    it.each(["1e308", "1e400"])(
+      "refuses %j rather than polling forever",
+      (value) => {
+        expect(() => parseWait(value)).toThrow(ProcessExitError);
+        expect(reported()).toContain("--wait takes a number of minutes");
+      },
+    );
   });
 });
