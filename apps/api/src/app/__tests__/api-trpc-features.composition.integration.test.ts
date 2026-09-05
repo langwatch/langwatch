@@ -39,6 +39,8 @@ import { ApiAuditPort, ApiAuthorizationPort, ApiRequestPolicy } from "../../api-
 import type { UserService } from "@langwatch/user-contract";
 import { composeAuthFeature } from "../../features/auth/auth.composition";
 import { composeBugReportFeature } from "../../features/bug-report/bug-report.composition";
+import { composeOrganizationFeature } from "../../features/organization/organization.composition";
+import { composeWorkflowFeature } from "../../features/workflow/workflow.composition";
 import {
   AuthSessionApiAuthenticationAdapter,
   BetterAuthBrowserSessionTransportAdapter,
@@ -343,6 +345,20 @@ function composeApplication(
       // process's own graph, so both the audit row and `publicEnv`'s answer
       // below are the ones those compositions produce.
       bugReport: composeBugReportFeature({ infrastructure }),
+      // The studio composes itself off the same infrastructure, so the row
+      // read below is the one it runs on this process's own connection.
+      workflow: composeWorkflowFeature({
+        infrastructure,
+        runtime: {
+          workflows: stub("workflow.workflows"),
+          nlpRuntime: stub("workflow.nlpRuntime"),
+        },
+        peers: {
+          datasets: stub("workflow.datasets"),
+          evaluators: stub("workflow.evaluators"),
+          modelProviders: stub("workflow.modelProviders"),
+        },
+      }),
       auth: composeAuthFeature({
         prisma: prisma.client,
         peers: { users: {} as unknown as UserService },
@@ -609,22 +625,30 @@ function composeSessionApplication(options: {
   getAllForUser: (...args: never[]) => Promise<unknown[]>;
   session?: BrowserSession;
 }) {
+  const infrastructure = {
+    ...stubInfrastructureEntitlements(),
+    prisma: testPrisma().client,
+    authz: testAuthz(),
+    audit: new RecordingAudit(),
+  };
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    composed: stubComposedFeatures(),
-    infrastructure: {
-      ...stubInfrastructureEntitlements(),
-      prisma: testPrisma().client,
-      authz: testAuthz(),
-      audit: new RecordingAudit(),
+    composed: {
+      ...stubComposedFeatures(),
+      // `organization.*` is the surface under test, so the real feature is
+      // composed here. The directory it answers from stays the injected
+      // double, because the namespace reads it off `ctx.app.organizations`.
+      organization: composeOrganizationFeature({
+        infrastructure,
+        peers: { encryption: undefined },
+        rateLimit: async () => ({ allowed: true, resetAt: 0 }),
+        baseHost: "https://app.langwatch.test",
+        demoProject: { userId: "demo-user", projectId: "demo-project" },
+      }),
     },
+    infrastructure,
     collaborators: testCollaborators({
       application: testApplication({
         organizations: { getAllForUser: options.getAllForUser },
-      }),
-      organization: stub("organization", {
-        signUpDataSchema: anySchema,
-        isCustomRole: () => false,
-        demoProject: () => ({ userId: "demo-user", projectId: "demo-project" }),
       }),
     }),
   });
