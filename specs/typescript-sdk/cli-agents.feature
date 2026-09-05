@@ -79,4 +79,5 @@ Feature: The agent commands show connected agents and run them through the relay
 
     Scenario: The target help names the connected forms
       When I read the help of the --target flag
-      Then it names connected:<id> and connected:<name>@<environment>
+      Then it names connected:<name> first, as the agent in development
+      And connected:<name>@<environment> and connected:<id> after it

@@ -33,7 +33,7 @@ The process connects only with an API key. The SDK reads `LANGWATCH_API_KEY` fro
 | `enabled` | `bool \| None` | `True`, `False` when `CI` is set | Whether this process connects. |
 | `instance_label` | `str \| None` | `None` | A name for this instance in the instances table. |
 | `timeout` | `float` | `120` | Seconds one call may take. The ceiling is `300`. |
-| `concurrency` | `int \| None` | `1` in `development`, `4` elsewhere | Calls this instance takes at the same time. |
+| `concurrency` | `int \| None` | `10` | Calls this instance takes at the same time. |
 | `sticky` | `bool` | `False` | Keep every turn of one conversation on one instance. |
 | `api_key` | `str \| None` | `LANGWATCH_API_KEY` | The key the connection authenticates with. |
 | `endpoint` | `str \| None` | `LANGWATCH_ENDPOINT` | The LangWatch instance to connect to. |
@@ -135,7 +135,9 @@ The connection starts on first use, once per process, on a daemon thread with it
 
 ### Transport
 
-The connection is an outbound WebSocket by default. On a network that blocks WebSockets, the same frames travel over HTTP long polling: the SDK posts the registration, waits on a request for the next turn, and posts each answer. Pass `transport="http"` or set `LANGWATCH_AGENT_TRANSPORT=http` to use it from the start. With the default transport, a proxy that answers the WebSocket upgrade with an HTTP status makes the SDK switch to HTTP on its own, with one warning line that names the status. The transport in use is printed on the connected line.
+The connection is an outbound WebSocket by default. On a network that blocks WebSockets, the same frames travel over HTTP long polling: the SDK posts the registration, waits on a request for the next turn, and posts each answer. Pass `transport="http"` or set `LANGWATCH_AGENT_TRANSPORT=http` to use it from the start.
+
+With the default transport, a proxy that answers the WebSocket upgrade with an HTTP status makes the SDK switch to HTTP on its own, with one warning line that names the status. The transport in use is printed on the connected line.
 
 ### Environment variables
 
