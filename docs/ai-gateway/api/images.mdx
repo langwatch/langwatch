@@ -37,7 +37,7 @@ curl https://gateway.langwatch.ai/v1/images/generations \
   }'
 ```
 
-The response is the standard images JSON, with the base64 image in `data[0].b64_json`.
+The response is the standard images JSON, passed through as the provider sent it. The gpt-image models put the image in `data[0].b64_json`, which is what the example below reads; the dall-e models answer with `data[0].url` unless you ask for base64.
 
 ```javascript
 const image = await client.images.generate({
@@ -111,6 +111,6 @@ An image call produces a gateway trace, the same as a chat call. The gateway rep
 | `gen_ai.usage.output_image_tokens` | Image tokens in the answer. This is what you pay for each generated image |
 | `gen_ai.usage.image_count` | The number of images in the response |
 
-The span records your prompt as its input. The response body is base64 image data, which the gateway never writes to a span. When the model returns a revised prompt, that revised prompt is the span's output.
+The span records your prompt as its input. The response body carries the image, as base64 or as a link to it, and the gateway never writes it to a span. When the model returns a revised prompt, that revised prompt is the span's output.
 
 **Also check:** [Errors](/ai-gateway/api/errors), [Observability](/ai-gateway/observability), [Model aliases](/ai-gateway/model-aliases).
