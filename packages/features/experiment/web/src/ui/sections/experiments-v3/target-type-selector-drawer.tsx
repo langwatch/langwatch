@@ -112,15 +112,13 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
     if (onSelect) {
       // Parent handles navigation (backward compat)
       onSelect(type);
-    } else {
+    } else if (type === "prompt") {
       // Use drawer navigation
-      if (type === "prompt") {
-        openDrawer("promptList", {}, { replace: true });
-      } else if (type === "agent") {
-        openDrawer("agentList", {}, { replace: true });
-      } else if (type === "evaluator") {
-        openDrawer("evaluatorList", {}, { replace: true });
-      }
+      openDrawer("promptList", {}, { replace: true });
+    } else if (type === "agent") {
+      openDrawer("agentList", {}, { replace: true });
+    } else if (type === "evaluator") {
+      openDrawer("evaluatorList", {}, { replace: true });
     }
   };
 

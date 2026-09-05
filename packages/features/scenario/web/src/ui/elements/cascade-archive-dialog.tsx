@@ -169,10 +169,12 @@ export function CascadeArchiveDialog({
                 ref={inputRef}
                 onKeyDown={(e) => {
                   e.stopPropagation();
-                  if (e.key === "Enter") {
-                    if (confirmationText.toLowerCase() === "delete" && !isLoading) {
-                      onConfirm();
-                    }
+                  if (
+                    e.key === "Enter" &&
+                    confirmationText.toLowerCase() === "delete" &&
+                    !isLoading
+                  ) {
+                    onConfirm();
                   }
                 }}
                 data-testid="cascade-archive-confirm-input"

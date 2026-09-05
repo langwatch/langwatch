@@ -11,36 +11,36 @@ import type {
   LangWatchQLQueryResult,
   LangWatchQLSchema,
 } from "@langwatch/analytics-contract";
-import { lwqlTenantCapability } from "../langwatch-ql/capability";
-import { LWQL_VIEW_CATALOG } from "../langwatch-ql/catalog/lwql-views";
+import { lwqlTenantCapability } from "./langwatch-ql-capability.service";
+import { LWQL_VIEW_CATALOG } from "../repositories/clickhouse/clickhouse.lwql-view-catalog.mapper";
 import {
   type LangWatchQLViewDefinition,
   lwqlAllowedTables,
   lwqlGatedColumns,
   lwqlVisibleViews,
-} from "../langwatch-ql/catalog/types";
-import { lwqlDiagnostics } from "../langwatch-ql/diagnostics";
+} from "../adapters/clickhouse.lwql-catalog-shapes.adapter";
+import { lwqlDiagnostics } from "../adapters/clickhouse.lwql-diagnostics.adapter";
 import {
   LangWatchQLParameterMissingError,
   LangWatchQLUnavailableError,
-} from "../langwatch-ql/errors";
+} from "@langwatch/analytics-contract";
 import {
   createLangWatchQLExecutor,
   DEFAULT_LWQL_RESULT_LIMITS,
   type LangWatchQLExecutor,
   type LangWatchQLResultLimits,
   lwqlConnectionFromEnvironment,
-} from "../langwatch-ql/executor";
+} from "./langwatch-ql-executor.service";
 import {
   assertLangWatchQLGranularityDeclaration,
   type LangWatchQLGranularityResolution,
   resolveLangWatchQLGranularity,
   resolveLangWatchQLTimeWindow,
-} from "../langwatch-ql/resolve-time-window";
-import { describeLangWatchQLSchema } from "../langwatch-ql/schema";
+} from "./langwatch-ql-time-window.service";
+import { describeLangWatchQLSchema } from "./langwatch-ql-schema.service";
 import type { LangWatchQLTimeWindow } from "@langwatch/analytics-contract";
 import { LWQL_PERIOD_GRANULARITY_PARAMETER } from "@langwatch/analytics-contract";
-import { lwqlValidationError } from "../langwatch-ql/validation/errors";
+import { lwqlValidationError } from "./langwatch-ql-validation-errors.service";
 import { type AcceptedLangWatchQL, validateLangWatchQL } from "../langwatch-ql/validation/validate";
 
 const logger = createLogger("langwatch:analytics:lwql");

@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { parseFragment } from "@langwatch/trace-web";
-import { TraceQueryClickHouseAdapter } from "@langwatch/trace-server";
 import { resolveTracesHrefForKey, tracesHrefForKey } from "../model/traces-href-for-key";
 
 /**
- * The link is only as good as the two contracts it spans: the Trace Explorer's fragment format,
- * and the query language's attribute syntax. Both are exercised for real here rather than
- * asserted as a string, so a change to either breaks this test instead of the feature.
+ * The link is only as good as the Trace Explorer's fragment format, which is
+ * exercised for real here rather than asserted as a string, so a change to it
+ * breaks this test instead of the feature. The query-language attribute
+ * syntax the fragment carries is trace-server's own contract, covered there —
+ * a gateway web package cannot depend on it directly (package-boundaries).
  */
 describe("tracesHrefForKey", () => {
   const href = tracesHrefForKey({
@@ -28,23 +29,6 @@ describe("tracesHrefForKey", () => {
 
     it("carries the key filter through intact", () => {
       expect(parsed?.overrides.query).toBe('trace.attribute.langwatch.virtual_key_id:"vk_01HTEST"');
-    });
-  });
-
-  describe("when the query language reads the filter it produced", () => {
-    const parsed = parseFragment(href.slice(href.indexOf("#")));
-    const translated = TraceQueryClickHouseAdapter.translateFilter(
-      parsed?.overrides.query ?? "",
-      "project_test",
-      { from: 1714435200000, to: 1715040000000 },
-    );
-
-    it("filters trace summaries on the attribute the gateway stamps", () => {
-      expect(translated).not.toBeNull();
-      expect(translated!.sql).toContain("Attributes[{");
-      const params = Object.values(translated!.params);
-      expect(params).toContain("langwatch.virtual_key_id");
-      expect(params).toContain("vk_01HTEST");
     });
   });
 });
@@ -92,21 +76,6 @@ describe("tracesHrefForKey narrowed to one model", () => {
       expect(parsed?.overrides.query).toBe(
         'trace.attribute.langwatch.virtual_key_id:"vk_01HTEST" AND model:"anthropic/claude-sonnet-4-5"',
       );
-    });
-
-    describe("when the query language reads the two clauses back", () => {
-      const translated = TraceQueryClickHouseAdapter.translateFilter(
-        parsed?.overrides.query ?? "",
-        "project_test",
-        { from: 1714435200000, to: 1715040000000 },
-      );
-
-      it("filters on the key and the model together", () => {
-        expect(translated).not.toBeNull();
-        const params = Object.values(translated!.params);
-        expect(params).toContain("vk_01HTEST");
-        expect(params).toContain("anthropic/claude-sonnet-4-5");
-      });
     });
   });
 

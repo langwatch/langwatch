@@ -58,7 +58,9 @@ export function parseLLMError(raw: string): ParsedLLMError {
           `"${pyUnescaped.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`,
         );
       }
-    } catch {}
+    } catch {
+      // Malformed repr escape — fall back to the raw (still-escaped) message.
+    }
     return {
       type: "unknown",
       message: unescapedMessage ? `${errorType}\n${unescapedMessage}` : raw,

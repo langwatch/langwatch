@@ -45,12 +45,12 @@ import { useMemberDisableAction } from "../../behavior/use-member-disable-action
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { CopyInput } from "../../ui/elements/copy-input";
 import { DomainJoinCard } from "../../ui/blocks/domain-join-card";
-import { InvitesTable } from "../../ui/blocks/invites-table";
+import { InvitesTable } from "../../ui/sections/invites-table";
 import { JoinRequestsTable } from "../../ui/blocks/join-requests-table";
 import { useJoinRequests } from "../../behavior/use-join-requests";
-import { DepartmentPicker } from "../../ui/elements/department-picker";
+import { DepartmentPicker } from "../../ui/sections/department-picker";
 import { MemberDetailDialog } from "../../ui/sections/member-detail-dialog";
-import { MemberSeatUsage } from "../../ui/elements/member-seat-usage";
+import { MemberSeatUsage } from "../../ui/sections/member-seat-usage";
 import { useDepartmentColumn } from "../../behavior/use-department-column";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";

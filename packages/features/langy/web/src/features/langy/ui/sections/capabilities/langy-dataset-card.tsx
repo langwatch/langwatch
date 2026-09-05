@@ -53,9 +53,14 @@ function parseDataset(output: unknown): {
           .filter(Boolean)
       : null;
     if (bullet) names.push(bullet[1]!.replace(/\*\*/g, ""));
-    else if (cells && cells.length > 0 && !/^-+$/.test(cells[0]!)) {
-      if (cells[0]!.toLowerCase() !== "name" && cells[0]!.toLowerCase() !== "date")
-        names.push(cells[0]!);
+    else if (
+      cells &&
+      cells.length > 0 &&
+      !/^-+$/.test(cells[0]!) &&
+      cells[0]!.toLowerCase() !== "name" &&
+      cells[0]!.toLowerCase() !== "date"
+    ) {
+      names.push(cells[0]!);
     }
     if (names.length >= 5) break;
   }

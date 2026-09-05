@@ -916,17 +916,18 @@ function enterIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
   // Compound names hold their segments here, and a segment may be a bound
   // parameter in identifier position rather than a string — which would let a
   // caller name a field the gate never sees.
-  if (nameParts !== undefined) {
-    if (!Array.isArray(nameParts) || nameParts.some((part) => typeof part !== "string")) {
-      report({
-        ctx,
-        frame,
-        code: "GATED_COLUMN",
-        message: "Name the field directly — a field cannot be chosen by a bound parameter.",
-        node,
-      });
-      return null;
-    }
+  if (
+    nameParts !== undefined &&
+    (!Array.isArray(nameParts) || nameParts.some((part) => typeof part !== "string"))
+  ) {
+    report({
+      ctx,
+      frame,
+      code: "GATED_COLUMN",
+      message: "Name the field directly — a field cannot be chosen by a bound parameter.",
+      node,
+    });
+    return null;
   }
   gateColumnReference({ name, ctx, frame, node });
   noteColumnPosition({ name, frame });

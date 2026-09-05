@@ -219,13 +219,15 @@ describe("ApiRateLimitInfrastructure", () => {
   describe("given the process has Redis only some of the time", () => {
     it("counts wherever the connection port points at the moment of the hit", async () => {
       const redis = fakeRedis();
-      let connection: RedisConnection | undefined;
-      const limiter = ApiRateLimitInfrastructure.create({ connection: () => connection });
+      const connectionHolder: { current?: RedisConnection } = {};
+      const limiter = ApiRateLimitInfrastructure.create({
+        connection: () => connectionHolder.current,
+      });
 
       await limiter.consume({ key: "user-1", windowSeconds: 60, max: 5 });
       expect(limiter.retainedWindows()).toBe(1);
 
-      connection = redis.connection;
+      connectionHolder.current = redis.connection;
       await limiter.consume({ key: "user-1", windowSeconds: 60, max: 5 });
 
       expect(redis.incr).toHaveBeenCalledWith("langwatch:ratelimit:user-1");

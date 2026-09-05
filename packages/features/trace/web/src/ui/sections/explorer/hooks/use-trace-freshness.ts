@@ -92,18 +92,16 @@ export function useTraceFreshness() {
         void trpcUtils.tracesV2.list.invalidate();
       }
 
-      if (mode === "live") {
-        // Discover (facets) is heavy. Coalesce into a 30s window so a
-        // steady trace stream doesn't keep it permanently refetching.
-        // `ask` / `paused` modes skip discover entirely — the user
-        // explicitly opted out of background churn.
-        if (!discoverInvalidateTimer.current) {
-          discoverInvalidateTimer.current = setTimeout(() => {
-            discoverInvalidateTimer.current = null;
-            void trpcUtils.tracesV2.discover.cancel();
-            void trpcUtils.tracesV2.discover.invalidate();
-          }, DISCOVER_INVALIDATE_DEBOUNCE_MS);
-        }
+      // Discover (facets) is heavy. Coalesce into a 30s window so a
+      // steady trace stream doesn't keep it permanently refetching.
+      // `ask` / `paused` modes skip discover entirely — the user
+      // explicitly opted out of background churn.
+      if (mode === "live" && !discoverInvalidateTimer.current) {
+        discoverInvalidateTimer.current = setTimeout(() => {
+          discoverInvalidateTimer.current = null;
+          void trpcUtils.tracesV2.discover.cancel();
+          void trpcUtils.tracesV2.discover.invalidate();
+        }, DISCOVER_INVALIDATE_DEBOUNCE_MS);
       }
 
       // Reset adaptive polling to fast interval

@@ -371,7 +371,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
               </Tabs.Trigger>
             </Tabs.List>
             <Tabs.Content value="skeleton" minWidth="full" minHeight="0" overflowY="auto">
-              {/* @ts-expect-error */}
+              {/* @ts-expect-error: Chakra Table.Root's generated prop types don't include the theme's custom size/variant tokens */}
               <Table.Root size={size === "sm" ? "xs" : "sm"} variant="grid">
                 <Table.Header>
                   <Table.Row>

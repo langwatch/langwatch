@@ -14,7 +14,6 @@ import {
 } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
-import type { inferRouterOutputs } from "@trpc/server";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, ExternalLink } from "react-feather";
 import type { Experiment, Project } from "@langwatch/workflow-contract";
@@ -24,7 +23,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useDejaViewLink } from "@langwatch/workflow-web/hooks/useDejaViewLink";
 import { FormatMoney } from "@langwatch/workflow-web/optimization_studio/components/FormatMoney";
 import { VersionBox } from "@langwatch/workflow-web/optimization_studio/components/History";
-import type { AppRouter } from "@langwatch/workflow-web/studio-host/api";
+import type { AppRouter, RouterOutputs } from "@langwatch/workflow-web/studio-host/api";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
@@ -278,13 +277,13 @@ export function BatchEvaluationV2RunList({
   ...props
 }: {
   batchEvaluationRuns: UseTRPCQueryResult<
-    inferRouterOutputs<AppRouter>["experiments"]["getExperimentBatchEvaluationRuns"],
+    RouterOutputs["experiments"]["getExperimentBatchEvaluationRuns"],
     TRPCClientErrorLike<AppRouter>
   >;
   selectedRun:
     | NonNullable<
         UseTRPCQueryResult<
-          inferRouterOutputs<AppRouter>["experiments"]["getExperimentBatchEvaluationRuns"],
+          RouterOutputs["experiments"]["getExperimentBatchEvaluationRuns"],
           TRPCClientErrorLike<AppRouter>
         >["data"]
       >["runs"][number]

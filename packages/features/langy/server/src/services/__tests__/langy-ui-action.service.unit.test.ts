@@ -695,9 +695,9 @@ describe("LangyUiActionService", () => {
     it("times out without running the backend", async () => {
       // The first scripted wait plants the claim before it lapses: the page
       // took the action and never completed. The second wait times out too.
-      let plantClaim: (() => void) | undefined;
-      const { redis, store } = makeRedis([() => plantClaim?.(), "wait-empty"]);
-      plantClaim = () => {
+      const plantClaimHolder: { current?: () => void } = {};
+      const { redis, store } = makeRedis([() => plantClaimHolder.current?.(), "wait-empty"]);
+      plantClaimHolder.current = () => {
         const pendingKey = [...store.kv.keys()].find((key) => key.startsWith("langy:ui:pending:"));
         if (!pendingKey) return;
         const actionId = pendingKey.replace("langy:ui:pending:", "");

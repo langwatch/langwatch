@@ -6,8 +6,8 @@ import crypto from "node:crypto";
 import { mintAzureBlobStoredObjectUri } from "@langwatch/stored-object-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter";
-import { ObjectNotFoundError } from "../../errors";
-import { StoredObjectStorageRegistry } from "../stored-object-storage.registry";
+import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
+import { StoredObjectStorageRegistry } from "../stored-object-storage-registry.adapter";
 
 const ACCOUNT_NAME = process.env.LANGWATCH_TEST_AZURE_ACCOUNT_NAME;
 const ACCOUNT_KEY = process.env.LANGWATCH_TEST_AZURE_ACCOUNT_KEY;
@@ -33,6 +33,7 @@ const PROJECT = `test-realazure-${RUN_ID}`;
 
 let driver: AzureBlobStoredObjectDriverAdapter;
 const writtenUris: string[] = [];
+const tokenUris: string[] = [];
 
 function uriFor(bytes: Buffer): string {
   const uri = mintAzureBlobStoredObjectUri({
@@ -42,6 +43,25 @@ function uriFor(bytes: Buffer): string {
     sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
   });
   writtenUris.push(uri);
+  return uri;
+}
+
+function tokenDriver() {
+  return AzureBlobStoredObjectDriverAdapter.create({
+    mode: "azureCli",
+    accountName: TOKEN_MODE_ACCOUNT!,
+    identity: {},
+  });
+}
+
+function tokenUriFor(bytes: Buffer): string {
+  const uri = mintAzureBlobStoredObjectUri({
+    accountName: TOKEN_MODE_ACCOUNT!,
+    container: CONTAINER!,
+    projectId: `test-token-${RUN_ID}`,
+    sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
+  });
+  tokenUris.push(uri);
   return uri;
 }
 
@@ -58,8 +78,12 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  if (!hasRealAzure) return;
-  await Promise.allSettled(writtenUris.map((uri) => driver.delete(uri)));
+  if (hasRealAzure) {
+    await Promise.allSettled(writtenUris.map((uri) => driver.delete(uri)));
+  }
+  if (hasTokenModeAzure) {
+    await Promise.allSettled(tokenUris.map((uri) => tokenDriver().delete(uri)));
+  }
 });
 
 describeRealAzure(
@@ -145,32 +169,6 @@ describeRealAzure(
 describeTokenAzure(
   "AzureBlobStoredObjectDriverAdapter against real Azure Blob using an Entra identity",
   () => {
-    const tokenUris: string[] = [];
-
-    function tokenDriver() {
-      return AzureBlobStoredObjectDriverAdapter.create({
-        mode: "azureCli",
-        accountName: TOKEN_MODE_ACCOUNT!,
-        identity: {},
-      });
-    }
-
-    function tokenUriFor(bytes: Buffer): string {
-      const uri = mintAzureBlobStoredObjectUri({
-        accountName: TOKEN_MODE_ACCOUNT!,
-        container: CONTAINER!,
-        projectId: `test-token-${RUN_ID}`,
-        sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
-      });
-      tokenUris.push(uri);
-      return uri;
-    }
-
-    afterAll(async () => {
-      if (!hasTokenModeAzure) return;
-      await Promise.allSettled(tokenUris.map((uri) => tokenDriver().delete(uri)));
-    });
-
     describe("given an account that refuses shared-key authentication", () => {
       /** @scenario "Blobs round-trip against a real storage account with shared-key access disabled" */
       it("writes, reads, sizes and deletes using a bearer token", async () => {

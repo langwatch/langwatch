@@ -2,11 +2,7 @@
  * The membership half's rules, over doubled ports.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  OrganizationUserRole,
-  type PrismaClient,
-  TeamUserRole,
-} from "@langwatch/prisma-client/generated";
+import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
 import { OrganizationMembershipService } from "../organization-membership.service";
 import type {
   OrganizationGrantCachePort,

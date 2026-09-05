@@ -30,7 +30,7 @@ export class FilterService {
    * rather than a fault - it fails at the call, with the same message it
    * always did, instead of at boot.
    */
-  constructor(private readonly repository: FilterOptionsPort | null) {}
+  private constructor(private readonly repository: FilterOptionsPort | null) {}
 
   static create(options: { repository: FilterOptionsPort | null }): FilterService {
     return new FilterService(options.repository);

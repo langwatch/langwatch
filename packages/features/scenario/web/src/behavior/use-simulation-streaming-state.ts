@@ -114,11 +114,12 @@ export function createStreamingStore() {
       messages = messages.filter((m) => m.messageId !== messageId);
       // Apply any buffered early deltas
       const buffered = earlyDeltas.get(messageId);
+      let resolvedMsg = msg;
       if (buffered?.deltas.length) {
-        msg = { ...msg, content: msg.content + buffered.deltas.join("") };
+        resolvedMsg = { ...msg, content: msg.content + buffered.deltas.join("") };
         earlyDeltas.delete(messageId);
       }
-      messages.push(msg);
+      messages.push(resolvedMsg);
       scheduleNotify();
     },
 

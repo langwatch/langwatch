@@ -32,25 +32,25 @@ describe("pollForGlobal", () => {
   describe("given the value is not yet available", () => {
     it("does not call onFound before the value appears", () => {
       const onFound = vi.fn();
-      let value: string | undefined;
+      const holder: { value?: string } = {};
 
-      pollForGlobal(() => value, onFound);
+      pollForGlobal(() => holder.value, onFound);
       vi.advanceTimersByTime(200);
 
       expect(onFound).not.toHaveBeenCalled();
-      value = "ready";
+      holder.value = "ready";
     });
 
     it("calls onFound once the value appears on a later poll", () => {
       const onFound = vi.fn();
-      let value: string | undefined;
+      const holder: { value?: string } = {};
 
-      pollForGlobal(() => value, onFound, { intervalMs: 100 });
+      pollForGlobal(() => holder.value, onFound, { intervalMs: 100 });
 
       vi.advanceTimersByTime(100);
       expect(onFound).not.toHaveBeenCalled();
 
-      value = "ready";
+      holder.value = "ready";
       vi.advanceTimersByTime(100);
 
       expect(onFound).toHaveBeenCalledTimes(1);
@@ -106,14 +106,14 @@ describe("pollForGlobal", () => {
     describe("when cancelled before the value appears", () => {
       it("never calls onFound even if the value later becomes available", () => {
         const onFound = vi.fn();
-        let value: string | undefined;
+        const holder: { value?: string } = {};
 
-        const cancel = pollForGlobal(() => value, onFound, {
+        const cancel = pollForGlobal(() => holder.value, onFound, {
           intervalMs: 50,
         });
         cancel();
 
-        value = "ready";
+        holder.value = "ready";
         vi.advanceTimersByTime(500);
 
         expect(onFound).not.toHaveBeenCalled();

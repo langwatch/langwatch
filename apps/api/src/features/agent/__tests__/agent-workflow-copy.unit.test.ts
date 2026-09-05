@@ -49,13 +49,13 @@ describe("ApiAgentWorkflowCopyAdapter", () => {
     });
 
     it("resolves the application at the copy, not at composition", async () => {
-      let workflows: ApiAgentWorkflowCopier | undefined;
+      const workflowsHolder: { current?: ApiAgentWorkflowCopier } = {};
       const adapter = ApiAgentWorkflowCopyAdapter.create({
-        workflows: () => workflows,
+        workflows: () => workflowsHolder.current,
         processName: "langwatch-api",
       });
 
-      workflows = {
+      workflowsHolder.current = {
         copy: async () =>
           ({ workflow: { id: "workflow_late" }, version: {} }) as unknown as Awaited<
             ReturnType<ApiAgentWorkflowCopier["copy"]>

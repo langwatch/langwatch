@@ -16,7 +16,6 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
-import type { inferRouterOutputs } from "@trpc/server";
 import cloneDeep from "lodash-es/cloneDeep";
 import { Search } from "lucide-react";
 import numeral from "numeral";
@@ -28,7 +27,7 @@ import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { type FilterParam, useFilterParams } from "../use-filter-params";
 import { filterOutEmptyFilters } from "../analytics/utils";
-import type { AppRouter } from "@langwatch/workflow-web/studio-host/api";
+import type { AppRouter, RouterOutputs } from "@langwatch/workflow-web/studio-host/api";
 import { availableFilters } from "../../../model/filters/registry";
 import type { FilterDefinition, FilterField } from "../../../model/filters/types";
 import { api } from "@langwatch/workflow-web/studio-host/api";
@@ -805,7 +804,7 @@ function RangeFilter({
   onChange,
 }: {
   filterData: UseTRPCQueryResult<
-    inferRouterOutputs<AppRouter>["analytics"]["dataForFilter"],
+    RouterOutputs["analytics"]["dataForFilter"],
     TRPCClientErrorLike<AppRouter>
   >;
   currentValues: string[];

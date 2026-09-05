@@ -54,25 +54,8 @@ export type NlpFetchTimeouts = {
 };
 
 /**
- * The two knobs as one process's environment spells them, for a composition
- * root to read its own environment with. Anything unusable stays unusable and
- * is clamped to the default where it is applied.
- */
-export function nlpFetchTimeoutsFromEnvironment(
-  environment: Record<string, string | undefined>,
-): NlpFetchTimeouts {
-  return {
-    engineCodeBlockTimeoutSeconds: Number(environment[NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV]),
-    maxTimeoutMs: Number(environment[NLP_FETCH_MAX_TIMEOUT_ENV]),
-  };
-}
-
-/**
- * Clamp, never reject, matching the engine's own parse
- * (`services/nlpgo/cmd/root.go`). Fractional is rejected to agree with
- * `clampCodeBlockTimeoutSeconds`'s integer-only Lambda clamp: when they
- * disagreed, "0.5" ran the Lambda on the 600s default while this side cut
- * turns off at 30.5s.
+ * Clamp, never reject, matching the engine's own parse. Fractional is
+ * rejected to agree with the Lambda clamp's integer-only rule.
  */
 function positiveWholeSecondsAsMs({
   value,
@@ -108,11 +91,8 @@ function floorFetchTimeoutMs(timeouts: NlpFetchTimeouts): number {
 }
 
 /**
- * The platform's own maximum socket-hold for one scenario turn (distinct from
- * the engine's Python-execution ceiling) — without it an absurd `timeoutMs`
- * parks a worker for as long as the number says. Its 15-minute default sits
- * above {@link floorFetchTimeoutMs}'s (630s) so the engine reports its own
- * timeout first, but that ordering is NOT enforced.
+ * The platform's own maximum socket-hold for one scenario turn. Its 15-minute
+ * default sits above {@link floorFetchTimeoutMs}'s but that ordering is NOT enforced.
  */
 function maxFetchTimeoutMs(timeouts: NlpFetchTimeouts): number {
   return positiveMs({ value: timeouts.maxTimeoutMs, fallbackMs: NLP_FETCH_MAX_TIMEOUT_DEFAULT_MS });
@@ -161,6 +141,22 @@ async function closeNlpFetchDispatchers(): Promise<void> {
 export class NlpFetchAdapter {
   static create({ timeouts }: { timeouts?: NlpFetchTimeouts } = {}): NlpFetchAdapter {
     return new NlpFetchAdapter(timeouts ?? {});
+  }
+
+  /**
+   * The two knobs as one process's environment spells them, for a
+   * composition root to read its own environment with. Anything unusable
+   * stays unusable and is clamped to the default where it is applied.
+   */
+  static timeoutsFromEnvironment(
+    environment: Record<string, string | undefined>,
+  ): NlpFetchTimeouts {
+    return {
+      engineCodeBlockTimeoutSeconds: Number(
+        environment[NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV],
+      ),
+      maxTimeoutMs: Number(environment[NLP_FETCH_MAX_TIMEOUT_ENV]),
+    };
   }
 
   private constructor(private readonly timeouts: NlpFetchTimeouts) {}

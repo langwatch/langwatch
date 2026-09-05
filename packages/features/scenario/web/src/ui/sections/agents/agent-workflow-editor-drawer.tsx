@@ -237,10 +237,11 @@ export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps)
   }, []);
 
   const handleClose = () => {
-    if (hasUnsavedChanges) {
-      if (!window.confirm("You have unsaved changes. Are you sure you want to close?")) {
-        return;
-      }
+    if (
+      hasUnsavedChanges &&
+      !window.confirm("You have unsaved changes. Are you sure you want to close?")
+    ) {
+      return;
     }
     onClose();
   };

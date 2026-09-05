@@ -12,9 +12,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { AddMembersForm } from "../add-members-form";
+import { AddMembersForm } from "../../sections/add-members-form";
 import { OrganizationUserRoleField } from "../../elements/organization-user-role-field";
-import { LITE_MEMBER_EXPLANATION } from "@langwatch/enterprise-licensing-web";
+import { LITE_MEMBER_EXPLANATION } from "@langwatch/enterprise-licensing-web/surfaces/seat-types";
 
 vi.mock("../../../behavior/organization-api", () => ({
   api: {

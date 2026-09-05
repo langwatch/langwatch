@@ -437,19 +437,21 @@ export class WorkerProductionComposition {
     // their `global:*` queues join the shared job registry the moment the first pipeline registers
     // — so the pair has to exist before any feature mounts, and the sender its subscriber calls is
     // produced by a pipeline this same composition registers afterwards.
-    let billingReportingInstaller: BillingReportingWorkerFeatureInstaller | undefined;
+    const billingReportingInstallerHolder: {
+      current: BillingReportingWorkerFeatureInstaller | undefined;
+    } = { current: undefined };
     const saasMeter = options.config.deployment.saas
       ? saasBillableEventsMeter({
           database: options.database,
           redis: eventingOptions.groupQueue.redis,
           resolveClickHouseClient: options.eventing.resolveClickHouseClient,
           getDispatch: () => {
-            if (!billingReportingInstaller) {
+            if (!billingReportingInstallerHolder.current) {
               throw new Error(
                 "SaaS billable-events metering is composed without the billing reporting pipeline; the meter has no sender.",
               );
             }
-            return billingReportingInstaller.commands.reportUsageForMonth;
+            return billingReportingInstallerHolder.current.commands.reportUsageForMonth;
           },
         })
       : undefined;
@@ -1266,7 +1268,7 @@ export class WorkerProductionComposition {
       }),
       eventing,
     });
-    billingReportingInstaller = billingReporting;
+    billingReportingInstallerHolder.current = billingReporting;
     // Unconditional, on the same footing as the identity ledgers below: the grants ledger's
     // CONSUMER half takes exactly two Postgres bindings — the read model's guarded writer and the
     // insert-only audit trail — over the one Prisma client this process opened, so there is no
