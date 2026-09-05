@@ -9,7 +9,7 @@
  *
  *   #1097  10% of successful turns render no answer at all       -> "never ends a turn blank"
  *   #1098  40% zero-tool, 58% under 120 characters               -> "answers from the project, not from memory"
- *   #1099  AGENTS.md:149 calls the working langwatch.* tools     -> "owns the tools it actually has"
+ *   #1099  AGENTS.md called the working langwatch.* tools        -> "owns the tools it actually has"
  *          hallucinations
  *   #1100  opencode coding-agent persona bleeding through        -> "does not narrate a checkout it never obtained"
  *   #1101  langwatch.monitor.create fails on 48% of calls        -> "a monitor it says it made really exists"
@@ -123,7 +123,8 @@ function withTurnTimings(adapter: ReturnType<typeof makeLangyAdapter>): {
 
 describe("Langy quality bar", () => {
   // A fresh local project holds only Langy's own mirrored runs (origin:
-  // langy), which rule 27 makes Langy exclude — so every data question would
+  // langy), which AGENTS.md's trace-origins rule makes Langy exclude
+  // ("exclude them unless the user asks about you") — so every data question would
   // truthfully answer "no traces". Seed real application-origin traffic so
   // the data scenarios have a non-zero ground truth to find.
   // The seed waits for the traces to become QUERYABLE, which can take most of a
@@ -156,7 +157,8 @@ describe("Langy quality bar", () => {
    * #1097 — 27 of 260 completed turns have no answer text and made no tool
    * call. The turn is written as `completed`, so it carries no error and never
    * reaches remediation: from every dashboard the platform has, a blank reply
-   * looks healthy. AGENTS.md rule 28 forbids it outright.
+   * looks healthy. AGENTS.md forbids it outright: "Every turn ends with at
+   * least one visible line of text; an empty reply is never correct."
    *
    * Asserted structurally, not by the judge. A judge grading an empty string
    * can rationalise it as terse; `length === 0` cannot.
@@ -284,7 +286,8 @@ describe("Langy quality bar", () => {
 
   /**
    * #1100 — the base system prompt is opencode's coding agent with one word
-   * rewritten, while AGENTS.md rule 24 restricts bash to the `langwatch` CLI.
+   * rewritten, while AGENTS.md restricts the shell to the `langwatch` CLI
+   * ("The `langwatch` CLI is your only LangWatch interface").
    * Prod shows the coding persona winning sometimes: 144 `read` calls across 7
    * projects, 68 `edit` calls — against a workspace that was never cloned.
    *
