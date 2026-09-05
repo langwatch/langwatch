@@ -31,28 +31,16 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { CONTENT_CATEGORIES, CONTENT_KEY_CATALOG } from "@langwatch/data-privacy-contract";
 import {
-  isContentGated,
-  isPostgresResident,
+  LangWatchQLCatalogShapesService,
   type LangWatchQLDedupStrategy,
-  lwqlAllowedTables,
-  lwqlGatedColumns,
-  lwqlGrainColumns,
-} from "../../adapters/clickhouse.lwql-catalog-shapes.adapter";
-import {
-  definerViewAuditQuery,
-  dropLangWatchQLRowPolicyStatement,
-  lwqlPolicyCoverageQuery,
-  lwqlRowPolicyStatement,
-} from "../../adapters/clickhouse.lwql-provisioning.adapter";
-import { LWQL_VIEW_CATALOG } from "../../repositories/clickhouse/clickhouse.lwql-view-catalog.mapper";
-import {
-  lwqlGrantedSourceColumns,
-  lwqlSourceTables,
-  lwqlViewSetupStatements,
-  lwqlViewStatement,
-  SHIPPED_LWQL_DEDUP,
-} from "../../repositories/clickhouse/clickhouse.lwql-views.mapper";
-import { validateLangWatchQL } from "../validation/validate";
+} from "../../services/langwatch-ql-catalog-shapes.service";
+import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service";
+import { LangWatchQLAccessAuditService } from "../../services/langwatch-ql-access-audit.service";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules";
+import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service";
+import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service";
+import { LangWatchQLViewStatementsService } from "../../services/langwatch-ql-view-statements.service";
+import { validateLangWatchQL } from "./lwql-validate";
 import {
   CLICKHOUSE_ERROR_CODE,
   DEDUP_FIXTURE,
@@ -78,6 +66,14 @@ import {
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
 } from "./lwql-clickhouse-harness";
+
+const viewProvisioning = LangWatchQLViewProvisioningService.create();
+const viewStatements = LangWatchQLViewStatementsService.create();
+
+const accessModel = LangWatchQLAccessModelService.create();
+const accessAudit = LangWatchQLAccessAuditService.create();
+
+const catalogShapes = LangWatchQLCatalogShapesService.create();
 
 /** A column no view exposes, so the grant must make it unreachable. */
 const OFF_CATALOG_COLUMN = "ProjectionId";
@@ -116,7 +112,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
 
   const applyShippedViews = async (): Promise<void> => {
     await harness.applyAsAdmin(
-      lwqlViewSetupStatements({
+      viewProvisioning.setupStatements({
         names: harness.names,
         sourceDatabase: harness.factDatabase,
         dedup: SHIPPED_LWQL_DEDUP,
@@ -162,10 +158,12 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
       // LangWatchQL database, not a migrated fact table, so where to look is
       // derived from the catalog rather than assumed to be one database.
       const sources = new Map(
-        lwqlSourceTables({
-          names: harness.names,
-          sourceDatabase: facts,
-        }).map((source) => [source.table, source.database ?? database]),
+        viewProvisioning
+          .sourceTables({
+            names: harness.names,
+            sourceDatabase: facts,
+          })
+          .map((source) => [source.table, source.database ?? database]),
       );
 
       for (const view of LWQL_VIEW_CATALOG) {
@@ -180,7 +178,9 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         ).toBeGreaterThan(0);
         const known = new Set(actual.map((column) => column.name));
 
-        const missing = lwqlGrantedSourceColumns(view).filter((column) => !known.has(column));
+        const missing = viewStatements
+          .grantedSourceColumns(view)
+          .filter((column) => !known.has(column));
         expect(missing, `${view.name} reads columns ${view.sourceTable} does not have`).toEqual([]);
       }
     });
@@ -224,7 +224,9 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
      */
     /** @scenario "Every LangWatchQL view's dedup declaration matches the table it reads" */
     it("declares the sort key and the engine its source table actually has", async () => {
-      const resident = LWQL_VIEW_CATALOG.filter((candidate) => !isPostgresResident(candidate));
+      const resident = LWQL_VIEW_CATALOG.filter(
+        (candidate) => !catalogShapes.isPostgresResident(candidate),
+      );
       expect(
         resident.length,
         "no ClickHouse-resident dataset — this case is inspecting nothing",
@@ -254,7 +256,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         // The grain can be narrower than the sort key — that is what a
         // time-leading analytics table is — but never something the engine does
         // not sort by, which would be a row identity no dedup shape can honour.
-        for (const column of lwqlGrainColumns(view)) {
+        for (const column of catalogShapes.grainColumns(view)) {
           expect(
             sortingKey,
             `${view.name} calls ${column} part of its grain, but ${view.sourceTable} does not sort by it`,
@@ -294,7 +296,9 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
       // Only the ClickHouse-resident half: a PostgreSQL-engine table has no
       // partitions, and its time column earns its keep a different way — a
       // predicate on it is pushed down to the primary as an index-usable one.
-      for (const view of LWQL_VIEW_CATALOG.filter((candidate) => !isPostgresResident(candidate))) {
+      for (const view of LWQL_VIEW_CATALOG.filter(
+        (candidate) => !catalogShapes.isPostgresResident(candidate),
+      )) {
         const partitionKey = await selectScalar<string>(
           harness.admin,
           `SELECT partition_key AS value FROM system.tables ` +
@@ -322,7 +326,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
           table: view.sourceTable,
           // A PostgreSQL-engine table sits in the LangWatchQL database, which is
           // `recordSeedControl`'s default; only the fact tables live elsewhere.
-          ...(isPostgresResident(view) ? {} : { database: facts }),
+          ...(catalogShapes.isPostgresResident(view) ? {} : { database: facts }),
           tenantColumn: "TenantId",
         });
         const rows = await selectRows<{ TenantId: string }>(
@@ -384,7 +388,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
      */
     /** @scenario "Detaching the row policy makes the other tenant's rows visible" */
     it("exposes the other tenant through the view once the source table's policy is detached", async () => {
-      const [sourceTable] = lwqlSourceTables({
+      const [sourceTable] = viewProvisioning.sourceTables({
         names: harness.names,
         sourceDatabase: facts,
         views: LWQL_VIEW_CATALOG.filter((view) => view.name === "simulations"),
@@ -402,7 +406,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
       let tenantsWithoutPolicy: string[] = [];
       try {
         await harness.applyAsAdmin([
-          dropLangWatchQLRowPolicyStatement({
+          accessModel.dropRowPolicyStatement({
             names: harness.names,
             table: sourceTable.table,
             database: facts,
@@ -416,7 +420,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         ).map((row) => row.TenantId);
       } finally {
         await harness.applyAsAdmin([
-          lwqlRowPolicyStatement({
+          accessModel.rowPolicyStatement({
             names: harness.names,
             lwqlTable: sourceTable,
           }),
@@ -586,7 +590,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
     /** @scenario "A LangWatchQL view returns one row per logical record, the latest version" */
     it("returns exactly one row per record for every view", async () => {
       for (const view of LWQL_VIEW_CATALOG) {
-        const keys = lwqlGrainColumns(view).join(", ");
+        const keys = catalogShapes.grainColumns(view).join(", ");
         const duplicated = await selectScalar<string>(
           tenantA,
           `SELECT count() AS value FROM (` +
@@ -826,7 +830,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
      */
     /** @scenario "Content-gated fields are refused in every expression position" */
     it("refuses a gated field in every expression position, over the canonical gated set", () => {
-      const withoutContent = lwqlGatedColumns({
+      const withoutContent = catalogShapes.gatedColumns({
         protections: {
           canSeeCapturedInput: false,
           canSeeCapturedOutput: false,
@@ -835,7 +839,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         views: LWQL_VIEW_CATALOG,
       });
       const contentColumns = LWQL_VIEW_CATALOG.flatMap((view) =>
-        view.columns.filter(isContentGated).map((column) => column.name),
+        view.columns.filter(catalogShapes.isContentGated).map((column) => column.name),
       );
       expect(
         [...new Set(contentColumns)].sort(),
@@ -857,7 +861,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
       }
 
       const policy = {
-        allowedTables: lwqlAllowedTables({
+        allowedTables: catalogShapes.allowedTables({
           database,
           views: LWQL_VIEW_CATALOG,
         }),
@@ -877,7 +881,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
       // refusals above are about the gate rather than about the SQL.
       const permitted = {
         ...policy,
-        gatedColumns: lwqlGatedColumns({
+        gatedColumns: catalogShapes.gatedColumns({
           protections: {
             canSeeCapturedInput: true,
             canSeeCapturedOutput: true,
@@ -908,7 +912,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         has_policy: number;
         is_invoker_view: number;
         covered: number;
-      }>(harness.admin, lwqlPolicyCoverageQuery({ names: harness.names }));
+      }>(harness.admin, accessAudit.policyCoverageQuery({ names: harness.names }));
 
       expect(
         coverage.length,
@@ -924,7 +928,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
       // The audit must be looking at both halves: the views, and the physical
       // tables under them. A query that only saw one would still read clean.
       const audited = coverage.map((row) => `${row.database}.${row.table}`);
-      const sources = lwqlSourceTables({
+      const sources = viewProvisioning.sourceTables({
         names: harness.names,
         sourceDatabase: facts,
       });
@@ -953,7 +957,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
     it("reports no definer-rights or materialized view in the LangWatchQL database", async () => {
       const flagged = await selectRows(
         harness.admin,
-        definerViewAuditQuery({ names: harness.names }),
+        accessAudit.definerViewAuditQuery({ names: harness.names }),
       );
       expect(
         flagged,
@@ -972,7 +976,9 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
       // Only the ClickHouse-resident sources: a PostgreSQL-engine table's rows
       // come from a relation the whole application also reads, and this case is
       // about the policies this module creates not reaching the administrator.
-      for (const view of LWQL_VIEW_CATALOG.filter((candidate) => !isPostgresResident(candidate))) {
+      for (const view of LWQL_VIEW_CATALOG.filter(
+        (candidate) => !catalogShapes.isPostgresResident(candidate),
+      )) {
         const tenants = await selectRows<{ TenantId: string }>(
           harness.admin,
           `SELECT DISTINCT TenantId FROM ${facts}.${view.sourceTable} ORDER BY TenantId`,
@@ -1028,7 +1034,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
       try {
         for (const strategy of strategies) {
           await harness.applyAsAdmin([
-            lwqlViewStatement({
+            viewStatements.viewStatement({
               names: harness.names,
               sourceDatabase: facts,
               view,

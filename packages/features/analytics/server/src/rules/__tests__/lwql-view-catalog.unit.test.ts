@@ -20,27 +20,20 @@ import {
   CONTENT_KEY_CATALOG,
   type ContentCategory,
 } from "@langwatch/data-privacy-contract";
-import { GATED_DATASET } from "../../../langwatch-ql/__tests__/gatedDatasetFixture";
+import { GATED_DATASET } from "../../langwatch-ql/__tests__/gatedDatasetFixture";
 import {
   CONTENT_ATTRIBUTE_KEYS,
   contentKeyExclusionSql,
   gateForContentCategory,
   isContentAttributeKey,
-} from "../clickhouse.lwql-content-gating.mapper";
-import { LWQL_VIEW_CATALOG, lwqlViewByName } from "../clickhouse.lwql-view-catalog.mapper";
+} from "../lwql-content-gating.rules";
+import { LWQL_VIEW_CATALOG, lwqlViewByName } from "../lwql-view-catalog.rules";
 import {
-  columnExpression,
-  isContentGated,
-  isPostgresResident,
+  LangWatchQLCatalogShapesService,
   LWQL_COLUMN_UNITS,
-  lwqlAllowedTables,
-  lwqlColumnGates,
-  lwqlContentGatedColumns,
-  lwqlGatedColumns,
-  lwqlGrainColumns,
-  lwqlViewSourceColumns,
-  lwqlVisibleViews,
-} from "../../../adapters/clickhouse.lwql-catalog-shapes.adapter";
+} from "../../services/langwatch-ql-catalog-shapes.service";
+
+const catalogShapes = LangWatchQLCatalogShapesService.create();
 
 /** `Map['key']` accesses in a column expression, with the key captured. */
 const MAP_KEY_ACCESS = /\[\s*'([^']+)'\s*\]/g;
@@ -49,8 +42,8 @@ const MAP_KEY_ACCESS = /\[\s*'([^']+)'\s*\]/g;
 const SOURCE = (name: string) => `SRC.\`${name}\``;
 
 /** A column's SQL, with source references qualified the way the generator does. */
-const expressionOf = (column: Parameters<typeof columnExpression>[0]["column"]) =>
-  columnExpression({ column, source: SOURCE });
+const expressionOf = (column: Parameters<typeof catalogShapes.columnExpression>[0]["column"]) =>
+  catalogShapes.columnExpression({ column, source: SOURCE });
 
 /** Which content category a span-attribute key belongs to, if any. */
 function contentCategoryOf(key: string): ContentCategory | null {
@@ -90,10 +83,10 @@ describe("given the LangWatchQL view catalog", () => {
         // reintroduce the breakdown the view exists to sum over.
         const grouped =
           view.dedup.aggregating === true &&
-          lwqlGrainColumns(view).length < view.dedup.keyColumns.length;
+          catalogShapes.grainColumns(view).length < view.dedup.keyColumns.length;
         for (const column of [
           ...(grouped ? [] : view.dedup.keyColumns),
-          ...lwqlGrainColumns(view),
+          ...catalogShapes.grainColumns(view),
         ]) {
           expect(columnNames, `${view.name} declares a key column it does not expose`).toContain(
             column,
@@ -105,7 +98,7 @@ describe("given the LangWatchQL view catalog", () => {
         // duplicate. It is also what keeps the grant sufficient: the source
         // columns are derived from the key columns, and the `in-tuple` body
         // names the grain.
-        for (const column of lwqlGrainColumns(view)) {
+        for (const column of catalogShapes.grainColumns(view)) {
           expect(
             view.dedup.keyColumns,
             `${view.name} calls ${column} part of its grain, but its source does not sort by it`,
@@ -119,7 +112,7 @@ describe("given the LangWatchQL view catalog", () => {
           `${view.name} pins the dedup strategy that does not deduplicate`,
         ).not.toBe("none");
 
-        if (isPostgresResident(view)) {
+        if (catalogShapes.isPostgresResident(view)) {
           // Nothing to collapse: PostgreSQL keeps one row per key, and a
           // version column here would be a claim about an engine that is not
           // underneath this dataset.
@@ -154,7 +147,7 @@ describe("given the LangWatchQL view catalog", () => {
         // A ClickHouse-resident view builds its own dedup subquery, so the same
         // columns must additionally be granted on the source table — even when
         // nothing exposes them — or that subquery cannot be evaluated.
-        const sourceColumns = lwqlViewSourceColumns(view);
+        const sourceColumns = catalogShapes.viewSourceColumns(view);
         for (const column of [
           ...view.dedup.keyColumns,
           ...(view.dedup.versionColumn ? [view.dedup.versionColumn] : []),
@@ -274,7 +267,7 @@ describe("given the LangWatchQL view catalog", () => {
     });
 
     it("qualifies allowed tables with the LangWatchQL database, never the physical one", () => {
-      const allowed = lwqlAllowedTables({
+      const allowed = catalogShapes.allowedTables({
         database: "analytics",
         views: LWQL_VIEW_CATALOG,
       });
@@ -306,7 +299,7 @@ describe("given the LangWatchQL view catalog", () => {
             checked += 1;
             if (category === null) {
               expect(
-                isContentGated(column),
+                catalogShapes.isContentGated(column),
                 `${view.name}.${column.name} reads the non-content key ${key} but is content-gated`,
               ).toBe(false);
               continue;
@@ -333,7 +326,9 @@ describe("given the LangWatchQL view catalog", () => {
     /** @scenario "The gated column set is derived from the data privacy policy, not hand-listed" */
     it("keeps every content key out of the ungated columns", () => {
       for (const view of LWQL_VIEW_CATALOG) {
-        for (const column of view.columns.filter((candidate) => !isContentGated(candidate))) {
+        for (const column of view.columns.filter(
+          (candidate) => !catalogShapes.isContentGated(candidate),
+        )) {
           const expression = expressionOf(column);
           for (const match of expression.matchAll(MAP_KEY_ACCESS)) {
             expect(
@@ -421,7 +416,7 @@ describe("given the LangWatchQL view catalog", () => {
       ).toBeGreaterThan(0);
       for (const view of analyticsDatasets) {
         expect(
-          view.columns.filter(isContentGated).map((column) => column.name),
+          view.columns.filter(catalogShapes.isContentGated).map((column) => column.name),
           `${view.name} exposes captured content`,
         ).toEqual([]);
       }
@@ -437,7 +432,7 @@ describe("given the LangWatchQL view catalog", () => {
         const view = lwqlViewByName(name);
         expect(view, `${name} is not in the catalog`).toBeDefined();
         expect(
-          view!.columns.filter(isContentGated).length,
+          view!.columns.filter(catalogShapes.isContentGated).length,
           `${name} gates no content, so the analytics case above distinguishes nothing`,
         ).toBeGreaterThan(0);
       }
@@ -477,7 +472,7 @@ describe("given the LangWatchQL view catalog", () => {
           .filter((column) => column.summed)
           .map((column) => column.name);
         expect(
-          [...lwqlGrainColumns(view), ...measures].sort(),
+          [...catalogShapes.grainColumns(view), ...measures].sort(),
           `${view.name} has a column that is neither a dimension of its published grain nor a measure that merges`,
         ).toEqual(view.columns.map((column) => column.name).sort());
         expect(
@@ -499,7 +494,7 @@ describe("given the LangWatchQL view catalog", () => {
         expect(
           [...view.joinKeys].sort(),
           `${view.name} advertises a join on part of its bucket key, which multiplies its measures`,
-        ).toEqual([...lwqlGrainColumns(view)].sort());
+        ).toEqual([...catalogShapes.grainColumns(view)].sort());
       }
     });
 
@@ -515,14 +510,14 @@ describe("given the LangWatchQL view catalog", () => {
     it("leaves a record dataset free to advertise a foreign key it is not unique on", () => {
       const evaluations = lwqlViewByName("evaluations")!;
       expect([...evaluations.joinKeys].sort()).not.toEqual(
-        [...lwqlGrainColumns(evaluations)].sort(),
+        [...catalogShapes.grainColumns(evaluations)].sort(),
       );
     });
 
     /** @scenario "A pre-aggregated dataset declares that its rows merge rather than supersede" */
     it("leaves a versioned dataset's version column required, so this is not a blanket exemption", () => {
       const versioned = LWQL_VIEW_CATALOG.filter(
-        (view) => !view.dedup.aggregating && !isPostgresResident(view),
+        (view) => !view.dedup.aggregating && !catalogShapes.isPostgresResident(view),
       );
       expect(
         versioned.length,
@@ -550,9 +545,12 @@ describe("given the LangWatchQL view catalog", () => {
         evaluationMetrics.dedup.strategy,
         "evaluation_metrics takes the default strategy, which collapses on a key its source moves",
       ).toBe("in-tuple");
-      expect([...lwqlGrainColumns(evaluationMetrics)]).toEqual(["TenantId", "EvaluationId"]);
+      expect([...catalogShapes.grainColumns(evaluationMetrics)]).toEqual([
+        "TenantId",
+        "EvaluationId",
+      ]);
       expect(
-        lwqlGrainColumns(evaluationMetrics).length,
+        catalogShapes.grainColumns(evaluationMetrics).length,
         "the grain is the whole sort key, so this dataset needs no strategy of its own",
       ).toBeLessThan(evaluationMetrics.dedup.keyColumns.length);
       expect(evaluationMetrics.dedup.versionColumn).toBe("UpdatedAt");
@@ -576,7 +574,7 @@ describe("given the LangWatchQL view catalog", () => {
       ).toBeGreaterThan(0);
       for (const view of pinned) {
         expect(
-          lwqlGrainColumns(view).length,
+          catalogShapes.grainColumns(view).length,
           `${view.name} pins a strategy its grain does not call for — the shipped default already collapses on the whole key`,
         ).toBeLessThan(view.dedup.keyColumns.length);
         expect(
@@ -599,7 +597,8 @@ describe("given the LangWatchQL view catalog", () => {
     it("requires a grain narrower than the engine's key to name a strategy that can deliver it", () => {
       const narrower = LWQL_VIEW_CATALOG.filter(
         (view) =>
-          !isPostgresResident(view) && lwqlGrainColumns(view).length < view.dedup.keyColumns.length,
+          !catalogShapes.isPostgresResident(view) &&
+          catalogShapes.grainColumns(view).length < view.dedup.keyColumns.length,
       );
       expect(
         narrower.length,
@@ -704,7 +703,7 @@ describe("given the LangWatchQL view catalog", () => {
   describe("when a caller's permissions are turned into the validator's gated set", () => {
     /** @scenario "The gated column set is derived from the data privacy policy, not hand-listed" */
     it("withholds every gated column from a caller holding nothing", () => {
-      const gated = lwqlGatedColumns({
+      const gated = catalogShapes.gatedColumns({
         protections: {},
         views: LWQL_VIEW_CATALOG,
       });
@@ -727,7 +726,7 @@ describe("given the LangWatchQL view catalog", () => {
      */
     /** @scenario "The gated column set is derived from the data privacy policy, not hand-listed" */
     it("treats an absent permission as withheld, not as held", () => {
-      const undefinedFlags = lwqlGatedColumns({
+      const undefinedFlags = catalogShapes.gatedColumns({
         protections: {
           canSeeCapturedInput: undefined,
           canSeeCapturedOutput: null,
@@ -742,7 +741,7 @@ describe("given the LangWatchQL view catalog", () => {
 
     it("withholds nothing from a caller holding every permission", () => {
       expect(
-        lwqlGatedColumns({
+        catalogShapes.gatedColumns({
           protections: {
             canSeeCapturedInput: true,
             canSeeCapturedOutput: true,
@@ -758,7 +757,7 @@ describe("given the LangWatchQL view catalog", () => {
      * caller who may see costs and not content keeps the cost columns.
      */
     it("separates the cost gate from the content gates", () => {
-      const contentOnly = lwqlGatedColumns({
+      const contentOnly = catalogShapes.gatedColumns({
         protections: {
           canSeeCapturedInput: false,
           canSeeCapturedOutput: false,
@@ -767,9 +766,9 @@ describe("given the LangWatchQL view catalog", () => {
         views: LWQL_VIEW_CATALOG,
       });
       expect(contentOnly).not.toContain("TotalCost");
-      expect(contentOnly).toEqual([...lwqlContentGatedColumns(LWQL_VIEW_CATALOG)]);
+      expect(contentOnly).toEqual([...catalogShapes.contentGatedColumns(LWQL_VIEW_CATALOG)]);
 
-      const costOnly = lwqlGatedColumns({
+      const costOnly = catalogShapes.gatedColumns({
         protections: {
           canSeeCapturedInput: true,
           canSeeCapturedOutput: true,
@@ -799,7 +798,7 @@ describe("given the LangWatchQL view catalog", () => {
      * more than one.
      */
     it("withholds a column needing two permissions when only one is held", () => {
-      const outputOnly = lwqlGatedColumns({
+      const outputOnly = catalogShapes.gatedColumns({
         protections: {
           canSeeCapturedInput: false,
           canSeeCapturedOutput: true,
@@ -845,13 +844,13 @@ describe("given the LangWatchQL view catalog", () => {
         return found;
       };
       expect(
-        lwqlColumnGates({
+        catalogShapes.columnGates({
           view: GATED_DATASET,
           column: column("TranscriptId"),
         }),
       ).toEqual(["input"]);
       expect(
-        lwqlColumnGates({
+        catalogShapes.columnGates({
           view: GATED_DATASET,
           column: column("Spoken"),
         }),
@@ -861,28 +860,34 @@ describe("given the LangWatchQL view catalog", () => {
     it("leaves a column's gates alone when its dataset is ungated", () => {
       const traces = lwqlViewByName("traces")!;
       for (const column of traces.columns) {
-        expect(lwqlColumnGates({ view: traces, column })).toBe(column.gates);
+        expect(catalogShapes.columnGates({ view: traces, column })).toBe(column.gates);
       }
     });
 
     it("hides the dataset from a caller who lacks its permission", () => {
       expect(
-        lwqlVisibleViews({
-          protections: holding(false, true),
-          views,
-        }).map((view) => view.name),
+        catalogShapes
+          .visibleViews({
+            protections: holding(false, true),
+            views,
+          })
+          .map((view) => view.name),
       ).not.toContain(GATED_DATASET.name);
     });
 
     it("shows it to a caller who holds it, so the case above is about the permission", () => {
       expect(
-        lwqlVisibleViews({ protections: holding(true, true), views }).map((view) => view.name),
+        catalogShapes
+          .visibleViews({ protections: holding(true, true), views })
+          .map((view) => view.name),
       ).toContain(GATED_DATASET.name);
     });
 
     it("leaves every other dataset visible", () => {
       expect(
-        lwqlVisibleViews({ protections: holding(false, false), views }).map((view) => view.name),
+        catalogShapes
+          .visibleViews({ protections: holding(false, false), views })
+          .map((view) => view.name),
       ).toEqual(LWQL_VIEW_CATALOG.map((view) => view.name));
     });
 
@@ -892,7 +897,7 @@ describe("given the LangWatchQL view catalog", () => {
      * naming one is refused rather than silently answered.
      */
     it("withholds every column of the hidden dataset", () => {
-      const withheld = lwqlGatedColumns({
+      const withheld = catalogShapes.gatedColumns({
         protections: holding(false, true),
         views,
       });
@@ -902,7 +907,7 @@ describe("given the LangWatchQL view catalog", () => {
     });
 
     it("withholds none of them from a caller holding the dataset's permission", () => {
-      expect(lwqlGatedColumns({ protections: holding(true, true), views })).toEqual([]);
+      expect(catalogShapes.gatedColumns({ protections: holding(true, true), views })).toEqual([]);
     });
   });
 });

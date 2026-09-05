@@ -6,13 +6,11 @@
 
 import type { LangWatchQLProtections, LangWatchQLSchema } from "@langwatch/analytics-contract";
 
-import { LWQL_VIEW_CATALOG } from "../repositories/clickhouse/clickhouse.lwql-view-catalog.mapper";
+import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules";
 import {
+  LangWatchQLCatalogShapesService,
   type LangWatchQLViewDefinition,
-  lwqlColumnGates,
-  lwqlGatedColumns,
-  lwqlVisibleViews,
-} from "../adapters/clickhouse.lwql-catalog-shapes.adapter";
+} from "../services/langwatch-ql-catalog-shapes.service";
 
 /** How many columns an example query names. Enough to be a template, not a dump. */
 const EXAMPLE_COLUMN_COUNT = 3;
@@ -36,78 +34,83 @@ export type {
   LangWatchQLSchemaDataset,
 } from "@langwatch/analytics-contract";
 
-/**
- * A runnable query over one dataset.
- */
-export function lwqlExampleSql({
-  database,
-  view,
-}: {
-  database: string;
-  view: LangWatchQLViewDefinition;
-}): string {
-  // The column's own gates, not the combined dataset-plus-column ones: a
-  // dataset gated as a whole is only *visible* to a caller who already holds
-  // its gates, so its ungated columns are runnable for everyone who can see
-  // the example — while the combined set would leave such a dataset with no
-  // columns at all and emit `SELECT ` with nothing to select.
-  const projection = view.columns
-    .filter((column) => column.gates.length === 0)
-    .filter((column) => column.name !== EXAMPLE_SKIPPED_COLUMN)
-    .slice(0, EXAMPLE_COLUMN_COUNT)
-    .map((column) => column.name);
-  if (projection.length === 0) {
-    // Every column carries its own gate: the one query still runnable by any
-    // caller who can see the dataset is a count. No ORDER BY — an aggregate
-    // without GROUP BY has nothing to order.
+const catalogShapes = LangWatchQLCatalogShapesService.create();
+
+/** The endpoint's projection of the LangWatchQL catalog for one caller. */
+export class LangWatchQLSchemaService {
+  static create(): LangWatchQLSchemaService {
+    return new LangWatchQLSchemaService();
+  }
+
+  private constructor() {}
+
+  /**
+   * A runnable query over one dataset.
+   */
+  exampleSql({ database, view }: { database: string; view: LangWatchQLViewDefinition }): string {
+    // The column's own gates, not the combined dataset-plus-column ones: a
+    // dataset gated as a whole is only *visible* to a caller who already holds
+    // its gates, so its ungated columns are runnable for everyone who can see
+    // the example — while the combined set would leave such a dataset with no
+    // columns at all and emit `SELECT ` with nothing to select.
+    const projection = view.columns
+      .filter((column) => column.gates.length === 0)
+      .filter((column) => column.name !== EXAMPLE_SKIPPED_COLUMN)
+      .slice(0, EXAMPLE_COLUMN_COUNT)
+      .map((column) => column.name);
+    if (projection.length === 0) {
+      // Every column carries its own gate: the one query still runnable by any
+      // caller who can see the dataset is a count. No ORDER BY — an aggregate
+      // without GROUP BY has nothing to order.
+      return (
+        `SELECT count() AS rows\n` +
+        `FROM ${database}.${view.name}\n` +
+        `WHERE ${view.timeColumn} >= subtractDays(now(), ${EXAMPLE_LOOKBACK_DAYS})`
+      );
+    }
+
     return (
-      `SELECT count() AS rows\n` +
+      `SELECT ${projection.join(", ")}\n` +
       `FROM ${database}.${view.name}\n` +
-      `WHERE ${view.timeColumn} >= subtractDays(now(), ${EXAMPLE_LOOKBACK_DAYS})`
+      `WHERE ${view.timeColumn} >= subtractDays(now(), ${EXAMPLE_LOOKBACK_DAYS})\n` +
+      `ORDER BY ${view.timeColumn} DESC\n` +
+      `LIMIT ${EXAMPLE_ROW_LIMIT}`
     );
   }
 
-  return (
-    `SELECT ${projection.join(", ")}\n` +
-    `FROM ${database}.${view.name}\n` +
-    `WHERE ${view.timeColumn} >= subtractDays(now(), ${EXAMPLE_LOOKBACK_DAYS})\n` +
-    `ORDER BY ${view.timeColumn} DESC\n` +
-    `LIMIT ${EXAMPLE_ROW_LIMIT}`
-  );
-}
-
-/**
- * The LangWatchQL schema, scoped to what one caller's permissions unlock.
- */
-export function describeLangWatchQLSchema({
-  database,
-  protections,
-  views = LWQL_VIEW_CATALOG,
-}: {
-  database: string;
-  protections: LangWatchQLProtections;
-  views?: readonly LangWatchQLViewDefinition[];
-}): LangWatchQLSchema {
-  const withheld = new Set(lwqlGatedColumns({ protections, views }));
-
-  return {
+  /**
+   * The LangWatchQL schema, scoped to what one caller's permissions unlock.
+   */
+  describe({
     database,
-    datasets: lwqlVisibleViews({ protections, views }).map((view) => ({
-      name: `${database}.${view.name}`,
-      description: view.description,
-      grain: view.grain,
-      joinKeys: view.joinKeys,
-      timeColumn: view.timeColumn,
-      freshness: view.freshness,
-      columns: view.columns.map((column) => ({
-        name: column.name,
-        type: column.type,
-        description: column.description,
-        unit: column.unit ?? null,
-        gates: lwqlColumnGates({ view, column }),
-        available: !withheld.has(column.name),
+    protections,
+    views = LWQL_VIEW_CATALOG,
+  }: {
+    database: string;
+    protections: LangWatchQLProtections;
+    views?: readonly LangWatchQLViewDefinition[];
+  }): LangWatchQLSchema {
+    const withheld = new Set(catalogShapes.gatedColumns({ protections, views }));
+
+    return {
+      database,
+      datasets: catalogShapes.visibleViews({ protections, views }).map((view) => ({
+        name: `${database}.${view.name}`,
+        description: view.description,
+        grain: view.grain,
+        joinKeys: view.joinKeys,
+        timeColumn: view.timeColumn,
+        freshness: view.freshness,
+        columns: view.columns.map((column) => ({
+          name: column.name,
+          type: column.type,
+          description: column.description,
+          unit: column.unit ?? null,
+          gates: catalogShapes.columnGates({ view, column }),
+          available: !withheld.has(column.name),
+        })),
+        exampleSql: this.exampleSql({ database, view }),
       })),
-      exampleSql: lwqlExampleSql({ database, view }),
-    })),
-  };
+    };
+  }
 }

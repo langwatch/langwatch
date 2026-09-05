@@ -47,7 +47,7 @@
  * @see specs/analytics/lwql-api.feature
  */
 
-import type { LangWatchQLViewDefinition } from "../../adapters/clickhouse.lwql-catalog-shapes.adapter";
+import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service";
 
 /**
  * How far behind the application's writes these datasets can be.

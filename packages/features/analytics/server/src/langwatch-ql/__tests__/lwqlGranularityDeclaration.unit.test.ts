@@ -17,9 +17,11 @@ import {
   LangWatchQLGranularityRequiresTimeWindowError,
   LangWatchQLReservedGranularityTypeError,
 } from "@langwatch/analytics-contract";
-import { assertLangWatchQLGranularityDeclaration } from "../../services/langwatch-ql-time-window.service";
-import type { LangWatchQLParameter } from "../validation/validate";
-import { validateLangWatchQL } from "../validation/validate";
+import { LangWatchQLTimeWindowService } from "../../services/langwatch-ql-time-window.service";
+
+const timeWindows = LangWatchQLTimeWindowService.create();
+import type { LangWatchQLParameter } from "../../rules/langwatch-ql-validation-shape.rules";
+import { validateLangWatchQL } from "./lwql-validate";
 
 /** The same minimal catalog the validator's own unit test drives. */
 const POLICY = {
@@ -66,7 +68,7 @@ describe("the validator accepts a bound parameter inside INTERVAL (A5)", () => {
 describe("assertLangWatchQLGranularityDeclaration (save-time rules)", () => {
   it("accepts a granularity declared alongside both period bounds", () => {
     expect(() =>
-      assertLangWatchQLGranularityDeclaration([
+      timeWindows.assertGranularityDeclaration([
         ...BOTH_PERIODS,
         { name: "period_granularity_seconds", type: "UInt32" },
       ]),
@@ -74,14 +76,14 @@ describe("assertLangWatchQLGranularityDeclaration (save-time rules)", () => {
   });
 
   it("accepts a statement that does not declare granularity at all", () => {
-    expect(() => assertLangWatchQLGranularityDeclaration(BOTH_PERIODS)).not.toThrow();
-    expect(() => assertLangWatchQLGranularityDeclaration([])).not.toThrow();
+    expect(() => timeWindows.assertGranularityDeclaration(BOTH_PERIODS)).not.toThrow();
+    expect(() => timeWindows.assertGranularityDeclaration([])).not.toThrow();
   });
 
   it("refuses a non-UInt32 declaration", () => {
     for (const type of ["Int32", "UInt16", "UInt64", "Float64", "String"]) {
       expect(() =>
-        assertLangWatchQLGranularityDeclaration([
+        timeWindows.assertGranularityDeclaration([
           ...BOTH_PERIODS,
           { name: "period_granularity_seconds", type },
         ]),
@@ -91,14 +93,14 @@ describe("assertLangWatchQLGranularityDeclaration (save-time rules)", () => {
 
   it("refuses granularity declared without either period bound", () => {
     expect(() =>
-      assertLangWatchQLGranularityDeclaration([
+      timeWindows.assertGranularityDeclaration([
         { name: "period_granularity_seconds", type: "UInt32" },
         { name: "period_start", type: "DateTime" },
       ]),
     ).toThrow(LangWatchQLGranularityRequiresTimeWindowError);
 
     expect(() =>
-      assertLangWatchQLGranularityDeclaration([
+      timeWindows.assertGranularityDeclaration([
         { name: "period_granularity_seconds", type: "UInt32" },
       ]),
     ).toThrow(LangWatchQLGranularityRequiresTimeWindowError);
@@ -110,7 +112,7 @@ describe("assertLangWatchQLGranularityDeclaration (save-time rules)", () => {
     // that cannot carry an instant is not a window, and the budget computed
     // against it would be fiction.
     expect(() =>
-      assertLangWatchQLGranularityDeclaration([
+      timeWindows.assertGranularityDeclaration([
         { name: "period_granularity_seconds", type: "UInt32" },
         { name: "period_start", type: "String" },
         { name: "period_end", type: "DateTime" },
@@ -124,14 +126,14 @@ describe("assertLangWatchQLGranularityDeclaration (save-time rules)", () => {
     // period_start sends them looking for a line already on screen; what
     // they have to change is its type.
     const mistyped = messageOf(() =>
-      assertLangWatchQLGranularityDeclaration([
+      timeWindows.assertGranularityDeclaration([
         { name: "period_granularity_seconds", type: "UInt32" },
         { name: "period_start", type: "String" },
         { name: "period_end", type: "DateTime" },
       ]),
     );
     const absent = messageOf(() =>
-      assertLangWatchQLGranularityDeclaration([
+      timeWindows.assertGranularityDeclaration([
         { name: "period_granularity_seconds", type: "UInt32" },
       ]),
     );

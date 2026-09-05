@@ -66,12 +66,12 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
 
-import { LWQL_CLEAN_DIAGNOSTICS_MEANING } from "../../adapters/clickhouse.lwql-diagnostics.adapter";
+import { LWQL_CLEAN_DIAGNOSTICS_MEANING } from "../../rules/langwatch-ql-diagnostics-shape.rules";
 import type { LangWatchQLRestPorts } from "../../services/langwatch-ql-route-guards.service";
 import { z } from "zod";
-import { LWQL_COLUMN_UNITS } from "../../adapters/clickhouse.lwql-catalog-shapes.adapter";
-import { LWQL_DIAGNOSTIC_CODES } from "../../adapters/clickhouse.lwql-diagnostics.adapter";
-import { MAX_LWQL_LENGTH } from "../../services/langwatch-ql-sql-text.service";
+import { LWQL_COLUMN_UNITS } from "../../services/langwatch-ql-catalog-shapes.service";
+import { LWQL_DIAGNOSTIC_CODES } from "../../rules/langwatch-ql-diagnostics-shape.rules";
+import { MAX_LWQL_LENGTH } from "../../rules/langwatch-ql-sql-literal.rules";
 import {
   lwqlGranularityStepSchema,
   lwqlTimeWindowSchema,

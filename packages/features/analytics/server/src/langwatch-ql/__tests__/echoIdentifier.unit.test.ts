@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { echoIdentifier } from "../violations";
+import { echoIdentifier } from "../../rules/langwatch-ql-violations.rules";
 
 /** A high surrogate with no low surrogate after it, or the reverse. */
 const UNPAIRED_SURROGATE =

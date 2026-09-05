@@ -27,9 +27,9 @@
  * @see specs/analytics/lwql-api.feature
  */
 
-import { contentFilteredMapSql } from "./clickhouse.lwql-content-gating.mapper";
-import { LWQL_POSTGRES_CATALOG } from "../postgres/postgres.lwql-view-catalog.mapper";
-import type { LangWatchQLViewDefinition } from "../../adapters/clickhouse.lwql-catalog-shapes.adapter";
+import { contentFilteredMapSql } from "./lwql-content-gating.rules";
+import { LWQL_POSTGRES_CATALOG } from "./lwql-postgres-view-catalog.rules";
+import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service";
 
 /**
  * How long after a write a row can be missing from these views.
@@ -1632,6 +1632,14 @@ const EVALUATION_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
     },
   ],
 };
+
+/**
+ * The column every LangWatchQL dataset names its owning tenant with.
+ *
+ * The fact tables because that is their column, the PostgreSQL-engine tables
+ * because the approved view renamed the application's `projectId` to match.
+ */
+export const TENANT_COLUMN = "TenantId";
 
 /**
  * The LangWatchQL schema, in the order the schema endpoint should publish it:

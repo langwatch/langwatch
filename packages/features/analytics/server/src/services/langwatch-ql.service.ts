@@ -11,37 +11,41 @@ import type {
   LangWatchQLQueryResult,
   LangWatchQLSchema,
 } from "@langwatch/analytics-contract";
-import { lwqlTenantCapability } from "./langwatch-ql-capability.service";
-import { LWQL_VIEW_CATALOG } from "../repositories/clickhouse/clickhouse.lwql-view-catalog.mapper";
+import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service";
+
+import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules";
 import {
+  LangWatchQLCatalogShapesService,
   type LangWatchQLViewDefinition,
-  lwqlAllowedTables,
-  lwqlGatedColumns,
-  lwqlVisibleViews,
-} from "../adapters/clickhouse.lwql-catalog-shapes.adapter";
-import { lwqlDiagnostics } from "../adapters/clickhouse.lwql-diagnostics.adapter";
+} from "../services/langwatch-ql-catalog-shapes.service";
+import { LangWatchQLDiagnosticsService } from "./langwatch-ql-diagnostics.service";
 import {
   LangWatchQLParameterMissingError,
   LangWatchQLUnavailableError,
 } from "@langwatch/analytics-contract";
+import { DEFAULT_LWQL_RESULT_LIMITS } from "./langwatch-ql-executor.service";
+import type {
+  LangWatchQLExecutorPort,
+  LangWatchQLResultLimits,
+} from "../ports/langwatch-ql-executor.port";
 import {
-  createLangWatchQLExecutor,
-  DEFAULT_LWQL_RESULT_LIMITS,
-  type LangWatchQLExecutor,
-  type LangWatchQLResultLimits,
-  lwqlConnectionFromEnvironment,
-} from "./langwatch-ql-executor.service";
-import {
-  assertLangWatchQLGranularityDeclaration,
   type LangWatchQLGranularityResolution,
-  resolveLangWatchQLGranularity,
-  resolveLangWatchQLTimeWindow,
+  LangWatchQLTimeWindowService,
 } from "./langwatch-ql-time-window.service";
-import { describeLangWatchQLSchema } from "./langwatch-ql-schema.service";
+import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service";
 import type { LangWatchQLTimeWindow } from "@langwatch/analytics-contract";
 import { LWQL_PERIOD_GRANULARITY_PARAMETER } from "@langwatch/analytics-contract";
-import { lwqlValidationError } from "./langwatch-ql-validation-errors.service";
-import { type AcceptedLangWatchQL, validateLangWatchQL } from "../langwatch-ql/validation/validate";
+import { LangWatchQLValidationErrorService } from "./langwatch-ql-validation-errors.service";
+import type { AcceptedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules";
+import { LangWatchQLValidationService } from "./langwatch-ql-validation.service";
+
+const catalogShapes = LangWatchQLCatalogShapesService.create();
+
+const lwqlCapability = LangWatchQLCapabilityService.create();
+const timeWindows = LangWatchQLTimeWindowService.create();
+const lwqlSchema = LangWatchQLSchemaService.create();
+const lwqlDiagnostics = LangWatchQLDiagnosticsService.create();
+const lwqlValidationErrors = LangWatchQLValidationErrorService.create();
 
 const logger = createLogger("langwatch:analytics:lwql");
 
@@ -59,7 +63,7 @@ function resolveRunGranularityOrRefuseUnfilled({
   awaitingTimeWindow,
 }: {
   /** Bound parameters the validated statement declares. */
-  readonly declared: Parameters<typeof resolveLangWatchQLGranularity>[0]["declared"];
+  readonly declared: Parameters<LangWatchQLTimeWindowService["resolveGranularity"]>[0]["declared"];
   /** Values the caller sent. */
   readonly parameters?: Readonly<Record<string, unknown>>;
   /** The period the surface is showing, when it has one. */
@@ -82,7 +86,7 @@ function resolveRunGranularityOrRefuseUnfilled({
   // for. A surface that picked the step on the member's behalf rather than at their request
   // — the dashboard, whose period is dragged around by a control the widget does not own —
   // passes "coarsen" instead, and reports the substitution rather than hiding it.
-  const granularity = resolveLangWatchQLGranularity({
+  const granularity = timeWindows.resolveGranularity({
     declared,
     ...(parameters ? { parameters } : {}),
     ...(granularitySeconds !== undefined ? { granularitySeconds } : {}),
@@ -157,9 +161,7 @@ export interface ValidatedLangWatchQL extends AcceptedLangWatchQL {
    * injected for the reserved names the statement declares.
    */
   readonly boundParameters?: Readonly<Record<string, unknown>>;
-  /**
-   * Reserved names the statement declares that no window filled.
-   */
+  /** Reserved names the statement declares that no window filled. */
   readonly awaitingTimeWindow: readonly string[];
 }
 
@@ -169,34 +171,24 @@ export interface LangWatchQLServiceDependencies {
    * identity provisioned — in which case every query is refused rather than run
    * with weaker guarantees.
    */
-  readonly executor: LangWatchQLExecutor | null;
+  readonly executor: LangWatchQLExecutorPort | null;
   /** Database the LangWatchQL views live in, and what unqualified names resolve to. */
   readonly database: string;
   readonly views?: readonly LangWatchQLViewDefinition[];
   readonly limits?: LangWatchQLResultLimits;
-  /**
-   * The clock the diagnostics ask "has this period finished yet" against.
-   */
+  /** The clock the diagnostics ask "has this period finished yet" against. */
   readonly now?: () => Date;
 }
-
-/**
- * The LangWatchQL analytics SQL API's application service, cached at module
- * scope rather than on the app container so test suites can swap the
- * executor between describe blocks without a full app teardown and rebuild.
- */
-let cached: LangWatchQLService | null = null;
 
 export class LangWatchQLService {
   private readonly views: readonly LangWatchQLViewDefinition[];
   private readonly limits: LangWatchQLResultLimits;
   private readonly now: () => Date;
+  private readonly validation = LangWatchQLValidationService.create();
 
-  /**
-   * Releases the transport the executor holds, where it holds one.
-   */
+  /** Releases the transport the executor holds, where it holds one. */
   async close(): Promise<void> {
-    await this.deps.executor?.close?.();
+    await this.deps.executor?.close();
   }
 
   constructor(private readonly deps: LangWatchQLServiceDependencies) {
@@ -209,58 +201,14 @@ export class LangWatchQLService {
     return new LangWatchQLService(deps);
   }
 
-  /**
-   * Builds the service from an environment a process handed over.
-   */
-  static fromEnvironment(
-    environment: Record<string, string | undefined>,
-    overrides: Partial<LangWatchQLServiceDependencies> = {},
-  ): LangWatchQLService {
-    const connection = lwqlConnectionFromEnvironment(environment);
-
-    return new LangWatchQLService({
-      executor: connection ? createLangWatchQLExecutor(connection) : null,
-      database: connection?.database ?? DEFAULT_LWQL_DATABASE,
-      ...overrides,
-    });
-  }
-
-  /** The process-wide service, built from the environment on first use. */
-  static shared(environment: Record<string, string | undefined>): LangWatchQLService {
-    cached ??= LangWatchQLService.fromEnvironment(environment);
-
-    return cached;
-  }
-
-  /**
-   * Replaces the process-wide service, or clears it so the next read rebuilds
-   * from the environment.
-   */
-  static setShared(service: LangWatchQLService | null): void {
-    cached = service;
-  }
-
-  /**
-   * Clears the process-wide service, releasing the transport it holds first.
-   */
-  static async closeShared(): Promise<void> {
-    const previous = cached;
-    cached = null;
-    await previous?.close();
-  }
-
-  /**
-   * Whether this deployment has a LangWatchQL identity to run a query as.
-   */
+  /** Whether this deployment has a LangWatchQL identity to run a query as. */
   get available(): boolean {
     return this.deps.executor != null;
   }
 
-  /**
-   * The LangWatchQL schema this caller's permissions unlock.
-   */
+  /** The LangWatchQL schema this caller's permissions unlock. */
   describeSchema({ protections }: { protections: LangWatchQLProtections }): LangWatchQLSchema {
-    return describeLangWatchQLSchema({
+    return lwqlSchema.describe({
       database: this.deps.database,
       protections,
       views: this.views,
@@ -286,21 +234,21 @@ export class LangWatchQLService {
     /** The period the surface is showing, when one is asking. */
     readonly timeWindow?: LangWatchQLTimeWindow;
   }): ValidatedLangWatchQL {
-    const validation = validateLangWatchQL({
+    const validation = this.validation.validate({
       sql,
       // The datasets this caller can reach, not every dataset the catalog has. A dataset gated
       // as a whole is absent from the schema endpoint, and `allowedTables` is what makes it
       // *unnameable* rather than merely unlisted: derived from the full catalog, a caller could
       // name a hidden dataset and read its row-policed rows despite holding none of the
       // permissions that dataset requires.
-      allowedTables: lwqlAllowedTables({
+      allowedTables: catalogShapes.allowedTables({
         database: this.deps.database,
-        views: lwqlVisibleViews({ protections, views: this.views }),
+        views: catalogShapes.visibleViews({ protections, views: this.views }),
       }),
       // Derived from the *full* catalog on purpose: a column of a hidden
       // dataset must stay gated so that naming it unqualified — where no table
       // reference reveals which dataset it came from — is refused too.
-      gatedColumns: lwqlGatedColumns({ protections, views: this.views }),
+      gatedColumns: catalogShapes.gatedColumns({ protections, views: this.views }),
       defaultDatabase: this.deps.database,
     });
 
@@ -313,18 +261,18 @@ export class LangWatchQLService {
         "LangWatchQL refused by policy",
       );
 
-      throw lwqlValidationError(validation);
+      throw lwqlValidationErrors.forRejection(validation);
     }
 
     // The granularity rules ride on every validate -- persisted saves AND
     // ad-hoc execution, since execute() calls validate() -- which is what
     // makes REST saves, tRPC saves and workbench runs refuse identically.
-    assertLangWatchQLGranularityDeclaration(validation.parameters);
+    timeWindows.assertGranularityDeclaration(validation.parameters);
 
     // Before the missing-parameter check, never after: an injected window IS a
     // value, and checking first would refuse every period-aware statement for
     // the two names the surface was about to supply.
-    const window = resolveLangWatchQLTimeWindow({
+    const window = timeWindows.resolveTimeWindow({
       declared: validation.parameters,
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
@@ -418,7 +366,7 @@ export class LangWatchQLService {
     validation,
     granularity,
   }: {
-    readonly executor: LangWatchQLExecutor;
+    readonly executor: LangWatchQLExecutorPort;
     readonly project: LangWatchQLCaller;
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;
@@ -444,7 +392,7 @@ export class LangWatchQLService {
       // granularity merge, so passing it drops `period_granularity_seconds`
       // from every statement that declares one.
       ...(Object.keys(executionParameters).length > 0 ? { parameters: executionParameters } : {}),
-      tenantCapability: lwqlTenantCapability({
+      tenantCapability: lwqlCapability.tenantCapability({
         secret: project.lwqlKey,
       }),
       limits: this.limits,
@@ -453,7 +401,7 @@ export class LangWatchQLService {
     // The facts the walk recorded, plus what actually came back. Both halves
     // are needed and neither is re-derived: a rule about the query's shape
     // reads `validation`, a rule about the answer reads the rows.
-    const diagnostics = lwqlDiagnostics({
+    const diagnostics = lwqlDiagnostics.diagnose({
       validation,
       database: this.deps.database,
       views: this.views,

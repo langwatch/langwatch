@@ -15,8 +15,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { type LangWatchQLValidation, validateLangWatchQL } from "../validate";
-import type { LangWatchQLViolationCode } from "../violations";
+import type { LangWatchQLValidation } from "../../rules/langwatch-ql-validation-shape.rules";
+import { validateLangWatchQL } from "./lwql-validate";
+import type { LangWatchQLViolationCode } from "../../rules/langwatch-ql-violations.rules";
 
 const POLICY = {
   allowedTables: ["analytics.traces", "analytics.spans"],

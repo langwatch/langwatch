@@ -25,8 +25,8 @@ import {
   CONTENT_KEY_CATALOG,
   type ContentCategory,
 } from "@langwatch/data-privacy-contract";
-import type { FieldProtection } from "../../rules/lwql-field-protection.rules";
-import { clickHouseLiteral } from "../../services/langwatch-ql-sql-text.service";
+import type { FieldProtection } from "./lwql-field-protection.rules";
+import { clickHouseLiteral } from "./langwatch-ql-sql-literal.rules";
 
 /**
  * Which read-time gate governs each data-privacy content category.
@@ -55,9 +55,11 @@ const CATEGORY_GATE: Record<ContentCategory, FieldProtection> = {
  * of them from the map and re-exposes the ones a caller may see as dedicated,
  * gated columns.
  */
-export const CONTENT_ATTRIBUTE_KEYS: readonly string[] = [
-  ...new Set(CONTENT_CATEGORIES.flatMap((category) => CONTENT_KEY_CATALOG[category])),
-].sort();
+export const CONTENT_ATTRIBUTE_KEYS: readonly string[] = CONTENT_CATEGORIES.flatMap(
+  (category) => CONTENT_KEY_CATALOG[category],
+)
+  .filter((key, index, keys) => keys.indexOf(key) === index)
+  .sort();
 
 /**
  * Key prefixes that carry the same content in exploded form.
@@ -100,8 +102,10 @@ export function isContentAttributeKey(key: string): boolean {
  * the keys it was meant to remove.
  */
 export function contentKeyExclusionSql(keyParameter = "k"): string {
-  const keys = CONTENT_ATTRIBUTE_KEYS.map(clickHouseLiteral).join(", ");
-  const prefixes = CONTENT_ATTRIBUTE_KEY_PREFIXES.map(clickHouseLiteral).join(", ");
+  const keys = CONTENT_ATTRIBUTE_KEYS.map((value) => clickHouseLiteral(value)).join(", ");
+  const prefixes = CONTENT_ATTRIBUTE_KEY_PREFIXES.map((value) => clickHouseLiteral(value)).join(
+    ", ",
+  );
   return (
     `${keyParameter} NOT IN (${keys}) ` +
     `AND NOT arrayExists(p -> startsWith(${keyParameter}, p), [${prefixes}])`

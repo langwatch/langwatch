@@ -12,7 +12,7 @@
  *
  * @see specs/analytics/lwql-api.feature
  */
-import type { SqlSourcePosition } from "./parser";
+import type { SqlSourcePosition } from "./langwatch-ql-parser.rules";
 
 /**
  * Why a query was refused.

@@ -16,8 +16,8 @@
  */
 import { HandledError, remediation } from "@langwatch/handled-error";
 
-import type { RejectedLangWatchQL } from "../langwatch-ql/validation/validate";
-import type { LangWatchQLViolation } from "../langwatch-ql/validation/violations";
+import type { RejectedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules";
+import type { LangWatchQLViolation } from "../rules/langwatch-ql-violations.rules";
 
 /**
  * `meta` for both codes: the violations, verbatim.
@@ -73,19 +73,30 @@ export class LangWatchQLNotPermittedError extends HandledError {
   }
 }
 
-/**
- * Turns a rejection into the handled error for it.
- *
- * A rejection whose only reason is that the text would not parse is a different
- * failure from one where the policy refused a construct: the first is a typo,
- * the second is a query doing something this API does not do, and telling a
- * caller to "check the syntax" of syntactically perfect SQL sends them looking
- * in the wrong place.
- */
-export function lwqlValidationError(rejection: RejectedLangWatchQL): HandledError {
-  const unparseable = rejection.violations.every((violation) => violation.code === "PARSE_FAILED");
+/** Names a refusal from the validator as the handled error the boundary ships. */
+export class LangWatchQLValidationErrorService {
+  static create(): LangWatchQLValidationErrorService {
+    return new LangWatchQLValidationErrorService();
+  }
 
-  return unparseable
-    ? new LangWatchQLUnparseableError(rejection.violations)
-    : new LangWatchQLNotPermittedError(rejection.violations);
+  private constructor() {}
+
+  /**
+   * Turns a rejection into the handled error for it.
+   *
+   * A rejection whose only reason is that the text would not parse is a different
+   * failure from one where the policy refused a construct: the first is a typo,
+   * the second is a query doing something this API does not do, and telling a
+   * caller to "check the syntax" of syntactically perfect SQL sends them looking
+   * in the wrong place.
+   */
+  forRejection(rejection: RejectedLangWatchQL): HandledError {
+    const unparseable = rejection.violations.every(
+      (violation) => violation.code === "PARSE_FAILED",
+    );
+
+    return unparseable
+      ? new LangWatchQLUnparseableError(rejection.violations)
+      : new LangWatchQLNotPermittedError(rejection.violations);
+  }
 }

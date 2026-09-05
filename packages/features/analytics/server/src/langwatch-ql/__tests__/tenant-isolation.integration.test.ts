@@ -21,15 +21,8 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import {
-  auditedSettingValue,
-  definerViewAuditQuery,
-  dropLangWatchQLRowPolicyStatement,
-  lwqlDictionaryAuditQuery,
-  lwqlGrantStatement,
-  lwqlPolicyCoverageQuery,
-  lwqlRowPolicyStatement,
-} from "../../adapters/clickhouse.lwql-provisioning.adapter";
+import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service";
+import { LangWatchQLAccessAuditService } from "../../services/langwatch-ql-access-audit.service";
 import {
   CLICKHOUSE_ERROR_CODE,
   expectClickHouseError,
@@ -44,6 +37,9 @@ import {
   selectScalar,
   startLangWatchQLClickHouse,
 } from "./lwql-clickhouse-harness";
+
+const accessModel = LangWatchQLAccessModelService.create();
+const accessAudit = LangWatchQLAccessAuditService.create();
 
 describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 server", () => {
   let harness: LangWatchQLClickHouseHarness;
@@ -119,7 +115,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
       let tenantsWithoutPolicy: string[] = [];
       try {
         await harness.applyAsAdmin([
-          dropLangWatchQLRowPolicyStatement({
+          accessModel.dropRowPolicyStatement({
             names: harness.names,
             table: "spans",
           }),
@@ -131,7 +127,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
         tenantsWithoutPolicy = rows.map((row) => row.TenantId);
       } finally {
         await harness.applyAsAdmin([
-          lwqlRowPolicyStatement({
+          accessModel.rowPolicyStatement({
             names: harness.names,
             lwqlTable: spans,
           }),
@@ -497,7 +493,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
         expect(
           settings[harness.names.tenantSetting],
           "the key hash is what makes a LangWatchQL query auditable",
-        ).toBe(auditedSettingValue(harness.tenantA.keyHash));
+        ).toBe(accessAudit.auditedSettingValue(harness.tenantA.keyHash));
 
         // Serialised whole, so the check covers every column rather than the
         // handful someone thought to name.
@@ -620,7 +616,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
     it("has no dictionary in the LangWatchQL database that could serve the same data unpoliced", async () => {
       const dictionaries = await selectRows<{ name: string }>(
         harness.admin,
-        lwqlDictionaryAuditQuery({ names: harness.names }),
+        accessAudit.dictionaryAuditQuery({ names: harness.names }),
       );
       expect(dictionaries).toEqual([]);
     });
@@ -649,7 +645,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
           // while having stopped testing a refusal to drop a policy that
           // actually exists.
           "DROP ROW POLICY",
-          dropLangWatchQLRowPolicyStatement({
+          accessModel.dropRowPolicyStatement({
             names: harness.names,
             table: "traces",
           }),
@@ -766,13 +762,13 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
         tenantA,
         `SELECT value FROM system.settings WHERE name = '${harness.names.tenantSetting}'`,
       );
-      expect(own).toBe(auditedSettingValue(harness.tenantA.keyHash));
+      expect(own).toBe(accessAudit.auditedSettingValue(harness.tenantA.keyHash));
 
       // Compared in TypeScript rather than in SQL: the value read back from
       // system.settings is the field-dumped form and already carries its own
       // quotes, so interpolating it into a SQL literal double-quotes it. This
       // also widens the check from one column to every setting in the view.
-      const otherTenantValue = auditedSettingValue(harness.tenantB.keyHash);
+      const otherTenantValue = accessAudit.auditedSettingValue(harness.tenantB.keyHash);
       const allSettings = await selectRows<{ name: string; value: string }>(
         tenantA,
         "SELECT name, value FROM system.settings",
@@ -818,7 +814,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
     it("has an effective row policy for every object the restricted identity can read", async () => {
       const coverage = await selectRows<{ table: string; has_policy: number }>(
         harness.admin,
-        lwqlPolicyCoverageQuery({ names: harness.names }),
+        accessAudit.policyCoverageQuery({ names: harness.names }),
       );
       expect(
         coverage.length,
@@ -847,7 +843,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
 
       const cleanBefore = await selectRows(
         harness.admin,
-        definerViewAuditQuery({ names: harness.names }),
+        accessAudit.definerViewAuditQuery({ names: harness.names }),
       );
       expect(cleanBefore, "the LangWatchQL database already contains a DEFINER view").toEqual([]);
 
@@ -860,8 +856,8 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
             `AS SELECT TenantId, TraceId FROM ${database}.traces`,
           `CREATE VIEW ${database}.${invokerView} SQL SECURITY INVOKER ` +
             `AS SELECT TenantId, TraceId FROM ${database}.traces`,
-          lwqlGrantStatement({ names: harness.names, table: definerView }),
-          lwqlGrantStatement({ names: harness.names, table: invokerView }),
+          accessModel.grantStatement({ names: harness.names, table: definerView }),
+          accessModel.grantStatement({ names: harness.names, table: invokerView }),
         ]);
 
         definerTenants = (
@@ -879,7 +875,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
         flagged = (
           await selectRows<{ name: string }>(
             harness.admin,
-            definerViewAuditQuery({ names: harness.names }),
+            accessAudit.definerViewAuditQuery({ names: harness.names }),
           )
         ).map((row) => row.name);
       } finally {
@@ -905,7 +901,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
 
       const cleanAfter = await selectRows(
         harness.admin,
-        definerViewAuditQuery({ names: harness.names }),
+        accessAudit.definerViewAuditQuery({ names: harness.names }),
       );
       expect(cleanAfter).toEqual([]);
     });

@@ -9,23 +9,19 @@ import { createLogger } from "@langwatch/observability";
 
 import { parseConnectionUrl } from "@langwatch/clickhouse-client";
 import { Task } from "@langwatch/task";
-import { lwqlConnectionFromEnvironment } from "../services/langwatch-ql-executor.service";
+import { LangWatchQLExecutorService } from "../services/langwatch-ql-executor.service";
 import {
+  LangWatchQLProductionProvisioningService,
   type LwqlKeyMapBackfillPlan,
-  lwqlKeyMapTableQualifiedName,
-  lwqlPostgresSchemaFromDatabaseUrl,
-  planLwqlKeyMapBackfill,
-  productionClickHouseObjectStatements,
-  productionLangWatchQLNames,
-  productionPostgresApprovedViewStatements,
-  productionPostgresReaderGrantStatements,
-  withTenancyOptOut,
 } from "../services/langwatch-ql-production-provisioning.service";
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
-} from "../adapters/clickhouse.lwql-provisioning.adapter";
+} from "../services/langwatch-ql-access-model.service";
 import { LWQL_KEY_MAP_INSERT_SETTINGS } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository";
+
+const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
+const lwqlExecutors = LangWatchQLExecutorService.create();
 
 const logger = createLogger("langwatch:task:lwql-provision");
 
@@ -74,7 +70,7 @@ async function runPostgresStatements({
   statements: string[];
 }): Promise<void> {
   for (const statement of statements) {
-    await database.$executeRawUnsafe(withTenancyOptOut(statement));
+    await database.$executeRawUnsafe(lwqlProvisioning.withTenancyOptOut(statement));
   }
 }
 
@@ -93,11 +89,11 @@ async function planBackfillFromCurrentState({
     select: { id: true, lwqlKey: true },
   });
 
-  const table = lwqlKeyMapTableQualifiedName({ names, sourceDatabase });
+  const table = lwqlProvisioning.keyMapTableQualifiedName({ names, sourceDatabase });
   // Deliberately unfiltered: this admin scan collects key hashes across ALL
   // tenants to diff against every project's key — the one query shape the
   // "every ClickHouse query MUST filter on TenantId" rule cannot apply to.
-  // `qualified()` (via lwqlKeyMapTableQualifiedName) validates the
+  // `qualified()` (via lwqlProvisioning.keyMapTableQualifiedName) validates the
   // interpolated database and table identifiers.
   const existingResult = await client.query({
     query: `SELECT DISTINCT ${KEY_MAP_COLUMNS.keyHash} FROM ${table}`,
@@ -114,7 +110,7 @@ async function planBackfillFromCurrentState({
       .filter((hash): hash is string => hash !== undefined),
   );
 
-  return planLwqlKeyMapBackfill({ projects, existingHashes });
+  return lwqlProvisioning.planKeyMapBackfill({ projects, existingHashes });
 }
 
 async function backfillKeyMap({
@@ -153,7 +149,7 @@ async function backfillKeyMap({
     return;
   }
 
-  const table = lwqlKeyMapTableQualifiedName({ names, sourceDatabase });
+  const table = lwqlProvisioning.keyMapTableQualifiedName({ names, sourceDatabase });
   await client.insert({
     table,
     values: plan.rowsToInsert,
@@ -178,13 +174,13 @@ export async function runLwqlProvisioningTask({
   /** The environment the launching process was configured with. */
   source: Record<string, string | undefined>;
 }): Promise<void> {
-  const connection = lwqlConnectionFromEnvironment(source);
+  const connection = lwqlExecutors.tryConnectionFromEnvironment(source);
   if (!connection) {
     logger.info("LWQL not configured, skipping");
     return;
   }
 
-  const names = productionLangWatchQLNames({ connection });
+  const names = lwqlProvisioning.names({ connection });
   const { database: sourceDatabase } = parseConnectionUrl();
 
   logger.info(
@@ -195,12 +191,12 @@ export async function runLwqlProvisioningTask({
   // The schema the tables actually live in (Prisma's `?schema=` URL
   // parameter), not a hardcoded `public` — the SaaS cloud deploys with
   // `schema=langwatch_db`, where `public."Annotation"` does not exist.
-  const postgresSchema = lwqlPostgresSchemaFromDatabaseUrl(source.DATABASE_URL);
+  const postgresSchema = lwqlProvisioning.postgresSchemaFromDatabaseUrl(source.DATABASE_URL);
 
   try {
     await runPostgresStatements({
       database,
-      statements: productionPostgresApprovedViewStatements({ schema: postgresSchema }),
+      statements: lwqlProvisioning.postgresApprovedViewStatements({ schema: postgresSchema }),
     });
     // Immediately after creation, in the same step: the reader role is provisioned
     // out of band and its grants were issued against whatever views existed then,
@@ -209,7 +205,7 @@ export async function runLwqlProvisioningTask({
     // out-of-band job by hand. A no-op where the role does not exist.
     await runPostgresStatements({
       database,
-      statements: productionPostgresReaderGrantStatements({
+      statements: lwqlProvisioning.postgresReaderGrantStatements({
         schema: postgresSchema,
         role: source.LWQL_POSTGRES_READER_ROLE,
       }),
@@ -222,7 +218,7 @@ export async function runLwqlProvisioningTask({
   await withAdminClickHouseClient({
     url: source.CLICKHOUSE_URL,
     fn: async (client) => {
-      const statements = productionClickHouseObjectStatements({
+      const statements = lwqlProvisioning.clickHouseObjectStatements({
         names,
         sourceDatabase,
       });

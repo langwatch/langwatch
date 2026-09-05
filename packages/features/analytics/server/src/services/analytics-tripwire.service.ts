@@ -5,11 +5,20 @@ import { AnalyticsTripwire } from "@langwatch/analytics-contract";
 const tolerance = 0.001;
 const logger = createLogger("langwatch:analytics:tripwire");
 
-export class LoggingAnalyticsTripwire extends AnalyticsTripwire {
+/** One metric on one bucket where the routed and legacy reads disagreed. */
+interface Divergence {
+  period: string;
+  date: string;
+  metric: string;
+  routed: number | null;
+  legacy: number | null;
+}
+
+export class LoggingAnalyticsTripwireService extends AnalyticsTripwire {
   static create(options: {
     isEnabled: (projectId: string) => Promise<boolean>;
-  }): LoggingAnalyticsTripwire {
-    return new LoggingAnalyticsTripwire(options.isEnabled);
+  }): LoggingAnalyticsTripwireService {
+    return new LoggingAnalyticsTripwireService(options.isEnabled);
   }
 
   private constructor(private readonly enabled: (projectId: string) => Promise<boolean>) {
@@ -27,75 +36,23 @@ export class LoggingAnalyticsTripwire extends AnalyticsTripwire {
     legacy: AnalyticsTimeseriesResult;
   }): void {
     try {
-      const divergences: Array<{
-        period: string;
-        date: string;
-        metric: string;
-        routed: number | null;
-        legacy: number | null;
-      }> = [];
-      for (const period of ["current", "previous"] as const) {
-        const routed =
-          period === "current" ? input.routed.currentPeriod : input.routed.previousPeriod;
-        const legacy =
-          period === "current" ? input.legacy.currentPeriod : input.legacy.previousPeriod;
-        const routedByDate = new Map(routed.map((bucket) => [bucket.date, bucket]));
-        const legacyByDate = new Map(legacy.map((bucket) => [bucket.date, bucket]));
-        for (const date of new Set([...routedByDate.keys(), ...legacyByDate.keys()])) {
-          const routedBucket = routedByDate.get(date);
-          const legacyBucket = legacyByDate.get(date);
-          if (!routedBucket || !legacyBucket) {
-            divergences.push({
-              period,
-              date,
-              metric: "*",
-              routed: routedBucket ? 1 : null,
-              legacy: legacyBucket ? 1 : null,
-            });
-            continue;
-          }
-
-          const routedMetrics = flatten(routedBucket);
-          const legacyMetrics = flatten(legacyBucket);
-          for (const metric of new Set([...routedMetrics.keys(), ...legacyMetrics.keys()])) {
-            const routedValue = routedMetrics.get(metric);
-            const legacyValue = legacyMetrics.get(metric);
-            if (routedValue === undefined || legacyValue === undefined) {
-              divergences.push({
-                period,
-                date,
-                metric,
-                routed: routedValue ?? null,
-                legacy: legacyValue ?? null,
-              });
-              continue;
-            }
-
-            const denominator = Math.max(Math.abs(routedValue), Math.abs(legacyValue));
-            if (denominator > 0 && Math.abs(routedValue - legacyValue) / denominator > tolerance) {
-              divergences.push({
-                period,
-                date,
-                metric,
-                routed: routedValue,
-                legacy: legacyValue,
-              });
-            }
-          }
-        }
+      const divergences = [
+        ...comparePeriod("current", input.routed.currentPeriod, input.legacy.currentPeriod),
+        ...comparePeriod("previous", input.routed.previousPeriod, input.legacy.previousPeriod),
+      ];
+      if (divergences.length === 0) {
+        return;
       }
 
-      if (divergences.length > 0) {
-        logger.warn(
-          {
-            projectId: input.projectId,
-            table: input.table,
-            divergenceCount: divergences.length,
-            divergences: divergences.slice(0, 10),
-          },
-          "ADR-034 tripwire: routed analytics result diverged from legacy",
-        );
-      }
+      logger.warn(
+        {
+          projectId: input.projectId,
+          table: input.table,
+          divergenceCount: divergences.length,
+          divergences: divergences.slice(0, 10),
+        },
+        "ADR-034 tripwire: routed analytics result diverged from legacy",
+      );
     } catch (error) {
       logger.warn(
         {
@@ -107,6 +64,77 @@ export class LoggingAnalyticsTripwire extends AnalyticsTripwire {
       );
     }
   }
+}
+
+type Bucket = Record<string, unknown> & { date: string };
+
+/** Every divergence between one period's routed and legacy buckets. */
+function comparePeriod(
+  period: string,
+  routed: readonly Bucket[],
+  legacy: readonly Bucket[],
+): Divergence[] {
+  const routedByDate = new Map(routed.map((bucket) => [bucket.date, bucket]));
+  const legacyByDate = new Map(legacy.map((bucket) => [bucket.date, bucket]));
+  const divergences: Divergence[] = [];
+
+  for (const date of new Set([...routedByDate.keys(), ...legacyByDate.keys()])) {
+    const routedBucket = routedByDate.get(date);
+    const legacyBucket = legacyByDate.get(date);
+    if (!routedBucket || !legacyBucket) {
+      divergences.push({
+        period,
+        date,
+        metric: "*",
+        routed: routedBucket ? 1 : null,
+        legacy: legacyBucket ? 1 : null,
+      });
+      continue;
+    }
+
+    divergences.push(...compareBucket({ period, date, routedBucket, legacyBucket }));
+  }
+
+  return divergences;
+}
+
+/** Every metric on one date where the two reads disagreed by more than the tolerance. */
+function compareBucket({
+  period,
+  date,
+  routedBucket,
+  legacyBucket,
+}: {
+  period: string;
+  date: string;
+  routedBucket: Bucket;
+  legacyBucket: Bucket;
+}): Divergence[] {
+  const routedMetrics = flatten(routedBucket);
+  const legacyMetrics = flatten(legacyBucket);
+  const divergences: Divergence[] = [];
+
+  for (const metric of new Set([...routedMetrics.keys(), ...legacyMetrics.keys()])) {
+    const routedValue = routedMetrics.get(metric);
+    const legacyValue = legacyMetrics.get(metric);
+    if (routedValue === undefined || legacyValue === undefined) {
+      divergences.push({
+        period,
+        date,
+        metric,
+        routed: routedValue ?? null,
+        legacy: legacyValue ?? null,
+      });
+      continue;
+    }
+
+    const denominator = Math.max(Math.abs(routedValue), Math.abs(legacyValue));
+    if (denominator > 0 && Math.abs(routedValue - legacyValue) / denominator > tolerance) {
+      divergences.push({ period, date, metric, routed: routedValue, legacy: legacyValue });
+    }
+  }
+
+  return divergences;
 }
 
 function flatten(bucket: Record<string, unknown>): Map<string, number> {
@@ -121,12 +149,17 @@ function flatten(bucket: Record<string, unknown>): Map<string, number> {
     if (value === null || typeof value !== "object" || Array.isArray(value)) {
       return;
     }
+
     for (const [key, nested] of Object.entries(value)) {
       visit(nested, path ? `${path}.${key}` : key);
     }
   };
+
   for (const [key, value] of Object.entries(bucket)) {
-    if (key !== "date") visit(value, key);
+    if (key !== "date") {
+      visit(value, key);
+    }
   }
+
   return result;
 }

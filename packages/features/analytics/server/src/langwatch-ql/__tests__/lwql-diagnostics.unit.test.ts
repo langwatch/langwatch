@@ -16,17 +16,20 @@
 
 import { describe, expect, it } from "vitest";
 
-import { LWQL_VIEW_CATALOG } from "../../repositories/clickhouse/clickhouse.lwql-view-catalog.mapper";
-import { lwqlAllowedTables } from "../../adapters/clickhouse.lwql-catalog-shapes.adapter";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules";
+import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service";
 import {
   type LangWatchQLDiagnostic,
   LWQL_CLEAN_DIAGNOSTICS_MEANING,
   LWQL_DIAGNOSTIC_CODES,
-  lwqlDiagnostics,
-} from "../../adapters/clickhouse.lwql-diagnostics.adapter";
+} from "../../rules/langwatch-ql-diagnostics-shape.rules";
+import { LangWatchQLDiagnosticsService } from "../../services/langwatch-ql-diagnostics.service";
 import type { LangWatchQLColumn } from "../../services/langwatch-ql-executor.service";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../../services/langwatch-ql-executor.service";
-import { validateLangWatchQL } from "../validation/validate";
+import { validateLangWatchQL } from "./lwql-validate";
+
+const catalogShapes = LangWatchQLCatalogShapesService.create();
+const lwqlDiagnostics = LangWatchQLDiagnosticsService.create();
 
 const DATABASE = "analytics";
 
@@ -60,7 +63,7 @@ function diagnose({
 }): readonly LangWatchQLDiagnostic[] {
   const validation = validateLangWatchQL({
     sql,
-    allowedTables: lwqlAllowedTables({
+    allowedTables: catalogShapes.allowedTables({
       database: DATABASE,
       views: LWQL_VIEW_CATALOG,
     }),
@@ -74,7 +77,7 @@ function diagnose({
         .join(" | ")}\n${sql}`,
     );
   }
-  return lwqlDiagnostics({
+  return lwqlDiagnostics.diagnose({
     validation,
     database: DATABASE,
     views: LWQL_VIEW_CATALOG,

@@ -13,12 +13,14 @@ import { describe, expect, it } from "vitest";
 
 import { pinTimezone } from "./pinTimezone";
 
-import { resolveLangWatchQLTimeWindow } from "../../services/langwatch-ql-time-window.service";
+import { LangWatchQLTimeWindowService } from "../../services/langwatch-ql-time-window.service";
+
+const timeWindows = LangWatchQLTimeWindowService.create();
 import {
   formatLangWatchQLDateTimeParameter,
   isLangWatchQLDateTimeParameterType,
 } from "@langwatch/analytics-contract";
-import type { LangWatchQLParameter } from "../validation/validate";
+import type { LangWatchQLParameter } from "../../rules/langwatch-ql-validation-shape.rules";
 
 const PERIOD: LangWatchQLParameter[] = [
   { name: "period_start", type: "DateTime" },
@@ -131,7 +133,7 @@ describe("given a statement and the window a surface is showing", () => {
   describe("when the statement declares both reserved names", () => {
     /** @scenario "Reserved period parameters are filled only when declared" */
     it("binds each to its end of the window, and says the statement follows it", () => {
-      const resolved = resolveLangWatchQLTimeWindow({
+      const resolved = timeWindows.resolveTimeWindow({
         declared: PERIOD,
         timeWindow: WINDOW,
       });
@@ -145,7 +147,7 @@ describe("given a statement and the window a surface is showing", () => {
     });
 
     it("keeps the caller's own parameters beside the injected ones", () => {
-      const resolved = resolveLangWatchQLTimeWindow({
+      const resolved = timeWindows.resolveTimeWindow({
         declared: [...PERIOD, { name: "name", type: "String" }],
         parameters: { name: "checkout" },
         timeWindow: WINDOW,
@@ -162,7 +164,7 @@ describe("given a statement and the window a surface is showing", () => {
   describe("when the statement declares only one of them", () => {
     /** @scenario "Reserved period parameters are filled only when declared" */
     it("binds the one it declared and sends no value for the other", () => {
-      const resolved = resolveLangWatchQLTimeWindow({
+      const resolved = timeWindows.resolveTimeWindow({
         declared: [{ name: "period_start", type: "DateTime" }],
         timeWindow: WINDOW,
       });
@@ -177,7 +179,7 @@ describe("given a statement and the window a surface is showing", () => {
   describe("when the statement declares neither", () => {
     /** @scenario "A statement without a period reports that fact" */
     it("injects nothing and reports that it does not follow the period", () => {
-      const resolved = resolveLangWatchQLTimeWindow({
+      const resolved = timeWindows.resolveTimeWindow({
         declared: [{ name: "name", type: "String" }],
         parameters: { name: "checkout" },
         timeWindow: WINDOW,
@@ -190,7 +192,7 @@ describe("given a statement and the window a surface is showing", () => {
 
     it("leaves an unparameterised statement with no parameters at all", () => {
       expect(
-        resolveLangWatchQLTimeWindow({ declared: [], timeWindow: WINDOW }).parameters,
+        timeWindows.resolveTimeWindow({ declared: [], timeWindow: WINDOW }).parameters,
       ).toBeUndefined();
     });
   });
@@ -209,7 +211,7 @@ describe("given a statement and the window a surface is showing", () => {
    */
   describe("when the window is inverted or has no width", () => {
     it("binds an inverted window exactly as given, refusing nothing", () => {
-      const resolved = resolveLangWatchQLTimeWindow({
+      const resolved = timeWindows.resolveTimeWindow({
         declared: PERIOD,
         timeWindow: { start: WINDOW.end, end: WINDOW.start },
       });
@@ -223,7 +225,7 @@ describe("given a statement and the window a surface is showing", () => {
     });
 
     it("binds a zero-width window exactly as given, refusing nothing", () => {
-      const resolved = resolveLangWatchQLTimeWindow({
+      const resolved = timeWindows.resolveTimeWindow({
         declared: PERIOD,
         timeWindow: { start: WINDOW.start, end: WINDOW.start },
       });
@@ -240,7 +242,7 @@ describe("given a statement and the window a surface is showing", () => {
   describe("when no window is supplied at all", () => {
     /** @scenario "A period-aware statement run with no window names what is unset" */
     it("defers the declared reserved names rather than refusing them", () => {
-      const resolved = resolveLangWatchQLTimeWindow({ declared: PERIOD });
+      const resolved = timeWindows.resolveTimeWindow({ declared: PERIOD });
 
       expect(resolved.awaitingTimeWindow).toEqual(["period_end", "period_start"]);
       expect(resolved.followsTimeWindow).toBe(true);
@@ -254,7 +256,7 @@ describe("given a request that reaches for a name the surface owns", () => {
     /** @scenario "Reserved parameter misuse is refused before execution" */
     it("refuses, naming what it may not set", () => {
       const run = () =>
-        resolveLangWatchQLTimeWindow({
+        timeWindows.resolveTimeWindow({
           declared: PERIOD,
           parameters: { period_start: "2020-01-01 00:00:00" },
           timeWindow: WINDOW,
@@ -268,7 +270,7 @@ describe("given a request that reaches for a name the surface owns", () => {
     it("refuses even when the statement never declared it", () => {
       expect(
         codeOf(() =>
-          resolveLangWatchQLTimeWindow({
+          timeWindows.resolveTimeWindow({
             declared: [],
             parameters: { period_end: "2020-01-01 00:00:00" },
           }),
@@ -281,7 +283,7 @@ describe("given a request that reaches for a name the surface owns", () => {
     /** @scenario "Reserved parameter misuse is refused before execution" */
     it("refuses, naming the declaration to rewrite", () => {
       const run = () =>
-        resolveLangWatchQLTimeWindow({
+        timeWindows.resolveTimeWindow({
           declared: [{ name: "period_start", type: "String" }],
           timeWindow: WINDOW,
         });
@@ -298,7 +300,7 @@ describe("given a request that reaches for a name the surface owns", () => {
     it("names the type before the supplied value when both are wrong", () => {
       expect(
         codeOf(() =>
-          resolveLangWatchQLTimeWindow({
+          timeWindows.resolveTimeWindow({
             declared: [{ name: "period_start", type: "String" }],
             parameters: { period_start: "2020-01-01 00:00:00" },
           }),

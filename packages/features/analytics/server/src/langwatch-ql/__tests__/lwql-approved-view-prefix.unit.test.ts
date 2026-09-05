@@ -20,12 +20,13 @@
 
 import { describe, expect, it } from "vitest";
 
-import { LWQL_VIEW_CATALOG } from "../../repositories/clickhouse/clickhouse.lwql-view-catalog.mapper";
-import { lwqlPostgresViews } from "../../adapters/clickhouse.lwql-catalog-shapes.adapter";
-import {
-  lwqlApprovedPostgresViewNames,
-  lwqlPostgresApprovedViewStatements,
-} from "../../repositories/clickhouse/clickhouse.lwql-views.mapper";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules";
+import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service";
+import { LangWatchQLPostgresViewsService } from "../../services/langwatch-ql-postgres-views.service";
+
+const postgresViews = LangWatchQLPostgresViewsService.create();
+
+const catalogShapes = LangWatchQLCatalogShapesService.create();
 
 /**
  * The prefix the infrastructure bootstrap's grant predicate matches
@@ -49,7 +50,7 @@ describe("given the LangWatchQL approved PostgreSQL views", () => {
   describe("when the catalog's mappings are read", () => {
     /** @scenario "Every approved view is named under the prefix the reader's grants match" */
     it("names every approved view under the prefix the grants match", () => {
-      const mapped = lwqlPostgresViews(LWQL_VIEW_CATALOG);
+      const mapped = catalogShapes.postgresViews(LWQL_VIEW_CATALOG);
       expect(
         mapped.length,
         "no dataset is PostgreSQL-resident — this case is inspecting nothing",
@@ -64,8 +65,8 @@ describe("given the LangWatchQL approved PostgreSQL views", () => {
 
     /** @scenario "Every approved view is named under the prefix the reader's grants match" */
     it("carries the prefix through to the names the grants are built from", () => {
-      const granted = lwqlApprovedPostgresViewNames();
-      expect(granted.length).toBe(lwqlPostgresViews(LWQL_VIEW_CATALOG).length);
+      const granted = postgresViews.approvedViewNames();
+      expect(granted.length).toBe(catalogShapes.postgresViews(LWQL_VIEW_CATALOG).length);
       for (const name of granted) {
         expect(name.startsWith(GRANTED_PREFIX), `${name} is ungranted`).toBe(true);
       }
@@ -75,7 +76,7 @@ describe("given the LangWatchQL approved PostgreSQL views", () => {
   describe("when the provisioner's statements are read", () => {
     /** @scenario "Every approved view is named under the prefix the reader's grants match" */
     it("creates every view under that prefix, not merely declares one", () => {
-      const statements = lwqlPostgresApprovedViewStatements({ schema: SCHEMA });
+      const statements = postgresViews.approvedViewStatements({ schema: SCHEMA });
       expect(statements.length).toBeGreaterThan(0);
       for (const statement of statements) {
         const relation = createdRelation(statement);
@@ -94,13 +95,13 @@ describe("given the LangWatchQL approved PostgreSQL views", () => {
      */
     /** @scenario "Every approved view is named under the prefix the reader's grants match" */
     it("rejects a mapping named the way the grants would miss", () => {
-      const [resident] = lwqlPostgresViews(LWQL_VIEW_CATALOG);
+      const [resident] = catalogShapes.postgresViews(LWQL_VIEW_CATALOG);
       if (!resident) throw new Error("catalog has no PostgreSQL-resident view");
       const renamed = {
         ...resident,
         postgres: { ...resident.postgres, approvedView: "governed_traces" },
       };
-      const [statement] = lwqlPostgresApprovedViewStatements({
+      const [statement] = postgresViews.approvedViewStatements({
         schema: SCHEMA,
         views: [renamed],
       });

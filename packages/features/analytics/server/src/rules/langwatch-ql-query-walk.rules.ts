@@ -1,30 +1,22 @@
 /**
- * LangWatchQL analytics SQL — the default-deny AST validator.
- *
- * The gateway's half of the isolation model. The database's half is already
- * proven and shipped in `../provisioning.ts`: a readonly identity, per-object
- * row policies, and a tenant capability the caller cannot forge. This validator
- * does not carry tenant isolation — it is defense in depth, and the reason it
- * exists is that a query which never reaches the database cannot exercise a bug
- * in the layer that would otherwise contain it.
+ * LangWatchQL analytics SQL — the default-deny walk, and the rule table it reads.
  *
  * ## The rule that makes it a gate rather than a filter
  *
  * The walk is an **allowlist over node kinds, and over each kind's fields**.
  * A node type {@link NODE_RULES} does not name is refused; so is a *field* the
  * rule for that node type does not name. Both matter. A kind-only allowlist
- * would let new syntax ride into an existing node — `INTO OUTFILE` is a plain
- * string literal hanging off a field of an otherwise ordinary SELECT — and the
- * walk would never look at it. So every field is either walked, explicitly
- * accepted as an inert scalar, restricted to an enumerated set of values, or
- * refused outright. There is no fourth state, and no field can be listed
- * without deciding which one it is.
+ * would let unrecognised syntax ride into an existing node — `INTO OUTFILE` is
+ * a plain string literal hanging off a field of an otherwise ordinary SELECT —
+ * and the walk would never look at it. So every field is either walked,
+ * explicitly accepted as an inert scalar, restricted to an enumerated set of
+ * values, or refused outright.
  *
  * The consequence is deliberate: when `@clickhouse/parser` learns syntax that
  * ClickHouse already supports, that syntax arrives here **refused**, and stays
- * refused until someone adds a rule for it. New capability is a review, never a
+ * refused until someone adds a rule for it. Capability is a review, never a
  * silent widening. The version is pinned exactly for the same reason
- * (`./parser.ts`).
+ * (`./langwatch-ql-parser.rules.ts`).
  *
  * ## What is allowed
  *
@@ -40,20 +32,19 @@
  * operator* arrives as one `Function` node, so a walk that stops at the kind
  * admits `getSetting()`, `currentUser()`, `hostName()` and `version()` — none
  * of which reaches another tenant, and all of which publish more of the server
- * than this API means to. `./functions.ts` is the name allowlist and carries
- * the rule that governs it: a function is listed because a LangWatchQL question
- * needs it, never because it looks harmless. It is applied in two places,
- * because a name reaches the walk in two shapes — a `Function` node, and the
- * bare `func_name` string of an `APPLY` column transformer.
+ * than this API means to. `./langwatch-ql-functions.rules.ts` is the name
+ * allowlist and carries the rule that governs it: a function is listed because
+ * a LangWatchQL question needs it, never because it looks harmless. It is
+ * applied in two places, because a name reaches the walk in two shapes — a
+ * `Function` node, and the bare `func_name` string of an `APPLY` transformer.
  *
  * ## Table functions
  *
  * Refused **positionally**: a `TableExpression` carrying a `table_function` is
- * a violation whatever the function is named. That is stronger than the
- * name-list pre-check `TABLE_FUNCTION_RE` in `src/server/ops/explain-core.ts`
- * applies to the ops EXPLAIN endpoint, so this file deliberately keeps no list
- * of its own — a second list is a second thing to keep in sync, and this one
- * would always be a subset of "all of them".
+ * a violation whatever the function is named. That is stronger than any
+ * name-list pre-check, so this file deliberately keeps no list of its own — a
+ * second list is a second thing to keep in sync, and this one would always be a
+ * subset of "all of them".
  *
  * Be accurate about why, because the database layer's measured behaviour is not
  * uniform. `url`, `s3`, `remote`, `file` and `postgresql` are already refused
@@ -65,260 +56,44 @@
  * safe today" never becomes a question anyone has to re-answer.
  *
  * @see specs/analytics/lwql-api.feature
- * @see ../provisioning.ts — the database-layer isolation this backs up
+ * @see dev/docs/adr/081-lwql-table-function-and-ssrf-policy.md
  */
-
-import { isAllowedLangWatchQLFunction, isLangWatchQLAggregateFunction } from "./functions";
 import {
-  clickHouseSqlParser,
-  type LangWatchQLParser,
-  type SqlAstNode,
-  type SqlSourcePosition,
-} from "./parser";
+  isAllowedLangWatchQLFunction,
+  isLangWatchQLAggregateFunction,
+} from "./langwatch-ql-functions.rules";
+import type { SqlAstNode, SqlSourcePosition } from "./langwatch-ql-parser.rules";
+import { qualifyTableName } from "./langwatch-ql-policy.rules";
 import {
-  type LangWatchQLPolicy,
-  qualifyTableName,
-  type ResolvedLangWatchQLPolicy,
-  resolveLangWatchQLPolicy,
-} from "./policy";
+  type BlockAccumulator,
+  type FieldArgs,
+  type FieldRule,
+  type Frame,
+  MAX_VIOLATIONS,
+  METADATA_FIELDS,
+  type NodeArgs,
+  type NodeRule,
+  UNRESOLVABLE_COLUMN_SETS,
+  type WalkContext,
+} from "./langwatch-ql-validation-shape.rules";
 import {
   echoIdentifier,
   type LangWatchQLClause,
-  type LangWatchQLViolation,
   type LangWatchQLViolationCode,
-} from "./violations";
+} from "./langwatch-ql-violations.rules";
 
-/** A bound parameter the query declares, e.g. `{since:DateTime}`. */
-export interface LangWatchQLParameter {
-  readonly name: string;
-  /** The declared ClickHouse type, as the caller wrote it. */
-  readonly type: string;
-}
+/** The frame the outermost statement is walked in. */
+export const ROOT_FRAME: Frame = {
+  clause: "statement",
+  isInSubquery: false,
+  subqueryDepth: 0,
+  nodeDepth: 0,
+  ctes: [],
+};
 
-/** A LangWatchQL table as one query block named it. */
-export interface LangWatchQLTableReference {
-  /** Qualified and lowercased, the way {@link AcceptedLangWatchQL.tables} is. */
-  readonly table: string;
-  /** The alias the block gave it, lowercased. Absent when it was named directly. */
-  readonly alias?: string;
-}
-
-/**
- * One equality a `JOIN` was written on, with each side exactly as the caller
- * wrote it — `t.TraceId`, not a resolved column.
- *
- * Resolving a side to a dataset is the reader's job, and
- * {@link LangWatchQLQueryBlock.tables} is what it takes to do it: the qualifier
- * is either an alias or a table name from that same list. The walk deliberately
- * does not do it here, because doing so would mean deciding what an ambiguous
- * or shadowed qualifier means — a judgement that belongs to whoever is asking,
- * not to the gate.
- */
-export interface LangWatchQLJoinEdge {
-  readonly left: string;
-  readonly right: string;
-}
-
-/**
- * One `SELECT` block, and the structure the walk saw in it.
- *
- * Recorded because a diagnostic like `POSSIBLE_FANOUT` — aggregating at a
- * parent's grain after a one-to-many join — is a question about the shape of
- * the query, and the walk is the only pass that ever looks at the tree. Reading
- * it back out later would mean parsing the statement a second time, and a
- * second parse is a second answer waiting to disagree with the first.
- */
-export interface LangWatchQLQueryBlock {
-  /**
-   * LangWatchQL tables this block reads, in first-seen order. CTE names are
-   * excluded for the same reason they are excluded from
-   * {@link AcceptedLangWatchQL.tables}: a `WITH` name is its own block.
-   */
-  readonly tables: readonly LangWatchQLTableReference[];
-  /**
-   * The equalities this block's joins were written on.
-   *
-   * Only the conjunctive ones whose two sides are both plain column
-   * references: `ON a = b AND c = d` contributes two edges, while a side that
-   * is a function call, a literal, or one arm of an `OR` contributes none. The
-   * question these answer is which key columns were matched, and an equality
-   * that may or may not hold is not one of them.
-   */
-  readonly joins: readonly LangWatchQLJoinEdge[];
-  /**
-   * Column names this block filters on, lowercased and stripped of any
-   * qualifier — `WHERE t.OccurredAt >= …` contributes `occurredat`.
-   *
-   * Only `WHERE`, `PREWHERE` and `QUALIFY`, which are the positions that bound
-   * what a read touches. A join condition is deliberately absent: it says which
-   * rows line up, not which rows are read.
-   *
-   * Recorded because "this query has no predicate on the dataset's partitioning
-   * column" is a question about the query's shape, and the walk is the only
-   * pass that ever looks at the tree. It reads the name as written, so a filter
-   * written against a *projection alias* (`SELECT toStartOfHour(t) AS b … WHERE
-   * b > x`) contributes the alias rather than the column — a diagnostic reading
-   * this can therefore under-count real predicates, never invent one.
-   */
-  readonly filteredColumns: readonly string[];
-  /** Whether the block carries `GROUP BY`, in any of its spellings. */
-  readonly hasGroupBy: boolean;
-  /**
-   * Names the block groups by, lowercased and stripped of any qualifier.
-   *
-   * Names, not expressions: `GROUP BY toStartOfHour(t)` groups by something the
-   * result has no name for, and is absent here, while the ordinary
-   * `SELECT toStartOfHour(t) AS bucket … GROUP BY bucket` contributes `bucket`
-   * — which is also the result column's name, and is what lets a reader tell a
-   * grouping key apart from an aggregate that happens to return a timestamp.
-   */
-  readonly groupByColumns: readonly string[];
-  /**
-   * Whether the block collapses rows with an aggregate.
-   *
-   * `false` for an aggregate used with `OVER`: a window function reads a frame
-   * and returns one value per row, which is the opposite of collapsing. A block
-   * with a join, no `hasGroupBy` and no `isAggregated` is the bare `SELECT` over a
-   * fanout that a diagnostic wants to warn about.
-   */
-  readonly isAggregated: boolean;
-}
-
-/** A query that passed the gate, with the facts the walk established. */
-export interface AcceptedLangWatchQL {
-  readonly ok: true;
-  /** LangWatchQL tables the query reads, qualified and lowercased. CTEs excluded. */
-  readonly tables: readonly string[];
-  /** Bound parameters the query declares, in first-seen order. */
-  readonly parameters: readonly LangWatchQLParameter[];
-  /**
-   * One entry per `SELECT` block, in the order the walk met them — the
-   * outermost query first, then what it contains.
-   */
-  readonly blocks: readonly LangWatchQLQueryBlock[];
-}
-
-/** A query that was refused, and every reason found before the walk stopped. */
-export interface RejectedLangWatchQL {
-  readonly ok: false;
-  /** Never empty. Capped at {@link MAX_VIOLATIONS}; a longer list is truncated. */
-  readonly violations: readonly LangWatchQLViolation[];
-}
-
-export type LangWatchQLValidation = AcceptedLangWatchQL | RejectedLangWatchQL;
-
-/**
- * How many reasons a single rejection reports.
- *
- * All of them, up to a cap: an agent fixing a query wants every problem at
- * once, not one per round trip. The cap is there because a pathological query
- * can violate the policy thousands of times and the list rides in a response
- * body.
- */
-export const MAX_VIOLATIONS = 20;
-
-/** Fields every node may carry that say nothing about what the query does. */
-const METADATA_FIELDS: ReadonlySet<string> = new Set([
-  "type",
-  "location",
-  "parent",
-  "leadingComments",
-  "trailingComments",
-]);
-
-/**
- * Column-set constructs whose members the walk cannot enumerate.
- *
- * Refused in a projection when the caller has restricted fields, because there
- * is no way to prove the expansion excludes them without the table's columns —
- * which this layer deliberately does not have. `COLUMNS(a, b)` is absent on
- * purpose: it names its columns, so they are checked like any other reference.
- */
-const UNRESOLVABLE_COLUMN_SETS: ReadonlySet<string> = new Set([
-  "Asterisk",
-  "QualifiedAsterisk",
-  "ColumnsRegexpMatcher",
-  "QualifiedColumnsRegexpMatcher",
-]);
-
-/**
- * A {@link LangWatchQLQueryBlock} while the walk is still filling it in.
- *
- * Mutable, and carried on the frame rather than looked up, so that whichever
- * node learns a fact writes it to the block it is lexically inside — which is
- * the only interpretation that stays right when blocks nest.
- */
-interface BlockAccumulator {
-  readonly tables: LangWatchQLTableReference[];
-  readonly joins: LangWatchQLJoinEdge[];
-  readonly filteredColumns: Set<string>;
-  readonly groupByColumns: Set<string>;
-  hasGroupBy: boolean;
-  isAggregated: boolean;
-}
-
-/** Where the walk currently is, and what it has learned on the way down. */
-interface Frame {
-  readonly clause: LangWatchQLClause;
-  /** Sticky: once inside a nested query, every violation reports `subquery`. */
-  readonly isInSubquery: boolean;
-  readonly subqueryDepth: number;
-  readonly nodeDepth: number;
-  /** CTE names visible here, lowercased. Not checked against the table policy. */
-  readonly ctes: ReadonlySet<string>;
-  /** The `SELECT` block this node sits in. Absent above the outermost one. */
-  readonly block?: BlockAccumulator;
-}
-
-/** Everything the walk accumulates. */
-interface WalkContext {
-  readonly policy: ResolvedLangWatchQLPolicy;
-  readonly violations: LangWatchQLViolation[];
-  readonly tables: Set<string>;
-  readonly parameters: Map<string, string>;
-  readonly blocks: BlockAccumulator[];
-}
-
-interface NodeArgs {
-  readonly node: SqlAstNode;
-  readonly frame: Frame;
-  readonly ctx: WalkContext;
-}
-
-interface FieldArgs extends NodeArgs {
-  readonly value: unknown;
-}
-
-/**
- * What the walk does with one field of one node kind.
- *
- * The four non-walking kinds are the whole point: a field cannot be listed
- * without saying whether its contents are inspected (`node` / `nodes` /
- * `custom`), inert (`scalar`), constrained to known values (`enum`), or fatal
- * (`refuse`). Anything not listed at all is refused by {@link walkNode}.
- */
-type FieldRule =
-  | { readonly kind: "node"; readonly clause?: LangWatchQLClause }
-  | { readonly kind: "nodes"; readonly clause?: LangWatchQLClause }
-  /** An `Identifier` naming a table or alias, not a column: never gate-checked. */
-  | { readonly kind: "identifierRef" }
-  | { readonly kind: "scalar" }
-  | { readonly kind: "enum"; readonly values: readonly string[] }
-  | {
-      readonly kind: "refuse";
-      readonly code: LangWatchQLViolationCode;
-      readonly message: string;
-    }
-  | { readonly kind: "custom"; readonly walk: (args: FieldArgs) => void };
-
-interface NodeRule {
-  /** Every field this node kind may carry. Anything else is refused. */
-  readonly fields: Readonly<Record<string, FieldRule>>;
-  /**
-   * Runs before the fields, and decides the frame they are walked in.
-   * Returning `null` refuses the subtree without descending into it.
-   */
-  readonly enter?: (args: NodeArgs) => Frame | null;
+/** Appends a name the accumulator has not seen, preserving first-seen order. */
+function addOnce(names: string[], name: string): void {
+  if (!names.includes(name)) names.push(name);
 }
 
 // ---------------------------------------------------------------------------
@@ -335,7 +110,7 @@ function isNode(value: unknown): value is SqlAstNode {
   );
 }
 
-function positionOf(node: SqlAstNode): SqlSourcePosition | undefined {
+export function positionOf(node: SqlAstNode): SqlSourcePosition | undefined {
   const start = (node as { location?: { start?: unknown } }).location?.start;
   if (typeof start !== "object" || start === null) return undefined;
   const { line, column } = start as { line?: unknown; column?: unknown };
@@ -398,7 +173,7 @@ function ruleFor(type: string): NodeRule | undefined {
   return Object.hasOwn(NODE_RULES, type) ? NODE_RULES[type] : undefined;
 }
 
-function walkNode(node: SqlAstNode, frame: Frame, ctx: WalkContext): void {
+export function walkNode(node: SqlAstNode, frame: Frame, ctx: WalkContext): void {
   if (ctx.violations.length >= MAX_VIOLATIONS) return;
 
   const here: Frame = { ...frame, nodeDepth: frame.nodeDepth + 1 };
@@ -426,7 +201,7 @@ function walkNode(node: SqlAstNode, frame: Frame, ctx: WalkContext): void {
 /** Every field the node carries, each against the rule that names it — or none. */
 function walkFields({ rule, node, frame, ctx }: NodeArgs & { rule: NodeRule }): void {
   for (const [field, value] of Object.entries(node)) {
-    if (METADATA_FIELDS.has(field) || value === undefined) continue;
+    if (METADATA_FIELDS.includes(field) || value === undefined) continue;
     const fieldRule = Object.hasOwn(rule.fields, field) ? rule.fields[field] : undefined;
     if (fieldRule) applyFieldRule({ rule: fieldRule, value, node, frame, ctx });
     else refuseUnrecognised({ node, frame, ctx });
@@ -557,7 +332,7 @@ function walkProjection({ value, node, frame, ctx }: FieldArgs): void {
       refuseUnrecognised({ node, frame: projection, ctx });
       continue;
     }
-    if (ctx.policy.gatedColumns.size > 0 && UNRESOLVABLE_COLUMN_SETS.has(element.type)) {
+    if (ctx.policy.gatedColumns.size > 0 && UNRESOLVABLE_COLUMN_SETS.includes(element.type)) {
       report({
         ctx,
         frame: projection,
@@ -623,8 +398,8 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
   const block: BlockAccumulator = {
     tables: [],
     joins: [],
-    filteredColumns: new Set<string>(),
-    groupByColumns: new Set<string>(),
+    filteredColumns: [],
+    groupByColumns: [],
     hasGroupBy:
       (Array.isArray(node.group_by) && node.group_by.length > 0) || node.group_by_all === true,
     isAggregated: false,
@@ -632,10 +407,10 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
   ctx.blocks.push(block);
 
   if (!Array.isArray(node.with)) return { ...frame, block };
-  const ctes = new Set(frame.ctes);
+  const ctes = [...frame.ctes];
   for (const item of node.with) {
     if (isNode(item) && item.type === "WithElement" && typeof item.name === "string") {
-      ctes.add(item.name.trim().toLowerCase());
+      addOnce(ctes, item.name.trim().toLowerCase());
     }
   }
   return { ...frame, ctes, block };
@@ -714,7 +489,7 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
 
   // A `WITH` name resolves to its own subquery, which is validated on its own
   // terms; it is not a table reference and never was.
-  if (database === undefined && frame.ctes.has(reference.name.trim().toLowerCase())) {
+  if (database === undefined && frame.ctes.includes(reference.name.trim().toLowerCase())) {
     return frame;
   }
 
@@ -734,7 +509,7 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
     });
     return null;
   }
-  ctx.tables.add(qualified);
+  addOnce(ctx.tables, qualified);
   frame.block?.tables.push({
     table: qualified,
     ...(reference.alias ? { alias: reference.alias.trim().toLowerCase() } : {}),
@@ -948,8 +723,8 @@ function noteColumnPosition({ name, frame }: { name: string; frame: Frame }): vo
   if (clause !== "filter" && clause !== "group") return;
   const leaf = name.split(".").at(-1)?.trim().toLowerCase();
   if (!leaf) return;
-  if (clause === "filter") block.filteredColumns.add(leaf);
-  else block.groupByColumns.add(leaf);
+  if (clause === "filter") addOnce(block.filteredColumns, leaf);
+  else addOnce(block.groupByColumns, leaf);
 }
 
 /**
@@ -993,7 +768,9 @@ function enterQueryParameter({ node, frame, ctx }: NodeArgs): Frame | null {
     });
     return null;
   }
-  if (!ctx.parameters.has(name)) ctx.parameters.set(name, paramType);
+  if (!ctx.parameters.some((parameter) => parameter.name === name)) {
+    ctx.parameters.push({ name, type: paramType });
+  }
   return frame;
 }
 
@@ -1298,154 +1075,3 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     fields: {},
   },
 };
-
-// ---------------------------------------------------------------------------
-// Entry point
-// ---------------------------------------------------------------------------
-
-export interface ValidateLangWatchQLInput extends LangWatchQLPolicy {
-  /** The SQL exactly as the caller submitted it. Never rewritten. */
-  readonly sql: string;
-  /**
-   * The front end. Defaults to the shipped ClickHouse parser; injected only by
-   * tests that need to drive the walk with a tree the grammar cannot produce.
-   */
-  readonly parser?: LangWatchQLParser;
-}
-
-/**
- * Decides whether a submitted query may be executed against the LangWatchQL
- * analytics schema.
- *
- * Never throws for a rejection — a refused query is an outcome, not an
- * exception, and the caller decides how to surface it (`./errors.ts` turns a
- * rejection into the handled error the REST boundary serialises). It also never
- * rewrites the SQL: the statement the executor sends is the statement that
- * arrived.
- *
- * @example
- * ```ts
- * const result = validateLangWatchQL({
- *   sql: "SELECT count() FROM traces",
- *   allowedTables: ["analytics.traces"],
- *   gatedColumns: ["body"],
- *   defaultDatabase: "analytics",
- * });
- * if (!result.ok) throw lwqlValidationError(result);
- * ```
- */
-export function validateLangWatchQL({
-  sql,
-  parser = clickHouseSqlParser,
-  ...policy
-}: ValidateLangWatchQLInput): LangWatchQLValidation {
-  const screened = screenSubmission(parser, sql);
-  if ("ok" in screened) return screened;
-
-  const ctx = createWalkContext(resolveLangWatchQLPolicy(policy));
-  walkNode(screened.statement, ROOT_FRAME, ctx);
-
-  if (ctx.violations.length > 0) return { ok: false, violations: ctx.violations };
-  return {
-    ok: true,
-    tables: [...ctx.tables],
-    parameters: [...ctx.parameters].map(([name, type]) => ({ name, type })),
-    blocks: ctx.blocks.map((block) => ({
-      tables: [...block.tables],
-      joins: [...block.joins],
-      filteredColumns: [...block.filteredColumns],
-      groupByColumns: [...block.groupByColumns],
-      hasGroupBy: block.hasGroupBy,
-      isAggregated: block.isAggregated,
-    })),
-  };
-}
-
-const NO_CTES: ReadonlySet<string> = new Set<string>();
-
-const ROOT_FRAME: Frame = {
-  clause: "statement",
-  isInSubquery: false,
-  subqueryDepth: 0,
-  nodeDepth: 0,
-  ctes: NO_CTES,
-};
-
-/** A rejection carrying one statement-level reason. */
-function statementRejection({
-  code,
-  message,
-  at,
-}: {
-  code: LangWatchQLViolationCode;
-  message: string;
-  at?: SqlSourcePosition;
-}): RejectedLangWatchQL {
-  return {
-    ok: false,
-    violations: [{ code, clause: "statement", message, ...(at ? { at } : {}) }],
-  };
-}
-
-/**
- * Everything decided before the walk: that the text parses, that it is exactly
- * one statement, and that the statement is a read query.
- *
- * Returns the statement to walk, or the rejection that replaces it.
- */
-function screenSubmission(
-  parser: LangWatchQLParser,
-  sql: string,
-): { statement: SqlAstNode } | RejectedLangWatchQL {
-  const parsed = parseOrRefuse(parser, sql);
-  if (!parsed.ok) {
-    return statementRejection({
-      code: "PARSE_FAILED",
-      message: "This is not valid ClickHouse SQL. Check the syntax and try again.",
-      at: parsed.at,
-    });
-  }
-  if (parsed.statements.length > 1) {
-    return statementRejection({
-      code: "MULTIPLE_STATEMENTS",
-      message: "Only one statement can be submitted at a time. Send a single SELECT statement.",
-    });
-  }
-  const statement = parsed.statements[0];
-  if (statement === undefined) {
-    return statementRejection({
-      code: "EMPTY_QUERY",
-      message: "No query was submitted. Send a single SELECT statement.",
-    });
-  }
-  if (statement.type !== "SelectWithUnionQuery") {
-    return statementRejection({
-      code: "STATEMENT_NOT_ALLOWED",
-      message:
-        "Only a single SELECT statement, optionally with a WITH clause, can be submitted here.",
-      at: positionOf(statement),
-    });
-  }
-  return { statement };
-}
-
-function parseOrRefuse(
-  parser: LangWatchQLParser,
-  sql: string,
-): ReturnType<LangWatchQLParser["parse"]> {
-  try {
-    return parser.parse(sql);
-  } catch {
-    return { ok: false };
-  }
-}
-
-function createWalkContext(policy: ResolvedLangWatchQLPolicy): WalkContext {
-  return {
-    policy,
-    violations: [],
-    tables: new Set<string>(),
-    parameters: new Map<string, string>(),
-    blocks: [],
-  };
-}

@@ -43,12 +43,11 @@ import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import {
-  lwqlViewSetupStatements,
-  SHIPPED_LWQL_DEDUP,
-} from "../../../repositories/clickhouse/clickhouse.lwql-views.mapper";
-import { lwqlTenantCapability } from "../../../services/langwatch-ql-capability.service";
-import { createLangWatchQLExecutor } from "../../../services/langwatch-ql-executor.service";
+import { SHIPPED_LWQL_DEDUP } from "../../../services/langwatch-ql-view-statements.service";
+import { LangWatchQLViewProvisioningService } from "../../../services/langwatch-ql-view-provisioning.service";
+import { LangWatchQLCapabilityService } from "../../../services/langwatch-ql-capability.service";
+
+import { ClickHouseLangWatchQLExecutorAdapter } from "../../../adapters/clickhouse.langwatch-ql-executor.adapter";
 import { LangWatchQLService } from "../../../services/langwatch-ql.service";
 import {
   type LangWatchQLClickHouseHarness,
@@ -59,6 +58,10 @@ import {
   startLangWatchQLPostgres,
 } from "../../../langwatch-ql/__tests__/lwql-clickhouse-harness";
 import { createQueryRestApp } from "../query.api";
+
+const viewProvisioning = LangWatchQLViewProvisioningService.create();
+
+const lwqlCapability = LangWatchQLCapabilityService.create();
 
 /** A tenant the door authenticates as, in the shape the credential resolves to. */
 interface QueryTenant {
@@ -706,10 +709,12 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
 
   const shippedService = () =>
     new LangWatchQLService({
-      executor: createLangWatchQLExecutor({
-        ...harness.restrictedConnection(),
-        database,
-        tenantSetting: harness.names.tenantSetting,
+      executor: ClickHouseLangWatchQLExecutorAdapter.create({
+        connection: {
+          ...harness.restrictedConnection(),
+          database,
+          tenantSetting: harness.names.tenantSetting,
+        },
       }),
       database,
     });
@@ -768,7 +773,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
     facts = harness.factDatabase;
     await mapPostgresIntoClickHouse({ harness, postgres });
     await harness.applyAsAdmin(
-      lwqlViewSetupStatements({
+      viewProvisioning.setupStatements({
         names: harness.names,
         sourceDatabase: facts,
         dedup: SHIPPED_LWQL_DEDUP,
@@ -782,7 +787,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       table: `${database}.${harness.names.keyMapTable}`,
       format: "JSONEachRow",
       values: [asking, other].map((tenant) => ({
-        KeyHash: lwqlTenantCapability({ secret: tenant.lwqlKey }),
+        KeyHash: lwqlCapability.tenantCapability({ secret: tenant.lwqlKey }),
         TenantId: tenant.id,
       })),
     });
@@ -1349,10 +1354,12 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       // for: the claim is about the relationship between the result and the
       // instant, and a wall clock would make it true only once.
       service = new LangWatchQLService({
-        executor: createLangWatchQLExecutor({
-          ...harness.restrictedConnection(),
-          database,
-          tenantSetting: harness.names.tenantSetting,
+        executor: ClickHouseLangWatchQLExecutorAdapter.create({
+          connection: {
+            ...harness.restrictedConnection(),
+            database,
+            tenantSetting: harness.names.tenantSetting,
+          },
         }),
         database,
         now: () => new Date(`${DAY.unfinishedPeriod}T12:30:00Z`),

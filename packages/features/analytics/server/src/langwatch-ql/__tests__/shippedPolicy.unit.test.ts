@@ -7,12 +7,24 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-/** `…/langwatch-ql/validation/__tests__` → `packages/features/analytics/server/` */
-const PACKAGE_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
+/** `…/langwatch-ql/__tests__` → `packages/features/analytics/server/` */
+const PACKAGE_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 /** the package → repository root */
-const REPO_ROOT = fileURLToPath(new URL("../../../../../../../../", import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL("../../../../../../../", import.meta.url));
 const ADR_ROOT = join(REPO_ROOT, "dev", "docs", "adr");
-const LWQL_ROOT = join(PACKAGE_ROOT, "src", "langwatch-ql");
+const SRC_ROOT = join(PACKAGE_ROOT, "src");
+const PARSER_MODULE = join(SRC_ROOT, "rules", "langwatch-ql-parser.rules.ts");
+
+/**
+ * Every module the LangWatchQL API is built from, wherever the strict layout
+ * puts it: the walk and its tables under `rules/`, the services that compose
+ * them, and whatever is left beside the tests.
+ */
+function lwqlSources(): string[] {
+  return walk(SRC_ROOT).filter((path) =>
+    /(?:^|\/)(?:langwatch-ql|lwql)/.test(path.slice(SRC_ROOT.length).replace(/\\/g, "/")),
+  );
+}
 
 /**
  * Packages that would mean a BI platform, a query engine, or a semantic layer had been
@@ -86,8 +98,8 @@ describe("what the LangWatchQL API ships", () => {
     });
 
     it("builds no parser, compiler, or intermediate representation of its own", () => {
-      const homegrown = walk(LWQL_ROOT).filter((path) =>
-        OWN_FRONT_END_PATTERN.test(path.slice(LWQL_ROOT.length)),
+      const homegrown = lwqlSources().filter((path) =>
+        OWN_FRONT_END_PATTERN.test(path.slice(SRC_ROOT.length)),
       );
 
       expect(
@@ -105,9 +117,7 @@ describe("what the LangWatchQL API ships", () => {
         pin,
         "a 0.x parser whose AST is the validator's security contract is pinned, not ranged",
       ).toMatch(/^\d+\.\d+\.\d+$/);
-      expect(readFileSync(join(LWQL_ROOT, "validation", "parser.ts"), "utf8")).toContain(
-        'from "@clickhouse/parser"',
-      );
+      expect(readFileSync(PARSER_MODULE, "utf8")).toContain('from "@clickhouse/parser"');
     });
   });
 

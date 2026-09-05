@@ -13,21 +13,39 @@ import { addDays, differenceInCalendarDays } from "date-fns";
 const getDaysDifference = (startDate: Date, endDate: Date) =>
   differenceInCalendarDays(endDate, startDate) + 1;
 
-export const currentVsPreviousDates = (
-  input: Readonly<{ startDate: number | string | Date; endDate: number | string | Date }>,
-  period?: number | string,
-) => {
-  const startDate = new Date(input.startDate);
-  const endDate = new Date(input.endDate);
+/** The comparison window a period-over-period read is measured against. */
+export class AnalyticsComparisonWindowService {
+  static create(): AnalyticsComparisonWindowService {
+    return new AnalyticsComparisonWindowService();
+  }
 
-  // Convert period from minutes to days if it's a number
-  const periodInDays =
-    typeof period === "number"
-      ? period / (24 * 60) // Convert minutes to days
-      : 1;
+  private constructor() {}
 
-  const daysDifference = Math.max(periodInDays, getDaysDifference(startDate, endDate));
-  const previousPeriodStartDate = addDays(startDate, -daysDifference);
+  /**
+   * Where the window immediately before `startDate` begins.
+   *
+   * @param period Minutes, when the surface has a datapoint step; one day
+   *   otherwise.
+   */
+  currentVsPrevious(
+    input: Readonly<{ startDate: number | string | Date; endDate: number | string | Date }>,
+    period?: number | string,
+  ): {
+    previousPeriodStartDate: Date;
+    startDate: Date;
+    endDate: Date;
+    daysDifference: number;
+  } {
+    const startDate = new Date(input.startDate);
+    const endDate = new Date(input.endDate);
+    const periodInDays = typeof period === "number" ? period / (24 * 60) : 1;
+    const daysDifference = Math.max(periodInDays, getDaysDifference(startDate, endDate));
 
-  return { previousPeriodStartDate, startDate, endDate, daysDifference };
-};
+    return {
+      previousPeriodStartDate: addDays(startDate, -daysDifference),
+      startDate,
+      endDate,
+      daysDifference,
+    };
+  }
+}

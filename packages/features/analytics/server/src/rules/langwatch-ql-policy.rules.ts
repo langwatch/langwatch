@@ -121,17 +121,3 @@ export function qualifyTableName({
   if (trimmed.includes(".")) return trimmed;
   return defaultDatabase ? `${defaultDatabase}.${trimmed}` : trimmed;
 }
-
-/** Normalises a policy once, before the walk. */
-export function resolveLangWatchQLPolicy(policy: LangWatchQLPolicy): ResolvedLangWatchQLPolicy {
-  const defaultDatabase = policy.defaultDatabase?.trim().toLowerCase() ?? "";
-  return {
-    allowedTables: new Set(
-      policy.allowedTables.map((entry) => qualifyTableName({ table: entry, defaultDatabase })),
-    ),
-    gatedColumns: new Set(policy.gatedColumns.map((column) => column.trim().toLowerCase())),
-    reservedDatabases: new Set(RESERVED_DATABASES),
-    defaultDatabase,
-    limits: policy.limits ?? DEFAULT_LWQL_LIMITS,
-  };
-}

@@ -34,14 +34,12 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { lwqlPostgresViews } from "../../adapters/clickhouse.lwql-catalog-shapes.adapter";
-import { LWQL_VIEW_CATALOG } from "../../repositories/clickhouse/clickhouse.lwql-view-catalog.mapper";
-import {
-  lwqlPostgresReaderConnectionLimit,
-  lwqlViewSetupStatements,
-  SHIPPED_LWQL_DEDUP,
-} from "../../repositories/clickhouse/clickhouse.lwql-views.mapper";
-import { DEFAULT_POSTGRES_ENGINE_POOL_SIZE } from "../../repositories/postgres/postgres.lwql-mapping.mapper";
+import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules";
+import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service";
+import { LangWatchQLPostgresViewsService } from "../../services/langwatch-ql-postgres-views.service";
+import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service";
+import { DEFAULT_POSTGRES_ENGINE_POOL_SIZE } from "../../services/langwatch-ql-postgres-mapping.service";
 import {
   CLICKHOUSE_ERROR_CODE,
   expectClickHouseError,
@@ -69,8 +67,13 @@ import {
   statementsLoggedSince,
 } from "./lwql-clickhouse-harness";
 
+const postgresViews = LangWatchQLPostgresViewsService.create();
+const viewProvisioning = LangWatchQLViewProvisioningService.create();
+
+const catalogShapes = LangWatchQLCatalogShapesService.create();
+
 /** The PostgreSQL-resident half of the shipped catalog, provisioned whole. */
-const POSTGRES_VIEWS = lwqlPostgresViews(LWQL_VIEW_CATALOG);
+const POSTGRES_VIEWS = catalogShapes.postgresViews(LWQL_VIEW_CATALOG);
 
 describe("given the PostgreSQL-resident catalog mapped into ClickHouse through the server-side named collection", () => {
   let harness: LangWatchQLClickHouseHarness;
@@ -88,7 +91,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
     // Only the PostgreSQL-resident half: the ClickHouse-resident entries read
     // migrated fact tables this suite does not stand up.
     await harness.applyAsAdmin(
-      lwqlViewSetupStatements({
+      viewProvisioning.setupStatements({
         names: harness.names,
         sourceDatabase: harness.factDatabase,
         views: POSTGRES_VIEWS,
@@ -390,7 +393,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
       // And the shipped one-deployment derivation clears one catalog's demand,
       // which is the property production depends on.
       expect(
-        lwqlPostgresReaderConnectionLimit(),
+        postgresViews.readerConnectionLimit(),
         "the cap does not clear the pools the catalog's mapped tables hold open",
       ).toBeGreaterThan(POSTGRES_VIEWS.length * DEFAULT_POSTGRES_ENGINE_POOL_SIZE - 1);
 

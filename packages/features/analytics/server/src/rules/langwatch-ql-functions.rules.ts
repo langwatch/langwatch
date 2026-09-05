@@ -446,8 +446,28 @@ const CONVERSION_FUNCTIONS: readonly string[] = [
   ),
 ];
 
+/**
+ * A membership table for names, keyed on a null prototype.
+ *
+ * A record rather than a set because a rules module holds data and functions
+ * and constructs nothing; a null prototype because the keys are function names
+ * a caller wrote, and an inherited `constructor` would otherwise read as a
+ * listed name.
+ */
+type NameLookup = Readonly<Record<string, true>>;
+
+function nameLookup(names: readonly string[]): NameLookup {
+  const lookup = Object.create(null) as Record<string, true>;
+  for (const name of names) lookup[name] = true;
+  return Object.freeze(lookup);
+}
+
+function isListed(lookup: NameLookup, name: string): boolean {
+  return lookup[name] === true;
+}
+
 /** Every name a LangWatchQL query may call, lowercased. */
-const ALLOWED_FUNCTION_NAMES: ReadonlySet<string> = new Set(
+const ALLOWED_FUNCTION_NAMES: NameLookup = nameLookup(
   [
     ...OPERATORS,
     ...AGGREGATE_FUNCTIONS,
@@ -463,7 +483,7 @@ const ALLOWED_FUNCTION_NAMES: ReadonlySet<string> = new Set(
 );
 
 /** The aggregates a combinator suffix may be appended to, lowercased. */
-const AGGREGATE_BASE_NAMES: ReadonlySet<string> = new Set(
+const AGGREGATE_BASE_NAMES: NameLookup = nameLookup(
   AGGREGATE_FUNCTIONS.map((name) => name.toLowerCase()),
 );
 
@@ -483,7 +503,7 @@ const MAX_COMBINATORS = 4;
 function aggregateBaseOf(lowercased: string): string | null {
   let name = lowercased;
   for (let pass = 0; pass <= MAX_COMBINATORS; pass += 1) {
-    if (AGGREGATE_BASE_NAMES.has(name)) return name;
+    if (isListed(AGGREGATE_BASE_NAMES, name)) return name;
     const suffix = AGGREGATE_COMBINATORS.find(
       (candidate) => name.length > candidate.length && name.endsWith(candidate),
     );
@@ -501,7 +521,7 @@ function aggregateBaseOf(lowercased: string): string | null {
  */
 export function isAllowedLangWatchQLFunction(name: string): boolean {
   const lowercased = name.trim().toLowerCase();
-  if (ALLOWED_FUNCTION_NAMES.has(lowercased)) return true;
+  if (isListed(ALLOWED_FUNCTION_NAMES, lowercased)) return true;
   return aggregateBaseOf(lowercased) !== null;
 }
 

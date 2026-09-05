@@ -15,7 +15,7 @@
  * @see ../catalog/types.ts — what the fields mean
  */
 
-import type { LangWatchQLViewDefinition } from "../../adapters/clickhouse.lwql-catalog-shapes.adapter";
+import type { LangWatchQLViewDefinition } from "../../services/langwatch-ql-catalog-shapes.service";
 
 /**
  * A dataset that *is* captured content end to end.

@@ -47,8 +47,10 @@ import { z } from "zod";
 
 import {
   type LangWatchQLRestPorts,
-  lwqlProject,
+  LangWatchQLRouteGuardsService,
 } from "../../services/langwatch-ql-route-guards.service";
+
+const routeGuards = LangWatchQLRouteGuardsService.create();
 
 /** The app every route in this family is registered on. */
 type LangWatchQLApp = SecuredApp<{ Variables: AppRestProjectVariables }>;
@@ -301,7 +303,7 @@ function registerList(secured: LangWatchQLApp, ports: LangWatchQLRestPorts): voi
       },
     }),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await routeGuards.project({
         featureFlags: ports.featureFlags(),
         project: c.get("project"),
         projects: ports.projects(),
@@ -335,7 +337,7 @@ function registerCreate(secured: LangWatchQLApp, ports: LangWatchQLRestPorts): v
     }),
     zValidator("json", createChartSchema),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await routeGuards.project({
         featureFlags: ports.featureFlags(),
         project: c.get("project"),
         projects: ports.projects(),
@@ -374,7 +376,7 @@ function registerRead(secured: LangWatchQLApp, ports: LangWatchQLRestPorts): voi
       },
     }),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await routeGuards.project({
         featureFlags: ports.featureFlags(),
         project: c.get("project"),
         projects: ports.projects(),
@@ -410,7 +412,7 @@ function registerUpdate(secured: LangWatchQLApp, ports: LangWatchQLRestPorts): v
     }),
     zValidator("json", updateChartSchema),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await routeGuards.project({
         featureFlags: ports.featureFlags(),
         project: c.get("project"),
         projects: ports.projects(),
@@ -452,7 +454,7 @@ function registerDelete(secured: LangWatchQLApp, ports: LangWatchQLRestPorts): v
       },
     }),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await routeGuards.project({
         featureFlags: ports.featureFlags(),
         project: c.get("project"),
         projects: ports.projects(),
@@ -488,7 +490,7 @@ function registerPlace(secured: LangWatchQLApp, ports: LangWatchQLRestPorts): vo
     }),
     zValidator("json", placeChartSchema),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await routeGuards.project({
         featureFlags: ports.featureFlags(),
         project: c.get("project"),
         projects: ports.projects(),
@@ -521,7 +523,7 @@ function registerUnplace(secured: LangWatchQLApp, ports: LangWatchQLRestPorts): 
       },
     }),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await routeGuards.project({
         featureFlags: ports.featureFlags(),
         project: c.get("project"),
         projects: ports.projects(),

@@ -4,7 +4,7 @@
  * Spec: specs/traces/saved-views.feature
  */
 import { describe, expect, it } from "vitest";
-import { clickHouseFilterConditions } from "../../../adapters/clickhouse.filter-conditions.adapter";
+import { clickHouseFilterConditions } from "../analytics-filter-conditions.rules";
 
 describe("clickHouseFilterConditions", () => {
   describe("traces.origin", () => {

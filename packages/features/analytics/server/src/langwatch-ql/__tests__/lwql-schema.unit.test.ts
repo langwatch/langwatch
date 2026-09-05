@@ -6,14 +6,15 @@
 import { describe, expect, it } from "vitest";
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 
-import { LWQL_VIEW_CATALOG } from "../../repositories/clickhouse/clickhouse.lwql-view-catalog.mapper";
-import {
-  lwqlAllowedTables,
-  lwqlGatedColumns,
-} from "../../adapters/clickhouse.lwql-catalog-shapes.adapter";
-import { describeLangWatchQLSchema } from "../../services/langwatch-ql-schema.service";
-import { validateLangWatchQL } from "../validation/validate";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules";
+import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service";
+import { LangWatchQLSchemaService } from "../../services/langwatch-ql-schema.service";
+
+const lwqlSchema = LangWatchQLSchemaService.create();
+import { validateLangWatchQL } from "./lwql-validate";
 import { GATED_DATASET, GATED_DATASET_QUALIFIED_NAME } from "./gatedDatasetFixture";
+
+const catalogShapes = LangWatchQLCatalogShapesService.create();
 
 const DATABASE = "analytics";
 
@@ -32,7 +33,7 @@ const WITHOUT_CONTENT: LangWatchQLProtections = {
 const WITHOUT_ANYTHING: LangWatchQLProtections = {};
 
 function schemaFor(protections: LangWatchQLProtections) {
-  return describeLangWatchQLSchema({ database: DATABASE, protections });
+  return lwqlSchema.describe({ database: DATABASE, protections });
 }
 
 function columnsOf(protections: LangWatchQLProtections) {
@@ -43,11 +44,11 @@ function columnsOf(protections: LangWatchQLProtections) {
 
 function policyFor(protections: LangWatchQLProtections) {
   return {
-    allowedTables: lwqlAllowedTables({
+    allowedTables: catalogShapes.allowedTables({
       database: DATABASE,
       views: LWQL_VIEW_CATALOG,
     }),
-    gatedColumns: lwqlGatedColumns({
+    gatedColumns: catalogShapes.gatedColumns({
       protections,
       views: LWQL_VIEW_CATALOG,
     }),
@@ -244,7 +245,7 @@ describe("given the LangWatchQL schema catalog", () => {
   describe("when a dataset is outside the caller's permissions", () => {
     const views = [...LWQL_VIEW_CATALOG, GATED_DATASET];
     const schemaWith = (protections: LangWatchQLProtections) =>
-      describeLangWatchQLSchema({ database: DATABASE, protections, views });
+      lwqlSchema.describe({ database: DATABASE, protections, views });
 
     it("leaves it out of the published schema entirely", () => {
       expect(schemaWith(WITHOUT_CONTENT).datasets.map((dataset) => dataset.name)).not.toContain(
@@ -286,8 +287,8 @@ describe("given the LangWatchQL schema catalog", () => {
       )!;
       const result = validateLangWatchQL({
         sql: dataset.exampleSql,
-        allowedTables: lwqlAllowedTables({ database: DATABASE, views }),
-        gatedColumns: lwqlGatedColumns({
+        allowedTables: catalogShapes.allowedTables({ database: DATABASE, views }),
+        gatedColumns: catalogShapes.gatedColumns({
           protections: FULLY_PERMITTED,
           views,
         }),
@@ -306,8 +307,8 @@ describe("given the LangWatchQL schema catalog", () => {
      */
     it("refuses every column of the hidden dataset at the gate", () => {
       const policy = {
-        allowedTables: lwqlAllowedTables({ database: DATABASE, views }),
-        gatedColumns: lwqlGatedColumns({
+        allowedTables: catalogShapes.allowedTables({ database: DATABASE, views }),
+        gatedColumns: catalogShapes.gatedColumns({
           protections: WITHOUT_CONTENT,
           views,
         }),

@@ -17,11 +17,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_LWQL_RESOURCE_LIMITS,
+  LangWatchQLAccessModelService,
   type LangWatchQLNames,
-  lwqlKeyMapTableStatement,
-  lwqlRowPolicyStatement,
-  lwqlSettingsProfileStatement,
-} from "../../adapters/clickhouse.lwql-provisioning.adapter";
+} from "../../services/langwatch-ql-access-model.service";
+
+const accessModel = LangWatchQLAccessModelService.create();
 
 const NAMES: LangWatchQLNames = {
   database: "lwql_unit",
@@ -56,7 +56,9 @@ describe("given the LangWatchQL settings profile statement", () => {
       ["bytes scanned", "max_bytes_to_read = 333000 CONST"],
       ["scan overflow", "read_overflow_mode = 'throw' CONST"],
     ])("pins the %s ceiling", (_label, expected) => {
-      expect(lwqlSettingsProfileStatement({ names: NAMES, limits: LIMITS })).toContain(expected);
+      expect(accessModel.settingsProfileStatement({ names: NAMES, limits: LIMITS })).toContain(
+        expected,
+      );
     });
 
     /**
@@ -67,7 +69,7 @@ describe("given the LangWatchQL settings profile statement", () => {
      * fail open.
      */
     it("leaves only the tenant capability changeable, defaulted to empty", () => {
-      const statement = lwqlSettingsProfileStatement({
+      const statement = accessModel.settingsProfileStatement({
         names: NAMES,
         limits: LIMITS,
       });
@@ -82,7 +84,7 @@ describe("given the LangWatchQL settings profile statement", () => {
 
   describe("when it is built from the shipped defaults", () => {
     it("bounds the shared identity's aggregate concurrency, not only each query", () => {
-      expect(lwqlSettingsProfileStatement({ names: NAMES })).toContain(
+      expect(accessModel.settingsProfileStatement({ names: NAMES })).toContain(
         `max_concurrent_queries_for_user = ${DEFAULT_LWQL_RESOURCE_LIMITS.maxConcurrentQueriesForUser} CONST`,
       );
       // A ceiling of zero is ClickHouse's "unlimited", so a default that
@@ -110,7 +112,7 @@ describe("given the LangWatchQL row policy", () => {
 
   describe("when a key hash resolves to more than one tenant", () => {
     it("admits no tenant at all, rather than every matching one", () => {
-      const statement = lwqlRowPolicyStatement({
+      const statement = accessModel.rowPolicyStatement({
         names: NAMES,
         lwqlTable: LWQL_TABLE,
       });
@@ -124,7 +126,7 @@ describe("given the LangWatchQL row policy", () => {
     });
 
     it("selects the tenant only under that single-tenant guard", () => {
-      const statement = lwqlRowPolicyStatement({
+      const statement = accessModel.rowPolicyStatement({
         names: NAMES,
         lwqlTable: LWQL_TABLE,
       });
@@ -141,7 +143,7 @@ describe("given the LangWatchQL row policy", () => {
 
   describe("when the key map table is created", () => {
     it("does not claim a uniqueness the engine will not enforce", () => {
-      const statement = lwqlKeyMapTableStatement({ names: NAMES });
+      const statement = accessModel.keyMapTableStatement({ names: NAMES });
 
       // ReplacingMergeTree without an explicit version and FINAL only promises
       // eventual dedup, and the policy would read duplicates in the window

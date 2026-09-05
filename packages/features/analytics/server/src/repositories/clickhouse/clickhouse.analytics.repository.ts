@@ -5,6 +5,7 @@ import {
   type AnalyticsFeedbacksResult,
   type AnalyticsTopDocumentsResult,
   type AnalyticsTable,
+  type AnalyticsTimeseriesInput,
   type AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
 import {
@@ -13,6 +14,7 @@ import {
   buildTopDocumentsQuery,
 } from "./clickhouse.aggregation-builder.mapper";
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "../../rules/clickhouse-settings.rules";
+import { pickAnalyticsTable } from "./clickhouse.analytics-route-table.mapper";
 import { buildEvalRollupTimeseriesQuery } from "./clickhouse.eval-rollup-timeseries-query.mapper";
 import { buildEvalSlimTimeseriesQuery } from "./clickhouse.eval-slim-timeseries-query.mapper";
 import { buildRollupTimeseriesQuery } from "./clickhouse.rollup-timeseries-query.mapper";
@@ -71,6 +73,10 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     private readonly resolveClient: (tenantId: string) => Promise<ClickHouseClient | null>,
   ) {
     super();
+  }
+
+  tableFor(input: AnalyticsTimeseriesInput): AnalyticsTable {
+    return pickAnalyticsTable(input);
   }
 
   async runTimeseries(query: AnalyticsTimeseriesQuery): Promise<AnalyticsTimeseriesResult> {

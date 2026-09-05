@@ -6,7 +6,7 @@ export {
   type AnalyticsFilterOptionsLookup,
   type AnalyticsFilterOptionsRequest,
 } from "./app/analytics.app";
-export { LoggingAnalyticsTripwire } from "./services/analytics-tripwire.service";
+export { LoggingAnalyticsTripwireService } from "./services/analytics-tripwire.service";
 
 /**
  * Filter matching without a query engine: the legacy `filters` grammar
@@ -46,21 +46,23 @@ export {
   type LangWatchQLServiceDependencies,
 } from "./services/langwatch-ql.service";
 export { lwqlEnabled, LWQL_FLAG } from "./rules/lwql-access.rules";
-export { lwqlTenantCapability } from "./services/langwatch-ql-capability.service";
+export { LangWatchQLCapabilityService } from "./services/langwatch-ql-capability.service";
 export {
   LangWatchQLNotEnabledError,
   LangWatchQLParameterMissingError,
   LangWatchQLUnavailableError,
 } from "@langwatch/analytics-contract";
 export {
-  createLangWatchQLExecutor,
   DEFAULT_LWQL_RESULT_LIMITS,
-  lwqlConnectionFromEnvironment,
-  type LangWatchQLConnection,
-  type LangWatchQLExecutor,
-  type LangWatchQLResultLimits,
+  LangWatchQLExecutorService,
 } from "./services/langwatch-ql-executor.service";
-export { MAX_LWQL_LENGTH } from "./services/langwatch-ql-sql-text.service";
+export {
+  type LangWatchQLConnection,
+  LangWatchQLExecutorPort,
+  type LangWatchQLResultLimits,
+} from "./ports/langwatch-ql-executor.port";
+export { ClickHouseLangWatchQLExecutorAdapter } from "./adapters/clickhouse.langwatch-ql-executor.adapter";
+export { MAX_LWQL_LENGTH } from "./rules/langwatch-ql-sql-literal.rules";
 export {
   lwqlGranularityStepSchema,
   lwqlTimeWindowSchema,
@@ -90,7 +92,7 @@ export {
   type TimeseriesInput,
   type TracesPivotFilters,
 } from "@langwatch/analytics-contract";
-export { currentVsPreviousDates } from "./services/analytics-comparison-window.service";
+export { AnalyticsComparisonWindowService } from "./services/analytics-comparison-window.service";
 
 /** The four ClickHouse query refusals a caller can act on. */
 export {
@@ -99,7 +101,7 @@ export {
   QueryScanLimitExceededError,
   QueryTimeoutError,
 } from "@langwatch/analytics-contract";
-export { generateClickHouseFilterConditions } from "./adapters/clickhouse.filter-conditions.adapter";
+export { generateClickHouseFilterConditions } from "./rules/analytics-filter-conditions.rules";
 
 /** The saved-chart REST family. */
 export {
@@ -123,18 +125,11 @@ export {
 export {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
-} from "./adapters/clickhouse.lwql-provisioning.adapter";
+} from "./services/langwatch-ql-access-model.service";
 export {
   type LwqlKeyMapBackfillPlan,
   type LwqlKeyMapRow,
-  lwqlKeyMapTableQualifiedName,
-  lwqlPostgresSchemaFromDatabaseUrl,
-  planLwqlKeyMapBackfill,
-  productionClickHouseObjectStatements,
-  productionLangWatchQLNames,
-  productionPostgresApprovedViewStatements,
-  productionPostgresReaderGrantStatements,
-  withTenancyOptOut,
+  LangWatchQLProductionProvisioningService,
 } from "./services/langwatch-ql-production-provisioning.service";
 
 export { LwqlProvisionTask } from "./tasks/lwql-provision.task";

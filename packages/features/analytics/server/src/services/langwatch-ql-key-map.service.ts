@@ -1,13 +1,17 @@
 import { createLogger } from "@langwatch/observability";
 
-import { lwqlTenantCapability } from "./langwatch-ql-capability.service";
-import type { LangWatchQLConnection } from "./langwatch-ql-executor.service";
+import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service";
+
+import type { LangWatchQLConnection } from "../ports/langwatch-ql-executor.port";
 import {
-  lwqlKeyMapTableQualifiedName,
-  productionLangWatchQLNames,
+  LangWatchQLProductionProvisioningService,
   type LwqlKeyMapRow,
 } from "./langwatch-ql-production-provisioning.service";
 import type { LwqlKeyMapRepository } from "../repositories/langwatch-ql-key-map.repository";
+
+const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
+
+const lwqlCapability = LangWatchQLCapabilityService.create();
 
 const logger = createLogger("langwatch:lwql-key-map-service");
 
@@ -71,13 +75,16 @@ export class LwqlKeyMapService {
     }
 
     try {
-      const names = productionLangWatchQLNames({ connection });
+      const names = lwqlProvisioning.names({ connection });
       const row: LwqlKeyMapRow = {
-        KeyHash: lwqlTenantCapability({ secret: input.lwqlKey }),
+        KeyHash: lwqlCapability.tenantCapability({ secret: input.lwqlKey }),
         TenantId: input.projectId,
       };
       await this.repository.insertRow({
-        table: lwqlKeyMapTableQualifiedName({ names, sourceDatabase: this.sourceDatabase }),
+        table: lwqlProvisioning.keyMapTableQualifiedName({
+          names,
+          sourceDatabase: this.sourceDatabase,
+        }),
         row,
       });
     } catch (error) {

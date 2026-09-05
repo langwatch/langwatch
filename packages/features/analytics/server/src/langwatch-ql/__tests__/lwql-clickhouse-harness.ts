@@ -59,34 +59,41 @@ import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
 import { TEST_CLICKHOUSE_IMAGE } from "@langwatch/test-harness";
 import { expect } from "vitest";
 
-import { lwqlTenantCapability } from "../../services/langwatch-ql-capability.service";
+import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service";
+
+import {
+  LangWatchQLAccessModelService,
+  type LangWatchQLNames,
+  type LangWatchQLTable,
+} from "../../services/langwatch-ql-access-model.service";
 import {
   CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML,
-  clickHouseAccessManagementConfigXml,
-  type LangWatchQLNames,
-  type LangWatchQLTable,
-  lwqlClickHouseSetupStatements,
-  lwqlRowPolicyStatement,
-} from "../../adapters/clickhouse.lwql-provisioning.adapter";
+  LangWatchQLServerConfigService,
+} from "../../services/langwatch-ql-server-config.service";
 import {
+  LangWatchQLCatalogShapesService,
   type LangWatchQLPostgresMapping,
   type LangWatchQLViewDefinition,
-  lwqlPostgresViews,
-} from "../../adapters/clickhouse.lwql-catalog-shapes.adapter";
-import { LWQL_VIEW_CATALOG } from "../../repositories/clickhouse/clickhouse.lwql-view-catalog.mapper";
-import {
-  lwqlApprovedPostgresViewNames,
-  lwqlPostgresApprovedViewStatements,
-  lwqlPostgresEngineTableStatements,
-  lwqlPostgresReaderConnectionLimit,
-} from "../../repositories/clickhouse/clickhouse.lwql-views.mapper";
+} from "../../services/langwatch-ql-catalog-shapes.service";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules";
+import { LangWatchQLPostgresViewsService } from "../../services/langwatch-ql-postgres-views.service";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
-  postgresNamedCollectionStatements,
-  postgresReaderRoleStatements,
-} from "../../repositories/postgres/postgres.lwql-mapping.mapper";
+  LangWatchQLPostgresMappingService,
+} from "../../services/langwatch-ql-postgres-mapping.service";
+
+const postgresMapping = LangWatchQLPostgresMappingService.create();
+
+const postgresViews = LangWatchQLPostgresViewsService.create();
+
+const accessModel = LangWatchQLAccessModelService.create();
+const serverConfig = LangWatchQLServerConfigService.create();
+
+const catalogShapes = LangWatchQLCatalogShapesService.create();
+
+const lwqlCapability = LangWatchQLCapabilityService.create();
 
 /** PostgreSQL image the PG-engine half of the proof runs against. */
 export const TEST_POSTGRES_IMAGE = "postgres:17";
@@ -160,7 +167,7 @@ function tenantFixture(tenantId: string, rawSecret: string): LangWatchQLTenantFi
     // own copy of the algorithm would drift into seeding a digest production
     // never computes — surfacing as every LangWatchQL read returning zero rows,
     // which is indistinguishable from a tenant that simply has no data.
-    keyHash: lwqlTenantCapability({ secret: rawSecret }),
+    keyHash: lwqlCapability.tenantCapability({ secret: rawSecret }),
   };
 }
 
@@ -268,7 +275,7 @@ export async function startLangWatchQLClickHouse({
   facts?: LangWatchQLFactTableMode;
 }): Promise<LangWatchQLClickHouseHarness> {
   const names = lwqlNamesForSuite(suite);
-  const accessManagementXml = clickHouseAccessManagementConfigXml({
+  const accessManagementXml = serverConfig.accessManagementConfigXml({
     administrativeUser: ADMIN_USER,
   });
   const configDigest = createHash("sha256")
@@ -343,7 +350,7 @@ export async function startLangWatchQLClickHouse({
   }
 
   await applyAsAdmin(
-    lwqlClickHouseSetupStatements({
+    accessModel.setupStatements({
       names,
       password: RESTRICTED_PASSWORD,
       lwqlTables,
@@ -1626,7 +1633,7 @@ export const PG_EXCLUDED_COLUMN = "comment";
 function mappedCatalogEntry(
   name: string,
 ): LangWatchQLViewDefinition & { postgres: LangWatchQLPostgresMapping } {
-  const entry = lwqlPostgresViews(LWQL_VIEW_CATALOG).find((view) => view.name === name);
+  const entry = catalogShapes.postgresViews(LWQL_VIEW_CATALOG).find((view) => view.name === name);
   if (!entry) {
     throw new Error(
       `lwql harness: "${name}" is not a PostgreSQL-resident dataset in the shipped catalog`,
@@ -1750,7 +1757,7 @@ const PG_BASE_TABLE_DDL: Record<string, string> = {
 const LWQL_TEST_CONCURRENT_CATALOGS = 6;
 
 /** The role's cap in this harness, so a test can assert the value that was set. */
-export const LWQL_TEST_POSTGRES_CONNECTION_LIMIT = lwqlPostgresReaderConnectionLimit({
+export const LWQL_TEST_POSTGRES_CONNECTION_LIMIT = postgresViews.readerConnectionLimit({
   concurrentCatalogs: LWQL_TEST_CONCURRENT_CATALOGS,
 });
 
@@ -1959,7 +1966,9 @@ export async function startLangWatchQLPostgres(): Promise<LangWatchQLPostgresHar
   const baseRelations = Object.keys(PG_BASE_TABLE_DDL);
   await applyAsAdmin([
     `ALTER DATABASE ${PG_DATABASE} SET log_statement='all'`,
-    ...lwqlApprovedPostgresViewNames().map((view) => `DROP VIEW IF EXISTS ${PG_SCHEMA}."${view}"`),
+    ...postgresViews
+      .approvedViewNames()
+      .map((view) => `DROP VIEW IF EXISTS ${PG_SCHEMA}."${view}"`),
     ...baseRelations.map((table) => `DROP TABLE IF EXISTS ${PG_SCHEMA}."${table}"`),
     `DROP TYPE IF EXISTS ${PG_SCHEMA}."ExperimentType"`,
     `CREATE TYPE ${PG_SCHEMA}."ExperimentType" AS ENUM ` +
@@ -1973,15 +1982,15 @@ export async function startLangWatchQLPostgres(): Promise<LangWatchQLPostgresHar
     ...POSTGRES_LOAD_FIXTURE_STATEMENTS,
     // The shipped generator, not a hand-copy: a catalog column the approved
     // view forgot would be a failure here rather than a silent exposure.
-    ...lwqlPostgresApprovedViewStatements({ schema: PG_SCHEMA }),
+    ...postgresViews.approvedViewStatements({ schema: PG_SCHEMA }),
   ]);
   await applyAsAdmin(
-    postgresReaderRoleStatements({
+    postgresMapping.readerRoleStatements({
       reader: {
         role: PG_READER_ROLE,
         password: PG_READER_PASSWORD,
         schema: PG_SCHEMA,
-        approvedViews: lwqlApprovedPostgresViewNames(),
+        approvedViews: postgresViews.approvedViewNames(),
         ...DEFAULT_POSTGRES_READER_LIMITS,
         connectionLimit: LWQL_TEST_POSTGRES_CONNECTION_LIMIT,
       },
@@ -2051,7 +2060,7 @@ export async function startLangWatchQLPostgres(): Promise<LangWatchQLPostgresHar
  *
  * Stops at the engine tables. The LangWatchQL views over them — the objects a
  * caller actually names, and the ones carrying the tenant pushdown predicate —
- * are `lwqlViewSetupStatements`' job, so a suite that wants the whole
+ * are `viewProvisioning.setupStatements`' job, so a suite that wants the whole
  * chain calls both, in that order. Keeping them apart is what lets the
  * isolation proof read the *unpredicated* engine table directly and compare.
  */
@@ -2062,13 +2071,15 @@ export async function mapPostgresIntoClickHouse({
   harness: LangWatchQLClickHouseHarness;
   postgres: LangWatchQLPostgresHarness;
 }): Promise<LangWatchQLTable[]> {
-  const lwqlTables = lwqlPostgresViews(LWQL_VIEW_CATALOG).map((view): LangWatchQLTable => ({
-    table: view.sourceTable,
-    tenantColumn: PG_MAPPED_TENANT_COLUMN,
-  }));
+  const lwqlTables = catalogShapes
+    .postgresViews(LWQL_VIEW_CATALOG)
+    .map((view): LangWatchQLTable => ({
+      table: view.sourceTable,
+      tenantColumn: PG_MAPPED_TENANT_COLUMN,
+    }));
   const collection = lwqlTestNamedCollection(harness.names);
   await harness.applyAsAdmin([
-    ...postgresNamedCollectionStatements({
+    ...postgresMapping.namedCollectionStatements({
       connection: {
         collection,
         // The docker host as seen from inside the ClickHouse container; see the
@@ -2083,15 +2094,17 @@ export async function mapPostgresIntoClickHouse({
     ...lwqlTables.map(
       (lwqlTable) => `DROP TABLE IF EXISTS ${harness.names.database}.${lwqlTable.table}`,
     ),
-    ...lwqlPostgresEngineTableStatements({
+    ...postgresViews.engineTableStatements({
       names: harness.names,
       collection,
     }),
-    // No grant here on purpose. `lwqlViewSetupStatements` issues the
+    // No grant here on purpose. `viewProvisioning.setupStatements` issues the
     // column-scoped one for every source it reads, and ClickHouse grants are
     // additive: a whole-table grant issued here would sit underneath it and
     // quietly widen it back out — the same trap the fixture fact tables carry.
-    ...lwqlTables.map((lwqlTable) => lwqlRowPolicyStatement({ names: harness.names, lwqlTable })),
+    ...lwqlTables.map((lwqlTable) =>
+      accessModel.rowPolicyStatement({ names: harness.names, lwqlTable }),
+    ),
   ]);
   return lwqlTables;
 }
@@ -2111,7 +2124,6 @@ async function readContainerLog(
     let buffer = "";
     let settled = false;
     let quiet: ReturnType<typeof setTimeout> | undefined;
-    let cap: ReturnType<typeof setTimeout> | undefined;
     const finish = (): void => {
       if (settled) return;
       settled = true;
@@ -2120,7 +2132,7 @@ async function readContainerLog(
       stream.destroy();
       resolve(buffer);
     };
-    cap = setTimeout(finish, maxMs);
+    const cap = setTimeout(finish, maxMs);
     quiet = setTimeout(finish, quietMs);
     stream.on("data", (chunk: Buffer | string) => {
       buffer += chunk.toString();

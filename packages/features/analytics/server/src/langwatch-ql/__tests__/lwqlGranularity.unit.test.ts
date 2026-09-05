@@ -19,10 +19,12 @@ import {
 } from "@langwatch/analytics-contract";
 import {
   LWQL_GRANULARITY_MAX_BUCKETS,
-  resolveLangWatchQLGranularity,
+  LangWatchQLTimeWindowService,
 } from "../../services/langwatch-ql-time-window.service";
+
+const timeWindows = LangWatchQLTimeWindowService.create();
 import { LWQL_GRANULARITY_STEPS } from "@langwatch/analytics-contract";
-import type { LangWatchQLParameter } from "../validation/validate";
+import type { LangWatchQLParameter } from "../../rules/langwatch-ql-validation-shape.rules";
 
 const GRANULARITY: LangWatchQLParameter[] = [
   { name: "period_granularity_seconds", type: "UInt32" },
@@ -74,7 +76,7 @@ function metaOf(run: () => unknown): Record<string, unknown> {
 describe("resolveLangWatchQLGranularity", () => {
   describe("given a statement that does not declare the parameter", () => {
     it("reports no granularity and injects nothing", () => {
-      const resolution = resolveLangWatchQLGranularity({
+      const resolution = timeWindows.resolveGranularity({
         declared: PERIOD,
         timeWindow: WINDOW,
         granularitySeconds: 60,
@@ -84,7 +86,7 @@ describe("resolveLangWatchQLGranularity", () => {
     });
 
     it("is unaffected by a caller-supplied value for an unrelated name", () => {
-      const resolution = resolveLangWatchQLGranularity({
+      const resolution = timeWindows.resolveGranularity({
         declared: PERIOD,
         parameters: { since: "2026-01-01" },
         timeWindow: WINDOW,
@@ -99,7 +101,7 @@ describe("resolveLangWatchQLGranularity", () => {
     /** @scenario "A statement declaring the granularity parameter runs at the step the workbench supplies" */
     it("follows granularity at the supplied step", () => {
       // An hour over a week: 168 buckets, comfortably inside the ceiling.
-      const resolution = resolveLangWatchQLGranularity({
+      const resolution = timeWindows.resolveGranularity({
         declared: [...PERIOD, ...GRANULARITY],
         timeWindow: WINDOW,
         granularitySeconds: 3600,
@@ -113,7 +115,7 @@ describe("resolveLangWatchQLGranularity", () => {
 
     /** @scenario "The resolver reports an unfilled declared granularity rather than inventing a step" */
     it("resolves without a step when the surface offers none, without inventing one", () => {
-      const resolution = resolveLangWatchQLGranularity({
+      const resolution = timeWindows.resolveGranularity({
         declared: [...PERIOD, ...GRANULARITY],
         timeWindow: WINDOW,
       });
@@ -131,7 +133,7 @@ describe("resolveLangWatchQLGranularity", () => {
       "refuses %s at run as well as save",
       (type) => {
         expect(() =>
-          resolveLangWatchQLGranularity({
+          timeWindows.resolveGranularity({
             declared: [...PERIOD, { name: "period_granularity_seconds", type }],
             timeWindow: WINDOW,
             granularitySeconds: 60,
@@ -144,7 +146,7 @@ describe("resolveLangWatchQLGranularity", () => {
       // Wrong type AND zero: the declaration is what the author must fix
       // first, so its copy is the answer either way.
       const run = () =>
-        resolveLangWatchQLGranularity({
+        timeWindows.resolveGranularity({
           declared: [...PERIOD, { name: "period_granularity_seconds", type: "Int64" }],
           parameters: {},
           timeWindow: WINDOW,
@@ -158,7 +160,7 @@ describe("resolveLangWatchQLGranularity", () => {
 
   describe("given a caller-supplied value for the reserved name", () => {
     const suppliesGranularity = () =>
-      resolveLangWatchQLGranularity({
+      timeWindows.resolveGranularity({
         declared: [...PERIOD, ...GRANULARITY],
         parameters: { period_granularity_seconds: 60 },
         timeWindow: WINDOW,
@@ -184,7 +186,7 @@ describe("resolveLangWatchQLGranularity", () => {
       // The guard's own reserved name is period_granularity_seconds; a
       // member's own parameter must ride through untouched even when a
       // genuine granularity declaration and step are present alongside it.
-      const resolution = resolveLangWatchQLGranularity({
+      const resolution = timeWindows.resolveGranularity({
         declared: [...PERIOD, ...GRANULARITY],
         parameters: { minTraceCount: 5 },
         timeWindow: WINDOW,
@@ -202,7 +204,7 @@ describe("resolveLangWatchQLGranularity", () => {
     /** @scenario "A zero or fractional step is refused as a wrong declaration" */
     it.each([[0], [-60], [1.5]])("refuses %p as a malformed step", (step) => {
       expect(() =>
-        resolveLangWatchQLGranularity({
+        timeWindows.resolveGranularity({
           declared: [...PERIOD, ...GRANULARITY],
           timeWindow: WINDOW,
           granularitySeconds: step,
@@ -214,7 +216,7 @@ describe("resolveLangWatchQLGranularity", () => {
       // The declaration here is a correct UInt32. Copy blaming its type sends
       // the author to a line that is already right.
       const run = () =>
-        resolveLangWatchQLGranularity({
+        timeWindows.resolveGranularity({
           declared: [...PERIOD, ...GRANULARITY],
           timeWindow: WINDOW,
           granularitySeconds: 1.5,
@@ -233,7 +235,7 @@ describe("resolveLangWatchQLGranularity", () => {
       // through -- and coarsening would then have "coarsened" it to the
       // 3,600-second hour, a step twice as fine as the one requested.
       expect(() =>
-        resolveLangWatchQLGranularity({
+        timeWindows.resolveGranularity({
           declared: [...PERIOD, ...GRANULARITY],
           timeWindow: WINDOW,
           granularitySeconds: 7200,
@@ -245,7 +247,7 @@ describe("resolveLangWatchQLGranularity", () => {
     it("admits every step the surface offers", () => {
       for (const step of LWQL_GRANULARITY_STEPS) {
         expect(() =>
-          resolveLangWatchQLGranularity({
+          timeWindows.resolveGranularity({
             declared: [...PERIOD, ...GRANULARITY],
             timeWindow: WINDOW,
             granularitySeconds: step,
@@ -260,7 +262,7 @@ describe("resolveLangWatchQLGranularity", () => {
     // A week at one-second steps: 604,800 buckets, far past the ceiling.
     it("refuses on a caller-owned surface", () => {
       expect(() =>
-        resolveLangWatchQLGranularity({
+        timeWindows.resolveGranularity({
           declared: [...PERIOD, ...GRANULARITY],
           timeWindow: WINDOW,
           granularitySeconds: 1,
@@ -271,7 +273,7 @@ describe("resolveLangWatchQLGranularity", () => {
 
     it("carries the arithmetic in the refusal's meta", () => {
       const run = () =>
-        resolveLangWatchQLGranularity({
+        timeWindows.resolveGranularity({
           declared: [...PERIOD, ...GRANULARITY],
           timeWindow: WINDOW,
           granularitySeconds: 1,
@@ -292,7 +294,7 @@ describe("resolveLangWatchQLGranularity", () => {
       // ceiling, and itself evidence that the 10,000 default has teeth:
       // a completely ordinary chart/range pairing lands on the wrong side
       // of it. The finest offered step that fits is the hour (168).
-      const resolution = resolveLangWatchQLGranularity({
+      const resolution = timeWindows.resolveGranularity({
         declared: [...PERIOD, ...GRANULARITY],
         timeWindow: WINDOW,
         granularitySeconds: 60,
@@ -305,7 +307,7 @@ describe("resolveLangWatchQLGranularity", () => {
 
     it("does not report coarsening when the requested step already fits", () => {
       // An hour over a week: 168 buckets. Fits.
-      const resolution = resolveLangWatchQLGranularity({
+      const resolution = timeWindows.resolveGranularity({
         declared: [...PERIOD, ...GRANULARITY],
         timeWindow: WINDOW,
         granularitySeconds: 3600,
@@ -344,7 +346,7 @@ describe("resolveLangWatchQLGranularity", () => {
 
       for (const timeWindow of windows) {
         for (const step of LWQL_GRANULARITY_STEPS) {
-          const resolution = resolveLangWatchQLGranularity({
+          const resolution = timeWindows.resolveGranularity({
             declared: [...PERIOD, ...GRANULARITY],
             timeWindow,
             granularitySeconds: step,
@@ -368,7 +370,7 @@ describe("resolveLangWatchQLGranularity", () => {
         end: new Date("2036-02-20T00:00:00.000Z"),
       };
       const run = () =>
-        resolveLangWatchQLGranularity({
+        timeWindows.resolveGranularity({
           declared: [...PERIOD, ...GRANULARITY],
           timeWindow: decade,
           granularitySeconds: 60,
@@ -397,7 +399,7 @@ describe("resolveLangWatchQLGranularity", () => {
       const coarsest = LWQL_GRANULARITY_STEPS[LWQL_GRANULARITY_STEPS.length - 1];
 
       const run = () =>
-        resolveLangWatchQLGranularity({
+        timeWindows.resolveGranularity({
           declared: [...PERIOD, ...GRANULARITY],
           timeWindow: decade,
           granularitySeconds: coarsest,
@@ -419,7 +421,7 @@ describe("resolveLangWatchQLGranularity", () => {
       // was itself a test bug, not a property of the contract.
       const start = new Date("2026-02-20T00:00:00.000Z");
       const end = new Date(start.getTime() + LWQL_GRANULARITY_MAX_BUCKETS * 1000);
-      const resolution = resolveLangWatchQLGranularity({
+      const resolution = timeWindows.resolveGranularity({
         declared: [...PERIOD, ...GRANULARITY],
         timeWindow: { start, end },
         granularitySeconds: 1,
@@ -433,7 +435,7 @@ describe("resolveLangWatchQLGranularity", () => {
       const start = new Date("2026-02-20T00:00:00.000Z");
       const end = new Date(start.getTime() + (LWQL_GRANULARITY_MAX_BUCKETS + 1) * 1000);
       expect(() =>
-        resolveLangWatchQLGranularity({
+        timeWindows.resolveGranularity({
           declared: [...PERIOD, ...GRANULARITY],
           timeWindow: { start, end },
           granularitySeconds: 1,
@@ -452,7 +454,7 @@ describe("resolveLangWatchQLGranularity", () => {
     it("runs at the supplied step rather than guessing a budget", () => {
       // Nothing to compute the budget against, so the supplied step rides
       // through unclamped -- there is no range it could overflow.
-      const resolution = resolveLangWatchQLGranularity({
+      const resolution = timeWindows.resolveGranularity({
         declared: GRANULARITY,
         granularitySeconds: 60,
       });

@@ -1,4 +1,4 @@
-import { generateClickHouseFilterConditions } from "../../adapters/clickhouse.filter-conditions.adapter";
+import { generateClickHouseFilterConditions } from "../../rules/analytics-filter-conditions.rules";
 import type { ClickHouseFilterQueryParams } from "./clickhouse.filter-shapes.mapper";
 import type { FilterOption } from "../../ports/filter-options.port";
 

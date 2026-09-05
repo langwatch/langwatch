@@ -24,11 +24,9 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import {
-  createLangWatchQLExecutor,
-  DEFAULT_LWQL_RESULT_LIMITS,
-  type LangWatchQLExecutor,
-} from "../../services/langwatch-ql-executor.service";
+import { ClickHouseLangWatchQLExecutorAdapter } from "../../adapters/clickhouse.langwatch-ql-executor.adapter";
+import type { LangWatchQLExecutorPort } from "../../ports/langwatch-ql-executor.port";
+import { DEFAULT_LWQL_RESULT_LIMITS } from "../../services/langwatch-ql-executor.service";
 import {
   type LangWatchQLClickHouseHarness,
   startLangWatchQLClickHouse,
@@ -39,7 +37,7 @@ const MISSING_COLUMN = "trace_idd_typo";
 
 describe("given SQL that names a column no dataset has", () => {
   let harness: LangWatchQLClickHouseHarness;
-  let executor: LangWatchQLExecutor;
+  let executor: LangWatchQLExecutorPort;
   let database: string;
 
   /** Whatever the executor threw, or a sentence saying it threw nothing. */
@@ -59,10 +57,12 @@ describe("given SQL that names a column no dataset has", () => {
   beforeAll(async () => {
     harness = await startLangWatchQLClickHouse({ suite: "unknownidentifier" });
     database = harness.names.database;
-    executor = createLangWatchQLExecutor({
-      ...harness.restrictedConnection(),
-      database,
-      tenantSetting: harness.names.tenantSetting,
+    executor = ClickHouseLangWatchQLExecutorAdapter.create({
+      connection: {
+        ...harness.restrictedConnection(),
+        database,
+        tenantSetting: harness.names.tenantSetting,
+      },
     });
   }, 180_000);
 

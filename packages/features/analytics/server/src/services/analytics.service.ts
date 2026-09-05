@@ -25,7 +25,6 @@ import {
 } from "@langwatch/analytics-contract";
 import { AnalyticsRepository } from "../repositories/analytics.repository";
 import { AnalyticsEvaluationRepository } from "../repositories/analytics-persistence.repository";
-import { pickAnalyticsTable } from "../repositories/clickhouse/clickhouse.analytics-route-table.mapper";
 
 const MINUTES_PER_DAY = 24 * 60;
 const MAX_TIMESERIES_BUCKETS = 1000;
@@ -131,7 +130,7 @@ export class AnalyticsService extends AnalyticsServiceContract {
         : estimatedBuckets > MAX_TIMESERIES_BUCKETS
           ? MINUTES_PER_DAY
           : parsed.timeScale;
-    const table = pickAnalyticsTable(parsed);
+    const table = this.repository.tableFor(parsed);
     const query = {
       table,
       tenantId: parsed.projectId,

@@ -2,7 +2,7 @@
  * The real-time evaluations running against a project's traffic, composed as their own
  * feature.
  */
-import { currentVsPreviousDates } from "@langwatch/analytics-server";
+import { AnalyticsComparisonWindowService } from "@langwatch/analytics-server";
 import {
   MonitorPerformanceAdapter,
   type EvaluationClickHouseResolver,
@@ -228,10 +228,9 @@ function composeMonitors(options: MonitorFeatureCollaborators): {
       // uses, so the trend comparison covers the exact same runs a person sees
       // when they open analytics for this evaluation.
       resolvePreviousPeriodStartMs: ({ startMs, endMs }) =>
-        currentVsPreviousDates({
-          startDate: startMs,
-          endDate: endMs,
-        }).previousPeriodStartDate.getTime(),
+        AnalyticsComparisonWindowService.create()
+          .currentVsPrevious({ startDate: startMs, endDate: endMs })
+          .previousPeriodStartDate.getTime(),
       copyEvaluatorToProject: (ctx, input) =>
         EvaluatorReplicationApi.create({
           replicateEvaluatorWorkflow: (replication) =>

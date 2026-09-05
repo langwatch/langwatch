@@ -3,6 +3,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { addDays, differenceInCalendarDays } from "date-fns";
 import type {
   AnalyticsEvaluationRow,
+  AnalyticsTable,
   AnalyticsTimeseriesInput,
   AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
@@ -10,6 +11,7 @@ import { AnalyticsService } from "../../services/analytics.service";
 import { AnalyticsAdapter } from "../../index";
 import { NullAnalyticsEvaluationRepository } from "../analytics-persistence.repository";
 import { AnalyticsRepository, type AnalyticsTimeseriesQuery } from "../analytics.repository";
+import { pickAnalyticsTable } from "../clickhouse/clickhouse.analytics-route-table.mapper";
 
 const input = (overrides: Partial<AnalyticsTimeseriesInput> = {}): AnalyticsTimeseriesInput => ({
   projectId: "project-1",
@@ -58,6 +60,12 @@ class RecordingRepository extends AnalyticsRepository {
   lastQuery: AnalyticsTimeseriesQuery | undefined;
   lastFeedbackInput: unknown;
   lastDocumentsInput: unknown;
+
+  // The real routing, because what these cases claim is which table a read is
+  // sent to — a double that answered a fixed table would assert itself.
+  tableFor(timeseriesInput: AnalyticsTimeseriesInput): AnalyticsTable {
+    return pickAnalyticsTable(timeseriesInput);
+  }
 
   async runTimeseries(query: AnalyticsTimeseriesQuery): Promise<AnalyticsTimeseriesResult> {
     this.lastQuery = query;
