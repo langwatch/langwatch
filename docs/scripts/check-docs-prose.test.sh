@@ -159,6 +159,27 @@ else
   check "the annotation points at the first line of the long paragraph" no
 fi
 
+# A table written without its outer pipes ends the paragraph that ran into it.
+# Without that, the prose before the table and the prose after it count as one
+# paragraph and a page under the limit on both sides reports a violation.
+TABLE_PAGE="$WORK/docs/table.mdx"
+{
+  printf -- '---\ntitle: Table\n---\n\n'
+  printf 'one two three four five six seven eight\n'
+  printf 'name | description\n'
+  printf -- '--- | ---\n'
+  printf 'a | b\n'
+  printf 'one two three four five six seven eight\n'
+} > "$TABLE_PAGE"
+
+TABLE_OUTPUT="$(DOCS_PROSE_MAX_PARAGRAPH_WORDS=10 bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
+if printf '%s\n' "$TABLE_OUTPUT" | grep -q 'table.mdx,line='; then
+  check "prose either side of a table without outer pipes is two paragraphs" no
+  echo "Output: $TABLE_OUTPUT"
+else
+  check "prose either side of a table without outer pipes is two paragraphs" yes
+fi
+
 if [[ $FAILURES -gt 0 ]]; then
   echo ""
   echo "Annotation: $ANNOTATION"
