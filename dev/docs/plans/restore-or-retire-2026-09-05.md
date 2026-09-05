@@ -72,3 +72,17 @@ Prior lists: `binding-gaps-2026-09-04.md` (written at 1,333 unbound) and
 - Operator feature-flag catalogue rendered System before Product (b127645ea8).
 - Secret REST family never fed the route policy registry; `track_event` alias declared no policy (0efee48b52).
 - `DatasetRecordNotFoundError` dropped from the dataset contract by a module overwrite (a080ec705f).
+
+## Needs a ruling (found 2026-09-05 afternoon; spec contradicts the branch's design, not a missing port)
+
+| spec | scenarios | why a test cannot be written honestly |
+| --- | ---: | --- |
+| `specs/dependencies/runtime-composition.feature` | 8 | names `tools/dev-runtime`, a combined process mode and an Agents RPC router; the branch runs three processes always and neither exists |
+| `specs/setup/typescript-7.feature` | 3 | "the whole repository is typechecked as one program": there is no root tsconfig any more, typechecking is per package by design |
+| `specs/setup/memory-footprint.feature` "pnpm start stays in production mode" | 1 | the hazard is gone: `.env` loads through `--env-file-if-exists`, which never overrides a set variable |
+| `specs/migration/system-migrations-runner.feature` "An automatic cohort includes a private-dataplane organization" | 1 | the cohort has no dataplane input, so a test would assert the absence of an exclusion nothing can express |
+| `specs/navigation/workspace-switcher.feature` tooltip / auto-focus | 3 | the switcher is now an always-visible per-team "New Project" row; there is no icon button, tooltip or hover state (parked `@unimplemented`) |
+| `specs/api-reference` run-plans and test-suites "A dated … path and the bare alias both answer" | 2 | the tests assert 404 on purpose for the four v1 families the /api twinning leaves alone (771069e998); spec and code disagree |
+| `specs/navigation/shared-section-navigation-layout.feature` narrow viewport | 1 | needs a real browser lane; jsdom cannot evaluate media queries |
+
+Proposed: delete the first four groups as stale against decisions already taken; keep the switcher three parked; align the api-reference wording with decision 20's exceptions; leave the browser scenario `@e2e` for the Playwright lane.
