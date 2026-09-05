@@ -5,9 +5,13 @@ keywords: langwatch, dspy, gepa, miprov2, prompt optimization, tool optimization
 description: Use your scenario suite as the metric of a DSPy optimizer, so it scores every candidate on full multi-turn conversations with your agent, on the cases that matter to you.
 ---
 
-Writing a metric for an agent is hard, because a reply has no single expected output to compare against. Your scenario suite is already that metric: it runs the whole conversation with a simulated user and judges it on the criteria you wrote, so the optimizer runs the [improvement loop](/improve-your-agent/overview) for you, one candidate after another, against the same suite you use as the quality gate.
+Writing a metric for an agent is hard, because a reply has no single expected output to compare against.
 
-To run a DSPy optimizer you give it a program and a metric. The program is a `dspy.ReAct` module, whose instructions contain every tool description, so rewriting the instructions rewrites the tool descriptions too; the metric runs one scenario against the candidate and scores the verdict, and GEPA also reads the judge's reasoning as feedback for the next candidate.
+Your scenario suite is already that metric: it runs the whole conversation with a simulated user and judges it on the criteria you wrote, so the optimizer runs the [improvement loop](/improve-your-agent/overview) for you, one candidate after another, against the same suite you use as the quality gate.
+
+To run a DSPy optimizer you give it a program and a metric. The program is a `dspy.ReAct` module, whose instructions contain every tool description, so rewriting the instructions rewrites the tool descriptions too.
+
+The metric runs one scenario against the candidate and scores the verdict, and GEPA also reads the judge's reasoning as feedback for the next candidate.
 
 The runnable example is in the SDK repository: [`sdks/python/examples/agent-optimization`](https://github.com/langwatch/langwatch/tree/main/sdks/python/examples/agent-optimization).
 
