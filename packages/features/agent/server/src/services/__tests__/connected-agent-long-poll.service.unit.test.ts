@@ -210,7 +210,7 @@ describe("LongPollTransport with a memory store", () => {
 /** A fake `AgentService` that upserts nothing, just echoes what it was given. */
 function registeringAgentService(): AgentService {
   return {
-    registerConnected: async (input) =>
+    registerConnected: async (input: Parameters<AgentService["registerConnected"]>[0]) =>
       ({
         id: input.id,
         name: input.name,

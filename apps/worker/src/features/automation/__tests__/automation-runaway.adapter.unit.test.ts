@@ -12,17 +12,21 @@ class NoopMailer extends EmailDeliveryPort {
   }
 }
 
-function adapter(filterSuppressed: (input: {
-  projectId: string;
-  triggerId: string;
-  emails: string[];
-}) => Promise<string[]>) {
+function adapter(
+  filterSuppressed: (input: {
+    projectId: string;
+    triggerId: string;
+    emails: string[];
+  }) => Promise<string[]>,
+) {
   return WorkerAutomationRunawayAdapter.create({
     redis: null,
     directories: {
       projects: {
         getOrganizationId: vi.fn().mockResolvedValue("org-1"),
-        tryGetById: vi.fn().mockResolvedValue({ id: "project-1", name: "Project", slug: "project" }),
+        tryGetById: vi
+          .fn()
+          .mockResolvedValue({ id: "project-1", name: "Project", slug: "project" }),
       },
       authorization: {
         listOrganizationBindings: vi.fn().mockResolvedValue([
@@ -35,7 +39,7 @@ function adapter(filterSuppressed: (input: {
     suppression: { filterSuppressed },
     mailer: new NoopMailer(),
     resolveClickHouseClient: vi.fn().mockResolvedValue(null),
-    metrics: new NoopAutomationRunawayMetrics(),
+    metrics: NoopAutomationRunawayMetrics.create(),
     baseHost: "https://app.langwatch.test",
   });
 }
@@ -101,7 +105,7 @@ describe("given a worker holding an automation containment claim", () => {
           suppression: { filterSuppressed: vi.fn() },
           mailer: new NoopMailer(),
           resolveClickHouseClient: vi.fn(),
-          metrics: new NoopAutomationRunawayMetrics(),
+          metrics: NoopAutomationRunawayMetrics.create(),
           baseHost: "https://app.langwatch.test",
         });
 
@@ -114,10 +118,7 @@ describe("given a worker holding an automation containment claim", () => {
 
         await worker1.releaseClaim(stale!);
 
-        const thirdAttempt = await worker1.tryClaimOnce(
-          "automation-cap-mail:trigger-1:20454",
-          10,
-        );
+        const thirdAttempt = await worker1.tryClaimOnce("automation-cap-mail:trigger-1:20454", 10);
         expect(thirdAttempt).toBeNull();
       } finally {
         vi.useRealTimers();

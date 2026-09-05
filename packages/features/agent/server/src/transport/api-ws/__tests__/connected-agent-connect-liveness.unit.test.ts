@@ -15,7 +15,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 import { createConnectedAgentRuntime } from "../../../services/connected-agent-runtime.service";
 import { createMemoryStateStore } from "../../../adapters/connected-agent-state.adapter";
-import type { AgentRepository } from "../../../repositories/agent.repository";
+import type { AgentLastSeenWriter } from "../../../projections/connected-agent-presence.projection";
 import { ConnectCredentialPort } from "../../../ports/connect-credential.port";
 import type {
   ConnectUpgradeRouterPort,
@@ -52,7 +52,7 @@ const fakeAgents = {
   registerConnected: async (input: { id: string; name: string }) =>
     ({ id: input.id, name: input.name } as Agent),
 } as unknown as AgentService;
-const fakeAgentRepository = { touchLastSeenAt: async () => undefined } as AgentRepository;
+const fakeAgentRepository: AgentLastSeenWriter = { touchLastSeenAt: async () => undefined };
 const fakeAgentPlatformUrl = () => "https://example.test/agents";
 
 function registerFrame(instanceId: string) {

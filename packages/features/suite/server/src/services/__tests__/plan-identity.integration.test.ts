@@ -29,6 +29,7 @@ import type { AgentService } from "@langwatch/agent-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import {
   resolveRunParameters,
+  scenarioRunConfigSchema,
   ScenarioSecretParameterMissingError,
   type ScenarioService,
   type ScenarioRunConfig,
@@ -37,13 +38,13 @@ import {
 import {
   CLI_EPHEMERAL_LABEL,
   sortSuiteTargets,
-  type SuiteExecutionPort,
   type SuiteRunResult,
   type SuiteScope,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import type { SuiteExecutionPort } from "../../ports/suite-execution.port";
 import { PrismaSuiteRepository } from "../../repositories/prisma/prisma.suite.repository";
 import { MemorySuiteRunRepository } from "../../repositories/memory/memory.suite-run.repository";
 import { SuiteService } from "../suite.service";
@@ -129,15 +130,16 @@ function fakeScenarioService(): ScenarioService {
       if (ids.length === 0) return [];
       const rows = await database().scenario.findMany({
         where: { id: { in: ids }, projectId: pid },
+        select: {
+          id: true,
+          name: true,
+          version: true,
+          situation: true,
+          criteria: true,
+          parameters: true,
+        },
       });
-      return rows.map((row) => ({
-        id: row.id,
-        name: row.name,
-        version: row.version,
-        situation: row.situation,
-        criteria: row.criteria,
-        parameters: row.parameters,
-      }));
+      return rows.map((row) => scenarioRunConfigSchema.parse(row));
     },
     getNamesByIds: async ({ ids, projectId: pid }: { ids: string[]; projectId: string }) => {
       if (ids.length === 0) return [];

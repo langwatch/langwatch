@@ -43,6 +43,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "hono": "^4.12.27",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

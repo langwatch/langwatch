@@ -152,7 +152,7 @@ describe("ConnectGateway without Redis", () => {
 /** A fake `AgentService` that upserts nothing, just echoes what it was given. */
 function registeringAgentService(): AgentService {
   return {
-    registerConnected: async (input) =>
+    registerConnected: async (input: Parameters<AgentService["registerConnected"]>[0]) =>
       ({
         id: input.id,
         name: input.name,
@@ -283,7 +283,7 @@ describe("ConnectGateway socket lifecycle", () => {
         releaseRegister = resolve;
       });
       const slowAgents: AgentService = {
-        registerConnected: async (input) => {
+        registerConnected: async (input: Parameters<AgentService["registerConnected"]>[0]) => {
           await gate;
           return {
             id: input.id,

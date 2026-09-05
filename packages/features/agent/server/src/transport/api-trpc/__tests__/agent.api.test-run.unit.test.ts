@@ -15,6 +15,7 @@ import { AgentTrpcApi, type AgentTrpcContext } from "../agent.api";
 const runResult: AgentTestRunResult = {
   scenarioRunId: "scenariorun_1",
   batchRunId: "batch_1",
+  setId: "set_1",
 };
 
 function harness(testRun = vi.fn().mockResolvedValue(runResult)) {

@@ -22,13 +22,13 @@ import type { PromptService } from "@langwatch/prompt-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import {
   scenarioTestSuiteSchema,
+  ScenarioTestSuiteNotFoundError,
   type ScenarioRunConfig,
   type ScenarioService,
   type ScenarioTestSuite,
   type SimulationService,
 } from "@langwatch/scenario-contract";
 import {
-  ScenarioTestSuiteNotFoundError,
   SuiteNameTakenError,
   SuiteNotFoundError,
   suiteSchema,
@@ -553,7 +553,7 @@ export type SuiteFamilies = ReturnType<typeof mountSuiteFamilies>;
 const renderHandled: ErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {
     return c.json(
-      { code: error.code, message: error.message, ...error.serialize() },
+      { message: error.message, ...error.serialize() },
       error.httpStatus as 400,
     );
   }

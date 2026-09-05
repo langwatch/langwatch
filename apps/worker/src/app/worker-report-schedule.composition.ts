@@ -10,9 +10,9 @@ import {
   ScheduledJobStorePort,
   SchedulerWakePort,
   SlackProviderAdapter,
-  dispatchScheduledReport,
-  loadReportCharts,
-  toReportTraceRow,
+  ReportChartService,
+  ReportDispatchService,
+  ReportTraceRowService,
   type ReportDispatchDeps,
   type ScheduledJobRecord,
 } from "@langwatch/automation-server";
@@ -64,7 +64,7 @@ export abstract class WorkerReportTraceListPort {
 /**
  * The traces a report lists, over a trace-list reader this process composes.
  *
- * `toReportTraceRow` is the feature's own mapper rather than a second copy of
+ * `ReportTraceRowService.toReportTraceRow` is the feature's own mapper rather than a second copy of
  * it here: the report's row shape (a snipped input, a numeric cost, a deep
  * link) is what the templates render, and two mappers would let a report and
  * the traces page disagree about the same trace.
@@ -129,7 +129,7 @@ export class ComposedWorkerReportTraceList extends WorkerReportTraceListPort {
       ...(filterWhere ? { filterWhere } : {}),
     });
     const projectUrl = `${this.baseHost}/${input.projectSlug}`;
-    return page.items.map((item) => toReportTraceRow({ item: item as never, projectUrl }));
+    return page.items.map((item) => ReportTraceRowService.toReportTraceRow({ item: item as never, projectUrl }));
   }
 }
 
@@ -237,7 +237,7 @@ export type WorkerReportSchedule = Readonly<{
 /**
  * The scheduled-report calendar, composed from what this process already holds.
  *
- * WHAT WAS MISSING. `dispatchScheduledReport` is Automation's own handler and
+ * WHAT WAS MISSING. `ReportDispatchService.dispatchScheduledReport` is Automation's own handler and
  * it had no caller anywhere in the tree: the loop that claims a due
  * `ScheduledJob` and the registration that maps `reportTrigger` onto the
  * handler both lived in the deleted application's composition root, so every
@@ -295,7 +295,7 @@ export function createWorkerReportSchedule(
     filterSuppressedRecipients: (input) => graphDelivery.filterSuppressed(input),
     listReportTraces: (input) => options.traces.listReportTraces(input),
     loadReportCharts: ({ projectId, source, from, to }) =>
-      loadReportCharts({
+      ReportChartService.loadReportCharts({
         deps: {
           loadCustomGraph: ({ projectId: project, customGraphId }) =>
             customGraphs.tryFindById({ customGraphId, projectId: project }),
@@ -328,7 +328,7 @@ export function createWorkerReportSchedule(
   const registry = new SchedulerRegistry();
   registry.register({
     targetType: REPORT_SCHEDULER_TARGET_TYPE,
-    handler: (fire) => dispatchScheduledReport({ deps, fire }),
+    handler: (fire) => ReportDispatchService.dispatchScheduledReport({ deps, fire }),
   });
 
   const scheduler = new SchedulerService({

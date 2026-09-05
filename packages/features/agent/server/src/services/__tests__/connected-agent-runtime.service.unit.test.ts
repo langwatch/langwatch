@@ -267,7 +267,7 @@ describe("CallDispatcher", () => {
         },
       });
       // Fill inst_2 so the pick lands on inst_1 for sure.
-      await runtime.registry.incrementInflight("inst_2");
+      await runtime.registry.incrementInflight({ projectId, instanceId: "inst_2" });
 
       await expect(
         runtime.dispatcher.dispatch({
@@ -300,7 +300,7 @@ describe("CallDispatcher", () => {
         },
       });
       // Fill inst_2 so the pick lands on inst_1 for sure.
-      await runtime.registry.incrementInflight("inst_2");
+      await runtime.registry.incrementInflight({ projectId, instanceId: "inst_2" });
 
       await expect(
         runtime.dispatcher.dispatch({
@@ -486,7 +486,7 @@ describe("CallDispatcher", () => {
       // Make the other instance the freer one; the pin must still win.
       const pinnedTo = firstTurn.instance.instanceId;
       const other = pinnedTo === "inst_a" ? "inst_b" : "inst_a";
-      await runtime.registry.incrementInflight(pinnedTo);
+      await runtime.registry.incrementInflight({ projectId, instanceId: pinnedTo });
       const secondTurn = await runtime.dispatcher.dispatch({
         projectId,
         agent: sticky,

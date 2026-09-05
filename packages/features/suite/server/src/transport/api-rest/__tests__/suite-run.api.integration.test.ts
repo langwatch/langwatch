@@ -103,6 +103,7 @@ const runResult: SuiteRunResult = {
   setId: "set_1",
   jobCount: 3,
   skippedArchived: { scenarios: [], targets: [] },
+  items: [],
 };
 
 describe("POST /api/suites/:id/run", () => {

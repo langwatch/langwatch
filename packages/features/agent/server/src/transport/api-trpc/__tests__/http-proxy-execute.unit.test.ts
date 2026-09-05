@@ -44,14 +44,12 @@ function harness(state: ExecutionState) {
 
   const dispatchedParameters = (): Record<string, unknown> => {
     if (dispatchedEvent?.type !== "execute_component") throw new Error("wrong event type");
-    const node = dispatchedEvent.payload.workflow.nodes.find(
-      (candidate) => candidate.id === dispatchedEvent!.payload.node_id,
+    const event = dispatchedEvent;
+    const node = event.payload.workflow.nodes.find(
+      (candidate) => candidate.id === event.payload.node_id,
     );
     return Object.fromEntries(
-      (node?.data.parameters ?? []).map((parameter: { identifier: string; value: unknown }) => [
-        parameter.identifier,
-        parameter.value,
-      ]),
+      (node?.data.parameters ?? []).map((parameter) => [parameter.identifier, parameter.value]),
     );
   };
 

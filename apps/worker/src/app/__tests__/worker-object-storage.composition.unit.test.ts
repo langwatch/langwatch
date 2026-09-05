@@ -1,4 +1,4 @@
-import { AzureBlobStoredObjectDriver } from "@langwatch/stored-object-server";
+import { AzureBlobStoredObjectDriverAdapter } from "@langwatch/stored-object-server";
 import { describe, expect, it } from "vitest";
 import { createWorkerAzureBlobDriver } from "../worker-object-storage.composition";
 import type { WorkerStorageConfig } from "../../platform/config/worker.config";
@@ -41,7 +41,7 @@ describe("createWorkerAzureBlobDriver", () => {
         container: "datasets",
       });
 
-      expect(driver).toBeInstanceOf(AzureBlobStoredObjectDriver);
+      expect(driver).toBeInstanceOf(AzureBlobStoredObjectDriverAdapter);
     });
   });
 });

@@ -2,7 +2,7 @@ import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/a
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import {
-  AzureBlobStoredObjectDriver,
+  AzureBlobStoredObjectDriverAdapter,
   resolveAzureCredentials,
 } from "@langwatch/stored-object-server";
 import type {
@@ -53,9 +53,9 @@ export type WorkerObjectStorage = {
  */
 export function createWorkerAzureBlobDriver(
   azure: WorkerStorageConfig["azure"],
-): AzureBlobStoredObjectDriver | undefined {
+): AzureBlobStoredObjectDriverAdapter | undefined {
   if (!azure.accountName) return undefined;
-  return AzureBlobStoredObjectDriver.create(
+  return AzureBlobStoredObjectDriverAdapter.create(
     resolveAzureCredentials({ config: azure, purpose: "write", identity: azure.identity }),
   );
 }

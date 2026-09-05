@@ -9,6 +9,7 @@
 import type {
   Agent,
   AgentConfig,
+  ConnectedAgentConfig,
   ConnectedAgentIdentity,
   UpdateAgentCommand,
 } from "@langwatch/agent-contract";
@@ -18,12 +19,12 @@ import type { AgentCopyRecord, PersistAgentInput } from "../../repositories/agen
 import { AgentRepository } from "../../repositories/agent.repository";
 import { AgentService } from "../agent.service";
 
-function config(overrides: Partial<AgentConfig> = {}): AgentConfig {
+function config(overrides: Partial<ConnectedAgentConfig> = {}): ConnectedAgentConfig {
   return {
     parameters: [],
     sdk: { name: "langwatch", version: "1.0.0", language: "python" },
     ...overrides,
-  } as AgentConfig;
+  } as ConnectedAgentConfig;
 }
 
 function identity(overrides: Partial<ConnectedAgentIdentity> = {}): ConnectedAgentIdentity {
@@ -222,7 +223,7 @@ describe("AgentService.registerConnected", () => {
         id: "agent_2",
         projectId: "project_1",
         name: "support-agent-renamed",
-        config: config({ timeoutMs: 9_000 } as Partial<AgentConfig>),
+        config: config({ timeoutMs: 9_000 } as Partial<ConnectedAgentConfig>),
         identity: identity(),
       });
 

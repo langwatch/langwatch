@@ -200,7 +200,7 @@ describe("PrismaSuiteRepository.findOrCreatePlanByName", () => {
         scope: { mode: "scenarios" },
         targets: [],
         scenarioIds: ["scenario_1"],
-        config: {},
+        config: { scope: { mode: "scenarios" }, targets: [] },
       });
 
       const sql = rawSqlFrom(executeRaw);

@@ -17,6 +17,7 @@ const runResult: SuiteRunResult = {
   setId: "set_1",
   jobCount: 1,
   skippedArchived: { scenarios: [], targets: [] },
+  items: [],
 };
 
 function harness(run = vi.fn().mockResolvedValue(runResult)) {

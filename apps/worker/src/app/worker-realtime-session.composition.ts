@@ -32,7 +32,7 @@ import {
   type GatewayRealtimeSessionCollaborators,
   type GatewaySpendConfirmationPort,
 } from "@langwatch/gateway-server";
-import { readCustomKeys } from "@langwatch/model-provider-server";
+import { EncryptedModelProviderCredentialAdapter } from "@langwatch/model-provider-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
@@ -217,7 +217,7 @@ class WorkerGatewayModelProviderCredentials extends GatewayModelProviderCredenti
   }
 
   readCustomKeys(stored: unknown): Record<string, unknown> {
-    const read = readCustomKeys(stored, this.encryption);
+    const read = EncryptedModelProviderCredentialAdapter.readCustomKeys(stored, this.encryption);
     return read.state === "read" ? read.keys : {};
   }
 }

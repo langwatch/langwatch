@@ -16,8 +16,8 @@ import {
 } from "@langwatch/agent-contract";
 import { describe, expect, it, vi } from "vitest";
 import { createMemoryStateStore } from "../../adapters/connected-agent-state.adapter";
-import type { AgentRepository } from "../../repositories/agent.repository";
 import type { ConnectCredentialPort } from "../../ports/connect-credential.port";
+import type { AgentLastSeenWriter } from "../../projections/connected-agent-presence.projection";
 import { createConnectedAgentRuntime } from "../connected-agent-runtime.service";
 import { AgentSessionCore } from "../connected-agent-session.service";
 import { LongPollTransport } from "../connected-agent-long-poll.service";
@@ -29,13 +29,13 @@ const credentials = { authorization: "Bearer sk-lw-test", projectId };
 const resolved = { project: { id: projectId, slug: "poll-lifecycle" }, userId: null };
 
 const fakeAgents = {} as AgentService;
-const fakeAgentRepository = { touchLastSeenAt: async () => undefined } as AgentRepository;
+const fakeAgentRepository: AgentLastSeenWriter = { touchLastSeenAt: async () => undefined };
 const fakeCredentials = {} as ConnectCredentialPort;
 const fakeAgentPlatformUrl = () => "https://example.test/agents";
 
 function registeringAgentService(): AgentService {
   return {
-    registerConnected: async (input) =>
+    registerConnected: async (input: Parameters<AgentService["registerConnected"]>[0]) =>
       ({
         id: input.id,
         name: input.name,

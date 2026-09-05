@@ -90,7 +90,11 @@ describe("the scenario runner's outbound fence", () => {
   });
 
   describe("given either setting of BLOCK_LOCAL_HTTP_CALLS", () => {
-    const toggles = [{}, { BLOCK_LOCAL_HTTP_CALLS: "true" }, { BLOCK_LOCAL_HTTP_CALLS: "false" }];
+    const toggles: Record<string, string>[] = [
+      {},
+      { BLOCK_LOCAL_HTTP_CALLS: "true" },
+      { BLOCK_LOCAL_HTTP_CALLS: "false" },
+    ];
 
     describe("when the runner validates a cloud metadata endpoint", () => {
       /** @scenario "Cloud metadata endpoints are blocked even when BLOCK_LOCAL_HTTP_CALLS is <toggle>" */

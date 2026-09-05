@@ -5,7 +5,12 @@
  *
  * @see specs/agents/connected-agents.feature
  */
-import type { Agent, AgentConfig, UpdateAgentCommand } from "@langwatch/agent-contract";
+import type {
+  Agent,
+  AgentConfig,
+  ConnectedAgentConfig,
+  UpdateAgentCommand,
+} from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
 import type { AgentsAuditLogPort, AgentsWorkflowPort } from "../../ports/agent.port";
 import type { AgentCopyRecord, PersistAgentInput } from "../../repositories/agent.repository";
@@ -78,7 +83,13 @@ class MemoryAgentRepository extends AgentRepository {
   }
 
   async create(input: PersistAgentInput): Promise<Agent> {
-    const agent = connectedAgent({ ...input, config: input.config });
+    const { identity, type, ...rest } = input;
+    const agent = connectedAgent({
+      ...rest,
+      ...identity,
+      type: type as "connected",
+      config: input.config as ConnectedAgentConfig,
+    });
     this.agents.push(agent);
     return agent;
   }
