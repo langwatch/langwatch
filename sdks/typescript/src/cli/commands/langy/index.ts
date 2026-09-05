@@ -24,6 +24,7 @@ import {
   waitForRequests,
 } from "./requests";
 import { startLangySession } from "./session";
+import { noticeRows } from "./ui";
 
 export interface LangyCommandOptions {
   /** The one thing the command does today. A bare `langwatch langy` does it too. */
@@ -109,7 +110,11 @@ async function shareControl(root: string): Promise<void> {
   if (choice.action === "quit") return;
   if (choice.action === "cancel") {
     await api.cancel({ requestId: choice.request.id });
-    console.log("Cancelled. The conversation has been told.");
+    for (const line of noticeRows(
+      "Cancelled this request. The conversation has been told.",
+    )) {
+      console.log(line);
+    }
     return;
   }
 

@@ -22,6 +22,8 @@ import {
   type ControlApi,
   type ControlRequest,
 } from "../requests";
+import type { KeyEvent, KeySource } from "../approval";
+import type { UiWriter } from "../ui";
 
 const ENDPOINT = "https://app.langwatch.test";
 
@@ -315,7 +317,9 @@ describe("given the share-control command", () => {
 
       const picker = asked[0]!.choices as Array<{ description: string }>;
       expect(picker[0]!.description).toBe("project ACME Shop, asked just now");
-      expect(picker[1]!.description).toBe("project ACME Shop, asked 3 min ago");
+      expect(picker[1]!.description).toBe(
+        "project ACME Shop, asked 3 minutes ago",
+      );
     });
   });
 
@@ -384,6 +388,152 @@ describe("given the share-control command", () => {
       expect(requests).toHaveLength(1);
       expect(waiting).toHaveBeenCalledTimes(1);
       expect(slept).toEqual([5_000, 5_000]);
+    });
+  });
+});
+
+describe("given a terminal that can draw the question", () => {
+  const ANSI_COLOURS = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+  const plain = (text: string): string => text.replace(ANSI_COLOURS, "");
+
+  /** A screen that keeps the box and the lines, and a keyboard to answer with. */
+  function boxScreen() {
+    let drawn: string[] = [];
+    const lines: string[] = [];
+    let listener: ((key: KeyEvent) => void) | null = null;
+    const writer: UiWriter = {
+      line: (text) => {
+        drawn = [];
+        lines.push(plain(text));
+      },
+      draw: (block) => {
+        drawn = block.map(plain);
+      },
+      erase: () => {
+        drawn = [];
+      },
+      interactive: true,
+    };
+    const keys: KeySource = {
+      listen: (onKey) => {
+        listener = onKey;
+        return () => {
+          listener = null;
+        };
+      },
+    };
+    return {
+      writer,
+      keys,
+      lines,
+      get drawn() {
+        return drawn;
+      },
+      press: (key: KeyEvent) => listener?.(key),
+    };
+  }
+
+  const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+  describe("when one conversation asked for this folder", () => {
+    /** @scenario "The request is asked in the same box as a permission question" */
+    it("draws the folder, the conversation and the two answers", async () => {
+      const screen = boxScreen();
+      const request = requestNamed("req_1", "Instrument tracing in acme-app");
+
+      const choice = chooseRequest({
+        requests: [request],
+        root: "/work/acme",
+        writer: screen.writer,
+        keys: screen.keys,
+      });
+      await settle();
+
+      const box = screen.drawn.join(" ").replace(/[│╭╮╰╯─]/g, " ").replace(/\s+/g, " ");
+      expect(screen.drawn[0]).toContain("Langy wants to work in acme");
+      expect(box).toContain("Instrument tracing in acme-app");
+      expect(box).toContain("Project ACME Shop");
+      expect(box).toContain("/work/acme");
+      expect(box).toContain("Do you want to share this folder?");
+      expect(box).toContain("❯ 1. Share this folder with Langy");
+      expect(box).toContain("2. Cancel this request");
+      expect(box).toContain("Enter or a number to answer");
+
+      screen.press({ name: "return" });
+      await expect(choice).resolves.toEqual({ action: "approve", request });
+      expect(screen.drawn).toEqual([]);
+      expect(screen.lines.join("\n")).toContain(
+        '⏺ Sharing this folder with "Instrument tracing in acme-app".',
+      );
+    });
+
+    /** @scenario "The request is asked in the same box as a permission question" */
+    it("cancels the request on the second option", async () => {
+      const screen = boxScreen();
+      const request = requestNamed("req_1", "Instrument tracing");
+
+      const choice = chooseRequest({
+        requests: [request],
+        root: "/work/acme",
+        writer: screen.writer,
+        keys: screen.keys,
+      });
+      await settle();
+      screen.press({ name: "2", sequence: "2" });
+
+      await expect(choice).resolves.toEqual({ action: "cancel", request });
+      expect(screen.drawn).toEqual([]);
+    });
+
+    it("leaves the request open on Escape", async () => {
+      const screen = boxScreen();
+
+      const choice = chooseRequest({
+        requests: [requestNamed("req_1", "Instrument tracing")],
+        root: "/work/acme",
+        writer: screen.writer,
+        keys: screen.keys,
+      });
+      await settle();
+      screen.press({ name: "escape" });
+
+      await expect(choice).resolves.toEqual({ action: "quit" });
+      expect(screen.lines.join("\n")).toContain("The request stays open");
+    });
+  });
+
+  describe("when two conversations asked for this folder", () => {
+    /** @scenario "Several open requests become a picker" */
+    it("picks one in the same box, then asks to share the folder", async () => {
+      const screen = boxScreen();
+      const first = {
+        ...requestNamed("req_1", "Instrument tracing"),
+        createdAt: new Date(Date.now() - 600_000).toISOString(),
+      };
+      const second = requestNamed("req_2", "Add a retry to the agent");
+
+      const choice = chooseRequest({
+        requests: [first, second],
+        root: "/work/acme",
+        writer: screen.writer,
+        keys: screen.keys,
+      });
+      await settle();
+
+      const picker = screen.drawn.join(" ").replace(/\s+/g, " ");
+      expect(picker).toContain("Which Langy session should get this folder?");
+      expect(picker).toContain("Instrument tracing");
+      expect(picker).toContain("Add a retry to the agent");
+      expect(picker).toContain("project ACME Shop");
+
+      // The newest request is the first row, so the second row is the older
+      // conversation.
+      screen.press({ name: "2", sequence: "2" });
+      await settle();
+      expect(screen.drawn.join(" ")).toContain("Do you want to share this folder?");
+
+      screen.press({ name: "return" });
+      await expect(choice).resolves.toEqual({ action: "approve", request: first });
     });
   });
 });

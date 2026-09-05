@@ -30,24 +30,34 @@ import {
   type UiWriter,
 } from "./ui";
 
-/** One row of the selector. */
-export interface ApprovalOption {
-  value: TerminalPermissionDecision;
+/** One row of a box. */
+export interface BoxOption<T> {
+  value: T;
   label: string;
 }
 
-/** Everything the box shows for one ask. */
-export interface ApprovalCard {
+/** Everything a box shows for one question. */
+export interface BoxCard<T> {
   /** The heading in the top border, naming the folder. */
   title: string;
-  /** The command or the path the answer is about. */
+  /** The command, the path or the conversation the answer is about. */
   subject: string;
-  /** Why the call stopped, and the time limit when there is one. */
+  /** Why the question is being asked, and the time limit when there is one. */
   description: string;
-  options: ApprovalOption[];
-  /** The patterns the session grant would cover, named under the options. */
-  patterns: string[];
+  /** The line above the options. */
+  question: string;
+  options: Array<BoxOption<T>>;
+  /** The keys the footer names. */
+  hint: string;
+  /** The patterns a session grant would cover, named under the options. */
+  patterns?: string[];
 }
+
+/** One row of the permission selector. */
+export type ApprovalOption = BoxOption<TerminalPermissionDecision>;
+
+/** Everything the box shows for one permission ask. */
+export type ApprovalCard = BoxCard<TerminalPermissionDecision>;
 
 /** What the developer answered in the terminal. */
 export interface TerminalApproval {
@@ -65,6 +75,10 @@ export interface OpenApproval {
 
 /** Opens the selector for one ask. */
 export type ApprovalPrompt = (card: ApprovalCard) => OpenApproval;
+
+/** The footer of the permission box. */
+export const APPROVAL_HINT =
+  "Enter or a number to answer · ↑↓ to choose · Esc to deny · or answer on the card in LangWatch";
 
 /** What the developer typed, after choosing to deny. */
 export const DENY_REASON_QUESTION =
@@ -150,7 +164,9 @@ export function approvalCardFor({
     title: approvalTitle({ call, workspaceName }),
     subject: summary,
     description: `${reason}${limit}`,
+    question: "Do you want to allow this?",
     options: approvalOptions(patterns),
+    hint: APPROVAL_HINT,
     patterns,
   };
 }
@@ -178,8 +194,6 @@ export function grantCoverageSentence(patterns: string[]): string | null {
 /** The widest the box is drawn, however wide the terminal is. */
 export const MAX_BOX_WIDTH = 100;
 
-const HINT =
-  "Enter or a number to answer · ↑↓ to choose · Esc to deny · or answer on the card in LangWatch";
 
 /**
  * The box, as the lines it occupies.
@@ -188,12 +202,12 @@ const HINT =
  * it drew and move the cursor back over exactly those rows when the selection
  * moves or the box is erased.
  */
-export function renderApprovalBox({
+export function renderBox<T>({
   card,
   selected,
   width = terminalWidth(),
 }: {
-  card: ApprovalCard;
+  card: BoxCard<T>;
   selected: number;
   width?: number;
 }): string[] {
@@ -214,7 +228,7 @@ export function renderApprovalBox({
     plain(`   ${line}`, `   ${chalk.gray(line)}`);
   }
   plain("");
-  plain("   Do you want to allow this?");
+  plain(`   ${card.question}`);
   card.options.forEach((option, index) => {
     const chosen = index === selected;
     const marker = `${chosen ? " ❯ " : "   "}${index + 1}. `;
@@ -227,7 +241,7 @@ export function renderApprovalBox({
       },
     );
   });
-  const coverage = grantCoverageSentence(card.patterns);
+  const coverage = grantCoverageSentence(card.patterns ?? []);
   if (coverage !== null) {
     plain("");
     for (const line of wrapWords(coverage, textWidth)) {
@@ -235,7 +249,7 @@ export function renderApprovalBox({
     }
   }
   plain("");
-  for (const line of wrapWords(HINT, textWidth)) {
+  for (const line of wrapWords(card.hint, textWidth)) {
     plain(`   ${line}`, `   ${chalk.gray(line)}`);
   }
 
@@ -330,61 +344,74 @@ export function createTerminalApprovals({
   return (card) => askApproval({ card, writer, keys, readReason, width });
 }
 
-/** Draws one ask and reads the answer. Exported so a test can drive it. */
-export function askApproval({
+/** An open box: the answer, and a way to close it before it is given. */
+export interface OpenBox<T> {
+  /** The answer, or null when the box was closed before one was given. */
+  answer: Promise<T | null>;
+  close: () => void;
+}
+
+/**
+ * Draws one box and reads the answer. Every question the terminal asks goes
+ * through this: the permission selector, and the request to share the folder.
+ *
+ * The box owns the bottom of the screen while it is open, so a command that
+ * finishes under it neither erases it nor scrolls it away.
+ */
+export function askBox<TValue, TAnswer = TValue>({
   card,
   writer,
   keys,
-  readReason,
   width = terminalWidth,
+  settle,
+  escape,
 }: {
-  card: ApprovalCard;
+  card: BoxCard<TValue>;
   writer: UiWriter;
   keys: KeySource;
-  readReason: (question: string) => Promise<string>;
   width?: () => number;
-}): OpenApproval {
+  /**
+   * What a chosen option answers with, read after the box is off the screen
+   * so anything it asks for is typed on a clean line. Left out, the value of
+   * the option is the answer.
+   */
+  settle?: (value: TValue) => TAnswer | Promise<TAnswer>;
+  /** What Escape answers with. Left out, Escape does nothing. */
+  escape?: { answer: TAnswer };
+}): OpenBox<TAnswer> {
   let selected = 0;
   let settled = false;
   let stopKeys: () => void = () => undefined;
-  let deliver: (value: TerminalApproval | null) => void = () => undefined;
-  const answer = new Promise<TerminalApproval | null>((resolve) => {
+  let deliver: (value: TAnswer | null) => void = () => undefined;
+  const answer = new Promise<TAnswer | null>((resolve) => {
     deliver = resolve;
   });
 
   const paint = (): void => {
-    writer.draw?.(renderApprovalBox({ card, selected, width: width() }));
+    writer.draw?.(renderBox({ card, selected, width: width() }), "box");
   };
 
-  const finish = (value: TerminalApproval | null): void => {
-    if (settled) return;
+  /** Takes the box off the screen, so what follows is typed on a clean line. */
+  const closeScreen = (): boolean => {
+    if (settled) return false;
     settled = true;
     stopKeys();
-    writer.erase?.();
-    deliver(value);
+    writer.erase?.("box");
+    return true;
   };
 
   const confirm = (): void => {
     const option = card.options[selected];
-    if (!option || settled) return;
-    if (option.value !== "deny") {
-      finish({ decision: option.value });
+    if (!option || !closeScreen()) return;
+    if (!settle) {
+      deliver(option.value as unknown as TAnswer);
       return;
     }
-    // The box goes away before the question, so the developer types on a
-    // clean line rather than over the frame.
-    settled = true;
-    stopKeys();
-    writer.erase?.();
-    void readReason(DENY_REASON_QUESTION).then((typed) => {
-      const reason = typed.trim();
-      deliver({ decision: "deny", ...(reason === "" ? {} : { reason }) });
-    });
+    void Promise.resolve(settle(option.value)).then(deliver);
   };
 
   const move = (step: number): void => {
-    selected =
-      (selected + step + card.options.length) % card.options.length;
+    selected = (selected + step + card.options.length) % card.options.length;
     paint();
   };
 
@@ -401,7 +428,7 @@ export function askApproval({
         move(1);
         return;
       case "escape":
-        finish({ decision: "deny" });
+        if (escape && closeScreen()) deliver(escape.answer);
         return;
       case "return":
       case "enter":
@@ -421,5 +448,40 @@ export function askApproval({
   });
 
   paint();
-  return { answer, close: () => finish(null) };
+  return {
+    answer,
+    close: () => {
+      if (closeScreen()) deliver(null);
+    },
+  };
+}
+
+/** Draws one permission ask and reads the answer. Exported so a test can drive it. */
+export function askApproval({
+  card,
+  writer,
+  keys,
+  readReason,
+  width = terminalWidth,
+}: {
+  card: ApprovalCard;
+  writer: UiWriter;
+  keys: KeySource;
+  readReason: (question: string) => Promise<string>;
+  width?: () => number;
+}): OpenApproval {
+  return askBox<TerminalPermissionDecision, TerminalApproval>({
+    card,
+    writer,
+    keys,
+    width,
+    // A denial reads one line of text, and it is typed after the box is off
+    // the screen rather than over the frame.
+    settle: async (decision) => {
+      if (decision !== "deny") return { decision };
+      const typed = (await readReason(DENY_REASON_QUESTION)).trim();
+      return { decision: "deny", ...(typed === "" ? {} : { reason: typed }) };
+    },
+    escape: { answer: { decision: "deny" } },
+  });
 }

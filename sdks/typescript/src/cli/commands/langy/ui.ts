@@ -133,7 +133,9 @@ export function askedAgo(createdAt: string, now: number = Date.now()): string {
   const seconds = Math.max(0, Math.round((now - at) / 1000));
   if (seconds < 60) return "asked just now";
   const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `asked ${minutes} min ago`;
+  if (minutes < 60) {
+    return `asked ${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  }
   const hours = Math.round(minutes / 60);
   return hours === 1 ? "asked 1 hour ago" : `asked ${hours} hours ago`;
 }
@@ -510,6 +512,25 @@ const HEADLINE_INDENT = 2;
 /** How many columns a result row and its continuations are indented by. */
 const CONTINUATION_INDENT = 5;
 
+/**
+ * One notice as the rows it takes: the glyph on the first row, and the rest
+ * of the words under it. The words break where they end, because a terminal
+ * that wraps on the column breaks them in the middle.
+ */
+export function noticeRows(
+  text: string,
+  {
+    width = terminalWidth(),
+    paint = (line: string) => line,
+  }: { width?: number; paint?: (line: string) => string } = {},
+): string[] {
+  const [first, ...rest] = wrapWords(text, Math.max(20, width - HEADLINE_INDENT));
+  return [
+    headlineRow(paint(first ?? "")),
+    ...rest.map((line) => continuationRow(paint(line))),
+  ];
+}
+
 /** The terminal side of a shared folder, over one writer. */
 export function createUi(
   writer: UiWriter = consoleWriter,
@@ -564,9 +585,7 @@ export function createUi(
     text: string,
     paint: (line: string) => string = (line) => line,
   ): void => {
-    const [first, ...rest] = fit(text, HEADLINE_INDENT);
-    emit(headlineRow(paint(first ?? "")));
-    for (const line of rest) emit(continuationRow(paint(line)));
+    for (const row of noticeRows(text, { width: width(), paint })) emit(row);
   };
 
   /** A line under a notice, wrapped the same way. */

@@ -21,8 +21,21 @@ import { buildAuthHeaders } from "../../../internal/api/auth";
 import { LANGWATCH_SDK_VERSION } from "../../../internal/constants";
 import { resolveCredentials } from "../../utils/apiKey";
 import { isLoggedIn, loadConfig } from "../../utils/governance/config";
+import {
+  askBox,
+  createStdinKeySource,
+  type BoxCard,
+  type KeySource,
+} from "./approval";
 import { LocalCallFailure } from "./errors";
-import { askedAgo, terminalWidth, wrapWords } from "./ui";
+import {
+  askedAgo,
+  consoleWriter,
+  noticeRows,
+  terminalWidth,
+  wrapWords,
+  type UiWriter,
+} from "./ui";
 
 /** How often the CLI looks again while it waits for a request. */
 export const REQUEST_POLL_INTERVAL_MS = 5_000;
@@ -315,22 +328,164 @@ export type RequestChoice =
   | { action: "cancel"; request: ControlRequest }
   | { action: "quit" };
 
+/** The heading of the box that asks for this folder. */
+export const shareRequestTitle = (root: string): string =>
+  `Langy wants to work in ${path.basename(root)}`;
+
+/** The footer of a box that asks for this folder. */
+const REQUEST_HINT =
+  "Enter or a number to answer · ↑↓ to choose · Esc to leave the request open";
+
+/** What the terminal says when the developer answered nothing. */
+const LEFT_OPEN_NOTICE =
+  "Nothing was shared. The request stays open, so run the command again when you want to share this folder.";
+
+/** The box that asks whether this folder goes to one conversation. */
+export function shareRequestCard({
+  request,
+  root,
+  now = Date.now(),
+}: {
+  request: ControlRequest;
+  root: string;
+  now?: number;
+}): BoxCard<"approve" | "cancel"> {
+  return {
+    title: shareRequestTitle(root),
+    subject: request.conversationTitle,
+    description: `Project ${request.projectName}, ${askedAgo(request.createdAt, now)}.\n${root}`,
+    question: "Do you want to share this folder?",
+    options: [
+      { value: "approve", label: "Share this folder with Langy" },
+      { value: "cancel", label: "Cancel this request" },
+    ],
+    hint: REQUEST_HINT,
+  };
+}
+
+/** The box that picks the conversation, when several asked for this folder. */
+export function requestPickerCard({
+  requests,
+  root,
+  now = Date.now(),
+}: {
+  requests: ControlRequest[];
+  root: string;
+  now?: number;
+}): BoxCard<string> {
+  return {
+    title: shareRequestTitle(root),
+    subject: `${requests.length} Langy conversations asked for this folder.`,
+    description: root,
+    question: "Which Langy session should get this folder?",
+    options: requests.map((entry) => ({
+      value: entry.id,
+      label: `${entry.conversationTitle} (${requestRowDescription(entry, now)})`,
+    })),
+    hint: REQUEST_HINT,
+  };
+}
+
 /**
- * Shows the open requests and asks what to do. One request offers Approve and
- * Cancel; several become a picker over their titles and projects first.
+ * Shows the open requests and asks what to do. One request offers to share
+ * the folder and to cancel; several become a picker over their titles and
+ * projects first.
+ *
+ * The question is drawn in the same boxed idiom as the permission selector,
+ * and settles into one notice, so the first screen of the session reads like
+ * every screen after it. Off a terminal there is nothing to draw on, so the
+ * question stays the list the prompts package renders.
  */
 export async function chooseRequest({
   requests,
   root,
   ask = prompts,
   now = Date.now(),
+  writer = consoleWriter,
+  keys,
 }: {
   requests: ControlRequest[];
   root: string;
   ask?: typeof prompts;
   now?: number;
+  writer?: UiWriter;
+  keys?: KeySource;
 }): Promise<RequestChoice> {
   const rows = collapseByConversation(requests);
+  if (rows.length === 0) return { action: "quit" };
+  if (writer.interactive === true && writer.draw) {
+    return chooseInBox({
+      rows,
+      root,
+      now,
+      writer,
+      keys: keys ?? createStdinKeySource(),
+    });
+  }
+  return chooseWithPrompts({ rows, root, now, ask });
+}
+
+/** The boxed question, on a terminal that can draw one. */
+async function chooseInBox({
+  rows,
+  root,
+  now,
+  writer,
+  keys,
+}: {
+  rows: ControlRequest[];
+  root: string;
+  now: number;
+  writer: UiWriter;
+  keys: KeySource;
+}): Promise<RequestChoice> {
+  const notice = (text: string): void => {
+    for (const line of noticeRows(text)) writer.line(line);
+  };
+
+  let request = rows[0];
+  if (rows.length > 1) {
+    const picked = await askBox<string>({
+      card: requestPickerCard({ requests: rows, root, now }),
+      writer,
+      keys,
+      escape: { answer: "" },
+    }).answer;
+    request = rows.find((entry) => entry.id === picked);
+    if (!request) {
+      notice(LEFT_OPEN_NOTICE);
+      return { action: "quit" };
+    }
+  }
+  if (!request) return { action: "quit" };
+
+  const answer = await askBox<"approve" | "cancel", "approve" | "cancel" | "quit">({
+    card: shareRequestCard({ request, root, now }),
+    writer,
+    keys,
+    escape: { answer: "quit" },
+  }).answer;
+  if (answer === "approve") {
+    notice(`Sharing this folder with "${request.conversationTitle}".`);
+    return { action: "approve", request };
+  }
+  if (answer === "cancel") return { action: "cancel", request };
+  notice(LEFT_OPEN_NOTICE);
+  return { action: "quit" };
+}
+
+/** The question as a list, for output that is piped rather than a terminal. */
+async function chooseWithPrompts({
+  rows,
+  root,
+  now,
+  ask,
+}: {
+  rows: ControlRequest[];
+  root: string;
+  now: number;
+  ask: typeof prompts;
+}): Promise<RequestChoice> {
   let request = rows[0];
   if (rows.length > 1) {
     const picked = await ask({
@@ -371,7 +526,6 @@ export async function chooseRequest({
   if (answer.action === "cancel") return { action: "cancel", request };
   return { action: "quit" };
 }
-
 /**
  * The open requests, waiting until one appears. The wait prints once and then
  * looks again on every interval, so a request recorded later is picked up

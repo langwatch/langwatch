@@ -16,7 +16,7 @@ import {
   askApproval,
   createTerminalApprovals,
   grantCoverageSentence,
-  renderApprovalBox,
+  renderBox,
   timeLimitSentence,
   type ApprovalCard,
   type KeyEvent,
@@ -136,7 +136,7 @@ describe("the options a permission ask offers", () => {
 describe("the box the selector draws", () => {
   /** @scenario "The selector says what the command is and what it changes" */
   it("frames the folder, the command, the reason and the three answers", () => {
-    const drawn = renderApprovalBox({ card, selected: 0, width: 79 }).map(plain);
+    const drawn = renderBox({ card, selected: 0, width: 79 }).map(plain);
 
     expect(drawn[0]).toContain("Langy wants to run in acme-support-dogfood");
     expect(drawn.join("\n")).toContain("uv run pytest");
@@ -160,7 +160,7 @@ describe("the box the selector draws", () => {
   describe("when the first option offers a session grant", () => {
     /** @scenario "The box says what the session grant covers" */
     it("names what every command the grant covers starts with", () => {
-      const drawn = renderApprovalBox({
+      const drawn = renderBox({
         card: approvalCardFor({
           call: bashCall(".venv/bin/python -c 'from app import x'"),
           workspaceName: "acme-support-dogfood",
@@ -206,7 +206,7 @@ describe("the box the selector draws", () => {
 
   describe("when an option names every pattern of a long chain", () => {
     it("wraps the label inside the frame", () => {
-      const drawn = renderApprovalBox({
+      const drawn = renderBox({
         card: approvalCardFor({
           call: bashCall("git add . && git commit -m x && git push"),
           workspaceName: "acme",
@@ -227,8 +227,8 @@ describe("the box the selector draws", () => {
 
   describe("when the selection moves", () => {
     it("moves the marker and nothing else", () => {
-      const first = renderApprovalBox({ card, selected: 0, width: 79 }).map(plain);
-      const second = renderApprovalBox({ card, selected: 1, width: 79 }).map(plain);
+      const first = renderBox({ card, selected: 0, width: 79 }).map(plain);
+      const second = renderBox({ card, selected: 1, width: 79 }).map(plain);
 
       expect(first).toHaveLength(second.length);
       expect(second.filter((line) => line.includes("❯"))).toHaveLength(1);
@@ -240,7 +240,7 @@ describe("the box the selector draws", () => {
 
   describe("when the heading is wider than the box", () => {
     it("cuts the heading rather than the frame", () => {
-      const wide = renderApprovalBox({
+      const wide = renderBox({
         card: { ...card, title: `Langy wants to run in ${"folder-".repeat(20)}` },
         selected: 0,
         width: 60,

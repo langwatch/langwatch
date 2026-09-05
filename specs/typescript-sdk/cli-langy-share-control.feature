@@ -35,6 +35,16 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       And prints that permission questions are answered here or on the card in LangWatch
 
     @unit
+    Scenario: The request is asked in the same box as a permission question
+      Given an open request shown in the terminal
+      Then the box heading names the folder
+      And the conversation title, the project and the folder read inside it
+      And the first option shares the folder and is selected
+      And the second option cancels the request
+      When I confirm the first option
+      Then the box is erased and one notice says the folder is shared
+
+    @unit
     Scenario: Cancelling tells the conversation
       Given an open request shown in the terminal
       When I cancel it
