@@ -1,0 +1,93 @@
+---
+title: Migrate from LiteLLM
+description: Map LiteLLM proxy keys, model lists, budgets, end-user ids and fallbacks to their LangWatch AI Gateway equivalents and move an application over with a base URL change.
+sidebarTitle: Migrate from LiteLLM
+---
+
+## What maps to what
+
+| LiteLLM proxy | LangWatch AI Gateway |
+|---|---|
+| Provider keys in `config.yaml` or the environment | A row per provider under **Settings > Model Providers**. See [Providers](/ai-gateway/providers/overview). |
+| A virtual key from `/key/generate` (`sk-...`) | A [virtual key](/ai-gateway/virtual-keys) (`vk-lw-...`), sent as `Authorization: Bearer`. |
+| `max_budget` and `budget_duration` on a key | A budget on the key: a limit in USD per day, week or month, block or warn. See [Budgets](/ai-gateway/budgets). |
+| `team_id` and team budgets | A key with **Ownership** on the team, and a budget on the team. |
+| `models` on a key | **Provider access** on the key: the providers and models it may call. |
+| `rpm_limit`, `tpm_limit` on a key | [Rate limits](/ai-gateway/rate-limits) on the key: requests per minute and per day. Tokens per minute are not enforced. |
+| `model_list` entries: `model_name` to `litellm_params.model` | The `provider/model` name on the request, or a model alias on the routing policy when the public name differs. See [Model naming](/ai-gateway/model-naming) and [Model aliases](/ai-gateway/model-aliases). |
+| `fallbacks` in `router_settings` | A [routing policy](/ai-gateway/governance/routing-policies): the provider rows a key tries, in order. |
+| `x-litellm-end-user-id` header, `user` body field | Both accepted as is. `X-LangWatch-End-User-Id` is the native header. |
+| `metadata` body field | `X-LangWatch-Metadata`, a request header with a JSON object, copied onto the spend event. The gateway does not read a `metadata` body field. |
+| Spend logs, `/spend/logs` | A [spend event](/ai-gateway/billing-events) per request, by webhook or over REST, and a trace per request in Trace Explorer. |
+
+Several `model_list` entries under one `model_name`, which LiteLLM balances across, have no equivalent: the gateway tries the rows of a routing policy in order.
+
+## 1. Move the credentials
+
+Add a row under **Settings > Model Providers** for each provider in your LiteLLM config. The LiteLLM model spellings carry over: `azure/<deployment>` and `bedrock/<model id>` are the same, and `vertex_ai/gemini-2.5-flash` is accepted as an alias of `vertex/gemini-2.5-flash`.
+
+## 2. Create the keys and budgets
+
+For each LiteLLM key, create a virtual key with the same budget and model list. From the CLI:
+
+```bash
+langwatch vk create \
+  --name acme-support-agent \
+  --scope team:<team_id> --trace-project <project_id> \
+  --budget-limit 100 --budget-window month --budget-breach block
+```
+
+A LiteLLM budget on a team becomes a budget with **Target** set to the team, under **AI Gateway > Budgets**. A per-end-user cap becomes an `attributed_user` budget. See [Budgets](/ai-gateway/budgets#per-end-user).
+
+## 3. Turn fallbacks into a routing policy
+
+```yaml
+# LiteLLM
+router_settings:
+  fallbacks:
+    - gpt-5-mini: ["azure-mini-eu"]
+```
+
+Create a routing policy under **AI Gateway > Routing policies** with the OpenAI row first and the Azure row second, map `gpt-5-mini` to `azure/acme-mini-eu` in its model aliases, and pick the policy under **Routing** on the key.
+
+## 4. Change the client
+
+<CodeGroup>
+
+```python Before
+client = OpenAI(
+    base_url="http://litellm.acme.internal:4000",
+    api_key="sk-...",
+)
+client.chat.completions.create(
+    model="gpt-5-mini",
+    messages=[...],
+    user="cust_8841",
+    extra_body={"metadata": {"plan": "pro"}},
+)
+```
+
+```python After
+client = OpenAI(
+    base_url="https://gateway.langwatch.ai/v1",
+    api_key="vk-lw-...",
+)
+client.chat.completions.create(
+    model="openai/gpt-5-mini",
+    messages=[...],
+    user="cust_8841",
+    extra_headers={"X-LangWatch-Metadata": '{"plan": "pro"}'},
+)
+```
+
+</CodeGroup>
+
+An application that sends `x-litellm-end-user-id` keeps working without a change. See [Python](/ai-gateway/sdks/python) and [TypeScript](/ai-gateway/sdks/typescript).
+
+## 5. Verify
+
+Send one request and check the response for `X-LangWatch-Gateway-Request-Id`. Open **Trace Explorer** in the key's project for the trace and **AI Gateway > Usage** for the spend.
+
+## Keep a LiteLLM proxy behind the gateway
+
+To move in stages, add the LiteLLM proxy as a [custom OpenAI-compatible provider](/ai-gateway/providers/custom-openai-compatible) with its URL as the base URL and a LiteLLM key as the API key. Keys created in LangWatch then reach it as `custom/<model_name>`, with LangWatch budgets, traces and spend events in front of it. Move providers to their own rows one at a time.

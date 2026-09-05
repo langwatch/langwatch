@@ -36,7 +36,7 @@ curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
   -d '{ "scope": {...}, "name": "customer-acme", "window": "month", "limit_usd": "250" }'
 ```
 
-- Send the same key and the same body again within **24 hours** and you get the original response back, with `X-Idempotent-Replay: true`. Nothing is created twice.
+- Send the same key and the same body again within **24 hours** and you get the original response back, with `X-Idempotent-Replay: true`. The server creates the resource once.
 - Send the same key with a **different** body and the request is refused: `409` with `error.code = "idempotency_error"`. The key already stands for a different request.
 - Retry while the first attempt is still running and you also get `409 idempotency_error`, so two racing retries cannot both create.
 - Only successful outcomes are stored. If the create failed, a retry runs it again for real.
@@ -208,8 +208,13 @@ Body (only `name` is required):
 ```
 
 - `scopes` defaults to the calling project. Team- and org-scoped keys need a scoped API key holding `virtualKeys:manage` at each requested scope; legacy project keys can only mint keys for their own project.
-- An org- or team-scoped key also needs a place for its traces and spend to land, and has to say where: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key). Without it, and without exactly one project scope naming a live project to take it from, creation refuses with `gateway_trace_project_ambiguous`. The same refusal covers a key scoped to several projects at once. An organization with no other live projects is exempt and the key gets its oldest live governance project, because there is nothing else to name; one with no governance project either refuses with `trace_project_required`. A `trace_project_id` that names a project this organization does not have refuses with `gateway_trace_project_unknown` rather than quietly resolving to somewhere else.
-- `trace_project_id` is decided once, when the key is written, and stored on it. Changing what the key is scoped to therefore never moves where its traces and spend land; send `trace_project_id` on the update to move it, validated the same way create validates it. Sending it as explicit `null` does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses, so it lands on the key's single project scope when exactly one names a live project, falls back to the organization's oldest live governance project when there are no other live projects to choose from, and is refused with `gateway_trace_project_ambiguous` when nothing selects a destination and the organization has live projects that could have been named. A key written before this was stored, in an organization that had no governance project to give it, can carry `null`: its traces are dropped and no budget counts its spend, so give it a `trace_project_id`.
+- An org- or team-scoped key also needs a place for its traces and spend to land, and has to say where. Pass `trace_project_id`, which requires `virtualKeys:manage` on that project. It is a destination, not a scope, and grants no access to the key.
+- Without `trace_project_id`, and without exactly one project scope naming a live project to take it from, creation refuses with `gateway_trace_project_ambiguous`. The same refusal covers a key scoped to several projects at once.
+- An organization with no other live projects is exempt, because no other project can be named, and the key gets its oldest live governance project. One with no governance project either refuses with `trace_project_required`. A `trace_project_id` that names a project this organization does not have refuses with `gateway_trace_project_unknown` rather than quietly resolving to somewhere else.
+- `trace_project_id` is decided once, when the key is written, and stored on it. Changing what the key is scoped to therefore never moves where its traces and spend land. Send `trace_project_id` on the update to move it, validated the same way create validates it.
+- Sending `trace_project_id` as explicit `null` does not clear it. It asks for the destination to be worked out again from what the key is now, under the same rules create uses.
+- That second pass lands on the key's single project scope when exactly one names a live project, and falls back to the organization's oldest live governance project when there are no other live projects to choose from. It is refused with `gateway_trace_project_ambiguous` when no scope selects a destination and the organization has live projects that could have been named.
+- A key written before this was stored, in an organization that had no governance project to give it, can carry `null`. Its traces are dropped and no budget counts its spend, so give it a `trace_project_id`.
 - `trace_project_archived` says the project the key traces into has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Point the key somewhere else if that is not what you want.
 - `budget` creates a budget atomically with the key and manages exactly that row on later updates: the key can never exist without the cap you asked for. Windows: `day`, `week`, `month`.
 - `routing_mode` is one of `none` (default: no silent failover), `fallback_all`, or `policy` (requires `routing_policy_id`).
@@ -264,7 +269,9 @@ Body (all fields optional):
 }
 ```
 
-`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope, and does not move where the key's traces and spend land. `trace_project_id` does: omitting it leaves the destination alone, a value moves it, and explicit `null` re-resolves it under the create-time rules rather than clearing it. `budget: null` archives the key's own cap (spend history is retained); omitting `budget` leaves it alone. `expires_at` follows the same three-way rule: omitted leaves the date alone, `null` clears it, and a date moves it. An expired key accepts this patch like any other, which is how it goes back into service without a new secret.
+`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope. It does not move where the key's traces and spend land. `trace_project_id` does: omitting it leaves the destination alone, a value moves it, and explicit `null` re-resolves it under the create-time rules rather than clearing it.
+
+`budget: null` archives the key's own cap and retains its spend history; omitting `budget` leaves it alone. `expires_at` follows the same three-way rule: omitted leaves the date alone, `null` clears it, and a date moves it. An expired key accepts this patch like any other, which is how it goes back into service without a new secret.
 
 ### Rotate, disable, enable, revoke
 
@@ -394,7 +401,9 @@ POST /budgets/:id/reset
 POST /budgets/:id/reset?end_user_id=u_123      // one end-user bucket of a template
 ```
 
-Moves the budget's period boundary to now and recomputes the next reset (`gatewayBudgets:update`; optional JSON body `{"reason": "..."}` for the audit log). Recorded spend is **never** mutated: the ledger and every emitted billing event are immutable, so reconciliation is unaffected. On calendar windows this truncates the running period and the next boundary stays calendar; on `manual` windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets one end-user bucket's boundary and leaves the template period untouched. Returns the updated budget row.
+Moves the budget's period boundary to now and recomputes the next reset (`gatewayBudgets:update`; optional JSON body `{"reason": "..."}` for the audit log). Recorded spend is **never** mutated: the ledger and every emitted billing event are immutable, so reconciliation is unaffected.
+
+On calendar windows this truncates the running period and the next boundary stays calendar; on `manual` windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets one end-user bucket's boundary and leaves the template period untouched. Returns the updated budget row.
 
 ### End-user spend
 
@@ -410,7 +419,7 @@ Soft archive: preserves ledger history, stops enforcement on new requests. Retur
 
 ## Provider bindings
 
-Provider credentials, rate limits, and fallback priority live on the platform-wide ModelProvider: use `/api/gateway-platform/v1/model-providers` or the Advanced (Gateway) tab in the dashboard. Budgets reference providers by ModelProvider id in `provider_key`. The `/providers` routes on this API answer `410`.
+Provider credentials, rate limits, and fallback priority live on the platform-wide ModelProvider: use `/api/gateway-platform/v1/model-providers` or the Advanced (Gateway) section in the dashboard. Budgets reference providers by ModelProvider id in `provider_key`. The `/providers` routes on this API answer `410`.
 
 ## Cache rules
 
