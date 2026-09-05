@@ -108,26 +108,27 @@ const registry = {
     tips: [
       "Read `meta.parameters`; it lists every parameter the SQL declares that the request left unset",
       "Send a value for each under `parameters`, keyed by the name inside the braces: `{since:DateTime}` reads `parameters.since`",
-      "`period_start` and `period_end` are the exception; send them as `timeWindow: { start, end }`, never under `parameters`",
-      "`period_granularity_seconds` is also an exception; send it as the request's own `granularitySeconds` field, never under `parameters`",
+      "`dashboard_context_period_start` and `dashboard_context_period_end` are the exception; send them as `timeWindow: { start, end }`, never under `parameters`",
+      "`dashboard_context_granularity_seconds` is also an exception; send it as the request's own `granularitySeconds` field, never under `parameters`",
     ],
   },
   lwql_reserved_parameter_supplied: {
     tips: [
       "Read `meta.parameters`; it lists the reserved names the request set for itself",
-      "`period_start` and `period_end` are supplied by the surface showing the chart; send `timeWindow: { start, end }` instead and drop them from `parameters`",
+      "`dashboard_context_period_start` and `dashboard_context_period_end` are supplied by the surface showing the chart; send `timeWindow: { start, end }` instead and drop them from `parameters`",
+      "`dashboard_context_granularity_seconds` is likewise supplied by the surface; drop it from `parameters` and send it as the request's own `granularitySeconds` field instead",
     ],
   },
   lwql_reserved_parameter_type: {
     tips: [
       "Read `meta.parameters`; it lists the reserved names declared with the wrong type",
-      "Declare each as `DateTime` or `DateTime64`, for example `{period_start:DateTime}`; the interval they describe is half-open, `>= {period_start:DateTime} AND < {period_end:DateTime}`",
+      "Declare each as `DateTime` or `DateTime64`, for example `{dashboard_context_period_start:DateTime}`; the interval they describe is half-open, `>= {dashboard_context_period_start:DateTime} AND < {dashboard_context_period_end:DateTime}`",
     ],
   },
   lwql_granularity_parameter_type: {
     tips: [
       "Read `meta.parameters`; it lists the parameter whose declaration was refused",
-      "Declare period_granularity_seconds as UInt32, for example {period_granularity_seconds:UInt32}",
+      "Declare dashboard_context_granularity_seconds as UInt32, for example {dashboard_context_granularity_seconds:UInt32}",
       "When the surface supplies the step itself, it must be one of the offered steps: 1 second, 1 minute, or 1 hour",
     ],
   },
@@ -139,7 +140,7 @@ const registry = {
   },
   lwql_granularity_requires_window: {
     tips: [
-      "A chart declaring period_granularity_seconds must also declare {period_start:DateTime} and {period_end:DateTime}",
+      "A chart declaring dashboard_context_granularity_seconds must also declare {dashboard_context_period_start:DateTime} and {dashboard_context_period_end:DateTime}",
       "The bucket budget is computed against the period those two bounds describe",
     ],
   },
@@ -147,6 +148,18 @@ const registry = {
     tips: [
       "The LangWatchQL feature is not enabled for this project; retrying will not help",
       "Ask an administrator to enable the SQL workbench for this project",
+    ],
+  },
+  custom_chart_playground_not_enabled: {
+    tips: [
+      "The custom-chart-playground feature is not enabled for this project; retrying will not help",
+      "Use the lwql-charts skill / `langwatch chart` commands for a saved dashboard chart instead",
+    ],
+  },
+  custom_graph_writes_disabled_for_playground: {
+    tips: [
+      "The custom-chart-playground is enabled for this project, which turns off creating or editing dashboard graphs; retrying will not help",
+      "Use the playground-widgets skill / `langwatch playground-widget` commands instead",
     ],
   },
   saved_workbench_chart_already_exists: {
@@ -180,6 +193,12 @@ const registry = {
       "Save the chart again from the workbench to replace the unreadable definition",
     ],
   },
+  saved_workbench_charts_disabled_for_playground: {
+    tips: [
+      "The custom-chart-playground is enabled for this project, which turns off saved workbench charts; retrying will not help",
+      "Use the playground-widgets skill / `langwatch playground-widget` commands instead",
+    ],
+  },
   lwql_unknown_identifier: {
     tips: [
       "Check the column name against the dataset's columns; a typo is the usual cause",
@@ -190,6 +209,12 @@ const registry = {
     tips: [
       "The LangWatchQL analytics SQL API is not provisioned on this deployment; retrying will not help",
       "Contact support to have it enabled for this workspace",
+    ],
+  },
+  lwql_provisioning_incomplete: {
+    tips: [
+      "The deployment's LangWatchQL access is provisioned, but the identity's grants on one dataset this query needs are incomplete",
+      "This is a platform-side gap, not a per-workspace setting; retry shortly, and contact support if it persists",
     ],
   },
   page_too_deep: {
@@ -550,6 +575,11 @@ const registry = {
   },
   langy_model_not_configured: {
     tips: ["Pick a model in the project's model settings, then retry"],
+  },
+  langy_skill_not_available: {
+    tips: [
+      "This skill is gated by a feature flag that is off for this project — use an available alternative instead of retrying",
+    ],
   },
   langy_model_not_allowed: {
     tips: ["Choose one of the models configured for this project and retry"],

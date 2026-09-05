@@ -86,7 +86,10 @@ func (rpc *RPC) HandleProbe(ctx context.Context, req *probeRequest) (*probeRespo
 	// never a real token — because a capability's SignatureKey encodes presence, not
 	// the secret.
 	caps := []app.Capability{github.New(githubTokenSentinel(req.HasGithubAuth), "", req.GithubRepoScopeKey)}
-	sig := domain.SignatureOf(req.ProjectID, req.ActorUserID, req.Model, req.EgressAllowlist, app.SignatureKeys(caps), req.MirrorTier, req.Harness)
+	// The probe wire shape carries no DisabledSkillIds field — not wired for
+	// probes yet, so nil here matches what a live worker's actual signature
+	// would use only when it too has none disabled.
+	sig := domain.SignatureOf(req.ProjectID, req.ActorUserID, req.Model, req.EgressAllowlist, app.SignatureKeys(caps), nil, req.MirrorTier, req.Harness)
 	return &probeResponse{Alive: rpc.app.HasLiveWorker(req.ConversationID, sig)}, nil
 }
 

@@ -48,8 +48,18 @@ export function sync(targetDir: string): void {
   // Same selection Langy's native generator uses (skills/_compiler/native.ts),
   // so the published set and the in-product set can never drift. Recipes nest
   // under recipes/<slug> in the published repo.
+  //
+  // A skill declaring `feature-flag` is excluded here specifically: this repo
+  // is a fully public, unauthenticated GitHub checkout, so there is no
+  // per-viewer flag to resolve — "gated" can only mean "not published yet".
+  // Langy still gets it (native.ts calls listPublishedSkills/listNativeSkills
+  // too, without this filter) and resolves the flag live, per caller.
   for (const skill of listPublishedSkills(skillsRoot)) {
     const target = skill.isRecipe ? path.join("recipes", skill.slug) : skill.slug;
+    if (skill.featureFlag) {
+      console.log(`  ⊘ ${target} (gated by ${skill.featureFlag}, not published)`);
+      continue;
+    }
     writeSkill(targetDir, target, skill.src);
     console.log(`  ✓ ${target}`);
   }

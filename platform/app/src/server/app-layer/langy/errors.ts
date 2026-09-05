@@ -127,6 +127,32 @@ export class LangyConversationIdUnadoptableError extends HandledError {
   }
 }
 
+/**
+ * The turn asked for a skill that exists but is gated off for this caller
+ * (HTTP 400) — same fate as an unknown skill id, since neither can be acted
+ * on. `flag` is named in the message so the caller (Langy itself, choosing
+ * from its own skill list) can self-correct to an ungated alternative
+ * instead of retrying the identical request.
+ */
+export class LangySkillNotAvailableError extends HandledError {
+  declare readonly code: "langy_skill_not_available";
+  constructor(
+    public readonly skillId: string,
+    public readonly flag: string,
+  ) {
+    super(
+      "langy_skill_not_available",
+      `The "${skillId}" skill is not enabled for this project (behind the "${flag}" feature flag). Do not retry with this skill — use an available alternative instead.`,
+      {
+        meta: { skillId, flag },
+        httpStatus: 400,
+        ...remediation("langy_skill_not_available"),
+      },
+    );
+    this.name = "LangySkillNotAvailableError";
+  }
+}
+
 /** No model is configured for the project's Langy (HTTP 409). */
 export class LangyModelNotConfiguredError extends HandledError {
   declare readonly code: "langy_model_not_configured";

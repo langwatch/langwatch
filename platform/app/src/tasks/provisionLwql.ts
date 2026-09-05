@@ -1,10 +1,13 @@
 /**
  * Deploy-time provisioning for LangWatchQL: creates the ClickHouse-native
  * views and the PostgreSQL approved views, and backfills the key-map table
- * from every project's `lwqlKey`. The ClickHouse access model (restricted
- * user, settings profile, grants, row policies) and the PostgreSQL-mapped
- * views are infra's job — terraform provisions both out of band, and this
- * task never touches either.
+ * from every project's `lwqlKey`. Outside SaaS it also reconciles the
+ * ClickHouse access model (restricted user, settings profile, grants, row
+ * policies) by default — see {@link shouldSelfProvisionLwqlAccessModel}. In
+ * SaaS that access model, and the PostgreSQL-mapped reader role, stay
+ * Terraform's job: Terraform provisions them out of band so it remains the
+ * single writer to that security boundary, and the unprivileged Cloud runtime
+ * never issues `CREATE USER`/`GRANT`.
  *
  * Runs after `clickhouseMigrate` (migration 00084 creates the key-map table
  * this task writes into) in `start:prepare:db`. A deploy with no `LWQL_*`
@@ -21,6 +24,7 @@
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
+import { env } from "~/env.mjs";
 import { lwqlConnectionFromEnv } from "../server/analytics/lwql/executor";
 import { LWQL_KEY_MAP_INSERT_SETTINGS } from "../server/analytics/lwql/lwqlKeyMap.repository";
 import {
@@ -32,12 +36,19 @@ import {
   productionLangWatchQLNames,
   productionPostgresApprovedViewStatements,
   productionPostgresReaderGrantStatements,
+  shouldSelfProvisionLwqlAccessModel,
   withTenancyOptOut,
 } from "../server/analytics/lwql/productionProvisioning";
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
+  lwqlClickHouseSetupStatements,
 } from "../server/analytics/lwql/provisioning";
+import {
+  lwqlSourceTables,
+  lwqlViewSetupStatements,
+  SHIPPED_LWQL_DEDUP,
+} from "../server/analytics/lwql/views";
 import { parseConnectionUrl } from "../server/clickhouse/goose";
 import { prisma } from "../server/db";
 
@@ -159,6 +170,56 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * Replaces every occurrence of each secret with a fixed marker.
+ *
+ * A ClickHouse error can echo the DDL that failed, and the access-model DDL
+ * embeds `LWQL_CLICKHOUSE_PASSWORD`; the admin `CLICKHOUSE_URL` can likewise
+ * surface in a connection error. Both are stripped before the message is
+ * logged or re-thrown. Literal `split`/`join` so no secret has to be escaped
+ * into a regexp. Empty/undefined secrets are skipped, never matched.
+ */
+export function redactSecrets(
+  text: string,
+  secrets: readonly (string | undefined)[],
+): string {
+  let redacted = text;
+  for (const secret of secrets) {
+    if (secret) redacted = redacted.split(secret).join("[REDACTED]");
+  }
+  return redacted;
+}
+
+/**
+ * Aborts the deploy when access-model reconciliation fails — the fail-closed
+ * path, not log-and-continue.
+ *
+ * The source GRANTs are applied before the row policies that scope them, so a
+ * failure part-way through can leave an existing ClickHouse view readable
+ * across tenants; continuing with the executor still available would serve
+ * those rows. Aborting is the safe state — the next run reconciles from
+ * scratch. Both the logged message and the re-thrown error are redacted, so
+ * neither this line nor the boot handler above it can leak the secrets the DDL
+ * carried.
+ */
+export function failClosedOnAccessModelReconciliation({
+  error,
+  secrets,
+}: {
+  error: unknown;
+  secrets: readonly (string | undefined)[];
+}): never {
+  const redacted = redactSecrets(errorMessage(error), secrets);
+  logger.error(
+    { error: redacted },
+    "lwql self-provisioning: failed to reconcile ClickHouse access model — aborting",
+  );
+  throw new Error(
+    `lwql self-provisioning: failed to reconcile ClickHouse access model: ${redacted}`,
+  );
+}
+
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: linear top-to-bottom provisioning sequence (Postgres views, grants, ClickHouse objects); splitting it would scatter the ordering it depends on.
 export default async function execute() {
   const connection = lwqlConnectionFromEnv();
   if (!connection) {
@@ -171,7 +232,7 @@ export default async function execute() {
 
   logger.info(
     { database: names.database, sourceDatabase },
-    "provisioning LangWatchQL objects — the ClickHouse access model and PostgreSQL-mapped views are provisioned by infra, out of band",
+    "provisioning LangWatchQL objects — outside SaaS the ClickHouse access model is reconciled here by default; in SaaS it and the PostgreSQL-mapped reader role are provisioned by Terraform, out of band",
   );
 
   // The schema the tables actually live in (Prisma's `?schema=` URL
@@ -205,6 +266,7 @@ export default async function execute() {
     throw error;
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: linear sequence of independent ClickHouse statement executions; the branches don't interact.
   await withAdminClickHouseClient(async (client) => {
     const statements = productionClickHouseObjectStatements({
       names,
@@ -240,6 +302,69 @@ export default async function execute() {
     // outage able to fail the backfill has already failed those and aborted
     // the deploy one step earlier.
     await backfillKeyMap({ client, names, sourceDatabase });
+
+    // Default outside SaaS, the exception being SaaS itself: there the
+    // ClickHouse access model (restricted user, settings profile, GRANTs, row
+    // policies) stays Terraform's job, out of band — Terraform is the single
+    // writer to that security boundary during incidents, the Cloud runtime
+    // identity is unprivileged by design, and issuing CREATE USER/GRANT here
+    // would be rejected against that server-managed identity (see
+    // productionProvisioning.ts). A self-hosted/dev deployment has no such
+    // Terraform job, so the app reconciles the model itself — closing the exact
+    // gap that leaves a newly-catalogued view (e.g. trace_metrics_by_minute)
+    // created but ungranted, failing ACCESS_DENIED, until someone re-runs the
+    // out-of-band job by hand. `LWQL_SELF_PROVISION_ACCESS_MODEL` overrides in
+    // both directions (see shouldSelfProvisionLwqlAccessModel).
+    if (
+      shouldSelfProvisionLwqlAccessModel({
+        override: process.env.LWQL_SELF_PROVISION_ACCESS_MODEL,
+        isSaas: env.IS_SAAS,
+      })
+    ) {
+      try {
+        const password = process.env.LWQL_CLICKHOUSE_PASSWORD;
+        if (!password) {
+          throw new Error(
+            "LWQL_SELF_PROVISION_ACCESS_MODEL=true but LWQL_CLICKHOUSE_PASSWORD is unset",
+          );
+        }
+        const lwqlTables = lwqlSourceTables({ names, sourceDatabase });
+        const accessStatements = lwqlClickHouseSetupStatements({
+          names,
+          password,
+          lwqlTables,
+          sourceDatabase,
+        });
+        for (const statement of accessStatements) {
+          await client.command({ query: statement });
+        }
+        // Must run *after* accessStatements above: the per-view GRANTs point
+        // at the restricted user accessStatements just (re)created, so a
+        // grant issued before the user still points at the replaced access
+        // entity (see views.ts's lwqlViewSetupStatements doc comment).
+        const viewStatements = lwqlViewSetupStatements({
+          names,
+          sourceDatabase,
+          dedup: SHIPPED_LWQL_DEDUP,
+        });
+        for (const statement of viewStatements) {
+          await client.command({ query: statement });
+        }
+        logger.info(
+          "lwql self-provisioning: ClickHouse access model (user, profile, grants, row policies) and view grants reconciled",
+        );
+      } catch (error) {
+        // The DDL above embeds LWQL_CLICKHOUSE_PASSWORD and dials CLICKHOUSE_URL;
+        // both are stripped before anything is logged or re-thrown.
+        failClosedOnAccessModelReconciliation({
+          error,
+          secrets: [
+            process.env.LWQL_CLICKHOUSE_PASSWORD,
+            process.env.CLICKHOUSE_URL,
+          ],
+        });
+      }
+    }
   });
 
   logger.info("LangWatchQL provisioning complete");

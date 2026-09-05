@@ -42,6 +42,12 @@ import type {
 import type { Protections } from "../../traces/protections";
 import { isUniqueConstraintError } from "../../utils/prismaErrors";
 import { allocateNextGridRow } from "../allocateNextGridRow";
+import {
+  CHART_GRID_DEFAULT_COL_SPAN,
+  CHART_GRID_DEFAULT_ROW_SPAN,
+  chartGridPlacementSchema,
+  fitsChartGridWidth,
+} from "../chartGrid";
 import { dashboardBelongsToProject } from "../dashboardBelongsToProject";
 import {
   getLangWatchQLService,
@@ -141,30 +147,24 @@ export interface SavedWorkbenchChartServiceDependencies {
   }) => Promise<number>;
 }
 
-/**
- * The ceiling a grid coordinate may carry. Far beyond any real dashboard, but
- * within Postgres's Int range — a larger value would overflow the column into
- * a generic 500 instead of this schema's named validation refusal.
- */
-const MAX_GRID_COORDINATE = 2_000_000_000;
-
-/** Grid bounds a chart may be placed with — the same 2-column grid the chart builder places onto. */
+/** Grid bounds a chart may be placed with — the same grid the chart builder places onto. */
 const placementSchema = z
   .object({
     dashboardId: z.string().min(1),
-    gridColumn: z.number().int().min(0).max(1).optional(),
-    gridRow: z.number().int().min(0).max(MAX_GRID_COORDINATE).optional(),
-    colSpan: z.number().int().min(1).max(2).optional(),
-    rowSpan: z.number().int().min(1).max(2).optional(),
+    ...chartGridPlacementSchema.partial().shape,
   })
   // Each field's own bounds pass a column/span pair that still overflows the
-  // grid — {gridColumn: 1, colSpan: 2} occupies columns 1 and 2, and column 2
-  // does not exist. Checked together so that combination is refused here
-  // rather than silently clipped or accepted by the placement it feeds.
-  .refine(({ gridColumn = 0, colSpan = 1 }) => gridColumn + colSpan <= 2, {
-    message: "gridColumn + colSpan must not exceed the 2-column grid",
-    path: ["colSpan"],
-  });
+  // grid — a card starting in the last column but two columns wide. Checked
+  // together so that combination is refused here rather than silently
+  // clipped or accepted by the placement it feeds.
+  .refine(
+    ({ gridColumn = 0, colSpan = CHART_GRID_DEFAULT_COL_SPAN }) =>
+      fitsChartGridWidth({ gridColumn, colSpan }),
+    {
+      message: "gridColumn + colSpan must not exceed the grid's columns",
+      path: ["colSpan"],
+    },
+  );
 
 export class SavedWorkbenchChartService {
   constructor(private readonly deps: SavedWorkbenchChartServiceDependencies) {}
@@ -467,8 +467,8 @@ export class SavedWorkbenchChartService {
       dashboardId: parsed.data.dashboardId,
       gridColumn: parsed.data.gridColumn ?? 0,
       gridRow,
-      colSpan: parsed.data.colSpan ?? 1,
-      rowSpan: parsed.data.rowSpan ?? 1,
+      colSpan: parsed.data.colSpan ?? CHART_GRID_DEFAULT_COL_SPAN,
+      rowSpan: parsed.data.rowSpan ?? CHART_GRID_DEFAULT_ROW_SPAN,
     });
     if (!row) throw new SavedWorkbenchChartNotFoundError();
 

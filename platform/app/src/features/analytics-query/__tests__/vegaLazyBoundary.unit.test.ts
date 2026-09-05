@@ -2,23 +2,23 @@
  * Where Vega is allowed to be reached from.
  *
  * Vega, Vega-Lite, vega-embed and the generated schema validator are several
- * megabytes that only Chart mode needs, and one ordinary-looking static import
- * from the workbench is all it takes to put every byte of it in the entry
- * chunk — with nothing visibly wrong. The import graph is what the bundler
- * splits on, so it is the import graph that is pinned here.
+ * megabytes that only a chart-rendering surface needs, and one
+ * ordinary-looking static import is all it takes to put every byte of it in
+ * the entry chunk — with nothing visibly wrong. The import graph is what the
+ * bundler splits on, so it is the import graph that is pinned here.
  *
  * The claim is containment: within this feature, every module that reaches a
  * Vega package is reachable only *behind a lazy boundary* — a module some
  * `Lazy…` wrapper loads with a dynamic `import()` and nothing imports directly.
  *
- * There are two such boundaries, and they are two because the surfaces mount
- * different components, not because the chunk differs: the workbench mounts
- * `LangWatchQLChartMode`, the dashboard widget mounts
- * `LangWatchQLWidgetChart`. Both reach `LangWatchQLVegaLiteChart` and so both
- * reach Vega; what matters is that neither is reachable statically. Pinning
- * only the workbench's boundary would have let the dashboard's chart be
- * imported directly from the grid — several megabytes back in the entry chunk,
- * with nothing visibly wrong.
+ * One such boundary: the dashboard widget mounts `LangWatchQLWidgetChart`,
+ * which reaches `LangWatchQLVegaLiteChart` and so reaches Vega; what matters
+ * is that it is not reachable statically. Pinning this boundary keeps the
+ * dashboard's chart from being imported directly from the grid — several
+ * megabytes back in the entry chunk, with nothing visibly wrong. (The
+ * workbench page and its own `LangWatchQLChartMode` boundary were removed
+ * along with the Custom query page; this is the one surface left that draws
+ * a Vega-Lite chart.)
  *
  * Node environment on purpose — this reads source, and evaluates none of it.
  */
@@ -40,11 +40,6 @@ const SRC_DIR = resolve(FEATURE_DIR, "../..");
  * its pair here — a boundary omitted is a boundary this suite does not check.
  */
 const LAZY_BOUNDARIES = [
-  {
-    wrapper: join(FEATURE_DIR, "components/LazyLangWatchQLChartMode.tsx"),
-    deferred: join(FEATURE_DIR, "components/LangWatchQLChartMode.tsx"),
-    specifier: 'import("./LangWatchQLChartMode")',
-  },
   {
     wrapper: join(FEATURE_DIR, "components/LazyLangWatchQLWidgetChart.tsx"),
     deferred: join(FEATURE_DIR, "components/LangWatchQLWidgetChart.tsx"),
@@ -166,9 +161,9 @@ const featureSourceFiles = (directory: string): string[] =>
   });
 
 describe("where the Vega runtime can be reached from", () => {
-  describe("given the workbench's own modules", () => {
+  describe("given this feature's own modules", () => {
     describe("when their static import graphs are walked", () => {
-      /** @scenario "Vega loads lazily from Chart mode only" */
+      /** @scenario "Vega loads lazily from the dashboard widget only" */
       it("reaches Vega from each deferred module, and from nothing that is not behind one", () => {
         const behindABoundary = new Set<string>();
         for (const { deferred } of LAZY_BOUNDARIES) {
@@ -186,7 +181,7 @@ describe("where the Vega runtime can be reached from", () => {
         expect(leaks.map((file) => file.replace(FEATURE_DIR, ""))).toEqual([]);
       });
 
-      /** @scenario "Each lazy Vega wrapper defers its own module, in Chart mode and on the dashboard widget" */
+      /** @scenario "The lazy Vega wrapper defers its own module, on the dashboard widget" */
       it.each(
         LAZY_BOUNDARIES.map((boundary) => [boundary.wrapper, boundary]),
       )("keeps %s free of everything it defers", (_name, {

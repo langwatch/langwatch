@@ -34,7 +34,8 @@ import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 
 import {
-  isClickHouseObjectUnavailableError,
+  isClickHouseObjectAccessDeniedError,
+  isClickHouseObjectMissingError,
   isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
   unknownIdentifierFromError,
@@ -42,6 +43,7 @@ import {
 import { toError } from "~/utils/posthogErrorCapture";
 
 import {
+  LangWatchQLProvisioningIncompleteError,
   LangWatchQLUnavailableError,
   LangWatchQLUnknownIdentifierError,
 } from "./errors";
@@ -245,8 +247,22 @@ function refusalFor({
   error: unknown;
   durationMs: number;
 }): unknown {
-  if (isClickHouseObjectUnavailableError(error)) {
+  // An unknown table/database or an access refusal cannot be the caller's SQL:
+  // the validator only lets catalog-approved names reach this point. Both mean
+  // this deployment's LangWatchQL objects or grants are incomplete, but not the
+  // same way, and the customer-facing codes say so differently.
+  if (isClickHouseObjectMissingError(error)) {
+    // The object itself is not there — the same "not provisioned here"
+    // condition as a null executor (no restricted identity configured at all).
     return new LangWatchQLUnavailableError({ reasons: [toError(error)] });
+  }
+  if (isClickHouseObjectAccessDeniedError(error)) {
+    // The object exists; this identity's grants on it are incomplete — narrower
+    // than "not provisioned," and purely our own gap rather than something a
+    // customer's workspace administrator could act on.
+    return new LangWatchQLProvisioningIncompleteError({
+      reasons: [toError(error)],
+    });
   }
   if (isClickHouseUnknownIdentifierError(error)) {
     return new LangWatchQLUnknownIdentifierError({

@@ -1012,3 +1012,10 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #   → Scenario: The dedicated PG role is read-only at the PostgreSQL layer
 #   → Scenario: The restricted identity cannot write through a PG-engine mapped table
 #   → Scenario: Every approved view is named under the prefix the reader's grants match
+
+  @unit
+  Scenario: A failed access-model reconciliation aborts the deploy without leaking the password
+    Given the self-provisioned ClickHouse access model whose DDL embeds the restricted user's password
+    When reconciling it fails and the error echoes that DDL
+    Then the deploy is aborted rather than continuing with the executor available
+    And the password and the admin connection string are redacted from anything logged or re-thrown

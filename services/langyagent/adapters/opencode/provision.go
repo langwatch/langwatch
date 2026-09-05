@@ -239,9 +239,7 @@ func (a *Agent) Provision(in ProvisionInput) error {
 				"permission": map[string]any{
 					"task":     "deny",
 					"question": "deny",
-					"skill": map[string]any{
-						"customize-opencode": "deny",
-					},
+					"skill":    skillPermissions(in.Creds.DisabledSkillIds),
 				},
 			},
 		},
@@ -403,6 +401,20 @@ func (a *Agent) Spawn(ctx context.Context, in SpawnInput) (*exec.Cmd, error) {
 	return cmd, nil
 }
 
+// skillPermissions builds the "skill" permission map for the build agent:
+// customize-opencode is always denied (see the comment above its caller), plus
+// a "deny" entry per flag-gated-off skill id in disabledSkillIds. opencode
+// removes a denied skill from <available_skills> as well as from execution,
+// so this is how a project's disabled flags actually hide a skill from the
+// model rather than merely blocking the call.
+func skillPermissions(disabledSkillIds []string) map[string]any {
+	perms := map[string]any{"customize-opencode": "deny"}
+	for _, id := range disabledSkillIds {
+		perms[id] = "deny"
+	}
+	return perms
+}
+
 // skillsDir is the directory opencode scans for a worker's skills:
 // $HOME/.config/opencode/skills. Each <name>/SKILL.md beneath it is discovered at
 // startup and exposed to the model as an invokable skill. Kept as one helper so
@@ -492,6 +504,10 @@ func buildWorkerEnv(workerHome, conversationID string, creds domain.Credentials,
 		// below) and the LLM virtual key (above).
 		"LANGWATCH_API_KEY="+creds.LangwatchAPIKey,
 		"LANGWATCH_ENDPOINT="+creds.LangwatchEndpoint,
+		// Without this, every project-scoped CLI call (playground-widget,
+		// trace search, analytics) fails with "No project is in scope"
+		// unless the worker also passes --project on each invocation.
+		"LANGWATCH_PROJECT_ID="+creds.ProjectID,
 		// The CLI's `ui call` names the conversation it is driving with this.
 		// A claim, not a credential: the control plane verifies the id belongs
 		// to the session key's owning user before doing anything.

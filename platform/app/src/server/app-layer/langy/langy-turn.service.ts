@@ -44,7 +44,12 @@ import {
   resolveLangyPrompt,
 } from "~/server/app-layer/langy/langyPromptRegistry";
 import type { LangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
-import { renderLangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
+import {
+  disabledSkillIds,
+  renderLangyTurnContext,
+  skillGateFlagFor,
+  skillGateFlags,
+} from "~/server/app-layer/langy/langyTurnContext.schema";
 import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import type {
   LangyMessageRepository,
@@ -56,8 +61,10 @@ import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/la
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import type { Session } from "~/server/auth";
 import { featureFlagService } from "~/server/featureFlag";
+import type { FeatureFlagKey } from "~/server/featureFlag/registry";
 import { getLangyTurnsCounter } from "~/server/metrics";
 import type { PromptService } from "~/server/prompt-config/prompt.service";
+import { LANGY_SKILLS } from "~/shared/langy/langySkills";
 import {
   LangyAgentUnavailableError,
   LangyConversationNotOwnedError,
@@ -66,6 +73,7 @@ import {
   LangyInsufficientScopeError,
   LangyModelNotAllowedError,
   LangyModelNotConfiguredError,
+  LangySkillNotAvailableError,
   LangyTurnInProgressError,
   LangyTurnNotStoppableError,
 } from "./errors";
@@ -85,6 +93,17 @@ const logger = createLogger("langwatch:langy:turn-service");
  * same bytes. Aliased here to keep the composition below readable.
  */
 const LANGY_OVERRIDE = LANGY_TURN_OVERRIDE_FALLBACK;
+
+/**
+ * Every skill id the worker can be handed, minus `client-command` (composer-
+ * intercepted, never reaches the agent — nothing to hide). The base for the
+ * per-turn disabled-skill computation below, so the worker is told about a
+ * flag-gated skill's absence the same way the wire schema already rejects an
+ * explicit request for it.
+ */
+const LANGY_SKILL_CATALOGUE_IDS = LANGY_SKILLS.filter(
+  (skill) => skill.source !== "client-command",
+).map((skill) => skill.id);
 
 /** Which path produced the turn's system-block override. */
 type LangyOverrideSource =
@@ -227,6 +246,67 @@ async function resolveLangyUiActionsOpen({
     );
     return false;
   }
+}
+
+/**
+ * Which of the given skill ids are gated off for this caller.
+ *
+ * Called ONCE per turn over the full skill catalogue (`LANGY_SKILL_CATALOGUE_IDS`)
+ * — never separately for the turn's requested ids — so a flag is resolved at
+ * most once no matter how many gated skills exist or were asked for. Its
+ * result serves two callers: rejecting a turn that explicitly asked for a
+ * gated skill (below), and telling the worker which skill ids to hide from
+ * the model entirely (`credentials.disabledSkillIds`).
+ *
+ * With zero gated skills in `ids` (the overwhelmingly common case today,
+ * since only the `playground-widgets` / `lwql-charts` pair declares a gate)
+ * this returns immediately with no flag lookup at all. Fails CLOSED per flag
+ * on a flag-store error: same reasoning as `resolveLangyUiActionsOpen` —
+ * treating an unreadable flag as off is the safe half of the trade both
+ * ways here, since it means the experimental skill
+ * (`release_custom_chart_playground`-gated) stays disabled AND the stable
+ * default it is mutually exclusive with stays available.
+ */
+async function resolveDisabledSkillIds({
+  ids,
+  userId,
+  projectId,
+  organizationId,
+}: {
+  ids: readonly string[];
+  userId: string;
+  projectId: string;
+  organizationId: string;
+}): Promise<string[]> {
+  const flagsToCheck = skillGateFlags(ids);
+  if (flagsToCheck.length === 0) return [];
+
+  const enabledFlags = new Set<string>();
+  await Promise.all(
+    flagsToCheck.map(async (flag) => {
+      try {
+        if (
+          // `flag` comes from a skill's own generated `feature-flag`
+          // front-matter (a plain string at the JSON boundary) — not a
+          // literal, so it can't be typed as `FeatureFlagKey` at its source.
+          await featureFlagService.isEnabled(flag as FeatureFlagKey, {
+            distinctId: userId,
+            projectId,
+            organizationId,
+          })
+        ) {
+          enabledFlags.add(flag);
+        }
+      } catch (error) {
+        logger.warn(
+          { error, projectId, flag },
+          "langy skill flag evaluation failed, treating the skill as gated off",
+        );
+      }
+    }),
+  );
+
+  return disabledSkillIds(ids, (flag) => enabledFlags.has(flag));
 }
 
 /**
@@ -1194,6 +1274,37 @@ export class LangyTurnService {
           ? uiActionsOpenResult.value
           : true;
 
+      // Resolved ONCE, over the full catalogue, for two callers: rejecting an
+      // explicit request for a gated skill (below, same as an unknown skill
+      // id would be at the zod boundary), and telling the worker which ids
+      // to hide from the model so it never even offers one this caller can't
+      // use. Costs nothing on the overwhelmingly common turn (no gated skill
+      // in the catalogue's current flag state): see `resolveDisabledSkillIds`.
+      const disabledSkills = await resolveDisabledSkillIds({
+        ids: LANGY_SKILL_CATALOGUE_IDS,
+        userId,
+        projectId,
+        organizationId: credentials.organizationId,
+      });
+      const requestedSkillIds = new Set(
+        (turnContext.skills ?? []).map((skill) => skill.id),
+      );
+      const disabledSkillId = disabledSkills.find((id) =>
+        requestedSkillIds.has(id),
+      );
+      if (disabledSkillId !== undefined) {
+        const flag = skillGateFlagFor(disabledSkillId);
+        // Counted exactly once: the outer catch classifies
+        // `LangySkillNotAvailableError` as `rejected`, so this path must not
+        // also increment a counter of its own.
+        // `flag` is always defined here: `disabledSkillIds` only returns ids
+        // `SKILL_GATES` (and therefore `skillGateFlagFor`) has an entry for.
+        throw new LangySkillNotAvailableError(disabledSkillId, flag ?? "");
+      }
+      if (disabledSkills.length > 0) {
+        credentials.disabledSkillIds = disabledSkills;
+      }
+
       // The per-turn user-message lane: what the user is looking at and the
       // turn-scoped cap note precede a clearly labelled ask, so the model
       // reads the DATA before the message that may refer to it.
@@ -1350,7 +1461,8 @@ export class LangyTurnService {
       getLangyTurnsCounter(
         error instanceof LangyTurnInProgressError
           ? "busy"
-          : error instanceof LangyAgentUnavailableError
+          : error instanceof LangyAgentUnavailableError ||
+              error instanceof LangySkillNotAvailableError
             ? "rejected"
             : "error",
       ).inc();

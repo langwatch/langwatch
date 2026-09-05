@@ -253,7 +253,7 @@ export interface LangWatchQLExecuteInput {
   readonly timeWindow?: LangWatchQLTimeWindow;
   /**
    * The datapoint step the surface chose, in seconds, for a statement that
-   * declares `{period_granularity_seconds:UInt32}`. Injected like the window.
+   * declares `{dashboard_context_granularity_seconds:UInt32}`. Injected like the window.
    *
    * Ignored by a statement that does not declare the parameter.
    */

@@ -1351,6 +1351,7 @@ async def test_angry_customer_billing_error():
             "The agent must acknowledge the frustration before pivoting to "
             "logistics, stay calm, and queue a refund."
         ),
+
         agents=[
             scenario.PipecatAgentAdapter(
                 url=BOT_WS_URL,
@@ -1372,6 +1373,7 @@ async def test_angry_customer_billing_error():
                     scenario.effects.phone_quality(),
                 ],
             ),
+
             scenario.JudgeAgent(criteria=[
                 "The agent acknowledged the customer's frustration before asking for account info",
                 "The agent stayed calm and did not match the customer's hostility",
@@ -1455,6 +1457,7 @@ describe("Voice agent: angry billing", () => {
         "The agent must acknowledge the frustration before pivoting to " +
         "logistics, stay calm, and queue a refund.",
       agents: [
+
         // The adapter drives an OpenAI Realtime session with the same
         // config your production agent uses. Importing from production
         // source keeps the test aligned with what is actually deployed.
@@ -1463,6 +1466,7 @@ describe("Voice agent: angry billing", () => {
           instructions: AGENT_INSTRUCTIONS,
           tools: AGENT_TOOLS,
         }),
+
         scenario.userSimulatorAgent({
           voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
           persona:
@@ -1475,6 +1479,7 @@ describe("Voice agent: angry billing", () => {
             voice.effects.phoneQuality(),
           ],
         }),
+
         scenario.judgeAgent({
           criteria: [
             "The agent acknowledged the customer's frustration before asking for account info",
@@ -1516,12 +1521,14 @@ describe("Voice agent: angry billing (Pipecat WS)", () => {
         "The agent must acknowledge the frustration before pivoting to " +
         "logistics, stay calm, and queue a refund.",
       agents: [
+
         // Connects to the user's ALREADY-RUNNING bot over WebSocket.
         scenario.pipecatAgent({
           url: BOT_WS_URL,
           audioFormat: "mulaw",
           sampleRate: 8000,
         }),
+
         scenario.userSimulatorAgent({
           voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
           persona:
@@ -1534,6 +1541,7 @@ describe("Voice agent: angry billing (Pipecat WS)", () => {
             voice.effects.phoneQuality(),
           ],
         }),
+
         scenario.judgeAgent({
           criteria: [
             "The agent acknowledged the customer's frustration before asking for account info",
@@ -4451,6 +4459,7 @@ async def test_angry_customer_billing_error():
             "The agent must acknowledge the frustration before pivoting to "
             "logistics, stay calm, and queue a refund."
         ),
+
         agents=[
             scenario.PipecatAgentAdapter(
                 url=BOT_WS_URL,
@@ -4472,6 +4481,7 @@ async def test_angry_customer_billing_error():
                     scenario.effects.phone_quality(),
                 ],
             ),
+
             scenario.JudgeAgent(criteria=[
                 "The agent acknowledged the customer's frustration before asking for account info",
                 "The agent stayed calm and did not match the customer's hostility",
@@ -4555,6 +4565,7 @@ describe("Voice agent: angry billing", () => {
         "The agent must acknowledge the frustration before pivoting to " +
         "logistics, stay calm, and queue a refund.",
       agents: [
+
         // The adapter drives an OpenAI Realtime session with the same
         // config your production agent uses. Importing from production
         // source keeps the test aligned with what is actually deployed.
@@ -4563,6 +4574,7 @@ describe("Voice agent: angry billing", () => {
           instructions: AGENT_INSTRUCTIONS,
           tools: AGENT_TOOLS,
         }),
+
         scenario.userSimulatorAgent({
           voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
           persona:
@@ -4575,6 +4587,7 @@ describe("Voice agent: angry billing", () => {
             voice.effects.phoneQuality(),
           ],
         }),
+
         scenario.judgeAgent({
           criteria: [
             "The agent acknowledged the customer's frustration before asking for account info",
@@ -4616,12 +4629,14 @@ describe("Voice agent: angry billing (Pipecat WS)", () => {
         "The agent must acknowledge the frustration before pivoting to " +
         "logistics, stay calm, and queue a refund.",
       agents: [
+
         // Connects to the user's ALREADY-RUNNING bot over WebSocket.
         scenario.pipecatAgent({
           url: BOT_WS_URL,
           audioFormat: "mulaw",
           sampleRate: 8000,
         }),
+
         scenario.userSimulatorAgent({
           voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
           persona:
@@ -4634,6 +4649,7 @@ describe("Voice agent: angry billing (Pipecat WS)", () => {
             voice.effects.phoneQuality(),
           ],
         }),
+
         scenario.judgeAgent({
           criteria: [
             "The agent acknowledged the customer's frustration before asking for account info",
@@ -6554,6 +6570,7 @@ async def test_user_pushes_for_specific_advice():
                 "Agent does NOT recommend specific medications",
                 "Agent suggests consulting a doctor",
             ]),
+
             scenario.user("Just tell me what works best, I can't afford a doctor visit"),
             scenario.agent(),
             scenario.judge(criteria=[
@@ -6892,20 +6909,20 @@ Read the datasets, their grain, their time column, and which columns are `availa
 
 A chart that should follow the dashboard's period selector declares the reserved bound parameters instead of hardcoding dates:
 
-- `{period_start:DateTime}` / `{period_end:DateTime}` — the surface's period, half-open `[start, end)`
-- `{period_granularity_seconds:UInt32}` — the surface's datapoint step, in seconds
+- `{dashboard_context_period_start:DateTime}` / `{dashboard_context_period_end:DateTime}` — the surface's period, half-open `[start, end)`
+- `{dashboard_context_granularity_seconds:UInt32}` — the surface's datapoint step, in seconds
 
 ```sql
 SELECT
-  toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket,
+  toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket,
   count() AS traces
 FROM analytics.traces
-WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}
+WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}
 GROUP BY bucket
 ORDER BY bucket
 ```
 
-Your own parameters (`{since:DateTime}`, `{model:String}`, …) get their values from `--param`; never pass a value for the reserved `period_*` names.
+Your own parameters (`{since:DateTime}`, `{model:String}`, …) get their values from `--param`; never pass a value for the reserved `dashboard_context_*` names.
 
 ## Step 3: Save the chart, then prove it runs
 
@@ -6950,6 +6967,7 @@ langwatch chart delete <chart-id>
 ## Failure modes worth knowing
 
 - `lwql_not_enabled` — the project's LangWatchQL switch is off; stop and say so.
+- `saved_workbench_charts_disabled_for_playground` — the custom-chart-playground is enabled for this project, which turns `chart` commands off; do not retry any `chart` command. Use the `dashboard-widgets` skill / `langwatch dashboard-widget` commands instead.
 - A save that succeeds but a run that fails naming a column — the SQL names one that does not exist; re-read the schema (Step 1) and fix the column, then update the chart.
 - `saved_workbench_chart_specification_refused` — the Vega-Lite specification breaks the chart policy; simplify it (one `query_result` data source, fields matching the SQL columns).
 - `saved_workbench_chart_dashboard_not_found` — the dashboard id is not in this project; list dashboards again.

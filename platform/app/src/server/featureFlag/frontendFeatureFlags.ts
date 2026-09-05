@@ -74,6 +74,9 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_governance_billed_cost_enabled",
   "release_langy_enabled",
   "release_langy_promo_enabled",
+  // Gates the custom-chart-playground page outside local development; the
+  // page falls back to NODE_ENV === "development" so dev stays unaffected.
+  "release_custom_chart_playground",
   // Gates the Optimize this prompt menu item alongside the UI-action channel
   // it hands off to; the server-side dispatch checks the same flag.
   "release_langy_ui_actions",

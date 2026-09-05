@@ -883,6 +883,50 @@
       ]
     },
     {
+      "id": "dashboard-widgets",
+      "name": "Dashboard Widgets",
+      "description": "Custom React widgets backed by LangWatchQL queries, authored and edited in place on dashboards",
+      "surfaces": {
+        "code": {
+          "cli": [
+            "dashboard-widget schema",
+            "dashboard-widget list",
+            "dashboard-widget get",
+            "dashboard-widget create",
+            "dashboard-widget update",
+            "dashboard-widget delete",
+            "dashboard-widget pin"
+          ],
+          "hints": {
+            "dashboard-widget schema": "langwatch dashboard-widget schema",
+            "dashboard-widget list": "langwatch dashboard-widget list -o json",
+            "dashboard-widget get": "langwatch dashboard-widget get <id> -o json",
+            "dashboard-widget create": "langwatch dashboard-widget create --name \"Errors by model\" --code-file widget.tsx --queries-file queries.json",
+            "dashboard-widget update": "langwatch dashboard-widget update <id> --code-file widget.tsx",
+            "dashboard-widget delete": "langwatch dashboard-widget delete <id>",
+            "dashboard-widget pin": "langwatch dashboard-widget pin <widget-id> --dashboard <dashboard-id-or-name>"
+          },
+          "skill": null,
+          "docs": null
+        },
+        "platform": {
+          "ui": "/analytics/reports",
+          "mcp": null,
+          "skill": null,
+          "docs": null
+        },
+        "api": "/api/v1/projects/{projectId}/analytics/dashboard-widgets",
+        "docs": null
+      },
+      "sync": null,
+      "produces": [
+        "dashboard-widgets"
+      ],
+      "consumes": [
+        "dashboards"
+      ]
+    },
+    {
       "id": "triggers",
       "name": "Triggers (Automations)",
       "description": "Automated actions triggered by conditions \u2014 email alerts, Slack notifications, dataset additions",

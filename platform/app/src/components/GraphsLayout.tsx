@@ -3,7 +3,6 @@ import type { PropsWithChildren } from "react";
 import { CustomDashboardsSection } from "~/components/analytics/CustomDashboardsSection";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
-import { CustomQueryMenuLink } from "~/features/analytics-query/components/CustomQueryMenuLink";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   AnalyticsHeader,
@@ -89,12 +88,6 @@ export default function GraphsLayout({
             >
               Custom
             </SmallLabel>
-            {project?.id && project.slug && (
-              <CustomQueryMenuLink
-                projectId={project.id}
-                projectSlug={project.slug}
-              />
-            )}
             {project?.slug && (
               <CustomDashboardsSection projectSlug={project.slug} />
             )}

@@ -35,6 +35,14 @@
 		"userPrompt": "Find my context sweet spot"
 	},
 	{
+		"id": "dashboard-widgets",
+		"label": "Dashboard widgets",
+		"description": "Author a dashboard widget — a small React component backed by named LangWatchQL queries — from a plain question. Discovers the analytics schema, writes the queries, writes the widget file, saves it, then proves it renders. Use when asked to build, prototype, or iterate on a custom chart widget, or to add a widget beyond what a standard saved chart can express.",
+		"category": "recipe",
+		"userPrompt": "Build me a custom chart widget",
+		"featureFlag": "release_custom_chart_playground"
+	},
+	{
 		"id": "datasets",
 		"label": "Datasets",
 		"description": "Generate realistic synthetic evaluation datasets by analyzing the user's codebase, prompts, production traces, and reference materials. Interactive and consultant-style. Asks clarifying questions, proposes a plan, generates a preview for approval, then delivers a complete dataset uploaded to LangWatch. Use when user asks to generate, create, or build a dataset for evaluation, testing, or benchmarking.",
@@ -108,7 +116,8 @@
 		"label": "Lwql charts",
 		"description": "Author a saved analytics chart from a plain question and place it on a dashboard. Discovers the LangWatchQL analytics schema, writes and test-runs the SQL, saves it as a chart with a Vega-Lite specification, and places it where the team already looks. Use when asked to build, save, run, or dashboard a metric or chart.",
 		"category": "recipe",
-		"userPrompt": "Build a chart from a question and put it on my dashboard"
+		"userPrompt": "Build a chart from a question and put it on my dashboard",
+		"excludedByFlag": "release_custom_chart_playground"
 	},
 	{
 		"id": "online-evaluations",

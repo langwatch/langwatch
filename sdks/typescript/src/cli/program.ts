@@ -3294,9 +3294,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     chartCmd
       .command("run <id>")
       .description("Run a saved chart's statement and print the result")
-      .option("--start <datetime>", "Period start for statements declaring {period_start:DateTime}")
-      .option("--end <datetime>", "Period end for statements declaring {period_end:DateTime}")
-      .option("--granularity <seconds>", "Datapoint step for statements declaring {period_granularity_seconds:UInt32}")
+      .option("--start <datetime>", "Period start for statements declaring {dashboard_context_period_start:DateTime}")
+      .option("--end <datetime>", "Period end for statements declaring {dashboard_context_period_end:DateTime}")
+      .option("--granularity <seconds>", "Datapoint step for statements declaring {dashboard_context_granularity_seconds:UInt32}")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
@@ -3344,6 +3344,122 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     async (id: string, options: { project?: string }) => {
       const { unplaceChartCommand: impl } = await import("./commands/charts/unplace.js");
       return impl(id, options);
+    },
+  );
+
+  // Add dashboard-widget command group — custom-chart-playground widgets
+  const dashboardWidgetCmd = program
+    .command("dashboard-widget")
+    .description("Manage dashboard widgets");
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("schema")
+      .description("Discover the LangWatchQL analytics datasets and columns to write a widget's queries against")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { dashboardWidgetSchemaCommand: impl } = await import("./commands/dashboard-widgets/schema.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("list")
+      .description("List the project's dashboard widgets")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { listDashboardWidgetsCommand: impl } = await import("./commands/dashboard-widgets/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("get <id>")
+      .description("Get a dashboard widget by ID — its React source and named queries")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { getDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/get.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("create")
+      .description("Save a dashboard widget from a React source file and its named LangWatchQL queries")
+      .requiredOption("--name <name>", "Widget name")
+      .option("--code <code>", "The widget's React source")
+      .option("--code-file <path>", "Read the widget's React source from a file")
+      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: {
+      name?: string;
+      code?: string;
+      codeFile?: string;
+      queriesFile?: string;
+      project?: string;
+    }) => {
+      const { createDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("update <id>")
+      .description("Update a dashboard widget's name or definition")
+      .option("--name <name>", "New widget name")
+      .option("--code <code>", "New React source")
+      .option("--code-file <path>", "Read the new React source from a file")
+      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      id: string,
+      options: {
+        name?: string;
+        code?: string;
+        codeFile?: string;
+        queriesFile?: string;
+        project?: string;
+      },
+    ) => {
+      const { updateDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/update.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("delete <id>")
+      .description("Delete a dashboard widget")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { deleteDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/delete.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("pin <widget>")
+      .description("Add a dashboard widget to a dashboard (widget and dashboard by id or name)")
+      .requiredOption("--dashboard <id-or-name>", "Dashboard to add the widget to")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      widget: string,
+      options: { dashboard?: string; project?: string },
+    ) => {
+      const { pinDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/pin.js");
+      return impl(widget, options);
     },
   );
 

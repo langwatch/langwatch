@@ -471,7 +471,7 @@ func (p *Pool) AcquireWarm(ctx context.Context, conversationID string, creds dom
 }
 
 func (p *Pool) acquire(ctx context.Context, conversationID string, creds domain.Credentials, forTurn bool) (app.Worker, error) {
-	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.MirrorTier, creds.Harness)
+	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.DisabledSkillIds, creds.MirrorTier, creds.Harness)
 
 	p.mu.Lock()
 	if w, ok := p.workers[conversationID]; ok {

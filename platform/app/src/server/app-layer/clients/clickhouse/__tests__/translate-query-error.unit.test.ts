@@ -6,7 +6,8 @@ import {
   QueryTimeoutError,
 } from "~/server/app-layer/traces/errors";
 import {
-  isClickHouseObjectUnavailableError,
+  isClickHouseObjectAccessDeniedError,
+  isClickHouseObjectMissingError,
   isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
   unknownIdentifierFromError,
@@ -199,27 +200,72 @@ describe("translateClickHouseQueryError", () => {
   });
 });
 
-describe("isClickHouseObjectUnavailableError", () => {
+describe("isClickHouseObjectMissingError", () => {
+  describe("when the error names a missing table or database", () => {
+    it.each([
+      [
+        "UNKNOWN_TABLE by driver properties",
+        { code: "60", type: "UNKNOWN_TABLE" },
+        "boom",
+      ],
+      [
+        "UNKNOWN_DATABASE by driver properties",
+        { code: "81", type: "UNKNOWN_DATABASE" },
+        "boom",
+      ],
+      [
+        "UNKNOWN_TABLE from raw HTTP text",
+        {},
+        "Code: 60. DB::Exception: Table lwql.traces does not exist. (UNKNOWN_TABLE)",
+      ],
+    ])("recognises %s", (_case, props, message) => {
+      const raw = Object.assign(new Error(message), props);
+
+      expect(isClickHouseObjectMissingError(raw)).toBe(true);
+    });
+  });
+
+  describe("when the error is ACCESS_DENIED", () => {
+    it("does not recognise it — that is isClickHouseObjectAccessDeniedError's job", () => {
+      const raw = Object.assign(new Error("boom"), {
+        code: "497",
+        type: "ACCESS_DENIED",
+      });
+
+      expect(isClickHouseObjectMissingError(raw)).toBe(false);
+    });
+  });
+
+  describe("when a variant name only appears echoed inside the query text", () => {
+    it("does not classify by it", () => {
+      // The engine echoes the submitted query in the message; only the anchored
+      // `Code: <n>.` prefix the engine writes itself gets a vote.
+      const raw = new Error(
+        "Code: 62. DB::Exception: Syntax error near UNKNOWN_TABLE",
+      );
+
+      expect(isClickHouseObjectMissingError(raw)).toBe(false);
+    });
+  });
+
+  describe("when the value is an unrelated error or not an Error at all", () => {
+    it("is false", () => {
+      expect(
+        isClickHouseObjectMissingError(
+          Object.assign(new Error("boom"), { code: "241" }),
+        ),
+      ).toBe(false);
+      expect(isClickHouseObjectMissingError("nope")).toBe(false);
+    });
+  });
+});
+
+describe("isClickHouseObjectAccessDeniedError", () => {
   it.each([
-    [
-      "UNKNOWN_TABLE by driver properties",
-      { code: "60", type: "UNKNOWN_TABLE" },
-      "boom",
-    ],
-    [
-      "UNKNOWN_DATABASE by driver properties",
-      { code: "81", type: "UNKNOWN_DATABASE" },
-      "boom",
-    ],
     [
       "ACCESS_DENIED by driver properties",
       { code: "497", type: "ACCESS_DENIED" },
       "boom",
-    ],
-    [
-      "UNKNOWN_TABLE from raw HTTP text",
-      {},
-      "Code: 60. DB::Exception: Table lwql.traces does not exist. (UNKNOWN_TABLE)",
     ],
     [
       "ACCESS_DENIED from raw HTTP text",
@@ -229,26 +275,25 @@ describe("isClickHouseObjectUnavailableError", () => {
   ])("recognises %s", (_case, props, message) => {
     const raw = Object.assign(new Error(message), props);
 
-    expect(isClickHouseObjectUnavailableError(raw)).toBe(true);
+    expect(isClickHouseObjectAccessDeniedError(raw)).toBe(true);
   });
 
-  it("does not classify by a variant name echoed from the query", () => {
-    // The engine echoes the submitted query in the message; only the anchored
-    // `Code: <n>.` prefix the engine writes itself gets a vote.
-    const raw = new Error(
-      "Code: 62. DB::Exception: Syntax error near UNKNOWN_TABLE",
-    );
+  it("does not recognise UNKNOWN_TABLE — that is isClickHouseObjectMissingError's job", () => {
+    const raw = Object.assign(new Error("boom"), {
+      code: "60",
+      type: "UNKNOWN_TABLE",
+    });
 
-    expect(isClickHouseObjectUnavailableError(raw)).toBe(false);
+    expect(isClickHouseObjectAccessDeniedError(raw)).toBe(false);
   });
 
   it("is false for unrelated errors and non-Error values", () => {
     expect(
-      isClickHouseObjectUnavailableError(
+      isClickHouseObjectAccessDeniedError(
         Object.assign(new Error("boom"), { code: "241" }),
       ),
     ).toBe(false);
-    expect(isClickHouseObjectUnavailableError("nope")).toBe(false);
+    expect(isClickHouseObjectAccessDeniedError("nope")).toBe(false);
   });
 });
 

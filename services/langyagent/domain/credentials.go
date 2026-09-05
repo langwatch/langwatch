@@ -78,6 +78,13 @@ type Credentials struct {
 	// default: a control plane that predates harness selection keeps every
 	// running worker.
 	Harness string `json:"harness,omitempty"`
+	// DisabledSkillIds are the skill ids the control plane has flag-gated off
+	// for this project/user, resolved once over the full skill catalog by
+	// langy-turn.service.ts. Folded into the worker signature (see
+	// SignatureOf) so a flag flip recycles the worker rather than reusing one
+	// still hiding (or still offering) the wrong set. Threaded to the
+	// opencode/pi adapters, which deny the model access to these skills.
+	DisabledSkillIds []string `json:"disabledSkillIds,omitempty"`
 }
 
 // MirrorTier is the fidelity of the ADR-061 mirror copy, resolved per
@@ -189,6 +196,12 @@ type CredentialSignature struct {
 	// produce the SAME signature: workers spawned before harness selection
 	// existed must not respawn on the deploy that introduces it.
 	Harness string
+	// DisabledSkillIds is a canonical fingerprint (sorted + newline-joined,
+	// via canonicalStrings) of the flag-gated-off skill ids for this
+	// project/user. Folded in for the same reason as EgressAllowlist: a flag
+	// flip changes what the worker must hide, so it must recycle rather than
+	// keep running under the set it booted with.
+	DisabledSkillIds string
 }
 
 // SignatureOf derives the comparable signature from the parts that must match for
@@ -198,7 +211,7 @@ type CredentialSignature struct {
 // canonicalisation lives in ONE place and the two can never compute subtly
 // different signatures. capabilityKeys carries only capability PRESENCE, never a
 // secret, which is why the probe can supply it from a boolean.
-func SignatureOf(projectID, actorUserID, model string, egressAllowlist, capabilityKeys []string, mirrorTier, harness string) CredentialSignature {
+func SignatureOf(projectID, actorUserID, model string, egressAllowlist, capabilityKeys, disabledSkillIds []string, mirrorTier, harness string) CredentialSignature {
 	return CredentialSignature{
 		ProjectID:       projectID,
 		ActorUserID:     actorUserID,
@@ -213,6 +226,9 @@ func SignatureOf(projectID, actorUserID, model string, egressAllowlist, capabili
 		// "opencode" mean the same worker, so they share a signature; "pi" is a
 		// different worker and forces a respawn.
 		Harness: NormalizeHarness(harness),
+		// A flag flip changes DisabledSkillIds' canonical fingerprint, which
+		// recycles the worker the same way an EgressAllowlist edit does.
+		DisabledSkillIds: canonicalStrings(disabledSkillIds),
 	}
 }
 

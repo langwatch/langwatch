@@ -30,6 +30,20 @@ vi.mock("../components/LangyModelPill", () => ({
   },
 }));
 
+// The skills palette now reads the project context and a feature flag to gate
+// flag-scoped skills; this test only cares that `/` opens the palette, so both
+// resolve to a stable off state instead of dragging in the tRPC surface.
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: undefined,
+    organization: undefined,
+  }),
+}));
+
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => ({ enabled: false }),
+}));
+
 import { Composer } from "../components/Composer";
 import { useLangyStore } from "../stores/langyStore";
 
