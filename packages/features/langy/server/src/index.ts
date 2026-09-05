@@ -6,6 +6,9 @@ export {
   LangyTrustedMessagePort,
   type PostgresLangyAdapterOptions,
 } from "./adapters/langy.langy.adapter";
+export { LangyNavigateFallbackService } from "./services/langy-navigate-fallback.service";
+export { LangyNavigateProjectPort } from "./ports/langy-navigate-project.port";
+export type { LangyRelayCompositionOptions } from "./adapters/langy.langy.adapter";
 export type { LangyDatabase } from "./repositories/prisma/prisma.langy-database.repository";
 export type { LangyTurnTechnicalPorts } from "./services/langy-turn.service";
 export {

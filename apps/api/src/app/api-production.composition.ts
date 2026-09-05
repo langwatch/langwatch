@@ -3193,6 +3193,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The senders the root registered, shared with the scenario half.
       commands: this.composedAgentPipelines.langyConversations,
       redis: queueInfrastructure?.redis ?? null,
+      publicBaseUrl: options.config.infrastructure.execution.publicBaseUrl,
       // The SAME fabric presence already publishes on: both live channels ride
       // one emitter per tenant rather than a second of their own.
       broadcast: this.composedPresence.emitter,

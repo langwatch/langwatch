@@ -218,6 +218,7 @@ function composeApplication(
     // No Redis, which is a real deployment shape: the live turn buffer is
     // absent and the browser falls back to the Postgres conversation read.
     redis: null,
+    publicBaseUrl: undefined,
     broadcast,
     demoProjectId: "demo-project",
     rateLimit: async () => ({ allowed: true, resetAt: Date.now() + 60_000 }),

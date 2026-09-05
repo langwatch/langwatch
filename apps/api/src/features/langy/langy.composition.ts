@@ -8,6 +8,7 @@ import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import {
   FeatureFlagLangyUiActionSurfaceAdapter,
   LangyApp,
+  LangyNavigateFallbackService,
   LangyTokenBufferAdapter,
   LangyTurnAccessAdapter,
   LangyTurnHandoffAdapter,
@@ -15,6 +16,7 @@ import {
   LangyUiActionService,
   PostgresLangyAdapter,
   type LangyEgressTrpcPorts,
+  type LangyRelayCompositionOptions,
   type LangyTrpcPorts,
   type LangyTurnTechnicalPorts,
   type LangyUiActionDefinition,
@@ -31,6 +33,7 @@ import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiAuditPort } from "../../api-request.policy";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
+import { createPlatformUrlBuilder } from "../../app/api-rest-ports";
 import {
   createLangyEgressTrpcRouter,
   createLangyTrpcRouter,
@@ -55,6 +58,8 @@ export type LangyFeatureCollaborators = Readonly<{
   commands: LangyConversationCommands;
   /** The token buffer, the turn access store and the handoff store share it. */
   redis: RedisConnection | null;
+  /** The address the worker's relay frames and navigate fallbacks are built under. */
+  publicBaseUrl: string | undefined;
   /** The fabric both live channels publish on. */
   broadcast: PresenceEmitterPort;
   /** The one project Langy never runs on, whatever a permission says. */
@@ -85,6 +90,7 @@ export function composeLangyFeature(options: {
   peers: LangyPeers;
   commands: LangyConversationCommands;
   redis: RedisConnection | null;
+  publicBaseUrl: string | undefined;
   broadcast: PresenceEmitterPort;
   demoProjectId: string | undefined;
   rateLimit: LangyFeatureCollaborators["rateLimit"];
@@ -97,6 +103,7 @@ export function composeLangyFeature(options: {
     projects: options.peers.projects,
     commands: options.commands,
     redis: options.redis,
+    publicBaseUrl: options.publicBaseUrl,
     broadcast: options.broadcast,
     demoProjectId: options.demoProjectId,
     rateLimit: options.rateLimit,
@@ -217,6 +224,7 @@ function composeLangy(options: LangyFeatureCollaborators): LangyApp {
     handoffStore: redis ? LangyTurnHandoffAdapter.create({ redis }) : null,
   };
 
+  const relay = composeLangyRelay(options, redis);
   const service = adapter.build({
     turns,
     credentials: {
@@ -241,6 +249,7 @@ function composeLangy(options: LangyFeatureCollaborators): LangyApp {
     commands: options.commands,
     events: null,
     ...(redis ? { feedbackPromptRedis: redis } : {}),
+    ...(relay ? { relay } : {}),
   });
 
   return LangyApp.create({
@@ -248,6 +257,31 @@ function composeLangy(options: LangyFeatureCollaborators): LangyApp {
     redis: redis as unknown as Parameters<typeof LangyApp.create>[0]["redis"],
     broadcast: options.broadcast,
   });
+}
+
+/**
+ * The live edge the worker pushes turn frames through. Absent without Redis or
+ * a public address: the relay route then refuses by name instead of relaying
+ * to nowhere. Navigate fallbacks resolve under the asking project's own slug.
+ */
+function composeLangyRelay(
+  options: LangyFeatureCollaborators,
+  redis: RedisConnection | null,
+): LangyRelayCompositionOptions | undefined {
+  if (!redis || !options.publicBaseUrl) return undefined;
+  const fallback = LangyNavigateFallbackService.create({
+    projects: {
+      trySlugOf: async (projectId) =>
+        (await options.projects.tryGetSummaryById(projectId))?.slug ?? null,
+    },
+    platformUrl: createPlatformUrlBuilder(options.publicBaseUrl),
+  });
+  return {
+    redis,
+    baseHost: options.publicBaseUrl,
+    resolveResourceUrl: (input) => fallback.tryResolveUrl(input),
+    logger: createLogger(`${options.processName}:langy-relay`),
+  };
 }
 
 /**
