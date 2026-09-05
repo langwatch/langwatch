@@ -186,6 +186,7 @@ export class GenieTraceMapperService {
   /** "THOUGHT_TYPE_UNDERSTANDING" and "UNDERSTANDING" both → "UNDERSTANDING". */
   private static thoughtTypeOf(thought: GenieThought): string {
     const raw = thought.thought_type ?? thought.type ?? "";
+
     return raw.startsWith(THOUGHT_TYPE_PREFIX) ? raw.slice(THOUGHT_TYPE_PREFIX.length) : raw;
   }
 
@@ -194,6 +195,7 @@ export class GenieTraceMapperService {
     if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
       return null;
     }
+
     return value < MS_THRESHOLD ? value * 1000 : value;
   }
 
@@ -215,9 +217,11 @@ export class GenieTraceMapperService {
         }
       }
     }
+
     const unknown = thoughts
       .filter((thought) => {
         const type = GenieTraceMapperService.thoughtTypeOf(thought);
+
         return (
           type !== DROPPED_THOUGHT_TYPE &&
           !THOUGHT_ORDER.includes(type as (typeof THOUGHT_ORDER)[number]) &&
@@ -225,6 +229,7 @@ export class GenieTraceMapperService {
         );
       })
       .map(textOf);
+
     return [...known, ...unknown].join("\n\n");
   }
 
@@ -237,11 +242,13 @@ export class GenieTraceMapperService {
     } catch {
       // Defensive path below renders the question from `extra` instead.
     }
+
     return {};
   }
 
   private static extraString(event: NormalizedPullEvent, key: string): string | undefined {
     const value = event.extra?.[key];
+
     return typeof value === "string" && value.length > 0 ? value : undefined;
   }
 
@@ -270,6 +277,7 @@ export class GenieTraceMapperService {
       GenieTraceMapperService.extraString(event, "status") ??
       ""
     ).trim();
+
     return status === "" || TERMINAL_MESSAGE_STATUSES.has(status);
   }
 
@@ -315,6 +323,7 @@ export class GenieTraceMapperService {
       GenieTraceMapperService.extraString(event, "status") ??
       ""
     ).trim();
+
     return {
       payload,
       origin,
@@ -353,6 +362,7 @@ export class GenieTraceMapperService {
       textAttachments.find((attachment) => (attachment.text?.purpose ?? "").endsWith("ANSWER")) ??
       textAttachments[0];
     const answerText = answerAttachment?.text?.content ?? "";
+
     // Defensive failure marker (Decision 13): never a false success. A
     // non-COMPLETED status or a completed message with no answer text both
     // degrade to a marked failure that still shows the question.
@@ -373,7 +383,10 @@ export class GenieTraceMapperService {
       content: GenieTraceMapperService.assistantContentOf(frame, attachments),
     };
     const reasoning = GenieTraceMapperService.flattenThoughts(attachments);
-    if (reasoning) assistantMessage.reasoning_content = reasoning;
+    if (reasoning) {
+      assistantMessage.reasoning_content = reasoning;
+    }
+
     return [
       ConversationTraceAssemblyService.stringAttr({ key: "langwatch.span.type", value: "llm" }),
       ConversationTraceAssemblyService.stringAttr({
@@ -427,10 +440,12 @@ export class GenieTraceMapperService {
       frame.payload.user_id != null
         ? String(frame.payload.user_id)
         : GenieTraceMapperService.extraString(event, "actorUserId");
-    if (rawUserId)
+    if (rawUserId) {
       attributes.push(
         ConversationTraceAssemblyService.stringAttr({ key: "langwatch.user.id", value: rawUserId }),
       );
+    }
+
     if (frame.status) {
       attributes.push(
         ConversationTraceAssemblyService.stringAttr({
@@ -439,6 +454,7 @@ export class GenieTraceMapperService {
         }),
       );
     }
+
     if (frame.regenCount > 0) {
       attributes.push(
         ConversationTraceAssemblyService.intAttr({
@@ -447,6 +463,7 @@ export class GenieTraceMapperService {
         }),
       );
     }
+
     const spaceId = GenieTraceMapperService.extraString(event, "spaceId");
     if (spaceId) {
       attributes.push(
@@ -456,6 +473,7 @@ export class GenieTraceMapperService {
         }),
       );
     }
+
     const statementIds = GenieTraceMapperService.queryAttachmentsOf(attachments)
       .map((attachment) => attachment.query?.statement_id)
       .filter((id): id is string => typeof id === "string" && id.length > 0);
@@ -469,6 +487,7 @@ export class GenieTraceMapperService {
         }),
       );
     }
+
     const vizPointers = attachments
       .map((attachment) => attachment.viz?.query_attachment_id)
       .filter((id): id is string => typeof id === "string" && id.length > 0);
@@ -481,6 +500,7 @@ export class GenieTraceMapperService {
         }),
       );
     }
+
     // `suggested_questions` are deliberately never read: Genie's offered
     // follow-ups are not something a person said (Decision 12).
     // Token counts are deliberately never copied from the puller's literal
@@ -524,11 +544,13 @@ export class GenieTraceMapperService {
         }),
       );
     }
+
     if (typeof rowCount === "number") {
       stepAttrs.push(
         ConversationTraceAssemblyService.intAttr({ key: "row_count", value: rowCount }),
       );
     }
+
     return {
       traceId: frame.traceId,
       spanId: ConversationTraceAssemblyService.hashId(`${frame.spanSeed}:query:${stepKey}`, 16),
@@ -565,6 +587,7 @@ export class GenieTraceMapperService {
     const stepSpans = GenieTraceMapperService.queryAttachmentsOf(attachments).map(
       (attachment, index) => GenieTraceMapperService.queryStepSpan(attachment, index, frame),
     );
+
     return [rootSpan, ...stepSpans];
   }
 
@@ -595,6 +618,7 @@ export class GenieTraceMapperService {
       .filter((event) => !!event.action && event.action === wanted)
       .filter((event) => GenieTraceMapperService.isSettledForRouting(event))
       .flatMap((event) => GenieTraceMapperService.mapMessage(event, origin));
+
     return ConversationTraceAssemblyService.assembleTraceRequest(spans, origin.profile);
   }
 }

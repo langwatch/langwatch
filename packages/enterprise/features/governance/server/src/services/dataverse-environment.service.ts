@@ -56,7 +56,10 @@ export class DataverseEnvironmentService {
 
   static isSameEnvironment(params: { value: string; environmentUrl: string }): boolean {
     const { value, environmentUrl } = params;
-    if (!DataverseEnvironmentService.isEnvironmentOrigin(value)) return false;
+    if (!DataverseEnvironmentService.isEnvironmentOrigin(value)) {
+      return false;
+    }
+
     try {
       // `origin` normalises scheme, host case and default ports, so a link that
       // differs from the configured address only in those respects still counts
@@ -74,11 +77,19 @@ export class DataverseEnvironmentService {
     } catch {
       return false;
     }
+
     // Plain http would put the token on the wire in clear even for a real
     // environment, and credentials in the URL are never part of a legitimate one.
-    if (url.protocol !== "https:") return false;
-    if (url.username !== "" || url.password !== "") return false;
+    if (url.protocol !== "https:") {
+      return false;
+    }
+
+    if (url.username !== "" || url.password !== "") {
+      return false;
+    }
+
     const host = url.hostname.toLowerCase();
+
     // `endsWith` on a leading-dot suffix, so `evildynamics.com` cannot pass as
     // `.dynamics.com` and the bare apex is not an environment either.
     return DATAVERSE_ENVIRONMENT_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));

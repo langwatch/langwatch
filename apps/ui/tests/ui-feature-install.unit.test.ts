@@ -104,7 +104,7 @@ const featureModules: Record<string, Record<string, unknown>> = {
 /** Every export from a feature module whose name ends in "Feature". */
 function featureExportsOf(module: Record<string, unknown>): Record<string, unknown>[] {
   return Object.entries(module)
-    .filter(([name]) => /Feature$/.test(name))
+    .filter(([name]) => name.endsWith("Feature"))
     .map(([, value]) => value as Record<string, unknown>);
 }
 

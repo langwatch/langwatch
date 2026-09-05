@@ -59,7 +59,9 @@ export class GatewayScopeResolutionService {
     const client = tx ?? this.prisma;
 
     const scopePredicates = await buildScopePredicates(client, vk);
-    if (scopePredicates.length === 0) return [];
+    if (scopePredicates.length === 0) {
+      return [];
+    }
 
     const reachable = await client.modelProvider.findMany({
       where: {
@@ -86,17 +88,23 @@ export class GatewayScopeResolutionService {
     const client = tx ?? this.prisma;
 
     const candidates = await this.scopeReachableModelProvidersForVk(vk, tx);
-    if (candidates.length === 0) return [];
+    if (candidates.length === 0) {
+      return [];
+    }
 
     if (vk.routingPolicyId) {
       const policy = await client.routingPolicy.findUnique({
         where: { id: vk.routingPolicyId },
         select: { modelProviderIds: true, organizationId: true },
       });
-      if (!policy || policy.organizationId !== vk.organizationId) return [];
+      if (!policy || policy.organizationId !== vk.organizationId) {
+        return [];
+      }
 
       const orderedIds = parseModelProviderIds(policy.modelProviderIds);
-      if (orderedIds.length === 0) return [];
+      if (orderedIds.length === 0) {
+        return [];
+      }
 
       const byId = new Map(candidates.map((mp) => [mp.id, mp]));
 
@@ -110,11 +118,17 @@ export class GatewayScopeResolutionService {
 function deterministicMpOrder(a: ModelProvider, b: ModelProvider): number {
   const pa = a.fallbackPriorityGlobal;
   const pb = b.fallbackPriorityGlobal;
-  if (pa !== null && pb !== null && pa !== pb) return pa - pb;
+  if (pa !== null && pb !== null && pa !== pb) {
+    return pa - pb;
+  }
 
-  if (pa !== null && pb === null) return -1;
+  if (pa !== null && pb === null) {
+    return -1;
+  }
 
-  if (pa === null && pb !== null) return 1;
+  if (pa === null && pb !== null) {
+    return 1;
+  }
 
   return a.createdAt.getTime() - b.createdAt.getTime();
 }
@@ -156,7 +170,9 @@ async function buildScopePredicates(
       where: { id: { in: [...projectIdsNeedingTeam] } },
       select: { id: true, teamId: true },
     });
-    for (const p of projects) teamIds.add(p.teamId);
+    for (const p of projects) {
+      teamIds.add(p.teamId);
+    }
   }
 
   const predicates: ScopePredicate[] = [];
@@ -182,7 +198,9 @@ async function buildScopePredicates(
 }
 
 function parseModelProviderIds(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
+  if (!Array.isArray(raw)) {
+    return [];
+  }
 
   return raw.filter((v): v is string => typeof v === "string" && v.length > 0);
 }

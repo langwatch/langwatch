@@ -428,9 +428,18 @@ export class IngestionSourceService {
    * those two would come to disagree about what "has pulled" means.
    */
   static hasPollerCursor(value: unknown): boolean {
-    if (value == null) return false;
-    if (typeof value === "string") return hasContentAsCursorString(value);
-    if (typeof value === "object") return Object.keys(value).length > 0;
+    if (value == null) {
+      return false;
+    }
+
+    if (typeof value === "string") {
+      return hasContentAsCursorString(value);
+    }
+
+    if (typeof value === "object") {
+      return Object.keys(value).length > 0;
+    }
+
     return false;
   }
 
@@ -500,11 +509,20 @@ export class IngestionSourceService {
  * JSON and keeps its "yes" by falling through the parse.
  */
 function hasContentAsCursorString(value: string): boolean {
-  if (value.length === 0) return false;
+  if (value.length === 0) {
+    return false;
+  }
+
   try {
     const parsed: unknown = JSON.parse(value);
-    if (parsed == null) return false;
-    if (typeof parsed === "object") return Object.keys(parsed).length > 0;
+    if (parsed == null) {
+      return false;
+    }
+
+    if (typeof parsed === "object") {
+      return Object.keys(parsed).length > 0;
+    }
+
     return true;
   } catch {
     return true;

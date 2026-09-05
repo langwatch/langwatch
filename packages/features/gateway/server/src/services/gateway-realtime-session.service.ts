@@ -537,7 +537,9 @@ async function recordRealtimeSessionSpan(params: {
   // No trace means the mint predates the trace id being carried, or the
   // request arrived with no trace context. Inventing a trace here would put a
   // cost in the explorer under an id nothing else references.
-  if (!session.traceId) return;
+  if (!session.traceId) {
+    return;
+  }
 
   const endMs = params.occurredAt.getTime();
   const startMs = Math.max(0, endMs - Math.max(0, params.durationMs));
@@ -575,7 +577,9 @@ async function recordRealtimeSessionSpan(params: {
     // reads only. Reaching for `traces?.collection` resolved to undefined, and
     // the guard below turned that into a silent return — no realtime session
     // has written its span since.
-    if (!params.spanIngestion) return;
+    if (!params.spanIngestion) {
+      return;
+    }
 
     await params.spanIngestion.ingestNormalizedSpan({
       tenantId: session.projectId,

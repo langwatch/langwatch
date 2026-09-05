@@ -57,7 +57,10 @@ export class BillingAlertCooldownService implements BillingCooldownCache {
 
   /** Take the key if it is free, in one step, so two callers cannot both win. */
   async claim(key: string): Promise<boolean> {
-    if (await this.get(key)) return false;
+    if (await this.get(key)) {
+      return false;
+    }
+
     await this.set(key, true);
 
     return true;

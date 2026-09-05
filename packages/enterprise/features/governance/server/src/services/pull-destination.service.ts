@@ -51,10 +51,17 @@ export class PullDestinationService {
     } catch {
       return false;
     }
+
     // Plain http would put the token on the wire in clear even for a real
     // workspace, and credentials in the URL are never part of a legitimate one.
-    if (url.protocol !== "https:") return false;
-    if (url.username !== "" || url.password !== "") return false;
+    if (url.protocol !== "https:") {
+      return false;
+    }
+
+    if (url.username !== "" || url.password !== "") {
+      return false;
+    }
+
     // A bare origin and nothing else. A workspace URL is a base that the puller
     // appends its own paths to, so anything past the host is not part of a
     // legitimate one — and a port or a path is how a matching host gets pointed
@@ -62,11 +69,14 @@ export class PullDestinationService {
     if (url.port !== "" || url.pathname !== "/" || url.search !== "" || url.hash !== "") {
       return false;
     }
+
     const host = url.hostname.toLowerCase();
     // The host as a hostname is spelt: rejecting anything else keeps this at
     // least as strict as the character check it replaces, so consolidating the
     // two copies cannot have widened what is accepted.
-    if (!/^[a-z0-9.-]+$/.test(host)) return false;
+    if (!/^[a-z0-9.-]+$/.test(host)) {
+      return false;
+    }
 
     return DATABRICKS_WORKSPACE_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
   }

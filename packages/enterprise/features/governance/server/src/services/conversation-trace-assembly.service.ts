@@ -225,6 +225,7 @@ export class ConversationTraceAssemblyService {
     const namespace = `${origin.profile.identityNamespace}:${origin.ingestionSourceId}`;
     const join = (fields: IdentityField[]) => fields.map(String).join(":");
     const spanSeed = `${namespace}:${join(seeds.span)}`;
+
     return {
       traceId: ConversationTraceAssemblyService.hashId(`${namespace}:${join(seeds.trace)}`, 32),
       threadId: `${origin.ingestionSourceId}:${join(seeds.thread)}`,
@@ -242,7 +243,10 @@ export class ConversationTraceAssemblyService {
     spans: OtlpJsonSpan[],
     profile: ConversationRoutingProfile,
   ): ExportTraceServiceRequest | null {
-    if (spans.length === 0) return null;
+    if (spans.length === 0) {
+      return null;
+    }
+
     return {
       resourceSpans: [
         {
