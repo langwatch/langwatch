@@ -83,13 +83,14 @@ export interface ThinkingMessage {
 /**
  * How long we wait before admitting nothing is happening.
  *
- * A cold spawn legitimately takes a few seconds (fork the worker, lay out the
- * home, install skills, wait for readiness), so silence is normal at first. The
- * first two steps name the startup's real phases — the control plane prepares
- * the worker's workspace, then the agent starts — so the wait reads as
- * progress, not one frozen line. It stops being normal quickly, and by 75s a
- * spawn that has produced NOTHING has almost certainly failed — the manager's
- * own readiness budget is long gone.
+ * The clock these read is SILENCE, not turn length: it restarts every time the
+ * turn produces something (see `langyTurnActivityKey`). A cold spawn
+ * legitimately takes a few seconds (fork the worker, lay out the home, install
+ * skills, wait for readiness), so silence is normal at first. The first two
+ * steps name the startup's real phases, the control plane prepares the
+ * worker's workspace and then the agent starts, so the wait reads as progress,
+ * not one frozen line. It stops being normal quickly, and by 75s a turn that
+ * has produced NOTHING for that long has almost certainly failed.
  */
 export const THINKING_STARTING_LANGY_MS = 6_000;
 export const THINKING_STILL_STARTING_MS = 12_000;
@@ -142,6 +143,79 @@ export function settledTool(message: ThinkingMessage | undefined): boolean {
       part.type.startsWith("tool-") &&
       (part.state === "output-available" || part.state === "output-error"),
   );
+}
+
+/**
+ * Everything that counts as the turn making progress.
+ *
+ * A local command runs on the developer's own machine and a tab that adopted a
+ * running turn has no live stream at all, so the assistant message can stay
+ * empty for minutes while the turn is working perfectly well. Those turns are
+ * visible in the durable record instead, in its tool calls and the cards they
+ * raised, and in the plan the agent keeps.
+ */
+export interface LangyTurnActivity {
+  messages: ThinkingMessage[];
+  /**
+   * The turn's durable tool calls. This is what a reloaded tab has and the
+   * live stream does not, and it is what proves a local command is running.
+   */
+  toolCalls?:
+    | readonly { toolCallId: string; status: string }[]
+    | null
+    | undefined;
+  /** The cards the turn raised, and whether the developer has answered them. */
+  waits?: readonly { waitId: string; status: string }[] | null | undefined;
+  /** The latest snapshot of the plan the agent is following. */
+  planItems?: readonly { content: string; status: string }[] | null | undefined;
+  /** The model's live reasoning so far. It grows with every delta. */
+  reasoning?: string | null | undefined;
+  /** The manager's latest status line for the turn. */
+  status?: string | null | undefined;
+  /** What the page Langy is driving reports it is doing. */
+  pageActivity?: string | null | undefined;
+}
+
+/**
+ * A fingerprint of everything the turn has produced so far.
+ *
+ * The escalation used to measure the time since the line MOUNTED, so a turn
+ * that ran a local command for two minutes, with a settled permission card on
+ * screen and output arriving in the terminal, was told it "may be stuck". The
+ * caller restarts its clock whenever this value changes, which turns the
+ * ladder into a measure of silence: a turn that really is silent still
+ * escalates, and a turn that is working never does.
+ *
+ * Only provable things go in, parts on the wire and rows in the durable
+ * record, so this can no more invent progress than the line itself can.
+ */
+export function langyTurnActivityKey(activity: LangyTurnActivity): string {
+  const parts = currentTurnAssistant(activity.messages)?.parts ?? [];
+  const shape = parts
+    .map((part) => `${part.type ?? ""}/${part.state ?? ""}`)
+    .join(",");
+  const prose = parts.reduce(
+    (total, part) =>
+      total + (part.type === "text" ? (part.text?.length ?? 0) : 0),
+    0,
+  );
+  const calls = (activity.toolCalls ?? [])
+    .map((call) => `${call.toolCallId}/${call.status}`)
+    .join(",");
+  const waits = (activity.waits ?? [])
+    .map((wait) => `${wait.waitId}/${wait.status}`)
+    .join(",");
+  const plan = (activity.planItems ?? []).map((item) => item.status).join(",");
+  return [
+    shape,
+    prose,
+    calls,
+    waits,
+    plan,
+    activity.reasoning?.length ?? 0,
+    activity.status ?? "",
+    activity.pageActivity ?? "",
+  ].join("|");
 }
 
 /** Has the model actually produced any prose yet? */
@@ -249,7 +323,11 @@ export function langyThinkingLine({
   awaitingAnswer = false,
 }: {
   messages: ThinkingMessage[];
-  /** Time since the turn was sent. */
+  /**
+   * How long the turn has been SILENT: the time since it last produced
+   * anything (`langyTurnActivityKey`), which on a turn that has produced
+   * nothing at all is the time since it was sent.
+   */
   elapsedMs: number;
   /**
    * What the page Langy is driving is doing right now, in the page's own

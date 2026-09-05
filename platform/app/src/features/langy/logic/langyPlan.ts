@@ -41,12 +41,50 @@ export interface LangyPlan {
   totalCount: number;
 }
 
-const PLAN_STATUSES = new Set<LangyPlanItemStatus>([
-  "pending",
-  "in_progress",
-  "completed",
-  "cancelled",
-]);
+/**
+ * Every status word that means one of the four the tool promised.
+ *
+ * `todowrite` documents `pending | in_progress | completed | cancelled`, and
+ * the status crosses the wire as a free string. A model that writes "done",
+ * "Completed" or "in-progress" instead used to land every one of its steps on
+ * `pending`, so the card read "Plan · 0 of 5 done" for a turn in which all
+ * five steps had finished. The word is lower-cased, and spaces and dashes fold
+ * to `_`, before the lookup, so only a genuinely unknown word falls back.
+ */
+const PLAN_STATUS_BY_WORD: Record<string, LangyPlanItemStatus> = {
+  pending: "pending",
+  todo: "pending",
+  not_started: "pending",
+  in_progress: "in_progress",
+  active: "in_progress",
+  doing: "in_progress",
+  completed: "completed",
+  complete: "completed",
+  done: "completed",
+  finished: "completed",
+  cancelled: "cancelled",
+  canceled: "cancelled",
+  skipped: "cancelled",
+  wont_do: "cancelled",
+};
+
+/**
+ * The plan status a wire value means. An unknown word stays `pending`: a step
+ * is only ever ticked from a status the agent actually wrote.
+ *
+ * Kept identical to `normalizeTodoStatus` in the worker's `todowrite` tool
+ * (services/langyworker/src/tools/todowrite.ts). The worker is a standalone
+ * package that compiles to its own binary and does not depend on this one, so
+ * the two copies are pinned by tests on both sides rather than shared.
+ */
+export function normalisePlanStatus(status: unknown): LangyPlanItemStatus {
+  if (typeof status !== "string") return "pending";
+  const word = status
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, "_");
+  return PLAN_STATUS_BY_WORD[word] ?? "pending";
+}
 
 /** The tool names that ARE the plan channel — never rendered as activity. */
 const PLAN_TOOL_NAMES = new Set(["todowrite", "todoread"]);
@@ -105,28 +143,33 @@ function partInput(part: unknown): unknown {
  * null when there is nothing list-shaped to read.
  */
 export function parseTodoList(input: unknown): LangyPlanItem[] | null {
-  const raw = Array.isArray(input)
-    ? input
-    : input && typeof input === "object"
-      ? (input as { todos?: unknown }).todos
-      : undefined;
-  if (!Array.isArray(raw)) return null;
+  const raw = todoRows(input);
+  if (!raw) return null;
 
   const items: LangyPlanItem[] = [];
   for (const entry of raw) {
-    if (!entry || typeof entry !== "object") continue;
-    const e = entry as { content?: unknown; status?: unknown };
-    const content =
-      typeof e.content === "string" ? cleanPlanContent(e.content) : "";
-    if (!content) continue;
-    const status =
-      typeof e.status === "string" &&
-      PLAN_STATUSES.has(e.status as LangyPlanItemStatus)
-        ? (e.status as LangyPlanItemStatus)
-        : "pending";
-    items.push({ content, status });
+    const item = planItemOf(entry);
+    if (item) items.push(item);
   }
   return items;
+}
+
+/** The rows a `todowrite` input carries, or null when it is not list-shaped. */
+function todoRows(input: unknown): unknown[] | null {
+  if (Array.isArray(input)) return input;
+  if (!input || typeof input !== "object") return null;
+  const todos = (input as { todos?: unknown }).todos;
+  return Array.isArray(todos) ? todos : null;
+}
+
+/** One row as a plan item, or null when it names no step. */
+function planItemOf(entry: unknown): LangyPlanItem | null {
+  if (!entry || typeof entry !== "object") return null;
+  const row = entry as { content?: unknown; status?: unknown };
+  const content =
+    typeof row.content === "string" ? cleanPlanContent(row.content) : "";
+  if (!content) return null;
+  return { content, status: normalisePlanStatus(row.status) };
 }
 
 /** Index of the single in-progress item, or -1 (first wins if the model erred). */
@@ -139,10 +182,56 @@ function normaliseItem(item: {
   content: string;
   status: string;
 }): LangyPlanItem {
-  const status = PLAN_STATUSES.has(item.status as LangyPlanItemStatus)
-    ? (item.status as LangyPlanItemStatus)
-    : "pending";
-  return { content: cleanPlanContent(item.content), status };
+  return {
+    content: cleanPlanContent(item.content),
+    status: normalisePlanStatus(item.status),
+  };
+}
+
+/**
+ * The latest valid plan snapshot on a message's tool parts. `todowrite`
+ * rewrites the whole list every call, so the last one that parsed is the plan.
+ */
+function latestPartsSnapshot(
+  parts: readonly unknown[],
+): LangyPlanItem[] | null {
+  let latest: LangyPlanItem[] | null = null;
+  for (const part of parts) {
+    if (!isPlanToolPart(part)) continue;
+    const parsed = parseTodoList(partInput(part));
+    if (parsed && parsed.length > 0) latest = parsed;
+  }
+  return latest;
+}
+
+/** How many steps a snapshot has finished. */
+function completedCountOf(items: LangyPlanItem[] | null): number {
+  return items?.filter((item) => item.status === "completed").length ?? 0;
+}
+
+/**
+ * The fresher of the two snapshots.
+ *
+ * The override is the live store's copy of the plan, and it is not always the
+ * newer one: if the stream dropped, or this tab adopted the turn late, it can
+ * still hold the all-pending list from the first `todowrite` call while the
+ * message's own parts already carry the finished steps. `todowrite` rewrites
+ * the whole list every call and a step never un-finishes, so more completed
+ * steps can only come from a later snapshot, which makes the completed count
+ * the one comparison that cannot invent progress.
+ */
+function fresherSnapshot({
+  override,
+  derived,
+}: {
+  override: LangyPlanItem[] | null;
+  derived: LangyPlanItem[] | null;
+}): LangyPlanItem[] | null {
+  if (!override || override.length === 0) return derived;
+  if (!derived || derived.length === 0) return override;
+  return completedCountOf(derived) > completedCountOf(override)
+    ? derived
+    : override;
 }
 
 /**
@@ -161,32 +250,23 @@ export function langyPlan(
   message: { parts: readonly unknown[] },
   opts?: {
     /**
-     * The manager's typed plan snapshot for the LIVE turn (capped + truncated).
-     * When present it is PREFERRED over parsing the raw todowrite parts — the
-     * client then enforces the same caps the manager did. Attribution still
-     * derives from the message's todowrite snapshots (by content). Absent (old
-     * turns, history) ⇒ Phase-1 tool-part parsing.
+     * The manager's typed plan snapshot for the LIVE turn (capped + truncated),
+     * or the turn's durable plan for a tab that reloaded mid-turn. It is
+     * preferred over parsing the raw todowrite parts, so the client enforces
+     * the same caps the manager did, unless the message's own parts carry MORE
+     * completed steps, in which case they are the fresher snapshot (see
+     * `fresherSnapshot`). Absent (old turns, history) ⇒ tool-part parsing.
      */
     overrideItems?: Array<{ content: string; status: string }> | null;
   },
 ): LangyPlan | null {
-  const parts = message.parts ?? [];
-
-  // The latest valid snapshot from the tool parts (used for attribution, and as
-  // the plan itself when there is no typed override).
-  let derived: LangyPlanItem[] | null = null;
-  for (const part of parts) {
-    if (!isPlanToolPart(part)) continue;
-    const parsed = parseTodoList(partInput(part));
-    if (parsed && parsed.length > 0) derived = parsed;
-  }
-
+  const derived = latestPartsSnapshot(message.parts ?? []);
   const override =
     opts?.overrideItems && opts.overrideItems.length > 0
       ? opts.overrideItems.map(normaliseItem).filter((it) => it.content)
       : null;
 
-  const items = override ?? derived;
+  const items = fresherSnapshot({ override, derived });
   if (!items || items.length === 0) return null;
 
   const completedCount = items.filter((it) => it.status === "completed").length;

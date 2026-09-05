@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import {
+  Fragment,
   Profiler,
   type ReactNode,
   useCallback,
@@ -152,10 +153,12 @@ import { resolveLangyStopTarget } from "../logic/langyStopTarget";
 import {
   currentTurnAssistant,
   hasTokens,
+  langyTurnActivityKey,
   runningTool,
   settledTool,
 } from "../logic/langyThinkingLine";
 import { buildTimeTravelView } from "../logic/langyTimeTravel";
+import { isLangyTranscriptMessage } from "../logic/langyTranscript";
 import { deriveWaveActivity } from "../logic/langyWaveMotion";
 import { isInternalHref } from "../logic/spaLink";
 import { tapeForConversation, useLangyDevLog } from "../stores/langyDevLog";
@@ -1553,7 +1556,7 @@ function LangyPanel({
   //     pre-answer history.
   useEffect(() => {
     const durableCount = historyMessages.filter(
-      (m) => m.role === "user" || m.role === "assistant",
+      isLangyTranscriptMessage,
     ).length;
     if (
       !shouldRehydrateEngineFromDurable({
@@ -2606,13 +2609,83 @@ function LangyPanel({
   // held above the composer while the turn works, back inside the message the
   // moment it settles, fails, or the reader stops it.
   const turnPlanItems = useLangyStore((s) => s.turnPlan);
+  // The same plan, off the turn's durable record. The live snapshot above only
+  // exists in the tab that watched the stream, so a reload mid-turn used to
+  // lose the checklist entirely until the turn finished and its `todowrite`
+  // parts landed on the message.
+  const recordedPlanItems = useLangyStore(
+    (s) => s.turnProjection.turn?.Plan ?? null,
+  );
+  const livePlanItems = turnPlanItems ?? recordedPlanItems;
   const streamingMessage =
     displayBusy && displayMessages.at(-1)?.role === "assistant"
       ? displayMessages.at(-1)
       : undefined;
-  const pinnedPlan = streamingMessage
-    ? langyPlan(streamingMessage, { overrideItems: turnPlanItems })
+  const pinnedPlan = displayBusy
+    ? langyPlan(streamingMessage ?? { parts: [] }, {
+        overrideItems: livePlanItems,
+      })
     : null;
+  // Everything the running turn has produced, as one value that changes when
+  // it produces more. The thinking line restarts its clock on it, so its
+  // escalation measures silence and not turn length: a local command running
+  // on the developer's machine, a card they just answered, a plan step ticking
+  // over: none of that reaches the message parts, and all of it is the turn
+  // working.
+  const turnActivityKey = useMemo(
+    () =>
+      langyTurnActivityKey({
+        messages: displayMessages,
+        toolCalls: turnToolCalls,
+        waits: permissionCards,
+        planItems: livePlanItems,
+        reasoning: displaySignals.reasoning,
+        status: displaySignals.status,
+      }),
+    [
+      displayMessages,
+      turnToolCalls,
+      permissionCards,
+      livePlanItems,
+      displaySignals.reasoning,
+      displaySignals.status,
+    ],
+  );
+  // What Langy is waiting for on the developer's own machine (ADR-129). Read
+  // from the durable record and the folded turn document, so a tab that
+  // adopted a running turn renders the cards without the live stream.
+  const localCards =
+    !timeTravel && projectId && activeConversationId
+      ? permissionCards.map((card) => (
+          <IsolatedErrorBoundary
+            key={card.waitId}
+            scope="This permission card failed to render"
+            resetKeys={[card.waitId]}
+          >
+            <LangyLocalPermissionCard
+              projectId={projectId}
+              conversationId={activeConversationId}
+              card={card}
+              skipAllowed={localWorkspace.data?.skipAllowed ?? false}
+              skipPermissions={localWorkspace.data?.skipPermissions ?? false}
+            />
+          </IsolatedErrorBoundary>
+        ))
+      : null;
+
+  // Where those cards sit in the column.
+  //
+  // While the turn runs they belong at the live edge, beside the working line:
+  // a card waiting for an answer is the thing to answer now. Once the turn
+  // settles they belong inside it, above the message that closed it. Appended
+  // below the whole transcript, they made a finished run end on a settled
+  // permission card, so a reader who came back to it read a command rather
+  // than the answer the turn had already given.
+  const cardAnchorIndex =
+    turnInFlight || displayMessages.at(-1)?.role !== "assistant"
+      ? -1
+      : displayMessages.length - 1;
+
   const turnHasVisibleOutput =
     !!runningTool(currentTurnMessage) ||
     hasTokens(currentTurnMessage) ||
@@ -3348,83 +3421,89 @@ function LangyPanel({
                           // bottom and made history jump as it grew.
                         >
                           {displayMessages.map((message, index) => (
-                            // One message's render crash stays that message's:
-                            // a malformed tool part or card payload draws an
-                            // inline error where the message would have been,
-                            // and the rest of the conversation stands.
-                            <IsolatedErrorBoundary
-                              key={message.id}
-                              scope="This message failed to render"
-                              resetKeys={[message.id]}
-                            >
-                              <MessageContent
-                                message={message}
-                                organizationId={organizationId}
-                                appliedOutcomes={appliedOutcomes}
-                                discardedProposals={discardedProposalIds}
-                                applyingProposals={applyingProposalIds}
-                                onApply={applyProposal}
-                                onDiscard={discardProposalInStore}
-                                conversationId={activeConversationId}
-                                isStreaming={
-                                  displayBusy &&
-                                  index === displayMessages.length - 1 &&
-                                  message.role === "assistant"
-                                }
-                                interrupted={
-                                  interruptedConversationId != null &&
-                                  interruptedConversationId ===
-                                    activeConversationId &&
-                                  index === displayMessages.length - 1 &&
-                                  message.role === "assistant"
-                                }
-                                // Only ever on a turn that COMPLETED. We were asking
-                                // "How did Langy do?" above a timeout card — rating an
-                                // answer that never arrived. The failure IS the feedback;
-                                // asking the user to score it as well is insulting, and
-                                // whatever they clicked would be noise in the data.
-                                //
-                                // `!turnError` covers the failure; `!recovery.isRecovering`
-                                // covers the turn that is still being re-driven and might
-                                // yet succeed. This is only the position + settled gate:
-                                // whether a card actually shows is `shouldAskFeedback` (the
-                                // backend cadence), the directive, or the pin.
-                                showFeedback={
-                                  !isBusy &&
-                                  // The durable phase too — never ask "How did Langy
-                                  // do?" while a turn is still in flight. And never
-                                  // while time-travelling: you cannot rate the past.
-                                  !timeTravel &&
-                                  !turnActive &&
-                                  !turnError &&
-                                  !recovery.isRecovering &&
-                                  message.role === "assistant" &&
-                                  index === displayMessages.length - 1
-                                }
-                                shouldAskFeedback={shouldAskFeedback}
-                                isFeedbackPinned={
-                                  pinnedFeedbackMessageId === message.id
-                                }
-                                // The block channel (ADR-060). Interaction is
-                                // live-only: while time-travelling the cards
-                                // render read-only from the replayed record.
-                                choicesTimeline={choicesTimeline}
-                                onChoiceSelect={
-                                  timeTravel ? undefined : selectChoice
-                                }
-                                onVerifyDerivedCard={
-                                  timeTravel ? undefined : verifyDerivedCard
-                                }
-                                onAskCodeAccessAgain={
-                                  timeTravel ? undefined : askCodeAccessAgain
-                                }
-                                liveCodeAccessCallId={liveCodeAccessCallId}
-                                // (No connect-card prop: MessageContent no longer sniffs
-                                // the prose for `[langy:connect-github]`. The connect card
-                                // is driven by the structured `langy_github_not_connected`
-                                // error below — one road, not two.)
-                              />
-                            </IsolatedErrorBoundary>
+                            <Fragment key={message.id}>
+                              {/* The cards the settled turn raised, above the
+                                  message that closed it, so the answer is the
+                                  last thing in the turn. */}
+                              {index === cardAnchorIndex ? localCards : null}
+                              {/* One message's render crash stays that
+                                  message's: a malformed tool part or card
+                                  payload draws an inline error where the
+                                  message would have been, and the rest of the
+                                  conversation stands. */}
+                              <IsolatedErrorBoundary
+                                scope="This message failed to render"
+                                resetKeys={[message.id]}
+                              >
+                                <MessageContent
+                                  message={message}
+                                  organizationId={organizationId}
+                                  appliedOutcomes={appliedOutcomes}
+                                  discardedProposals={discardedProposalIds}
+                                  applyingProposals={applyingProposalIds}
+                                  onApply={applyProposal}
+                                  onDiscard={discardProposalInStore}
+                                  conversationId={activeConversationId}
+                                  isStreaming={
+                                    displayBusy &&
+                                    index === displayMessages.length - 1 &&
+                                    message.role === "assistant"
+                                  }
+                                  interrupted={
+                                    interruptedConversationId != null &&
+                                    interruptedConversationId ===
+                                      activeConversationId &&
+                                    index === displayMessages.length - 1 &&
+                                    message.role === "assistant"
+                                  }
+                                  // Only ever on a turn that COMPLETED. We were asking
+                                  // "How did Langy do?" above a timeout card — rating an
+                                  // answer that never arrived. The failure IS the feedback;
+                                  // asking the user to score it as well is insulting, and
+                                  // whatever they clicked would be noise in the data.
+                                  //
+                                  // `!turnError` covers the failure; `!recovery.isRecovering`
+                                  // covers the turn that is still being re-driven and might
+                                  // yet succeed. This is only the position + settled gate:
+                                  // whether a card actually shows is `shouldAskFeedback` (the
+                                  // backend cadence), the directive, or the pin.
+                                  showFeedback={
+                                    !isBusy &&
+                                    // The durable phase too — never ask "How did Langy
+                                    // do?" while a turn is still in flight. And never
+                                    // while time-travelling: you cannot rate the past.
+                                    !timeTravel &&
+                                    !turnActive &&
+                                    !turnError &&
+                                    !recovery.isRecovering &&
+                                    message.role === "assistant" &&
+                                    index === displayMessages.length - 1
+                                  }
+                                  shouldAskFeedback={shouldAskFeedback}
+                                  isFeedbackPinned={
+                                    pinnedFeedbackMessageId === message.id
+                                  }
+                                  // The block channel (ADR-060). Interaction is
+                                  // live-only: while time-travelling the cards
+                                  // render read-only from the replayed record.
+                                  choicesTimeline={choicesTimeline}
+                                  onChoiceSelect={
+                                    timeTravel ? undefined : selectChoice
+                                  }
+                                  onVerifyDerivedCard={
+                                    timeTravel ? undefined : verifyDerivedCard
+                                  }
+                                  onAskCodeAccessAgain={
+                                    timeTravel ? undefined : askCodeAccessAgain
+                                  }
+                                  liveCodeAccessCallId={liveCodeAccessCallId}
+                                  // (No connect-card prop: MessageContent no longer sniffs
+                                  // the prose for `[langy:connect-github]`. The connect card
+                                  // is driven by the structured `langy_github_not_connected`
+                                  // error below — one road, not two.)
+                                />
+                              </IsolatedErrorBoundary>
+                            </Fragment>
                           ))}
                           {/* The question the reader has already asked but which
                             has not become a message yet.
@@ -3439,32 +3518,11 @@ function LangyPanel({
                             That is not a polish gap, it is input that looks
                             lost. Drawn as the real bubble, in the place the
                             real bubble will appear, so the swap is invisible. */}
-                          {/* What Langy is waiting for on the developer's own
-                              machine (ADR-129). Read from the folded turn
-                              document, so a tab that adopted a running turn
-                              renders the card without the live stream. */}
-                          {!timeTravel && projectId && activeConversationId
-                            ? permissionCards.map((card) => (
-                                <IsolatedErrorBoundary
-                                  key={card.waitId}
-                                  scope="This permission card failed to render"
-                                  resetKeys={[card.waitId]}
-                                >
-                                  <LangyLocalPermissionCard
-                                    projectId={projectId}
-                                    conversationId={activeConversationId}
-                                    card={card}
-                                    skipAllowed={
-                                      localWorkspace.data?.skipAllowed ?? false
-                                    }
-                                    skipPermissions={
-                                      localWorkspace.data?.skipPermissions ??
-                                      false
-                                    }
-                                  />
-                                </IsolatedErrorBoundary>
-                              ))
-                            : null}
+                          {/* The cards of a turn that is still running, at the
+                              live edge where the answer they want is given.
+                              A settled turn's cards render inside it instead,
+                              above the message that closed it. */}
+                          {cardAnchorIndex === -1 ? localCards : null}
                           {!timeTravel && pendingPrompt ? (
                             <QueuedPrompt
                               prompt={pendingPrompt}
@@ -3510,6 +3568,11 @@ function LangyPanel({
                                   // about a turn that is waiting on the
                                   // reader (ADR-129).
                                   awaitingAnswer={awaitingAnswer}
+                                  // Everything the turn has produced so far.
+                                  // The line's escalation clock restarts on
+                                  // it, so it measures silence rather than
+                                  // how long the turn has been running.
+                                  activityKey={turnActivityKey}
                                   // The panel-open warm proved this
                                   // conversation's worker alive, so the first
                                   // message reads "Thinking…" instead of the

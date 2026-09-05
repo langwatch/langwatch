@@ -744,4 +744,58 @@ describe("given a running turn that is following a plan", () => {
     });
     expect(screen.getByText("Plan · 1 of 3 done")).toBeTruthy();
   });
+
+  /**
+   * The turn's plan is written to its durable record end to end, and nothing
+   * in the panel read it back. A reader who refreshed mid-turn had no live
+   * snapshot and no `todowrite` part on the message yet, so the checklist
+   * disappeared until the turn finished.
+   *
+   * @scenario "A reload in the middle of a turn keeps the checklist" */
+  it("reads the plan off the turn's record when the live snapshot is gone", async () => {
+    snapshotRef.current = {
+      messages: [{ id: "m1", role: "user", text: "improve this prompt" }],
+      isTurnInFlight: true,
+      inFlightTurnId: "turn-live",
+      eventCursor: null,
+      currentTurnId: "turn-live",
+    };
+    engine.messages = [
+      {
+        id: "m1",
+        role: "user",
+        parts: [{ type: "text", text: "improve this prompt" }],
+      },
+    ];
+    engine.status = "streaming";
+    renderReloadedPanel();
+
+    // The catch-up tail a refreshed tab reads: the turn, and the plan it has
+    // reached. Nothing else on screen carries the plan.
+    act(() => {
+      useLangyStore.getState().applyTurnEvents([
+        recordedAccepted({
+          id: "event-1",
+          createdAt: 1_000,
+          turnId: "turn-live",
+        }),
+        {
+          id: "event-2",
+          createdAt: 2_000,
+          occurredAt: 2_000,
+          type: LANGY_CONVERSATION_EVENT_TYPES.PLAN_UPDATED,
+          data: {
+            conversationId: CONVERSATION_ID,
+            turnId: "turn-live",
+            items: PLAN,
+          },
+        },
+      ]);
+    });
+
+    expect(useLangyStore.getState().turnPlan).toBeNull();
+    await waitFor(planCard);
+    expect(screen.getByText("Rewrite the prompt")).toBeTruthy();
+    expect(screen.getByText("Plan · 1 of 3 done")).toBeTruthy();
+  });
 });

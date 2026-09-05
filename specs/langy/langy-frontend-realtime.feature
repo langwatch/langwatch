@@ -255,6 +255,32 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     And it never says the turn is taking longer than usual
     And it never says Langy may be stuck
 
+  # The escalation used to measure the time since the line appeared, which is
+  # turn length, not silence. So a turn that had answered a permission card and
+  # was running a local command, with its output arriving in the terminal, was
+  # told "Langy still has not answered. It may be stuck." while nothing was
+  # wrong. A local command and a card the developer answered never reach the
+  # message on screen, so the line has to read the turn's own record too.
+  @unit
+  Scenario: The escalation measures silence, not how long the turn has run
+    Given a turn that has been running far longer than the stuck threshold
+    When it produced something more recently than that
+    Then the line does not say the turn is slow or that Langy may be stuck
+
+  @unit
+  Scenario: Work that never reaches the message still counts as progress
+    Given a turn whose message on screen carries nothing
+    Then a tool call in the turn's record counts as the turn making progress
+    And a card the developer answered counts
+    And a plan step changing counts
+    And reasoning or prose arriving counts
+
+  @unit
+  Scenario: A turn that really is silent still ends up looking stuck
+    Given a turn that has produced nothing at all
+    When the silence passes the stuck threshold
+    Then the line says Langy may be stuck
+
   @unit
   Scenario: Live reasoning reads as thinking, not as starting up
     Given a turn is in flight with no prose and no tool call yet
