@@ -58,6 +58,21 @@ export const OFFLINE_PUSHBACK = [
   "End your turn with that offer.",
 ].join(" ");
 
+/**
+ * What the model reads when LangWatch lost the call and the folder is still
+ * there.
+ *
+ * A poll that answers "not found" says the app dropped the envelope, which is
+ * a different thing from the machine going away. Sending the user to share
+ * their folder again, while their command line sits connected, is advice they
+ * cannot act on.
+ */
+export const CALL_LOST_PUSHBACK = [
+  "LangWatch lost this call, so it did not run. The shared folder is still connected.",
+  "Run the same command one more time.",
+  "If it fails the same way again, tell the user in one line what is not done and end your turn.",
+].join(" ");
+
 /** What the model reads when a call is stopped. */
 export const CANCELLED_PUSHBACK =
   "cancelled: the turn was stopped, so the call on the user's machine was stopped too";
@@ -114,6 +129,15 @@ type CreateControlRequestResponse = {
 /** The app did not answer. Each tool turns this into its own pushback, never a stack trace. */
 export class AppUnreachableError extends Error {}
 
+/**
+ * The app answered, and it does not hold this call any more.
+ *
+ * A subclass of the one above, so every existing catch still reads it as a
+ * call that did not run; the tools that can act on the difference test for
+ * this one first.
+ */
+export class CallLostError extends AppUnreachableError {}
+
 /** The turn was stopped while the call was on the machine. */
 export class CallCancelledError extends Error {}
 
@@ -158,6 +182,9 @@ export async function callApp<T>({
   } catch {
     if (signal?.aborted) throw new CallCancelledError(CANCELLED_PUSHBACK);
     throw new AppUnreachableError("the LangWatch app did not answer");
+  }
+  if (response.status === 404) {
+    throw new CallLostError("the LangWatch app does not hold this call any more");
   }
   if (!response.ok) throw new AppUnreachableError("the LangWatch app did not answer");
   try {
@@ -231,6 +258,45 @@ export function renderWorkspaceFacts(workspace: WorkspaceInfo): string {
     "The user's folder is connected. Work with the local_* tools.",
     ...lines,
   ].join("\n");
+}
+
+/**
+ * The folder's own state, read from the app. False when the app could not
+ * answer at all, so a failed read never claims the folder is there.
+ */
+async function isWorkspaceConnected({
+  signal,
+}: {
+  signal?: AbortSignal;
+}): Promise<boolean> {
+  try {
+    const status = await callApp<WorkspaceStatus>({
+      path: `/api/langy/local/workspace?conversationId=${encodeURIComponent(conversationId())}`,
+      method: "GET",
+      signal,
+      timeoutMs: REQUEST_TIMEOUT_MS,
+    });
+    return status.connected === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * What a local call that did not run tells the model.
+ *
+ * The folder going away and the app losing the call are different things, and
+ * only the first one is fixed by sharing the folder again, so the folder's own
+ * state is read before either is said.
+ */
+export async function localCallPushback({
+  signal,
+}: {
+  signal?: AbortSignal;
+}): Promise<string> {
+  return (await isWorkspaceConnected({ signal }))
+    ? CALL_LOST_PUSHBACK
+    : OFFLINE_PUSHBACK;
 }
 
 /**
@@ -487,10 +553,12 @@ export function createLocalWorkspaceExtension({
                 await runLocalCall({ tool: name, params, turnContext, toolCallId, signal }),
               );
             } catch (error) {
-              // A folder that is not there is a pushback the model acts on,
-              // not a failure: it asks for code access instead of retrying.
+              // A call that did not run is a pushback the model acts on, not a
+              // failure. Which pushback depends on the folder, which is read
+              // rather than guessed: a lost call is retried, a folder that is
+              // gone is offered the two ways on.
               if (error instanceof AppUnreachableError) {
-                return textResult(OFFLINE_PUSHBACK);
+                return textResult(await localCallPushback({ signal }));
               }
               throw error;
             }

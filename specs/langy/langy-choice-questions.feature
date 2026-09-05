@@ -135,6 +135,20 @@ Feature: Langy asks a real question with selectable options
       Then the choices card renders with the options
       And the turn stays in flight, with the tool waiting
 
+    @unit
+    Scenario: A question renders in a tab that never watched the turn
+      Given a turn this tab adopted, so it reads no live stream
+      When the tool raises the question wait
+      Then the choices card is built from the conversation record alone
+      And it carries the question and its options
+
+    @unit
+    Scenario: A settled question reads settled, with the option that was chosen
+      Given a question wait that was answered somewhere else
+      When the card is read back
+      Then it renders locked on the option the answer names
+      And it offers no way to answer again
+
     @integration
     Scenario: Selecting an option returns it to the tool and the turn continues
       Given an open question card asked by the tool

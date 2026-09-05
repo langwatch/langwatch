@@ -32,6 +32,7 @@ import {
   CALL_POLL_HOLD_MS,
   CALL_RESULT_TTL_MS,
   LIVE_STREAM_KEEPALIVE_MS,
+  PERMISSION_WAIT_BUDGET_MS,
   POLL_INTERVAL_MS,
 } from "./constants";
 import { LangyLocalWorkspaceOfflineError } from "./errors";
@@ -66,6 +67,12 @@ export const storedLocalCallSchema = z
     state: z.enum(CALL_STATES),
     createdAt: z.number(),
     deadlineAt: z.number(),
+    /**
+     * The whole time the command may run, so a call released from a permission
+     * card starts its limit again. Absent on records written before the
+     * dispatcher kept it, which read as a deadline that never moves.
+     */
+    timeoutMs: z.number().optional(),
     /** The permission card this call is waiting on, while it waits. */
     waitId: z.string().optional(),
     ok: z.boolean().optional(),
@@ -159,16 +166,12 @@ export class LocalCallDispatcher {
       state: "pending" as CallState,
       createdAt,
       deadlineAt: createdAt + timeoutMs,
+      timeoutMs,
       ...call,
     } as StoredLocalCall;
 
     await this.write(stored);
-    await this.store.zadd({
-      key: pendingCallsKey(conversationId),
-      score: stored.deadlineAt,
-      member: stored.callId,
-      ttlSeconds: this.envelopeTtlSeconds(stored),
-    });
+    await this.track(stored);
     await this.store.publish(
       workspaceChannel(conversationId),
       JSON.stringify({ call: stored.callId } satisfies WorkspaceNudge),
@@ -278,6 +281,12 @@ export class LocalCallDispatcher {
   /**
    * The command line needs the developer's answer first. Returns the call as
    * it now stands so the caller can raise the card against it.
+   *
+   * The envelope now has to outlive the CARD, not the command. A thirty second
+   * command left its envelope sixty seconds past its own deadline while the
+   * card was allowed ten minutes, so an ask answered ninety seconds later
+   * polled a call the platform had already dropped, and the worker read three
+   * "not found" answers as a folder that had gone away.
    */
   async awaitPermission({
     callId,
@@ -294,6 +303,7 @@ export class LocalCallDispatcher {
       waitId,
     };
     await this.write(next);
+    await this.track(next);
     return next;
   }
 
@@ -309,7 +319,17 @@ export class LocalCallDispatcher {
   }): Promise<void> {
     const call = await this.read(callId);
     if (call && call.state === "awaiting_permission") {
-      await this.write({ ...call, state: "running" });
+      // The command starts now, so its time limit starts now. Counting the
+      // minutes the developer spent reading the card against the command left
+      // a long ask with a deadline already behind it.
+      const released: StoredLocalCall = {
+        ...call,
+        state: "running",
+        deadlineAt:
+          this.now() + (call.timeoutMs ?? call.deadlineAt - call.createdAt),
+      };
+      await this.write(released);
+      await this.track(released);
     }
     await this.store.publish(
       workspaceChannel(conversationId),
@@ -460,8 +480,29 @@ export class LocalCallDispatcher {
     );
   }
 
+  /** Keeps the conversation's pending set in step with the call's own expiry. */
+  private async track(call: StoredLocalCall): Promise<void> {
+    await this.store.zadd({
+      key: pendingCallsKey(call.conversationId),
+      score: this.expiresAt(call),
+      member: call.callId,
+      ttlSeconds: this.envelopeTtlSeconds(call),
+    });
+  }
+
+  /**
+   * When the envelope stops being worth keeping. A call waiting on a card
+   * lives for the card's whole budget: the developer has that long to answer,
+   * and the call has to be there when they do.
+   */
+  private expiresAt(call: StoredLocalCall): number {
+    if (call.state !== "awaiting_permission") return call.deadlineAt;
+    return Math.max(call.deadlineAt, this.now() + PERMISSION_WAIT_BUDGET_MS);
+  }
+
   private envelopeTtlSeconds(call: StoredLocalCall): number {
-    const remaining = call.deadlineAt - this.now() + CALL_ENVELOPE_SLACK_MS;
+    const remaining =
+      this.expiresAt(call) - this.now() + CALL_ENVELOPE_SLACK_MS;
     return Math.max(1, Math.ceil(remaining / 1000));
   }
 }

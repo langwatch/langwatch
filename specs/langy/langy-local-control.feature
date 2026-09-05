@@ -78,8 +78,8 @@ Feature: Langy works in a folder shared from the developer's machine
       Given an approved control request
       And no turn is in flight
       When the CLI connects
-      Then a user message reads that the local folder is connected, naming the folder and the machine
-      And that message does not repeat the whole path the card already shows
+      Then a user message reads that the local folder is connected
+      And that message carries nothing the card above it already shows
       And Langy starts working on the change it offered
 
     @integration
@@ -129,6 +129,22 @@ Feature: Langy works in a folder shared from the developer's machine
       And the id is forgotten when the result arrives
 
     @integration
+    Scenario: A call the command line is still running is not handed over again
+      Given a command line that reconnects while a command still runs
+      And a register frame that names that call as still in flight
+      When the connection scans the calls pending on the conversation
+      Then the call is not handed over a second time
+      And a result for a call that already ended is accepted with no error
+
+    @integration
+    Scenario: A folder replaced by a newer one stops receiving work
+      Given a connected folder
+      When another folder connects to the same conversation
+      Then the first connection is told the folder was replaced, and it closes
+      And a new call goes only to the newest folder
+      And a result from the replaced connection is refused
+
+    @integration
     Scenario: Ctrl-C disconnects at once, not when a heartbeat expires
       Given a connected folder
       When the CLI exits
@@ -150,6 +166,12 @@ Feature: Langy works in a folder shared from the developer's machine
       When the folder disconnects
       Then the line reads the folder name and the machine name
       And it reads the path only for a folder that has no name
+
+    @unit
+    Scenario: The line that says the folder connected repeats nothing from the card
+      Given a code access card that names the folder path, the machine and the branch
+      When the folder connects
+      Then the line under the card reads only that the local folder is connected
 
     @unit
     Scenario: The disconnect notice does not put the conversation back to work
@@ -261,6 +283,22 @@ Feature: Langy works in a folder shared from the developer's machine
       Then the platform settles that card from the frame
       And a frame for a card that already settled is ignored
 
+    @integration
+    Scenario: A call waiting on a permission card keeps its envelope
+      Given a call for a command with a time limit of thirty seconds
+      When the card waits ninety seconds for an answer
+      Then the call is still there when the answer arrives
+      And the poll for it does not answer "not found"
+      And the command gets its whole time limit from the moment of the answer
+
+    @unit
+    Scenario: A lost call is not reported to Langy as a folder that went away
+      Given a poll that answers "not found" until the worker gives up
+      When the worker reads the folder state
+      And the folder is still connected
+      Then Langy reads that the call was lost and to run the command one more time
+      And Langy does not read that the shared folder is gone
+
   Rule: The session key is the only credential and it ends with the conversation
 
     @integration
@@ -276,6 +314,13 @@ Feature: Langy works in a folder shared from the developer's machine
       When I disconnect from the panel header chip
       Then the CLI exits with a message that the folder was disconnected from LangWatch
       And the session key no longer connects
+
+    @integration
+    Scenario: Disconnecting revokes the key even when the command line cannot be reached
+      Given a connected folder whose command line misses the disconnect frame
+      When I disconnect from the panel header chip
+      Then the key that controlled the conversation controls nothing
+      And the command line that reconnects with it is refused
 
   Rule: The link the command line prints opens the conversation
 

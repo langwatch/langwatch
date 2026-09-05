@@ -249,6 +249,28 @@ Feature: The CLI decides what Langy may run on the developer's machine
       Then that card also reads answered in the terminal
       And a card answered in the panel names no terminal
 
+    @unit
+    Scenario: The panel names the terminal while the ask is open there too
+      Given a conversation with a connected local folder
+      And a card waiting for an answer
+      Then the waiting line reads that I can answer on the card above or in the terminal
+      And the composer reads the same
+      And a conversation with no shared folder reads only about the card
+
+    @integration
+    Scenario: The panel learns about a terminal answer at once
+      Given a card waiting for an answer
+      When the command line reports the answer the developer gave in the terminal
+      Then the settled card reaches the live stream before the durable record is written
+
+    @integration
+    Scenario: A click on a card the terminal already answered answers nothing
+      Given a card that the terminal answered while it was still on screen
+      When I click one of its buttons
+      Then the answer is refused
+      And the card reads that it was answered in the terminal
+      And no failure is shown on the card
+
   Rule: A card sits where it happened, and never after the answer
 
     # Every card of the conversation was drawn below the whole transcript, so a

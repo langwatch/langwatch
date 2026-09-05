@@ -3,6 +3,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
   CODE_ACCESS_TOOL_NAME,
   LOCAL_TOOL_NAMES,
+  CALL_LOST_PUSHBACK,
   OFFLINE_PUSHBACK,
   createLocalWorkspaceExtension,
 } from "./local-workspace.js";
@@ -258,6 +259,44 @@ describe("the local workspace tools", () => {
       expect(text).toContain("langy --share-control");
       expect(text).not.toContain("Error");
     });
+  });
+
+  describe("when the app lost the call and the folder is still connected", () => {
+    /** @scenario "A lost call is not reported to Langy as a folder that went away" */
+    it("tells Langy the call was lost and to run the command again", async () => {
+      const workspace = {
+        connected: true,
+        codeAccessPreference: null,
+        github: { installed: false },
+        workspace: { root: "/Users/dev/acme-app", name: "acme-app", os: "darwin" },
+      };
+      const fetchMock = vi.fn(async (url: string) => {
+        const path = new URL(url).pathname;
+        if (path === "/api/langy/local/calls") {
+          return { ok: true, status: 200, json: async () => ({ callId: "call_lost" }) };
+        }
+        if (path === "/api/langy/local/workspace") {
+          return { ok: true, status: 200, json: async () => workspace };
+        }
+        // The envelope is gone: every poll answers "not found".
+        return { ok: false, status: 404, json: async () => ({}) };
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const text = textOf(
+        await registeredTools().get("local_bash")!.execute("t_lost", { command: "pnpm test" }),
+      );
+
+      expect(text).toBe(CALL_LOST_PUSHBACK);
+      expect(text).toContain("Run the same command one more time");
+      expect(text).not.toContain("not connected any more");
+      expect(text).not.toContain("langy --share-control");
+      expect(
+        fetchMock.mock.calls.some(([url]) =>
+          String(url).includes("/api/langy/local/workspace"),
+        ),
+      ).toBe(true);
+    }, 15_000);
   });
 
   describe("when the turn is stopped", () => {
