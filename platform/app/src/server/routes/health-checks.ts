@@ -17,6 +17,7 @@ import type {
   IExportTraceServiceRequest,
 } from "@opentelemetry/otlp-transformer";
 import crypto from "crypto";
+import type { Context } from "hono";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import {
@@ -558,6 +559,53 @@ secured
 // run's real result, never a cached one.
 //
 // @see specs/scenarios/scenario-canary-healthcheck.feature
+
+// Trims and validates the two required query params in one place so the
+// handler's cognitive complexity stays low; returns the 400 message text
+// unchanged when either is missing/blank.
+function readCanaryQuery(
+  c: Context,
+): { projectId: string; runPlanId: string } | { missing: string[] } {
+  const projectId = c.req.query("projectId")?.trim();
+  const runPlanId = c.req.query("runPlanId")?.trim();
+  if (projectId && runPlanId) {
+    return { projectId, runPlanId };
+  }
+  return {
+    missing: [
+      ...(projectId ? [] : ["projectId"]),
+      ...(runPlanId ? [] : ["runPlanId"]),
+    ],
+  };
+}
+
+// Maps the canary's result union to its HTTP response so the handler itself
+// only has to call it — keeps the branching out of the handler's complexity.
+function canaryResultToResponse(
+  c: Context,
+  result: Awaited<ReturnType<typeof runScenarioHealthCanary>>,
+) {
+  if ("busy" in result) {
+    return c.json({ status: "busy" }, { status: 429 });
+  }
+  if (result.healthy) {
+    return c.json({
+      status: "ok",
+      scenarioRunId: result.scenarioRunId,
+      durationMs: result.durationMs,
+    });
+  }
+  return c.json(
+    {
+      status: "unhealthy",
+      reason: result.reason,
+      scenarioRunId: result.scenarioRunId,
+      durationMs: result.durationMs,
+    },
+    { status: 503 },
+  );
+}
+
 secured
   .access(
     internalSecret(
@@ -585,44 +633,20 @@ secured
     // the run plan lookup (the multitenancy guard rejects an unscoped read) and
     // `runPlanId` names the plan. A missing/blank either is a bad request,
     // distinct from the 503 a plan that does not resolve reports.
-    const projectId = c.req.query("projectId")?.trim();
-    const runPlanId = c.req.query("runPlanId")?.trim();
-    if (!projectId || !runPlanId) {
-      const missing = [
-        ...(projectId ? [] : ["projectId"]),
-        ...(runPlanId ? [] : ["runPlanId"]),
-      ];
+    const query = readCanaryQuery(c);
+    if ("missing" in query) {
       return c.json(
         {
-          message: `${missing.join(" and ")} query parameter${
-            missing.length > 1 ? "s are" : " is"
+          message: `${query.missing.join(" and ")} query parameter${
+            query.missing.length > 1 ? "s are" : " is"
           } required.`,
         },
         { status: 400 },
       );
     }
 
-    const result = await runScenarioHealthCanary({ projectId, runPlanId });
-
-    if ("busy" in result) {
-      return c.json({ status: "busy" }, { status: 429 });
-    }
-    if (result.healthy) {
-      return c.json({
-        status: "ok",
-        scenarioRunId: result.scenarioRunId,
-        durationMs: result.durationMs,
-      });
-    }
-    return c.json(
-      {
-        status: "unhealthy",
-        reason: result.reason,
-        scenarioRunId: result.scenarioRunId,
-        durationMs: result.durationMs,
-      },
-      { status: 503 },
-    );
+    const result = await runScenarioHealthCanary(query);
+    return canaryResultToResponse(c, result);
   });
 
 export const app = secured.hono;
