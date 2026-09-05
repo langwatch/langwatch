@@ -1,9 +1,7 @@
 /**
+ * The migration driver reads the same addresses the byte driver does, through the same parser. What is proved here is that it
+ * refuses another provider's address by name, and that a key reaches S3 as the bytes it was minted from.
  * @vitest-environment node
- *
- * The migration driver reads the same addresses the byte driver does, through
- * the same parser. What is proved here is that it refuses another provider's
- * address by name, and that a key reaches S3 as the bytes it was minted from.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

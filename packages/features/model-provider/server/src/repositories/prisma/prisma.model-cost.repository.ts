@@ -11,14 +11,6 @@ type Database = Pick<PrismaClient, "customLLMModelCost">;
 export class PrismaModelCostRepository extends ModelCostRepository {
   /**
    * The runtime check that belongs to the UNTYPED seam, and only to it.
-   *
-   * `PostgresModelProviderAdapter` still takes `database: object` — the legacy
-   * shape the standards call out — so something has to say what that object must
-   * be before a query runs. `PostgresModelCostCatalogAdapter` takes
-   * `Pick<PrismaClient, "customLLMModelCost">`, which says the same thing at
-   * compile time, and re-checking it there did more than duplicate the type: an
-   * `in` test refuses any client that answers through a proxy, so a composition
-   * test handing the graph a stand-in was told its Prisma was not a Prisma.
    */
   static requireModelCostDatabase(database: object): Database {
     if (!isModelCostDatabase(database)) {

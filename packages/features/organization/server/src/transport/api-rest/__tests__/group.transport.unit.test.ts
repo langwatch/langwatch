@@ -1,19 +1,7 @@
 /**
- * The `/api/groups` REST door: the access policy every route declares, the
- * Enterprise gate that runs after it, the wire body, and the status a domain
- * refusal becomes.
- *
- * Ported from `platform/app/src/app/api/groups/__tests__/`:
- * `groups-rest-api.integration.test.ts` and
- * `groups-enterprise-gate.integration.test.ts`, both of which drove this family
- * against real Postgres. What they proved about the SERVICE — that a group its
- * identity provider owns cannot be renamed here, that a member has to belong to
- * the organization — is in `group.service.unit.test.ts`, where the rule lives.
- * What is asserted here is that the door dispatches to it, attributes the write,
- * and renders the refusal with its own status and code.
- *
+ * The `/api/groups` REST door: the access policy every route declares, the Enterprise gate
+ * that runs after it, the wire body, and the status a domain refusal becomes.
  * Spec: specs/groups/groups-rest-api.feature
- *       specs/licensing/management-apis-enterprise-gate.feature
  */
 import {
   createRestApiService,
@@ -88,11 +76,6 @@ function groupPage(): OrganizationGroupPage {
 
 /**
  * The process's enforcement, plus the two ports this family declares.
- *
- * The Enterprise gate is applied per route AFTER the access chain, so an
- * unauthenticated request must still answer 401 rather than 402 — "you are not
- * who you say" comes before "your plan does not include this". `entitled: false`
- * is what drives that ordering assertion.
  */
 function spine(options: { granted?: readonly string[] } = {}) {
   const granted = new Set(options.granted ?? ["organization:manage"]);
@@ -209,10 +192,9 @@ describe("createGroupRestApp", () => {
     });
 
     /**
-     * The plan gate runs after the access chain, so a request with no
-     * credential is refused as unauthenticated even on an unentitled
-     * organization. "You are not who you say" beats "your plan does not
-     * include this".
+     * The plan gate runs after the access chain, so a request with no credential
+     * is refused as unauthenticated even on an unentitled organization. "You are
+     * not who you say" beats "your plan does not include this".
      */
     it("stays a 401 rather than a plan refusal on an unentitled organization", async () => {
       const { hono, gateRefusals } = buildApi({ entitled: false });

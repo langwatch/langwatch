@@ -1,27 +1,7 @@
 /**
+ * Real-Postgres coverage for Default Models read visibility when a member's project access comes from ROLE BINDINGS only (an ORGANIZATION-scope MEMBER binding plus a TEAM-scope MEMBER binding, no legacy TeamUser row).
  * @vitest-environment node
- *
  * @see specs/model-providers/role-based-default-models.feature
- *
- * Real-Postgres coverage for Default Models read visibility when a member's
- * project access comes from ROLE BINDINGS only (an ORGANIZATION-scope MEMBER
- * binding plus a TEAM-scope MEMBER binding, no legacy TeamUser row).
- *
- * On main this guarded `batchScopePermissions`, a hand-rolled batch loader
- * that fetched role bindings only for the scope ids it was directly asked
- * about — so a project-permission batch never loaded the TEAM-scoped
- * bindings a project inherits from, and a role-binding-only member saw no
- * default models. That loader is gone: `ModelProviderDefaultsService.
- * getSnapshot` now asks `ModelProviderAuthorizationService.canRead` once per
- * config row, which delegates straight to `AuthzService.getDecision` — the
- * real permission engine, with no scope-id batching to have a blind spot in.
- *
- * The authz decision here is computed from real Postgres role-binding rows
- * (including the project -> team lookup a TEAM-scope binding needs to cover
- * a project), not echoed, so this still proves the visibility this scenario
- * describes rather than a mock's own bookkeeping.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";

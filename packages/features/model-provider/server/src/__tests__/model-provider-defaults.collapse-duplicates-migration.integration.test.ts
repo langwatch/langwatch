@@ -1,26 +1,7 @@
 /**
+ * ("Migration collapses pre-invariant duplicate configs per scope")
  * @vitest-environment node
- *
  * @see specs/model-providers/model-default-config-cascade.feature
- *   ("Migration collapses pre-invariant duplicate configs per scope")
- *
- * The one-config-per-scope rule applied to rows written before it existed —
- * against real Postgres, replaying the shipped migration.
- *
- * The write path now claims each scope on save, so no new duplicate can
- * appear. Rows already in a customer's database still carry the old shape:
- * several configs attached to the same scope, of which only the newest ever
- * resolved. Migration 20260814120000_collapse_duplicate_model_default_scopes
- * collapses them by the resolver's own tiebreak, so resolution results do
- * not change.
- *
- * The statements are read from the migration file and replayed inside a
- * rolled-back transaction, narrowed to this test's synthetic rows: the
- * shipped statements are deliberately blanket (a one-shot backfill over
- * every pre-migration row), and the narrowing is a property of the replay
- * only, so the replay cannot disturb rows another suite owns.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";

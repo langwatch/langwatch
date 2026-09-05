@@ -64,11 +64,6 @@ export { ExperimentRunStateStoreAdapter } from "./adapters/experiment-run-state-
 
 /**
  * The workbench run loop, moved WHOLE out of the retired application.
- *
- * The shared execution model it folds over now lives in
- * `@langwatch/experiment-contract`, which both the browser that composes a run
- * and the server that executes it may import — so the loop needed no copy of
- * what a cell is.
  */
 export { EvaluatorNoInputsResolvedError } from "./experiment-execution.errors";
 export { createSemaphore } from "./processes/experiment-run-semaphore.process";

@@ -49,15 +49,7 @@ export const targetResultEventDataSchema = z.object({
   /**
    * The failure's stable code, as the serialised handled error the SSE frame
    * carries (`target_result.domainError`).
-   *
-   * `error` is the engine's engineer-facing string; it is what the row used to
-   * hold ALONE, so a page reload turned a coded failure back into raw engine
-   * text in the customer's cell. Persisting the code lets the read-back render
    * the same registry copy the live stream does (ADR-045).
-   *
-   * Carried whole rather than mirrored field-by-field: the shape is owned by
-   * `@langwatch/handled-error`, and an event log that silently drops fields it
-   * was not built with is worse than one that keeps them.
    */
   domainError: z
     .custom<SerializedHandledError>((value) => typeof value === "object" && value !== null)
@@ -68,12 +60,6 @@ export const targetResultEventDataSchema = z.object({
   /**
    * True when the cell was copied into this run from the board rather than
    * produced by it.
-   *
-   * A run holds the whole board so the results page can draw every column, but
-   * a copied cell was paid for by the run that produced it. Counting its money
-   * or its time again reports spend that did not happen, and counting it as
-   * completed reports more cells done than the run dispatched. The fold reads
-   * this field to tell the two apart.
    */
   carriedOver: z.boolean().optional(),
 });
@@ -108,10 +94,6 @@ export const evaluatorResultEventDataSchema = z.object({
   /**
    * True when the verdict was copied into this run from the board rather than
    * produced by it. See `targetResultEventDataSchema.carriedOver`.
-   *
-   * A carried verdict still counts toward what the run scored: the run stands
-   * for the board, and a reader comparing two columns needs both sides. Its
-   * money does not count, for the same reason a carried output's does not.
    */
   carriedOver: z.boolean().optional(),
 });

@@ -1,14 +1,7 @@
 /**
+ * Verifies that all five stored_object_* Prometheus metrics are registered with the correct names and label sets. These metrics are
+ * emitted by StoredObjectsService through its telemetry port and surfaced at /metrics via prom-client's default registry.
  * @vitest-environment node
- *
- * Verifies that all five stored_object_* Prometheus metrics are registered
- * with the correct names and label sets. These metrics are emitted by
- * StoredObjectsService through its telemetry port and surfaced at /metrics via
- * prom-client's default registry.
- *
- * The suite drives the port rather than the counters, because the port is what
- * the service holds: a recording that stopped reaching prom-client would still
- * satisfy an assertion made against the counter directly.
  */
 
 import { register } from "prom-client";

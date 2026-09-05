@@ -1,11 +1,9 @@
 /** @vitest-environment node */
 
 /**
- * The declared-check seam's own behaviour, over the ports interface: which
- * decision each builder asks for, what an unauthenticated or miswired call
- * gets, and the SHAPE of a refusal. The authorization port is a bare mock
- * here — the engine's own decisions are `authz-service.facade.unit.test.ts`'s
- * business.
+ * The declared-check seam's own behaviour, over the ports interface: which decision each builder asks for, what an
+ * unauthenticated or miswired call gets, and the SHAPE of a refusal. The authorization port is a bare mock here —
+ * the engine's own decisions are `authz-service.facade.unit.test.ts`'s business.
  */
 import {
   type AuthzGetDecisionInput,
@@ -19,10 +17,7 @@ import {
 } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import type {
-  TrpcAuthorizationDecisions,
-  TrpcMiddlewareContext,
-} from "../trpc-policy-ports.js";
+import type { TrpcAuthorizationDecisions, TrpcMiddlewareContext } from "../trpc-policy-ports.js";
 import {
   createDeclaredAuthzMiddlewares,
   type TrpcDeclaredAuthzContext,
@@ -48,9 +43,8 @@ function makePorts({
 } = {}): TrpcDeclaredAuthzPorts<TrpcDeclaredAuthzContext> & {
   decisions: TrpcAuthorizationDecisions;
 } {
-  const checkScopeLineage = vi.fn<
-    (input: AuthzScopeLineageInput) => Promise<AuthzScopeLineageResult>
-  >();
+  const checkScopeLineage =
+    vi.fn<(input: AuthzScopeLineageInput) => Promise<AuthzScopeLineageResult>>();
   const decisions: TrpcAuthorizationDecisions = {
     getDecision,
     getProjectAnyDecision,

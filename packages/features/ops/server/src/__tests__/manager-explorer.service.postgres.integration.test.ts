@@ -1,13 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The fleet repository and the audited actions against a real Postgres. Rows
- * are namespaced by a per-run process name so parallel runs and leftover data
- * cannot collide, and reaped in afterAll.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it so the suite
- * stays runnable on a box with no database.
- *
  * Spec: specs/ops/process-manager-visibility.feature
  * Spec: specs/ops/dead-letter-recovery.feature
  */
@@ -118,11 +110,6 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
 
   /**
    * The dead-letter block seeds under its own names.
-   *
-   * The fleet-count block seeds two dead rows (`dead-1`, `dead-2`) under
-   * plain `ns` to assert `deadMessages: 2`. Those rows are dead and the dead
-   * read is fleet-wide, so an assertion narrowing on `ns` counts them as well
-   * as its own — off by exactly the rows another block happened to need.
    */
   const nsDead = `${ns}.dl`;
   const nsDeadB = `${nsDead}.b`;

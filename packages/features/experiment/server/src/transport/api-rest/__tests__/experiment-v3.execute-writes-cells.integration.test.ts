@@ -1,19 +1,7 @@
 /**
+ * A run started by an open workbench tab used to reach the board only through that tab. A background tab holds its save timer and a dropped connection loses the cells the page held, so
+ * the run read as complete in its own record while the board still read "No output yet". The streaming route now writes the cells itself, the same way the polling runner does.
  * @see specs/experiments-v3/workbench-versioning.feature
- *
- * A run started by an open workbench tab used to reach the board only through
- * that tab. A background tab holds its save timer and a dropped connection
- * loses the cells the page held, so the run read as complete in its own record
- * while the board still read "No output yet". The streaming route now writes
- * the cells itself, the same way the polling runner does.
- *
- * The ROUTE, not the writer, is what this file guards: the wiring is the part
- * that was missing. Ported from
- * `platform/app/src/server/routes/__tests__/experiments-execute-writes-cells.integration.test.ts`
- * (#7629), where the route read its collaborators off a module-global app; the
- * family takes them as ports now, so the fakes are passed in rather than
- * mocked into place. Its `applyWorkbenchTransform` assertions become the
- * read-then-write pair this seam is built from.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { Hono, type ErrorHandler } from "hono";

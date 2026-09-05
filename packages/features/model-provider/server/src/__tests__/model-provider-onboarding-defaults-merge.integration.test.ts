@@ -1,25 +1,7 @@
 /**
+ * Real-Postgres cover for the onboarding seed's per-key merge (main #7556): the seed used to stop at the first config already attached to a scope, so the order providers were added in decided which roles ever existed — an Anthropic-first organization got DEFAULT and FAST and no EMBEDDINGS, and adding OpenAI afterwards did nothing at all.
  * @vitest-environment node
- *
  * @see specs/model-providers/onboarding-flow.feature
- *
- * Real-Postgres cover for the onboarding seed's per-key merge (main #7556):
- * the seed used to stop at the first config already attached to a scope, so
- * the order providers were added in decided which roles ever existed — an
- * Anthropic-first organization got DEFAULT and FAST and no EMBEDDINGS, and
- * adding OpenAI afterwards did nothing at all.
- *
- * `ModelProviderOnboardingDefaultsService.seed` in THIS package still has
- * that shape: `if (await this.options.defaults.tryFindByScope(scope))
- * continue;` skips seeding the whole scope the moment any config is already
- * there, rather than merging in the roles the new provider's plan adds and
- * the existing config lacks. Two of the four scenarios below fail against
- * that method as written — see the report for which, and the "needs
- * production change" note pointing at the fix (a per-key merge, and a
- * command-service hook for the disabled -> enabled transition, neither of
- * which exists in this package yet).
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";

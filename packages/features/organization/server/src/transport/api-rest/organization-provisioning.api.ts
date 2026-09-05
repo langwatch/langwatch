@@ -1,22 +1,5 @@
 /**
  * Instance-administrator organization provisioning, self-hosted only.
- *
- * The one management surface that exists before any organization does, so it
- * authenticates against the instance (the `LANGWATCH_INSTANCE_ADMIN_API_KEY`
- * bearer credential) rather than an organization key, and it is deliberately a
- * plain SecuredApp rather than an `@langwatch/api` service: there is no
- * organization to resolve, no plan to gate on, and no RBAC principal.
- *
- * Availability is a per-request property: when the credential is not
- * configured, or the deployment is SaaS, every path answers 404: the family
- * is absent, not forbidden. The routes stay mounted and policy-registered
- * either way, so the route-policy registry and the composed router can never
- * disagree about them, and the OpenAPI document (which describes the
- * self-hosted capability) can be generated without the credential.
- *
- * Creating an organization returns an organization-scoped admin API key so
- * infrastructure-as-code can chain: instance key creates the organization,
- * the returned key does everything else through the management APIs.
  */
 import { timingSafeEqual } from "node:crypto";
 
@@ -50,13 +33,6 @@ export interface OrganizationProvisioningSummary {
 /**
  * The organization capability this family needs, which is not the one the
  * `OrganizationService` contract publishes.
- *
- * Provisioning is the instance's surface, not a tenant's: it creates an
- * organization before any credential for it exists, reads the instance's
- * whole roster, and compensates a half-finished run by removing what it made.
- * None of those are on the contract today, so the port names exactly the four
- * the family calls. They belong on `OrganizationService` — moving them there
- * is a change to the organization package, not to a transport move.
  */
 export interface OrganizationProvisioningPort {
   createForProvisioning(input: {
@@ -70,13 +46,6 @@ export interface OrganizationProvisioningPort {
 
 /**
  * The instance credential was absent or wrong.
- *
- * A handled error rather than a hand-rolled body, so `createServiceApp`'s
- * error handler serialises it like every other refusal on the surface and the
- * caller reads a stable `code` instead of an HTTP phrase. The two cases stay
- * apart because they need different answers: nothing presented means "set
- * LANGWATCH_INSTANCE_ADMIN_API_KEY, or pass --instance-key"; a wrong value
- * means the credential itself is not the instance's.
  */
 class InstanceAdminRefusedError extends HandledError {
   constructor(code: "missing_credentials" | "invalid_credentials") {
@@ -100,16 +69,9 @@ function isAuthorized(authorizationHeader: string | undefined, expected: string)
 }
 
 /**
- * Constant-time bearer check against the instance credential (the
- * langy-internal pattern: a plain `===` leaks the secret one byte at a time
- * to anything that can time responses). Availability comes first: an
- * unconfigured credential or a SaaS deployment means the family does not
- * exist, so the answer is 404 before any credential is examined.
- *
- * Both facts are read per request rather than captured at mount: a deployment
- * (or a test) that sets the variable after boot is honoured, and blank counts
- * as unset. The same variable is declared in the env schema for validation
- * and documentation.
+ * Constant-time bearer check against the instance credential (the langy-internal pattern: a plain `===` leaks the secret one
+ * byte at a time to anything that can time responses). Availability comes first: an unconfigured credential or a SaaS
+ * deployment means the family does not exist, so the answer is 404 before any credential is examined.
  */
 export function verifyInstanceAdminKey(options: {
   instanceAdminKey: () => string | undefined;
@@ -184,12 +146,11 @@ export function createOrganizationsRestApp(options: {
       instanceAdminKey: options.instanceAdminKey,
       isSaas: options.isSaas,
     }),
-    // Enforced as a shared secret, published as a credential: the operator who
-    // sets LANGWATCH_INSTANCE_ADMIN_API_KEY is the caller, and the document
-    // declares `instance_admin_key` for exactly that. Left at the service app's
-    // default the family would classify as `internal`, which the spec generator
-    // refuses to advertise, and rightly so for a secret nobody outside the
-    // deployment holds.
+    // Enforced as a shared secret, published as a credential: the operator who sets
+    // LANGWATCH_INSTANCE_ADMIN_API_KEY is the caller, and the document declares
+    // `instance_admin_key` for exactly that. Left at the service app's default the family
+    // would classify as `internal`, which the spec generator refuses to advertise, and rightly
+    // so for a secret nobody outside the deployment holds.
     credentialClass: "instance_admin_api_key",
   });
 

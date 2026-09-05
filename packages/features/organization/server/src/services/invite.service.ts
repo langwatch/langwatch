@@ -29,10 +29,9 @@ import {
 } from "./invite.errors";
 
 /**
- * The KSUID resource prefix a role binding is minted under, restated the way
- * the membership repository and the identifier adapter beside it restate it:
- * the string is the stored id's shape, and it belongs next to every writer
- * that mints one rather than in a constants module a package cannot see.
+ * The KSUID resource prefix a role binding is minted under, restated the way the membership repository
+ * and the identifier adapter beside it restate it: the string is the stored id's shape, and it belongs
+ * next to every writer that mints one rather than in a constants module a package cannot see.
  */
 const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
 
@@ -44,17 +43,9 @@ const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
 export const INVITE_EXPIRATION_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
- * Ceiling on the batch-invite transaction, derived from the work it holds:
- * the batch endpoint accepts 50 invites and {@link InviteService.persistInvites}
- * issues one duplicate check and one insert per invite on the single
- * connection an interactive transaction owns, so 100 sequential indexed
- * statements. At 200ms apiece, which is already an unhappy database, that is
- * 20 seconds; Prisma's 5s default fails the whole batch with P2028 well before
- * a large batch is unhealthy.
- *
- * Not larger, because the transaction pins one pool connection for its whole
- * life: this number is the cap on how long one batch may hold a connection,
- * not a target. A batch that reaches it is failing for a real reason.
+ * Ceiling on the batch-invite transaction, derived from the work it holds: the batch endpoint accepts 50 invites and {@link InviteService.persistInvites} issues
+ * one duplicate check and one insert per invite on the single connection an interactive transaction owns, so 100 sequential indexed statements. At 200ms apiece,
+ * which is already an unhappy database, that is 20 seconds; Prisma's 5s default fails the whole batch with P2028 well before a large batch is unhealthy.
  */
 const INVITE_BATCH_TXN_TIMEOUT_MS = 20_000;
 
@@ -101,11 +92,9 @@ interface CreateAdminInviteInput {
 }
 
 /**
- * One requested invite for the {@link InviteService.createInvites}
- * orchestrator. `teams` carries either built-in team roles, `CUSTOM` with a
- * `customRoleId`, or the `custom:{roleId}` string form the invite form sends;
- * `teamIds` is the legacy comma-separated form that assigns the default team
- * role for the organization role.
+ * One requested invite for the {@link InviteService.createInvites} orchestrator. `teams` carries either built-in
+ * team roles, `CUSTOM` with a `customRoleId`, or the `custom:{roleId}` string form the invite form sends;
+ * `teamIds` is the legacy comma-separated form that assigns the default team role for the organization role.
  */
 interface CreateInvitesInviteInput {
   email: string;
@@ -137,12 +126,8 @@ interface CreatePaymentPendingInviteInput {
 }
 
 /**
- * Service that encapsulates invite creation, validation, and acceptance
- * logic, extracted from the organization router.
- *
- * Dependencies are injected to follow DIP and enable testability.
+ * Everything the invitation service is composed FROM.
  */
-/** Everything the invitation service is composed FROM. */
 export type InviteServiceDependencies = Readonly<{
   /** The connection, or the caller's transaction client. */
   prisma: PrismaClient | Prisma.TransactionClient;
@@ -170,6 +155,10 @@ export type InviteServiceDependencies = Readonly<{
   mail?: OrganizationInviteMailPort | undefined;
 }>;
 
+/**
+ * Service that encapsulates invite creation, validation, and acceptance
+ * logic, extracted from the organization router.
+ */
 export class InviteService {
   private constructor(private readonly deps: InviteServiceDependencies) {}
 
@@ -180,12 +169,6 @@ export class InviteService {
   /**
    * Whether the signed-in person may accept an invitation targeting
    * `inviteEmail`, and through which identifier (D11).
-   *
-   * `matchable` is the user's proven addresses from the identity read fork —
-   * `null` for a user not yet on identifiers, who keeps the legacy
-   * case-insensitive session-email comparison byte-for-byte. For a user on
-   * identifiers the proven set is the authority: a session email nothing
-   * verified does not accept.
    */
   static matchInviteToAcceptor({
     inviteEmail,
@@ -213,20 +196,8 @@ export class InviteService {
   }
 
   /**
-   * The invited address as somebody signed in as the wrong account is allowed
-   * to see it: first character, then the domain — `s•••@acme.com`.
-   *
-   * Enough to recognize an address you already own, and not enough to learn
-   * one you do not. The domain survives whole because that is the half that
-   * makes the hint useful ("oh, my work account"), and the half a person
-   * holding a link for a colleague at that company already knows. The local
-   * part is what identifies the individual, so only its first character
-   * survives — and a single-character local part reveals nothing further by
-   * being shown, since the mask would be the whole of it either way.
-   *
-   * Anything that is not an address is masked whole rather than passed
-   * through: a value this function cannot parse is a value it cannot promise
-   * to have redacted.
+   * The invited address as somebody signed in as the wrong account is allowed to
+   * see it: first character, then the domain — `s•••@acme.com`.
    */
   static maskInvitedAddress(email: string): string {
     const trimmed = email.trim();
@@ -244,12 +215,6 @@ export class InviteService {
   /**
    * The team memberships an accepted invitation grants. Pure, like
    * `classifyInvitesByMemberType`, so the correction is testable in isolation.
-   *
-   * A Lite Member seat allows the Viewer team role only, and a custom role
-   * requires a full seat. New invitations are refused above that ceiling when
-   * they are written, but invitations stored before the rule may still promise
-   * more; the seat corrects them here, the same way a seat change corrects
-   * stored access rows, rather than refusing the person who clicked the link.
    */
   static resolveInviteTeamMemberships({
     role,
@@ -308,9 +273,6 @@ export class InviteService {
   }
 
   /**
-   * Pure function that classifies invites by member type (full vs lite).
-   * Testable in isolation without database or dependencies.
-   *
    * @param invites - Array of invites with role and optional team assignments
    * @param customRoleMap - Map of custom role ID to permissions array
    * @returns Count of full members and lite members
@@ -327,10 +289,9 @@ export class InviteService {
     }>;
     customRoleMap: Map<string, string[]>;
     /**
-     * The lite-seat rule, from whichever vertical owns it. Passed rather than
-     * imported: it is the entitlement feature's answer, and a core package
-     * reaching into that one for a predicate is how two counts of the same
-     * organization start disagreeing.
+     * The lite-seat rule, from whichever vertical owns it. Passed rather than imported: it is
+     * the entitlement feature's answer, and a core package reaching into that one for a
+     * predicate is how two counts of the same organization start disagreeing.
      */
     isViewOnlyCustomRole: (permissions: string[]) => boolean;
   }): { fullMembers: number; liteMembers: number } {
@@ -395,13 +356,6 @@ export class InviteService {
 
   /**
    * Validates that an invite can be created:
-   * - No duplicate invitations across PENDING and PAYMENT_PENDING statuses
-   * - Returns the existing invite if a duplicate is found (null if no duplicate)
-   *
-   * Case-insensitive on the address, like the membership check next door and
-   * like `acceptInvite`'s own comparison: an exact match would let
-   * `Alice@acme.com` and `alice@acme.com` both become pending invites for one
-   * person, who could then accept both.
    */
   async checkDuplicateInvite({
     email,
@@ -422,14 +376,6 @@ export class InviteService {
 
   /**
    * Refuses any address that already belongs to a member of this organization.
-   *
-   * Runs before the invites are written, and refuses the whole batch rather
-   * than quietly dropping the offending row: an admin who typed five addresses
-   * and got four invites with no comment on the fifth has been told nothing.
-   *
-   * Membership is by user, and an invite is by email, so the two are joined
-   * through `User.email`. An address with no account cannot be a member yet, so
-   * it is simply absent from the lookup.
    */
   async assertNotAlreadyMembers({
     emails,
@@ -542,11 +488,9 @@ export class InviteService {
   }
 
   /**
-   * A Lite Member seat allows the Viewer team role only, and a custom role
-   * requires a full seat, so an invitation cannot be written promising more.
-   * Refused here, where the admin choosing the roles can act on it; an
-   * invitation stored before this rule is corrected at acceptance instead
-   * (`resolveInviteTeamMemberships`).
+   * A Lite Member seat allows the Viewer team role only, and a custom role requires a full seat, so an invitation
+   * cannot be written promising more. Refused here, where the admin choosing the roles can act on it; an invitation
+   * stored before this rule is corrected at acceptance instead (`resolveInviteTeamMemberships`).
    */
   private assertAssignmentsWithinInvitedSeat({
     role,
@@ -567,9 +511,8 @@ export class InviteService {
   }
 
   /**
-   * Creates an invite record with PENDING status (DB-only, no email).
-   * Use this inside transactions to avoid sending emails before commit.
-   *
+   * Creates an invite record with PENDING status (DB-only, no email). Use this
+   * inside transactions to avoid sending emails before commit.
    * @returns The created invite and its organization (for email sending later)
    */
   async createAdminInviteRecord(
@@ -588,11 +531,6 @@ export class InviteService {
 
   /**
    * The pending invite row itself, with no organization lookup attached.
-   *
-   * Split out so a batch that has already loaded the organization writes each
-   * row without re-reading it: {@link persistInvites} runs inside an
-   * interactive transaction holding one connection, where fifty invites meant
-   * fifty redundant reads of a row the caller was already holding.
    */
   private async createInviteRow(input: CreateAdminInviteInput): Promise<OrganizationInvite> {
     // Every writer of a pending invite passes through here, including the
@@ -655,13 +593,6 @@ export class InviteService {
    * The whole admin batch-invite flow in one place: membership and licence
    * checks, team and custom-role validation, duplicate handling, transactional
    * creation, then email delivery with per-invite `emailNotSent` reporting.
-   *
-   * `validation` picks what happens to an invite that names an invalid team
-   * or custom role. The invite form keeps `"lenient"`, which drops the
-   * offending assignment or invite the way the tRPC router always has; the
-   * API surface uses `"strict"`, which refuses the batch loudly, because a
-   * provisioning tool that is silently given less than it asked for believes
-   * the grant took effect.
    */
   async createInvites({
     organizationId,
@@ -766,15 +697,6 @@ export class InviteService {
   /**
    * Writes the prepared invites inside the caller's transaction, skipping the
    * ones an existing invite already covers (or refusing them in strict mode).
-   *
-   * One invite at a time: an interactive transaction holds a single
-   * connection, so a parallel fan-out would not run in parallel anyway, and it
-   * would let two invites for the same address in one batch both read "no
-   * duplicate" and both be written.
-   *
-   * `organization` is the row the caller already loaded, paired with every
-   * invite for the email phase, so a fifty-invite batch does not re-read it
-   * fifty times on the transaction's one connection.
    */
   private async persistInvites({
     tx,
@@ -818,9 +740,8 @@ export class InviteService {
 
   /**
    * Validates and normalizes one requested invite into the record shape
-   * `createAdminInviteRecord` persists. Returns null when lenient validation
-   * drops the invite entirely (no valid teams, blank email, or an invalid
-   * custom role).
+   * `createAdminInviteRecord` persists. Returns null when lenient validation drops the
+   * invite entirely (no valid teams, blank email, or an invalid custom role).
    */
   private async prepareInvite({
     organizationId,
@@ -860,10 +781,9 @@ export class InviteService {
   }
 
   /**
-   * The team side of one requested invite, from whichever form the request
-   * used: explicit team role entries, or the legacy comma-separated team id
-   * list. Returns null when the invite names no teams at all, or when
-   * lenient validation drops it entirely.
+   * The team side of one requested invite, from whichever form the request used: explicit
+   * team role entries, or the legacy comma-separated team id list. Returns null when the
+   * invite names no teams at all, or when lenient validation drops it entirely.
    */
   private async resolveInviteTeams({
     organizationId,
@@ -895,10 +815,9 @@ export class InviteService {
   }
 
   /**
-   * Resolves explicit team role entries: the teams must belong to the
-   * organization, custom-role forms are normalized, and the custom roles
-   * must be assignable. Returns null when lenient validation drops the
-   * invite (no valid teams, or an invalid custom role).
+   * Resolves explicit team role entries: the teams must belong to the organization,
+   * custom-role forms are normalized, and the custom roles must be assignable. Returns null
+   * when lenient validation drops the invite (no valid teams, or an invalid custom role).
    */
   private async resolveExplicitInviteTeams({
     organizationId,
@@ -1002,10 +921,9 @@ export class InviteService {
   }
 
   /**
-   * Narrows explicit team role entries to valid teams only, folding the
-   * `custom:{roleId}` string form and `CUSTOM` into TeamUserRole.CUSTOM. An
-   * assignment naming a custom role without its id is refused in strict
-   * mode and dropped in lenient mode.
+   * Narrows explicit team role entries to valid teams only, folding the `custom:{roleId}`
+   * string form and `CUSTOM` into TeamUserRole.CUSTOM. An assignment naming a custom role
+   * without its id is refused in strict mode and dropped in lenient mode.
    */
   private normalizeTeamAssignments({
     teams,
@@ -1062,11 +980,10 @@ export class InviteService {
       return true;
     }
 
-    // Through the role service, which is where assignability is defined: an
-    // invite validated against a different rule than `applyInvite` applies
-    // would be accepted here and silently dropped on acceptance. The service
-    // rather than `RoleApp`: this asks which custom roles an organization may
-    // assign, not whether the caller may administer them, and there is no
+    // Through the role service, which is where assignability is defined: an invite validated
+    // against a different rule than `applyInvite` applies would be accepted here and silently
+    // dropped on acceptance. The service rather than `RoleApp`: this asks which custom roles
+    // an organization may assign, not whether the caller may administer them, and there is no
     // administrator on this path.
     const roleService = this.roleService;
     const validCustomRoleIds = new Set(
@@ -1088,15 +1005,9 @@ export class InviteService {
   }
 
   /**
-   * Pending and approval-waiting invites with the acceptance link each one
-   * carries. The link is included because a provisioning tool with no email
-   * provider configured has no other way to hand the invite to the person.
-   */
-  /**
-   * Outstanding invitations with their state visible (D11): expired and
-   * revoked rows are part of the answer now — an admin resends an EXPIRED
-   * one instead of wondering where it went. ACCEPTED rows are members, and
-   * PAYMENT_PENDING rides the checkout surface; neither belongs here.
+   * Outstanding invitations with their state visible (D11) and the
+   * acceptance link each one carries — needed when no email provider is
+   * configured to hand the invite to the person another way.
    */
   async listInvites({ organizationId }: { organizationId: string }): Promise<
     Array<
@@ -1132,17 +1043,9 @@ export class InviteService {
   }
 
   /**
-   * Revocation is a state, not a delete (D11): the row stays, visible as
-   * REVOKED, and the code on it stops opening anything. Organization-scoped:
-   * an invite id from another organization reads as not found, never as
-   * someone else's invite.
-   *
-   * Only invitations that were never accepted can be revoked — taking access
-   * back from an accepted one is member removal, a different operation with
-   * a different audit trail. No grants to take back, and that is a property
-   * of `applyInvite` rather than an omission here: it marks the invite
-   * ACCEPTED in the same transaction that creates the membership, before it
-   * emits a single grant. A revocable invite has granted nothing.
+   * Revocation is a state, not a delete (D11): the row stays, visible as REVOKED, and the
+   * code on it stops opening anything. Organization-scoped: an invite id from another
+   * organization reads as not found, never as someone else's invite.
    */
   async revokeInvite({
     organizationId,
@@ -1167,16 +1070,9 @@ export class InviteService {
   }
 
   /**
-   * One-click resend (D11): a fresh invite code and a fresh 14-day expiry
-   * on the same row, and a new email out. Rotating the code IS the old
-   * link's revocation — a leaked stale link matches no row afterwards.
-   *
-   * Resend CLAIMS the row exactly as acceptance does: a conditional update
-   * on the (status, inviteCode) pair it read, so two admins racing a resend
-   * mint exactly one live code — the loser reads as not found and reloads.
-   * Only PENDING rows (including ones past their expiry, which is what
-   * resend exists for) can be resent; a revoked or accepted invitation
-   * stays what it is.
+   * One-click resend (D11): a fresh invite code and a fresh 14-day expiry on the
+   * same row, and a new email out. Rotating the code IS the old link's
+   * revocation — a leaked stale link matches no row afterwards.
    */
   async resendInvite({
     organizationId,
@@ -1234,17 +1130,6 @@ export class InviteService {
 
   /**
    * The invitee, holding an expired link, asks for a fresh one (D11).
-   *
-   * The asymmetry with `resendInvite` is deliberate: this mints nothing.
-   * Only an admin can rotate a code, so all this does is tell the admins
-   * who can that somebody is waiting. A path that let the holder of a stale
-   * code mint a live one would make expiry decorative.
-   *
-   * The caller may be signed out and is identified by nothing but the code,
-   * so the answer says only that the ask went out. It names no admin: who
-   * runs an organization is not something an expired link should teach.
-   * Non-expired invitations answer like missing ones, which keeps this from
-   * being a way to probe a code's state.
    */
   async requestFreshInvite({
     inviteCode,
@@ -1351,10 +1236,9 @@ export class InviteService {
   }
 
   /**
-   * Finds the best project slug to redirect to after accepting an invite.
-   * Tries the first assigned team first, then falls back to any non-archived
-   * project in the org so the client can land directly in the app rather than
-   * hitting the onboarding flow.
+   * Finds the best project slug to redirect to after accepting an invite. Tries the first
+   * assigned team first, then falls back to any non-archived project in the org so the
+   * client can land directly in the app rather than hitting the onboarding flow.
    */
   async findLandingProjectSlug(invite: OrganizationInvite): Promise<string | null> {
     // Collect all invited team IDs from either format
@@ -1396,11 +1280,6 @@ export class InviteService {
   /**
    * Finds a PENDING, non-expired invite matching the given organization and
    * email (case-insensitive). Returns null when no such invite exists.
-   *
-   * Used by the SSO auto-onboarding hook so a new signup whose domain matches
-   * an SSO-enforced org adopts the invite's role + team assignments rather
-   * than the default MEMBER, and the invite gets marked ACCEPTED instead of
-   * lingering as an outstanding link.
    */
   async findPendingByOrgAndEmail({
     organizationId,
@@ -1420,29 +1299,9 @@ export class InviteService {
   }
 
   /**
-   * Applies a PENDING invite to a user: writes OrganizationUser, marks the
-   * invite ACCEPTED, and grants the access the invite describes — the
-   * ORGANIZATION-scoped grant (skipped for EXTERNAL — they get access via
-   * team/project grants) and each team's grant.
-   *
-   * The membership row and the acceptance share one transaction; the grants
+   * Applies a PENDING invite to a user: writes OrganizationUser, marks the invite ACCEPTED, and grants the access the invite describes — the
+   * ORGANIZATION-scoped grant (skipped for EXTERNAL — they get access via team/project grants) and each team's grant.
    * cannot join it, because they are ledger commands (ADR-092 §13, source
-   * `invite`). So the order is membership-and-acceptance first, grants
-   * after, and that order is what makes the invite lifecycle
-   * consistent: **a PENDING invite never carries grants**. `revokeInvite` can
-   * therefore retire one without hunting for access to take back — there is
-   * none — and the window a crash opens leaves a member who holds a seat and
-   * no grants, which is less access than the invite asked for rather than
-   * more.
-   *
-   * The grants are idempotent (revoke-then-attach, duplicates skipped), so
-   * re-running the tail of this is safe — including via the retry path
-   * below, which is what makes that safety reachable: the old guard refused
-   * every retry of an ACCEPTED invite outright, so a crash between the
-   * transaction above and the grants was unrepairable (no caller could ever
-   * reach the idempotent tail again). An ACCEPTED invite whose caller holds
-   * the membership the transaction wrote — the same user retrying, not a
-   * different one — re-runs the grant tail instead of refusing.
    */
   async applyInvite({
     userId,
@@ -1471,15 +1330,11 @@ export class InviteService {
       throw new InviteNotReadyError(invite.id, invite.status);
     }
 
-    // Root client only, and it always was: the grants below are ledger
-    // commands that cannot ride a caller's transaction, and the acceptance
-    // now opens one of its own.
-    //
-    // The acceptance CLAIMS the row (D11): a conditional update on the
-    // expected (status, inviteCode) pair, inside the same transaction as the
-    // membership write. Two racers on one PENDING invite cannot both win —
-    // the loser's update matches nothing, the transaction rolls back, and
-    // no membership row is written for them.
+    // Root client only, and it always was: the grants below are ledger commands that cannot ride a
+    // caller's transaction, and the acceptance now opens one of its own. The acceptance CLAIMS the row
+    // (D11): a conditional update on the expected (status, inviteCode) pair, inside the same transaction
+    // as the membership write. Two racers on one PENDING invite cannot both win — the loser's update
+    // matches nothing, the transaction rolls back, and no membership row is written for them.
     const prisma = this.requireRootClient();
     const claimed = await prisma.$transaction(async (tx) => {
       const claim = await tx.organizationInvite.updateMany({
@@ -1542,11 +1397,9 @@ export class InviteService {
   }
 
   /**
-   * Whether `userId` holds the organization membership `applyInvite`'s
-   * transaction writes — the two commit together, so holding it means THIS
-   * user's own accept is what committed, and retrying the grant tail is
-   * therefore a repair rather than a different person reaching for someone
-   * else's invite.
+   * Whether `userId` holds the organization membership `applyInvite`'s transaction writes — the two
+   * commit together, so holding it means THIS user's own accept is what committed, and retrying the
+   * grant tail is therefore a repair rather than a different person reaching for someone else's invite.
    */
   private async callerHoldsMembership({
     userId,
@@ -1564,10 +1417,9 @@ export class InviteService {
   }
 
   /**
-   * The grant tail of `applyInvite`: the ORGANIZATION-scoped grant (skipped
-   * for EXTERNAL) and each team's grant. Idempotent (revoke-then-attach,
-   * duplicates skipped), so both the fresh-accept caller and the retry-repair
-   * caller in `applyInvite` can run it safely.
+   * The grant tail of `applyInvite`: the ORGANIZATION-scoped grant (skipped for EXTERNAL)
+   * and each team's grant. Idempotent (revoke-then-attach, duplicates skipped), so both the
+   * fresh-accept caller and the retry-repair caller in `applyInvite` can run it safely.
    */
   private async applyInviteGrants({
     userId,

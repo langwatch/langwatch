@@ -1,12 +1,5 @@
 /**
  * What actually reaches the engine when a cell runs.
- *
- * The studio boundary is a fake port fed scripted component events (the
- * platform version mocked three `~/`-rooted modules; the cell takes its
- * studio boundary as a port now, so the fake is passed in instead), so these
- * run the dispatch decision itself without a live NLP service: whether the
- * evaluator is sent at all.
- *
  * @see specs/experiments-v3/evaluation-execution.feature
  */
 import type { EvaluatorConfig } from "@langwatch/experiment-contract";
@@ -186,10 +179,9 @@ describe("given an evaluator attached to a target column", () => {
 });
 
 /**
- * An evaluator can also BE a column rather than a chip attached to one. That
- * column dispatches through the target path, which the chip guard never
- * reached, so an unmapped evaluator column scored empty against empty and
- * reported a pass for every row.
+ * An evaluator can also BE a column rather than a chip attached to one. That column
+ * dispatches through the target path, which the chip guard never reached, so an unmapped
+ * evaluator column scored empty against empty and reported a pass for every row.
  */
 describe("given an evaluator run as its own column", () => {
   const loadedEvaluators = new Map([

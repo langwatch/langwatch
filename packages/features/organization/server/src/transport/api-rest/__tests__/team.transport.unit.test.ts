@@ -1,9 +1,6 @@
 /**
- * The `/api/teams` REST door, at the point finding H4 of the 2026-09-04
- * feature-surface security pass touches it: every route that names ONE team
- * resolves its permission at that team's scope, not the organization's. The
- * collection routes stay organization-scoped, because that is what they act on.
- *
+ * The `/api/teams` REST door, at the point finding H4 of the 2026-09-04 feature-surface security pass touches it: every route that names ONE team resolves its
+ * permission at that team's scope, not the organization's. The collection routes stay organization-scoped, because that is what they act on.
  * Spec: specs/security/resource-scope-permission-checks.feature
  */
 import {

@@ -44,18 +44,6 @@ const CONTENT_LENGTH = /^\d+$/;
 
 /**
  * The size the wire states authoritatively, or null when it states none.
- *
- * A chunked upload declares no length at all, and a request carrying both
- * headers is only honest about the transfer encoding. A header that is not a
- * non-negative integer states nothing usable either: an unparsable or negative
- * value, and the `"a, b"` a repeated header collapses into, all read as
- * "unknown" rather than as zero, so the size is measured by draining instead of
- * trusted. Reading them as a number is what makes the comparison against the
- * cap false and lets the body through uncapped, and a strict HTTP parser is not
- * the only thing in front of this: behind the route adapter the header arrives
- * unvalidated.
- *
- * In every one of those cases the size is knowable only by reading the body.
  */
 export function declaredSize(headers: Headers): number | null {
   if (headers.has("transfer-encoding")) return null;
@@ -71,10 +59,6 @@ export function declaredSize(headers: Headers): number | null {
 
 /**
  * The request a route reads after the body has been drained to measure it.
- *
- * Built from the URL rather than from the previous request, for the reason on
- * `bodyLimit` below: the constructor must never be handed another request
- * object to interpret.
  */
 function withBufferedBody(request: Request, body: Uint8Array<ArrayBuffer>): Request {
   return new Request(request.url, {
@@ -87,23 +71,6 @@ function withBufferedBody(request: Request, body: Uint8Array<ArrayBuffer>): Requ
 
 /**
  * Caps the size of a request body, rejecting anything larger with 413.
- *
- * This is the app's own middleware rather than `hono/body-limit` because that
- * one is incompatible with how the Node bridge is wired. When a request has no
- * `Content-Length` — a chunked upload, which is what the OpenTelemetry OTLP
- * exporters send — the size can only be known by draining the stream, so the
- * body has to be put back for the route to read. Hono does that with
- * `new Request(c.req.raw, init)`, and `@hono/node-server` hands Hono a lazy
- * stand-in for the incoming message rather than a real `Request`. Only the
- * `Request` subclass that adapter installs globally knows how to unwrap that
- * stand-in, and `src/start.ts` passes `overrideGlobalObjects: false` so the
- * process keeps the platform's own globals. The global constructor therefore
- * receives an object it does not recognise and throws, turning every chunked
- * upload into a 500.
- *
- * Rebuilding from the URL sidesteps it: the buffered bytes, method, headers and
- * abort signal are carried over explicitly, so the constructor never has to
- * interpret another request object.
  */
 export const bodyLimit = (options: BodyLimitOptions): MiddlewareHandler => {
   const { maxSize } = options;

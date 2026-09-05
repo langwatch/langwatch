@@ -1,8 +1,6 @@
 /**
- * Metric Translator - Converts ES metric definitions to ClickHouse SQL expressions.
- *
- * This module translates the ES aggregation patterns used in analytics metrics
- * to equivalent ClickHouse SQL expressions.
+ * Metric Translator - Converts ES metric definitions to ClickHouse SQL
+ * expressions.
  */
 
 import type {
@@ -22,11 +20,6 @@ import {
 
 /**
  * The metric keys each category translator below has an expression for.
- *
- * These arrays type the `metric` parameter of the translator they name, and
- * those switches carry no `default` branch, so a case label absent from its
- * array does not compile and an array entry with no case label does not
- * either. The enumeration cannot drift from the SQL it stands for.
  */
 export const METADATA_METRIC_KEYS = [
   "metadata.trace_id",
@@ -123,10 +116,6 @@ export function unknownMetricError(index: number): ValidationError {
 
 /**
  * Maximum thread session duration in milliseconds (3 hours).
- *
- * WHY: Sessions longer than 3 hours are capped to prevent outliers
- * (e.g., tabs left open overnight) from skewing average duration metrics.
- * This matches the legacy analytics behavior for consistency.
  */
 const MAX_THREAD_SESSION_DURATION_MS = 3 * 60 * 60 * 1000; // 10800000ms = 3 hours
 
@@ -134,10 +123,6 @@ const MAX_THREAD_SESSION_DURATION_MS = 3 * 60 * 60 * 1000; // 10800000ms = 3 hou
  * SQL for a trace's bundled (non-billed) cost. Prefers the fold-time per-span
  * NonBilledCost column; rows folded before it existed (NULL) fall back to the
  * legacy all-or-nothing langwatch.cost.non_billable boolean. Always non-null.
- *
- * Exported for the aggregation builder's grouped (CTE/dedup) path, which
- * materializes this exact expression as a per-trace CTE column and rewrites
- * metric expressions against it (see `dedupSubstitutions()` in aggregation-builder.ts).
  */
 export function nonBilledCostExpression(ts: string): string {
   return `coalesce(${ts}.NonBilledCost, if(${ts}.Attributes['langwatch.cost.non_billable'] = 'true', ${ts}.TotalCost, 0), 0)`;
@@ -195,20 +180,6 @@ export const percentileToPercent: Record<PercentileAggregationTypes, number> = {
 
 /**
  * Per-metric opt-in for which percentile aggregate to compile to.
- *
- * - `"exact"` → quantileExact / quantileExactArray / quantileExactIf. Exact
- *   sort-based percentile. Memory grows O(N) with the input row count, which
- *   has been the top driver of OOM on heavy analytics dashboards.
- * - `"tdigest"` → quantileTDigest / quantileTDigestArray / quantileTDigestIf.
- *   t-digest sketch, ±5% error at distribution tails, bounded memory per
- *   aggregator state. The accuracy gap is invisible on latency / cost /
- *   token-count dashboards. Default for `performance.*` metrics.
- *
- * Existing call sites omit the parameter and stay on `"exact"`, matching the
- * pre-existing behaviour. The cost / latency translators pass `"tdigest"` to
- * opt in. Evaluation score / pass-rate metrics deliberately stay on `"exact"`
- * because their distributions are narrow enough that a ±5% tail miss can flip
- * dashboard outcomes (e.g. a p95 score crossing a threshold).
  */
 export type PercentileMode = "exact" | "tdigest";
 
@@ -234,11 +205,8 @@ export function isPercentileAggregation(agg: AggregationTypes): agg is Percentil
 }
 
 /**
- * Get the ClickHouse conditional aggregation function name.
- * Maps ES aggregation names to their CH "*If" counterparts.
- * Special cases:
- * - cardinality -> uniqIf (cardinalityIf doesn't exist)
- * - terms -> uniqIf (terms is also a cardinality operation)
+ * Get the ClickHouse conditional aggregation function name. Maps ES
+ * aggregation names to their CH "*If" counterparts. Special cases:
  */
 function getConditionalAggregation(aggregation: AggregationTypes): string {
   switch (aggregation) {
@@ -329,10 +297,6 @@ function sanitizeAliasPart(value: string): string {
 
 /**
  * Build alias for a metric aggregation.
- *
- * Every caller-supplied part is reduced to `[a-zA-Z0-9_]` before it joins the
- * alias, so no part of an alias can close an expression or open a clause even
- * if a caller reaches this without passing the metric enumeration first.
  */
 export function buildMetricAlias(
   index: number,
@@ -349,12 +313,6 @@ export function buildMetricAlias(
 
 /**
  * Translate a metric definition to ClickHouse SQL.
- *
- * WHY PREFIX-BASED ROUTING: Metrics are organized by category prefix
- * (metadata.*, performance.*, evaluations.*, events.*, sentiment.*, threads.*)
- * to mirror the ES aggregation structure. Each category may require different
- * JOINs and has different column mappings. The prefix routing ensures each
- * metric type gets its specialized translation logic.
  */
 export function translateMetric(
   metric: string,
@@ -475,11 +433,10 @@ function translateMetadataMetric(
       };
 
     case "metadata.span_type":
-      // Cardinality aggregation translates to uniq(ts.TraceId) which only
-      // needs trace_summaries. Joining stored_spans would fan out rows and
-      // inflate trace-level SUM metrics (TotalCost, TotalTokens) when
-      // combined in the same query.
-      // Non-cardinality aggregations (e.g. groupBy) need the JOIN to access
+      // Cardinality aggregation translates to uniq(ts.TraceId) which only needs
+      // trace_summaries. Joining stored_spans would fan out rows and inflate
+      // trace-level SUM metrics (TotalCost, TotalTokens) when combined in the same
+      // query. Non-cardinality aggregations (e.g. groupBy) need the JOIN to access
       // span-level SpanType data.
       if (aggregation !== "cardinality") {
         requiredJoins.push("stored_spans");
@@ -495,14 +452,6 @@ function translateMetadataMetric(
 
 /**
  * Translate performance metrics
- *
- * All performance.* and spans.metrics.* percentile aggregations route through
- * `perfAgg` below, which hard-codes `percentileMode: "tdigest"`. The wrapper
- * exists so adding a new performance.* case doesn't require remembering to
- * thread the literal at every call site - forgetting silently regresses to
- * `quantileExact` (the helper's default) and the O(N) memory bug only surfaces
- * under heavy analytics load. If you ever want a per-call override, drop back
- * to the raw `translateSimpleAggregation(col, aggregation, alias, mode)` form.
  */
 function translatePerformanceMetric(
   metric: PerformanceMetricKey,
@@ -834,17 +783,6 @@ function translateEventMetric(
 
 /**
  * Translate sentiment metrics.
- *
- * For thumbs_up_down:
- * - cardinality: counts traces that have a thumbs_up_down event (countIf)
- * - all other aggregations (sum, avg, min, max, percentiles): extracts vote
- *   values from Events.Attributes where event name = 'thumbs_up_down' and
- *   attribute key = 'event.metrics.vote', filters out zeros, then delegates
- *   to translateArrayAggregation for proper array-level aggregation.
- *
- * WHY zero filtering: The ES registry (registry.ts) uses must_not: { term:
- * { "events.metrics.value": 0 } } to exclude zero votes. Zeros represent
- * neutral/missing values that would skew aggregation results.
  */
 function translateSentimentMetric(
   metric: SentimentMetricKey,

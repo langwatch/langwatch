@@ -5,11 +5,9 @@ import { MemberSeatLimitReachedError } from "../organization-membership.errors";
 import { InviteService } from "../invite.service";
 
 /**
- * A lapsed license keeps binding the seat count it sold (ADR/spec
- * specs/licensing/expired-license-enforcement.feature): once the resolved
- * plan reports the license's own `maxMembers` and the organization already
- * holds that many full members, adding one more is refused exactly like an
- * over-seats organization on a current license.
+ * A lapsed license keeps binding the seat count it sold (ADR/spec specs/licensing/expired-license-enforcement.feature): once
+ * the resolved plan reports the license's own `maxMembers` and the organization already holds that many full members, adding
+ * one more is refused exactly like an over-seats organization on a current license.
  */
 function buildService(options: { maxMembers: number; currentFullMembers: number }) {
   const prisma = {

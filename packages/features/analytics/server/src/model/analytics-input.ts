@@ -75,16 +75,6 @@ export type SharedFiltersInput = z.infer<typeof sharedFiltersInputSchema>;
 
 /**
  * One series a chart asks for: which metric, aggregated how, narrowed by what.
- *
- * `metric` and `groupBy` are strings rather than an enum of the registry's
- * keys. The registry that enumerated them was presentation-coupled — every
- * entry carried a colour set and a number formatter — and it stayed with the
- * browser surface that renders those. What decides whether a metric is real is
- * the metric translator's `KNOWN_METRIC_KEYS`, which it checks before it
- * compiles anything: a key it has no expression for raises a
- * `validation_error` naming the series, and never reaches the SQL. `groupBy`
- * is a lookup into an enumerated registry of expression builders, so an
- * unknown key selects the default expression rather than being interpolated.
  */
 export const seriesInputSchema = z.object({
   metric: z.string().min(1),
@@ -114,11 +104,6 @@ export type SeriesInput = z.infer<typeof seriesInputSchema>;
 
 /**
  * The full timeseries request: the shared filters plus the series to compute.
- *
- * Extended from {@link sharedFiltersInputSchema} rather than declared beside
- * it, so a constraint added to the filter half reaches the charted reads, the
- * REST analytics body and the traces filter input together instead of one of
- * the three.
  */
 export const timeseriesInputSchema = sharedFiltersInputSchema.extend({
   series: z.array(seriesInputSchema),
@@ -132,12 +117,6 @@ export type TimeseriesInput = z.infer<typeof timeseriesInputSchema>;
 
 /**
  * Whether an absent result value for a series truly means zero.
- *
- * Counts and sums are additive: no matching rows IS zero. Averages, extrema and
- * percentiles are not — they are only ever absent when there was no data, and
- * defaulting them to 0 fabricates a measurement (a 0% pass rate on a day an
- * evaluator never ran). Pipeline series re-aggregate per entity, so the
- * cross-entity pipeline aggregation decides additivity.
  */
 export function isZeroWhenAbsentSeries(series: SeriesInput): boolean {
   if (series.pipeline) return series.pipeline.aggregation === "sum";

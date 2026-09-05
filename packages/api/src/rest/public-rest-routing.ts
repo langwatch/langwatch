@@ -298,18 +298,8 @@ function endpointKey(endpoint: Pick<ResolvedEndpoint, "method" | "path">): strin
 }
 
 /**
- * Register one handler stack on one method+path.
- *
- * Hono's per-method registrations are separate calls with no dynamic form, so
- * the method has to be dispatched rather than passed. Both mounters need that
- * and had a copy each; this is the one they share.
- */
-/**
  * Mounts one resolved route at its bare `/api` path and, unless the family
  * already names a generation of its own, at the canonical `/api/v1` twin.
- *
- * `path` is the family-relative path; both returned paths are absolute and
- * byte-identical to what Hono's route table reports.
  */
 export function mountFamilyRoute({
   app,
@@ -335,6 +325,9 @@ export function mountFamilyRoute({
   return { path: absolute, canonicalPath };
 }
 
+/**
+ * Register one handler stack on one method+path.
+ */
 export function mountRoute({
   app,
   method,

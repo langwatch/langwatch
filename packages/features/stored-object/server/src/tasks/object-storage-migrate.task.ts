@@ -1,17 +1,5 @@
 /**
  * Operator task for controlled S3 <-> Azure Blob migration.
- *
- * Usage:
- *   pnpm --filter @langwatch/tasks task object-storage-migrate plan
- *   pnpm --filter @langwatch/tasks task object-storage-migrate copy
- *   OBJECT_STORAGE_MIGRATION_WRITES_PAUSED=1 \
- *   OBJECT_STORAGE_MIGRATION_READS_PAUSED=1 \
- *     pnpm --filter @langwatch/tasks task object-storage-migrate finalize
- *   pnpm --filter @langwatch/tasks task object-storage-migrate verify
- *
- * Credentials are read only from the OBJECT_STORAGE_MIGRATION_* namespace.
- * They never need to be placed in command-line arguments or made active app
- * credentials before cutover.
  */
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
@@ -300,14 +288,9 @@ export function toAzureCredentials(
 }
 
 /**
- * The task-launcher entry — `pnpm --filter @langwatch/tasks task
- * object-storage-migrate <plan|copy|finalize|verify>`. `migration` is a
- * factory rather than a built instance: `apps/tasks` composes every catalogue
- * entry at boot, before a phase is known, so building the
- * {@link ObjectStorageMigrationService} (via {@link createMigrationTask}) is deferred
- * to `run()`, the same way the process's other infrastructure-backed tasks
- * defer `host.require*()`. This class is only the seam that reads the phase
- * off `args[0]`.
+ * The task-launcher entry — `pnpm --filter @langwatch/tasks task object-storage-migrate <plan|copy|finalize|verify>`. `migration` is a factory rather than a built instance:
+ * `apps/tasks` composes every catalogue entry at boot, before a phase is known, so building the {@link ObjectStorageMigrationService} (via {@link createMigrationTask}) is
+ * deferred to `run()`, the same way the process's other infrastructure-backed tasks defer `host.require*()`. This class is only the seam that reads the phase off `args[0]`.
  */
 export class ObjectStorageMigrateTask extends Task {
   readonly name = "object-storage-migrate";

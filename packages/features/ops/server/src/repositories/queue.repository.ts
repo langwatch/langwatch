@@ -13,9 +13,6 @@ import type {
 
 /**
  * Every tenant currently over its in-flight cap, plus how many exist.
- *
- * `total` is the honest count even when `tenants` is capped, so a caller can
- * say "showing N of M" rather than presenting a bounded list as complete.
  */
 export type ParkedTenantsPage = OpsParkedTenantsPage;
 export type BlockedSummary = OpsBlockedSummary;
@@ -40,11 +37,6 @@ export abstract class QueueRepository {
 
   /**
    * Enumerate tenants parked over their in-flight cap, deepest first.
-   *
-   * The registry of over-cap tenants is naturally tiny (one entry per tenant,
-   * not per group), so this stays cheap even when the parked DEPTH is in the
-   * hundreds of thousands — which is exactly the case the dashboard has to
-   * explain. Bounded by `maxTenants`; the reported `total` is unbounded.
    */
   abstract enumerateParkedTenants(params: {
     queueNames: string[];
@@ -53,9 +45,6 @@ export abstract class QueueRepository {
 
   /**
    * One parked tenant's groups, ordered by dispatch eligibility.
-   *
-   * Deliberately request-time rather than snapshot-carried: a parking storm
-   * can hold hundreds of thousands of groups, and shipping those in a snapshot
    * every pod reads would recreate the size problem ADR-090 removes.
    */
   abstract listParkedGroups(params: {
@@ -164,11 +153,6 @@ export abstract class QueueRepository {
   /**
    * The drift the most recent reconcile pass published for each named queue,
    * summed as absolute values.
-   *
-   * Every instance reads this, including the ones that won no marker and so
-   * computed nothing themselves. `null` for a queue with no live figure (never
-   * reconciled, or the last one has aged out) is skipped rather than counted as
-   * zero, so a queue that has stopped reconciling does not read as healthy.
    */
   abstract readPublishedPendingDrift(queueNames: string[]): Promise<number>;
 }

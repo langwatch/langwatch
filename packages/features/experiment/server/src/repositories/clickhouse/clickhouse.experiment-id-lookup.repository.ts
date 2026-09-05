@@ -5,9 +5,8 @@ const TABLE_NAME = "experiment_runs" as const;
 
 /**
  * Backs `experimentMetricsSync`'s late-bound lookup (see pipelineRegistry.ts,
- * `registerExperimentRunPipeline`): the trace pipeline knows a `runId` but not
- * the `experimentId` it belongs to, and only `experiment_runs` carries that
- * mapping.
+ * `registerExperimentRunPipeline`): the trace pipeline knows a `runId` but not the
+ * `experimentId` it belongs to, and only `experiment_runs` carries that mapping.
  */
 export class ClickHouseExperimentIdLookupRepository extends ExperimentIdLookupRepository {
   private constructor(private readonly clickhouse: ExperimentClickHousePort) {

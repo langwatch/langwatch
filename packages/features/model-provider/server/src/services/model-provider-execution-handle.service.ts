@@ -20,14 +20,6 @@ import type {
 
 /**
  * Returns a Vercel AI SDK model handle for the given project + feature.
- *
- * Resolution: an explicit `model` argument wins. Otherwise the cascade
- * resolver returns whatever model the given feature key resolves to at
- * the project's scope chain; without a feature key we default to
- * `prompt.create_default` since that's the canonical DEFAULT role
- * surface. If nothing resolves, the resolver throws
- * `ModelNotConfiguredError` and the surrounding tRPC interceptor maps
- * it to a sticky toast prompting the user to configure a default.
  */
 export type ModelProviderExecutionHandleInput = {
   projectId: string;
@@ -40,19 +32,10 @@ export type ModelProviderExecutionHandleOptions = {
   modelProviders: ModelProviderService;
   /**
    * The project read that decides whether the id names anything at all.
-   *
-   * `ProjectService` satisfies it. Without it an unknown project resolves to
-   * an empty provider set and the customer is told they have configured no
-   * providers, which is a different — and wrong — thing to be told.
    */
   projects: ModelCostProjectPort;
   /**
    * Where the execution proxy answers, fully formed: nlpgo's `/go/proxy/v1`.
-   *
-   * The whole URL rather than the engine's address plus a path this package
-   * would have to know, because the path is the WORKFLOW feature's and a
-   * feature server package may not reach into another's. The composition root
-   * holds both and joins them.
    */
   executionProxyBaseUrl: string;
   /**
@@ -82,11 +65,10 @@ async function resolveModel({
   }
 
   // 2. Cascade-resolved default for the given feature key. Throws
-  //    ModelNotConfiguredError when nothing is set at any scope —
-  //    that error MUST propagate so the tRPC interceptor maps it to
-  //    MODEL_NOT_CONFIGURED and the frontend opens the missing-model
-  //    popup with the feature+role in context. Swallowing it here
-  //    would silently substitute an unrelated model.
+  // ModelNotConfiguredError when nothing is set at any scope — that error MUST
+  // propagate so the tRPC interceptor maps it to MODEL_NOT_CONFIGURED and the
+  // frontend opens the missing-model popup with the feature+role in context.
+  // Swallowing it here would silently substitute an unrelated model.
   try {
     const resolved = await modelProviderService.resolveModelForFeature({
       projectId,
@@ -97,16 +79,11 @@ async function resolveModel({
       return resolved.model;
     }
 
-    // Cascade picked a model but the backing provider is disabled.
-    // Silently swapping to a random enabled provider is dangerous (the
-    // user thinks they're calling the one they configured); throw a
-    // typed error so the frontend can offer a one-click swap to the
-    // cascade-next candidate (if any) or a deep-link to settings.
-    //
-    // `resolved.scope` is always non-null on the success path (the
-    // resolver returns ModelNotConfiguredError when nothing resolves,
-    // not a null-scope Resolution), but the type is loose — narrow
-    // here so the typed error stays correct.
+    // Cascade picked a model but the backing provider is disabled. Silently swapping to a random enabled provider is
+    // dangerous (the user thinks they're calling the one they configured); throw a typed error so the frontend can
+    // offer a one-click swap to the cascade-next candidate (if any) or a deep-link to settings. `resolved.scope` is
+    // always non-null on the success path (the resolver returns ModelNotConfiguredError when nothing resolves, not a
+    // null-scope Resolution), but the type is loose — narrow here so the typed error stays correct.
     if (resolved.scope === null) {
       throw new Error("resolveModelForFeature returned a null scope");
     }
@@ -179,11 +156,6 @@ async function resolveModel({
 
 /**
  * The model-resolution cascade with its collaborators bound once.
- *
- * The static below is the cascade; this is how a process holds it. Every
- * caller in a process resolves through the SAME instance, which is the point:
- * two instances could disagree about where the execution proxy lives, and the
- * one that drifts answers with a handle pointing at nothing.
  */
 export class ModelProviderExecutionHandleService {
   static create(options: ModelProviderExecutionHandleOptions): ModelProviderExecutionHandleService {

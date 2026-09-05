@@ -115,10 +115,9 @@ async function readJsonObject(
 }
 
 /**
- * The body as text, refused the moment it passes the cap. A chunked body
- * declares no length, so `Content-Length` cannot be the gate: reading the
- * whole request into a string before measuring it is what let one caller
- * hold gigabytes of heap per request.
+ * The body as text, refused the moment it passes the cap. A chunked body declares no
+ * length, so `Content-Length` cannot be the gate: reading the whole request into a string
+ * before measuring it is what let one caller hold gigabytes of heap per request.
  */
 async function readBodyWithinCap(context: Context, maxInputBytes: number): Promise<string> {
   const body = context.req.raw.body;

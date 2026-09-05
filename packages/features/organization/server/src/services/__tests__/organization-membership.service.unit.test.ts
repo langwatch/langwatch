@@ -1,10 +1,5 @@
 /**
  * The membership half's rules, over doubled ports.
- *
- * Moved with the service out of the platform application. Three of its groups
- * did not come: `tryGetOrganizationIdByTeamId`, `getProjectIds` and the
- * settings read/write were delegations to the canonical organization service,
- * which the package owns and covers on its own side.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {

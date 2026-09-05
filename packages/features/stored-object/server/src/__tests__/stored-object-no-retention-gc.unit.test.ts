@@ -1,17 +1,6 @@
 /**
- * @vitest-environment node
- *
  * AC16: stored objects are never deleted on a clock.
- *
- * The RFC forbids automatic time-based deletion, and the only way a stored
- * object can be reaped behind a customer's back is a scheduled or recurring
- * process reaching the row-and-byte deletion. This walks the two processes
- * that own recurring work and asserts none of their source names it, so
- * adding such a job trips here and forces the constraint to be revisited on
- * purpose.
- *
- * The walk is asserted to have found real files first: a tree that moved
- * would otherwise turn this into a check that passes by finding nothing.
+ * @vitest-environment node
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";

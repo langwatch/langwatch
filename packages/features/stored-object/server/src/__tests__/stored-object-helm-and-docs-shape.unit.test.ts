@@ -1,13 +1,7 @@
 /**
- * @vitest-environment node
- *
  * Source-of-truth shape checks for the deployment surface that stored-objects
  * relies on (helm chart, self-hosting docs, .env.example, route imports).
- *
- * These are file-content assertions, not behavior tests. They exist to bind
- * the feature scenarios that document deployment contracts so a future
- * accidental rename or removal trips CI instead of being caught at deploy
- * time. They read real files on disk; no mocks of the system under test.
+ * @vitest-environment node
  */
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -171,10 +165,9 @@ describe("Helm chart exposes an Azure Blob dataplane provider (AC37, issue #4133
     });
 
     /**
-     * Ruthless-review P2 on PR #6092: flipping the provider to azureBlob used
-     * to drop S3_BUCKET_NAME from the deployment in the same act, so the
-     * migration semantics createS3Client implements (legacy s3:// reads
-     * survive while a bucket is configured) were unreachable from the chart.
+     * Ruthless-review P2 on PR #6092: flipping the provider to azureBlob used to drop S3_BUCKET_NAME from
+     * the deployment in the same act, so the migration semantics createS3Client implements (legacy s3://
+     * reads survive while a bucket is configured) were unreachable from the chart.
      */
     it("can still emit the legacy S3 read config while azure is the write backend", () => {
       const values = readRepoFile("charts/langwatch/values.yaml");
@@ -240,12 +233,11 @@ describe("Self-hosting docs cover the stored-objects deployment surface", () => 
     it("the architecture diagram shows an App -> S3 arrow for externalized byte content", () => {
       const overview = readRepoFile("docs/self-hosting/overview.mdx");
 
-      // Diagram edge added in this PR — the existing CH->S3 cold-storage
-      // arrow is not enough; the App pod itself writes externalized bytes
-      // (scenario media, datasets, ...) into the shared dataplane bucket.
-      // The label was reframed during PR #4058 review from "scenario media"
-      // to "externalized byte content" so the docs accurately name S3 as
-      // the general file-storage layer.
+      // Diagram edge added in this PR — the existing CH->S3 cold-storage arrow is
+      // not enough; the App pod itself writes externalized bytes (scenario media,
+      // datasets, ...) into the shared dataplane bucket. The label was reframed
+      // during PR #4058 review from "scenario media" to "externalized byte content"
+      // so the docs accurately name S3 as the general file-storage layer.
       expect(overview).toMatch(/App\s*-->\s*\|"externalized byte content[^"]*"\|\s*S3/);
     });
   });

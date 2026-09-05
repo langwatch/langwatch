@@ -1,12 +1,7 @@
 /**
+ * Integration tests for the bug-report intake, against the real database and the real Hono
+ * route. Corresponds to the scenarios in specs/support/bug-reports.feature.
  * @vitest-environment node
- *
- * Integration tests for the bug-report intake, against the real database and
- * the real Hono route. Corresponds to the scenarios in
- * specs/support/bug-reports.feature.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it so the
- * suite stays runnable on a box with no database.
  */
 import { randomUUID } from "node:crypto";
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";

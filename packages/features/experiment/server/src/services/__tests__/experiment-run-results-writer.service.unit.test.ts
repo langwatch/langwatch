@@ -1,8 +1,7 @@
 /**
+ * The writer a streaming run feeds its frames into. The route decides whether a run writes
+ * its cells at all; this decides what one frame stream turns into.
  * @see specs/experiments-v3/workbench-versioning.feature
- *
- * The writer a streaming run feeds its frames into. The route decides whether
- * a run writes its cells at all; this decides what one frame stream turns into.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluationV3Event, ExperimentService } from "@langwatch/experiment-contract";

@@ -23,32 +23,11 @@ import { registerRoutePolicy } from "./route-registry.js";
 
 /**
  * Which error shape a route family publishes.
- *
- * `canonical` is what new families use. `legacy` is the flat
- * `{ error: "<sentence>", message? }` the families that predate the envelope
- * already published, and which their consumers parse; it stays until a family
- * migrates on purpose, because the shape is part of its contract.
- *
- * The package names the two shapes because the builder has to choose between
- * them — which `onError` a family installs, and which refusal body its auth
- * chain answers with — but it renders neither. Both are supplied as ports.
  */
 export type ApiErrorEnvelope = "legacy" | "canonical";
 
 /**
  * Everything the builder needs from the process it runs in.
- *
- * The service decides WHICH checks a route gets and records that decision in
- * the route registry; it performs none of them. Authentication reads API keys,
- * sessions and role bindings out of a database, and error rendering reads the
- * application's own error taxonomy — neither belongs in a transport package,
- * and dragging either in would put Prisma behind `@langwatch/api`.
- *
- * A process supplies these once, through {@link createRestApiService}, and gets
- * every app factory back already bound to them. That is deliberately the only
- * way to obtain them: a service that could be built before its ports were
- * installed would silently produce apps with empty enforcement chains, which is
- * the one failure this whole mechanism exists to make impossible.
  */
 export interface RestApiServicePorts {
   /**
@@ -115,14 +94,6 @@ export interface RestApiServicePorts {
   /**
    * Organization-scope authentication in THROWING mode, for the versioned
    * families {@link RestApiService.createVersionedApp} builds.
-   *
-   * A versioned family renders every refusal through the framework's own
-   * error handler, so its auth chain has to raise the refusal rather than
-   * answer it: a middleware that writes its own response would publish a body
-   * the family's error contract never declared. The envelope-parameterised
-   * `authenticateOrganization` above answers directly, which is right for a
-   * Hono-verb family and wrong here — they are two different middlewares, not
-   * one middleware in two moods.
    */
   readonly authenticateOrganizationThrowing: MiddlewareHandler;
   /** Organization-scope RBAC check that throws rather than answering. */
@@ -132,11 +103,9 @@ export interface RestApiServicePorts {
 }
 
 /**
- * A strategy turns an {@link AccessPolicy} into the middleware chain that
- * authenticates the caller (for the strategy's scope) and authorizes the
- * requested permission. Strategies delegate to the process's own auth
- * middleware through {@link RestApiServicePorts} so there is exactly one
- * implementation of each check.
+ * A strategy turns an {@link AccessPolicy} into the middleware chain that authenticates the caller (for the
+ * strategy's scope) and authorizes the requested permission. Strategies delegate to the process's own auth
+ * middleware through {@link RestApiServicePorts} so there is exactly one implementation of each check.
  */
 interface AuthStrategy {
   /** Scope name, used in error messages + registry entries. */
@@ -144,10 +113,6 @@ interface AuthStrategy {
   /**
    * Build the middleware chain for a policy. `public` policies short-circuit to
    * an empty chain in {@link SecuredApp} before this is ever called.
-   *
-   * `errorEnvelope` is the family's published error shape: the chain refuses
-   * requests itself, so it has to answer in the same shape the family's
-   * handlers do.
    */
   chainFor(policy: AccessPolicy, errorEnvelope: ApiErrorEnvelope): MiddlewareHandler[];
 }
@@ -159,10 +124,6 @@ type HttpVerb = (typeof HTTP_VERBS)[number];
  * Derive the family label (tracer span name + registry grouping) from the
  * basePath so it can never typo or drift from the mount path: `/api/agents`
  * becomes `agents`, `/api/gateway/v1` becomes `gateway-v1`.
- *
- * Exported because the OpenAPI and route-coverage tooling derives the same
- * label: two derivations would let one family be labelled two ways and split
- * its authorization audit in half.
  */
 export function familyFromBasePath(basePath: string): string {
   return (
@@ -175,19 +136,9 @@ export function familyFromBasePath(basePath: string): string {
 }
 
 /**
- * The verb surface exposed by {@link SecuredApp.access}. Typed EXACTLY as the
- * underlying Hono instance's own verb methods, so validator inference
- * (`c.req.valid(...)`) and context typing (`c.get(...)`) are preserved
- * natively — that native inference is why the methods keep Hono's own return
- * type (`Hono<E>`) rather than `void`: collapsing the overloaded verb
- * signatures to strip the return would break `c.req.valid(...)`.
- *
- * The builder only controls HOW you reach these methods — you must first call
- * `.access(policy)`. A verb returns the raw `Hono<E>`, so chaining a second
- * verb onto it (`.access(p).get(...).post(...)`) would bypass the policy gate;
- * the route-registry introspection test is the backstop that fails CI if any
- * such unclassified route reaches the composed router. Always start each route
- * with a fresh `.access(...)`.
+ * The verb surface exposed by {@link SecuredApp.access}. Typed EXACTLY as the underlying Hono instance's own verb methods, so validator inference
+ * (`c.req.valid(...)`) and context typing (`c.get(...)`) are preserved natively — that native inference is why the methods keep Hono's own return type
+ * (`Hono<E>`) rather than `void`: collapsing the overloaded verb signatures to strip the return would break `c.req.valid(...)`.
  */
 export type SecuredVerbs<E extends Env> = Pick<Hono<E>, HttpVerb> & {
   /**
@@ -204,12 +155,9 @@ export type SecuredVerbs<E extends Env> = Pick<Hono<E>, HttpVerb> & {
 };
 
 /**
- * A Hono application whose routes cannot be registered without first declaring
- * an {@link AccessPolicy}. The bare app deliberately does NOT expose
- * `.get/.post/...` — the only way to register a route is
- * `app.access(policy).get(path, ...handlers)`. Omitting the policy is a
- * compile-time error; bypassing the builder is caught by the router
- * introspection guard test against the route registry.
+ * A Hono application whose routes cannot be registered without first declaring an {@link AccessPolicy}. The bare app deliberately does NOT
+ * expose `.get/.post/...` — the only way to register a route is `app.access(policy).get(path, ...handlers)`. Omitting the policy is a
+ * compile-time error; bypassing the builder is caught by the router introspection guard test against the route registry.
  */
 export class SecuredApp<E extends Env> {
   /** The underlying Hono app — mount this in the API router via `api.route("/", app.hono)`. */
@@ -227,10 +175,9 @@ export class SecuredApp<E extends Env> {
   private readonly strategy: AuthStrategy;
   private readonly errorEnvelope: ApiErrorEnvelope;
   /**
-   * The credential class the family publishes, when its scope's default would
-   * name the wrong one. Only the instance-admin family needs it: a service app
-   * enforces a shared secret, but that secret is a credential an operator
-   * holds and the document declares a scheme for.
+   * The credential class the family publishes, when its scope's default would name the wrong one. Only
+   * the instance-admin family needs it: a service app enforces a shared secret, but that secret is a
+   * credential an operator holds and the document declares a scheme for.
    */
   private readonly credentialClass?: CredentialClass;
 
@@ -279,12 +226,6 @@ export class SecuredApp<E extends Env> {
 
   /**
    * The credential class a route publishes.
-   *
-   * The app-level override renames only what the app's own secret classifies
-   * as, so a `publicEndpoint` on the same app still publishes as `none`: the
-   * SCIM discovery endpoints an identity provider reads before it holds a
-   * token are not reached by that token, and saying they were would put a
-   * security requirement on the one thing that has none.
    */
   private publishedCredentialClass(policy: AccessPolicy): CredentialClass {
     const derived = credentialClassFor({
@@ -319,19 +260,11 @@ export class SecuredApp<E extends Env> {
           credentialClass: this.publishedCredentialClass(policy),
           ...(aliasPath ? { canonicalPath: aliasPath } : {}),
         });
-        // Prepend the enforcement chain, then the caller's handlers. The
-        // verb method's STATIC type is Hono's own, so validator + context
-        // inference is unaffected by this runtime prepend.
-        //
-        // HEAD has no Hono shortcut, and `.on("HEAD", …)` does not give it
-        // one: Hono answers HEAD BEFORE routing, by re-dispatching the same
-        // request as GET and returning `new Response(null, thatResponse)`
-        // (hono-base.js `#dispatch`). Nothing HEAD-shaped is ever matched, so
-        // the handler registered here CANNOT RUN — a path that also has a GET
-        // is served by that GET with the body dropped, and a path that does
-        // not 404s. The registration is kept because the policy it records is
-        // what `generateOpenAPISpec` reads; the handler is decoration.
-        // Asserted both ways in rest-api-service.unit.test.ts.
+        // Prepend the enforcement chain, then the caller's handlers. The verb method's STATIC type is Hono's own, so validator + context inference is unaffected by this
+        // runtime prepend. HEAD has no Hono shortcut, and `.on("HEAD", …)` does not give it one: Hono answers HEAD BEFORE routing, by re-dispatching the same request as
+        // GET and returning `new Response(null, thatResponse)` (hono-base.js `#dispatch`). Nothing HEAD-shaped is ever matched, so the handler registered here CANNOT RUN
+        // — a path that also has a GET is served by that GET with the body dropped, and a path that does not 404s. The registration is kept because the policy it records
+        // is what `generateOpenAPISpec` reads; the handler is decoration. Asserted both ways in rest-api-service.unit.test.ts.
         const stack = [this.stampRoute(method, registeredPath), ...chain, ...handlers];
         // The v1 twin: same stack, same policy, one logical route. Its copy
         // carries no OpenAPI metadata, so the describer publishes the bare
@@ -342,7 +275,12 @@ export class SecuredApp<E extends Env> {
             path: string,
             ...handlers: MiddlewareHandler[]
           ) => unknown;
-          on.call(this.hono, method === "all" ? "ALL" : method.toUpperCase(), aliasPath, ...undescribedStack(stack));
+          on.call(
+            this.hono,
+            method === "all" ? "ALL" : method.toUpperCase(),
+            aliasPath,
+            ...undescribedStack(stack),
+          );
         }
         if (method === "head") {
           const on = this.hono.on as unknown as (
@@ -372,11 +310,9 @@ export class SecuredApp<E extends Env> {
   }
 
   /**
-   * Names this family and the endpoint the request resolved to, built once per
-   * registration. Twenty-one families share the `/api` base path, so every one
-   * of their app-level middlewares runs for `/api/prompts` and only the route
-   * that matched can say which endpoint answered it. The request logger writes
-   * one record per request and reads both off the context.
+   * Names this family and the endpoint the request resolved to, built once per registration. Twenty-one families share the
+   * `/api` base path, so every one of their app-level middlewares runs for `/api/prompts` and only the route that matched can
+   * say which endpoint answered it. The request logger writes one record per request and reads both off the context.
    */
   private stampRoute(method: string, path: string): MiddlewareHandler {
     const family = this.family;
@@ -389,11 +325,9 @@ export class SecuredApp<E extends Env> {
   }
 
   /**
-   * Mount another secured app under this one. Use for composing versioned
-   * sub-apps. Routes mounted this way still carry their own declared policies
-   * (recorded when they were built). Only a {@link SecuredApp} can be mounted —
-   * a raw Hono would smuggle in routes with no declared policy, so wrap one in
-   * a SecuredApp first if you must.
+   * Mount another secured app under this one. Use for composing versioned sub-apps. Routes mounted this way still
+   * carry their own declared policies (recorded when they were built). Only a {@link SecuredApp} can be mounted — a
+   * raw Hono would smuggle in routes with no declared policy, so wrap one in a SecuredApp first if you must.
    */
   route(path: string, app: SecuredApp<Env>): this {
     this.hono.route(mergePath(this.basePath, path), app.hono);
@@ -507,10 +441,6 @@ export interface VersionedEndpointMeta {
 
 /**
  * One versioned family: the service builder and the policy every route wears.
- *
- * `policy(permission)` is the REST twin of the tRPC spine's `policy(permission)`
- * — the same word for the same idea, applied at the head of the definition
- * chain rather than around a procedure.
  */
 export interface RestApiVersionedFamily {
   service: ServiceBuilder<unknown, EndpointVariables, unknown>;
@@ -518,10 +448,9 @@ export interface RestApiVersionedFamily {
 }
 
 /**
- * Puts one mount in the route-policy registry, refusing to classify a route
- * that never declared a policy. Every mount the framework creates arrives
- * here: each dated version, `latest`, withdrawn 410 tombstones (their
- * inherited config carries the meta), and the two version-namespace guards.
+ * Puts one mount in the route-policy registry, refusing to classify a route that never declared a
+ * policy. Every mount the framework creates arrives here: each dated version, `latest`, withdrawn 410
+ * tombstones (their inherited config carries the meta), and the two version-namespace guards.
  */
 function registerMountedRoute({ route, family }: { route: MountedRoute; family: string }): void {
   if (route.isNamespaceGuard) {
@@ -594,52 +523,17 @@ interface SecuredAppArgs {
 }
 
 /**
- * Every REST family factory a process gets back once it has supplied its ports.
- *
- * One service, two family shapes, because the two shapes differ only in how a
- * route is spelled and not in what enforces it:
- *
- * ```ts
- * // A Hono-verb family: the policy gates the verb.
- * const app = api.createProjectApp({ basePath: "/api/traces" });
- * app.access(requires("traces:view")).get("/:id", handler);
- *
- * // A dated-contract family: the policy heads the definition chain.
- * const { service, policy } = api.createVersionedApp({
- *   name: "roles",
- *   basePath: "/api/roles",
- *   routeMiddleware: [enterprisePlanGate],
- * });
- * service.registerRoute("get", "/", VERSION, listHandler, (b) =>
- *   policy("organization:manage")(b).withOutput(roleListSchema),
- * );
- * ```
- *
- * Both record the route's declared policy in the same registry, and neither
- * can produce a route that declared none: the verb methods are unreachable
- * without `.access(policy)`, and a versioned endpoint whose config carries no
- * policy meta fails the build.
- *
- * `ProjectVariables` and `OrganizationVariables` are the context shapes the
- * process's own authentication middleware sets — the resolved project and
- * organization rows. The package never names those types: it only guarantees
- * that a handler on a project app sees whatever `authenticateProject` put
- * there, plus whatever per-route middleware the family chains on top.
+ * Every REST family factory a process gets back once it has supplied its
+ * ports.
  */
 export interface RestApiService<
   ProjectVariables extends object,
   OrganizationVariables extends object,
 > {
   /**
-   * A project-scoped secured app. Authenticates via project API key / legacy
-   * project key / browser session (the process's unified auth middleware) and
-   * authorizes `requires(...)` against the caller's project-scoped role
-   * bindings — the Hono equivalent of tRPC's `checkProjectPermission`.
-   *
-   * `Extra` widens the context Variables for apps that chain per-route
-   * middleware which set additional context (e.g. a service middleware that
-   * sets `c.var.modelProviderService`), so handlers keep full `c.get(...)`
-   * typing.
+   * A project-scoped secured app. Authenticates via project API key / legacy project key / browser
+   * session (the process's unified auth middleware) and authorizes `requires(...)` against the caller's
+   * project-scoped role bindings — the Hono equivalent of tRPC's `checkProjectPermission`.
    */
   createProjectApp<Extra extends object = Record<never, never>>(
     args: SecuredAppArgs,
@@ -655,19 +549,17 @@ export interface RestApiService<
   ): SecuredApp<{ Variables: OrganizationVariables & Extra }>;
 
   /**
-   * A service-to-service secured app. Routes authenticate with a shared secret
-   * / signature (verified by `verifySecret`) rather than an RBAC credential, so
-   * the only valid policies are `internalSecret(reason)` and
-   * `publicEndpoint(reason)`.
+   * A service-to-service secured app. Routes authenticate with a shared secret / signature
+   * (verified by `verifySecret`) rather than an RBAC credential, so the only valid policies
+   * are `internalSecret(reason)` and `publicEndpoint(reason)`.
    */
   createServiceApp<E extends Env = Env>(
     args: SecuredAppArgs & {
       verifySecret?: MiddlewareHandler;
       /**
-       * Overrides the credential class the family publishes. Set it only when
-       * the secret is one an API client holds and the document declares a
-       * scheme for it; leaving it unset keeps the honest default, `internal`,
-       * which the spec generator refuses to advertise.
+       * Overrides the credential class the family publishes. Set it only when the secret is one
+       * an API client holds and the document declares a scheme for it; leaving it unset keeps
+       * the honest default, `internal`, which the spec generator refuses to advertise.
        */
       credentialClass?: CredentialClass;
     },
@@ -676,37 +568,20 @@ export interface RestApiService<
   /**
    * An organization-scoped family on the dated-contract framework: versioned
    * paths, declarative input/output schemas and generated OpenAPI.
-   *
-   * The enforcement ORDER is fixed here, not at the call site: org auth
-   * (throwing), then the RBAC check (403 `insufficient_permissions`), then
-   * whatever `routeMiddleware` the process supplied — an Enterprise plan gate,
-   * typically, which answers 402. "You don't have access" must always beat
-   * "your plan doesn't include this", and both must come after authentication,
-   * which is also what a plan gate needs in order to find the organization on
-   * the context.
    */
   createVersionedApp(options: {
     name: string;
     /** Spelled out at the call site so the route-coverage gate can read it. */
     basePath: string;
     /**
-     * Per-route middleware applied AFTER authentication and the RBAC check,
-     * to every route the family declares.
-     *
-     * This is a plain middleware slot, not a feature of the builder: an
-     * Enterprise plan gate is one middleware a process may put here, and the
-     * builder neither knows nor names it.
+     * Per-route middleware applied AFTER authentication and the RBAC check, to
+     * every route the family declares.
      */
     routeMiddleware?: readonly MiddlewareHandler[];
   }): RestApiVersionedFamily;
 
   /**
    * The process's `onError` for the flat legacy body.
-   *
-   * A family-level `onError` REPLACES the one the app installed, so a family
-   * that names its own domain errors has to delegate the rest back here or it
-   * silently stops rendering handled errors at all. Exposed on the service so
-   * that delegation needs no second import.
    */
   readonly legacyErrorHandler: ErrorHandler;
   /** The process's `onError` for the canonical envelope. @see legacyErrorHandler */
@@ -716,11 +591,6 @@ export interface RestApiService<
 /**
  * Bind every REST family factory to one process's authentication, logging,
  * tracing, error rendering and plan gating.
- *
- * Call it once, at composition time, and pass the result to each family. It is
- * the only way to build a `SecuredApp` or a versioned family, which is what
- * guarantees no route family can be constructed before the checks it declares
- * exist.
  */
 export function createRestApiService<
   ProjectVariables extends object,

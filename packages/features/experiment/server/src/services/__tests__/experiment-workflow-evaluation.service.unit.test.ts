@@ -67,12 +67,9 @@ type FakeVersion = { id: string; version: string; dsl: unknown };
 type FakeWorkflow = { id: string; name: string; archived?: boolean; versions: FakeVersion[] };
 
 /**
- * In-memory ExperimentWorkflowDslPort. `tryFindEvaluableVersion` returns the
- * last-pushed version when no versionId is named — a stand-in for the real
- * Postgres adapter's createdAt ordering (@langwatch/api-experiment-run's
- * PostgresExperimentWorkflowDslAdapter), which needs a live database to prove.
- * This fake only proves the SERVICE delegates the "which version" decision to
- * the port rather than deciding it itself.
+ * In-memory ExperimentWorkflowDslPort. `tryFindEvaluableVersion` returns the last-pushed version when no versionId is named — a stand-in for the real
+ * Postgres adapter's createdAt ordering (@langwatch/api-experiment-run's PostgresExperimentWorkflowDslAdapter), which needs a live database to prove.
+ * This fake only proves the SERVICE delegates the "which version" decision to the port rather than deciding it itself.
  */
 function buildWorkflowSource(workflows: Record<string, FakeWorkflow>): ExperimentWorkflowDslPort {
   return {

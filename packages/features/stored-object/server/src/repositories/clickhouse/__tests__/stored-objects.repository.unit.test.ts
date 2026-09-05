@@ -1,9 +1,7 @@
 /**
+ * Unit tests for StoredObjectsRepository — verifies that queries are project-scoped and
+ * that insert/findById delegate to the ClickHouse client with the expected shape.
  * @vitest-environment node
- *
- * Unit tests for StoredObjectsRepository — verifies that queries are
- * project-scoped and that insert/findById delegate to the ClickHouse
- * client with the expected shape.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

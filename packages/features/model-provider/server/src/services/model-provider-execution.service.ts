@@ -33,12 +33,11 @@ export class ModelProviderExecutionService {
     input: ModelProviderExecutionPrepareInput,
   ): Promise<ModelProviderExecutionParameters> {
     const parsed = modelProviderExecutionPrepareInputSchema.parse(input);
-    // A stored `<provider>/latest` or `<provider>/latest-mini` alias resolves to
-    // the concrete model here, at the last stop before the wire. The pickers
-    // resolve it on their own, but the prompts API, the CLI and agent-written
-    // configs store the alias verbatim, and no provider knows the word
-    // "latest". Runs before the serving-row selection so the row is picked for
-    // the concrete model. A concrete id passes through unchanged.
+    // A stored `<provider>/latest` or `<provider>/latest-mini` alias resolves to the concrete
+    // model here, at the last stop before the wire. The pickers resolve it on their own, but
+    // the prompts API, the CLI and agent-written configs store the alias verbatim, and no
+    // provider knows the word "latest". Runs before the serving-row selection so the row is
+    // picked for the concrete model. A concrete id passes through unchanged.
     const model = expandLatestAlias(parsed.model);
     this.assertCodexCanNotExecute(model, null);
     const provider = await this.resolveProvider({ ...parsed, model });

@@ -1,17 +1,7 @@
 /**
+ * Real-Postgres coverage for `ModelProviderCommandService.delete`'s scope-aware lookup: a model-provider list shows credentials granted at the organization, a team, or a sibling project, so the delete has to resolve those same rows rather than filtering by the caller's project alone. `model-provider-command.delete.unit.test.ts` pins this against mocked collaborators; only real Postgres proves the repository's own tenancy filter actually matches across scopes and refuses across organizations.
  * @vitest-environment node
- *
  * @see specs/model-providers/provider-deletion.feature
- *
- * Real-Postgres coverage for `ModelProviderCommandService.delete`'s
- * scope-aware lookup: a model-provider list shows credentials granted at the
- * organization, a team, or a sibling project, so the delete has to resolve
- * those same rows rather than filtering by the caller's project alone.
- * `model-provider-command.delete.unit.test.ts` pins this against mocked
- * collaborators; only real Postgres proves the repository's own tenancy
- * filter actually matches across scopes and refuses across organizations.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";

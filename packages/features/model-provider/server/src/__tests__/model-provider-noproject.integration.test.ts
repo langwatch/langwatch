@@ -1,27 +1,7 @@
 /**
+ * Real-Postgres coverage for the provider write path on an organization that has no project at all. A provider belongs to an organization and reaches the scopes attached to it, so nothing on the write path needs a project — `tryResolveAnchor` short-circuits on `organizationId` before it ever looks at `projectId`. `model-provider-command.delete.unit.test.ts` pins that against a mocked `scopes` port; only real Postgres proves the write actually lands with no project row anywhere near it.
  * @vitest-environment node
- *
  * @see specs/model-providers/providers-without-a-project.feature
- *
- * Real-Postgres coverage for the provider write path on an organization
- * that has no project at all. A provider belongs to an organization and
- * reaches the scopes attached to it, so nothing on the write path needs a
- * project — `tryResolveAnchor` short-circuits on `organizationId` before it
- * ever looks at `projectId`. `model-provider-command.delete.unit.test.ts`
- * pins that against a mocked `scopes` port; only real Postgres proves the
- * write actually lands with no project row anywhere near it.
- *
- * The probe scenarios ("A read-only member cannot probe...", "Checking a
- * credential for a scope I can manage") are ported against
- * `ModelProviderCommandService.testConnection` — the current architecture's
- * check-an-already-saved-credential seam — rather than main's deleted
- * `modelProvider.validateApiKey` route, which probed an arbitrary
- * caller-supplied URL directly against caller-supplied scopes. That route no
- * longer exists in this shape; `testConnection`'s own doc comment says it
- * "checks a credential that is already saved", which is the same property
- * these scenarios describe.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -48,10 +28,9 @@ import {
 type Role = "ADMIN" | "MEMBER";
 
 /**
- * Computes decisions from a real per-user/organization role table, the way
- * `AuthzService` does, instead of echoing whatever the test wants: ADMIN
- * holds every manage permission at its own organization, MEMBER holds none.
- * A user with no row in the table is a stranger to every organization.
+ * Computes decisions from a real per-user/organization role table, the way `AuthzService` does, instead of echoing
+ * whatever the test wants: ADMIN holds every manage permission at its own organization, MEMBER holds none. A user
+ * with no row in the table is a stranger to every organization.
  */
 function roleComputingAuthz(roles: Record<string, { organizationId: string; role: Role }>) {
   return {

@@ -1,10 +1,7 @@
 /**
+ * Backup collection is opt-OUT, so every stock install reaches the backup log — including the ones that have never taken a backup and therefore have
+ * no `system.backup_log` at all. That absence is a fact about the instance, and a warning repeated for it buries the failures that are real.
  * Spec: specs/ops/clickhouse-backup-metrics.feature
- *
- * Backup collection is opt-OUT, so every stock install reaches the backup log
- * — including the ones that have never taken a backup and therefore have no
- * `system.backup_log` at all. That absence is a fact about the instance, and
- * a warning repeated for it buries the failures that are real.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

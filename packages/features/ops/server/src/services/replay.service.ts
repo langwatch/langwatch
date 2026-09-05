@@ -12,11 +12,9 @@ const logger = createLogger("langwatch:ops:replay-service");
 const REPLAY_LOCK_TTL_SECONDS = 3600;
 
 /**
- * How often the running replay re-extends its lock on a standalone heartbeat
- * timer. Running independently of progress/batch callbacks keeps the lock
- * alive even when a single batch phase (a huge tenant's drain wait, a slow
- * ClickHouse load) emits nothing for longer than REPLAY_LOCK_TTL_SECONDS,
- * whose expiry used to silently stop status updates mid-run.
+ * How often the running replay re-extends its lock on a standalone heartbeat timer. Running independently of progress/batch
+ * callbacks keeps the lock alive even when a single batch phase (a huge tenant's drain wait, a slow ClickHouse load) emits
+ * nothing for longer than REPLAY_LOCK_TTL_SECONDS, whose expiry used to silently stop status updates mid-run.
  */
 export const LOCK_REFRESH_INTERVAL_MS = 60_000;
 
@@ -62,22 +60,9 @@ export class ReplayService {
     tenantIds: string[];
     aggregateIds?: string[];
     /**
-     * Rebuild from scratch instead of resuming: clear the selected
-     * projections' replay markers (completed set and in-flight cutoffs) under
-     * the replay lock, before discovery, so every discovered aggregate is
-     * replayed rather than skipped as already done.
-     *
-     * Required whenever the target tables no longer hold the rows those
-     * markers vouch for: tables truncated by hand, or swapped empty by a
-     * migration. Markers from an earlier aborted run survive on purpose so a
-     * plain re-run resumes where it stopped; against emptied tables that same
-     * behaviour drops the skipped aggregates' history with a successful-looking
-     * run and no error.
-     *
-     * Only safe when the target tables are empty for the replayed scope: map
-     * projections append increments, so replaying an aggregate whose rows are
-     * still present double counts. Leave unset to resume a partially failed
-     * run whose written rows are still in place.
+     * Rebuild from scratch instead of resuming: clear the selected projections' replay markers
+     * (completed set and in-flight cutoffs) under the replay lock, before discovery, so every
+     * discovered aggregate is replayed rather than skipped as already done.
      */
     fullRebuild?: boolean;
     description: string;

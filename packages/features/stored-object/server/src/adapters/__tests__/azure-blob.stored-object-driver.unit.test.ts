@@ -1,12 +1,7 @@
 /**
+ * Unit tests for AzureBlobStoredObjectDriverAdapter. The driver talks the Azure Blob REST
+ * API directly via global `fetch`, so we stub `fetch` to verify:
  * @vitest-environment node
- *
- * Unit tests for AzureBlobStoredObjectDriverAdapter. The driver talks the Azure
- * Blob REST API directly via global `fetch`, so we stub `fetch` to verify:
- *   - the URI is parsed into account/container/blob correctly
- *   - the request is signed with the SharedKey authorization header
- *   - GET/PUT/DELETE/HEAD round-trip the right HTTP shapes
- *   - 404s from Azure surface as ObjectNotFoundError on GET
  */
 import crypto from "node:crypto";
 import type { Readable } from "node:stream";
@@ -320,32 +315,9 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
 
   describe("given a fixed-input vector (known-answer test for SharedKey HMAC)", () => {
     /**
-     * KAT vector — all inputs are fixed so any regression in canonicalization
-     * order, positional string-to-sign slots, or HMAC construction fails this
-     * test deterministically rather than silently producing a header that passes
-     * a prefix regex but Azure rejects with a 403.
-     *
-     * Canonical string-to-sign (14 newline-separated fields):
-     *   PUT\n
-     *   \n                                    ← Content-Encoding (empty)
-     *   \n                                    ← Content-Language (empty)
-     *   11\n                                  ← Content-Length
-     *   \n                                    ← Content-MD5 (empty)
-     *   application/octet-stream\n            ← Content-Type
-     *   \n                                    ← Date legacy (empty)
-     *   \n                                    ← If-Modified-Since (empty)
-     *   \n                                    ← If-Match (empty)
-     *   \n                                    ← If-None-Match (empty)
-     *   \n                                    ← If-Unmodified-Since (empty)
-     *   \n                                    ← Range (empty)
-     *   x-ms-blob-type:BlockBlob\n            ← canonicalized headers (sorted)
-     *   x-ms-date:Wed, 23 Oct 2013 09:49:06 GMT\n
-     *   x-ms-version:2021-12-02\n
-     *   /myaccount/stored-objects/proj-1/kat-blob  ← canonicalized resource
-     *
-     * HMAC-SHA256 of the above string with key
-     *   Buffer.from("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
-     * (before base64-encoding the key) produces the expected signature below.
+     * KAT vector — all inputs are fixed so any regression in canonicalization order, positional
+     * string-to-sign slots, or HMAC construction fails this test deterministically rather than silently
+     * producing a header that passes a prefix regex but Azure rejects with a 403.
      */
     const KAT_ACCOUNT_NAME = "myaccount";
     // Raw bytes: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" (64 ASCII chars)
@@ -432,16 +404,9 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
 
   describe("when Azurite path-style addressing puts the account in the endpoint path", () => {
     /**
-     * Regression for the Azurite-signing gap (AC37 / issue #4133): when
-     * `endpointBaseUrl` addresses the account via a path segment (Azurite's
-     * only mode — it has no per-account subdomain like production Azure),
-     * the shared-key canonicalised resource must include the account name
-     * TWICE (`/{account}/{account}/{container}/{blob}`), not once. Getting
-     * this wrong produces a well-formed-looking `SharedKey` header that
-     * Azurite rejects with 403 AuthenticationFailed — a bug a prefix-only
-     * regex assertion on the header would never catch, so this test
-     * recomputes the exact expected signature (KAT-style) rather than just
-     * checking the `SharedKey {account}:` prefix.
+     * Regression for the Azurite-signing gap (AC37 / issue #4133): when `endpointBaseUrl` addresses the account via a path segment (Azurite's only mode — it has no per-account subdomain like production Azure), the shared-key
+     * canonicalised resource must include the account name TWICE (`/{account}/{account}/{container}/{blob}`), not once. Getting this wrong produces a well-formed-looking `SharedKey` header that Azurite rejects with 403
+     * AuthenticationFailed — a bug a prefix-only regex assertion on the header would never catch, so this test recomputes the exact expected signature (KAT-style) rather than just checking the `SharedKey {account}:` prefix.
      */
     const PATH_STYLE_ACCOUNT = "devstoreaccount1";
     const PATH_STYLE_ENDPOINT = "http://127.0.0.1:10000/devstoreaccount1";
@@ -598,12 +563,9 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
   });
 
   /**
-   * The headline contract of issue #6087 is that there is NO credential
-   * fallback: a token-mode driver that cannot get a token must fail, never
-   * quietly downgrade to shared-key or send the request unsigned. Every other
-   * token test here stubs a SUCCESSFUL acquisition, so adding a `catch` around
-   * the token call that fell back to shared-key signing would leave this whole
-   * suite green. These pin the failure path itself.
+   * The headline contract of issue #6087 is that there is NO credential fallback: a token-mode driver that cannot get a token must fail, never quietly
+   * downgrade to shared-key or send the request unsigned. Every other token test here stubs a SUCCESSFUL acquisition, so adding a `catch` around the
+   * token call that fell back to shared-key signing would leave this whole suite green. These pin the failure path itself.
    */
   describe("given a token-based auth mode where the token exchange fails", () => {
     const tokenFailure = new Error("AADSTS70021: No matching federated identity record found");

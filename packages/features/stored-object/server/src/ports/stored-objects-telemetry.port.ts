@@ -1,11 +1,5 @@
 /**
  * What the content-addressed store reports about its own work.
- *
- * A port rather than a metrics registry import, for the reason every other
- * feature package here keeps one: the counter names are the feature's, but the
- * registry they are published on and the process that scrapes it are the
- * deployment's. `PrometheusStoredObjectsTelemetryAdapter` is the implementation that
- * keeps the five series the platform application published.
  */
 export abstract class StoredObjectsTelemetryPort {
   /** One `storeFromBytes` call arrived, whatever it went on to do. */

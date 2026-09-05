@@ -1,9 +1,6 @@
 /**
- * Field mappings from Elasticsearch field paths to ClickHouse table and column access.
- *
- * This module maps the ES nested document structure to CH's denormalized table structure.
- * ES uses nested objects (spans.*, evaluations.*, events.*) while CH uses separate tables
- * with JOINs and Map columns for attributes.
+ * Field mappings from Elasticsearch field paths to ClickHouse table and column
+ * access.
  */
 
 /**
@@ -94,11 +91,9 @@ export const SPAN_ANALYTICS_COLUMNS = [
 export type CHTable = "trace_summaries" | "stored_spans" | "evaluation_runs";
 
 /**
- * Field mapping configuration for the legacy `trace_summaries` SQL builder
+ * Field mapping configuration for the legacy `trace_summaries` SQL builder previously carried here has moved to
+ * `../routing/field-availability.ts` where the router + slim/rollup builders consume it directly.
  * (`aggregation-builder.ts`). The ADR-034 routing metadata (`availableOn`)
- * previously carried here has moved to
- * `../routing/field-availability.ts` where the
- * router + slim/rollup builders consume it directly.
  */
 export interface FieldMapping {
   /** The ClickHouse table containing this field */
@@ -115,9 +110,6 @@ export interface FieldMapping {
 
 /**
  * ES field path to CH field mapping.
- *
- * Maps Elasticsearch field paths used in analytics metrics and filters
- * to their corresponding ClickHouse table and column expressions.
  */
 export const fieldMappings: Record<string, FieldMapping> = {
   // ===== Trace Identity Fields =====
@@ -477,25 +469,8 @@ export function getTableAlias(table: CHTable): string {
 
 /**
  * Build JOIN clause for a table, selecting only the columns needed.
- *
- * @param table - The table to JOIN
- * @param requiredColumns - Optional set of columns needed by the query.
- *   When provided, only these columns (plus identity columns) are selected.
- *   When omitted, all analytics columns for the table are selected.
- * @param spanTimeFilter - Optional SQL fragment bounding `StartTime` on the
- *   `stored_spans` subquery (e.g. `AND StartTime >= {startDate} - INTERVAL 2 DAY
- *   AND StartTime < {endDate} + INTERVAL 2 DAY`). Without it the subquery filters
- *   on `TenantId` only and cold-scans every weekly partition (incl. S3-tiered
- *   ones). The caller passes the fragment matching its date regime; the referenced
- *   params are bound by the outer query. Ignored for non-`stored_spans` tables.
- * @param evalTimeFilter - Optional SQL fragment bounding the `evaluation_runs`
- *   subquery's partition column (e.g. `AND ScheduledAt >= {startDate} - INTERVAL
- *   7 DAY AND UpdatedAt >= {startDate} - INTERVAL 7 DAY`). Same disease as
- *   `spanTimeFilter`: without it the subquery — and its IN-tuple dedup inner —
- *   filter on `TenantId` only and walk the tenant's entire history across every
- *   partition. Applied to BOTH the outer subquery and the dedup inner, since the
- *   inner GROUP BY is the scan that actually walks the partitions. Ignored for
- *   non-`evaluation_runs` tables.
+ * @param table the table to JOIN; @param requiredColumns optional column subset (defaults to all analytics columns).
+ * @param spanTimeFilter / @param evalTimeFilter optional partition-column bounds for `stored_spans` / `evaluation_runs` — without one the subquery cold-scans every partition; ignored for other tables.
  */
 export function buildJoinClause({
   table,
@@ -606,15 +581,8 @@ function buildColumnPattern(col: string, alias: string): RegExp {
 }
 
 /**
- * Extract which stored_spans columns are referenced in a set of SQL expressions.
- *
- * Scans the expressions for references to known span column names (including
- * through the table alias `ss.`). Returns the set of column names suitable for
- * passing to `buildJoinClause` as `requiredColumns`.
- *
- * WHY: The full SpanAttributes Map column can be kilobytes per span.
- * Selecting only the columns actually referenced avoids reading unused data
- * and prevents ClickHouse OOM on large result sets.
+ * Extract which stored_spans columns are referenced in a set of SQL
+ * expressions.
  */
 export function extractReferencedSpanColumns(expressions: string[]): ReadonlySet<string> {
   const joined = expressions.join(" ");
@@ -631,16 +599,9 @@ export function extractReferencedSpanColumns(expressions: string[]): ReadonlySet
 }
 
 /**
- * Build a JOIN-subquery projection that materializes only the referenced keys
- * of `SpanAttributes` as a narrow reconstructed map, e.g.
- * `map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS SpanAttributes`.
- *
- * `SpanAttributes` is a `Map(String, String)` whose values can be multi-megabyte
- * (RAG contexts, full input/output IO). Selecting the whole column into a JOIN
- * subquery buffers every value on the join side even when the outer query only
- * reads one small key (e.g. the span type), which drove a per-query 3.5 GiB
- * MEMORY_LIMIT_EXCEEDED in prod. The reconstructed map keeps the column name and
- * type identical, so outer `ss.SpanAttributes['key']` accesses are unchanged.
+ * Build a JOIN-subquery projection that materializes only the referenced keys of
+ * `SpanAttributes` as a narrow reconstructed map, e.g. `map('langwatch.span.type',
+ * SpanAttributes['langwatch.span.type']) AS SpanAttributes`.
  */
 export function spanAttributesNarrowProjection(keys: readonly string[]): string {
   const entries = keys.map((key) => `'${key}', SpanAttributes['${key}']`).join(", ");
@@ -650,13 +611,6 @@ export function spanAttributesNarrowProjection(keys: readonly string[]): string 
 /**
  * Narrow the `SpanAttributes` entry of a stored_spans required-column set to a
  * reconstructed map of only the referenced keys, when it is safe to do so.
- *
- * Safe means every `SpanAttributes` mention in the expressions is a plain
- * single-quoted key access (`SpanAttributes['key']`) with no generic use of the
- * whole map (e.g. `mapKeys(SpanAttributes)`). If any mention cannot be reduced to
- * a known key, the whole map is kept so no referenced value is dropped. Returns
- * the input set unchanged when SpanAttributes is not selected or cannot be
- * narrowed.
  */
 export function narrowSpanAttributesColumns({
   columns,
@@ -710,12 +664,6 @@ export function extractReferencedEvaluationColumns(expressions: string[]): Reado
 /**
  * Extract which trace_summaries columns are referenced in a set of SQL
  * expressions.
- *
- * Scans the expressions for references to known trace analytics column names
- * (including through the table alias `ts.`). Returns the set of column names
- * suitable for passing to `dedupedTraceSummaries` so the deduped subquery only
- * reads the columns actually used, instead of the full analytics set with its
- * wide Attributes map.
  */
 export function extractReferencedTraceColumns(expressions: string[]): ReadonlySet<string> {
   const joined = expressions.join(" ");

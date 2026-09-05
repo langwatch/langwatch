@@ -38,12 +38,9 @@ const REDIS_STATE_TTL_SECONDS = 3600;
 const QUEUE_DISCOVERY_INTERVAL_MS = 10_000;
 
 /**
+ * The live cycle is cheap and stays at 2s; the detail cycle walks every blocked set in full and enumerates parked tenants, which is only affordable because ONE
+ * writer in the fleet runs it. Fifteen seconds keeps the drill-downs usefully fresh while leaving the exhaustive work firmly in the background.
  * How often the exhaustive detail scan runs (ADR-090).
- *
- * The live cycle is cheap and stays at 2s; the detail cycle walks every blocked
- * set in full and enumerates parked tenants, which is only affordable because
- * ONE writer in the fleet runs it. Fifteen seconds keeps the drill-downs
- * usefully fresh while leaving the exhaustive work firmly in the background.
  */
 const DETAIL_CYCLE_INTERVAL_MS = 15_000;
 
@@ -110,11 +107,9 @@ function emptyPhases(): DashboardData["phases"] {
 }
 
 /**
- * Raw `__jobType` values become the projection-kind node names the health
- * join looks up: folds enqueue as `projection`, maps as `handler`, state
- * projections as `stateProjection`. Filing `handler` under `fold` (as this
- * did until #7322) left every map row permanently dark — the join looked
- * under `map`, which the tree never produced.
+ * Raw `__jobType` values become the projection-kind node names the health join looks up: folds enqueue as `projection`, maps
+ * as `handler`, state projections as `stateProjection`. Filing `handler` under `fold` (as this did until #7322) left every map
+ * row permanently dark — the join looked under `map`, which the tree never produced.
  */
 function normalizeJobType(jobType: string): string {
   const lower = jobType.toLowerCase();
@@ -160,9 +155,6 @@ function mergePeakBucket(mine: PeakBucket | undefined, theirs: PeakBucket): Peak
 
 /**
  * Union two rolling histories by timestamp, newest window kept.
- *
- * The persisted series wins a collision: it is the fleet's record, whereas a
- * point only this instance holds was sampled while it was not the writer.
  */
 function mergeThroughput({
   mine,
@@ -189,17 +181,9 @@ function mergeThroughput({
 }
 
 /**
+ * Every pod that can reach Redis starts one of these, but only the pod holding `ops:snapshot:lease` scans and publishes; the rest idle their loop after a single
+ * `SET NX`. Readers never call into this class — they read the artifacts it persists, so two browser tabs on different pods cannot disagree.
  * The lease-elected snapshot writer (ADR-090).
- *
- * Every pod that can reach Redis starts one of these, but only the pod holding
- * `ops:snapshot:lease` scans and publishes; the rest idle their loop after a
- * single `SET NX`. Readers never call into this class — they read the artifacts
- * it persists, so two browser tabs on different pods cannot disagree.
- *
- * The pending-counter reconcile is deliberately NOT lease-gated. It already has
- * its own cross-instance single-flight marker
- * (`packages/features/ops/specs/pending-counter-reconcile.feature`), and stacking the snapshot
- * lease on top would make several of that spec's scenarios unreachable.
  */
 export class OpsMetricsCollectorService {
   private redis: IORedis | Cluster;
@@ -493,10 +477,9 @@ export class OpsMetricsCollectorService {
   }
 
   /**
-   * Awaits the lease release. The caller is a shutdown hook racing a process
-   * exit and a Redis disconnect, so a fire-and-forget release here is the same
-   * as no release at all: the connection closes first and the fleet waits out
-   * the full lease TTL for a writer it could have had immediately.
+   * Awaits the lease release. The caller is a shutdown hook racing a process exit and a Redis
+   * disconnect, so a fire-and-forget release here is the same as no release at all: the connection
+   * closes first and the fleet waits out the full lease TTL for a writer it could have had immediately.
    */
   async stop(): Promise<void> {
     if (this.collectInterval) {
@@ -548,12 +531,11 @@ export class OpsMetricsCollectorService {
         }
       }
 
-      // Read back what every instance published rather than keeping what this
-      // one measured. The reconcile is single-flighted, so an instance that won
-      // no marker measured nothing and would otherwise report 0 drift for a
-      // queue that has plenty, and an instance that won some of the queues would
-      // report a partial total. Reading the shared figures is what makes every
-      // instance agree, and agree on the whole.
+      // Read back what every instance published rather than keeping what this one measured. The
+      // reconcile is single-flighted, so an instance that won no marker measured nothing and
+      // would otherwise report 0 drift for a queue that has plenty, and an instance that won
+      // some of the queues would report a partial total. Reading the shared figures is what
+      // makes every instance agree, and agree on the whole.
       this.latestPendingDrift = await this.ops.readQueuePendingDrift({
         queueNames: this.groupQueueNames,
       });
@@ -750,11 +732,6 @@ export class OpsMetricsCollectorService {
 
   /**
    * Exhaustive artifact, on its own slower cadence.
-   *
-   * Deliberately NOT awaited by the caller: the detail scan walks every blocked
-   * set in full, and a slow one must never delay the live cycle or — far worse
-   * — the lease renewal that keeps this pod the writer. Overrun shows up as a
-   * stale `computedAt`, which readers surface, rather than as a lost lease.
    */
   private maybePublishDetail(queues: QueueInfo[]): void {
     if (!this.snapshots) {
@@ -816,12 +793,11 @@ export class OpsMetricsCollectorService {
           latencyWindows,
         };
 
-        // Only adopt the artifact the fence ACCEPTED. A rejected write means
-        // the lease turned over mid-scan, so this payload was never published;
-        // keeping it would have `getLatestDetail()` report a detail artifact no
-        // reader can see. Leaving `lastDetailAt` alone is deliberate too — a
-        // pod that regains the lease should rescan rather than sit out a
-        // cadence it never completed.
+        // Only adopt the artifact the fence ACCEPTED. A rejected write means the lease
+        // turned over mid-scan, so this payload was never published; keeping it would
+        // have `getLatestDetail()` report a detail artifact no reader can see. Leaving
+        // `lastDetailAt` alone is deliberate too — a pod that regains the lease should
+        // rescan rather than sit out a cadence it never completed.
         const published = await snapshots.writeDetail({
           snapshot: detail,
           leaseToken: tokenAtScanStart,
@@ -850,10 +826,9 @@ export class OpsMetricsCollectorService {
   }
 
   /**
-   * Windowed P50/P99 from the completion histograms GroupQueue maintains:
-   * the hour window merges the last sixty minute-buckets, day and week merge
-   * hour-buckets, all time reads the cumulative hash. Runs on the detail
-   * cycle only — one writer, ~230 pipelined HGETALLs per queue per 15s.
+   * Windowed P50/P99 from the completion histograms GroupQueue maintains: the hour window merges the
+   * last sixty minute-buckets, day and week merge hour-buckets, all time reads the cumulative hash. Runs
+   * on the detail cycle only — one writer, ~230 pipelined HGETALLs per queue per 15s.
    */
   private async computeLatencyWindows(): Promise<LatencyWindows> {
     try {
@@ -1191,16 +1166,6 @@ export class OpsMetricsCollectorService {
 
   /**
    * Fold the fleet's persisted accumulators into this instance's.
-   *
-   * MERGES rather than assigns, because this runs at two very different
-   * moments. At boot the local state is empty and a merge is a plain load. On
-   * lease acquisition it is not: peaks and the rolling history are ACCUMULATED
-   * rather than derived from Redis, so a pod that has spent hours losing the
-   * election holds accumulators frozen at its own boot. Assigning either
-   * direction would lose real observations — the incoming writer would either
-   * publish its stale numbers over the fleet's, or discard a peak it genuinely
-   * saw before the handover. Taking the max of each peak and the union of the
-   * two histories keeps whichever is true.
    */
   private async restoreState(): Promise<void> {
     try {
@@ -1322,16 +1287,11 @@ export class OpsMetricsCollectorService {
           return;
         }
 
-        // Taking over: reload the fleet's accumulators BEFORE scanning, and so
-        // before the publish and persist at the end of this cycle.
-        //
-        // Peaks and the rolling history are accumulated, not derived, and a pod
-        // that has been losing the election holds them frozen at its own boot.
-        // Publishing those would blank the chart and reset the peak tiles for
-        // every viewer; persisting them would then overwrite the fleet's record
-        // with the stale copy, losing it for good rather than for one cycle.
-        // Every rolling deploy moves this lease, so this is the ordinary path,
-        // not the exceptional one.
+        // Taking over: reload the fleet's accumulators BEFORE scanning, and so before the publish and persist at the end of this
+        // cycle. Peaks and the rolling history are accumulated, not derived, and a pod that has been losing the election holds them
+        // frozen at its own boot. Publishing those would blank the chart and reset the peak tiles for every viewer; persisting them
+        // would then overwrite the fleet's record with the stale copy, losing it for good rather than for one cycle. Every rolling
+        // deploy moves this lease, so this is the ordinary path, not the exceptional one.
         if (!this.holdsLease) {
           await this.restoreState();
         }

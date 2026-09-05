@@ -1,8 +1,7 @@
 /**
- * Unit tests for the Azure Blob token cache + acquisition module
- * (issue #6087). `@azure/identity` is mocked so tests control exactly when
- * an exchange resolves, rejects, and what it returns — the real SDK network
- * calls are exercised only by the (out of scope here) integration suites.
+ * Unit tests for the Azure Blob token cache + acquisition module (issue #6087). `@azure/identity` is
+ * mocked so tests control exactly when an exchange resolves, rejects, and what it returns — the real
+ * SDK network calls are exercised only by the (out of scope here) integration suites.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -95,12 +94,11 @@ describe("getAzureBlobToken", () => {
     /** @scenario "A sovereign-cloud storage endpoint obtains tokens from the matching authority" */
     it("requests the token from the configured authority, scoped to the configured audience", async () => {
       workloadGetToken.mockResolvedValue(futureToken("sovereign-token"));
-      // The real WorkloadIdentityCredential throws CredentialUnavailableError
-      // without tenantId/clientId; our mock accepts any options object, so the
-      // constructor wiring is exactly what this suite cannot catch unless it
-      // asserts on it. Dropping those two lines from buildCredential() would
-      // otherwise leave every test here green while breaking every real
-      // workload-identity exchange in production.
+      // The real WorkloadIdentityCredential throws CredentialUnavailableError without
+      // tenantId/clientId; our mock accepts any options object, so the constructor wiring is
+      // exactly what this suite cannot catch unless it asserts on it. Dropping those two lines
+      // from buildCredential() would otherwise leave every test here green while breaking every
+      // real workload-identity exchange in production.
       const sovereignCredentials = workloadCredentials(
         {
           tenantId: "tenant-id-from-webhook",

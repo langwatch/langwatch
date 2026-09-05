@@ -51,10 +51,6 @@ const resultEvents = [targetResultEventSchema, evaluatorResultEventSchema] as co
 
 /**
  * The verdict as ClickHouse holds it: a nullable flag.
- *
- * An evaluator that errored or was skipped reports no verdict at all, and that
- * is not the same fact as a failure. It stays null so a pass rate counts it in
- * neither half.
  */
 const toPassedFlag = (passed: boolean | null | undefined): number | null => {
   if (passed === undefined || passed === null) return null;

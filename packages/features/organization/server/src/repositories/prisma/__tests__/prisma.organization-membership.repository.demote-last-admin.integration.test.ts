@@ -1,17 +1,7 @@
 /**
+ * Moved from `organization.member-roles.planLimit.integration.test.ts` on platform/app, whose real subject was the plan-limit gate exercised through the deleted `appRouter` — a process-owned tRPC boundary this package does not own. The one scenario that belongs here is the repository's own invariant: demoting the organization's last ADMIN is refused before any plan check runs.
  * @vitest-environment node
- *
  * @see specs/licensing/seat-reconciliation.feature
- *
- * Moved from `organization.member-roles.planLimit.integration.test.ts` on
- * platform/app, whose real subject was the plan-limit gate exercised through
- * the deleted `appRouter` — a process-owned tRPC boundary this package does
- * not own. The one scenario that belongs here is the repository's own
- * invariant: demoting the organization's last ADMIN is refused before any
- * plan check runs.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it so the
- * suite stays runnable on a box with no database.
  */
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";

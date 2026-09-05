@@ -78,11 +78,6 @@ describe("ModelProviderKeysService", () => {
  * The customKeys counterpart of the header merge above — same
  * placeholder-restoration contract, applied to the provider's credential
  * record rather than its extra headers.
- *
- * PORTED FROM
- * `platform/app/src/server/modelProviders/__tests__/modelProvider.service.unit.test.ts`,
- * whose subject (a standalone `mergeStoredCustomKeys` function) is now this
- * class's `merge` method.
  */
 describe("ModelProviderKeysService merge", () => {
   describe("given a row with nothing worth keeping", () => {
@@ -279,12 +274,9 @@ describe("ModelProviderKeysService maskApiKeys", () => {
 });
 
 /**
- * The read side of the same policy. Every tRPC and REST response carrying a
- * provider row goes through `tryMask` and `maskHeaders` first, so this is the
- * guarantee that a stored credential never reaches a browser. Moved here with
- * the Model Provider tRPC vertical: the masking is the service's, not the
- * transport's, and the transport's own pass-through is pinned separately in
- * `model-provider-trpc-api.unit.test.ts`.
+ * The read side of the same policy. Every tRPC and REST response carrying a provider row goes through `tryMask` and `maskHeaders` first, so this is
+ * the guarantee that a stored credential never reaches a browser. Moved here with the Model Provider tRPC vertical: the masking is the service's, not
+ * the transport's, and the transport's own pass-through is pinned separately in `model-provider-trpc-api.unit.test.ts`.
  */
 describe("ModelProviderKeysService read masking", () => {
   const storedCredentials: Record<string, Record<string, string>> = {

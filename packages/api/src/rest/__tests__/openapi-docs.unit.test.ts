@@ -4,12 +4,10 @@ import { z } from "zod";
 
 import { createTestService as createService } from "./test-service.js";
 
-// ---------------------------------------------------------------------------
 // Documentation contract (ADR 002 §2): the published spec carries EVERY dated
 // version of every documented endpoint, plus latest — so a pinned client sees
 // the schemas its version actually serves. Preview is never documented, and no
 // documented path lacks a version namespace.
-// ---------------------------------------------------------------------------
 
 const SPEC_OPTIONS = { excludeStaticFile: false } as const;
 

@@ -1,17 +1,7 @@
 /**
+ * The organization and its team commit before provisioning finishes setting them up, and the caller has no id to compensate with until the call returns. A failure after that commit therefore has to be undone here or nowhere: what it would otherwise leave is an organization with no bootstrap key, holding a slug that answers every retry with a 409 until somebody reaches the database directly.
  * @vitest-environment node
- *
  * @see specs/organizations/organizations-provisioning-rest-api.feature
- *
- * The organization and its team commit before provisioning finishes setting
- * them up, and the caller has no id to compensate with until the call returns.
- * A failure after that commit therefore has to be undone here or nowhere: what
- * it would otherwise leave is an organization with no bootstrap key, holding a
- * slug that answers every retry with a 409 until somebody reaches the database
- * directly.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it so the
- * suite stays runnable on a box with no database.
  */
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it, vi } from "vitest";

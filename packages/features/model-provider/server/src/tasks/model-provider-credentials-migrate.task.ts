@@ -11,10 +11,6 @@ const logger = createLogger("langwatch:task:model-provider-migrate-credentials")
 
 /**
  * Encrypts every `customKeys` value still written in plaintext.
- *
- * The cipher is the deployment's, handed in: the ciphertext is a wire format
- * read by every other process, so a second implementation of it would write
- * rows that nothing can decrypt.
  */
 export async function runModelProviderKeysMigration({
   database,
@@ -63,11 +59,6 @@ export async function runModelProviderKeysMigration({
 /**
  * The task-launcher entry — `pnpm --filter @langwatch/tasks task
  * model-provider-migrate-credentials`.
- *
- * `database` and `cipher` are thunks for the same reason as
- * `LwqlProvisionTask`'s: the launcher builds the whole catalogue before it
- * knows which task was asked for, so resolving a possibly-absent handle is
- * deferred to `run()`.
  */
 export class ModelProviderCredentialsMigrateTask extends Task {
   readonly name = "model-provider-migrate-credentials";

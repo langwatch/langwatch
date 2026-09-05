@@ -1,10 +1,5 @@
 /**
  * Marking a whole route family as a deprecated alias.
- *
- * A family that has a successor says so on every response, refusals included,
- * so an integrator reading the wire finds the move without reading the docs.
- * The two headers are the standard pair: `Deprecation` states the fact, and
- * the `Link` relation names where the family went.
  */
 import type { MiddlewareHandler } from "hono";
 

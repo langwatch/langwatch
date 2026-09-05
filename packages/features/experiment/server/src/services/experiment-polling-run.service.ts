@@ -1,11 +1,5 @@
 /**
  * Shared polling-mode runner for evaluations-v3.
- *
- * Both the run API (POST /:slug/run) and the workflow evaluate endpoint
- * (POST /api/workflows/:id/evaluate) go through here so there is one backend
- * execution path: it registers a run, kicks the orchestrator off in the
- * background, and hands back the run id plus a shareable results URL the
- * caller can poll or open in the browser.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -70,12 +64,6 @@ type RunnerOrchestratorInput = Omit<
 
 /**
  * Records a failed run, and says nothing the customer must not read.
- *
- * The mapper is the one the streaming path uses, so a polled run and a
- * streamed one report a failure identically: a handled error keeps its code
- * and travels as `domainError`; anything else is the unnamed-failure marker
- * plus the trace id. The raw message stops here, in the log line, next to the
- * trace id that ties it to the run row the customer can see.
  */
 const reportFailedRun = async ({
   error,
@@ -136,10 +124,6 @@ const runExecution = async ({
   /**
    * The cells go in before the run reports it ended, so a caller that polls
    * until it does and then reads the workbench finds them there.
-   *
-   * A stopped run writes them too. The rows that finished before the stop are
-   * the run's whole output, and dropping them leaves the table reading "No
-   * output yet" for work that did run.
    */
   const writeCellsBack = async (reason: "finished" | "stopped") => {
     logger.info(
@@ -219,9 +203,8 @@ export class ExperimentPollingRunService {
 
   /**
    * Registers a run, starts the orchestrator in the background, and returns
-   * immediately with the run id and results URL. The run streams its events
-   * into the run-state manager so the caller can poll
-   * GET /runs/:runId(/results).
+   * immediately with the run id and results URL. The run streams its events into
+   * the run-state manager so the caller can poll GET /runs/:runId(/results).
    */
   static async startPollingRun(
     input: StartPollingRunInput,

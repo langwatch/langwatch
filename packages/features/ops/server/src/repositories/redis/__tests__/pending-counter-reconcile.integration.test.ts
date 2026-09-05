@@ -371,9 +371,6 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
 
   /**
    * Seed a queue so a reconcile measures exactly `drift`, then run one.
-   *
-   * `counter - groundTruth` is the drift, so the counter is seeded at
-   * `jobs + drift` against `jobs` real jobs.
    */
   const reconcileWithDrift = async (params: {
     queue: string;

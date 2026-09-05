@@ -6,12 +6,6 @@ import { QueueRedisRepository } from "../queue.repository";
  * A pipeline whose queued commands all come back NOSCRIPT — what Redis returns
  * when a node has no cached copy of the script (restart, SCRIPT FLUSH, or the
  * first call against a fresh cluster node).
- *
- * Tested here rather than against a live Redis on purpose: reaching this state
- * for real needs a global `SCRIPT FLUSH`, which blanks the cache for every
- * other suite sharing the instance and made an unrelated queue suite fail
- * intermittently. The behaviour under test is entirely in the recovery
- * function, so a fake pipeline pins it deterministically and harms nobody.
  */
 function pipelineReturning(results: Array<[Error | null, unknown]>): ChainableCommander {
   return { exec: async () => results } as unknown as ChainableCommander;

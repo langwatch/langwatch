@@ -37,12 +37,6 @@ const readCustomKeys = (raw: unknown) =>
 
 /**
  * The three answers a stored credential bag can give.
- *
- * The middle one and the last one used to be the same answer. A caller reading
- * only the keys cannot tell a provider that holds no credentials from one
- * whose credentials cannot be read, and those want opposite treatment: the
- * first is a configuration an operator chose, the second is an encryption key
- * that changed under a row nobody has touched.
  */
 describe("readCustomKeys", () => {
   beforeEach(() => {

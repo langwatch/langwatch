@@ -1,9 +1,7 @@
 /**
- * The board cells a run carries rather than produces, so opening a run
- * shows the whole board, not one column. Not routed through storage's own
- * event path or the SSE stream — that would re-report old verdicts and
- * overwrite cells this run never produced. A write failure is logged and
- * dropped rather than stopping the run.
+ * The board cells a run carries rather than produces, so opening a run shows the whole board, not one column. Not
+ * routed through storage's own event path or the SSE stream — that would re-report old verdicts and overwrite
+ * cells this run never produced. A write failure is logged and dropped rather than stopping the run.
  */
 
 import type {

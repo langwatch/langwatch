@@ -1,14 +1,5 @@
 /**
  * The second place the Codex licence is enforced.
- *
- * Choosing a Codex model as a feature's default is refused by the resolver.
- * This is the other end: a model arriving at execution anyway — a value saved
- * before the restriction existed, or a row reached by id — and it has to be
- * refused there too, or the licence holds only for new configuration.
- *
- * The check runs twice on purpose. Once on the model reference before any
- * lookup, and once on the provider the reference resolved to, because a model
- * id that does not look like Codex can still resolve to the Codex provider.
  */
 
 import { describe, expect, it } from "vitest";

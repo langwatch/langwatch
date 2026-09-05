@@ -16,14 +16,6 @@ import {
 /**
  * The documented API root and default endpoint of every provider the probe
  * knows how to reach.
- *
- * Stated here rather than derived from the onboarding grid's registry, which
- * is where they used to live: that registry is a BROWSER module — icons,
- * themed assets, field labels — and no server module may value-import one.
- * These two maps are the only thing this module ever read from it, and they
- * are not presentation: they are where a credential is carried to.
- *
- * Keyed by the BACKEND provider key the model-provider registry uses.
  */
 const providerDefaultBaseUrls: Record<string, string> = {
   openai: "https://api.openai.com/v1",
@@ -42,21 +34,11 @@ const providerApiRoots: Record<string, string> = {
 
 /**
  * The response shape the probe actually receives.
- *
- * The three members it reads, and no more: the egress the composition root
- * supplies goes out through undici so it can pin the resolved IP, and naming
- * undici's own `Response` here would put a transport library in a package that
- * never opens a socket.
  */
 type ProbeResponse = ModelProviderEgressResponse;
 
 /**
  * The verdict this module produces, and the reasons a check never ran.
- *
- * Declared in `@langwatch/model-provider-contract` rather than here: the same
- * three answers travel out through the packaged transport to the browser, and a
- * shape restated on either side is a shape that drifts. This module is the one
- * that decides which of them a credential gets.
  */
 
 const verified = (): ModelProviderCredentialVerdict => ({ outcome: "verified", valid: true });
@@ -75,12 +57,6 @@ const unchecked = (reason: ModelProviderUncheckedReason): ModelProviderCredentia
 
 /**
  * Authentication strategy for API key validation.
- * - `bearer`: Uses `Authorization: Bearer {key}` header (OpenAI-compatible) - DEFAULT
- * - `anthropic`: Uses `x-api-key` header with `anthropic-version`
- * - `gemini`: Uses query parameter `?key=` — or, when the credential carries
- *   a project and location, `x-goog-api-key` on a generate-content POST
- *   against the Agent Platform host (the second Google door)
- * - `elevenlabs`: Uses `xi-api-key` header
  */
 type AuthStrategy = "bearer" | "anthropic" | "gemini" | "elevenlabs";
 
@@ -99,30 +75,18 @@ const PROVIDER_AUTH_OVERRIDES: Partial<Record<string, AuthStrategy>> = {
 
 /**
  * The model a credential check asks Agent Platform to run.
- *
- * Any published model would do; this one is picked because it resolves in
- * both `global` and the regional locations. A model the project cannot reach
- * answers 404 rather than 401, which `handleHttpError` already keeps distinct
- * from a refused key.
  */
 const AGENT_PLATFORM_PROBE_MODEL = "gemini-2.5-flash";
 
 /**
- * The host Gemini Enterprise Agent Platform answers on — Gemini's second
- * door. Lived on the onboarding registry while Agent Platform was its own
- * provider; now that it is a credential mode of `gemini` (whose `apiRoot`
- * stays the Gemini API host), the second host is provider knowledge stated
- * here.
+ * The host Gemini Enterprise Agent Platform answers on — Gemini's second door. Lived on the onboarding
+ * registry while Agent Platform was its own provider; now that it is a credential mode of `gemini`
+ * (whose `apiRoot` stays the Gemini API host), the second host is provider knowledge stated here.
  */
 const AGENT_PLATFORM_API_ROOT = "https://aiplatform.googleapis.com";
 
 /**
  * The smallest generate-content request that still proves the credential.
- *
- * Agent Platform has to be probed by generating rather than by listing:
- * `GET .../models` answers `401 "API keys are not supported by this API"`
- * however good the key is, so validating the way every other provider here
- * does would report a working credential as unusable.
  */
 const AGENT_PLATFORM_PROBE_BODY = JSON.stringify({
   contents: [{ role: "user", parts: [{ text: "ping" }] }],
@@ -131,20 +95,6 @@ const AGENT_PLATFORM_PROBE_BODY = JSON.stringify({
 
 /**
  * Providers we will not probe, and must not pretend to have probed.
- *
- * `bedrock`, `vertex_ai` and `azure` are here for the original reason: their
- * credentials are AWS signatures, gcloud application-default credentials and
- * deployment-scoped Azure keys, none of which a models listing exercises.
- *
- * `azure_safety` is here because leaving it out was a bug waiting for a
- * caller. It is a content-safety service, not a language model: it
- * authenticates with `Ocp-Apim-Subscription-Key` and has no `/models` route.
- * Nothing in this module excluded it, and it carries an endpoint field, so a
- * stored endpoint was enough to send it down the bearer branch and have a
- * perfectly good credential reported as refused. Until now the only thing
- * standing in the way was `isLlmProvider` in the settings form — a client-side
- * gate, in front of one of several callers. The rule belongs here, where every
- * caller passes.
  */
 const NOT_PROBEABLE: ReadonlySet<string> = new Set([
   "bedrock",
@@ -154,18 +104,15 @@ const NOT_PROBEABLE: ReadonlySet<string> = new Set([
 ] as const);
 
 /**
- * Validation endpoints for providers that are not part of the onboarding
- * registry (which is what feeds `providerDefaultBaseUrls`). ElevenLabs is an
- * audio-only provider added directly in Settings, so its models endpoint
- * lives here.
+ * Validation endpoints for providers that are not part of the onboarding registry (which
+ * is what feeds `providerDefaultBaseUrls`). ElevenLabs is an audio-only provider added
+ * directly in Settings, so its models endpoint lives here.
  */
 const VALIDATION_ONLY_BASE_URLS: Record<string, string> = {
   elevenlabs: "https://api.elevenlabs.io/v1",
 };
 
 /**
- * Builds the models endpoint URL by normalizing and appending /models if needed.
- *
  * @param baseUrl - The user-provided base URL (may be empty)
  * @param defaultBaseUrl - The default base URL for the provider
  * @returns The full URL to the models endpoint
@@ -181,24 +128,6 @@ const logger = createLogger("langwatch:api:providerValidation");
 
 /**
  * Every way a credential check can fail, as a coded handled error.
- *
- * None of these carry the provider's own sentence, in any field. A handled
- * error's `message` is NOT private — the REST boundary sends
- * `{ error: code, message }` verbatim (`app/api/middleware/error-handler.ts`)
- * — so "server-side only" is not a property `message` has, and an upstream
- * refusal is precisely the text that quotes the request back: an OpenAI 401
- * body reads `Incorrect API key provided: sk-proj-…`, and for Gemini the
- * request carries the key in its query string.
- *
- * Relaying it through `meta.message` is not the way round this either. That
- * channel exists and is allowlisted per code, but a model provider's rejection
- * was tried there as `llm_upstream_error` and removed for this exact reason —
- * see the note on `ALLOWED_PER_CODE` in
- * `features/errors/logic/__tests__/presentation.unit.test.ts`.
- *
- * So the provider's words go to `logger` beside the throw, where the doc says
- * they belong, and the customer reads this code's entry in
- * `features/errors/logic/presentation.ts`.
  */
 
 /** The provider positively identified the credential itself as wrong. */
@@ -229,9 +158,6 @@ export class ProviderServiceDisabledError extends HandledError {
 
 /**
  * The credential exists but its own restrictions refuse this call.
- *
- * `reason` is a discriminant from a set Google enumerates, not free text, so
- * it is safe to carry and to branch copy on.
  */
 export class ProviderKeyRestrictedError extends HandledError {
   constructor({
@@ -242,10 +168,9 @@ export class ProviderKeyRestrictedError extends HandledError {
     provider: string;
     reason: string;
     /**
-     * Which Google door refused — the same `API_KEY_SERVICE_BLOCKED`
-     * reason means opposite remediations on the two doors (fill in the
-     * project/location pair vs clear it), so the presentation registry
-     * branches on this.
+     * Which Google door refused — the same `API_KEY_SERVICE_BLOCKED` reason means
+     * opposite remediations on the two doors (fill in the project/location pair vs
+     * clear it), so the presentation registry branches on this.
      */
     googleDoor?: "gemini-api" | "agent-platform";
   }) {
@@ -260,10 +185,6 @@ export class ProviderKeyRestrictedError extends HandledError {
 
 /**
  * The provider answered, refused, and did not say anything we can map.
- *
- * `fault: "provider"` because a 429 or a 503 is theirs, not the customer's,
- * and the status is the one fact worth carrying — a number from a known set
- * rather than a sentence.
  */
 export class ProviderRefusedError extends HandledError {
   constructor({ provider, status }: { provider: string; status: number }) {
@@ -287,19 +208,7 @@ export class ProviderKeyMissingError extends HandledError {
 }
 
 /**
- * The probe never reached the provider, so nothing was learned about the key.
- *
- * The one failure here that is thrown rather than returned: a refused key is
- * an answer, an unreachable provider is the absence of one.
- */
-/**
  * The endpoint answered with a redirect, and we will not follow it.
- *
- * `fault: "customer"` because the fix is theirs and it is a small one: point
- * the base URL at the address the endpoint actually serves. Following the hop
- * is not an option — it would carry the credential to a host the SSRF
- * validator never saw, and a cross-origin hop keeps the provider-specific auth
- * headers even where it drops `Authorization`.
  */
 export class ProviderEndpointRedirectedError extends HandledError {
   constructor({ provider }: { provider: string }) {
@@ -320,6 +229,9 @@ export class ProviderEndpointRedirectedError extends HandledError {
   }
 }
 
+/**
+ * The probe never reached the provider, so nothing was learned about the key.
+ */
 export class ProviderUnreachableError extends HandledError {
   constructor({
     provider,
@@ -348,18 +260,8 @@ export class ProviderUnreachableError extends HandledError {
 const MAX_UPSTREAM_DETAIL_LENGTH = 300;
 
 /**
- * Google answers a refused key with a machine-readable `reason`, and only
- * `API_KEY_INVALID` actually means the key is wrong. The rest are project or
- * key-restriction problems that generating a new key will never fix.
- *
- * These refusals are where a Google Cloud customer lands when their key was
- * minted for another Google service. The most common case is an Agent
- * Platform key hitting generativelanguage.googleapis.com, which answers
- * `API_KEY_SERVICE_BLOCKED` — the signal that the key is fine and belongs on
- * Gemini's other door: the customer fills in the project and location fields
- * and the same provider row validates and serves through
- * aiplatform.googleapis.com instead.
- *
+ * Google answers a refused key with a machine-readable `reason`, and only `API_KEY_INVALID` actually means the key
+ * is wrong. The rest are project or key-restriction problems that generating a new key will never fix.
  * @see https://cloud.google.com/apis/design/errors
  */
 const GEMINI_REASON_ERRORS: Record<
@@ -493,10 +395,6 @@ async function readUpstreamRefusal(
 
 /**
  * Google's verdict on the key itself, when it gave one.
- *
- * The only branch that ranks a refusal by what the provider said rather than
- * by the status it said it with, which is why it reads better apart from the
- * status handling below.
  */
 function geminiReasonRefusal({
   provider,
@@ -534,12 +432,6 @@ function refusal(error: HandledError, rank: number): RankedFailure {
 }
 
 /**
- * Turns an HTTP failure into the coded error that best describes it.
- *
- * The provider's own sentence is read, logged, and then dropped. It still
- * decides how a refusal RANKS — a shape that explained itself is a better
- * answer than one that did not — but it never travels, on any field.
- *
  * @param response - The fetch Response object
  * @param context - Which provider was probed, and with which key
  * @returns The refusal, ranked
@@ -611,9 +503,8 @@ type ProbeContext = {
   /** Whether the customer can point this provider at their own URL */
   hasConfigurableEndpoint: boolean;
   /**
-   * Which Google door a `gemini` credential is being checked through.
-   * The doors disagree on what a 400 means: the Gemini API answers a
-   * rejected key with 400, while on Agent Platform's generate-content
+   * Which Google door a `gemini` credential is being checked through. The doors disagree on what a 400
+   * means: the Gemini API answers a rejected key with 400, while on Agent Platform's generate-content
    * probe a 400 is a malformed request — never a verdict on the key.
    */
   googleDoor?: "gemini-api" | "agent-platform";
@@ -621,21 +512,11 @@ type ProbeContext = {
 
 /**
  * How long the whole walk gets to find an answer.
- *
- * The budget is shared across every shape rather than granted to each, because
- * a per-shape timeout multiplies: four shapes at ten seconds each would let one
- * black-holed host hold a tRPC request thread for forty. The customer supplies
- * the host for any provider with an endpoint of its own, so this is the only
- * thing bounding it — undici's own default gives up minutes later.
  */
 const PROBE_BUDGET_MS = 10_000;
 
 /**
  * The request that proves a key works.
- *
- * Listing models for every provider that has such an endpoint; `method` and
- * `body` exist for the one that does not — Agent Platform rejects API keys on
- * its listing route and accepts them only on a generate-content POST.
  */
 type ProbeRequest = {
   url: string;
@@ -646,18 +527,6 @@ type ProbeRequest = {
 
 /**
  * Every way a provider's credential can legitimately prove itself.
- *
- * A credential is not tied to one URL. Google alone issues keys from AI
- * Studio, the Cloud console and Agent Platform, and the same key answers on
- * `?key=`, on the `x-goog-api-key` header and on the OpenAI-compatible
- * surface — each of which is a different API with its own enablement. Probing
- * a single hardcoded shape turned "we did not ask the right way" into
- * "your key is invalid", which is the wrong conclusion and not one the
- * customer can act on.
- *
- * The shapes below are the ones verified to answer 200 for a live key. A
- * provider whose auth is unambiguous keeps a single entry; adding a shape is
- * appending to its list.
  */
 function buildProbeCandidates({
   strategy,
@@ -696,11 +565,10 @@ function buildProbeCandidates({
     case "elevenlabs":
       return [{ url, headers: { ...headers, "xi-api-key": apiKey } }];
     case "gemini": {
-      // A credential carrying a project and location is an Agent Platform
-      // key: it names the door it opens, so only that door is asked. The
-      // Gemini API host is not probed at all — the key is refused there by
-      // its own restrictions, and that refusal would outrank nothing while
-      // costing a request. See
+      // A credential carrying a project and location is an Agent Platform key: it
+      // names the door it opens, so only that door is asked. The Gemini API host is
+      // not probed at all — the key is refused there by its own restrictions, and
+      // that refusal would outrank nothing while costing a request. See
       // specs/model-providers/google-agent-platform.feature.
       if (agentPlatform?.project && agentPlatform.location) {
         const { project, location } = agentPlatform;
@@ -708,15 +576,11 @@ function buildProbeCandidates({
 
         return [
           {
-            // The key rides in a header, not `?key=`, which Agent Platform
-            // also accepts: a credential in a URL reaches access logs, proxy
-            // logs and browser history, and both shapes were verified to
-            // work.
-            //
-            // The global host with a region in the path was verified live
-            // against two regions (us-central1, europe-west4), both 200 —
-            // the same form every other verified shape uses, so this does
-            // not special-case a regional subdomain on top of it.
+            // The key rides in a header, not `?key=`, which Agent Platform also accepts: a credential
+            // in a URL reaches access logs, proxy logs and browser history, and both shapes were
+            // verified to work. The global host with a region in the path was verified live against
+            // two regions (us-central1, europe-west4), both 200 — the same form every other verified
+            // shape uses, so this does not special-case a regional subdomain on top of it.
             url:
               `${host}/v1/projects/${encodeURIComponent(project)}` +
               `/locations/${encodeURIComponent(location)}/publishers/google/models/` +
@@ -767,14 +631,6 @@ function buildProbeCandidates({
 
 /**
  * How useful a refusal is to the customer, lowest first.
- *
- * Ranking matters because the shapes do not answer equally well. Asked about
- * a plainly invalid key, the primary endpoints return Google's canonical
- * `API_KEY_INVALID`, while the OpenAI-compatible surface answers with a
- * vaguer "Please pass a valid API key" and no reason at all. Preferring
- * whichever refusal merely differs from our own wording picks that vaguer
- * one and appends it to the canonical sentence, which reads worse than
- * saying nothing.
  */
 const FAILURE_RANK = {
   /** A mapped reason naming something the customer can change. */
@@ -797,12 +653,6 @@ type RankedFailure = {
 
 /**
  * Picks the refusal worth showing, keeping the first of equally useful ones.
- *
- * Undefined for an empty list rather than a manufactured verdict. Nothing was
- * asked, so there is nothing to report about the key — the caller turns that
- * into `ProviderUnreachableError`. An earlier version defaulted to "invalid
- * API key" here, which is the one answer that is certainly wrong when no
- * request was made, and the exact misdiagnosis this module exists to remove.
  */
 function mostInformativeFailure(failures: RankedFailure[]): RankedFailure | undefined {
   return failures.reduce<RankedFailure | undefined>(
@@ -824,19 +674,6 @@ function unreachableFailure(context: ProbeContext): RankedFailure {
 
 /**
  * The endpoint answered — with a redirect we will not follow.
- *
- * Worth telling apart from "never answered". The endpoint is reachable and
- * something is listening; it just wants us somewhere else, and we decline
- * because a hop carries the credential to a host the validator has not seen.
- * Reporting that as unreachable sends the customer to check their network
- * when what they need to change is a URL — the misdiagnosis this module
- * exists to remove, and one three previous fixes were about.
- *
- * Matched by type, not by message. The helper's own catch rewrites a plain
- * `Error` into "Connection failed to host:port: …" on its way out, so any
- * string comparison here would be testing text this module never receives —
- * and would report every refused redirect as a connection failure while
- * looking entirely correct.
  */
 function isRefusedRedirect(err: unknown, egress: ModelProviderEgressPort): boolean {
   return egress.isRedirectRefusal(err);
@@ -853,13 +690,6 @@ function redirectedFailure(context: ProbeContext): RankedFailure {
 
 /**
  * One auth shape, asked once: accepted, refused, or never answered.
- *
- * Only the request is guarded. Reading the refusal happens outside the
- * `catch`, because the two failures mean opposite things: a throw from
- * `fetch` is the request not landing, while a throw from `handleHttpError` is
- * a bug in our own parsing of a response we did get. Catching both told the
- * customer to check their network connection for a host that had answered
- * perfectly well, and hid the defect completely.
  */
 async function probeOnce({
   candidate,
@@ -874,24 +704,11 @@ async function probeOnce({
 }): Promise<{ accepted: true; failure?: undefined } | { accepted: false; failure: RankedFailure }> {
   let response: ProbeResponse;
   try {
-    // Through the SSRF validator, not bare `fetch`.
-    //
-    // Every request here carries a customer's credential to a URL a customer
-    // chose. Several providers expose a configurable endpoint, so "the URL on
-    // the row" is not a trusted value just because nobody passed one in on
-    // this call — an endpoint saved earlier is as attacker-controlled as one
-    // supplied now, and the stored key rides along either way. That makes this
-    // the shape `utils/ssrfProtection` exists for: a cloud-metadata denylist
-    // that applies regardless of configuration, private-address blocking, and
-    // IP pinning so a name cannot resolve to something else between the check
-    // and the connection.
-    //
-    // `followRedirects: false` for the reason the webhook destination gives at
-    // `httpDestination.ts:39-43`: hop re-validation falls back to the weaker
-    // env-gated validator, and — measured on this repo's Node — a cross-origin
-    // redirect strips `Authorization` but carries `x-api-key`, `x-goog-api-key`
-    // and `xi-api-key` straight through to the new host. A redirect is not
-    // something a models listing needs.
+    // Through the SSRF validator, not bare `fetch`. Every request here carries a customer's credential to a URL a customer chose. Several providers expose a configurable endpoint, so "the URL on the row" is not a
+    // trusted value just because nobody passed one in on this call — an endpoint saved earlier is as attacker-controlled as one supplied now, and the stored key rides along either way. That makes this the shape
+    // `utils/ssrfProtection` exists for: a cloud-metadata denylist that applies regardless of configuration, private-address blocking, and IP pinning so a name cannot resolve to something else between the check and
+    // the connection. `followRedirects: false` for the reason the webhook destination gives at `httpDestination.ts:39-43`: hop re-validation falls back to the weaker env-gated validator, and — measured on this
+    // repo's Node — a cross-origin redirect strips `Authorization` but carries `x-api-key`, `x-goog-api-key` and `xi-api-key` straight through to the new host. A redirect is not something a models listing needs.
     response = await egress.fetch(candidate.url, {
       method: candidate.method ?? "GET",
       headers: candidate.headers,
@@ -916,11 +733,6 @@ async function probeOnce({
 }
 
 /**
- * Asks the provider to list its models, trying each way the credential could
- * legitimately authenticate. One shape answering is proof the key works, so
- * the chain stops there; only when every shape has been refused is the key
- * reported as unusable.
- *
  * @param candidates - The auth shapes to try, in preference order
  * @param context - Which provider is being probed, and with which key
  * @returns Promise resolving to validation result
@@ -982,11 +794,6 @@ async function runProbeChain({
 /**
  * Which of Google's two doors a credential is being checked against, for the
  * providers that have two.
- *
- * Carried on the probe context so a refusal can say which door refused —
- * "fill in the project and location" and "clear them" are opposite
- * instructions, and giving the wrong one sends the customer the wrong way.
- * Absent entirely for every other provider, which has only one door.
  */
 function googleDoorFor({
   provider,
@@ -1004,27 +811,8 @@ function googleDoorFor({
 }
 
 /**
- * The credential-shaped reasons we decline to ask: nothing usable to send, or
- * nowhere to send it.
- *
- * `null` means the probe can go ahead. The two provider-shaped reasons —
- * an unrecognised provider, and one whose auth we cannot exercise — are
- * decided by the callers before they get here, because both need the registry
- * entry this function is deliberately not given.
- *
- * Kept out of the probe because these are the answers a customer reads as "we
- * did not check", and a branch that quietly returned a pass instead is the
- * failure the third verdict exists to prevent.
- */
-/**
  * The project and location that name Gemini's Agent Platform door, if the
  * credential carries them.
- *
- * Two field-name pairs reach the same door. A row created since the fold uses
- * `GEMINI_*`; a legacy row created while Agent Platform was its own provider
- * still wears the retired names, and goes on working until those rows are
- * converted. Both are read here so no caller has to know which era a
- * credential came from.
  */
 function agentPlatformPair({
   provider,
@@ -1045,6 +833,10 @@ function agentPlatformPair({
   };
 }
 
+/**
+ * The credential-shaped reasons we decline to ask: nothing usable to send,
+ * or nowhere to send it.
+ */
 function whyNotCheckable({
   provider,
   apiKey,
@@ -1057,10 +849,9 @@ function whyNotCheckable({
   baseUrl: string;
   defaultBaseUrl: string;
   /**
-   * Whether the credential names the Agent Platform door (a project and a
-   * location). That probe builds its URL from the API root and needs no base
-   * URL, so "nowhere to ask" is false for it however empty the endpoint
-   * fields are.
+   * Whether the credential names the Agent Platform door (a project and a location). That
+   * probe builds its URL from the API root and needs no base URL, so "nowhere to ask" is
+   * false for it however empty the endpoint fields are.
    */
   hasAgentPlatformDoor: boolean;
 }): ModelProviderUncheckedReason | null {
@@ -1076,16 +867,11 @@ function whyNotCheckable({
     return "no_credential";
   }
 
-  // Nowhere to ask (e.g. voyage, which has no models listing). Probing anyway
-  // would fetch a relative URL, throw, and surface as a misleading "check your
-  // network connection". The key is exercised on the first real call instead.
-  //
-  // The Agent Platform door is exempt, and that exemption is load-bearing: a
-  // legacy row reaching it has no onboarding tile left to supply a default
-  // base URL, so without this it would be declined without a request and — on
-  // the old two-state result — reported as a pass. A key that was never probed
-  // coming back green is the failure both this exemption and the third verdict
-  // exist to prevent, from either end.
+  // Nowhere to ask (e.g. voyage, which has no models listing). Probing anyway would fetch a relative URL, throw, and surface as a misleading
+  // "check your network connection". The key is exercised on the first real call instead. The Agent Platform door is exempt, and that
+  // exemption is load-bearing: a legacy row reaching it has no onboarding tile left to supply a default base URL, so without this it would
+  // be declined without a request and — on the old two-state result — reported as a pass. A key that was never probed coming back green is
+  // the failure both this exemption and the third verdict exist to prevent, from either end.
   if (!baseUrl && !defaultBaseUrl && !hasAgentPlatformDoor) {
     return "no_endpoint";
   }
@@ -1095,21 +881,12 @@ function whyNotCheckable({
 
 /**
  * The catalogue's credential probe, over the process's guarded egress.
- *
- * A class over the two functions above rather than the functions themselves,
- * because the egress is the composition root's: this is where the deployment's
- * SSRF policy meets the feature's knowledge of how each provider authenticates.
  */
 export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCredentialProbePort {
   /**
-   * Validates an API key against a custom URL or default URL.
-   * Gets API key from stored DB value OR env var (whichever exists).
-   *
-   * @param projectId - The project ID to look up stored keys
-   * @param provider - The provider key (e.g., "openai", "anthropic")
-   * @param customBaseUrl - Optional custom base URL to validate against. If not provided, uses default URL.
-   * @param modelProviders - composed Model Provider service
-   * @returns Promise resolving to validation result
+   * Validates an API key (from the stored DB value or an env var) against a
+   * custom URL, or the default URL when none is given.
+   * @param projectId project to look up stored keys for; @param provider e.g. "openai"; @param customBaseUrl optional override.
    */
   static async validateKeyWithCustomUrl({
     projectId,
@@ -1165,15 +942,11 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
       return refused(new ProviderKeyMissingError({ provider }).serialize());
     }
 
-    // Start from what's stored, not from a blank object: a provider whose
-    // credential is more than a key plus an endpoint — Agent Platform's
-    // project and location, or any future one — had those fields silently
-    // dropped when this rebuilt customKeys from scratch. That turned "the
-    // customer edited an unrelated field" into an empty probe walk and a
-    // false "could not reach the provider", which is the exact misdiagnosis
-    // this whole area of the code exists to remove. The freshly resolved key
-    // and an explicit custom URL are layered on top, in that order, so they
-    // still win over whatever was stored.
+    // Start from what's stored, not from a blank object: a provider whose credential is more than a key plus an endpoint — Agent
+    // Platform's project and location, or any future one — had those fields silently dropped when this rebuilt customKeys from
+    // scratch. That turned "the customer edited an unrelated field" into an empty probe walk and a false "could not reach the
+    // provider", which is the exact misdiagnosis this whole area of the code exists to remove. The freshly resolved key and an
+    // explicit custom URL are layered on top, in that order, so they still win over whatever was stored.
     const customKeys: Record<string, string> = {
       ...storedKeys,
       [apiKeyField]: apiKey,
@@ -1191,26 +964,9 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
   }
 
   /**
-   * Validates an API key for a given model provider.
-   *
-   * Uses the `modelProviders` registry to dynamically get API key and endpoint
-   * field names. All providers use bearer auth by default unless overridden.
-   *
    * @param provider - The provider key (e.g., "openai", "anthropic")
    * @param customKeys - Record containing the API key and optional base URL
    * @returns Promise resolving to validation result
-   *
-   * @remarks
-   * - Skips validation if the API key is masked (editing existing provider without changing key)
-   * - Skips validation for providers with complex auth (Bedrock, Vertex AI, Azure)
-   *
-   * @example
-   * ```ts
-   * const result = await validateProviderApiKey("openai", {
-   *   OPENAI_API_KEY: "sk-...",
-   *   OPENAI_BASE_URL: "https://api.openai.com/v1"
-   * });
-   * ```
    */
   static async validateProviderApiKey(
     provider: string,
@@ -1295,10 +1051,6 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
 
 /**
  * The probe a deployment with no guarded egress composes.
- *
- * Every credential comes back `unchecked` rather than `verified`: a key that
- * was never probed reported as working is the failure the third verdict exists
- * to prevent, and it is the one answer this stand-in must not give.
  */
 export class UnavailableModelProviderCredentialProbeAdapter extends ModelProviderCredentialProbePort {
   static create(): UnavailableModelProviderCredentialProbeAdapter {

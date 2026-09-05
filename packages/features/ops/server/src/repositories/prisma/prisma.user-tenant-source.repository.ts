@@ -2,10 +2,9 @@ import type { TenantSource } from "@langwatch/system-migrations";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**
- * Tenants for the USER-rooted migration pass are users, walked in id order
+ * Tenants for the USER-rooted migration pass are users, walked in id order can belong to many organizations or
+ * none). Same paging contract as the organization source, so the generic runner drives both unchanged.
  * (ADR-101 §6: the identity migrations' tenant is the user, because a user
- * can belong to many organizations or none). Same paging contract as the
- * organization source, so the generic runner drives both unchanged.
  */
 export class PrismaUserTenantSourceRepository implements TenantSource {
   static create({ prisma }: { prisma: PrismaClient }): PrismaUserTenantSourceRepository {

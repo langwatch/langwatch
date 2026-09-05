@@ -1,17 +1,5 @@
 /**
  * Whether everything a workbench state points at still exists.
- *
- * A workbench names prompts, agents, evaluators, workflows and datasets by id.
- * Saving one whose references have been deleted stores a configuration that
- * cannot run, and the customer finds out when they press the button — several
- * saves after the edit that broke it. So the save is refused, naming the type
- * and the id that is missing.
- *
- * The distinction that carries the most weight is DOWN versus GONE. Two of the
- * five features answer by throwing, so their not-found errors become `false`
- * and everything else is rethrown. An evaluator service that is unreachable
- * must not read as an evaluator that was deleted: one is a retry, the other
- * tells the customer to fix their workbench.
  */
 
 import { describe, expect, it } from "vitest";

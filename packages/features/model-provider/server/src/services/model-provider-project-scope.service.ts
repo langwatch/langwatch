@@ -8,20 +8,6 @@ export type ModelProviderProjectSystemContext = {
 
 /**
  * The scope facts that come off a project row and nothing else.
- *
- * A Model Provider scope is the triple `PROJECT` / `TEAM` / `ORGANIZATION`,
- * and every id in it is on the project read with its team. These four
- * derivations were methods of `ModelProviderScopeService`, which still answers
- * them — it composes this and delegates, so there is one implementation and no
- * twin to drift — but they are separated from the four that are left there,
- * which resolve a billing profile, list an organization's teams or page its
- * projects. Those are organization questions; a project's own row is the whole
- * of this one.
- *
- * That separation is what lets a process compose the cost listing. Ingestion
- * prices a span against a project's own cost rules; deriving the scopes those
- * rules are stored under used to require an organization service the process
- * has no other reason to build.
  */
 export class ModelProviderProjectScopeService {
   private constructor(private readonly projects: ModelCostProjectPort) {}

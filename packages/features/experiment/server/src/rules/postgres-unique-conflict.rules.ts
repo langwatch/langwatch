@@ -1,12 +1,5 @@
 /**
  * Reading a Postgres unique-constraint violation out of a driver error.
- *
- * Two experiment writes race on the same unique index — the slug within a
- * project, and the experiment id — and both recover by retrying rather than
- * failing, so both have to recognise the collision. That means knowing
- * P2002 and where the driver puts the column names: the shape below is
- * Prisma's, and it differs between the classic client and the driver
- * adapter, which is why the targets look in two places.
  */
 
 import { z } from "zod";

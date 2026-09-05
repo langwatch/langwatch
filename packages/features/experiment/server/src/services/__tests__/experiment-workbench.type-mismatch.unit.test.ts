@@ -1,12 +1,7 @@
 /**
+ * The row-type check moved to the repository (`prisma.experiment.repository.ts` throws `ExperimentTypeMismatchError` for a row that is not `EVALUATIONS_V3`), but the workbench service still has to be the one
+ * that hands the refusal on rather than swallowing or repackaging it — a workbench call on any other kind of experiment must reach the caller as the same customer-safe, coded refusal every time.
  * @see specs/experiments-v3/workbench-versioning.feature
- *
- * The row-type check moved to the repository (`prisma.experiment.repository.ts`
- * throws `ExperimentTypeMismatchError` for a row that is not
- * `EVALUATIONS_V3`), but the workbench service still has to be the one that
- * hands the refusal on rather than swallowing or repackaging it — a workbench
- * call on any other kind of experiment must reach the caller as the same
- * customer-safe, coded refusal every time.
  */
 import { HandledError } from "@langwatch/handled-error";
 import { ExperimentTypeMismatchError } from "@langwatch/experiment-contract";

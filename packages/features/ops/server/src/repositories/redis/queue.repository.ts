@@ -303,12 +303,11 @@ redis.call("SREM", dlqIndexKey, groupId)
 return {count, lastError or ""}
 `;
 
-// Re-arm (or drop, when the requested TTL is not positive) the pending-reconcile
-// single-flight marker, but only while the caller still holds it. A marker that
-// lapsed mid-pass may already have been re-acquired by another instance, and
-// extending or dropping that one would put two reconcile passes on the same
-// counter at once — exactly what the marker exists to prevent. GET-then-act is
-// safe only inside a script, where nothing else can run in between.
+// Re-arm (or drop, when the requested TTL is not positive) the pending-reconcile single-flight marker,
+// but only while the caller still holds it. A marker that lapsed mid-pass may already have been
+// re-acquired by another instance, and extending or dropping that one would put two reconcile passes
+// on the same counter at once — exactly what the marker exists to prevent. GET-then-act is safe only
+// inside a script, where nothing else can run in between.
 const RECONCILE_MARKER_TTL_LUA = `
 local markerKey  = KEYS[1]
 local holderToken = ARGV[1]
@@ -319,16 +318,10 @@ if ttlMs <= 0 then return redis.call("DEL", markerKey) end
 return redis.call("PEXPIRE", markerKey, ttlMs)
 `;
 
-// Write the reconciled counter only while this pass still holds the marker.
-//
-// Losing the marker means another pass has started and may already have written
-// a fresher value; a late write from the old pass would put a stale count back.
-// The check and the write have to be one step, so a marker lost between them
-// cannot leave the stale write to land anyway.
+// Write the reconciled counter only while this pass still holds the marker. Losing the marker means another pass has started and may already have written a fresher value; a late write
+// from the old pass would put a stale count back. The check and the write have to be one step, so a marker lost between them cannot leave the stale write to land anyway.
 /**
- * Exported so the fence can be tested against the real script and a real Redis.
- * The reconcile unit suite runs against a fake that models these semantics, and
- * a model cannot fail when the thing it models changes.
+ * Exported so the fence can be tested against the real script and a real Redis. The reconcile unit suite runs against a fake that models these semantics, and a model cannot fail when the thing it models changes.
  */
 export const RECONCILE_WRITE_LUA = `
 local markerKey  = KEYS[1]
@@ -363,14 +356,11 @@ end
 return pruned
 `;
 
-// ── Cached scripts ───────────────────────────────────────────────────
-//
-// EVALSHA, not EVAL: plain EVAL re-transfers and re-hashes the full source on
-// every call, which was measured at ~33% of the prod Redis engine CPU for the
-// queue's own scripts (see `cachedLuaScript.ts`). These ops scripts are larger
-// than they look — each one carries the shared TTL/park helpers — and the bulk
-// paths below run one per group across a whole page, so the same argument
-// applies. A NOSCRIPT miss falls back to EVAL once and warms the node's cache.
+// ── Cached scripts ─────────────────────────────────────────────────── EVALSHA, not EVAL: plain EVAL re-transfers
+// and re-hashes the full source on every call, which was measured at ~33% of the prod Redis engine CPU for the
+// queue's own scripts (see `cachedLuaScript.ts`). These ops scripts are larger than they look — each one carries
+// the shared TTL/park helpers — and the bulk paths below run one per group across a whole page, so the same
+// argument applies. A NOSCRIPT miss falls back to EVAL once and warms the node's cache.
 
 const unblockScript = new CachedLuaScript(UNBLOCK_LUA);
 const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
@@ -403,36 +393,16 @@ const PENDING_RECONCILE_ZCARD_BATCH = 1000;
 
 /**
  * How long the single-flight marker survives without a refresh.
- *
- * The marker is re-armed to this after every index page and every ZCARD batch,
- * so a pass holds it for as long as it runs no matter how long that is — both
- * phases refresh, since collection is itself a paging walk and on a large queue
- * can outlast a lease on its own. It bounds the other direction instead: an
- * instance that dies mid-pass strands the marker for at most this long before
- * another instance may take over.
  */
 const PENDING_RECONCILE_LEASE_MS = 30_000;
 
 /**
  * How long a published drift figure stays readable.
- *
- * Three reconcile cycles (the collector runs one per minute). The value has to
- * outlive the gap between passes or every instance would read null for most of
- * the minute, and it has to expire or a queue whose reconcile has stopped
- * entirely would pin its last drift on the dashboard forever. Expiring is the
- * safer end of that trade: a missing figure reads as "unknown" and drops out of
- * the aggregate, where a stale one reads as a live measurement.
  */
 const PENDING_DRIFT_TTL_MS = 180_000;
 
 /**
  * How long the keyspace sweep waits once it has nothing left to adopt.
- *
- * At that point every group is in the pending index and the sweep is a backstop
- * against a writer nobody noticed was missing, so it can be rare. While it is
- * still adopting — through a rollout, or on a queue that predates the index — it
- * runs every pass instead, which is what this reconcile cost before the index
- * existed. See {@link QueueRedisRepository.sweepKeyspaceForGroups}.
  */
 const PENDING_RECONCILE_SWEEP_BACKSTOP_MS = 60 * 60 * 1000;
 
@@ -478,16 +448,6 @@ export class QueueRedisRepository extends QueueRepository {
   /**
    * Run a pipeline of cached scripts, re-running any entry the node had no
    * cached copy of.
-   *
-   * `queue()` sends EVALSHA with no fallback of its own — a queued command
-   * cannot retry itself — so a node whose script cache is cold (restart,
-   * SCRIPT FLUSH, or the first call against a fresh cluster node) fails EVERY
-   * entry in the batch with NOSCRIPT. These are the bulk operator paths, so
-   * without this a "drain everything" would report zero drained and quietly do
-   * nothing. Re-running through `run()` both completes the work and loads the
-   * source for later calls.
-   *
-   * Returns the same `[err, value]` tuples `pipeline.exec()` does.
    */
   static async execWithNoScriptRecovery({
     pipeline,
@@ -581,14 +541,11 @@ export class QueueRedisRepository extends QueueRepository {
     const totalPendingKey = `${prefix}stats:total-pending`;
     const parkedTenantsKey = `${prefix}parked-tenants`;
 
-    // Sample BOTH ends of the ready zset. The zset is scored by dispatch
-    // eligibility, so its ends hold the two distinct stuck-group classes: the
-    // high end is the most-deferred groups (in-flight, retry backoff — where a
-    // failing group hides between attempts), the low end is the most-eligible
-    // ones (an old due head the dispatcher is starving). A single-ended
-    // ZREVRANGE sampled only the deferred end, so an aged eligible backlog past
-    // `limit` never appeared in the dashboard at all. When the zset fits in
-    // `limit` the two ranges coincide and dedup makes this identical to before.
+    // Sample BOTH ends of the ready zset. The zset is scored by dispatch eligibility, so its ends hold the two distinct
+    // stuck-group classes: the high end is the most-deferred groups (in-flight, retry backoff — where a failing group hides
+    // between attempts), the low end is the most-eligible ones (an old due head the dispatcher is starving). A single-ended
+    // ZREVRANGE sampled only the deferred end, so an aged eligible backlog past `limit` never appeared in the dashboard at all.
+    // When the zset fits in `limit` the two ranges coincide and dedup makes this identical to before.
     const [
       readyCount,
       blockedCount,
@@ -787,11 +744,9 @@ export class QueueRedisRepository extends QueueRepository {
   // ── Job Browsing ────────────────────────────────────────────────
 
   /**
-   * The payload size to DISPLAY for a staged value: the encoder-recorded
-   * `header.s` when present, and null when the value cannot say. Deliberately
-   * not `readJobPayloadBytes`, whose
-   * "unknown is worth the cap" sentinel is a batch-budget rule — rendered on
-   * a job card it would read as a 50 MB payload that isn't one.
+   * The payload size to DISPLAY for a staged value: the encoder-recorded `header.s` when present, and null when the
+   * value cannot say. Deliberately not `readJobPayloadBytes`, whose "unknown is worth the cap" sentinel is a
+   * batch-budget rule — rendered on a job card it would read as a 50 MB payload that isn't one.
    */
   private readDisplayPayloadBytes(raw: string): number | null {
     try {
@@ -992,10 +947,6 @@ export class QueueRedisRepository extends QueueRepository {
 
   /**
    * One queue's over-cap tenants.
-   *
-   * The registry holds one entry per OVER-CAP TENANT, not per parked group, so
-   * this stays cheap even when parked DEPTH is in the hundreds of thousands —
-   * which is exactly the case the dashboard has to explain.
    */
   private async parkedTenantsForQueue(queueName: string): Promise<ParkedTenant[]> {
     const prefix = `${queueName}:gq:`;
@@ -1031,9 +982,8 @@ export class QueueRedisRepository extends QueueRepository {
   }
 
   /**
-   * Age comes from each tenant's head parked group's oldest job. The head is
-   * the tenant's most dispatch-eligible parked group, and parking preserves the
-   * score it held in ready, so this is the closest available answer to "how
+   * Age comes from each tenant's head parked group's oldest job. The head is the tenant's most dispatch-eligible
+   * parked group, and parking preserves the score it held in ready, so this is the closest available answer to "how
    * long has this tenant been waiting" without walking every parked group.
    */
   private async oldestJobPerTenant({
@@ -1261,11 +1211,10 @@ export class QueueRedisRepository extends QueueRepository {
     return this.redis.smembers(`${params.queueName}:gq:paused-jobs`);
   }
 
-  // Tenant pause: encoded as a special "tenant:<id>" entry in the same
-  // paused-jobs SET that DISPATCH_BATCH_LUA already consults. The Lua dispatcher
-  // extracts the tenantId from each groupId (everything before the first
-  // "/") and checks SISMEMBER for "tenant:<id>". Added post-2026-05-11
-  // incident so an operator can halt ALL processing for a runaway tenant
+  // Tenant pause: encoded as a special "tenant:<id>" entry in the same paused-jobs SET that
+  // DISPATCH_BATCH_LUA already consults. The Lua dispatcher extracts the tenantId from each
+  // groupId (everything before the first "/") and checks SISMEMBER for "tenant:<id>". Added
+  // post-2026-05-11 incident so an operator can halt ALL processing for a runaway tenant
   // without touching pipeline keys. See specs/queue-pausing/.
   static readonly TENANT_PAUSE_PREFIX = "tenant:";
 
@@ -1291,30 +1240,11 @@ export class QueueRedisRepository extends QueueRepository {
     return all.filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length));
   }
 
-  // Bulk-drain every group whose ID starts with "<tenantId>/" for the given
-  // queue, optionally narrowed by a substring filter on the groupId.
-  // Returns the total group count and total job count drained.
-  // Added post-2026-05-11 incident — clicking 500K Drain buttons by hand
-  // wasn't feasible.
-  //
-  // `groupIdContains`: optional plain-text fragment that the groupId
-  // must contain in addition to starting with `<tenantId>/`. Use this to
-  // scope a drain to part of a tenant's groups — for example:
-  //   - "/fold/traceSummary/" → drop only that fold's groups
-  //   - "/reactor/customEvaluationSync/" → drop only this subscriber's groups
-  //   - "/map/spanStorage/" → drop only the span-storage map groups
-  // Honest substring semantics (matches the operator's mental model of
-  // what they see in the Groups table): no fancy resolution to pipeline
-  // names — those live in job data which would require an HGET per group
-  // and dominate the latency. Document the groupId shape so operators
-  // know what to type.
-  //
-  // Performance: ZSCAN pages 1000 groupIds at a time, then ALL matching
-  // DRAIN_GROUP_LUA EVALs for that page are issued as a single Redis
-  // pipeline. At 500K groups → ~500 page round-trips instead of 500,000
-  // sequential ones. The PR-#3970 production drain of 507K groups took
-  // 4 min via a similar pipelined approach; the previous one-at-a-time
-  // shape would have been ~tens of minutes through TLS+ElastiCache.
+  // Bulk-drain every group whose ID starts with "<tenantId>/" for the given queue, optionally narrowed
+  // by a substring filter on the groupId. Returns the total group count and total job count drained.
+  // Added post-2026-05-11 incident — clicking 500K Drain buttons by hand wasn't feasible.
+  // `groupIdContains`: optional plain-text fragment that the groupId must contain in addition to
+  // starting with `<tenantId>/`. Use this to scope a drain to part of a tenant's groups — for example:
   async drainTenant(params: {
     queueName: string;
     tenantId: string;
@@ -1579,10 +1509,9 @@ export class QueueRedisRepository extends QueueRepository {
   }
 
   /**
-   * Redrive an explicit set of DLQ groups. The list comes from what the
-   * operator's filter SHOWED, so acting on ids rather than re-evaluating a
-   * filter server-side means the confirmation and the act cover the same
-   * groups (specs/ops/dead-letter-recovery.feature).
+   * Redrive an explicit set of DLQ groups. The list comes from what the operator's filter
+   * SHOWED, so acting on ids rather than re-evaluating a filter server-side means the
+   * confirmation and the act cover the same groups (specs/ops/dead-letter-recovery.feature).
    */
   async redriveManyFromDlq(params: {
     queueName: string;
@@ -1619,10 +1548,9 @@ export class QueueRedisRepository extends QueueRepository {
   }
 
   /**
-   * Run one Lua script over an explicit group-id list, batched into pipelines.
-   * Shared by the two explicit-id recovery paths, which differ only in their
-   * script, their key arity and what they count. Errored replies are skipped
-   * — a group that failed its script simply does not count as acted on.
+   * Run one Lua script over an explicit group-id list, batched into pipelines. Shared by the two
+   * explicit-id recovery paths, which differ only in their script, their key arity and what they count.
+   * Errored replies are skipped — a group that failed its script simply does not count as acted on.
    */
   private async runOverDlqGroups(params: {
     groupIds: string[];
@@ -1649,10 +1577,9 @@ export class QueueRedisRepository extends QueueRepository {
   }
 
   /**
-   * Discard an explicit set of DLQ groups: their jobs never run again. The
-   * substrate forgets DLQ entries at their TTL anyway, so the durable record
-   * is the audit row the service writes from what this returns — per-group
-   * job counts and a sample of the last errors.
+   * Discard an explicit set of DLQ groups: their jobs never run again. The substrate forgets
+   * DLQ entries at their TTL anyway, so the durable record is the audit row the service
+   * writes from what this returns — per-group job counts and a sample of the last errors.
    */
   async discardManyFromDlq(params: { queueName: string; groupIds: string[] }): Promise<{
     discardedCount: number;
@@ -1973,14 +1900,6 @@ export class QueueRedisRepository extends QueueRepository {
 
   /**
    * Reconcile the total-pending counter against the live ground truth.
-   *
-   * Dispatch, worker death, TTL expiry and DLQ moves can leave the metadata
-   * counter above the authoritative sum of live job zsets. This method repairs
-   * that read-only metric without affecting dispatch correctness.
-   *
-   * One holder computes per window. It keeps the marker for the whole scan,
-   * then shortens it to the remainder of the interval. Concurrent dispatch may
-   * cause small drift during the final write; the next cycle repairs it.
    */
   async tryReconcileTotalPending(
     queueName: string,
@@ -2009,13 +1928,11 @@ export class QueueRedisRepository extends QueueRepository {
       const raw = await this.redis.get(counterKey);
       const counter = Math.max(0, parseInt(raw ?? "0", 10) || 0);
 
-      // Collection is itself a paging walk, so it re-arms the lease as it goes.
-      // Without that a pass on a large queue could spend its whole lease before
-      // the first ZCARD batch and lose the marker to another instance mid-pass.
-      //
-      // Losing it aborts the pass. A pass that no longer holds the marker cannot
-      // know whether a newer one has already written, so anything it computed is
-      // a candidate for overwriting fresher state with staler state.
+      // Collection is itself a paging walk, so it re-arms the lease as it goes. Without that a
+      // pass on a large queue could spend its whole lease before the first ZCARD batch and lose
+      // the marker to another instance mid-pass. Losing it aborts the pass. A pass that no
+      // longer holds the marker cannot know whether a newer one has already written, so anything
+      // it computed is a candidate for overwriting fresher state with staler state.
       const refreshLease = async (): Promise<boolean> =>
         await this.setReconcileMarkerTtl({
           markerKey,
@@ -2037,13 +1954,11 @@ export class QueueRedisRepository extends QueueRepository {
 
       const drift = counter - groundTruth;
 
-      // Fenced write: a pass that lost the marker must not put its count back
-      // over a newer pass's. `0` means the marker moved on, so this pass reports
-      // nothing rather than a result it did not manage to publish.
-      //
-      // The drift goes out under the same fence as the counter it describes.
-      // Publishing it separately would let a pass write the counter, lose the
-      // marker, and still announce a drift for a count it did not land.
+      // Fenced write: a pass that lost the marker must not put its count back over a newer
+      // pass's. `0` means the marker moved on, so this pass reports nothing rather than a result
+      // it did not manage to publish. The drift goes out under the same fence as the counter it
+      // describes. Publishing it separately would let a pass write the counter, lose the marker,
+      // and still announce a drift for a count it did not land.
       const wrote = await reconcileWriteScript.run(
         this.redis,
         3,
@@ -2109,27 +2024,6 @@ export class QueueRedisRepository extends QueueRepository {
 
   /**
    * Collect the ids of every group that can be holding a pending job.
-   *
-   * Deliberately not a keyspace SCAN: SCAN walks every key in the database
-   * regardless of MATCH, so the cost of a pass would track the size of the whole
-   * Redis instance rather than the number of groups in this queue.
-   *
-   * The authority is `pending-groups`, written atomically with every job insert
-   * (see PENDING_INDEX_HELPER_LUA). It is read as a single index, so no group can
-   * slip between two reads the way it can between the lifecycle indexes.
-   *
-   * The lifecycle indexes are still read, and cover the groups the index does not
-   * yet know about: everything staged before it existed, and everything staged by
-   * a pod on the previous release while a rollout is in progress. Those groups are
-   * still exposed to the sequential-read race the index exists to remove, so any
-   * id found there is written into the index as it is read. One observation is
-   * enough — from then on the group is counted from the index and is immune,
-   * which bounds the exposure at "until first seen" rather than "until drained".
-   *
-   * The legs can be dropped once no queue predates the index and no pod predates
-   * the writers.
-   *
-   * Returns null when the pass lost its single-flight marker partway.
    */
   private async collectPendingGroupIds(params: {
     prefix: string;
@@ -2208,16 +2102,8 @@ export class QueueRedisRepository extends QueueRepository {
   }
 
   /**
-   * Adopt groups the lifecycle indexes know about but the pending index does not.
-   *
-   * Until a group is in the index it is counted by reading the lifecycle indexes
-   * in sequence, and a group moving between them mid-read can be missed. Writing
-   * it in on first sight closes that for every later pass.
-   *
-   * Returns false when the lease was lost, which aborts the pass: this runs
-   * inside the pass's marker and can span several round trips, so it has to hold
-   * the lease like every other phase rather than run on a marker that has since
-   * moved to another instance.
+   * Adopt groups the lifecycle indexes know about but the pending index does
+   * not.
    */
   private async backfillPendingIndex(params: {
     prefix: string;
@@ -2247,23 +2133,6 @@ export class QueueRedisRepository extends QueueRepository {
   /**
    * Walk the keyspace for `group:<id>:jobs` keys and adopt every group into the
    * pending index.
-   *
-   * This is the one enumeration that cannot miss a group: it reads key existence,
-   * so a group is found whatever lifecycle index it is in and however it moves
-   * between them. That is what makes it the right tool for the groups the index
-   * does not know about — everything staged before the index existed, and
-   * everything staged by a pod on the previous release during a rollout. Reading
-   * the lifecycle indexes cannot cover those safely, and adopting on sight only
-   * helps a group the pass actually saw.
-   *
-   * It is also the expensive one — SCAN walks every key in the database
-   * regardless of MATCH — which is why it is not how the counter is normally
-   * enumerated. It runs when the queue has groups the index has not learned yet
-   * (so, repeatedly through a rollout, at the cost this reconcile had before the
-   * index existed and no more) and drops back to a slow backstop cadence once a
-   * sweep finds nothing new to adopt.
-   *
-   * Returns null when the lease was lost.
    */
   private async sweepKeyspaceForGroups(params: {
     prefix: string;
@@ -2303,10 +2172,6 @@ export class QueueRedisRepository extends QueueRepository {
 
   /**
    * Whether a keyspace sweep is due.
-   *
-   * Due when one has never run, or when the stored due time has passed. The due
-   * time is written by {@link recordSweepOutcome}, which keeps sweeping every
-   * pass while sweeps are still finding groups to adopt.
    */
   private async isKeyspaceSweepDue(prefix: string): Promise<boolean> {
     const raw = await this.redis.get(`${prefix}${SWEEP_DUE_KEY_SUFFIX}`);
@@ -2317,22 +2182,6 @@ export class QueueRedisRepository extends QueueRepository {
 
   /**
    * Schedule the next keyspace sweep from what this one adopted.
-   *
-   * Adopting something means the index is still behind — a rollout is in flight,
-   * or the queue predates the index — so the next pass sweeps again, which costs
-   * what this reconcile cost before the index existed and no more. Adopting
-   * nothing means the index is complete, and the sweep drops back to a slow
-   * backstop that only has to catch a writer nobody has noticed is missing.
-   *
-   * `adopted` counts what the SWEEP found unindexed, not everything the pass
-   * adopted. The lifecycle legs also turn up unindexed ids, but they include
-   * groups that hold no jobs at all — a drained group still listed in `ready` or
-   * `blocked` is adopted, pruned for being empty, and found again next pass.
-   * Counting those would answer "sweep again" forever and pin the queue to the
-   * expensive walk on a group with no pending work to find.
-   *
-   * Only ever called by a pass that swept. Calling it otherwise moves the
-   * deadline without the walk that earns it, and the sweep stops coming due.
    */
   private async recordSweepOutcome(params: { prefix: string; adopted: number }): Promise<void> {
     const nextDueAt =
@@ -2342,9 +2191,6 @@ export class QueueRedisRepository extends QueueRepository {
 
   /**
    * Page one index into `into`, re-arming the lease after each page.
-   *
-   * Returns false when the lease was lost, which aborts the pass: a pass that no
-   * longer owns the marker must not go on to publish a count.
    */
   private async collectIndexMembers(params: {
     key: string;
@@ -2372,14 +2218,6 @@ export class QueueRedisRepository extends QueueRepository {
   /**
    * Sum ZCARD over the collected keys in batches, re-arming the single-flight
    * lease between batches so a long pass keeps its hold.
-   *
-   * Returns null if any pipeline entry errors, if the whole batch fails, or if
-   * the lease was lost — a flaky ZCARD must never write a partial under-count as
-   * ground truth, and a pass that lost the marker must not write at all. The next
-   * cycle retries.
-   *
-   * Also reports the keys observed empty, which the caller may prune from the
-   * pending index.
    */
   private async sumPendingJobs(params: {
     jobsKeys: string[];
@@ -2402,9 +2240,6 @@ export class QueueRedisRepository extends QueueRepository {
 
   /**
    * ZCARD one batch of keys in a single round trip.
-   *
-   * Returns null on any failure — whole-batch or single-entry — so the caller
-   * abandons the pass rather than folding a shortfall into the total.
    */
   private async countOneBatch(
     jobsKeys: string[],
@@ -2444,10 +2279,6 @@ export class QueueRedisRepository extends QueueRepository {
 
   /**
    * Drop groups this pass observed empty from the pending index.
-   *
-   * Best-effort and never fatal: the index is allowed to over-report, so a failed
-   * prune costs a few wasted ZCARDs on later passes and nothing else. The script
-   * re-reads each zset atomically, so a group staged since the observation stays.
    */
   private async prunePendingIndex(params: {
     prefix: string;
@@ -2487,11 +2318,6 @@ export class QueueRedisRepository extends QueueRepository {
   /**
    * Re-arm the single-flight marker this pass holds, or drop it when the
    * requested TTL has already run out.
-   *
-   * Returns whether this pass still owned the marker. A false is the signal to
-   * abort: the marker has moved to another instance, so anything this pass went
-   * on to write could overwrite fresher state. An error reports the same way —
-   * being unable to prove ownership is not the same as holding it.
    */
   private async setReconcileMarkerTtl(params: {
     markerKey: string;

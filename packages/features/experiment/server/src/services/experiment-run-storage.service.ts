@@ -1,10 +1,7 @@
 /**
- * Everything a run writes to ClickHouse and the evaluation pipeline as it
- * executes: the run-started/run-completed dispatches, and the per-event
- * `record` that mirrors each target and evaluator result. Also owns the
- * per-(row, target) caches Phase 2 comparison cells read (outputs, scores,
- * which keys this run actually produced) and the traceId lookup evaluator
- * results reference.
+ * Everything a run writes to ClickHouse and the evaluation pipeline as it executes: the run-started/run-completed dispatches, and the
+ * per-event `record` that mirrors each target and evaluator result. Also owns the per-(row, target) caches Phase 2 comparison cells read
+ * (outputs, scores, which keys this run actually produced) and the traceId lookup evaluator results reference.
  */
 
 import { generate } from "@langwatch/ksuid";

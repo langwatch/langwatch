@@ -1,20 +1,7 @@
 /**
+ * Moved from `organization.setMemberDisabled.integration.test.ts` on platform/app. That file drove its assertions through the deleted `appRouter`, the authz engine's `permissions.getDecision`, and the license seat-counting service — none of which this package owns any more (the seat counter moved to `@langwatch/entitlement-server`, the permission decision to the authz package). What is left as this repository's own invariant is the disable/re-enable write itself: it flips `disabledAt` without touching role or department, and it refuses to take the last active admin down.
  * @vitest-environment node
- *
  * @see specs/licensing/seat-reconciliation.feature
- *
- * Moved from `organization.setMemberDisabled.integration.test.ts` on
- * platform/app. That file drove its assertions through the deleted
- * `appRouter`, the authz engine's `permissions.getDecision`, and the license
- * seat-counting service — none of which this package owns any more (the
- * seat counter moved to `@langwatch/entitlement-server`, the permission
- * decision to the authz package). What is left as this repository's own
- * invariant is the disable/re-enable write itself: it flips `disabledAt`
- * without touching role or department, and it refuses to take the last
- * active admin down.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it so the
- * suite stays runnable on a box with no database.
  */
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";

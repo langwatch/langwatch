@@ -42,23 +42,11 @@ import type {
 import { API_VERSION_HEADER, assertVersionLabel, VERSION_PREVIEW } from "./types.js";
 import { type RegistrationEvent, resolveVersions } from "./versioning.js";
 
-// ---------------------------------------------------------------------------
-// Handler shapes
-//
-// The handler signature is positional: `(c, input)` — the Hono context and the
-// validated input. REST path, query and body fields are normalized into that
-// argument. Provided services remain typed context variables; SSE query stays
-// on context because the stream is its second argument.
-//
-// A note on typing honesty: `input` is declared on the definition chain, which
-// is the argument AFTER the handler — and TypeScript checks arguments in
-// order, so the chain cannot flow back into the handler's parameter type (the
-// compiler checks the handler body before it infers from `define`). Annotate
-// the handler parameter (or delegate to a typed domain function) for a typed
-// `input`; the declared schema is always the runtime guarantee. An endpoint
-// registered without a chain gets `input: undefined` — that one IS enforced by
-// the no-chain overloads below.
-// ---------------------------------------------------------------------------
+// Handler shapes The handler signature is positional: `(c, input)` — the Hono context and the validated input. REST path, query and body fields are normalized into that argument.
+// Provided services remain typed context variables; SSE query stays on context because the stream is its second argument. A note on typing honesty: `input` is declared on the definition
+// chain, which is the argument AFTER the handler — and TypeScript checks arguments in order, so the chain cannot flow back into the handler's parameter type (the compiler checks the
+// handler body before it infers from `define`). Annotate the handler parameter (or delegate to a typed domain function) for a typed `input`; the declared schema is always the runtime
+// guarantee. An endpoint registered without a chain gets `input: undefined` — that one IS enforced by the no-chain overloads below.
 
 /**
  * Contextual handler shape. The inferred `THandler` retains whether the author
@@ -96,10 +84,6 @@ type SseHandler<TVariables extends Record<string, unknown>, TApp> = (
 
 /**
  * Fluent builder for constructing a versioned Hono service.
- *
- * @typeParam TProject - The project type provider factories see as `base.project`.
- * @typeParam TVariables - The context variable map: `EndpointVariables` widened
- *   by each `.provide()` call, so `c.get("things")` is typed in every handler.
  */
 class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp = unknown> {
   private readonly _config: ServiceConfig<TApp>;
@@ -149,9 +133,8 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
     >(this._config, { ...this._providers, ...providers }, [...this._events], this._defaults);
   }
 
-  // -- service-level defaults (ADR 001 §4) -----------------------------------
-  //
-  // A `.withX()` on the service builder is the default for every endpoint.
+  // -- service-level defaults (ADR 001 §4) ----------------------------------- A
+  // `.withX()` on the service builder is the default for every endpoint.
   // Endpoint-level re-declaration wins; `withMiddleware` stacks (service
   // middleware runs first); `withAuth` keeps its override semantics including
   // `"none"`; `withCache` / `withRateLimit` have per-endpoint opt-outs.
@@ -264,10 +247,9 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
   }
 
   /**
-   * A registrar sharing a chain across endpoints (ADR 001 §5). Dotted names
-   * registered through the group are prefixed with the group's name and
-   * grammar-checked on the full name; `registerRoute` paths are used as-is.
-   * Groups do not nest and carry no version.
+   * A registrar sharing a chain across endpoints (ADR 001 §5). Dotted names registered
+   * through the group are prefixed with the group's name and grammar-checked on the full
+   * name; `registerRoute` paths are used as-is. Groups do not nest and carry no version.
    */
   group(
     name: string,
@@ -619,11 +601,6 @@ class GroupRegistrar<TVariables extends Record<string, unknown>, TApp = unknown>
 
 /**
  * The sealed author-facing surface for modern REST services.
- *
- * It deliberately exposes no provider composition: process composition
- * happens before a REST service is handed to a transport.
- * Endpoint schemas come before their handler so TypeScript can derive both
- * handler input and result types from the Zod 4 schemas.
  */
 export interface RestService<
   TApp = unknown,

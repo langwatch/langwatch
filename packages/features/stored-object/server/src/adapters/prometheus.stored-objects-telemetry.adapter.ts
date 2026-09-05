@@ -1,10 +1,5 @@
 /**
  * The five series the content-addressed store publishes, on Prometheus.
- *
- * The names are the ones the platform application registered, unchanged: a
- * dashboard or alert reading `stored_object_write_failures_total` keeps
- * reading the same counter after the store moved processes, which is the whole
- * point of moving the definitions with the code that increments them.
  */
 import { Counter, Histogram, register } from "prom-client";
 import { StoredObjectsTelemetryPort } from "../ports/stored-objects-telemetry.port";

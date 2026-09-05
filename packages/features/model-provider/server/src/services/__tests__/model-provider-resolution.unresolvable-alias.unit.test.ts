@@ -1,20 +1,7 @@
 /**
+ * ("Exhaustion caused by an unresolvable latest-alias still reports 'nothing
+ * configured'")
  * @see specs/model-providers/model-default-config-cascade.feature
- *   ("Exhaustion caused by an unresolvable latest-alias still reports
- *   'nothing configured'")
- *
- * Pure-logic unit test for the OTHER exhaustion cause the resolver must
- * keep distinct from a restricted-model refusal: a `<provider>/latest`
- * alias that cannot resolve to any concrete model in the current catalog.
- * Conflating the two would tell a user to change a model-restriction
- * setting that isn't their actual problem.
- *
- * The real catalog always resolves a live `<provider>/latest` for the
- * providers `resolveLatestAlias` supports, so `isLatestAlias` /
- * `expandLatestAlias` are mocked to force the unresolvable branch
- * deterministically — asserting against the live catalog's current
- * contents would be brittle, since the catalog changes independently of
- * this behavior.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -49,7 +36,12 @@ function resolver() {
     },
     catalog: {
       defaultFeatures: () => [
-        { key: PLAYGROUND, role: "DEFAULT", displayName: PLAYGROUND, description: "the playground" },
+        {
+          key: PLAYGROUND,
+          role: "DEFAULT",
+          displayName: PLAYGROUND,
+          description: "the playground",
+        },
       ],
     },
     scopes: {

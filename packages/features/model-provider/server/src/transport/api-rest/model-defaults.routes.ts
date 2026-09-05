@@ -23,19 +23,16 @@ import {
 const logger = createLogger("langwatch:api:model-defaults");
 
 /**
- * The service authorizes each named scope against the key's OWNING USER, so
- * the key's own grants capped nothing: a read-only key minted for CI could
- * repoint the organization's models. The ceiling is checked at the project the
- * credential resolved to; a legacy project key keeps its full access.
+ * The service authorizes each named scope against the key's OWNING USER, so the key's own grants
+ * capped nothing: a read-only key minted for CI could repoint the organization's models. The ceiling
+ * is checked at the project the credential resolved to; a legacy project key keeps its full access.
  */
 const MODEL_DEFAULTS_WRITE_PERMISSION = "project:manage" as const;
 
 /**
- * Uniform error mapping for the default-model write handlers: a typed
- * HTTPException (e.g. the 404 orphan-config ownership backstop) and any
- * HandledError (the app's onError serialises those with their own status
- * and code) pass through untouched, any other Error collapses to a 400,
- * and non-Error throwables re-throw as-is.
+ * Uniform error mapping for the default-model write handlers: a typed HTTPException (e.g. the 404 orphan-config
+ * ownership backstop) and any HandledError (the app's onError serialises those with their own status and code)
+ * pass through untouched, any other Error collapses to a 400, and non-Error throwables re-throw as-is.
  */
 function rethrowModelDefaultsWriteError(err: unknown): never {
   if (err instanceof HTTPException) throw err;

@@ -11,31 +11,14 @@ const logger = createLogger("langwatch:modelProviders:aiCall");
 
 /**
  * Legacy wire-format discriminator carried on the tRPC `data.cause` sidecar.
- *
  * @deprecated NOT the error's code — the code is `ai_call_failed`, which is
- * what `APP_ERROR_CODES` enumerates and what the presentation registry writes
- * copy for. This constant survives for one consumer:
- * `src/utils/trpcError.ts::extractAiCallFailedInfo`, fed by the bespoke
- * `aiCallFailedCause` block in `src/server/api/trpc.ts`. New code reads
- * `error.code`.
  */
 export const AI_CALL_FAILED_CAUSE = "AI_CALL_FAILED" as const;
 
 /**
- * Thrown when a downstream AI call fails for a reason that is NOT "no model is
- * configured" — the provider returned 401 on a stale key, the registered
- * custom model id no longer exists, the SDK threw parsing a malformed
- * response.
- *
- * A `HandledError` carrying the enumerated `ai_call_failed` code: the words a
- * customer reads come from the code-keyed presentation registry, never from
- * the provider. `fault` is `provider` because the model was asked and did not
- * answer usably; `httpStatus` stays 400 so the failure keeps reading as
- * user-actionable ("check your model configuration") rather than as a server
- * fault monitoring and retry policies should react to.
- *
- * Distinct from `model_not_configured`: that one says "you have nothing set".
- * This one says "you have something set, but it didn't work".
+ * Thrown when a downstream AI call fails for a reason that is NOT "no model is configured"
+ * — the provider returned 401 on a stale key, the registered custom model id no longer
+ * exists, the SDK threw parsing a malformed response.
  */
 export class AiCallFailedError extends HandledError {
   declare readonly code: "ai_call_failed";
@@ -51,13 +34,6 @@ export class AiCallFailedError extends HandledError {
     public readonly featureDisplayName: string,
     /**
      * The provider's / SDK's own sentence.
-     *
-     * SERVER-SIDE ONLY. It is a raw upstream string — deployment names,
-     * endpoint hosts, fragments of the response body, sometimes a credential
-     * echoed back — so it is deliberately absent from `message` (which the
-     * REST boundary ships verbatim), from `meta` (the client contract) and
-     * from {@link toResponseBody}. `wrapAiCall` logs it; that is where
-     * internals belong.
      */
     public readonly originalErrorMessage: string,
   ) {
@@ -96,13 +72,9 @@ export class AiCallFailureService {
   private constructor() {}
 
   /**
-   * Wraps a function performing an AI call (generateText, embeddings,
-   * stream, etc.) so a failure the caller cannot name rethrows as a typed
-   * `AiCallFailedError` carrying the feature context.
-   * `ModelNotConfiguredError` and `ModelProviderDisabledError` pass through
-   * untouched — both are raised by model resolution, which now happens inside
-   * the wrapped call, and each has its own remediation copy the generic
-   * ai_call_failed message would bury.
+   * Wraps a function performing an AI call (generateText, embeddings, stream, etc.) so a failure the caller cannot name rethrows as a typed `AiCallFailedError`
+   * carrying the feature context. `ModelNotConfiguredError` and `ModelProviderDisabledError` pass through untouched — both are raised by model resolution, which now
+   * happens inside the wrapped call, and each has its own remediation copy the generic ai_call_failed message would bury.
    */
   async wrapAiCall<T>(
     feature: { key: string; role: ModelRole; displayName: string },

@@ -1,38 +1,9 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
 
 /**
- * The access decision for a single HTTP route. Every route mounted through the
- * secured app builder must declare exactly one of these — that is the whole
- * point: the access decision is a mandatory, reviewable property of the route,
- * not a positional middleware a developer can forget.
- *
- *   - permission       — the caller's credential must hold this RBAC permission
- *                        at the app's scope (project or organization).
- *   - apiKeyPermission — like `permission`, but enforced through the API-key
- *                        ceiling: legacy project API keys retain full access
- *                        while scoped API keys must hold the permission.
- *                        Use for the public REST surface (gateway-platform,
- *                        governance) so the registry records the real
- *                        permission instead of a blanket "any authenticated".
- *   - projectPermission — for org apps addressing one project: the permission
- *                        is resolved at the scope of the project named in the
- *                        route, not the organization. An org-wide grant still
- *                        passes (org bindings are ancestors of project scope);
- *                        a team- or project-scoped grant reaches only the
- *                        projects it was actually given.
- *   - teamPermission    — the same idea one tier up: for org apps addressing
- *                        one team, the permission is resolved at that team's
- *                        scope, so a team-scoped grant reaches only its own
- *                        team.
- *   - anyAuthenticated — any valid credential for the app's scope; no specific
- *                        permission. Use sparingly and only when the handler
- *                        itself does no privileged read/write.
- *   - public           — intentionally unauthenticated (health probes, OAuth
- *                        handshakes, share links). The reason is mandatory and
- *                        surfaces in the route registry for review.
- *   - internal         — service-to-service, authenticated by a shared secret
- *                        or signature rather than an RBAC credential (collector,
- *                        cron, gateway-internal, webhooks). Reason mandatory.
+ * The access decision for a single HTTP route. Every route mounted through the secured app builder
+ * must declare exactly one of these — that is the whole point: the access decision is a mandatory,
+ * reviewable property of the route, not a positional middleware a developer can forget.
  */
 export type AccessPolicy =
   | { readonly kind: "permission"; readonly permission: AuthzPermission }
@@ -63,18 +34,6 @@ export type AccessPolicy =
       readonly permissions: readonly AuthzPermission[];
       /**
        * What kind of credential reaches this route:
-       *
-       *   apiKey   — a project/personal API key (what SDKs, the CLI and the
-       *              Langy assistant carry)
-       *   session  — a browser session cookie only
-       *   both     — either is accepted
-       *   internal — a shared secret or signature, not a user credential
-       *
-       * Mandatory for the same reason `permissions` is. It exists so that
-       * "can an API key even reach this route?" is a property of the route
-       * rather than a curated list of paths kept somewhere else — the audits
-       * that need the answer were maintaining their own path lists, which
-       * silently misclassify a route the moment one is added or renamed.
        */
       readonly credential: HandlerCredential;
     };
@@ -84,18 +43,6 @@ export type HandlerCredential = "apiKey" | "session" | "both" | "internal";
 
 /**
  * Which credential an API consumer presents to reach a route.
- *
- * Narrower than {@link HandlerCredential}, and the difference is the point:
- * this answers "which key do I send", and the two API-key families are not
- * interchangeable. An organization key reaches organization routes and, with
- * `X-Project-Id`, project routes too; a project key can never reach an
- * organization route: `resolveOrgOnly` never resolves one, so authentication
- * fails before any permission is consulted and no grant on the key makes a
- * difference. Getting that wrong costs an afternoon, so it is a property of
- * the route rather than something to infer from the path.
- *
- * A route that also accepts a browser session still publishes its key class:
- * the session is not something an integrator can send.
  */
 export type CredentialClass =
   | "project_api_key"
@@ -121,20 +68,6 @@ export type CredentialClass =
 /**
  * The credential class a route reaches by, from the app it is mounted on and
  * the policy it declares.
- *
- * Derived rather than declared per route, because the app already decides it
- * for every route but one kind: a handler-managed route can opt out of its
- * app's family, and that is the only thing this has to read from the policy.
- *
- * The pair worth spelling out is a handler on a **service** app that says it
- * accepts an API key, which is what the receiver surface is: the collector,
- * the three OTLP signals, annotations, legacy traces and evaluations all sit
- * on a service app and resolve `X-Auth-Token` themselves. There are only two
- * key families, and the organization one exists only where an organization is
- * resolved, so a handler resolving a key on an app that resolves neither is
- * resolving a project key. Falling through to the service app's own answer,
- * `internal`, would say those routes take a shared secret, which is exactly
- * backwards for the most widely integrated endpoints we have.
  */
 export function credentialClassFor({
   scope,
@@ -192,12 +125,9 @@ export function requires<P extends AuthzPermission>(
 }
 
 /**
- * Require an RBAC permission through the API-key ceiling. Legacy project API
- * keys bypass the ceiling (full access — the historical behaviour of project
- * keys); scoped API keys must satisfy `effective = ApiKey ∩ user` for
- * the permission at the project scope. This is the public REST surface's
- * equivalent of `requires(...)`, kept distinct so the registry records that
- * the gate is the API-key ceiling rather than a strict role check.
+ * Require an RBAC permission through the API-key ceiling. Legacy project API keys bypass the ceiling (full access — the historical behaviour of
+ * project keys); scoped API keys must satisfy `effective = ApiKey ∩ user` for the permission at the project scope. This is the public REST surface's
+ * equivalent of `requires(...)`, kept distinct so the registry records that the gate is the API-key ceiling rather than a strict role check.
  */
 export function apiKeyPermission<P extends AuthzPermission>(
   permission: P,
@@ -206,10 +136,9 @@ export function apiKeyPermission<P extends AuthzPermission>(
 }
 
 /**
- * Require an RBAC permission at the scope of the project the route addresses,
- * for org apps that operate on one project at a time. `requires(...)` would
- * resolve at organization scope there, so a single org-wide grant would reach
- * every project in the org.
+ * Require an RBAC permission at the scope of the project the route addresses, for org apps
+ * that operate on one project at a time. `requires(...)` would resolve at organization
+ * scope there, so a single org-wide grant would reach every project in the org.
  */
 export function requiresOnProject<P extends AuthzPermission>(
   permission: P,
@@ -227,11 +156,9 @@ export function requiresOnProject<P extends AuthzPermission>(
 }
 
 /**
- * Require an RBAC permission at the scope of the team the route addresses, for
- * org apps that operate on one team at a time. The project twin's reasoning
- * applies unchanged: `requires(...)` resolves at organization scope, so a
- * team-scoped binding could never pass and an org-wide grant reached every
- * team in the org.
+ * Require an RBAC permission at the scope of the team the route addresses, for org apps that operate on one team
+ * at a time. The project twin's reasoning applies unchanged: `requires(...)` resolves at organization scope, so a
+ * team-scoped binding could never pass and an org-wide grant reached every team in the org.
  */
 export function requiresOnTeam<P extends AuthzPermission>(
   permission: P,
@@ -283,13 +210,9 @@ export function internalSecret(reason: string): {
 }
 
 /**
- * The route authenticates and authorizes WITHIN its handler (legacy pattern:
- * in-handler API-key resolution, `getServerAuthSession`, signature checks, or
- * a framework like tRPC/BetterAuth that runs its own per-request RBAC). The
- * builder applies no auth chain; `reason` documents how the handler enforces
- * access so the route is still a reviewable registry entry rather than an
- * unaccounted-for endpoint. Prefer a real `requires(...)` / `internalSecret(...)`
- * strategy when the auth can be expressed as middleware.
+ * The route authenticates and authorizes WITHIN its handler (legacy pattern: in-handler API-key resolution, `getServerAuthSession`, signature checks, or a framework like tRPC/BetterAuth
+ * that runs its own per-request RBAC). The builder applies no auth chain; `reason` documents how the handler enforces access so the route is still a reviewable registry entry rather than
+ * an unaccounted-for endpoint. Prefer a real `requires(...)` / `internalSecret(...)` strategy when the auth can be expressed as middleware.
  */
 export function handlerManagedAuth({
   reason,
@@ -303,13 +226,6 @@ export function handlerManagedAuth({
    * The RBAC permissions this handler enforces for itself — `[]` when it gates
    * on something that is not an RBAC permission (an internal secret, a raw
    * session check, a signature).
-   *
-   * REQUIRED, and that is the entire point. When it was optional, omitting it
-   * and having nothing to declare were the same value, so a self-enforcing RBAC
-   * route contributed nothing to the registry and every audit that reads the
-   * registry walked straight past it. Writing `[]` is a claim; leaving it out
-   * was an absence, and absence is what let `POST /api/experiments/:slug/run`
-   * sit on a grain no least-privilege key could hold.
    */
   permissions: readonly AuthzPermission[];
 }): Extract<AccessPolicy, { kind: "handlerManaged" }> {
@@ -319,10 +235,6 @@ export function handlerManagedAuth({
 
 /**
  * Can a caller holding an API key reach this route at all?
- *
- * The question every "what can a key-bearing client do?" audit actually wants.
- * Non-handler-managed policies are reachable by key: the secured-app builder
- * authenticates them by key or session alike.
  */
 export function isApiKeyReachable(policy: AccessPolicy): boolean {
   if (policy.kind === "handlerManaged") {
@@ -332,10 +244,9 @@ export function isApiKeyReachable(policy: AccessPolicy): boolean {
 }
 
 /**
- * Every RBAC permission a route requires, whichever way it declares it —
- * middleware policy or self-enforcing handler. The single place any audit
- * should ask "what does this route actually demand?", so a new policy kind
- * cannot quietly drop out of the answer.
+ * Every RBAC permission a route requires, whichever way it declares it — middleware policy
+ * or self-enforcing handler. The single place any audit should ask "what does this route
+ * actually demand?", so a new policy kind cannot quietly drop out of the answer.
  */
 export function policyPermissions(policy: AccessPolicy): readonly AuthzPermission[] {
   switch (policy.kind) {

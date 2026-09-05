@@ -1,14 +1,6 @@
 /**
- * @vitest-environment node
  * @integration
- *
- * The package-owned ClickHouse contract for the evaluation_analytics slim
- * table. The app integration suite used to own this coverage; keeping it
- * beside the Analytics repository makes the table owner and its read-back
- * columns impossible to miss during the app split.
- *
- * The schema is supplied by the existing ClickHouse test service/global setup.
- * This suite deliberately creates no tables and does not carry a second DDL.
+ * @vitest-environment node
  */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { randomUUID } from "node:crypto";

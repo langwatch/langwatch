@@ -16,12 +16,6 @@ const logger = createLogger("langwatch:filters:repository");
 
 /**
  * Reads the distinct values a filter can offer.
- *
- * The query lives here rather than in the service because a filter's SQL is
- * storage, not policy: which table it reads, how it scopes to the tenant and
- * how its rows decode are all facts about ClickHouse. The service above keeps
- * what is genuinely its own - validating the caller, tracing the call, and
- * deciding that an unsupported field simply has no options.
  */
 export class FilterOptionsClickHouseRepository extends FilterOptionsPort {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {

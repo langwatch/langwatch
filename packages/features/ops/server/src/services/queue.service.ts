@@ -18,12 +18,6 @@ const UNTYPED_ERROR_SHAPE = "untyped_error";
 
 /**
  * Reduce raw job errors to something safe to keep in a durable audit row.
- *
- * Only a leading error CLASS survives — `TimeoutError`, `HttpError`. Anything
- * else becomes a fixed placeholder, because a job's error text is arbitrary
- * and its first words are no safer than its last: `"alice@example.com payment
- * failed"` leads with the address. Enough for an operator to see "these all
- * died the same way" and no more; the full message stays on the failing job.
  */
 function summarizeErrorShapes(messages: string[]): string[] {
   const shapes = new Set<string>();

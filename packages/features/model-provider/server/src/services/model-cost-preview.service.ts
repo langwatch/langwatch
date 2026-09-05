@@ -1,17 +1,6 @@
 /**
  * The cost-rule drawer's live preview, and the span detail's "you have no rate
  * for this model" hint.
- *
- * Both answer one question — would THIS rule price THAT span — and both must
- * answer it exactly the way the ingestion pipeline will, so matching runs
- * through the contract's own `matchModelCost` cascade rather than a second
- * implementation of it. A preview that matched differently from the rule would
- * talk somebody into a pricing rule that then prices nothing.
- *
- * The span reader arrives per call rather than as a construction dependency:
- * it is the REQUEST's reader, so the preview reads through the same
- * request-scoped services as the rest of the call instead of a process
- * singleton.
  */
 import {
   estimateCost,
@@ -43,11 +32,6 @@ const MAX_UNMATCHED_MODELS = 8;
 
 /**
  * The two span reads the preview issues, declared structurally.
- *
- * Structural rather than an abstract port because the reader is the trace
- * feature's, and a model-provider port class would be this package declaring
- * another feature's collaborator. The process passes its own; this names the
- * two methods it has to answer.
  */
 export type ModelCostPreviewSpanReader = Readonly<{
   getModelUsageStats(input: {
@@ -217,10 +201,9 @@ export class ModelCostPreviewService {
   }
 
   /**
-   * Whether a span's detail view should suggest creating a model cost mapping:
-   * the span names a model and carries token usage, yet no cost was computed for
-   * it AND no stored rule matches the model. The last check keeps the suggestion
-   * off spans that pre-date a rule the reader already created.
+   * Whether a span's detail view should suggest creating a model cost mapping: the span names a model
+   * and carries token usage, yet no cost was computed for it AND no stored rule matches the model. The
+   * last check keeps the suggestion off spans that pre-date a rule the reader already created.
    */
   async deriveUnmappedCostSuggestion({
     costs,

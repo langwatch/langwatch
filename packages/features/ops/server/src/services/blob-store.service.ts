@@ -16,12 +16,6 @@ const STATS_SAMPLE_LIMIT = 200;
 
 /**
  * Read and reclaim surface for the group queue's content-addressed blob store.
- *
- * Every destructive method logs what it removed and who asked. Deleting a
- * payload out from under a staged job is unrecoverable and invisible at the
- * queue level (the job completes without its handler), so the trail has to name
- * the actor — as an opaque user id, never an email; the id is enough to trace
- * an action back through the account without putting PII in the log stream.
  */
 export class BlobStoreService {
   private constructor(private readonly repo: BlobStoreRepository) {}

@@ -1,12 +1,6 @@
 /**
- * Tests ExperimentRunOrchestratorService.executeConnectedCell: running a connected agent as a workbench column.
- *
- * The relay dispatcher is injected, so the turn is scripted rather than sent
- * to a real process, and the studio port is a fake that replays scripted
- * component events, so the grading evaluators run their mapping logic without
- * a live NLP service. (The platform version mocked three `~/`-rooted modules;
- * the cell takes its studio boundary as a port now, so the fake is passed in.)
- *
+ * Tests ExperimentRunOrchestratorService.executeConnectedCell: running a
+ * connected agent as a workbench column.
  * @see specs/experiments-v3/connected-agent-target.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -32,10 +26,8 @@ import {
 import type { EvaluationV3Event, ExecutionCell } from "@langwatch/experiment-contract";
 
 /**
- * The studio boundary the grading evaluators reach, scripted rather than dialled.
- *
- * `postEvent` records what was sent and replays whatever the case put in
- * `scripted.component`, which is what the platform test's module mock did.
+ * The studio boundary the grading evaluators reach, scripted rather than
+ * dialled.
  */
 const ports = {
   studio: {
@@ -394,10 +386,9 @@ describe("given a personal development agent of another person", () => {
   } as unknown as typeof agent;
 
   /**
-   * The rule itself lives in the Suite feature and is composed onto this port
-   * in apps/api. What this file pins is the seam: the run hands the port every
-   * loaded agent and whoever started it, and refuses on the port's refusal
-   * before a single cell exists.
+   * The rule itself lives in the Suite feature and is composed onto this port in apps/api.
+   * What this file pins is the seam: the run hands the port every loaded agent and whoever
+   * started it, and refuses on the port's refusal before a single cell exists.
    */
   const assertRunnable = vi.fn(async () => {
     throw new AgentOwnerOnlyError({

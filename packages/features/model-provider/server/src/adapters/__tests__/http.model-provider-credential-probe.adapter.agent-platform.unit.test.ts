@@ -1,17 +1,7 @@
 /**
- * Gemini is one provider with two Google doors: an AI Studio key answers on
- * generativelanguage.googleapis.com, an Agent Platform key on
- * aiplatform.googleapis.com at a path naming the project and location. The
- * credential's shape — pair present or absent — decides which door is asked,
- * so what these tests pin is mostly *which request goes out*.
- *
- * Agent Platform also cannot be validated by listing models: `GET .../models`
- * answers 401 "API keys are not supported by this API" however good the key
- * is, while `:generateContent` accepts one. Established against real keys of
- * both kinds, not from documentation.
- *
- * Covers @unit scenarios from
- * specs/model-providers/google-agent-platform.feature.
+ * Gemini is one provider with two Google doors: an AI Studio key answers on generativelanguage.googleapis.com, an Agent
+ * Platform key on aiplatform.googleapis.com at a path naming the project and location. The credential's shape — pair present
+ * or absent — decides which door is asked, so what these tests pin is mostly *which request goes out*.
  */
 import { RedirectRefusedError } from "@langwatch/egress";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -238,10 +228,9 @@ describe("validateProviderApiKey for gemini's two Google doors", () => {
     });
 
     /**
-     * The doors disagree on 400: the Gemini API rejects a bad key with it,
-     * while on Agent Platform's generate-content probe it means a malformed
-     * request. Blaming the key here would revive the exact misdiagnosis the
-     * fold exists to remove — through the other door.
+     * The doors disagree on 400: the Gemini API rejects a bad key with it, while on Agent
+     * Platform's generate-content probe it means a malformed request. Blaming the key here
+     * would revive the exact misdiagnosis the fold exists to remove — through the other door.
      */
     it("does not read an Agent Platform 400 as a key verdict", async () => {
       mockFetch.mockResolvedValue({

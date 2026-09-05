@@ -10,12 +10,11 @@ import {
   ProviderUnreachableError,
 } from "../http.model-provider-credential-probe.adapter";
 
-// The probe goes out through the guarded egress port the composition root
-// hands it, not `global.fetch`, so that port is what these tests stand in for;
-// mocking the global would leave the real SSRF fence in the path and every
-// assertion here would be about DNS. Only the fetch is replaced — the redirect
-// refusal is still recognised by the egress's real error type, so the error
-// classes these tests reject with are the ones production actually sees.
+// The probe goes out through the guarded egress port the composition root hands it, not
+// `global.fetch`, so that port is what these tests stand in for; mocking the global would leave the
+// real SSRF fence in the path and every assertion here would be about DNS. Only the fetch is replaced
+// — the redirect refusal is still recognised by the egress's real error type, so the error classes
+// these tests reject with are the ones production actually sees.
 const mockFetch = vi.fn();
 const egress: ModelProviderEgressPort = {
   fetch: (...args: unknown[]) => mockFetch(...args),
@@ -29,10 +28,6 @@ type ValidationResult = ModelProviderCredentialVerdict;
 
 /**
  * The code a refusal carries, or `undefined` when the key was accepted.
- *
- * Asserted on instead of prose throughout: the code is the contract, while the
- * sentence a customer reads is the registry's and is free to be reworded
- * without any of these tests being about it.
  */
 const codeOf = (result: ValidationResult): string | undefined =>
   result.valid ? undefined : result.domainError.code;
@@ -394,12 +389,11 @@ describe("validateProviderApiKey", () => {
       },
     });
 
-    // Persistent, not one-shot: a refusal that is not `API_KEY_INVALID` does
-    // not stop the walk, so Gemini goes on to probe every remaining shape —
-    // and a key the provider refuses is refused on all of them. Queuing a
-    // single response left the later shapes resolving `undefined`, which the
-    // probe loop used to swallow as "unreachable" and outrank with the real
-    // refusal, so these tests passed without ever exercising the walk.
+    // Persistent, not one-shot: a refusal that is not `API_KEY_INVALID` does not stop the
+    // walk, so Gemini goes on to probe every remaining shape — and a key the provider refuses
+    // is refused on all of them. Queuing a single response left the later shapes resolving
+    // `undefined`, which the probe loop used to swallow as "unreachable" and outrank with the
+    // real refusal, so these tests passed without ever exercising the walk.
     const respondWith = (status: number, body: unknown) => {
       mockFetch.mockResolvedValue({
         ok: false,
@@ -477,12 +471,9 @@ describe("validateProviderApiKey", () => {
     });
 
     /**
-     * Captured verbatim from Google (translate.googleapis.com, 2026-07-27)
-     * by calling a restricted API with a live key. Kept whole rather than
-     * hand-written, because the shape is the thing under test: the reason we
-     * act on sits in `error.details[]`, while `error.errors[0].reason` holds
-     * an unrelated "forbidden". Reading the wrong one silently loses the
-     * diagnosis, and only a real payload proves which is which.
+     * Captured verbatim from Google (translate.googleapis.com, 2026-07-27) by calling a restricted API with a live key. Kept whole rather than
+     * hand-written, because the shape is the thing under test: the reason we act on sits in `error.details[]`, while `error.errors[0].reason`
+     * holds an unrelated "forbidden". Reading the wrong one silently loses the diagnosis, and only a real payload proves which is which.
      */
     const CAPTURED_GOOGLE_403 = {
       error: {
@@ -778,13 +769,9 @@ describe("validateProviderApiKey", () => {
     });
 
     /**
-     * Found end to end, not by a mock. Asked about a plainly invalid key the
-     * primary endpoints return Google's canonical API_KEY_INVALID, while the
-     * OpenAI-compatible surface answers "Please pass a valid API key" with no
-     * reason at all. Preferring whichever refusal merely differed from our own
-     * wording picked that vaguer one and appended it, producing "Invalid API
-     * key. Please check your API key and try again. Please pass a valid API
-     * key" against a live key.
+     * Found end to end, not by a mock. Asked about a plainly invalid key the primary endpoints return Google's canonical API_KEY_INVALID, while the OpenAI-compatible
+     * surface answers "Please pass a valid API key" with no reason at all. Preferring whichever refusal merely differed from our own wording picked that vaguer one
+     * and appended it, producing "Invalid API key. Please check your API key and try again. Please pass a valid API key" against a live key.
      */
     it("prefers the provider's verdict over a vaguer fallback message", async () => {
       const canonical = {
@@ -826,10 +813,9 @@ describe("validateProviderApiKey", () => {
     });
 
     /**
-     * The provider has already settled it. Asking the remaining shapes cannot
-     * change the answer and each one is another outbound request on the
-     * request thread — which is also what stopped the vaguer sentence from
-     * being reached in the first place.
+     * The provider has already settled it. Asking the remaining shapes cannot change the
+     * answer and each one is another outbound request on the request thread — which is also
+     * what stopped the vaguer sentence from being reached in the first place.
      */
     it("stops asking once the provider calls the key invalid", async () => {
       mockFetch.mockResolvedValue({
@@ -938,14 +924,6 @@ describe("validateProviderApiKey", () => {
 
 /**
  * The third answer.
- *
- * For most of this file's life a check had two outcomes, and a check that
- * never ran returned the same value as one that succeeded. That is harmless
- * while the answer only decides whether a save may proceed — a skip should
- * not block a save — and it becomes a false statement the moment a customer
- * reads it. Six of the sixteen registered providers reach one of these
- * paths, so a control that reported them as working would be wrong on more
- * than a third of the list.
  */
 describe("given a check that never reached the provider", () => {
   beforeEach(() => {
@@ -1049,12 +1027,6 @@ describe("given a check that never reached the provider", () => {
 
   /**
    * Where the probe is allowed to go.
-   *
-   * Several providers expose a configurable endpoint, so the address a probe
-   * dials is a customer-supplied value however it got there — typed on this
-   * request, or saved on a provider row earlier and picked up by a later
-   * check. The credential rides along either way, which makes every probe an
-   * outbound request to an untrusted host carrying a secret.
    */
   describe("when deciding where the credential may be sent", () => {
     /** @scenario "A credential is never carried to an address we have not vetted" */
@@ -1076,12 +1048,11 @@ describe("given a check that never reached the provider", () => {
 
     /** @scenario "A redirect is reported as a redirect, not as unreachable" */
     it("says the endpoint redirected rather than that it could not be reached", async () => {
-      // The helper's own error type. An earlier version of this test rejected
-      // with a bare Error carrying the same text, which passed while the real
-      // thing did not work at all: the helper's catch rewrites a plain Error
-      // into "Connection failed to host:port: …", so the production matcher was
-      // comparing against a string it never receives. The type survives that
-      // catch, and asserting on it is what makes this test about the real path.
+      // The helper's own error type. An earlier version of this test rejected with a bare Error
+      // carrying the same text, which passed while the real thing did not work at all: the
+      // helper's catch rewrites a plain Error into "Connection failed to host:port: …", so the
+      // production matcher was comparing against a string it never receives. The type survives
+      // that catch, and asserting on it is what makes this test about the real path.
       mockFetch.mockRejectedValueOnce(new RedirectRefusedError());
 
       const result = await validateProviderApiKey("custom", {

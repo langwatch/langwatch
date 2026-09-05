@@ -1,21 +1,7 @@
 /**
+ * The `/api/experiments` door: the three routes it publishes, the permission each declares, the page window it derives from the query
+ * string, the one row shape both the list and the read answer with, and the attribution it hands the application on a create.
  * @vitest-environment node
- *
- * The `/api/experiments` door: the three routes it publishes, the permission
- * each declares, the page window it derives from the query string, the one row
- * shape both the list and the read answer with, and the attribution it hands
- * the application on a create.
- *
- * Ported from three files under `platform/app/src/app/api/experiments/__tests__`:
- * `experiments-list.integration.test.ts` and `runs-list.integration.test.ts`
- * (both `describe.skipIf(CI)` against a running dev server on :5560),
- * `experiments-read-one.integration.test.ts`, and `create-broadcast.integration.test.ts`.
- * The runs endpoints those files also exercised are NOT this family's — they
- * are still `platform/app/src/server/routes/experiments-v3.ts` — so nothing
- * about them is claimed here.
- *
- * The application is stubbed. This file asserts what the transport does, never
- * what the domain decides.
  */
 import {
   createAppRestSecurity,
@@ -44,10 +30,9 @@ const experiment = {
 } as unknown as Experiment;
 
 /**
- * The process's own boundary renderer, reduced to what these tests read back:
- * a handled refusal keeps its own status and its own `code` in `error`. The
- * real renderer adds remediation tips, a trace block and the log line; none of
- * that is the door's, and none of it is asserted here.
+ * The process's own boundary renderer, reduced to what these tests read back: a handled refusal keeps
+ * its own status and its own `code` in `error`. The real renderer adds remediation tips, a trace block
+ * and the log line; none of that is the door's, and none of it is asserted here.
  */
 const boundaryErrorHandler: ErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {
@@ -67,11 +52,6 @@ const boundaryErrorHandler: ErrorHandler = (error, c) => {
 
 /**
  * Every enforcement step the builder chose for the route under test.
- *
- * `requireToken` makes the stubbed project authentication behave the way the
- * process's own does: a request carrying no credential is refused there, before
- * any handler runs. It is the one thing about a 401 this family owns — that
- * every one of its routes sits behind that middleware.
  */
 function testSecurity({ requireToken = false } = {}): {
   security: AppRestSecurity;

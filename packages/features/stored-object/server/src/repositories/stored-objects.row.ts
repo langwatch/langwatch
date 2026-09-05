@@ -1,9 +1,5 @@
 /**
  * One row of the content-addressed `stored_objects` ClickHouse table.
- *
- * The field names are the column names on purpose: this shape is what the
- * table holds, and a camel-cased mirror of it would be a second vocabulary for
- * the same eleven columns.
  */
 import { z } from "zod";
 
@@ -21,10 +17,9 @@ export const storedObjectSchema = z.object({
   /** MIME type (e.g. "text/plain", "image/png"). */
   media_type: z.string(),
   /**
-   * Byte length of the stored content.
-   * Stored as UInt64 in ClickHouse; represented as number here (safe up to
-   * ~9 PB via JS MAX_SAFE_INTEGER; content blobs extracted from trace events
-   * are orders of magnitude smaller).
+   * Byte length of the stored content. Stored as UInt64 in ClickHouse;
+   * represented as number here (safe up to ~9 PB via JS MAX_SAFE_INTEGER;
+   * content blobs extracted from trace events are orders of magnitude smaller).
    */
   size_bytes: z.number(),
   /** Hex-encoded SHA-256 of the content bytes. Used for deduplication. */

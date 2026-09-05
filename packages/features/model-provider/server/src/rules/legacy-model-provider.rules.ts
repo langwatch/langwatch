@@ -1,18 +1,5 @@
 /**
  * The legacy Model Provider shapes the execution paths still speak.
- *
- * LiteLLM dispatch, the evaluator runner, the workflow DSL and the Azure
- * content-safety env resolver were all written against the Prisma row this
- * feature used to hand out. They are adapted here, at the edge of the package,
- * so the canonical DTOs (`ModelProviderExecution`, `ModelProviderSummary`) stay
- * the only thing the service returns and no caller reaches a row shape again.
- *
- * `toLegacyExecutionProvider` and `toLegacyProviderSummary` differ only in what
- * they are given: the first adapts the server-only execution DTO, whose
- * `customKeys` are decrypted, and the second the summary DTO, whose credentials
- * are already masked. Neither masks anything itself — mixing them up would put
- * a decrypted key on a browser response, so they are named for the DTO rather
- * than merged into one call.
  */
 import {
   customModelEntrySchema,
@@ -41,10 +28,9 @@ type LegacyModelProviderScope = {
 type LegacyCustomModel = CustomModelEntry;
 
 /**
- * The legacy execution shape used by LiteLLM and the workflow DSL.  It is
- * deliberately assembled from the canonical server-only execution DTO at the
- * app boundary: contract callers never receive the app's registry type or
- * Prisma row shape.
+ * The legacy execution shape used by LiteLLM and the workflow DSL. It is deliberately
+ * assembled from the canonical server-only execution DTO at the app boundary: contract
+ * callers never receive the app's registry type or Prisma row shape.
  */
 export type LegacyModelProviderExecution = {
   id: string;
@@ -264,12 +250,11 @@ export const getProjectModelProvidersForFrontend = async (
   };
 };
 
-// List shape (one entry per row) for surfaces that need to render every
-// stored credential — the Model Providers settings table can show two
-// rows of the same provider when the user has e.g. "OpenAI — Org" and
-// "OpenAI — Project override" side by side. The Record-by-provider-key
-// `getProjectModelProvidersForFrontend` collapses those duplicates and
-// is not safe to use here.
+// List shape (one entry per row) for surfaces that need to render every stored credential
+// — the Model Providers settings table can show two rows of the same provider when the
+// user has e.g. "OpenAI — Org" and "OpenAI — Project override" side by side. The
+// Record-by-provider-key `getProjectModelProvidersForFrontend` collapses those duplicates
+// and is not safe to use here.
 export const listOrgModelProvidersForFrontend = async (
   service: ModelProviderService,
   organizationId: string,
@@ -342,11 +327,9 @@ export const prepareEnvKeys = (modelProvider: LegacyModelProviderExecution) => {
 };
 
 /**
- * The managed-provider service is still accepted and still ignored: every
- * caller passes it, and the routing decision it used to feed moved into
- * `prepareExecution`. Typed `unknown` rather than reaching for the enterprise
- * contract, because nothing here reads it and naming the type would put an
- * enterprise dependency on this package for a parameter with no body.
+ * The managed-provider service is still accepted and still ignored: every caller passes it, and the routing decision it used
+ * to feed moved into `prepareExecution`. Typed `unknown` rather than reaching for the enterprise contract, because nothing
+ * here reads it and naming the type would put an enterprise dependency on this package for a parameter with no body.
  */
 export const prepareLitellmParams = async (
   service: ModelProviderService,

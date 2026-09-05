@@ -1,10 +1,7 @@
 /**
+ * The gauges these feed are the only producer for the table-size, disk and backup alerts, so the two things asserted here are the two ways they lie:
+ * reporting a table that no longer exists, and letting one unreachable endpoint take every other endpoint's numbers off the dashboard.
  * Spec: specs/ops/worker-operational-loops.feature
- *
- * The gauges these feed are the only producer for the table-size, disk and
- * backup alerts, so the two things asserted here are the two ways they lie:
- * reporting a table that no longer exists, and letting one unreachable
- * endpoint take every other endpoint's numbers off the dashboard.
  */
 import { describe, expect, it } from "vitest";
 

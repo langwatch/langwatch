@@ -1,8 +1,5 @@
 /**
  * Shared data loading utilities for Evaluations V3 execution.
- *
- * Handles loading and normalizing datasets, prompts, agents, and evaluators
- * for both the execute route (UI) and the run route (CI/CD API).
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -52,10 +49,6 @@ const parseJsonColumns = (
 
 /**
  * Normalizes inline dataset records from column IDs to column names.
- *
- * Inline datasets use synthetic column IDs (e.g., "input_0", "messages_2")
- * for UI purposes (React keys, duplicate handling, renaming). This function
- * normalizes them to use column names, matching saved dataset format.
  */
 const normalizeColumnIdsToNames = (
   rows: Array<Record<string, unknown>>,
@@ -97,16 +90,9 @@ type DatasetInput = {
 };
 
 /**
- * Normalizes inline row-first data (from the run API or an SDK) into the loaded
- * dataset shape. Columns are derived from the union of keys across rows.
- *
- * Unlike the saved/attached-dataset paths, inline values are NOT run through
- * parseJsonColumns: row-first data arrives as native JSON (a caller posting a
- * chat-messages or rag-contexts column sends an actual array/object, not a
- * stringified one) and carries no declared column types to mark which strings
- * to parse. So every column is typed "string" and values pass through as-is;
- * structured fields are already structured. A caller that hand-sends
- * stringified JSON is responsible for sending it parsed instead.
+ * Normalizes inline row-first data (from the run API or an SDK) into the
+ * loaded dataset shape. Columns are derived from the union of keys across
+ * rows.
  */
 const rowsFromInlineData = (data: Array<Record<string, unknown>>): LoadedDataset => {
   const columnNames: string[] = [];
@@ -127,11 +113,8 @@ const rowsFromInlineData = (data: Array<Record<string, unknown>>): LoadedDataset
 };
 
 /**
- * Result of loading all execution data.
- */
-/**
- * A studio workflow loaded for a workflow target: the committed DSL that is run
- * as a whole, once per dataset row.
+ * A studio workflow loaded for a workflow target: the committed DSL that is
+ * run as a whole, once per dataset row.
  */
 export type LoadedWorkflow = {
   id: string;
@@ -143,6 +126,9 @@ export type LoadedWorkflow = {
 /** DB evaluator rows a run has loaded, keyed by their own id. */
 export type LoadedEvaluators = Map<string, { id: string; name: string; config: unknown }>;
 
+/**
+ * Result of loading all execution data.
+ */
 export type LoadedExecutionData = {
   datasetRows: Array<Record<string, unknown>>;
   datasetColumns: Array<{ id: string; name: string; type: string }>;
@@ -175,9 +161,6 @@ type EvaluatorForLoading = {
 };
 
 /**
- * Loads all execution data: dataset, prompts, agents, evaluators.
- */
-/**
  * Optional run-time inputs that override or supply the dataset to evaluate.
  * Sent by the run API, the workflow evaluate endpoint, and the SDKs.
  */
@@ -189,11 +172,6 @@ export type ExecutionDataInputs = {
 
 /**
  * Canonical feature services this load reads through.
- *
- * The retired application reached four of these off a process singleton and
- * built a fifth (an Agents feature over the module-global Prisma client) inside
- * the loop. They are injected now, so a run and the read path that names its
- * columns go through the same graph.
  */
 export type ExecutionDataServices = {
   datasets: DatasetService;
@@ -217,12 +195,6 @@ export class ExperimentExecutionDataService {
 
   /**
    * Loads and normalizes a dataset (inline or saved).
-   *
-   * - Inline datasets: Transposes column-first to row-first, normalizes IDs to names
-   * - Saved datasets: Loads from DB
-   * - Both: Parses JSON columns (chat_messages, json, list, etc.)
-   *
-   * After this function, all dataset rows use column NAMES as keys.
    */
   static async loadDataset(
     dataset: DatasetInput,
@@ -277,12 +249,6 @@ export class ExperimentExecutionDataService {
 
   /**
    * Applies caller-provided parameters as constant columns across every row.
-   *
-   * Each parameter overrides (or adds) that column on every row, and any
-   * parameter that is not already a column is appended to the column list. With
-   * no rows, the parameters form a single synthetic row, so an
-   * evaluate-with-flags call needs no placeholder dataset. Mirrors the row-level
-   * effect of the workflow entry-parameter injection.
    */
   static applyParametersToRows({
     rows,
@@ -341,14 +307,14 @@ export class ExperimentExecutionDataService {
    * Cache key for a loaded prompt. Two targets that pin the same prompt to
    * different versions must not share a loaded prompt, so the key includes the
    * requested version (or "latest" when the target follows the newest one).
-   *
-   * Every reader goes through this helper: keying a lookup on the bare promptId
-   * reads whichever version was loaded last.
    */
   static promptLoadKey(target: { promptId?: string; promptVersionNumber?: number }): string {
     return `${target.promptId ?? ""}@${target.promptVersionNumber ?? "latest"}`;
   }
 
+  /**
+   * Loads all execution data: dataset, prompts, agents, evaluators.
+   */
   static async loadExecutionData(
     projectId: string,
     dataset: DatasetInput,
@@ -464,12 +430,11 @@ export class ExperimentExecutionDataService {
 
     for (const target of targets) {
       if (target.type === "agent" && target.dbAgentId) {
-        // A missing agent used to leave the map short and the run continued
-        // against nothing, reporting an empty column rather than the deletion
-        // that caused it. Same answer as a missing prompt or workflow: say what
-        // is gone and stop. `getById` throws `AgentNotFoundError` rather than
-        // returning a nullable — translate it to the same sentinel shape every
-        // other missing-target path in this loader returns.
+        // A missing agent used to leave the map short and the run continued against nothing,
+        // reporting an empty column rather than the deletion that caused it. Same answer as a
+        // missing prompt or workflow: say what is gone and stop. `getById` throws
+        // `AgentNotFoundError` rather than returning a nullable — translate it to the same
+        // sentinel shape every other missing-target path in this loader returns.
         let agent: Agent;
         try {
           agent = await agentService.getById({
@@ -554,12 +519,11 @@ export class ExperimentExecutionDataService {
       loadedWorkflows.set(ExperimentExecutionDataService.workflowLoadKey(target), result);
     }
 
-    // An agent target can itself wrap a Studio workflow (agent.type ===
-    // "workflow", created via Agent -> New Agent -> Workflow). That agent has no
-    // code of its own — just a pointer to the linked workflow — so it must run
-    // the whole workflow the same way a direct workflow target does, not the
-    // agent's (nonexistent) code. Resolve and cache that linked workflow here so
-    // the orchestrator can dispatch it to executeWorkflowCell.
+    // An agent target can itself wrap a Studio workflow (agent.type === "workflow", created
+    // via Agent -> New Agent -> Workflow). That agent has no code of its own — just a pointer
+    // to the linked workflow — so it must run the whole workflow the same way a direct
+    // workflow target does, not the agent's (nonexistent) code. Resolve and cache that linked
+    // workflow here so the orchestrator can dispatch it to executeWorkflowCell.
     for (const target of targets) {
       if (target.type !== "agent" || !target.dbAgentId) {
         continue;

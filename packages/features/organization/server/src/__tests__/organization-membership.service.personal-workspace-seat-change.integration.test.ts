@@ -1,28 +1,7 @@
 /**
- * @vitest-environment node
- *
- * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
- *
  * The one write in the personal-workspace suite that has to succeed.
- *
- * An admin working down the member list moves somebody to a Lite Member seat,
- * and the workspace provisioned for that member has no say in it. It used to:
- * the downgrade swept the personal team into its everything-becomes-Viewer
- * correction, tripped the last-admin guard on a team whose only admin is its
- * owner, and rolled the whole transaction back, so the organization role never
- * changed either.
- *
- * Ported from `personal-workspace-invariants.integration.test.ts` on
- * platform/app, which drove the deleted `appRouter`. The decision moved to
- * `OrganizationMembershipService.changeMemberRole`, which asks
- * `findSharedTeamIds` which teams a seat correction applies to.
- *
- * Bindings are ledger facts, so the corrections are recorded rather than
- * written here: the writer captures what the seat change asked the ledger for,
- * which is where "the shared team was corrected and the workspace was not"
- * can be read.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it.
+ * @vitest-environment node
+ * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";

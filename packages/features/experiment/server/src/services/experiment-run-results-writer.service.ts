@@ -1,17 +1,5 @@
 /**
  * Where a run's cells reach the saved workbench state.
- *
- * Both execution paths end here. The polling runner calls the write directly
- * at the point it decides the run ended; a streaming run started by an open
- * page feeds its frames through the writer, which folds them and writes them
- * when the last frame arrives.
- *
- * The page saves the same cells itself, so the streaming write looks like a
- * duplicate. It is not: the page's save depends on the tab. A browser that
- * puts a background tab to sleep holds the save timer, and a connection that
- * drops before the last frame loses the cells the page had. Either way the run
- * is complete in its own record and the board still reads "No output yet". The
- * server holds every frame it sent, so it can write what the page could not.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -36,12 +24,6 @@ const logger = createLogger("langwatch:experiment:run-results-writer");
 
 /**
  * Where a completed run writes its cells so an open page can show them.
- *
- * The workbench state is the canonical home of a run's cells: a browser run
- * autosaves them there, and a page that opens later reads them back. A backend
- * run has no page to stream to, so it writes them itself through the same
- * server-owned seam, which validates the state, advances the version and tells
- * the tenant the experiment moved.
  */
 export interface RunResultsPersistence {
   experiments: ExperimentService;
@@ -50,14 +32,8 @@ export interface RunResultsPersistence {
 }
 
 /**
- * Writes a completed run's cells into the saved workbench state.
- *
- * Never throws: the cells are already stored, so a workbench that could not be
- * updated costs the open page a refresh, not the run. One retry covers the
- * concurrent write (a person typing in the same experiment), which is the same
- * answer the assistant's backend edits give a stale read.
+ * What a streaming run feeds its frames into so its cells reach the board.
  */
-/** What a streaming run feeds its frames into so its cells reach the board. */
 export interface RunResultsWriter {
   /**
    * Record one frame. The cells are written when the run reports it ended,
@@ -67,12 +43,8 @@ export interface RunResultsWriter {
 }
 
 /**
- * The writer a streaming run gets, and the write both execution paths end in.
- *
- * An experiment that was never saved has no state to write into. A run given
- * its own rows, another saved dataset or constant parameters produces cells
- * that do not line up with the rows the workbench shows, which is the same
- * rule the polling runner applies before it passes its persistence.
+ * The writer a streaming run gets, and the write both execution paths end
+ * in: writes a completed run's cells into the saved workbench state.
  */
 export class ExperimentRunResultsWriterService implements RunResultsWriter {
   private readonly draft = emptyRunResultsDraft();

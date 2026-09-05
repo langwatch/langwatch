@@ -1,24 +1,7 @@
 /**
+ * the Organization row inside the same create (atomic by construction — no separate write that can fail on its own), produces an identical result shape regardless of intent, and persists NULL when no intent is given (legacy default).
  * @vitest-environment node
- *
  * ADR-038 I4/I5: `createAndAssign` persists the declared primary intent on
- * the Organization row inside the same create (atomic by construction — no
- * separate write that can fail on its own), produces an identical result
- * shape regardless of intent, and persists NULL when no intent is given
- * (legacy default).
- *
- * Exercised at the repository layer because the tRPC-level
- * initializeOrganization integration tests are env-gated (App singleton
- * requires IS_SAAS + Stripe config) and permanently skipped.
- *
- * Settings updates (the Primary use setting) now live on the canonical
- * organization repository, not the membership one — the two are wired
- * against the same database here since the invariant spans both.
- *
- * Pairs with: specs/features/onboarding/intent-fork.feature
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it so the
- * suite stays runnable on a box with no database.
  */
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";

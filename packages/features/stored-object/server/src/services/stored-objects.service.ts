@@ -1,16 +1,5 @@
 /**
  * StoredObjectsService — business logic layer for stored objects.
- *
- * Orchestrates content-addressed storage: deduplication via SHA-256 probe,
- * byte I/O via the storage registry, and row persistence via
- * StoredObjectsRepository.
- *
- * PLURAL, and that is the distinction from {@link StoredObjectService}: this
- * is the content-addressed store over the ClickHouse `stored_objects` table
- * that every trace attachment, dataset upload and evaluation payload written
- * before the canonical Postgres store still lives in. The two are not
- * interchangeable — an object written through one is not readable through the
- * other — which is why both exist and why neither is a wrapper of the other.
  */
 import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
@@ -30,13 +19,6 @@ const logger = createLogger("langwatch:stored-objects:service");
 
 /**
  * Derives a deterministic content-addressed id from (projectId, sha256).
- *
- * Uses @langwatch/ksuid with a fixed timestamp (0) and sequence (0) so the
- * id is purely a function of the input bytes — no randomness, no system clock.
- * The 8-byte Instance identifier is the first 8 bytes of sha1(projectId:sha256),
- * making same inputs always produce the same output. Concurrent pods calling
- * this function for the same (projectId, sha256) pair will write the same id,
- * collapsing onto one ClickHouse row in the ReplacingMergeTree.
  */
 function deriveStoredObjectId({
   projectId,
@@ -71,14 +53,9 @@ export type StoredObjectsServiceOptions = Readonly<{
    */
   registry: RegistryResolver;
   /**
-   * Where a NEW object goes, as the deployment's destination precedence
-   * resolves it — BYOC bucket, then the selected backend, then the documented
+   * Where a NEW object goes, as the deployment's destination precedence resolves
+   * it — BYOC bucket, then the selected backend, then the documented
    * single-replica filesystem fallback.
-   *
-   * Required rather than defaulted: the precedence reads the deployment's own
-   * configuration, and a service that guessed a destination would spill a
-   * tenant's bytes into the wrong place on a misconfiguration rather than
-   * failing where the operator can see it.
    */
   mintStorageUri: MintStorageUri;
   /** The five series this store publishes about its own work. */
@@ -115,21 +92,6 @@ export class StoredObjectsService {
 
   /**
    * Stores byte content for a project, deduplicating by content hash.
-   *
-   * Steps:
-   *  1. Compute SHA-256 of bytes.
-   *  2. Derive deterministic id from (projectId, sha256).
-   *  3. Probe repository for an existing row with the same sha256.
-   *  4. On hit: return existing id without writing anything.
-   *  5. On miss: PUT bytes, INSERT row, return new id.
-   *
-   * If the PUT fails the CH row is NOT inserted and the error is rethrown.
-   *
-   * Metrics:
-   *  - `stored_object_extract_total{purpose}` on every call.
-   *  - `stored_object_dedup_hit_total{purpose}` on dedup hit.
-   *  - `stored_object_write_failures_total{purpose}` on PUT failure.
-   *  - `stored_object_size_bytes{purpose}` histogram on every call.
    */
   async storeFromBytes({
     projectId,
@@ -168,14 +130,11 @@ export class StoredObjectsService {
         span.setAttribute("stored_object.id", id);
         span.setAttribute("stored_object.sha256", sha256);
 
-        // Dedup probe: if content already present, skip PUT + INSERT.
-        // Lookup by id (not sha256) because:
-        //   1. id is derived deterministically from (projectId, sha256) right
-        //      above, so it's already known here — no extra computation.
-        //   2. The stored_objects table's `ORDER BY (project_id, id)` makes
-        //      this a primary-key seek with partition pruning; a sha256
-        //      lookup would scan every weekly partition incl. cold S3 because
-        //      sha256 is not in the sort key.
+        // Dedup probe: if content already present, skip PUT + INSERT. Lookup by id (not sha256)
+        // because: 1. id is derived deterministically from (projectId, sha256) right above, so
+        // it's already known here — no extra computation. 2. The stored_objects table's `ORDER BY
+        // (project_id, id)` makes this a primary-key seek with partition pruning; a sha256 lookup
+        // would scan every weekly partition incl. cold S3 because sha256 is not in the sort key.
         const existing = await this.repository.findById({ projectId, id });
         if (existing) {
           this.telemetry.recordDedupHit(purpose);
@@ -259,15 +218,6 @@ export class StoredObjectsService {
 
   /**
    * Probes for existence without streaming the bytes.
-   *
-   * Returns the same tri-state as the HTTP HEAD route at `/api/files/:id`:
-   *  - `{ status: "available", mediaType }` — row exists and storage has the bytes
-   *  - `{ status: "missing", mediaType }`   — row exists but storage 404s
-   *  - `{ status: "not_found" }`            — no row matches
-   *
-   * Used by the tRPC `storedObjects.headById` probe from the renderer to
-   * distinguish "blob is gone" (graceful missing-badge) from "row never
-   * existed" (404) without round-tripping the body.
    */
   async headById({
     projectId,
@@ -294,16 +244,6 @@ export class StoredObjectsService {
 
   /**
    * Retrieves a stored object row and a readable stream of its bytes.
-   *
-   * Returns:
-   *  - `{ row, stream }` when the row exists and storage has the bytes.
-   *  - `{ row, status: "missing" }` when the row exists but storage 404s.
-   *  - `null` when the row does not exist (caller maps to 404).
-   *
-   * On any non-404 storage error the error is rethrown (caller maps to 502).
-   *
-   * Metrics:
-   *  - `stored_object_read_failures_total` on non-404 storage errors.
    */
   async getById({
     projectId,
@@ -361,10 +301,9 @@ export class StoredObjectsService {
   }
 
   /**
+   * summed `size_bytes` of the project's live stored objects, optionally scoped to one `purpose` (e.g. "evaluation_inputs").
+   * This is the durable-object side of a tenant's storage usage, alongside the ClickHouse row bytes.
    * Returns the storage-accounting byte ledger for a project (ADR-040): the
-   * summed `size_bytes` of the project's live stored objects, optionally scoped
-   * to one `purpose` (e.g. "evaluation_inputs"). This is the durable-object
-   * side of a tenant's storage usage, alongside the ClickHouse row bytes.
    */
   async getStorageUsageByProject({
     projectId,
@@ -387,23 +326,8 @@ export class StoredObjectsService {
   }
 
   /**
-   * Deletes all stored objects owned by a project: deletes the bytes from
-   * the storage backend first, then deletes the stored_objects rows from
-   * ClickHouse.
-   *
-   * Bytes-before-rows ordering is intentional. If we deleted rows first and
-   * then crashed mid-cascade, the bytes would orphan in S3/disk with no row
-   * pointing at them — irrecoverably (we no longer know which keys to
-   * delete). Bytes-first means a crash leaves rows that point at missing
-   * bytes; GET /api/files/:id returns 404-missing for those, which is the
-   * graceful degradation we already handle on the read path.
-   *
-   * Each individual byte-delete is best-effort: a single storage failure
-   * does not halt the cascade. Failed rows are NOT removed from ClickHouse
-   * — they stay behind as retryable tombstones so a follow-up cascade
-   * re-attempts the byte-delete using the same `storage_uri`. Dropping the
-   * row along with a failed byte-delete would lose the address of the
-   * orphaned bytes (Sergio review 2026-05-20).
+   * Deletes all stored objects owned by a project: deletes the bytes from the
+   * storage backend first, then deletes the stored_objects rows from ClickHouse.
    */
   async deleteOwnedBy({ projectId }: { projectId: string }): Promise<void> {
     return tracer.withActiveSpan(

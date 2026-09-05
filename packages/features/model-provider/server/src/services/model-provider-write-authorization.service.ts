@@ -7,11 +7,6 @@ import { ModelProviderAuthorizationService } from "./model-provider-authorizatio
 
 /**
  * Shared write check for the model-provider's provider and default commands.
- *
- * The refusing counterpart to {@link ModelProviderAuthorizationService}: that
- * one answers whether a write is allowed, this one throws the error the
- * command surfaces. It delegates rather than re-deciding, because a check that
- * refuses and a check that answers must never be able to disagree.
  */
 export class ModelProviderWriteAuthorizationService {
   private constructor(private readonly authorization: ModelProviderAuthorizationService) {}

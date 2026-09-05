@@ -39,10 +39,6 @@ import { ExperimentRunItemStore } from "../stores/eventing/eventing.experiment-r
 
 /**
  * All experiment-run-processing commands defined from event data schemas.
- *
- * The event data schemas in processes/experiment-run-events.process.ts are the
- * single source of truth.
- * Command data = envelope (tenantId, occurredAt) + event data.
  */
 
 export const StartExperimentRunCommand = defineCommand({
@@ -64,10 +60,6 @@ export const StartExperimentRunCommand = defineCommand({
 /**
  * The identity of one cell result, used both to order the event and to name
  * its queue job.
- *
- * The store deduplicates on the idempotency key and the queue deduplicates on
- * the job id, so the two must always describe the same cell. One builder for
- * both keeps them that way.
  */
 const targetResultIdentity = (d: {
   tenantId: string;
@@ -104,11 +96,6 @@ export const RecordTargetResultCommand = defineCommand({
 
 /**
  * A verdict is identified by its target as well as its evaluator and its row.
- *
- * Every evaluator runs against every target, so two columns produce a verdict
- * for the same evaluator on the same row. `event_log` is a ReplacingMergeTree
- * ordered by the idempotency key, so a key without the target makes those two
- * verdicts one row and one column loses its score.
  */
 export const RecordEvaluatorResultCommand = defineCommand({
   commandType: "lw.experiment_run.record_evaluator_result",
@@ -174,12 +161,6 @@ export interface ExperimentRunProcessingPipelineDeps {
 /**
  * The Eventing side of experiment run processing: the storage this feature's
  * pipeline reads and writes through, and the pipeline definition itself.
- *
- * The pipeline uses experiment_run aggregates (aggregateId = runId) and tracks
- * the lifecycle of a run: started -> target results -> evaluator results ->
- * completed. Its fold projection keeps the run summary (progress, costs,
- * scores, pass rate) in `experiment_runs`; its map projection writes each
- * individual result to `experiment_run_items` for query-optimized access.
  */
 export class ExperimentEventingAdapter {
   private constructor(private readonly clickhouse: ExperimentClickHousePort | null) {}

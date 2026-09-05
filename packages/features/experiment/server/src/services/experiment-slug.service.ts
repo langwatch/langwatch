@@ -1,15 +1,5 @@
 /**
  * The slug an experiment is saved under.
- *
- * A slug is unique per project and appears in the customer's URLs, so a name
- * reused within a project cannot simply take the slug it wants. The first
- * free `-2`, `-3`, ... suffix is used instead, which is what makes a second
- * "Latency sweep" land next to the first rather than on top of it.
- *
- * The search is bounded. After a hundred tries the answer is a minted id
- * instead: an unbounded loop here would be a request that never returns, and
- * a project with a hundred experiments of one name does not need the
- * hundred-and-first to be pretty.
  */
 
 const MAX_NUMBERED_SUFFIX = 102;

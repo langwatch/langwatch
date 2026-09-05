@@ -1,20 +1,6 @@
 /**
  * The organization surface the canonical contract does not carry: membership,
  * seats, role cascades, provisioning and the audit trail.
- *
- * These fourteen operations were the platform application's own
- * `OrganizationService` — a class that implemented the whole
- * `OrganizationService` contract by DELEGATING every contract method to the
- * packaged service beside it and adding these on top. Only the additions moved
- * here; the delegations were a seam that existed to keep one object on the
- * request context, and a process that composes both can compose that object
- * for itself.
- *
- * Nothing here reads an environment, a service locator or a request. What the
- * platform reached for through `getApp()` — the plan store, the grant cache —
- * and what it resolved through a thunk to break a construction cycle — session
- * revocation — arrive as ports, so a process that holds none of them says so
- * by name rather than by a stack trace from inside a member write.
  */
 import { generate } from "@langwatch/ksuid";
 import {
@@ -68,13 +54,6 @@ const TEAM_KSUID_RESOURCE = "team";
  * Pure function that returns a team enriched with a synthesized member entry
  * for the given user if they have a RoleBinding for this team or one of its
  * projects but no TeamUser row yet.
- *
- * This is intentionally a standalone function — NOT a method on
- * `OrganizationService` — because the service instance is wrapped with the
- * `traced()` proxy (see `@langwatch/observability/node`) which turns every method call
- * into an async call that returns a Promise. Callers expecting a synchronous
- * return value would silently get a Promise with `members === undefined`,
- * causing team membership enrichment to fail invisibly.
  */
 type TeamMembershipLike = {
   userId: string;
@@ -87,16 +66,9 @@ type TeamMembershipLike = {
 };
 
 /**
- * The raw client behind the repository, for orchestrations that compose
- * helpers operating on one (the personal-team guard, shared-team
- * enumeration, the license-enforcement repository). Absent only with the
- * null repository, where these operations are not meaningful.
- *
- * A standalone function, NOT a method on `OrganizationService`, for the same
- * reason as {@link enrichTeamWithRoleBindings}: the service instance is
- * wrapped with the `traced()` proxy, which turns every method call into an
- * async call returning a Promise, and a Promise standing in for a Prisma
- * client fails only later, deep inside whatever received it.
+ * The raw client behind the repository, for orchestrations that compose helpers operating on one (the
+ * personal-team guard, shared-team enumeration, the license-enforcement repository). Absent only with
+ * the null repository, where these operations are not meaningful.
  */
 function clientFromRepo(repo: OrganizationMembershipRepository): PrismaClient {
   const client = repo.getClient?.();
@@ -108,10 +80,9 @@ function clientFromRepo(repo: OrganizationMembershipRepository): PrismaClient {
 }
 
 /**
- * The union of permissions granted by the custom roles behind these team
- * bindings, or undefined when none apply. Feeds seat classification, which
- * treats a member whose custom roles grant only view permissions as a Lite
- * Member.
+ * The union of permissions granted by the custom roles behind these team bindings, or
+ * undefined when none apply. Feeds seat classification, which treats a member whose custom
+ * roles grant only view permissions as a Lite Member.
  */
 async function collectCustomRolePermissions({
   prisma,
@@ -152,10 +123,6 @@ async function collectCustomRolePermissions({
 /**
  * A team-role update the caller could not have meant: it names a different
  * member, or a team outside the organization whose seats are being changed.
- *
- * Raised here rather than as the platform's `TRPCError`, which a package may
- * not depend on: the code is what the client renders its words from, and a
- * transport-shaped error would have made this service unusable from REST.
  */
 class TeamRoleUpdateRejectedError extends HandledError {
   declare readonly code: "validation_error";
@@ -272,12 +239,7 @@ export class OrganizationMembershipService {
   /**
    * Creates an organization with a default team and assigns the given user as
    * admin.
-   *
-   * The repository writes the organization, the membership row and the first
-   * team in one transaction. The founder's two ADMIN grants cannot join it —
    * they are ledger facts (ADR-092 delivery-plan PR 2) — so they follow it,
-   * and a crash in between leaves an organization its founder has a seat in
-   * and no grants on, which the next sign-in is what surfaces.
    */
   async createAndAssign(params: {
     userId: string;
@@ -320,18 +282,6 @@ export class OrganizationMembershipService {
    * Creates an organization with a default team and NO user attached: the
    * self-hosted instance provisioning path ({@link createAndAssign} requires a
    * member to assign, and this path runs before any user exists).
-   *
-   * An explicit slug is taken verbatim, so infrastructure-as-code can address
-   * the organization by a natural key it chose; a missing slug is derived from
-   * the name with an id suffix, exactly like sign-up. A taken slug raises
-   * `organization_slug_taken` (409) from the repository.
-   *
-   * All of it or none of it: the repository commits the organization and its
-   * team before the prompt tags are seeded, and until this method returns the
-   * caller has no id to compensate with. A failure after that commit would
-   * leave an organization with no bootstrap key, unreachable, holding a slug
-   * that answers every retry with a 409 until somebody reaches the database
-   * directly, so the seeding step undoes the commit before it rethrows.
    */
   async createForProvisioning(params: {
     name: string;
@@ -386,11 +336,9 @@ export class OrganizationMembershipService {
   }
 
   /**
-   * Compensation for a provisioning run that created the organization but
-   * could not finish: without its bootstrap key the organization is
-   * unreachable, and its slug squats every retry as a 409. Removing what the
-   * run created lets the caller simply retry. Provisioning is the only
-   * caller; nothing else may delete an organization through this surface.
+   * Compensation for a provisioning run that created the organization but could not finish: without its bootstrap key the
+   * organization is unreachable, and its slug squats every retry as a 409. Removing what the run created lets the caller simply
+   * retry. Provisioning is the only caller; nothing else may delete an organization through this surface.
    */
   async deleteProvisionedOrganization({
     organizationId,
@@ -492,15 +440,6 @@ export class OrganizationMembershipService {
 
   /**
    * Removes a user from an organization and all its teams.
-   *
-   * Not one transaction, and deliberately ordered instead: the grants they
-   * hold are revoked first and the membership row goes after, so a crash
-   * leaves somebody holding a seat and no access rather than grants nobody
-   * can reach.
-   *
-   * Refuses to remove the acting user's own membership so an organization
-   * cannot lose its last acting administrator by accident; a credential that
-   * acts as nobody (a service key) cannot trip the guard.
    */
   async deleteMember(params: {
     organizationId: string;
@@ -530,13 +469,6 @@ export class OrganizationMembershipService {
    * Disables or re-enables a membership, which revokes or restores access to
    * this organization and returns or takes back a licensed seat. Role,
    * department and history are untouched, so this is reversible.
-   *
-   * Re-enabling consumes a seat, so it goes through the same check as
-   * inviting someone. Disabling only ever frees one, and is what an
-   * over-seats organization is being asked to do, so it is never blocked.
-   * Disabling your own membership is refused for the same reason removing
-   * it is: an organization must not lock itself out through its last acting
-   * administrator.
    */
   async setMemberDisabled(params: {
     organizationId: string;
@@ -602,14 +534,9 @@ export class OrganizationMembershipService {
   }
 
   /**
-   * The full member-role-change orchestration: personal-workspace assertion,
-   * shared-team scoping, seat classification (a Lite Member gaining non-view
-   * permissions re-checks the full-member seats) and the Enterprise gate for
-   * custom-role assignments, then the cascading role update itself.
-   *
-   * Seat overflow propagates as `LimitExceededError`
-   * (`resource_limit_exceeded`), the same refusal every other member-limit
-   * path raises, so the client's limit modal keeps opening off one shape.
+   * The full member-role-change orchestration: personal-workspace assertion, shared-team scoping, seat
+   * classification (a Lite Member gaining non-view permissions re-checks the full-member seats) and the
+   * Enterprise gate for custom-role assignments, then the cascading role update itself.
    */
   async changeMemberRole(params: {
     organizationId: string;
@@ -699,11 +626,9 @@ export class OrganizationMembershipService {
   }
 
   /**
-   * Updates a member's organization role and cascades effective team role changes.
-   * Computes effective team role updates from the requested updates and current memberships.
-   *
-   * License checks must be performed by the caller (router) before invoking this method,
-   * as they require request-scoped plan context.
+   * Updates a member's organization role and cascades effective team role
+   * changes. Computes effective team role updates from the requested updates and
+   * current memberships.
    */
   async updateMemberRole(params: {
     organizationId: string;
@@ -771,12 +696,9 @@ export class OrganizationMembershipService {
   }
 
   /**
-   * Updates a team member's role. The repository decides the change under one
-   * transaction — the last-admin guard included — and emits the grant it
-   * resolves to once that has committed, since grants are ledger facts and
-   * cannot ride a database transaction.
-   *
-   * License checks for EXTERNAL users must be performed by the caller (router).
+   * Updates a team member's role. The repository decides the change under one transaction —
+   * the last-admin guard included — and emits the grant it resolves to once that has
+   * committed, since grants are ledger facts and cannot ride a database transaction.
    */
   async updateTeamMemberRole(params: {
     teamId: string;

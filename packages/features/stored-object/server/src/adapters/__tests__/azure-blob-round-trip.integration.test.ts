@@ -1,17 +1,7 @@
 /**
+ * Bytes going out to Azure Blob and coming back, through the real driver, the real registry dispatch and the real destination policy — an in-memory blob account stands in for the socket, and nothing above it is doubled.
  * @vitest-environment node
- *
- * Bytes going out to Azure Blob and coming back, through the real driver,
- * the real registry dispatch and the real destination policy — an in-memory
- * blob account stands in for the socket, and nothing above it is doubled.
- *
- * Two callers depend on that path and neither is the driver's own suite: the
- * content-addressed store scenario media is written through, and the
- * groupQueue durable tier, whose ref is labelled `s3` and which therefore has
- * to be shown reaching Azure on an install with no S3 configured at all.
- *
  * Spec: specs/features/scenarios/externalize-event-byte-content.feature
- *       specs/features/scenarios/azure-blob-workload-identity.feature
  */
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
@@ -36,10 +26,9 @@ const CONTAINER = "stored-objects";
 const PROJECT_ID = "proj-1";
 
 /**
- * An Azure Blob account at the HTTP boundary: PUT stores, GET returns, HEAD
- * probes, DELETE removes, and anything absent answers 404 the way the service
- * expects. Only `fetch` is replaced, so signing, URI parsing and scheme
- * dispatch are all the production code.
+ * An Azure Blob account at the HTTP boundary: PUT stores, GET returns, HEAD probes, DELETE
+ * removes, and anything absent answers 404 the way the service expects. Only `fetch` is
+ * replaced, so signing, URI parsing and scheme dispatch are all the production code.
  */
 function installBlobAccount(): Map<string, Buffer> {
   const blobs = new Map<string, Buffer>();

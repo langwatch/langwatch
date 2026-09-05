@@ -232,15 +232,9 @@ describe("OrganizationService groups", () => {
   });
 
   /**
-   * Ported from the groups REST suite
-   * (`platform/app/src/app/api/groups/__tests__/groups-rest-api.integration.test.ts`),
-   * which reached these guards through HTTP and a real database. The guards
-   * themselves are the service's, so this is where they belong: the REST family
-   * only turns the refusal into a status.
-   *
-   * A directory-managed group answers `scim_managed_group` — a conflict with
-   * the identity provider that owns it, not a malformed request: whatever an
-   * administrator changed here would come back on the next sync.
+   * Ported from the groups REST suite (`platform/app/src/app/api/groups/__tests__/groups-rest-api.integration.test.ts`), which
+   * reached these guards through HTTP and a real database. The guards themselves are the service's, so this is where they
+   * belong: the REST family only turns the refusal into a status.
    */
   describe("given a group its identity provider owns", () => {
     const directoryManaged: OrganizationGroup = { ...group, scimSource: "okta" };

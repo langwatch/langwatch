@@ -1,14 +1,6 @@
 /**
- * S3StoredObjectDriverAdapter — byte operations over S3-compatible object storage.
- *
- * Constructed per project so the correct BYOC endpoint, region and credentials
- * are resolved for every operation: a URI minted against a tenant's own bucket
- * is unreadable through the deployment's shared client, so which connection
- * answers is a function of the project rather than of the process.
- *
- * The bucket and key are taken from the URI itself and never from
- * configuration — a persisted `s3://` URI is the address, and reading it
- * through a differently-configured bucket would answer for the wrong object.
+ * S3StoredObjectDriverAdapter — byte operations over S3-compatible object
+ * storage.
  */
 import type { Readable } from "node:stream";
 import {
@@ -29,10 +21,6 @@ import type { StoredObjectStorageDriver } from "./stored-object-storage.registry
 
 /**
  * The process's shared AWS transport policy, as this driver asks for it.
- *
- * Structural rather than an `AwsClientProcessRuntime` import: what the driver
- * needs is one call that turns a target into client configuration, and the
- * pooling, proxying and retry policy behind it are the process's.
  */
 export type StoredObjectS3ClientPolicy = Readonly<{
   build(input: {

@@ -1,16 +1,7 @@
 /**
+ * ("Saving with a key that names no user is refused with a handled error")
  * @vitest-environment node
- *
  * @see specs/model-providers/model-default-config-cascade.feature
- *   ("Saving with a key that names no user is refused with a handled error")
- *
- * The default-models write gate walks the CALLER's role bindings, so it
- * needs a user to walk them for. A project API key names only a project; the
- * guard used to answer that with a plain `Error("Not authenticated")` that
- * collapsed to a 400. That is wrong at the customer twice over — the
- * request WAS authenticated, and "not authenticated" reads as a malformed
- * body, not as a scope-tier limitation. Every write route (create, update,
- * delete) checks `apiKeyUserId` before it ever reaches the service.
  */
 import {
   createAppRestSecurity,

@@ -1,17 +1,7 @@
 /**
+ * Real-Postgres coverage for multi-instance provider rows: creating a second row of the same provider type at a different scope instead of silently overwriting an existing one, the atomic multi-scope write gate, cross-tenant read refusal, and runtime provider-ROW selection following the specific MODEL rather than the collapsed provider winner (a stale project-scoped Azure row must not shadow an organization row whose catalog actually lists the requested model).
  * @vitest-environment node
- *
  * @see specs/model-providers/scope-and-multi-instance.feature
- *
- * Real-Postgres coverage for multi-instance provider rows: creating a
- * second row of the same provider type at a different scope instead of
- * silently overwriting an existing one, the atomic multi-scope write gate,
- * cross-tenant read refusal, and runtime provider-ROW selection following
- * the specific MODEL rather than the collapsed provider winner (a stale
- * project-scoped Azure row must not shadow an organization row whose
- * catalog actually lists the requested model).
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";

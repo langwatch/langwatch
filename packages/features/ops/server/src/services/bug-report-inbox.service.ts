@@ -1,9 +1,5 @@
 /**
  * The two reads the operator back office makes of the support inbox.
- *
- * A listing is a page plus the total behind it, which is two queries against
- * one filter — so the pairing lives here rather than being restated by every
- * caller that would otherwise have to remember the second one.
  */
 import type { BugReport } from "@langwatch/prisma-client/generated";
 import type { BugReportRepository } from "../ports/bug-report.repository";

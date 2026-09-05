@@ -1,11 +1,7 @@
 /**
- * Runs one cell whose target is a whole committed Studio workflow. The
- * row goes through `execute_flow` once, the End node's result becomes
- * the target output, each of the workflow's own evaluator nodes becomes
- * an evaluator result under the node's display name, and node costs are
- * summed with LLM nodes priced the same way `executeCell` prices them.
- * Evaluators attached to the column are then graded through S4's loop,
- * only when the workflow produced a result.
+ * Runs one cell whose target is a whole committed Studio workflow. The row goes through `execute_flow` once, the End node's result becomes the target output, each
+ * of the workflow's own evaluator nodes becomes an evaluator result under the node's display name, and node costs are summed with LLM nodes priced the same way
+ * `executeCell` prices them. Evaluators attached to the column are then graded through S4's loop, only when the workflow produced a result.
  */
 
 import {

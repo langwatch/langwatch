@@ -1,19 +1,7 @@
 /**
- * @vitest-environment node
- *
- * @see specs/model-providers/provider-configuration.feature
- *
  * `modelProvider.getAllForProject`'s tenancy boundary.
- *
- * The route declares `policy("project:view")` — a generic, process-supplied
- * check with no model-provider logic of its own, so this suite injects a
- * `policy` double the way `evaluator-trpc-api.unit.test.ts` does: a real
- * `.use()` middleware, not the production `trpc-runtime-policy` chain (that
- * lives in `@langwatch/api` and is process-composed). What makes it a real
- * check rather than an echo is that its permission decision is COMPUTED from
- * a small in-memory tenancy fixture — project -> team -> organization, and
- * who holds which role where — mirroring what `AuthzService.getDecision`
- * would answer, instead of a stub that returns whatever the test wants.
+ * @vitest-environment node
+ * @see specs/model-providers/provider-configuration.feature
  */
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
@@ -64,15 +52,17 @@ function harness() {
   const policy =
     (permission: AuthzPermission) =>
     <TProcedure>(procedure: TProcedure): TProcedure =>
-      (procedure as any).use((options: { ctx: TestContext; input: { projectId: string }; next: () => unknown }) => {
-        if (permission !== "project:view") {
-          throw new Error(`unexpected permission in this harness: ${permission}`);
-        }
-        if (!canViewProject(options.ctx.userId, options.input.projectId)) {
-          throw new TRPCError({ code: "FORBIDDEN" });
-        }
-        return options.next();
-      }) as TProcedure;
+      (procedure as any).use(
+        (options: { ctx: TestContext; input: { projectId: string }; next: () => unknown }) => {
+          if (permission !== "project:view") {
+            throw new Error(`unexpected permission in this harness: ${permission}`);
+          }
+          if (!canViewProject(options.ctx.userId, options.input.projectId)) {
+            throw new TRPCError({ code: "FORBIDDEN" });
+          }
+          return options.next();
+        },
+      ) as TProcedure;
 
   const providers = {
     openai: {
@@ -127,9 +117,9 @@ describe("modelProvider.getAllForProject authz", () => {
     it("rejects with FORBIDDEN", async () => {
       const { callerFor } = harness();
 
-      await expect(callerFor("user_with_nothing").getAllForProject({ projectId: PROJECT_A })).rejects.toMatchObject(
-        { code: "FORBIDDEN" },
-      );
+      await expect(
+        callerFor("user_with_nothing").getAllForProject({ projectId: PROJECT_A }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 
@@ -159,7 +149,9 @@ describe("modelProvider.getAllForProject authz", () => {
     it("returns providers, proving the denials above are not vacuous", async () => {
       const { callerFor } = harness();
 
-      const result = await callerFor("user_member_of_project_a").getAllForProject({ projectId: PROJECT_A });
+      const result = await callerFor("user_member_of_project_a").getAllForProject({
+        projectId: PROJECT_A,
+      });
 
       expect(result.openai).toBeDefined();
     });

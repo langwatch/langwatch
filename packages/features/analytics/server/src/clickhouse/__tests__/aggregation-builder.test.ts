@@ -15,12 +15,6 @@ const { mapEvalAggregationToOuter, extractTraceAggregationColumn, hasEvalMixedWi
 /**
  * The SELECT list of every `stored_spans` subquery in a built statement, in
  * order, as column arrays.
- *
- * Asserting on the list rather than on `sql.toContain("SomeColumn")` is what
- * makes a pruning test discriminate. The outer query names the same columns on
- * the join alias, so a substring check is satisfied by the outer reference
- * alone and stays green when the subquery selects the whole analytics set, or
- * drops a column the ARRAY JOIN needs.
  */
 const storedSpansSelectLists = (sql: string): string[][] =>
   Array.from(sql.matchAll(/JOIN \(SELECT (.+?) FROM stored_spans/g)).map(([, columns]) =>
@@ -145,15 +139,11 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("TotalCost");
     });
 
-    // @regression: LLM Metrics card mixed metadata.span_type (cardinality) with
-    // performance.total_cost (sum) and performance.total_tokens (sum). The span_type
-    // metric forced a stored_spans JOIN even though cardinality only uses uniq(TraceId)
-    // from trace_summaries. The JOIN created one row per span per trace, inflating
-    // the trace-level SUM aggregations (cost ~4x, tokens ~6x).
-    // @regression issue #3088: When trace-level metrics (sum of TotalCost) are combined
-    // with evaluation metrics (avg of evaluation_pass_rate) in buildSimpleTimeseriesQuery,
-    // the evaluation_runs JOIN produces N rows per trace, inflating sum(TotalCost) by N.
-    // The fix must ensure trace-level aggregations are not fanned out by eval join cardinality.
+    // @regression: LLM Metrics card mixed metadata.span_type (cardinality) with performance.total_cost (sum) and performance.total_tokens (sum). The
+    // span_type metric forced a stored_spans JOIN even though cardinality only uses uniq(TraceId) from trace_summaries. The JOIN created one row per span
+    // per trace, inflating the trace-level SUM aggregations (cost ~4x, tokens ~6x). @regression issue #3088: When trace-level metrics (sum of TotalCost)
+    // are combined with evaluation metrics (avg of evaluation_pass_rate) in buildSimpleTimeseriesQuery, the evaluation_runs JOIN produces N rows per
+    // trace, inflating sum(TotalCost) by N. The fix must ensure trace-level aggregations are not fanned out by eval join cardinality.
     it("does not inflate trace-level aggregations when mixed with evaluation metrics in simple path", () => {
       const input = {
         ...baseInput,
@@ -184,12 +174,11 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
     });
 
-    // The query windows on trace OccurredAt, but evaluation_runs partitions on
-    // ScheduledAt (UpdatedAt on older deployments) — an OccurredAt filter prunes
-    // nothing there, so an unbounded JOIN subquery walks the tenant's ENTIRE
-    // evaluation history across every partition, including S3-tiered cold ones.
-    // Measured in production at ~900 executions / 6,400s of query time per
-    // 30min on a single worker pod before the bound existed.
+    // The query windows on trace OccurredAt, but evaluation_runs partitions on ScheduledAt
+    // (UpdatedAt on older deployments) — an OccurredAt filter prunes nothing there, so an
+    // unbounded JOIN subquery walks the tenant's ENTIRE evaluation history across every
+    // partition, including S3-tiered cold ones. Measured in production at ~900 executions /
+    // 6,400s of query time per 30min on a single worker pod before the bound existed.
     it("bounds the evaluation_runs JOIN subquery on both candidate partition columns", () => {
       const input = {
         ...baseInput,
@@ -329,17 +318,11 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
     });
 
-    // @regression: Trace-level metrics emitted `avg(ts.<Column>)` in the outer
-    // SELECT when routed through the arrayJoin groupBy path, but `ts` is only
-    // in scope inside the `deduped_traces` CTE. Columns not registered in
-    // `DEDUP_FIELD_MAPPINGS` and not projected into the CTE caused ClickHouse
-    // to reject the query with:
-    //   "Unknown expression or function identifier `ts.<Column>` in scope"
-    //
-    // Audit of `metric-translator.ts` revealed two trace-level columns with
-    // this bug: `TokensPerSecond` and `TimeToFirstTokenMs`. Both have been
-    // projected into the CTE and wired into DEDUP_FIELD_MAPPINGS so
-    // `transformMetricForDedup` rewrites the outer reference to the CTE alias.
+    // @regression: Trace-level metrics emitted `avg(ts.<Column>)` in the outer SELECT when routed through the arrayJoin groupBy path, but `ts`
+    // is only in scope inside the `deduped_traces` CTE. Columns not registered in `DEDUP_FIELD_MAPPINGS` and not projected into the CTE caused
+    // ClickHouse to reject the query with: "Unknown expression or function identifier `ts.<Column>` in scope" Audit of `metric-translator.ts`
+    // revealed two trace-level columns with this bug: `TokensPerSecond` and `TimeToFirstTokenMs`. Both have been projected into the CTE and
+    // wired into DEDUP_FIELD_MAPPINGS so `transformMetricForDedup` rewrites the outer reference to the CTE alias.
     it.each([
       {
         metric: "performance.tokens_per_second",
@@ -390,18 +373,11 @@ describe("aggregation-builder", () => {
       },
     );
 
-    // @regression: Dashboard widgets `avgCostPerModel` and `avgTokensPerModel`
-    // emit `pipeline: { field: "trace_id", aggregation: "avg" }` on a
-    // trace-level metric (`performance.total_cost`, `performance.completion_tokens`)
-    // with `groupBy: metadata.model`. The arrayJoin CTE path previously only
-    // rewrote pipelines with `aggregation: "sum"`; `"avg"` (and min/max) fell
-    // through and the metric was silently dropped from the outer SELECT — the
-    // query returned 200 OK with no values, and the UI showed "No data".
-    //
-    // For trace-level columns the CTE already deduplicates by (trace_id,
-    // group_key), so the per-trace inner aggregation is identity — sum/avg/min/max
-    // all collapse to the per-trace scalar, and the outer aggregation equals
-    // the direct aggregation over deduped traces.
+    // @regression: Dashboard widgets `avgCostPerModel` and `avgTokensPerModel` emit `pipeline: { field: "trace_id", aggregation: "avg" }` on a trace-level metric
+    // (`performance.total_cost`, `performance.completion_tokens`) with `groupBy: metadata.model`. The arrayJoin CTE path previously only rewrote pipelines with
+    // `aggregation: "sum"`; `"avg"` (and min/max) fell through and the metric was silently dropped from the outer SELECT — the query returned 200 OK with no values,
+    // and the UI showed "No data". For trace-level columns the CTE already deduplicates by (trace_id, group_key), so the per-trace inner aggregation is identity —
+    // sum/avg/min/max all collapse to the per-trace scalar, and the outer aggregation equals the direct aggregation over deduped traces.
     it.each([
       {
         metric: "performance.total_cost",
@@ -438,14 +414,11 @@ describe("aggregation-builder", () => {
       },
     );
 
-    // @guard: prevent this class of bug from recurring silently. Any
-    // trace-level column referenced via `${ts}.<Column>` in metric-translator
-    // MUST appear in a dedupSubstitutions() source (which is consumed by
-    // transformMetricForDedup to rewrite outer references to the CTE alias)
-    // AND be projected in the CTE. Columns not in this list are handled
-    // specially (see allowlist below). If a new trace-level metric is added
-    // and this test fails, either add the column to the CTE select list +
-    // dedupSubstitutions, or extend the allowlist with a reason.
+    // @guard: prevent this class of bug from recurring silently. Any trace-level column referenced via
+    // `${ts}.<Column>` in metric-translator MUST appear in a dedupSubstitutions() source (which is consumed by
+    // transformMetricForDedup to rewrite outer references to the CTE alias) AND be projected in the CTE. Columns not
+    // in this list are handled specially (see allowlist below). If a new trace-level metric is added and this test
+    // fails, either add the column to the CTE select list + dedupSubstitutions, or extend the allowlist with a reason.
     it("every ${ts}.<Column> reference in metric-translator is handled", async () => {
       const fs = await import("node:fs/promises");
       const path = await import("node:path");
@@ -1443,13 +1416,11 @@ describe("aggregation-builder", () => {
       expect(result.sql).not.toContain("JOIN stored_spans ");
       expect(result.sql).not.toMatch(/SELECT\s+\*\s+FROM\s+stored_spans/);
 
-      // The exact list, not `toContain("SpanAttributes")`. The outer ARRAY JOIN
-      // and the rag.contexts predicate both name SpanAttributes on the `ss`
-      // alias, so a substring check passes even when the subquery does not
-      // select it, and it also cannot see a regression that widens the list.
-      // Both of them: the top-10 part and the total-count part each carry their
-      // own subquery, and pruning one while leaving the other wide would halve
-      // the benefit while every substring assertion stayed green.
+      // The exact list, not `toContain("SpanAttributes")`. The outer ARRAY JOIN and the rag.contexts
+      // predicate both name SpanAttributes on the `ss` alias, so a substring check passes even when the
+      // subquery does not select it, and it also cannot see a regression that widens the list. Both of them:
+      // the top-10 part and the total-count part each carry their own subquery, and pruning one while
+      // leaving the other wide would halve the benefit while every substring assertion stayed green.
       expect(storedSpansSelectLists(result.sql)).toEqual([
         ["TenantId", "TraceId", "SpanId", "SpanAttributes"],
         ["TenantId", "TraceId", "SpanId", "SpanAttributes"],

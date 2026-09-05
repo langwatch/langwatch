@@ -1,14 +1,7 @@
 /**
- * @see specs/experiments-v3/execution-backend.feature - Verdict Identity
- *
  * The identity of a recorded verdict is what `event_log` orders on, and that
  * table is a ReplacingMergeTree. Two rows sharing an identity become one row.
- *
- * Every evaluator runs against every target, so a run with two columns produces
- * two verdicts for the same evaluator on the same row. They are different
- * facts. While the identity left the target out, one of them replaced the other
- * on the way to storage, and the results page drew that column with its output
- * and its cost but no score at all.
+ * @see specs/experiments-v3/execution-backend.feature - Verdict Identity
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -76,10 +69,6 @@ const output = (targetId: string): Command<TargetResultEventData & CommandEnvelo
 
 /**
  * The identity the store orders on, for one recorded event.
- *
- * `handle` is declared as `Promise<Event[]> | Event[]` for handlers that need
- * to read state first. These two build their event from the payload alone and
- * answer at once, so the array is taken directly.
  */
 const identityOfEvent = (result: CommandHandlerResult<Event>): string => {
   const [event] = result as Event[];

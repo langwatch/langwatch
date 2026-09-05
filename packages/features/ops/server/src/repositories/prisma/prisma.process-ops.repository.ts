@@ -22,11 +22,6 @@ function traceIdFromCarrier(carrier: unknown): string | null {
 
 /**
  * How many dead letters one bulk act moves.
- *
- * An unbounded UPDATE over this table holds row locks for as long as it takes,
- * on the highest-volume write path in the system. The cap makes the act
- * bounded and repeatable instead: the count comes back, the operator sees what
- * moved, and pressing again takes the next slice.
  */
 const BULK_RECOVERY_LIMIT = 5_000;
 
@@ -40,12 +35,6 @@ function escapeLike(term: string): string {
 
 /**
  * Fleet-level reads over the process-manager substrate's own tables.
- *
- * The aggregate reads are deliberately cross-tenant — the same posture as the
- * substrate's own wake scanner — so they go through raw SQL with the guard's
- * explicit `-- @tenancy` opt-out; every returned row still carries its
- * project-scoped identity, and the surface they feed is ops-gated. The keyed
- * reads and every write stay on guarded Prisma queries that carry projectId.
  */
 export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
   static create({ prisma }: { prisma: PrismaClient }): ProcessOpsPrismaRepository {
@@ -299,11 +288,6 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
 
   /**
    * Every retired message across the fleet, newest retirement first.
-   *
-   * Ordered by `updatedAt` rather than `createdAt`: a dead row's interesting
-   * moment is when it was RETIRED, and a message that spent 68 hours climbing
-   * the Stripe ladder before dying is days newer than its creation suggests.
-   * An operator opening this mid-incident wants what just broke at the top.
    */
   async findDeadMessages(params: {
     processName?: string;
@@ -379,19 +363,6 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
 
   /**
    * Indexing, deliberately left to ops.
-   *
-   * The reads below scan `status = 'dead'` and sort by `updatedAt`. The
-   * table's only relevant index leads with `status`, which narrows to the
-   * dead rows; the sort over that subset is what is unindexed. That is
-   * acceptable because the dead population is bounded by operator attention
-   * rather than by traffic — a fleet with enough dead messages for this sort
-   * to matter has a far louder problem than the query plan.
-   *
-   * A Prisma migration is the wrong instrument if it ever does matter: a
-   * deploy-time CREATE INDEX takes a SHARE lock on the highest-volume write
-   * path in the system. The schema says as much for the two indexes the
-   * retention sweep wanted, and the answer there is the same one here —
-   * CREATE INDEX CONCURRENTLY, run from the runbook.
    */
   async countDeadByProcessName(): Promise<DeadLetterCount[]> {
     const rows = await this.prisma.$queryRaw<

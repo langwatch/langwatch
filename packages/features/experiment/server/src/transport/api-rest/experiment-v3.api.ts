@@ -2,31 +2,6 @@
  * The experiment WORKBENCH's ten REST doors: the run it starts, the run it
  * stops, the three ways a run is read back, and the four the saved setup is
  * read and written through.
- *
- * `/api/experiments` is shared with the packaged experiment family next door,
- * which owns the bare list and create; this app owns everything under it that
- * the workbench and a CI job reach, and it is registered FIRST so its literal
- * `/runs` siblings are not swallowed by that family's `:slug`.
- *
- * ## Two credential classes, and why neither goes through the framework chain
- *
- * `/execute` and `/abort` are `credential: "session"` — the workbench streams
- * UI state to a browser, and the abort is authorized against the run's owner
- * rather than against a key. The other eight are `credential: "apiKey"`, and
- * they resolve the key themselves because the refusal they publish carries the
- * handled ceiling payload (code, permission, tips) that a CI job branches on.
- * Both arrive as ports so a process resolves a person and a key exactly once,
- * however many families ask.
- *
- * ## What is absent, and what each absence answers
- *
- * The RUN LOOP is a composition choice, not a fact of this package: a process
- * with no progress store cannot serve a poll, and one with no run ports cannot
- * start a stream. Rather than mount half a family, the four run routes refuse
- * BY NAME with `service_unavailable` and the four workbench routes — which need
- * nothing but the application — keep answering. That is the same split the
- * organization family's invitation half already records: a door that cannot
- * answer says so, instead of answering something a caller will act on.
  */
 import { handlerManagedAuth } from "@langwatch/api";
 import {
@@ -117,10 +92,6 @@ export type ExperimentV3StartRunInput = Omit<
 
 /**
  * The run loop this process composed, or the holes where it did not.
- *
- * `ports` and `progress` are nullable together with intent: the orchestrator
- * needs the first to run a cell and the second to be polled afterwards, and a
- * process holding one without the other would start runs nothing can report on.
  */
 export type ExperimentV3RunLoop = Readonly<{
   ports: ExperimentRunPorts | null;
@@ -153,12 +124,8 @@ export interface ExperimentV3RestPorts<TSession extends ExperimentV3RestSession>
   /** The run loop, as this process composed it. */
   run: ExperimentV3RunLoop;
   /**
-   * Records that a person ran an experiment, where this process has somewhere
-   * to record it.
-   *
-   * Optional, and absent on a process with no product-analytics sink. A run
-   * that completed must never fail because the adoption signal had nowhere to
-   * go, so an absent sink is a signal not sent rather than a run not finished.
+   * Records that a person ran an experiment, where this process has somewhere to
+   * record it.
    */
   recordExperimentRan?:
     | ((input: {
@@ -187,13 +154,6 @@ export class ExperimentRunLoopUnavailableError extends HandledError {
 
 /**
  * The errors these routes answer with.
- *
- * Both come out flat, but by different routes. A 404 is a thrown
- * `HandledError` (`ExperimentNotFoundError`, `RunNotFoundError`) that the
- * boundary serialises, so it carries the code in `error` plus the error's
- * `meta` spread alongside it. A 401 is answered by the credential port, which
- * forwards the full handled denial payload when there is one — the same open
- * shape covers both.
  */
 const experimentErrorResponses = {
   401: {
@@ -217,9 +177,6 @@ const experimentErrorResponses = {
 /**
  * The answer every workbench route has for a slug that names another kind of
  * experiment, such as a DSPy run or a legacy batch evaluation.
- *
- * Only the workbench routes reach it. The run routes look the experiment up by
- * type, so for them the same slug is a 404 instead.
  */
 const workbenchTypeErrorResponse = {
   400: {
@@ -234,12 +191,6 @@ const workbenchTypeErrorResponse = {
 
 /**
  * The two extra answers a workbench WRITE has.
- *
- * A 409 means someone else saved on top of the state this caller read; its
- * `currentVersion` is what to read again. A 400 means the request was refused
- * before anything was written: the setup does not match the schema, it points
- * at a prompt, dataset or evaluator this project no longer has, or the slug
- * names another kind of experiment.
  */
 const workbenchWriteErrorResponses = {
   400: {
@@ -265,11 +216,6 @@ const workbenchWriteErrorResponses = {
 /**
  * Query parameters and path segments that are optional positive integers, or
  * nothing.
- *
- * The whole value has to be digits. `parseInt` reads the leading number and
- * discards the rest, so it turns `3abc` into 3 and `1.5` into 1: a mistyped
- * `/versions/3abc/restore` would then restore version 3 instead of answering
- * 404, which is a write the caller never asked for.
  */
 const parseOptionalPositiveInt = (value: string | undefined) => {
   if (value === undefined) return undefined;
@@ -351,13 +297,11 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
 
   secured.access(sessionAuth).post(
     "/execute",
-    // Kept out of the published document. The route authenticates with a
-    // browser session and streams workbench UI state, so an API-key caller
-    // has no way to reach it; publishing it would document an endpoint that
-    // answers 401 to everyone reading the reference. `zValidator` alone would
-    // have emitted an operation here — the body schema is enough metadata for
-    // the generator — so the exclusion has to be stated, not merely implied
-    // by leaving `describeRoute` off.
+    // Kept out of the published document. The route authenticates with a browser session and streams
+    // workbench UI state, so an API-key caller has no way to reach it; publishing it would document an
+    // endpoint that answers 401 to everyone reading the reference. `zValidator` alone would have emitted
+    // an operation here — the body schema is enough metadata for the generator — so the exclusion has to
+    // be stated, not merely implied by leaving `describeRoute` off.
     describeRoute({ hide: true }),
     zValidator("json", executionRequestSchema),
     async (c) => {
@@ -470,12 +414,11 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
           });
 
           for await (const event of orchestrator) {
-            // The board first, then the run store, then the customer. The cells
-            // go in before the run reports it ended, for the same reason the
-            // backend runner writes them first: a caller that reads "done" and
-            // then reads the workbench finds them there. The writer swallows
-            // its own failures, so a write that fails costs the page a refresh
-            // and never the run.
+            // The board first, then the run store, then the customer. The cells go in
+            // before the run reports it ended, for the same reason the backend runner
+            // writes them first: a caller that reads "done" and then reads the workbench
+            // finds them there. The writer swallows its own failures, so a write that
+            // fails costs the page a refresh and never the run.
             await resultsWriter?.record(event);
             // The `execution_started` frame names the run, and the page hands
             // that id to a poller as soon as it reads it, so a frame released
@@ -499,14 +442,11 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
           logger.error({ error, projectId }, "Orchestrator error");
           ports.reportError?.(error, { projectId });
 
-          // Through the same mapper the orchestrator uses: a handled error
-          // travels as its code plus `domainError` (so the client renders
-          // registry copy), and anything else becomes a fixed generic string.
-          // Writing `(error as Error).message` here put a Prisma string or a Go
-          // net error straight into the customer's cell.
-          //
-          // No `rowIndex`: the orchestrator itself threw, so the whole run is
-          // gone and the mapper says so, rather than blaming one row.
+          // Through the same mapper the orchestrator uses: a handled error travels as its code plus
+          // `domainError` (so the client renders registry copy), and anything else becomes a fixed
+          // generic string. Writing `(error as Error).message` here put a Prisma string or a Go net
+          // error straight into the customer's cell. No `rowIndex`: the orchestrator itself threw,
+          // so the whole run is gone and the mapper says so, rather than blaming one row.
           const failure = mapThrownErrorEvent({ error });
           if (failure.type === "error") {
             // The code, never the thrown message: a poller reads this straight
@@ -548,15 +488,11 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
 
     const { ports: runPorts, progress } = requireRunLoop();
 
-    // Ownership check: holding evaluations:manage on `projectId` does NOT grant
-    // the right to abort a run that belongs to a different project. The runId is
-    // attacker-controlled, so verify the run is owned by the authenticated
-    // project before signaling an abort. Without this, a user could abort another
-    // tenant's experiment run by guessing its runId.
-    //
-    // In-flight runs register their owner through the abort port, which is set
-    // before the first frame of either path. The progress store is the
-    // fallback: it also holds the owner, for as long as the run state lives.
+    // Ownership check: holding evaluations:manage on `projectId` does NOT grant the right to abort a run that belongs
+    // to a different project. The runId is attacker-controlled, so verify the run is owned by the authenticated
+    // project before signaling an abort. Without this, a user could abort another tenant's experiment run by guessing
+    // its runId. In-flight runs register their owner through the abort port, which is set before the first frame of
+    // either path. The progress store is the fallback: it also holds the owner, for as long as the run state lives.
     const ownerProjectId =
       (await runPorts.abort.getRunningProjectId(runId)) ??
       (await progress.tryGetRunState(runId))?.projectId;
@@ -654,13 +590,11 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
     async (c) => {
       const { slug } = c.req.param();
 
-      // Starting a run CREATES a run row against an experiment that already
-      // exists; it does not administer the evaluations family. Asking for
-      // `:manage` here refused every least-privilege key that legitimately holds
-      // the create — the Langy session key among them, which stops short of
-      // `:manage` precisely because `:manage` implies the delete. `:manage` still
-      // satisfies `:create` through the permission hierarchy, so narrowing the
-      // grain takes access away from nobody.
+      // Starting a run CREATES a run row against an experiment that already exists; it does not administer
+      // the evaluations family. Asking for `:manage` here refused every least-privilege key that
+      // legitimately holds the create — the Langy session key among them, which stops short of `:manage`
+      // precisely because `:manage` implies the delete. `:manage` still satisfies `:create` through the
+      // permission hierarchy, so narrowing the grain takes access away from nobody.
       const credential = await ports.authenticateCredential({
         request: c.req.raw,
         permission: "evaluations:create",
@@ -1100,19 +1034,11 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
       const { project, markUsed } = credential;
       const { progress } = requireRunLoop();
 
-      // Resolve the owning experiment. The results store is keyed on
-      // (TenantId, ExperimentId, RunId) — runId alone is not unique across
-      // experiments (SDK callers can reuse a stable run_id) — so we must know
-      // the experimentId before we query results.
-      //
-      // Two sources, tried in order:
-      //   1. the progress store — covers fresh runs.
-      //   2. experimentSlug query param → a row lookup — covers older runs
-      //      whose run state has expired but whose result rows remain.
-      //
-      // The previous "most recently updated experiment in the project"
-      // fallback was unsafe: it returned cryptic 404s whenever the user had
-      // edited any other experiment after the one that owned this run.
+      // Resolve the owning experiment. The results store is keyed on (TenantId, ExperimentId, RunId) — runId alone is not unique across
+      // experiments (SDK callers can reuse a stable run_id) — so we must know the experimentId before we query results. Two sources, tried in
+      // order: 1. the progress store — covers fresh runs. 2. experimentSlug query param → a row lookup — covers older runs whose run state has
+      // expired but whose result rows remain. The previous "most recently updated experiment in the project" fallback was unsafe: it returned
+      // cryptic 404s whenever the user had edited any other experiment after the one that owned this run.
       const runState = await progress.tryGetRunState(runId);
       const slugFromState =
         runState && runState.projectId === project.id ? runState.experimentSlug : undefined;
@@ -1432,13 +1358,11 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
       const experiments = ports.experiments();
       const workbench = await experiments.getWorkbenchState({ projectId: project.id, slug });
 
-      // A path segment that is not a version number names a version this
-      // experiment never had, which is the same answer as a number it never
-      // had. One code, so a caller branches once.
-      //
-      // The reported version is 0, a number no experiment version ever has.
-      // `Number("abc")` is `NaN`, which JSON writes as `null`, so a caller that
-      // reads `version` as a number could not parse its own 404.
+      // A path segment that is not a version number names a version this experiment
+      // never had, which is the same answer as a number it never had. One code, so a
+      // caller branches once. The reported version is 0, a number no experiment
+      // version ever has. `Number("abc")` is `NaN`, which JSON writes as `null`, so
+      // a caller that reads `version` as a number could not parse its own 404.
       const parsedVersion = parseOptionalPositiveInt(version);
       if (parsedVersion === undefined) {
         throw new ExperimentVersionNotFoundError({
@@ -1467,12 +1391,6 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
 
 /**
  * `/api/evaluations/v3/*` — the family's older name, re-dispatched.
- *
- * Takes the canonical app rather than importing it, for the same reason the
- * OTLP path aliases do: an alias that can be mounted without the family it
- * forwards into is an alias that can 404 on a deployment serving the routes.
- * Registered AFTER the canonical family, and kept while the Python SDK still
- * calls the old paths.
  */
 export function createExperimentV3LegacyAliasRestApp(options: {
   canonical: MountableRestApp;

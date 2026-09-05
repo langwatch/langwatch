@@ -1,17 +1,6 @@
 /**
- * @vitest-environment node
- *
  * The experiment application: the rules that moved off its two doors onto it.
- *
- *   - attributing a workbench write to its caller, stamped in four places
- *     before this (three in tRPC, one in REST);
- *   - what an experiment nobody has run aggregates to, defaulted twice in the
- *     REST list and read routes;
- *   - what a create with no setup starts from;
- *   - reading a workflow that may already be gone, caught in four handlers;
- *   - what archiving an experiment cascades into.
- *
- * The services are stubbed. Nothing here speaks HTTP or tRPC.
+ * @vitest-environment node
  */
 import type { ResolvedApiKeyToken } from "@langwatch/api-key-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";

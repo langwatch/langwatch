@@ -1,11 +1,7 @@
 /**
- * What a target or an evaluator is actually handed at dispatch, and
- * whether it should be dispatched at all. Resolves a cell's mappings into
- * an input record, applies the comparison branch that bypasses per-target
- * mappings, and answers the two dispatch guards: does this evaluator
- * resolve any input, and does this evaluator COLUMN. Both exist because an
- * evaluator resolving nothing does not fail — `exact_match` compares "" to
- * "" and reports a pass, and that pass counts in the run's pass rate.
+ * What a target or an evaluator is actually handed at dispatch, and whether it should be dispatched at all. Resolves a cell's mappings into an input record, applies the
+ * comparison branch that bypasses per-target mappings, and answers the two dispatch guards: does this evaluator resolve any input, and does this evaluator COLUMN. Both exist
+ * because an evaluator resolving nothing does not fail — `exact_match` compares "" to "" and reports a pass, and that pass counts in the run's pass rate.
  */
 
 import {

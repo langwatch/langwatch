@@ -1,21 +1,7 @@
 /**
+ * A personal workspace is one team with exactly one member, its owner, and it cannot be archived: the uniqueness of one personal team per (organization, owner) covers archived rows while the provisioning lookup skips them, so an archived workspace holds the owner's only slot and nothing can hand it back.
  * @vitest-environment node
- *
  * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
- *
- * A personal workspace is one team with exactly one member, its owner, and it
- * cannot be archived: the uniqueness of one personal team per (organization,
- * owner) covers archived rows while the provisioning lookup skips them, so an
- * archived workspace holds the owner's only slot and nothing can hand it back.
- *
- * Ported from `personal-workspace-invariants.integration.test.ts` on
- * platform/app, which drove the deleted `appRouter`. The refusals moved here:
- * `OrganizationService.archiveTeam` and `.addTeamMember` are the seam that
- * raises `PersonalTeamProtectedError`, and `.updateTeam` is the write that
- * deliberately stays open, because renaming a workspace changes nothing about
- * its shape.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it.
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

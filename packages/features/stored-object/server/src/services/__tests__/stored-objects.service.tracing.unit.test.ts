@@ -1,13 +1,6 @@
 /**
- * @vitest-environment node
- *
  * The spans the stored-object byte paths open.
- *
- * An operator debugging a slow ingest or a broken `/api/files/:id` read has
- * only these two spans to work from: without them the storage call is time
- * attributed to whatever route happened to be on the stack. The names are
- * asserted because a rename is what silently empties an operator's saved
- * query.
+ * @vitest-environment node
  */
 import { Readable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";

@@ -18,11 +18,6 @@ export type StoredObjectStorageDriverFactory = () => StoredObjectStorageDriver |
 
 /**
  * Provider-neutral scheme dispatch owned by Stored Objects.
- *
- * The app and Worker roots supply drivers and configuration; this registry
- * owns only dispatch and Azure's lazy registration policy. In particular, a
- * configured Azure read driver is not constructed until an azure-blob URI is
- * actually read.
  */
 export class StoredObjectStorageRegistry extends StoredObjectStoragePort {
   constructor(input: {

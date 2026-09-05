@@ -1,14 +1,6 @@
 /**
  * Unit tests for the shared timeseries row parser
  * (`repositories/_timeseries-row-parser.ts`).
- *
- * Pins the bucket-normalisation contract: additive series (counts / sums)
- * default missing buckets to 0 because "no rows" really is zero, while
- * average-type series (avg / min / max / percentiles) stay absent — a
- * defaulted 0 there fabricates a value, e.g. a 0% pass rate on a day the
- * evaluator never ran, which made the Evaluations-page card show 25% while
- * the analytics donut correctly showed 100% for the same evaluator.
- * See specs/analytics/evaluation-pass-rate-consistency.feature.
  */
 
 import { describe, expect, it } from "vitest";

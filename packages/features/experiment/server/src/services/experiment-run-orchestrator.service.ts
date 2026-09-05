@@ -317,11 +317,9 @@ export class ExperimentRunOrchestratorService {
   ): { detail: string; errorType: string } => processComparisonSkipMessage(reason);
 
   /**
-   * The Phase 2 back-fill event for one REUSED (not executed) candidate
-   * output (#5789 fix 2), or `null` when this entry does not need one: it
-   * was already produced this run, its key does not parse to a row/target
-   * pair, its row is outside this run's scope, the row no longer exists, or
-   * the seeded output itself is absent.
+   * The Phase 2 back-fill event for one REUSED (not executed) candidate output (#5789 fix 2), or `null` when this
+   * entry does not need one: it was already produced this run, its key does not parse to a row/target pair, its row
+   * is outside this run's scope, the row no longer exists, or the seeded output itself is absent.
    */
   static buildSeededTargetResultEvent(
     key: string,
@@ -396,10 +394,9 @@ export class ExperimentRunOrchestratorService {
     });
 
   /**
-   * Prices an LLM node's token usage at the project's canonical model rate.
-   * Kept as its own tiny implementation (not a delegation) — it only reaches
-   * `cost`, and {@link ExperimentCellExecutionService} is built from the
-   * full port bag plus a workflow service this call site does not have.
+   * Prices an LLM node's token usage at the project's canonical model rate. Kept as its own tiny implementation (not
+   * a delegation) — it only reaches `cost`, and {@link ExperimentCellExecutionService} is built from the full port
+   * bag plus a workflow service this call site does not have.
    */
   static priceMetrics = async (
     cost: ExperimentModelCostPort,
@@ -478,10 +475,9 @@ export class ExperimentRunOrchestratorService {
   }
 
   /**
+   * turn through the relay dispatcher, since the agent runs in the customer's own process. Each row is
+   * its own conversation, no history carried. Delegates to {@link ExperimentConnectedCellService}.
    * Executes a single cell whose target is a connected agent (ADR-128): one
-   * turn through the relay dispatcher, since the agent runs in the
-   * customer's own process. Each row is its own conversation, no history carried.
-   * Delegates to {@link ExperimentConnectedCellService}.
    */
   static async *executeConnectedCell(input: ConnectedCellInput): AsyncGenerator<EvaluationV3Event> {
     const { ports, workflows, dispatch, sleep, now, ...cellInput } = input;

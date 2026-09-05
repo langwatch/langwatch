@@ -10,13 +10,8 @@ import type {
 const logger = createLogger("langwatch:task:model-provider-migrate-custom-models");
 
 /**
- * Converts every legacy `string[]` custom-model column to `CustomModelEntry[]`.
- *
- * A row already in object form is skipped, so a re-run costs one read per row
- * and writes nothing. Scoped project by project rather than table-wide
- * because the client is the process's guarded one: a `ModelProvider` is
- * addressed through its scopes, and a query that named no tenant would be
- * refused by the tenancy guard rather than answered.
+ * Converts every legacy `string[]` custom-model column to
+ * `CustomModelEntry[]`.
  */
 export async function runCustomModelsMigration({
   database,
@@ -84,10 +79,6 @@ function updateDataFor(result: {
 /**
  * The task-launcher entry — `pnpm --filter @langwatch/tasks task
  * model-provider-migrate-custom-models`.
- *
- * `database` is a thunk for the same reason as `LwqlProvisionTask`'s: the
- * launcher builds the whole catalogue before it knows which task was asked
- * for, so resolving a possibly-absent handle is deferred to `run()`.
  */
 export class ModelProviderCustomModelsMigrateTask extends Task {
   readonly name = "model-provider-migrate-custom-models";

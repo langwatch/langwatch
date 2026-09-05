@@ -1,9 +1,6 @@
 /**
  * The stored-objects table as its readers see it: seven operations over
  * content-addressed rows, every one scoped to a project first.
- *
- * The service holds this class; the ClickHouse implementation is chosen at
- * the composition root.
  */
 import type { StoredObject } from "./stored-objects.row";
 

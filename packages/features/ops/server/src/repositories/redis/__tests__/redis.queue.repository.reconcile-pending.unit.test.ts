@@ -12,14 +12,6 @@ const LEASE_MS = 30_000;
 
 /**
  * Minimal in-memory stand-in for the Redis commands a reconcile pass issues.
- *
- * `zscan`/`sscan` page for real (a page holds at most COUNT entries) so the
- * paging loops are exercised rather than short-circuited, and `scan` is a spy
- * that records any keyspace walk so a test can assert none happens.
- *
- * `evalsha` models the marker-TTL script rather than running it; the Lua itself
- * is covered against a real Redis in
- * `__tests__/integration/pending-counter-reconcile.integration.test.ts`.
  */
 class FakeRedis {
   readonly strings = new Map<string, string>();
@@ -179,9 +171,8 @@ class FakeRedis {
   }
 
   /**
-   * Models the three cached scripts, told apart by their first key: the fenced
-   * counter write and the marker re-arm both act on the marker (and are then
-   * separated by arity), while the prune acts on the pending index.
+   * Models the three cached scripts, told apart by their first key: the fenced counter write and the marker re-arm
+   * both act on the marker (and are then separated by arity), while the prune acts on the pending index.
    */
   // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional evalsha signature
   async evalsha(

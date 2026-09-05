@@ -8,17 +8,6 @@ import {
 
 /**
  * One model call, asked to say the same thing in English.
- *
- * The model is resolved through the ordinary cascade at the `translate.text`
- * feature key, so a project that pointed that key somewhere specific gets the
- * model it chose — and a project that configured nothing gets the same
- * "configure a default" refusal every other surface gives, rather than a
- * silently different model.
- *
- * The gateway arrives with the CALL rather than at construction, because the
- * service hands the port itself: composing this adapter over the service that
- * owns it would be a cycle, and the cycle is exactly what the port's parameter
- * exists to avoid.
  */
 export class VercelAiModelTranslationAdapter extends ModelTranslationPort {
   static create(

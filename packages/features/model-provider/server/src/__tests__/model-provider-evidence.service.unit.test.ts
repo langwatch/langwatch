@@ -1,12 +1,6 @@
 /**
  * The setup checklist's provider step, read through this feature's own
  * persistence.
- *
- * Two things are pinned here and they are different failures. The CASCADE — a
- * provider attached at the organization counts toward every project under it —
- * is the answer the step gets wrong when it matches the project scope alone.
- * The COLUMNS the read selects are what keeps the question answerable without
- * the deployment's cipher: an id, never `customKeys`.
  */
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -51,11 +45,9 @@ function testDatabase(row: { id: string } | null) {
 describe("ModelProviderEvidenceService", () => {
   describe("given a project whose organization holds an enabled provider", () => {
     /**
-     * The read that answers the setup checklist's provider step is this
-     * feature's, so the `where` it issues is one place and the columns it
-     * selects are governed by the same rules as every other read of this
-     * table. It selects an id: a credential column never leaves the database
-     * to answer a boolean.
+     * The read that answers the setup checklist's provider step is this feature's, so the `where` it
+     * issues is one place and the columns it selects are governed by the same rules as every other read of
+     * this table. It selects an id: a credential column never leaves the database to answer a boolean.
      */
     it("matches the project, team and organization scopes without selecting a credential", async () => {
       const { findFirst, database } = testDatabase({ id: "provider-1" });

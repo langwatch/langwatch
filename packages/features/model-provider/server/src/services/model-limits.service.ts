@@ -1,14 +1,5 @@
 /**
  * The registry's context-window and output ceilings for one model id.
- *
- * Read by the model pickers, which cap a max-tokens field at what the model
- * will actually accept. The lookup tries the id as given and then its bare
- * name, because a caller names a model either way (`openai/gpt-5` and `gpt-5`
- * are the same row of the catalogue).
- *
- * Answers `null` rather than throwing on anything it cannot resolve: a picker
- * that cannot find a ceiling shows no ceiling, which is the honest answer for
- * a model the catalogue has never heard of.
  */
 import { getModelById, type ModelLimits } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";

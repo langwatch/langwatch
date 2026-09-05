@@ -1,13 +1,5 @@
 /**
  * Shared real-Postgres fixtures for the model-provider integration suites.
- *
- * Every suite that ports a scenario from main's `platform/app/src/server/
- * modelProviders/__tests__/*.integration.test.ts` needs the same three
- * things: an org/team/project tenancy fixture, a `ModelCostProjectPort`
- * backed by real rows (not a mock that echoes what the test wants), and an
- * identity credential codec so `PrismaModelProviderRepository` does not need
- * `CREDENTIALS_SECRET`. Centralising them keeps each suite about the
- * behaviour it names.
  */
 import { randomBytes } from "node:crypto";
 import {
@@ -57,11 +49,6 @@ const notImplemented = (): never => {
 
 /**
  * Reads real project + team rows this integration suite created.
- *
- * Only the reads `ModelProviderScopeService`/`ModelProviderProjectScopeService`
- * actually call are backed by Postgres; the rest of `ProjectService`'s surface
- * is unused by the model-provider services under test here and throws if a
- * future caller starts depending on it.
  */
 export class PrismaProjects extends ProjectService {
   constructor(private readonly prisma: PrismaClient) {
@@ -268,10 +255,9 @@ export const noopConnectionRateLimiter = { assertAvailable: async () => {} };
 export const noopOnboardingDefaults = { seed: async () => {} };
 
 /**
- * A real `ModelProviderCatalog` (routing-handle rules, model metadata, static
- * cost rates all come from the base class) with only the network-touching
- * verdict controllable, so a probe test can assert whether it fired without
- * a real outbound request.
+ * A real `ModelProviderCatalog` (routing-handle rules, model metadata, static cost rates
+ * all come from the base class) with only the network-touching verdict controllable, so a
+ * probe test can assert whether it fired without a real outbound request.
  */
 export class TestModelProviderCatalog extends ModelProviderCatalog {
   testConnectionCalls: Array<{ provider: string; customKeys: Record<string, unknown> }> = [];

@@ -28,11 +28,6 @@ export abstract class OpsExplainClientResolver {
 
 /**
  * Resolving and running the operator-only EXPLAIN, as the service asks for it.
- *
- * No `TenantId` scoping, deliberately: the clickhouse-optimizer agent this
- * endpoint serves legitimately runs EXPLAINs across the whole fleet, which
- * is why this repository sits outside the tenant-scoped access pattern
- * every other repository follows.
  */
 export abstract class OpsExplainRepository {
   /**
@@ -43,10 +38,9 @@ export abstract class OpsExplainRepository {
   abstract resolveClient(): OpsExplainClientResolution | null;
 
   /**
-   * Runs the (already server-wrapped) EXPLAIN query. `guardrails` are
-   * ClickHouse settings sent only for the fallback client — the
-   * `langwatch_ops` user's `readonly_safe` profile forbids client-side
-   * setting modifications and already enforces the same caps server-side.
+   * Runs the (already server-wrapped) EXPLAIN query. `guardrails` are ClickHouse settings sent only for
+   * the fallback client — the `langwatch_ops` user's `readonly_safe` profile forbids client-side setting
+   * modifications and already enforces the same caps server-side.
    */
   abstract runExplain(params: {
     client: OpsExplainQueryClient;

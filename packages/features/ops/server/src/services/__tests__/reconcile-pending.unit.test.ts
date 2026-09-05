@@ -39,10 +39,9 @@ describe("OpsMetricsCollectorService", () => {
     describe("given this instance measured the drift itself", () => {
       describe("when reconcilePending runs", () => {
         /**
-         * The published figure and the locally measured one are deliberately
-         * different here. Reporting the local sum (40) would pass on a test
-         * that used matching numbers, so they are kept apart to make the two
-         * outcomes distinguishable.
+         * The published figure and the locally measured one are deliberately different
+         * here. Reporting the local sum (40) would pass on a test that used matching
+         * numbers, so they are kept apart to make the two outcomes distinguishable.
          */
         it("reports the published drift rather than its own measurement", async () => {
           const ops = OpsMetricsTestAdapter.create();

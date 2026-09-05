@@ -87,11 +87,9 @@ describe("QueueService", () => {
 
   describe("operator-action audit", () => {
     /**
-     * These six acts wrote no audit row at all before this suite existed, and
-     * `QueueControlAction` had no name for any of them, so the gap could not
-     * be closed by accident. Each act is recorded when it changed something,
-     * with the metadata that is unrecoverable afterwards; the table at the end
-     * of this block covers the other half, that none of them records a no-op.
+     * These six acts wrote no audit row at all before this suite existed, and `QueueControlAction` had no name for any of them, so
+     * the gap could not be closed by accident. Each act is recorded when it changed something, with the metadata that is
+     * unrecoverable afterwards; the table at the end of this block covers the other half, that none of them records a no-op.
      */
     const auditedService = (overrides: Record<string, unknown>) => {
       const repo = createMockRepo(overrides);
@@ -271,11 +269,9 @@ describe("QueueService", () => {
     });
 
     /**
-     * One case per gate. Each act is gated on its own "did anything change"
-     * field, so making any single one of them append unconditionally fills the
-     * log with clicks while every other test in this file stays green. A
-     * seventh audited act arriving without its no-op case shows up here as a
-     * missing row rather than as an audit log nobody trusts.
+     * One case per gate. Each act is gated on its own "did anything change" field, so making any single one of them append
+     * unconditionally fills the log with clicks while every other test in this file stays green. A seventh audited act arriving
+     * without its no-op case shows up here as a missing row rather than as an audit log nobody trusts.
      */
     const noOpActs: {
       name: string;

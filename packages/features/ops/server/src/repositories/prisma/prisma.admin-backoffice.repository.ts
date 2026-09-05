@@ -18,10 +18,6 @@ import { AdminBackofficeRepository } from "../admin-backoffice.repository";
 
 /**
  * Private Prisma/React-Admin adapter for the Ops backoffice surface.
- *
- * The transport deliberately does not know that this is backed by Prisma or
- * ra-data-simple-prisma. Keeping the compatibility adapter here preserves the
- * existing response shape while the shared Ops contract stays portable.
  */
 export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
   private constructor(private readonly database: AdminDatabase) {

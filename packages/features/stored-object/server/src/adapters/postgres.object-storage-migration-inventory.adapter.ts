@@ -11,14 +11,6 @@ import type {
 /**
  * The three pages a migration walks: the projects in scope, the live
  * stored-object rows under each, and the datasets whose chunks ride along.
- *
- * `privateOrganizations` is the BYOC exclusion — an organization routed to its
- * own S3 account is not this deployment's to move — and it arrives as the
- * route map the process was configured with rather than being read here.
- *
- * Reads a repository and Prisma directly, which is what makes this an
- * adapter rather than a task: a task calls services and adapters, never a
- * repository.
  */
 export class PostgresObjectStorageMigrationInventoryAdapter implements MigrationInventory {
   static create(input: {

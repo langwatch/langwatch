@@ -1,23 +1,7 @@
 /**
- * @vitest-environment node
- *
- * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
- *
  * When a personal workspace goes, and what happens if its owner comes back.
- *
- * Moved from `personal-workspace-lifecycle.integration.test.ts` on
- * platform/app. That file drove the whole path through the deleted
- * `appRouter` and the deleted `PersonalWorkspaceService`; the two halves of
- * the behaviour it tested both live in this package now —
- * `PrismaOrganizationMembershipRepository.deleteMember` archives the
- * personal team and project on removal, and
- * `PrismaOrganizationRepository.ensurePersonalWorkspace` recognises and
- * revives an archived workspace on the next `ensure`. The RBAC re-grant
- * assertion (`hasProjectPermission`) does not travel: it belongs to the
- * authz package now, not this one.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it so the
- * suite stays runnable on a box with no database.
+ * @vitest-environment node
+ * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

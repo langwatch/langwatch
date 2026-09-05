@@ -1,9 +1,5 @@
 /**
  * Byte I/O for stored objects, addressed by storage URI.
- *
- * The service holds this port; the registry in `adapters/` implements it by
- * dispatching on the URI's scheme to whichever provider drivers the process
- * composed.
  */
 import type { Readable } from "node:stream";
 

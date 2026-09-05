@@ -1,8 +1,6 @@
 /**
- * The writer's detail cycle publishes windowed (hour/day/week/all-time)
- * percentiles alongside the strip's last-200-jobs tiles — real time windows
- * need time-bucketed data, not a sample.
- *
+ * The writer's detail cycle publishes windowed (hour/day/week/all-time) percentiles alongside the
+ * strip's last-200-jobs tiles — real time windows need time-bucketed data, not a sample.
  * Spec: packages/features/ops/specs/dashboard-latency-windows.feature
  */
 import IORedis, { type Redis } from "ioredis";

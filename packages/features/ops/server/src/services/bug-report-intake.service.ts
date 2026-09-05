@@ -11,11 +11,9 @@ import type {
 const logger = createLogger("langwatch:bug-reports");
 
 /**
- * Intake for issue reports sent by customers' coding agents (the CLI
- * `langwatch report` command and the MCP report tool). Deliberately
- * unauthenticated: the reporter may be struggling precisely because setup
- * failed, so a report must never require a working login. An API key, when
- * present, only enriches the report with a project link and is never a gate.
+ * Intake for issue reports sent by customers' coding agents (the CLI `langwatch report` command and the MCP report tool).
+ * Deliberately unauthenticated: the reporter may be struggling precisely because setup failed, so a report must never require
+ * a working login. An API key, when present, only enriches the report with a project link and is never a gate.
  */
 
 export class BugReportRateLimitedError extends HandledError {

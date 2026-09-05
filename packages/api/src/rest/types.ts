@@ -63,17 +63,6 @@ export type HttpMethod = "get" | "post" | "put" | "delete" | "patch";
 
 /**
  * Context key holding the endpoint a request matched, as `METHOD /path`.
- *
- * The REGISTERED path, not the URL that arrived: `GET /things/:id` rather than
- * `GET /things/th_01J9Z...`. That is the difference between a field you can
- * group by and one with a distinct value per request — the request log already
- * carries the concrete `url`, and what it lacked was the endpoint identity to
- * aggregate on.
- *
- * Set by the version-context middleware, which is first in every endpoint's
- * stack, so it is present for anything downstream of routing: the request log,
- * and the output-validation failure in `response.ts`, which could otherwise say
- * only that *an* endpoint returned the wrong shape.
  */
 export const ENDPOINT_ROUTE = "endpointRoute" as const;
 
@@ -82,19 +71,13 @@ export const ENDPOINT_INPUT = "endpointInput" as const;
 
 /**
  * Context key holding the family that actually resolved the request.
- *
- * Stamped by the route stack, not by the mount, because twenty-one families
- * share the `/api` base path: every one of their app-level middlewares matches
- * `/api/prompts`, and only the one owning the route ever reaches its handler.
  */
 export const REQUEST_FAMILY = "requestFamily" as const;
 
 /**
- * Context key marking that a request log record is already owed for this
- * request. See {@link REQUEST_FAMILY}: a request passing through twenty-one
- * mounted families passed through twenty-one request loggers and wrote
- * twenty-one identical lines. The outermost one owns the record; the rest
- * stand down.
+ * Context key marking that a request log record is already owed for this request. See {@link REQUEST_FAMILY}: a
+ * request passing through twenty-one mounted families passed through twenty-one request loggers and wrote
+ * twenty-one identical lines. The outermost one owns the record; the rest stand down.
  */
 export const REQUEST_LOG_CLAIM = "requestLogClaim" as const;
 
@@ -104,15 +87,6 @@ export const REQUEST_LOG_CLAIM = "requestLogClaim" as const;
 
 /**
  * The base request context handed to `.provide()` factories.
- *
- * Generic `TProject` lets consumers type `base.project` downstream:
- *
- * ```ts
- * createService<Project>({ name: "things" })
- * ```
- *
- * Provided services themselves reach handlers as typed context variables
- * (`c.get("things")`), not through this object.
  */
 export interface BaseApp<TProject = unknown> {
   project: TProject;
@@ -124,12 +98,6 @@ export interface BaseApp<TProject = unknown> {
 
 /**
  * A family's Hono app as a mount target.
- *
- * Each family carries its own request-context shape, and Hono's environment
- * parameter is invariant, so no single concrete `Hono<E>` accepts them all.
- * This is the same erasure Hono's own `route()` signature performs on the
- * sub-app it mounts: the parent reads nothing out of the child's environment,
- * so nothing is lost and the caller needs no cast of its own.
  */
 export type MountableRestApp = Hono<any, any, any>;
 
@@ -139,10 +107,6 @@ export type MountableRestApp = Hono<any, any, any>;
 
 /**
  * OpenAPI documentation for an endpoint, declared via `.withDocs(...)`.
- *
- * Every dated mount of a documented endpoint — plus `latest` — reaches the
- * published document; `preview` mounts serve traffic but are never documented.
- * These options shape each documented operation.
  */
 export interface EndpointDocs {
   /** Short summary shown next to the operation in the reference. */
@@ -176,9 +140,6 @@ export interface EndpointDocs {
  * The resolved definition of one endpoint, produced by merging the service
  * defaults, the group defaults and the endpoint's own declaration chain
  * (service < group < endpoint; middleware concatenates in that order).
- *
- * This is what travels on `MountedRoute.config`: opt-outs are already resolved,
- * so `rateLimit` / `cache` appear only when they actually apply.
  */
 export interface EndpointDef {
   /** JSON body schema. */
@@ -197,24 +158,12 @@ export interface EndpointDef {
   docs?: EndpointDocs;
   /**
    * Auth behaviour for this endpoint.
-   * - `"default"` -- use the service-level auth middleware (default).
-   * - `"none"` -- skip authentication entirely.
-   * - A `MiddlewareHandler` -- use a custom auth middleware for this endpoint.
    */
   auth?: "default" | "none" | MiddlewareHandler;
   /** Permission enforced by the framework after authentication. */
   permission?: AuthzPermission;
   /**
    * The input field naming the scope the permission is about.
-   *
-   * Set when the endpoint's input carries a tenant id, which the type-state
-   * makes mandatory in that case. The framework then compares the id the
-   * REQUEST named against the scope the CREDENTIAL resolved to, and refuses
-   * when they differ — a caller holding `project:view` in their own project
-   * must not read a different one by naming it in the body.
-   *
-   * Absent means the credential's own scope is the whole answer, which is
-   * only reachable when the input names no scope at all.
    */
   permissionScope?: string;
   /** Written reason this endpoint deliberately has no permission check. */
@@ -248,10 +197,8 @@ export interface EndpointDef {
 export type EndpointConfig = Omit<EndpointDef, "permission" | "noPermission"> & AccessDeclaration;
 
 /**
- * The definition shape the chain builder accumulates before precedence is
- * resolved: identical to {@link EndpointDef}, except the two capabilities with
- * explicit opt-outs still carry their `false` markers.
- *
+ * The definition shape the chain builder accumulates before precedence is resolved: identical to {@link
+ * EndpointDef}, except the two capabilities with explicit opt-outs still carry their `false` markers.
  * @internal
  */
 export interface RawEndpointDef extends Omit<EndpointDef, "rateLimit" | "cache" | "resourceLimit"> {
@@ -269,10 +216,6 @@ export interface RawEndpointDef extends Omit<EndpointDef, "rateLimit" | "cache" 
 /**
  * The context variables every handler can read. `.provide()` services widen
  * this map through the service builder's type, so `c.get("things")` is typed.
- *
- * `query` remains a context value for SSE because the handler's second
- * argument is the stream. Regular REST handlers receive their input
- * as the second argument instead.
  */
 export type EndpointVariables = {
   // biome-ignore lint/suspicious/noExplicitAny: validated at runtime by the declared SSE query schema; inference from the trailing define callback is not expressible in TypeScript.
@@ -301,10 +244,6 @@ export interface RequestActor {
 /**
  * One route registration on the built Hono app, reported to
  * `ServiceConfig.onRouteMounted`.
- *
- * `path` is absolute (base path included) and byte-identical to what the
- * app's Hono route table (`app.routes[i].path`) reports for the same
- * registration, so consumers can key route policies on it directly.
  */
 export interface MountedRoute {
   /** Mounted HTTP method; SSE endpoints report `"get"`, guards `"all"`. */
@@ -327,10 +266,9 @@ export interface MountedRoute {
   /** True when this mount answers 410 Gone for a withdrawn endpoint. */
   withdrawn: boolean;
   /**
-   * True for the catch-alls that 404 unknown version namespaces (and the bare
-   * paths that no longer alias anything). They are real routes in the Hono
-   * route table and MUST be covered by any route policy registry built from
-   * this callback.
+   * True for the catch-alls that 404 unknown version namespaces (and the bare paths that no
+   * longer alias anything). They are real routes in the Hono route table and MUST be covered
+   * by any route policy registry built from this callback.
    */
   isNamespaceGuard?: boolean;
   /** True for the public REST mount whose date version is optional in the URL. */
@@ -373,10 +311,9 @@ export interface ServiceConfig<TApp = unknown> {
   /** Resolves the authenticated actor when a handler calls `context.actor()`. */
   actor?: (context: Context) => RequestActor;
   /**
-   * Authorizes an input-dependent permission when a handler calls
-   * `context.authorize(permission)`. Static endpoint permissions still belong
-   * on `.withPermission(...)`; this seam is for a permission selected from
-   * validated request data.
+   * Authorizes an input-dependent permission when a handler calls `context.authorize(permission)`.
+   * Static endpoint permissions still belong on `.withPermission(...)`; this seam is for a permission
+   * selected from validated request data.
    */
   authorize?: (context: Context, permission: AuthzPermission) => Promise<void>;
   /** @deprecated Legacy compatibility check; modern REST uses validated input before authorization. */
@@ -394,17 +331,16 @@ export interface ServiceConfig<TApp = unknown> {
   /** Custom error handler. If omitted the framework default is used. */
   onError?: (err: Error, c: Context) => Response | Promise<Response>;
   /**
-   * Called synchronously during `build()` for every route mounted on the app:
-   * each dated version, `latest`, `preview`, withdrawn (410) endpoints, and
-   * the namespace guards. Lets the host register route policies without
-   * re-deriving the route table.
-   */
-  /**
    * Set `false` to keep the family off `/api/v1`. Reserved for a family whose
    * canonical path is already claimed by a different family — a legacy
    * surface superseded by a v1 one, or an alias fan-out that mounts its own.
    */
   v1Alias?: boolean;
+  /**
+   * Called synchronously during `build()` for every mounted route (each
+   * dated version, `latest`, `preview`, withdrawn endpoints, the namespace
+   * guards). Lets the host register route policies without re-deriving it.
+   */
   onRouteMounted?: (route: MountedRoute) => void;
   /** @internal Enables the additive `/api/v1/{service}` REST surface. */
   publicRest?: {

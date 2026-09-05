@@ -1,15 +1,7 @@
 /**
+ * The `team.*` tRPC surface: the eight procedure names the clients call, the `callerCanManage` probe the two member reads pass to the service so it can decide how much of
+ * each member row to return, the team lookup that supplies the organization the write acts in, and the Enterprise plan gate that refuses a custom team role.
  * @vitest-environment node
- *
- * The `team.*` tRPC surface: the eight procedure names the clients call, the
- * `callerCanManage` probe the two member reads pass to the service so it can
- * decide how much of each member row to return, the team lookup that supplies
- * the organization the write acts in, and the Enterprise plan gate that
- * refuses a custom team role.
- *
- * The procedure handed in narrows its own context the way an authenticated
- * process procedure does, so this also pins that a process can hand over a
- * procedure it has already composed.
  */
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -92,13 +84,9 @@ const team = TEAM as never;
 describe("TeamTrpcApi", () => {
   describe("given a process policy that reads the validated input", () => {
     /**
-     * tRPC appends the input parser as a middleware at the point `.input()`
-     * is called, so anything installed before it runs with `input ===
-     * undefined`. The process's real policy resolves the authorized scope id
-     * FROM the input, which is why this feature applies the decorator after
-     * its own parser. Installed the other way round, the authorization check,
-     * the scope-lineage guard and the audit row would all see nothing and
-     * every guard would still report green.
+     * tRPC appends the input parser as a middleware at the point `.input()` is called, so anything installed before it runs with `input === undefined`. The process's
+     * real policy resolves the authorized scope id FROM the input, which is why this feature applies the decorator after its own parser. Installed the other way
+     * round, the authorization check, the scope-lineage guard and the audit row would all see nothing and every guard would still report green.
      */
     it("hands the policy the parsed input, not undefined", async () => {
       const seen: unknown[] = [];

@@ -1,13 +1,7 @@
 /**
+ * A run started by an open workbench tab used to exist only inside that tab: `GET /api/experiments/runs/:runId` answered 404 for it, and the CLI could not follow a run it had just started. The streaming route mirrors the run into the same
+ * run-state store the polling runner writes, so a browser run and a CI run are readable the same way. This exercises the real `ExperimentRunStateMirrorService`, wired to a fake `progress` port, rather than stubbing the mirror away.
  * @see specs/experiments-v3/evaluation-execution.feature
- *
- * A run started by an open workbench tab used to exist only inside that tab:
- * `GET /api/experiments/runs/:runId` answered 404 for it, and the CLI could not
- * follow a run it had just started. The streaming route mirrors the run into
- * the same run-state store the polling runner writes, so a browser run and a
- * CI run are readable the same way. This exercises the real
- * `ExperimentRunStateMirrorService`, wired to a fake `progress` port, rather than
- * stubbing the mirror away.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { UNNAMED_FAILURE } from "@langwatch/experiment-contract";

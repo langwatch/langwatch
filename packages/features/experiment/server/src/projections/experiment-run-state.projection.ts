@@ -18,12 +18,8 @@ import {
 import { normalizeDurationMs } from "../processes/experiment-run-duration.process";
 
 /**
- * State data for an experiment run.
- * Matches the experiment_runs ClickHouse table schema.
- *
- * This is both the fold state and the stored data — one type, not two.
- * Handlers do all computation using simple counters (no Sets/arrays).
- * Store is a dumb read/write layer.
+ * State data for an experiment run. Matches the experiment_runs ClickHouse
+ * table schema.
  */
 export interface ExperimentRunStateData {
   RunId: string;
@@ -91,10 +87,6 @@ const experimentRunEvents = [
 
 /**
  * Type-safe fold projection for experiment run state.
- *
- * - `implements FoldEventHandlers` enforces a handler exists for every event schema
- * - Handler names derived from event type strings (e.g. `"lw.experiment_run.started"` -> `handleExperimentRunStarted`)
- * - `UpdatedAt` is auto-managed by the base class after each handler call
  */
 export class ExperimentRunStateFoldProjection
   extends AbstractFoldProjection<ExperimentRunStateData, typeof experimentRunEvents>
@@ -105,16 +97,9 @@ export class ExperimentRunStateFoldProjection
   readonly store: FoldProjectionStore<ExperimentRunStateData>;
 
   /**
-   * Order-insensitive fold: every handler is a counter (`CompletedCount++`),
-   * a running sum (`TotalCost`/`TotalDurationMs`/`TotalScoreSum` +=), a
-   * `Math.max` (`Total`), or a keyed map that last-write-wins per key
-   * (`TraceMetrics[traceId]` subtract-old/add-new, `Targets` merged by id) —
-   * so the state converges to the same value whichever order events are seen
-   * in. A run's aggregate is dataset-scale (one targetResult per row + one
-   * evaluatorResult per row×evaluator, thousands of events), so re-folding the
-   * whole history on every out-of-order event is the same O(n²) amplification
-   * that hit the trace folds — pure waste here since the result is identical.
-   * See specs/trace-processing/hot-trace-fold-amplification.feature.
+   * Order-insensitive fold: every handler is a counter (`CompletedCount++`), a running sum (`TotalCost`/`TotalDurationMs`/`TotalScoreSum` +=), a `Math.max` (`Total`), or a keyed map that last-write-wins per key (`TraceMetrics[traceId]`
+   * subtract-old/add-new, `Targets` merged by id) — so the state converges to the same value whichever order events are seen in. A run's aggregate is dataset-scale (one targetResult per row + one evaluatorResult per row×evaluator, thousands of
+   * events), so re-folding the whole history on every out-of-order event is the same O(n²) amplification that hit the trace folds — pure waste here since the result is identical. See specs/trace-processing/hot-trace-fold-amplification.feature.
    */
   readonly options = { refoldOnOutOfOrder: false } as const;
 
@@ -172,15 +157,8 @@ export class ExperimentRunStateFoldProjection
   }
 
   /**
-   * A cell the run produced moves every counter. A cell the run CARRIED from
-   * the board moves none of them.
-   *
-   * Money and time belong to the run that spent them, and the carried cell was
-   * paid for by an earlier run, so adding it here reports spend that did not
-   * happen. `Total` counts the cells this run dispatched, so a carried cell
-   * that incremented `CompletedCount` would report the run as more than
-   * finished. The carried cell is still stored, and the results page draws it;
-   * it just is not this run's work.
+   * A cell the run produced moves every counter. A cell the run CARRIED from the
+   * board moves none of them.
    */
   handleExperimentRunTargetResult(
     event: TargetResultEvent,

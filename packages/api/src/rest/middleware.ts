@@ -36,9 +36,6 @@ function injectTraceHeaders(c: Context): void {
 
 /**
  * Creates a Hono middleware that wraps each request in an OTel span.
- *
- * Sets `traceId` and `spanId` on the Hono context for downstream use.
- * After the handler runs, adds org/project/user attributes to the span.
  */
 export function tracerMiddleware(options?: { name?: string }) {
   return async (c: Context, next: Next): Promise<void> => {
@@ -115,16 +112,8 @@ export function tracerMiddleware(options?: { name?: string }) {
 // ---------------------------------------------------------------------------
 
 /**
- * Creates a Hono middleware that logs each request using `@langwatch/observability`.
- *
- * Sets up async context propagation so that downstream code can access
- * org/project/user context via `getCurrentContext()`.
- *
- * ONE record per request, whatever the mount looks like. Families are mounted
- * side by side and twenty-one of them share the `/api` base path, so a request
- * for `/api/prompts` runs twenty-one of these; the first to run claims the
- * record and the rest pass straight through. Which family it belongs to comes
- * from {@link REQUEST_FAMILY}, stamped by the stack that resolved the route.
+ * Creates a Hono middleware that logs each request using
+ * `@langwatch/observability`.
  */
 export function loggerMiddleware(options?: { name?: string }) {
   const logger = createLogger(`langwatch:api:${options?.name ?? "hono"}`);
@@ -168,13 +157,11 @@ export function loggerMiddleware(options?: { name?: string }) {
             resolved?.status ??
             (requestError ? getStatusCodeFromError(requestError) : c.res.status);
 
-          // This is the only error record written per failed request. The
-          // error handler deliberately does not log its own copy.
-          // `url` is the path that arrived, so it carries ids and is a
-          // different value on every request. `route` is the endpoint that
-          // matched — `GET /things/:id` — which is what you group by when
-          // asking which endpoint is failing. Absent for anything that never
-          // reached an endpoint stack: a 404, or a version-namespace guard.
+          // This is the only error record written per failed request. The error handler deliberately
+          // does not log its own copy. `url` is the path that arrived, so it carries ids and is a
+          // different value on every request. `route` is the endpoint that matched — `GET
+          // /things/:id` — which is what you group by when asking which endpoint is failing. Absent
+          // for anything that never reached an endpoint stack: a 404, or a version-namespace guard.
           const route = c.get(ENDPOINT_ROUTE) as string | undefined;
           // The family that resolved the route, which is not the family whose
           // logger claimed the record when several share a base path.

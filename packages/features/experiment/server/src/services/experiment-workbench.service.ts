@@ -1,21 +1,6 @@
 /**
- * The evaluations workbench: the customer's working copy of an experiment,
- * and its version history.
- *
- * Every write funnels through `saveWorkbenchState`. Restoring a version,
- * committing one, and recording a run's results all read the current state
- * and save it back, so there is exactly one place that checks references,
- * strips results out of the snapshot, publishes the update, and enforces
- * optimistic concurrency. A second write path would be a second chance to
- * forget one of those.
- *
- * The concurrency check is `expectedVersion`. Two people editing one
- * workbench is normal, so a save carrying a stale version is refused rather
- * than silently overwriting the other person's work — `StaleWorkbenchStateError`
- * is what the UI turns into "this changed while you were editing".
- *
- * Split out of `ExperimentService`, which was 749 lines and had this whole
- * sub-domain inside it alongside experiments, runs and DSPy steps.
+ * The evaluations workbench: the customer's working copy of an experiment, and
+ * its version history.
  */
 
 import {

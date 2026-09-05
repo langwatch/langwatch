@@ -70,10 +70,6 @@ interface StackOptions<TProject> {
 
 /**
  * Composes the complete middleware pipeline for an active endpoint.
- *
- * The fixed order (ADR 003 §3): version context, auth, permission, rate limit,
- * resource limit, endpoint middleware, OpenAPI documentation, validation,
- * cache read, providers, handler.
  */
 export function buildEndpointMiddlewareStack<TProject>(
   options: StackOptions<TProject>,
@@ -227,13 +223,6 @@ function requestCapabilitiesMiddleware(
 
 /**
  * Whether this mount reaches the OpenAPI document.
- *
- * Every dated mount of a documented endpoint is published, plus `latest`, so a
- * pinned client sees the schemas its version actually serves. `preview` is
- * never documented: preview is where an endpoint may change without notice,
- * and documenting it would promise stability it does not have. `docs.hide`
- * opts the endpoint out entirely, and endpoints that declare nothing
- * documentable are skipped rather than published as bare stubs.
  */
 function isDocumentedMount({
   config,
@@ -470,15 +459,6 @@ function appendValidationMiddleware({
 
   /**
    * The validation failure, as the error the boundary knows how to answer with.
-   *
-   * hono-openapi v0.4 handed the hook zod's `ZodError` itself; v1 wraps
-   * `@hono/standard-validator` and hands over the Standard Schema failure — the
-   * issue array, bare. Throwing that array reaches `onError` as a value with no
-   * `name`, no `message` and no prototype it recognises, so a 400 that named
-   * the offending field became an unhandled "Unknown Error" instead.
-   *
-   * The issues themselves are unchanged: zod's Standard Schema issues ARE
-   * `ZodIssue`s, so re-wrapping restores exactly the error v0.4 threw.
    */
   const asZodError = (error: unknown): unknown =>
     Array.isArray(error) ? createApiSchemaError(error as ApiSchemaIssue[]) : error;
@@ -748,10 +728,6 @@ function assertAuthorizedProjectInput({
 
 /**
  * Where the credential's own value for each scope lives on the request.
- *
- * `teamId` reads off the authenticated project rather than a context key of
- * its own: a project credential resolves to exactly one team, and that team is
- * the only one it may speak for.
  */
 const SCOPE_SOURCES: Record<string, (context: Context) => unknown> = {
   projectId: (context) => readField(context.get("project"), "id"),
@@ -767,16 +743,6 @@ function readField(value: unknown, field: string): unknown {
 
 /**
  * Refuses a request that names a scope its credential did not resolve to.
- *
- * The endpoint declared which input field its permission is about, so this
- * compares that field against what authentication established. Holding
- * `project:view` in one project is not permission to name a different one in
- * the body — and until the endpoint could say which field it meant, nothing
- * compared them unless the whole service had opted in.
- *
- * Fail-closed on purpose: a scope this cannot resolve a credential value for
- * is refused rather than waved through, because the alternative is a check
- * that silently does nothing.
  */
 function assertAuthorizedScopeInput({
   context,

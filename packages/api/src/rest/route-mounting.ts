@@ -20,12 +20,6 @@ type ErrorHandler = NonNullable<ServiceConfig["onError"]>;
 /**
  * Mounts every resolved version namespace, the bare alias, and the two
  * namespace guards.
- *
- * Every mount answers at its bare `/api/{family}` path and at the canonical
- * `/api/v1/{family}` twin (ADR 002 §1). The bare alias serves `latest` and
- * owns the declared operation id; the `latest` namespace keeps its own,
- * suffixed. Public REST adds its separate, optional date-version routes after
- * the explicit mounts (ADR 004).
  */
 export function mountResolvedRoutes<TProject>({
   app,
@@ -96,12 +90,11 @@ export function mountResolvedRoutes<TProject>({
     });
   }
 
-  // The date-namespace fallback. An endpoint serves at version V its latest
-  // registration dated on or before V, and V is whatever real date the caller
-  // asked for — registered or not. The eager mounts cover the registered
-  // versions; this dispatches every other real date to the effective version's
-  // stack, and falls through to the 404 guard for anything that is not a
-  // servable date.
+  // The date-namespace fallback. An endpoint serves at version V its latest registration
+  // dated on or before V, and V is whatever real date the caller asked for — registered or
+  // not. The eager mounts cover the registered versions; this dispatches every other real
+  // date to the effective version's stack, and falls through to the 404 guard for anything
+  // that is not a servable date.
   const fallback = buildDateFallback({
     basePath,
     onError,
@@ -188,9 +181,6 @@ function mountVersion<TProject>({
 
 /**
  * The bare alias: the `latest` catalogue served without a version segment.
- *
- * It is the address the published document names, so it carries the declared
- * operation id and the same stack the `latest` namespace runs.
  */
 function mountBareAlias<TProject>({
   app,
@@ -255,10 +245,9 @@ interface FallbackCandidate {
 }
 
 /**
- * Pre-builds the dispatch stacks for unregistered dates: one candidate list
- * per effective dated version, always undocumented (unregistered dates are not
- * in the document) and validating params off the fallback's own path match.
- * Returns null when no dated version exists, leaving the guards as plain 404s.
+ * Pre-builds the dispatch stacks for unregistered dates: one candidate list per effective dated version, always
+ * undocumented (unregistered dates are not in the document) and validating params off the fallback's own path
+ * match. Returns null when no dated version exists, leaving the guards as plain 404s.
  */
 function buildDateFallback<TProject>({
   basePath,
@@ -345,10 +334,9 @@ function buildDateFallback<TProject>({
 }
 
 /**
- * Matches an endpoint path against the request's remainder, extracting
- * `:params`. Supports the registerRoute path shapes: literal segments,
- * `:name`, `:name{constraint}` (the constraint is honored, not templated away)
- * and a trailing `*`.
+ * Matches an endpoint path against the request's remainder, extracting `:params`. Supports
+ * the registerRoute path shapes: literal segments, `:name`, `:name{constraint}` (the
+ * constraint is honored, not templated away) and a trailing `*`.
  */
 export function matchPath(pattern: string, path: string): Record<string, string> | null {
   const patternSegments = splitSegments(pattern);

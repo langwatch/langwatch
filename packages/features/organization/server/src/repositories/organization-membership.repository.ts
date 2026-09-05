@@ -85,10 +85,9 @@ export interface CreateAndAssignResult {
 }
 
 /**
- * Input for creating an organization with no user attached: the instance
- * provisioning path. Unlike {@link CreateAndAssignInput} there is no member to
- * assign: the caller mints an organization-scoped admin API key afterwards,
- * and that credential is how anything reaches the new organization.
+ * Input for creating an organization with no user attached: the instance provisioning path. Unlike
+ * {@link CreateAndAssignInput} there is no member to assign: the caller mints an organization-scoped
+ * admin API key afterwards, and that credential is how anything reaches the new organization.
  */
 export interface CreateForProvisioningInput {
   orgId: string;
@@ -100,10 +99,9 @@ export interface CreateForProvisioningInput {
 }
 
 /**
- * One organization as the instance provisioning surface reads it back: the
- * natural key (`slug`) plus enough to tell entries apart. Deliberately not the
- * settings shape: an instance administrator lists organizations to find one,
- * not to manage it.
+ * One organization as the instance provisioning surface reads it back: the natural key
+ * (`slug`) plus enough to tell entries apart. Deliberately not the settings shape: an
+ * instance administrator lists organizations to find one, not to manage it.
  */
 export interface OrganizationProvisioningSummary {
   id: string;
@@ -138,9 +136,8 @@ export interface AuditLogFilters {
 }
 
 /**
- * Enriched audit log entry with resolved user and project data.
- * Backed by a single `AuditLog` table that stores both gateway-shape
- * (targetKind + before/after diff) and platform-shape (args + metadata)
+ * Enriched audit log entry with resolved user and project data. Backed by a single `AuditLog` table
+ * that stores both gateway-shape (targetKind + before/after diff) and platform-shape (args + metadata)
  * rows. The `source` field is computed from the presence of `targetKind`.
  */
 export interface EnrichedAuditLog {
@@ -246,9 +243,6 @@ export interface UpdateMemberRoleInput {
 
 /**
  * What the seat change did that the admin who made it would not otherwise see.
- *
- * A correction to Viewer can take away a shared team's only team-scoped admin.
- * The change is allowed, so this is the only place it is visible.
  */
 export interface UpdateMemberRoleResult {
   teamsLeftWithoutAdmin: Array<{ id: string; name: string }>;
@@ -281,10 +275,9 @@ export abstract class OrganizationMembershipRepository {
   abstract createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult>;
 
   /**
-   * Creates an organization and its default team with no user attached (the
-   * instance provisioning path). Throws `OrganizationSlugTakenError` when the
-   * slug is already claimed, so provisioning tools get a deterministic 409 on
-   * the natural key.
+   * Creates an organization and its default team with no user attached (the instance
+   * provisioning path). Throws `OrganizationSlugTakenError` when the slug is already
+   * claimed, so provisioning tools get a deterministic 409 on the natural key.
    */
   abstract createForProvisioning(input: CreateForProvisioningInput): Promise<CreateAndAssignResult>;
 
@@ -356,14 +349,6 @@ export abstract class OrganizationMembershipRepository {
 
   /**
    * The raw Prisma client behind this repository, when it has one.
-   *
-   * The member-role orchestration in `OrganizationService` composes helpers
-   * that operate on a raw client (the personal-team guard, shared-team
-   * enumeration, the license-enforcement repository). Exposing the client
-   * here keeps those flows constructible from the repository alone, so every
-   * existing `new OrganizationService(repo, tags)` call site keeps working.
-   * Optional on purpose: the null repository has no client, and callers must
-   * treat its absence as "this operation is unavailable".
    */
   abstract getClient?(): PrismaClient | null;
 

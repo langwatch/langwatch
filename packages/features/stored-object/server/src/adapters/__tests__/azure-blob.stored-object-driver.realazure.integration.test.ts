@@ -1,29 +1,6 @@
 /**
- * @vitest-environment node
  * @integration
- *
- * AC37 (issue #4133) — the SAME driver contract as
- * `azure-blob.stored-object-driver.integration.test.ts`, but against a REAL
- * Azure Storage account instead of Azurite.
- *
- * Why this exists as a separate suite: Azurite is reachable only through
- * PATH-style addressing (`http://host:10000/{account}/...`), so every
- * signature the emulator suite verifies takes the `pathStyle: true` branch of
- * `canonicalisedResource`. Production Azure is HOST-style
- * (`https://{account}.blob.core.windows.net/...`) and takes the OTHER branch —
- * which no emulator test can ever exercise. A signing bug that only affects
- * production would pass the entire Azurite suite green.
- *
- * Skips itself unless the four env vars below are set, so CI (which has no
- * Azure credentials) is unaffected. To run it:
- *
- *   LANGWATCH_TEST_AZURE_ACCOUNT_NAME=... \
- *   LANGWATCH_TEST_AZURE_ACCOUNT_KEY=... \
- *   LANGWATCH_TEST_AZURE_CONTAINER=... \
- *   pnpm --filter @langwatch/stored-object-server test -- run src/adapters/__tests__/azure-blob.stored-object-driver.realazure.integration.test.ts
- *
- * Every blob it writes is prefixed with a unique run id and deleted in
- * `afterAll`, so it never accumulates state in the account.
+ * @vitest-environment node
  */
 import crypto from "node:crypto";
 import { mintAzureBlobStoredObjectUri } from "@langwatch/stored-object-contract";
@@ -42,15 +19,9 @@ const hasRealAzure = Boolean(ACCOUNT_NAME && ACCOUNT_KEY && CONTAINER);
 const describeRealAzure = hasRealAzure ? describe : describe.skip;
 
 /**
- * Token-mode (Entra) verification against a real account. Separate switch from
- * the shared-key one above because it needs a DIFFERENT account posture —
- * ideally one with `allowSharedKeyAccess=false`, where the shared-key suite
- * cannot pass by construction.
- *
- * `azureCli` is the mode a developer can actually run: it borrows the identity
- * from `az login`. The AKS path (`workloadIdentity`) is the same code with a
- * different credential class, so exercising this proves the bearer request
- * shape Azure accepts — the thing no mocked test and no emulator can.
+ * Token-mode (Entra) verification against a real account. Separate switch from the
+ * shared-key one above because it needs a DIFFERENT account posture — ideally one with
+ * `allowSharedKeyAccess=false`, where the shared-key suite cannot pass by construction.
  */
 const TOKEN_MODE_ACCOUNT = process.env.LANGWATCH_TEST_AZURE_TOKEN_ACCOUNT_NAME;
 const hasTokenModeAzure = Boolean(TOKEN_MODE_ACCOUNT && CONTAINER);

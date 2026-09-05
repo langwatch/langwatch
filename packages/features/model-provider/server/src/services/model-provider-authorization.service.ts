@@ -10,15 +10,6 @@ type ModelProviderPermission =
 
 /**
  * Whether an actor may read or write a model-provider scope.
- *
- * The single place the scope-to-permission mapping lives. It used to exist
- * twice — `writePermission` here and `requiredPermission` in the write-assert
- * service, byte for byte — which is one edit away from the two disagreeing
- * about what writing a TEAM scope requires while both keep answering
- * confidently.
- *
- * `canWrite` answers; the write-assert service throws. Both go through this
- * one decision call.
  */
 export class ModelProviderAuthorizationService {
   private constructor(private readonly authz: AuthzService) {}
@@ -45,9 +36,6 @@ export class ModelProviderAuthorizationService {
 
   /**
    * What writing this scope requires.
-   *
-   * Public because the refusal a caller throws has to NAME the permission the
-   * actor was missing, and that name must be the one actually checked.
    */
   static writePermission(
     scopeType: ModelDefaultScope["scopeType"],

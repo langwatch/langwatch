@@ -76,13 +76,6 @@ async function teamNameFor({
 /**
  * The organization's active administrators, locked for the rest of the
  * transaction.
- *
- * A plain count is a read-then-write race: two transactions each removing a
- * DIFFERENT admin both count two, both pass their guard, and both commit,
- * leaving an organization nobody can sign in to and no way back from inside
- * the product. `FOR UPDATE` makes the second caller wait for the first to
- * commit and then re-read the set, so it sees the single remaining admin and
- * refuses.
  */
 async function lockActiveAdmins({
   tx,
@@ -93,10 +86,9 @@ async function lockActiveAdmins({
 }): Promise<Array<{ userId: string }>> {
   // `role::text` rather than a cast to the enum type: the type name would have
   // to be schema-qualified to be safe, and the comparison runs over one
-  // organization's memberships either way.
-  // `ORDER BY` fixes the order rows are locked in, so two callers racing over
-  // the same set queue behind each other instead of deadlocking on a
-  // half-acquired one.
+  // organization's memberships either way. `ORDER BY` fixes the order rows are
+  // locked in, so two callers racing over the same set queue behind each other
+  // instead of deadlocking on a half-acquired one.
   return tx.$queryRaw<Array<{ userId: string }>>`
     SELECT "userId" FROM "OrganizationUser"
     WHERE "organizationId" = ${organizationId}
@@ -110,12 +102,6 @@ async function lockActiveAdmins({
 /**
  * The organization row of a provisioning run, with a slug race answered as
  * {@link OrganizationSlugTakenError}.
- *
- * Scoped to this one insert because the surrounding transaction also writes
- * `Team.slug`, `Team.id` and `Organization.id`: a P2002 caught around the
- * whole transaction would tell a provisioning tool to retry a slug that was
- * never the problem. Within this insert, `slug` is the only unique column the
- * caller can collide on twice.
  */
 async function createProvisionedOrganization(
   tx: Prisma.TransactionClient,
@@ -155,15 +141,9 @@ function namesSlug(target: unknown): boolean {
 }
 
 /**
- * Point a member's binding on one scope at a role without replacing the row
- * — an UPDATE, never a delete-then-recreate, which would change its id
- * mid-save: the member dialog stages removals by id, and a binding batch
- * built against ids a churned recreate had already replaced would carry
- * ids that no longer exist. Keeping the id stable keeps what the admin
- * staged addressable through the whole save, and rows keep their creation
- * order instead of jumping to the bottom of the access list on every
- * correction. Several rows on one scope still collapse to the one this
- * sync sets.
+ * Point a member's binding on one scope at a role without replacing the row — an UPDATE, never a delete-then-recreate, which would change its id mid-save: the member dialog stages removals by id,
+ * and a binding batch built against ids a churned recreate had already replaced would carry ids that no longer exist. Keeping the id stable keeps what the admin staged addressable through the whole
+ * save, and rows keep their creation order instead of jumping to the bottom of the access list on every correction. Several rows on one scope still collapse to the one this sync sets.
  */
 async function planUserScopeBinding({
   tx,
@@ -210,10 +190,8 @@ async function planUserScopeBinding({
 }
 
 /**
- * What a scope-binding correction resolves to once the transaction has read
- * the rows: the ids that collapse away, and either the role change on the row
- * that stays or a fresh attach. Planned inside the transaction and emitted
- * after it commits — bindings are ledger facts, and the ledger is their only
+ * What a scope-binding correction resolves to once the transaction has read the rows: the ids that collapse away, and either the role change on the row that stays
+ * or a fresh attach. Planned inside the transaction and emitted after it commits — bindings are ledger facts, and the ledger is their only
  * writer (ADR-092 §13).
  */
 type ScopeBindingPlan = {
@@ -227,10 +205,9 @@ type ScopeBindingPlan = {
 };
 
 /**
- * Emit a batch of plans, revocations first: a crash mid-batch leaves the
- * member with less access than the correction asked for, never more, and the
- * retry converges. Revoking the collapsed siblings before the role change
- * also keeps the surviving row's target role free of a duplicate.
+ * Emit a batch of plans, revocations first: a crash mid-batch leaves the member with less access than
+ * the correction asked for, never more, and the retry converges. Revoking the collapsed siblings
+ * before the role change also keeps the surviving row's target role free of a duplicate.
  */
 async function emitScopeBindingPlans({
   writer,
@@ -273,10 +250,9 @@ async function emitScopeBindingPlans({
 }
 
 /**
- * The KSUID resource a role binding is born under. Spelled as a literal, the
- * way every other feature package spells its own: the prefix is a PERSISTED
- * format, and a second description of it writes bindings the revocation
- * queries never find.
+ * The KSUID resource a role binding is born under. Spelled as a literal, the way every
+ * other feature package spells its own: the prefix is a PERSISTED format, and a second
+ * description of it writes bindings the revocation queries never find.
  */
 const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
 
@@ -285,10 +261,6 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     database: PrismaClient;
     /**
      * The grant ledger every membership write states its access on.
-     *
-     * Required rather than resolved: the platform read it off a service
-     * locator, which meant a repository constructed before the application
-     * existed appeared to work and wrote bindings nobody could revoke.
      */
     grants: AuthzGrantsService;
   }): PrismaOrganizationMembershipRepository {
@@ -466,21 +438,18 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   }
 
   async deleteProvisionedOrganization(organizationId: string): Promise<void> {
-    // Deliberately imperative, and it stays that way: this is a tenant purge,
-    // not a grant write. The organization itself is going away, so there is no
-    // access left to describe and no stream left to append to — emitting
-    // revocations for rows whose aggregate is being deleted would only leave
-    // the ledger holding facts about a tenant that no longer exists.
-    //
+    // Deliberately imperative, and it stays that way: this is a tenant purge, not a grant
+    // write. The organization itself is going away, so there is no access left to describe and
+    // no stream left to append to — emitting revocations for rows whose aggregate is being
+    // deleted would only leave the ledger holding facts about a tenant that no longer exists.
     // Role bindings first: RoleBinding.apiKeyId restricts api-key deletion.
     await this.prisma.$transaction([
       this.prisma.roleBinding.deleteMany({ where: { organizationId } }),
-      // The authorization read model. It carries organizationId as a plain
-      // column and never a relation - facts derived from the log must not
-      // presume the row they describe still exists - so nothing cascades
-      // them, and a purge that skipped them would leave a deleted tenant's
-      // access rows behind as the only surviving head. Usage before its
-      // Grant.
+      // The authorization read model. It carries organizationId as a plain column
+      // and never a relation - facts derived from the log must not presume the row
+      // they describe still exists - so nothing cascades them, and a purge that
+      // skipped them would leave a deleted tenant's access rows behind as the only
+      // surviving head. Usage before its Grant.
       this.prisma.grantUsage.deleteMany({ where: { organizationId } }),
       this.prisma.grant.deleteMany({ where: { organizationId } }),
       this.prisma.role.deleteMany({ where: { organizationId } }),
@@ -779,20 +748,6 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
 
   /**
    * Removes a membership, and the personal workspace that came with it.
-   *
-   * `PERSONAL_TEAM_ARCHIVE_REFUSAL` is the sentence an admin gets when they try
-   * to archive a personal workspace directly, and it tells them these
-   * workspaces "disappear with the member's access to the organization". That
-   * was not true: the membership and its role bindings went, and the personal
-   * team and project stayed behind owned by somebody who is no longer a member,
-   * still holding their one slot per (organization, owner). So the refusal
-   * pointed at a cleanup that never happened, and an admin asking how to get
-   * rid of one had no answer at all.
-   *
-   * Archived, not deleted, for the same reason every other project is: the work
-   * is still the work. `PersonalWorkspaceService.ensure()` reactivates this
-   * exact pair if the person is invited back, which is what keeps archiving here
-   * from bricking that slot.
    */
   async deleteMember(input: DeleteMemberInput): Promise<void> {
     const { organizationId, userId, actingUserId } = input;
@@ -814,24 +769,22 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     });
 
     if (!member) {
-      // The membership is already gone, which is also what a retry of a
-      // removal that died between the two writes below sees. Revoking again
-      // is a no-op when the first attempt finished and the repair when it did
-      // not, so the retry can still reach grants the seat no longer names —
-      // refusing outright left them orphaned, and a re-invite reactivated
-      // them.
+      // The membership is already gone, which is also what a retry of a removal that
+      // died between the two writes below sees. Revoking again is a no-op when the
+      // first attempt finished and the repair when it did not, so the retry can
+      // still reach grants the seat no longer names — refusing outright left them
+      // orphaned, and a re-invite reactivated them.
       await revokeTheirGrants();
       throw new MemberNotFoundError(userId);
     }
 
     await this.assertRemovalKeepsAnActiveAdmin({ organizationId, member });
 
-    // Snapshotted before the revoke below so a refusal inside the
-    // transaction — the locked re-check is the one two concurrent removals
-    // of the last two admins can actually trip, the advisory check above
-    // passes for both — can put back exactly what this call is about to take
-    // away, rather than leaving a member who keeps their seat and loses
-    // every grant it should carry.
+    // Snapshotted before the revoke below so a refusal inside the transaction —
+    // the locked re-check is the one two concurrent removals of the last two
+    // admins can actually trip, the advisory check above passes for both — can put
+    // back exactly what this call is about to take away, rather than leaving a
+    // member who keeps their seat and loses every grant it should carry.
     const grantsBeforeRevoke = await this.prisma.roleBinding.findMany({
       where: { organizationId, userId },
       select: {
@@ -881,12 +834,9 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   }
 
   /**
-   * Same guard as disabling or demoting the last admin, and the only
-   * irreversible one of the three: an organization with no admin who can
-   * sign in cannot be recovered from inside the product. Read ahead of the
-   * revocation as well as inside the removal transaction, so a refusal never
-   * strips the last admin's grants on its way to saying no; the locked read
-   * inside the transaction is still the authority.
+   * Same guard as disabling or demoting the last admin, and the only irreversible one of the three: an organization with no admin who can
+   * sign in cannot be recovered from inside the product. Read ahead of the revocation as well as inside the removal transaction, so a
+   * refusal never strips the last admin's grants on its way to saying no; the locked read inside the transaction is still the authority.
    */
   private async assertRemovalKeepsAnActiveAdmin({
     organizationId,
@@ -976,12 +926,11 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     if (personalTeams.length === 0) return;
 
     const personalTeamIds = personalTeams.map((team) => team.id);
-    // `isPersonal` on the same terms the reactivation reads it, so the two
-    // sides move the same rows. A personal team holds nothing else today
-    // (creating a project in one, or moving one into it, is refused), and the
-    // flag mirrors the team's, so this narrows nothing away; it keeps the pair
-    // symmetric if that ever slips, since archiving what the revival would
-    // not return is the failure with no way back.
+    // `isPersonal` on the same terms the reactivation reads it, so the two sides move the same
+    // rows. A personal team holds nothing else today (creating a project in one, or moving one
+    // into it, is refused), and the flag mirrors the team's, so this narrows nothing away; it
+    // keeps the pair symmetric if that ever slips, since archiving what the revival would not
+    // return is the failure with no way back.
     await tx.project.updateMany({
       where: {
         teamId: { in: personalTeamIds },
@@ -1199,12 +1148,11 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
             userId,
           });
           if (adminsAfter.size === 0) {
-            // A caller who named this team asked for a team-local change, and a
-            // team needs an admin. A seat correction did not name it: the
-            // decision was about one person's seat, and every shared team is
-            // still administered through any ORGANIZATION-scoped ADMIN binding
-            // — so it goes through, and the team is reported so the admin who
-            // did it is not left to discover this.
+            // A caller who named this team asked for a team-local change, and a team needs
+            // an admin. A seat correction did not name it: the decision was about one
+            // person's seat, and every shared team is still administered through any
+            // ORGANIZATION-scoped ADMIN binding — so it goes through, and the team is
+            // reported so the admin who did it is not left to discover this.
             if (teamRoleUpdate.origin === "requested") {
               throw new TeamLastAdminRequiredError(await teamNameFor({ tx, teamId }));
             }
@@ -1235,15 +1183,11 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         );
       }
 
-      // The seat correction reaches everything the seat caps, and a member
-      // can hold PROJECT-scoped rows the team loop above never sees. Shared
-      // projects only: the member's own personal workspace keeps its stored
-      // rows and is capped at resolution, which is what makes re-promoting
-      // them a no-op (personal-workspace-integrity.feature). Corrected
-      // through planUserScopeBinding so ids survive, several rows on one
-      // project collapse to one, and a pre-existing Viewer row cannot collide
-      // with the correction on the partial unique index. Left alone on the
-      // way back up: an upgrade grants nothing on its own.
+      // The seat correction reaches everything the seat caps, and a member can hold PROJECT-scoped rows the team loop above never
+      // sees. Shared projects only: the member's own personal workspace keeps its stored rows and is capped at resolution, which is
+      // what makes re-promoting them a no-op (personal-workspace-integrity.feature). Corrected through planUserScopeBinding so ids
+      // survive, several rows on one project collapse to one, and a pre-existing Viewer row cannot collide with the correction on
+      // the partial unique index. Left alone on the way back up: an upgrade grants nothing on its own.
       if (role === OrganizationUserRole.EXTERNAL) {
         const projectRows = await tx.roleBinding.findMany({
           where: {
@@ -1374,12 +1318,11 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
 
         const isTargetUserAdmin = targetUserBinding.role === TeamUserRole.ADMIN;
 
-        // The projection is the whole guard: a save that does not demote an
-        // admin cannot shrink the admin set, and one that does is checked
-        // against its exact post-state. A team already without an admin stays
-        // editable from here — this is one of the places somebody gets
-        // promoted back, so the team form's carve-out holds for the member
-        // dialog too.
+        // The projection is the whole guard: a save that does not demote an admin
+        // cannot shrink the admin set, and one that does is checked against its exact
+        // post-state. A team already without an admin stays editable from here — this
+        // is one of the places somebody gets promoted back, so the team form's
+        // carve-out holds for the member dialog too.
         if (isTargetUserAdmin) {
           const adminsAfter = await projectAdminUserIdsWithoutDirectRole({
             tx,

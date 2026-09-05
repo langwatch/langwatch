@@ -1,7 +1,6 @@
 /**
  * Unit tests for applyParametersToRows: binding caller-provided parameters as
  * constant columns across rows, including the no-dataset synthetic-row case.
- *
  * @see specs/experiments-v3/execution-inputs.feature
  */
 import { describe, expect, it } from "vitest";

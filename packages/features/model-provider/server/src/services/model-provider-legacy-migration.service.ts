@@ -1,20 +1,5 @@
 /**
  * The row-level conversions two one-off data migrations perform.
- *
- * Both are PURE, and that is what puts them here rather than in the runner:
- * what a row becomes is the feature's rule, and the walk over the table — which
- * projects, which client, which credential — is the running process's. A runner
- * that also owned the rule would make the rule untestable without a database.
- *
- * The custom-model conversion turns the legacy `string[]` columns into
- * `CustomModelEntry[]` objects, dropping entries the registry now supplies
- * automatically. It is idempotent: a row already in object form is skipped.
- *
- * The credential conversion encrypts a `customKeys` object that was written
- * before the column was encrypted at rest. It is idempotent the same way, and
- * it takes the deployment's own cipher rather than constructing one, because
- * the ciphertext is a WIRE FORMAT: rows written here are read by every process,
- * so a second implementation of the cipher would write rows nothing can read.
  */
 
 import { isLegacyCustomModels, type CustomModelEntry } from "@langwatch/model-provider-contract";
@@ -137,11 +122,6 @@ interface ModelProviderCredentialRow {
 
 /**
  * Whether a `customKeys` value has already been encrypted.
- *
- * The encrypted form is a JSON string holding the ciphertext, which Prisma
- * reads back as a `string`; the plaintext form is a JSON object, which comes
- * back as an `object`. The two types are the whole discriminator, which is what
- * makes a re-run of this migration a no-op instead of a second encryption.
  */
 function isAlreadyEncrypted(customKeys: unknown): boolean {
   return typeof customKeys === "string";
@@ -157,9 +137,6 @@ export class ModelProviderLegacyMigrationService {
 
   /**
    * Migrate a single ModelProvider row's custom models data.
-   *
-   * Pure function: takes a row and a registry lookup function, returns the
-   * migrated fields or null if no update is needed.
    */
   migrateCustomModelsRow({
     row,

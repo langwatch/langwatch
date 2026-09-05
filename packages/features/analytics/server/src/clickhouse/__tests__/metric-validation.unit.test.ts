@@ -1,9 +1,6 @@
 /**
- * A caller-supplied metric reaches the ClickHouse SELECT list as an alias and,
- * before this guard, as a `count() AS <alias>` fallback for any key the
- * translator had no expression for. These tests build the real SQL and assert
- * the injected text is absent from every string the builder emits.
- *
+ * A caller-supplied metric reaches the ClickHouse SELECT list as an alias and, before this guard, as a `count() AS <alias>` fallback for any key the
+ * translator had no expression for. These tests build the real SQL and assert the injected text is absent from every string the builder emits.
  * @see specs/analytics/timeseries-metric-validation.feature
  */
 

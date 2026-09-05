@@ -1,14 +1,5 @@
 /**
  * The run-state half of a streaming execution.
- *
- * A run started by an open tab used to exist only inside that tab, so
- * `GET /runs/:runId` answered 404 for it and `langwatch experiment status`
- * could not follow a run it had just started. The store is Redis, so a poll
- * served by a different process finds the run too.
- *
- * This lives beside the runner rather than in the route, so the route stays
- * request handling and stream output and the run's lifecycle stays with the
- * execution layer that owns it.
  */
 
 import type { SerializedHandledError } from "@langwatch/handled-error";
@@ -24,9 +15,6 @@ export interface RunStateMirror {
   record(event: EvaluationV3Event): Promise<void>;
   /**
    * Record that the run died before it reported how it ended.
-   *
-   * Not written once the run has reported that, since a write after the last
-   * frame would rewrite a finished run as a failed one.
    */
   fail(failure: {
     code: string;
@@ -121,10 +109,6 @@ export class ExperimentRunStateMirrorService implements RunStateMirror {
 
   /**
    * The mirror never fails the run it is watching.
-   *
-   * The store is Redis and it is a side channel for pollers, so a timeout on it
-   * must not reach the `for await` loop the run is streaming through: that
-   * would write an error frame to the customer and abandon a healthy run.
    */
   private async mirrored(what: string, write: () => Promise<unknown>): Promise<void> {
     try {

@@ -1,15 +1,7 @@
 /**
+ * A run holds a snapshot of the whole board, so the cells outside its execution scope are
+ * copied in rather than produced. A copied cell was paid for by the run that produced it.
  * @see specs/experiments-v3/run-board-snapshot.feature
- *
- * A run holds a snapshot of the whole board, so the cells outside its
- * execution scope are copied in rather than produced. A copied cell was paid
- * for by the run that produced it.
- *
- * The rule the fold enforces: money and time belong to this run, verdicts and
- * scores belong to the board. So a carried cell adds nothing to `TotalCost`,
- * `TotalDurationMs`, `CompletedCount`, `FailedCount` or `Progress` (the last
- * three are counted against `Total`, which is what the run dispatched), and it
- * does add to `PassedCount`, `GradedCount`, `TotalScoreSum` and `ScoreCount`.
  */
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";

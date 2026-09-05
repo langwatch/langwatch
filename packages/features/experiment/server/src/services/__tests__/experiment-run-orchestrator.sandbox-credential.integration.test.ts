@@ -1,7 +1,6 @@
 /**
- * The run's sandbox credential must reach the workflow a code node executes
- * — `mintRunSandboxApiKey` and `withSandboxApiKey` existed but were never
- * wired together. Pins the wiring: the dispatched event carries `sandbox_api_key`.
+ * The run's sandbox credential must reach the workflow a code node executes — `mintRunSandboxApiKey` and `withSandboxApiKey`
+ * existed but were never wired together. Pins the wiring: the dispatched event carries `sandbox_api_key`.
  * @see specs/experiments-v3/evaluation-execution.feature
  */
 import type { StudioServerEvent, WorkflowService } from "@langwatch/workflow-contract";

@@ -1,9 +1,7 @@
 /**
- * Turns a workbench state plus a run scope into the concrete phase-1 cells
- * a run executes, and answers how many there will be before the run
- * starts. Reaches nothing outside itself: given the same state, rows and
- * scope it returns the same list, which is why the polling run can call it
- * to publish a total before any cell has run.
+ * Turns a workbench state plus a run scope into the concrete phase-1 cells a run executes, and answers how many
+ * there will be before the run starts. Reaches nothing outside itself: given the same state, rows and scope it
+ * returns the same list, which is why the polling run can call it to publish a total before any cell has run.
  */
 
 import {

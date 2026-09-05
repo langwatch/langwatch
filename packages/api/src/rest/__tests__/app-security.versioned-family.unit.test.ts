@@ -1,15 +1,7 @@
 /**
- * The REST service's whole job is that one declaration per endpoint feeds two
- * consumers that must never disagree: the route-policy registry the
- * authorization audit reads, and the enforcement chain that refuses requests.
- * These tests pin both halves structurally for a versioned family: every mount
- * shape lands in the registry (dated, latest and both version-namespace
- * guards), the enforcement chain runs auth, then the permission check, then
- * the family's route middleware — the Enterprise plan gate in production —
- * and an endpoint that never declared a policy cannot build at all.
- *
- * No module mocking: every check is a port, so the fakes below ARE the process
- * the service is bound to.
+ * The REST service's whole job is that one declaration per endpoint feeds two consumers that must never disagree: the route-policy registry the authorization audit reads, and the enforcement chain
+ * that refuses requests. These tests pin both halves structurally for a versioned family: every mount shape lands in the registry (dated, latest and both version-namespace guards), the enforcement
+ * chain runs auth, then the permission check, then the family's route middleware — the Enterprise plan gate in production — and an endpoint that never declared a policy cannot build at all.
  */
 import type { MiddlewareHandler } from "hono";
 import { beforeAll, describe, expect, it } from "vitest";

@@ -13,10 +13,6 @@ const logger = createLogger("langwatch:lwql-key-map-service");
 
 /**
  * Where a failed sync is reported beyond the log line.
- *
- * A port because the sink is the deployment's: the row is repaired by the
- * scheduled backfill either way, so what this class owes the operator is a
- * report, and which reporter receives it is not the feature's decision.
  */
 export abstract class LwqlKeyMapErrorSinkPort {
   abstract capture(error: Error, context: Readonly<{ projectId: string; cause: unknown }>): void;
@@ -35,11 +31,9 @@ export class LwqlKeyMapService {
   ) {}
 
   /**
-   * `sourceDatabase` is the ClickHouse database the approved views read, which
-   * a process knows from its own connection string. Taken as an argument
-   * rather than parsed here, because a package that parsed the deployment's
-   * connection string would be reading configuration that belongs to whoever
-   * composed it.
+   * `sourceDatabase` is the ClickHouse database the approved views read, which a process knows from its own
+   * connection string. Taken as an argument rather than parsed here, because a package that parsed the deployment's
+   * connection string would be reading configuration that belongs to whoever composed it.
    */
   static create(options: {
     repository: LwqlKeyMapRepository;

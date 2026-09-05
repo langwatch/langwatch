@@ -28,11 +28,6 @@ export type ModelProviderRestVariables = AppRestProjectVariables & {
 
 /**
  * Resolves the calling project's organization onto the context.
- *
- * Neither handler reads it, and it is kept because dropping it would change
- * what a project whose team has gone missing gets back: today that is a 500
- * saying so, rather than a read that proceeds against a project with no
- * organization behind it.
  */
 function resolveOrganization(organizations: () => OrganizationService): MiddlewareHandler {
   return async (c, next) => {
@@ -68,10 +63,6 @@ function resolveOrganization(organizations: () => OrganizationService): Middlewa
 
 /**
  * REST for a project's model providers.
- *
- * Both verbs answer with masked credentials, because the same shape is what
- * the settings UI reads: `getForProject` is the masking read, and the write
- * re-reads through it rather than echoing what it was sent.
  */
 export function createModelProvidersRestApp(options: {
   security: AppRestSecurity;
@@ -172,15 +163,11 @@ export function createModelProvidersRestApp(options: {
         defaultModel = `${provider}/${defaultModel}`;
       }
 
-      // REST endpoint is keyed on the provider string in the URL and preserves
-      // the legacy single-instance upsert contract. The multi-instance create
-      // flow lives behind the tRPC `update` procedure, which goes through the
-      // id-based path.
-      //
-      // Nothing is caught here on purpose. Every failure `upsert` raises is a
-      // HandledError carrying its own status and code, and the framework
-      // boundary renders it; catching them to rethrow one 400 replaced every
-      // status with 400 and every code with `http_error`.
+      // REST endpoint is keyed on the provider string in the URL and preserves the legacy single-instance
+      // upsert contract. The multi-instance create flow lives behind the tRPC `update` procedure, which goes
+      // through the id-based path. Nothing is caught here on purpose. Every failure `upsert` raises is a
+      // HandledError carrying its own status and code, and the framework boundary renders it; catching them
+      // to rethrow one 400 replaced every status with 400 and every code with `http_error`.
       await service.upsert({
         projectId: project.id,
         provider,

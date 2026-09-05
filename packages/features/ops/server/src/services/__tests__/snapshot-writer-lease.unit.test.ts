@@ -4,10 +4,9 @@ import type { OpsSnapshotService } from "@langwatch/ops-contract";
 import { OpsMetricsTestAdapter } from "./ops-metrics.fixture";
 
 /**
+ * the lease must return BEFORE scanning, not merely skip the write. A version that scanned and then discarded would still run
+ * ~14 scans a cycle across the fleet and look identical from the outside, so this is worth pinning.
  * The lease gate is the whole cost saving in ADR-090: a pod that does not hold
- * the lease must return BEFORE scanning, not merely skip the write. A version
- * that scanned and then discarded would still run ~14 scans a cycle across the
- * fleet and look identical from the outside, so this is worth pinning.
  */
 
 const redisStub = {

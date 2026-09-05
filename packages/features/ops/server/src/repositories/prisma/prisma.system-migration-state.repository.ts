@@ -21,10 +21,9 @@ function parseStatus(raw: string): TenantMigrationStatus {
 }
 
 /**
- * The stored per-(migration, tenant) state - the runner's port plus the ops
- * finders the dashboard reads. `SystemMigrationTenantState` has no tenant FK
- * on purpose (the runner is generic over tenants), so every query here keys
- * by migration name first.
+ * The stored per-(migration, tenant) state - the runner's port plus the ops finders the
+ * dashboard reads. `SystemMigrationTenantState` has no tenant FK on purpose (the runner is
+ * generic over tenants), so every query here keys by migration name first.
  */
 export class PrismaSystemMigrationStateRepository implements SystemMigrationStateRepository {
   static create({ prisma }: { prisma: PrismaClient }): PrismaSystemMigrationStateRepository {
@@ -58,12 +57,11 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
     // no-report case has to be written, and for a nullable Json column
     // that means the DbNull sentinel rather than a bare null.
     const report = record.report == null ? Prisma.DbNull : (record.report as Prisma.InputJsonValue);
-    // The transition's own business time, stamped by the writer. It is what
-    // the grants-ledger projection orders folded transitions against, and it
-    // has to be written here too: a direct write that left the column alone
-    // would let a replayed fact from last year overwrite the latch this call
-    // just set. `updatedAt` cannot serve - it moves for reasons that are not
-    // transitions.
+    // The transition's own business time, stamped by the writer. It is what the
+    // grants-ledger projection orders folded transitions against, and it has to be
+    // written here too: a direct write that left the column alone would let a
+    // replayed fact from last year overwrite the latch this call just set.
+    // `updatedAt` cannot serve - it moves for reasons that are not transitions.
     const occurredAt = new Date();
     await this.prisma.systemMigrationTenantState.upsert({
       where: {
@@ -84,15 +82,9 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
   }
 
   /**
-   * The runner's compare-and-set (see the port's own doc): the update is
-   * guarded on `status != rolled_back` in the same statement, so an
-   * operator's pin written between the pass's read and this write can never
-   * be overwritten - the guarded UPDATE simply matches nothing. A row that
-   * does not exist yet is created; a create that collides on the unique key
-   * means the row appeared since the guarded update ran, and the only
-   * writer that creates nothing-to-rolled_back transitions is nobody (the
-   * operator can only pin an EXISTING record), so the collision is read as
-   * the pin standing and answered `false`.
+   * The runner's compare-and-set (see the port's own doc): the update is guarded on `status != rolled_back` in the same statement, so an operator's pin written between the pass's read and this write can never be
+   * overwritten - the guarded UPDATE simply matches nothing. A row that does not exist yet is created; a create that collides on the unique key means the row appeared since the guarded update ran, and the only
+   * writer that creates nothing-to-rolled_back transitions is nobody (the operator can only pin an EXISTING record), so the collision is read as the pin standing and answered `false`.
    */
   async upsertRecordUnlessRolledBack(record: TenantMigrationRecord): Promise<boolean> {
     const report = record.report == null ? Prisma.DbNull : (record.report as Prisma.InputJsonValue);

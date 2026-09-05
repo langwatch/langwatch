@@ -98,12 +98,6 @@ export {
 } from "./transport/api-trpc/stored-object.api";
 /**
  * The CONTENT-ADDRESSED store, moved here whole from the platform application.
- *
- * Plural where the canonical store above is singular, and the plural is the
- * distinction rather than a typo: `StoredObjectsService` reads and writes the
- * ClickHouse `stored_objects` table every trace attachment, dataset upload and
- * evaluation payload written before the Postgres store still lives in. An
- * object written through one is not readable through the other.
  */
 export { ObjectNotFoundError, UnsupportedStorageSchemeError } from "./errors";
 export {

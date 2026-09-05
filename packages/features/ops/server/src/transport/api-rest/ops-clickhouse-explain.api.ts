@@ -1,36 +1,5 @@
 /**
  * The operator-only `POST /api/ops/clickhouse/explain` family.
- *
- * Lets the clickhouse-optimizer agent run EXPLAIN against the ClickHouse
- * instance the deployment holds. Defenses, outermost to innermost:
- *
- *   1. An operator secret, constant-time compared.
- *   2. Query normalization (single ClickHouse-aware lexer) — bypasses like
- *      `url/**\/('http://x')` and `'/*' = 'x' OR ... url(...)` can't evade the
- *      regex pass.
- *   3. Input regex filter on the normalized text — table-function deny-list,
- *      SYSTEM_SCHEMA guard, multi-statement guard, forbidden-keyword guard.
- *      Tenant scoping is NOT enforced here on purpose: the optimizer agent
- *      legitimately runs cross-tenant EXPLAINs across the fleet.
- *   4. Server-side EXPLAIN wrapping — the caller's SQL never reaches ClickHouse
- *      unwrapped.
- *   5. EXPLAIN type allowlist — ANALYZE is blocked (it would execute the inner
- *      query).
- *   6. A dedicated readonly ClickHouse account, which is the ONE thing this
- *      family cannot compose for itself. It arrives as a service the process
- *      built from its own `CLICKHOUSE_OPS_URL`, and a process that has none
- *      does not mount this family at all — the fail-closed rule the platform
- *      application spelled as a 503 in production is a 404 here, because a
- *      family that cannot be served safely is absent rather than refusing.
- *   7. Per-query ClickHouse settings: readonly=1 + 10s exec cap + 10MB result
- *      cap + 1GB memory cap.
- *   8. Audit log of every accepted request — redacted shape + sha256 prefix,
- *      raw literals stripped so logs aren't a PII sink.
- *
- * Cross-tenant by design, which is why it is a transport in THIS package
- * rather than one more family beside the product ones: nothing else in the
- * deployment reads ClickHouse without a tenant key, and keeping the exception
- * in the operator feature is what makes it findable.
  */
 import { timingSafeEqual } from "node:crypto";
 
@@ -54,9 +23,6 @@ export interface OpsClickHouseExplainRestPorts {
   opsApiKey: () => string;
   /**
    * The dedicated readonly account's EXPLAIN service.
-   *
-   * Resolved per request, as every other family's service is: mounting must
-   * not force a ClickHouse client to be opened.
    */
   explain: () => OpsExplainService;
   /**

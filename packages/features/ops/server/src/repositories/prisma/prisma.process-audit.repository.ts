@@ -9,10 +9,9 @@ const TARGET_KIND = "process_instance";
 const FLEET_TARGET_ID = "fleet";
 
 /**
- * Writes process-manager operator actions to the shared audit log, the same
+ * Writes process-manager operator actions to the shared audit log, the same customer-visible effect re-emitted out
+ * of band, so "why did this deliver at 03:14" must be answerable without anyone's memory.
  * contract the scheduler controls follow (ADR-091): a redriven intent is a
- * customer-visible effect re-emitted out of band, so "why did this deliver at
- * 03:14" must be answerable without anyone's memory.
  */
 export class ProcessAuditRepository extends ProcessAuditSink {
   static create({ prisma }: { prisma: PrismaClient }): ProcessAuditRepository {

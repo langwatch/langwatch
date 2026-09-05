@@ -1,12 +1,5 @@
 /**
  * One request, one request-log record.
- *
- * Twenty-one families mount at the `/api` base path, so every one of their
- * app-level middlewares matches `/api/prompts` and the process wrote up to
- * twenty-one identical `request handled` lines for a single request — same
- * trace id, same millisecond, different span. Finding F5 of
- * `dev/docs/plans/e2e-walk-2026-09-04.md`.
- *
  * @see specs/observability/one-request-one-log-record.feature
  */
 import { Hono, type MiddlewareHandler } from "hono";

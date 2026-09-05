@@ -9,9 +9,6 @@ const logger = createLogger("langwatch:experiment-run-processing:experiment-run-
 
 /**
  * The AppendStore for experiment run result items.
- *
- * Adapts the ClickHouse insert into the experiment_run_items table to the
- * AppendStore interface used by MapProjection definitions.
  */
 export class ExperimentRunItemStore implements AppendStore<ClickHouseExperimentRunResultRecord> {
   private constructor(

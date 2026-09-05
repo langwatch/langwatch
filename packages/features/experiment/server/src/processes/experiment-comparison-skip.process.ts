@@ -1,8 +1,7 @@
 /**
- * The five reasons a comparison row cannot be built, and the sentence a
- * customer reads for each. Pure. The copy lives here rather than on the
- * service so a test can pin the wording and the `error_type` without
- * running an orchestration.
+ * The five reasons a comparison row cannot be built, and the sentence a customer reads for
+ * each. Pure. The copy lives here rather than on the service so a test can pin the wording
+ * and the `error_type` without running an orchestration.
  */
 
 export type ComparisonSkipReason = {

@@ -1,11 +1,5 @@
 /**
  * Guards on what the LangWatchQL API *ships*, as opposed to what it computes.
- *
- * Two scope commitments from #6480 that nothing else can hold: the API stays
- * native ClickHouse SQL parsed by ClickHouse's own grammar (no query language,
- * compiler or IR of ours, and no BI platform underneath it), and the
- * table-function policy is written down where the next person will look for it
- * rather than living only in a code comment.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -21,10 +15,9 @@ const ADR_ROOT = join(REPO_ROOT, "dev", "docs", "adr");
 const LWQL_ROOT = join(PACKAGE_ROOT, "src", "langwatch-ql");
 
 /**
- * Packages that would mean a BI platform, a query engine, or a semantic layer
- * had been taken on. #6480 reversed an earlier direction (#6346, #5670) that
- * would have built one; the point of listing them is that the reversal is
- * enforced rather than remembered.
+ * Packages that would mean a BI platform, a query engine, or a semantic layer had been
+ * taken on. #6480 reversed an earlier direction (#6346, #5670) that would have built one;
+ * the point of listing them is that the reversal is enforced rather than remembered.
  */
 const BI_PLATFORM_PATTERN =
   /(^|[/@-])(cube|cubejs|trino|presto|superset|metabase|looker|malloy)([/-]|$)/i;
@@ -37,11 +30,7 @@ const OWN_FRONT_END_PATTERN = /(grammar|lexer|tokeni[sz]|compiler|codegen|\bir\b
 
 /**
  * The ADR that owns the table-function and SSRF policy.
- *
- * Named rather than discovered by text search: ownership is a decision, and a
- * search finds whichever ADR happens to mention both terms. Anchoring it here
  * means an ADR-081 that stopped documenting the policy fails as exactly that,
- * rather than as a corpus-wide count nobody can read.
  */
 const POLICY_ADR = "081-lwql-table-function-and-ssrf-policy.md";
 
@@ -152,14 +141,11 @@ describe("what the LangWatchQL API ships", () => {
       expect(policy.text, "names the AST half").toMatch(/AST/);
       expect(policy.text, "names the grants half").toMatch(/grant/i);
 
-      // Uniqueness second, and it means something different: a reader who
-      // follows the index must land on one answer, not two that could diverge.
-      //
-      // Read off the *filename*, not the body. A body search cannot tell an ADR
-      // that owns the policy from one that cites it, and the sibling LangWatchQL
-      // ADRs legitimately cite it — 082 and 084 both name table functions and
-      // SSRF while deciding something else entirely. An ADR *titled* for the
-      // policy is the ambiguity worth failing on.
+      // Uniqueness second, and it means something different: a reader who follows the index must land on one
+      // answer, not two that could diverge. Read off the *filename*, not the body. A body search cannot tell
+      // an ADR that owns the policy from one that cites it, and the sibling LangWatchQL ADRs legitimately
+      // cite it — 082 and 084 both name table functions and SSRF while deciding something else entirely. An
+      // ADR *titled* for the policy is the ambiguity worth failing on.
       expect(
         adrs
           .filter(({ name }) => TABLE_FUNCTION_PATTERN.test(name) && /ssrf/i.test(name))

@@ -1,13 +1,8 @@
-// ---------------------------------------------------------------------------
-// @langwatch/api/rest -- the Hono service framework
-//
-// Versioned namespaces, the definition chain, the endpoint pipeline, SSE, and
-// the route security spine every LangWatch REST family mounts on.
-//
-// The error vocabulary, the access-policy vocabulary, the capability ports and
-// the schema boundary live at `@langwatch/api` and are NOT re-exported from
+// @langwatch/api/rest -- the Hono service framework Versioned namespaces, the definition
+// chain, the endpoint pipeline, SSE, and the route security spine every LangWatch REST
+// family mounts on. The error vocabulary, the access-policy vocabulary, the capability
+// ports and the schema boundary live at `@langwatch/api` and are NOT re-exported from
 // here: a consumer imports each from the entry point that owns it.
-// ---------------------------------------------------------------------------
 
 // The fingerprint a credential refusal is logged with, on every family that
 // resolves its own credential.
@@ -106,25 +101,11 @@ export {
   type VersionedEndpointMeta,
 } from "./security/rest-api-service.js";
 
-// ---------------------------------------------------------------------------
-// The REST kit an application's route families are built from.
-//
-// Everything here was previously `apps/api/src/app-rest`, which a package may
-// not import: a REST family that lives in `packages/features/<f>/server` needs
-// the same request validator, error vocabulary, response schemas, idempotency
-// wire contract and correlation handles as one still mounted from an
-// application, and two definitions would let one surface's 422 become the
-// other's 500 without anything reporting it.
-//
-// What deliberately did NOT come with it is every BOUND instance: the concrete
-// permission catalogue behind `AppRestRbacVocabulary`, the broadcast transport
-// behind `AppRestBroadcast`, the function that reads a deployment's origin to
-// build a `PlatformUrlBuilder`, the idempotency ledger behind
-// `IdempotentRunner`, and the audit sink behind `AppRestManagementAuditPort`.
-// Each of those needs a database, a queue or a validated environment, and a
-// package may read none of the three. The port type is here; the process that
-// owns the substrate supplies the value.
-// ---------------------------------------------------------------------------
+// The REST kit an application's route families are built from. Everything here was previously `apps/api/src/app-rest`, which a package may not import: a REST family that lives in `packages/features/<f>/server` needs the
+// same request validator, error vocabulary, response schemas, idempotency wire contract and correlation handles as one still mounted from an application, and two definitions would let one surface's 422 become the other's
+// 500 without anything reporting it. What deliberately did NOT come with it is every BOUND instance: the concrete permission catalogue behind `AppRestRbacVocabulary`, the broadcast transport behind `AppRestBroadcast`, the
+// function that reads a deployment's origin to build a `PlatformUrlBuilder`, the idempotency ledger behind `IdempotentRunner`, and the audit sink behind `AppRestManagementAuditPort`. Each of those needs a database, a queue
+// or a validated environment, and a package may read none of the three. The port type is here; the process that owns the substrate supplies the value.
 
 export {
   type AppRestSecurity,

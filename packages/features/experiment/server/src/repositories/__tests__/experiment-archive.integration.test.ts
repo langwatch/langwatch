@@ -24,12 +24,9 @@ import { UnavailableExperimentExecutionAdapter } from "../../adapters/unavailabl
 import { NoopExperimentWorkbenchUpdatesAdapter } from "../../adapters/noop-experiment-workbench-updates.adapter";
 
 /**
+ * The Postgres half of archiving: what `archiveActive` actually leaves behind. The cascade into a backing workflow and monitor is covered by
+ * `app/__tests__/experiment.app.unit.test.ts` against a stubbed repository, since that cascade lives in `ExperimentApp`, not this repository.
  * @see specs/experiments-v3/experiment-archive.feature
- *
- * The Postgres half of archiving: what `archiveActive` actually leaves
- * behind. The cascade into a backing workflow and monitor is covered by
- * `app/__tests__/experiment.app.unit.test.ts` against a stubbed repository,
- * since that cascade lives in `ExperimentApp`, not this repository.
  */
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

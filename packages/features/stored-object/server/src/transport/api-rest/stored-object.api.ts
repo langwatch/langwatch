@@ -1,15 +1,5 @@
 /**
  * Public REST for reading the bytes of a stored object.
- *
- * Mounted at `/api/files`. Authentication is dual — a project API key or a
- * browser session — because browsers fire `<audio src="/api/files/:id">` with
- * the session cookie and no custom headers. Authorization is per-object and
- * happens in the handler: which permission guards a read depends on what the
- * object IS.
- *
- * The application, the dual-auth verifier, the permission check and the rate
- * limiter all arrive as arguments. Each of the last three reads the process's
- * own database or Redis, which is why they are ports rather than imports.
  */
 import { Readable } from "node:stream";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -31,48 +21,33 @@ import type { StoredObjectApp } from "#app/stored-object.app";
 
 /**
  * What the family's dual-auth verifier leaves on the request context.
- *
- * Named here rather than imported because the verifier itself is the
- * application's — the family only needs to know which of the two credential
- * kinds claimed the request.
  */
 export type FilesDualAuthVariables = {
   apiKeyProjectId?: string;
   userId?: string;
   /**
-   * The resolved key's ceiling. The key branch used to compare the caller's
-   * own `X-Project-Id` against the owner and pass, so a key scoped to one
-   * project read every project's bytes. Which permission to ask for is this
-   * family's decision, which is why it arrives as a call rather than a chain.
+   * The resolved key's ceiling. The key branch used to compare the caller's own `X-Project-Id` against
+   * the owner and pass, so a key scoped to one project read every project's bytes. Which permission to
+   * ask for is this family's decision, which is why it arrives as a call rather than a chain.
    */
   apiKeyCeiling?: (permission: AuthzPermission) => Promise<void>;
 };
 
 /**
  * Per-project rate limit on the read endpoint.
- *
- * 120 requests / minute / project covers the realistic in-app render
- * cases (~10 media parts in flight at a time) with headroom, and caps
- * scraper abuse from one tenant's credentials at 2 req/s. Tuneable per
- * project when AC12 lands proper per-tenant overrides.
  */
 const FILES_RATE_LIMIT_WINDOW_SECONDS = 60;
 const FILES_RATE_LIMIT_MAX = 120;
 
 /**
- * Stored objects are shared by several features, and which permission guards
- * a read depends on what the object IS: trace media requires `traces:view`,
- * scenario media requires `scenarios:view` — the two are separate permission
- * categories and a custom role can hold one without the other.
+ * Stored objects are shared by several features, and which permission guards a read depends on what
+ * the object IS: trace media requires `traces:view`, scenario media requires `scenarios:view` — the
+ * two are separate permission categories and a custom role can hold one without the other.
  */
 const FILE_VIEW_PERMISSIONS = ["traces:view", "scenarios:view"] as const;
 
 /**
  * The key's ceiling, satisfied by ANY of the permissions a file read can need.
- *
- * The object's purpose is not known yet, so a key holding either category
- * passes here and the purpose-specific gate runs once the row is read. The
- * last refusal is what reaches the caller, carrying its own code.
  */
 async function enforceAnyOf(
   ceiling: (permission: AuthzPermission) => Promise<void>,
@@ -108,16 +83,9 @@ const DENIAL_CODES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * True only for the denial shapes the permission check documents.
- * Anything else — a dropped database connection, a Prisma fault — is an
- * infrastructure failure that must bubble up as a 5xx, never be masked as
- * a 403.
- *
- * Matched on `code`, never on prose. This used to compare the denial's message
- * word for word, which made a copy edit a silent behaviour change: reword the
- * sentence and every denial here quietly becomes a 500. Codes are the stable
- * half of a handled error precisely so control flow can rest on them, and
- * `code` survives a serialisation boundary where `instanceof` would not.
+ * True only for the denial shapes the permission check documents. Anything
+ * else — a dropped database connection, a Prisma fault — is an infrastructure
+ * failure that must bubble up as a 5xx, never be masked as a 403.
  */
 export function isPermissionDenial(err: unknown): boolean {
   return HandledError.isHandled(err) && DENIAL_CODES.has(err.code);
@@ -125,11 +93,6 @@ export function isPermissionDenial(err: unknown): boolean {
 
 /**
  * Refuses the read unless `userId` holds `permission` on `projectId`.
- *
- * Throws the application's own denial — a handled error carrying one of the
- * codes {@link isPermissionDenial} recognises — rather than returning a
- * boolean, so an infrastructure failure underneath it stays distinguishable
- * from a refusal.
  */
 export type FilesProjectPermissionCheck = (args: {
   userId: string;
@@ -145,18 +108,9 @@ export type FilesRateLimiter = (args: {
 }) => Promise<{ allowed: boolean; resetAt: number }>;
 
 /**
- * Builds the 200 response for a stored-object read. Applies the safe
- * Content-Type allowlist, Content-Disposition, Content-Length, and all
- * security headers. For HEAD requests the stream is drained and the body is
- * omitted; for GET the stream is forwarded.
- *
- * `requestedFilename` is the caller-supplied display name (the `filename`
- * query param the attachment chip appends). Stored objects are
- * content-addressed, so the row itself has no filename; passing the
- * message-level one through gives downloads from the browser viewer a
- * human name instead of the object id. It runs through the same
- * `sanitizeFilenameSegment` allowlist as the id (header injection is
- * neutralised), and an empty sanitised result falls back to the id.
+ * Builds the 200 response for a stored-object read. Applies the safe Content-Type
+ * allowlist, Content-Disposition, Content-Length, and all security headers. For HEAD
+ * requests the stream is drained and the body is omitted; for GET the stream is forwarded.
  */
 function streamFileResponse({
   row,
@@ -228,14 +182,9 @@ export function createFilesRestApp<
   });
 
   /**
-   * Checks that the caller (API key or session user) is allowed to read files
-   * owned by `ownerProjectId` AT ALL. Runs BEFORE the row is read so a foreign
-   * claim is always 403 regardless of row existence (no 403-vs-404 oracle);
-   * because the object's purpose is not known yet, a caller passes with ANY of
-   * the file-view permissions — the purpose-specific gate runs after the read
-   * (`authorizeFilePurpose`). An API key is pinned to the project it resolved
-   * to AND capped by its own ceiling. Throws HTTPException(403)/(401) or the
-   * key's own refusal on failure; returns void on success.
+   * Checks that the caller (API key or session user) is allowed to read files owned by `ownerProjectId` AT ALL. Runs BEFORE the row is read so a foreign claim is always 403 regardless of row existence (no
+   * 403-vs-404 oracle); because the object's purpose is not known yet, a caller passes with ANY of the file-view permissions — the purpose-specific gate runs after the read (`authorizeFilePurpose`). An API key is
+   * pinned to the project it resolved to AND capped by its own ceiling. Throws HTTPException(403)/(401) or the key's own refusal on failure; returns void on success.
    */
   async function authorizeFileRead({
     apiKeyProjectId,
@@ -279,11 +228,9 @@ export function createFilesRestApp<
   }
 
   /**
-   * Purpose-specific authorization, applied once the row (and so its purpose)
-   * is known: `trace_content` objects require `traces:view`, everything else
-   * (the scenario purposes) requires `scenarios:view`. An API-key caller was
-   * already pinned to the owning project and capped by its own ceiling in
-   * `authorizeFileRead`.
+   * Purpose-specific authorization, applied once the row (and so its purpose) is known: `trace_content` objects
+   * require `traces:view`, everything else (the scenario purposes) requires `scenarios:view`. An API-key caller was
+   * already pinned to the owning project and capped by its own ceiling in `authorizeFileRead`.
    */
   async function authorizeFilePurpose({
     userId,
@@ -308,34 +255,8 @@ export function createFilesRestApp<
   }
 
   /**
-   * GET /api/files/:projectId/:id  (project-scoped — issue #4947)
-   * GET /api/files/:id             (legacy id-only — backward compatible)
-   *
-   * Streams the bytes for the given stored object id.
-   *
-   * Auth: either an API key scoped to the file's project, or a session cookie
-   * belonging to a user with `scenarios:view` on that project.
-   *
-   * Owner resolution:
-   *  - Project-scoped URL: the owning project is taken from the URL path. No
-   *    cross-tenant lookup — the read is scoped directly to that project, and a
-   *    URL whose `projectId` is not the caller's (403) or does not own the row
-   *    (404) cannot serve another tenant's bytes.
-   *  - Legacy id-only URL: the owning project is resolved from the
-   *    stored_objects row via the cross-tenant fallback (NOT from any header),
-   *    retained so URLs minted before #4947 keep resolving.
-   *
-   * Responses:
-   *  200 — bytes streamed with a coerced Content-Type and Content-Length.
-   *  401 — no valid credentials.
-   *  403 — credentials are valid but the caller has no access to the project.
-   *  404 — no row exists (status: not_found) OR storage 404d (status: missing).
-   *  429 — per-caller rate limit exceeded (keyed before owner resolution).
-   *  502 — row exists, storage returned a non-404 error.
-   *
-   * HEAD mirrors GET for byte-free probes (used by the UI MediaPart to
-   * disambiguate "missing" vs "transient error" without paying for a full body
-   * download).
+   * GET /api/files/:projectId/:id (project-scoped — issue #4947) GET
+   * /api/files/:id (legacy id-only — backward compatible)
    */
   async function handleFileRead(
     // `E`, not the default: Hono's `Context` is invariant in its environment,
@@ -352,12 +273,11 @@ export function createFilesRestApp<
     // Undefined on the legacy id-only route (`/api/files/:id`).
     const projectIdFromUrl = c.req.param("projectId");
 
-    // Step 1: per-caller rate limit (AC12). Keyed on the caller's identity
-    // (apiKeyProjectId or userId) so that enumeration attempts are throttled
-    // BEFORE we touch the shared cross-tenant CH client. Using the owner
-    // project as the key would require the cross-tenant lookup first, which
-    // lets an authenticated user fan out id probes against other tenants
-    // before hitting any throttle.
+    // Step 1: per-caller rate limit (AC12). Keyed on the caller's identity (apiKeyProjectId or
+    // userId) so that enumeration attempts are throttled BEFORE we touch the shared
+    // cross-tenant CH client. Using the owner project as the key would require the
+    // cross-tenant lookup first, which lets an authenticated user fan out id probes against
+    // other tenants before hitting any throttle.
     const apiKeyProjectId = c.get("apiKeyProjectId");
     const userId = c.get("userId");
     const callerKey = apiKeyProjectId ?? userId;
@@ -377,25 +297,11 @@ export function createFilesRestApp<
       return rateLimitedResponse(rl.resetAt);
     }
 
-    // Step 2: resolve the owning project.
-    //
-    // Project-scoped URL (`/api/files/:projectId/:id`, issue #4947): the URL
-    // carries the claimed owner, so take it directly — no cross-tenant lookup.
-    // The authorization gate (step 3) rejects a claim that is not the caller's
-    // own project, and the project-scoped read (step 4) returns 404 when the
-    // claim does not actually own the row. So a tampered or foreign `projectId`
-    // in the URL can never serve another tenant's bytes, and the 403-vs-404
-    // cross-tenant existence oracle is closed (a foreign claim is always 403,
-    // regardless of whether the row exists).
-    //
-    // Legacy id-only URL (`/api/files/:id`): no project context in the URL, so
-    // fall back to the cross-tenant owner lookup. The lookup fans out across
-    // every configured ClickHouse instance with failure isolation: a transient
-    // outage on a private/BYOC instance throws
-    // `StoredObjectOwnerLookupUnavailableError` so this route can return 502
-    // rather than masking the degraded instance as a 404 (Sergio review
-    // 2026-05-20). Retained so URLs embedded in historical message content keep
-    // resolving — no backfill (see #4947).
+    // Step 2: resolve the owning project. Project-scoped URL (`/api/files/:projectId/:id`, issue #4947): the URL carries the claimed owner, so take it directly — no cross-tenant lookup. The authorization gate (step 3) rejects a claim that
+    // is not the caller's own project, and the project-scoped read (step 4) returns 404 when the claim does not actually own the row. So a tampered or foreign `projectId` in the URL can never serve another tenant's bytes, and the
+    // 403-vs-404 cross-tenant existence oracle is closed (a foreign claim is always 403, regardless of whether the row exists). Legacy id-only URL (`/api/files/:id`): no project context in the URL, so fall back to the cross-tenant owner
+    // lookup. The lookup fans out across every configured ClickHouse instance with failure isolation: a transient outage on a private/BYOC instance throws `StoredObjectOwnerLookupUnavailableError` so this route can return 502 rather than
+    // masking the degraded instance as a 404 (Sergio review 2026-05-20). Retained so URLs embedded in historical message content keep resolving — no backfill (see #4947).
     let owner: { projectId: string } | null;
     if (projectIdFromUrl) {
       owner = { projectId: projectIdFromUrl };

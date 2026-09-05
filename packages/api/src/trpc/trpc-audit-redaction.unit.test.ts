@@ -1,13 +1,7 @@
 /**
- * The audit trail stores a mutation's input verbatim, and `customKeys` carries
- * provider API keys exactly as the customer typed them. Credential probing
- * became a mutation so the key would stop travelling in a URL — which would
- * have moved it straight into a durable, queryable table instead had this not
- * gone in alongside.
- *
- * Covers @unit scenarios from
- * specs/model-providers/credential-validation.feature and
- * specs/scenarios/secret-run-parameters.feature.
+ * The audit trail stores a mutation's input verbatim, and `customKeys` carries provider API keys exactly as the
+ * customer typed them. Credential probing became a mutation so the key would stop travelling in a URL — which
+ * would have moved it straight into a durable, queryable table instead had this not gone in alongside.
  */
 import { describe, expect, it } from "vitest";
 

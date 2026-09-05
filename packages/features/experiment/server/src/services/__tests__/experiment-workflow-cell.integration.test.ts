@@ -1,13 +1,6 @@
 /**
- * Tests ExperimentRunOrchestratorService.executeWorkflowCell: running a whole studio workflow as an
- * evaluations-v3 target. The studio boundary is a fake port fed a scripted
- * set of server events (the platform version mocked three `~/`-rooted
- * modules; the cell takes its studio boundary as a port now, so the fake is
- * passed in instead), so this runs the classification and mapping logic
- * without a live NLP service. The workflow run and the grading evaluators are
- * two separate dispatches, so they are scripted separately and the fake
- * answers each by the message it was given.
- *
+ * Tests ExperimentRunOrchestratorService.executeWorkflowCell: running a whole studio workflow as an evaluations-v3 target. The studio boundary is a fake port fed a scripted set of server events (the platform version mocked three `~/`-rooted modules; the cell takes its studio boundary as a port
+ * now, so the fake is passed in instead), so this runs the classification and mapping logic without a live NLP service. The workflow run and the grading evaluators are two separate dispatches, so they are scripted separately and the fake answers each by the message it was given.
  * @see specs/experiments-v3/evaluation-execution.feature
  */
 import type { EvaluatorConfig } from "@langwatch/experiment-contract";

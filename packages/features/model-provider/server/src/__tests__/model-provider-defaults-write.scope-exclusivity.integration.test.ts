@@ -1,16 +1,7 @@
 /**
+ * Real-Postgres coverage for the one-config-per-scope invariant on ModelDefaultConfig writes, and the handled errors the write path raises instead of leaking plain 500s. Customer report: "+ Add config" at organization scope stacked a second org row instead of replacing the first, and saving an all-inherit new config surfaced a raw "unknown error" 500.
  * @vitest-environment node
- *
  * @see specs/model-providers/model-default-config-cascade.feature
- *
- * Real-Postgres coverage for the one-config-per-scope invariant on
- * ModelDefaultConfig writes, and the handled errors the write path raises
- * instead of leaking plain 500s. Customer report: "+ Add config" at
- * organization scope stacked a second org row instead of replacing the
- * first, and saving an all-inherit new config surfaced a raw "unknown
- * error" 500.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";

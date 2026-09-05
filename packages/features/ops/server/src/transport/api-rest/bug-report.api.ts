@@ -1,18 +1,6 @@
 /**
- * Intake for issue reports from customers' coding agents:
- * `POST /api/bug-reports`.
- *
- * Public on purpose: the reporter may be struggling precisely because auth or
- * setup failed, so submitting a report must never require credentials. An API
- * key, when present, only links the report to a project. The route stays
- * thin: shape validation here, rate limiting and persistence in the service.
- *
- * The credential is read rather than enforced, which is why the reader is a
- * port and not the framework's authenticate-then-authorize chain: a request
- * with no credential, an expired one, or one for another tenant all file the
- * same report — only the project link differs.
- *
- * See specs/support/bug-reports.feature.
+ * Intake for issue reports from customers' coding agents: `POST
+ * /api/bug-reports`.
  */
 import { publicEndpoint } from "@langwatch/api";
 import { bodyLimit, type AppRestSecurity, type MountableRestApp } from "@langwatch/api/rest";
@@ -35,10 +23,6 @@ const MAX_BODY_BYTES = 12 * 1024 * 1024;
 /**
  * The project credential a report MAY carry, as this process reads one off a
  * request.
- *
- * A port because credential precedence (Basic, then Bearer, then
- * `X-Auth-Token`) is the deployment's published contract across every REST
- * family, and a second reading of it here is how the two would drift.
  */
 export type BugReportRestCredentialReader = (
   request: Request,

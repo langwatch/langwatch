@@ -4,20 +4,6 @@ import { ProcessOpsPrismaRepository } from "../prisma.process-ops.repository";
 
 /**
  * The dead-letter reads, executed against a stubbed Prisma.
- *
- * These live on the unit lane deliberately. `findDeadMessages` shipped with an
- * unbalanced type-argument list — `$queryRaw<Array<…>(sql)` closed `Array<`
- * but never `$queryRaw<`, so TypeScript fell back to parsing the whole
- * expression as a `<` comparison and emitted `$queryRaw < Array(sql)`. The
- * query never reached Postgres, `rows` was a boolean, and every call to
- * /ops/event-sourcing/dead-letters died on `rows.map is not a function` in
- * 3ms. It typechecked clean, because a comparison is valid TypeScript.
- *
- * Nothing about that is visible in the source text, so the guard has to be a
- * test that calls the method and looks at what came back. The integration
- * suite covers the same methods against a real Postgres, but it needs a
- * datastore lane; this one runs everywhere, on every change.
- *
  * Spec: specs/ops/process-manager-visibility.feature
  */
 

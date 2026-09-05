@@ -26,14 +26,6 @@ export type WorkflowEvaluationParameters = Record<string, string | number | bool
 
 /**
  * What an evaluation trigger answers with.
- *
- * Restated structurally rather than imported: the Workflow REST family owns the
- * same shape as the contract of its own trigger, and a core feature server may
- * not depend on another feature's server. A refusal is a value rather than an
- * exception on purpose — the three ways a trigger can be refused are named by
- * this module's own error classes just below, and the mapping stays beside them
- * rather than in a catch that recognises classes by identity across a package
- * boundary.
  */
 export type WorkflowEvaluationOutcome =
   | Readonly<{
@@ -74,12 +66,9 @@ const WORKFLOW_TARGET_ID = "workflow-target";
 const WORKFLOW_DATASET_ID = "workflow-dataset";
 
 /**
- * Runs a studio workflow as an evaluations-v3 evaluation. It resolves the
- * committed version, ensures the workflow's backing experiment exists, loads
- * the dataset (the workflow's attached dataset, or caller-supplied data /
- * dataset id / parameters), and starts the v3 orchestrator, returning the run
- * id and a results URL. This is the single backend execution path, shared with
- * the evaluations-v3 run API.
+ * Runs a studio workflow as an evaluations-v3 evaluation. It resolves the committed version, ensures the workflow's backing experiment
+ * exists, loads the dataset (the workflow's attached dataset, or caller-supplied data / dataset id / parameters), and starts the v3
+ * orchestrator, returning the run id and a results URL. This is the single backend execution path, shared with the evaluations-v3 run API.
  */
 export type WorkflowEvaluationDependencies = {
   experiments: ExperimentService;
@@ -108,12 +97,6 @@ export class WorkflowEvaluationService {
   /**
    * The same trigger, as the REST boundary reads it: a run, or a refusal
    * carrying the status and the sentence the caller is answered with.
-   *
-   * The three refusals are named by this module's own error classes, so the
-   * mapping lives beside them rather than in a transport that would have to
-   * recognise them by identity across a package boundary. Anything else is
-   * rethrown and degrades to an unknown error with a trace id, which is what
-   * an infrastructure failure should do.
    */
   async triggerEvaluationForRest(input: {
     projectId: string;

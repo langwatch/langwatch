@@ -1,12 +1,6 @@
 /**
- * @vitest-environment node
- *
  * The API-key ceiling on the `/api/model-defaults` writes.
- *
- * The service authorizes each named scope against the key's OWNING USER, so a
- * deliberately narrow CI key repointed the organization's default and LANGY
- * models with its owner's grants. The three write routes declare the ceiling,
- * so the key's own scope caps the owner's; the read route is unchanged.
+ * @vitest-environment node
  */
 import {
   createAppRestSecurity,

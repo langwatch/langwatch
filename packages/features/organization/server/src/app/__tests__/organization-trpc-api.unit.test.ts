@@ -1,15 +1,7 @@
 /**
+ * The `organization.*` tRPC surface: the ordering rule that makes the policy see a parsed input, the invitation-acceptance status guard, the
+ * identifier-aware address match behind it, and the seat refusal a member re-enable turns into the shape the client's limit modal opens off.
  * @vitest-environment node
- *
- * The `organization.*` tRPC surface: the ordering rule that makes the policy
- * see a parsed input, the invitation-acceptance status guard, the
- * identifier-aware address match behind it, and the seat refusal a member
- * re-enable turns into the shape the client's limit modal opens off.
- *
- * The deeper invitation behaviour this surface used to be tested through —
- * the conditional ACCEPTED claim, the membership row committing before the
- * ledger grants — belongs to `InviteService` and is pinned by that service's
- * own suite. What is left here is what the transport itself decides.
  */
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
@@ -153,13 +145,9 @@ function harness({
 describe("OrganizationTrpcApi", () => {
   describe("given a process policy that reads the validated input", () => {
     /**
-     * tRPC appends the input parser as a middleware at the point `.input()`
-     * is called, so anything installed before it runs with `input ===
-     * undefined`. The process's real policy resolves the authorized scope id
-     * FROM the input, which is why this feature applies the decorator after
-     * its own parser. Installed the other way round, the authorization check,
-     * the scope-lineage guard and the audit row would all see nothing and
-     * every guard would still report green.
+     * tRPC appends the input parser as a middleware at the point `.input()` is called, so anything installed before it runs with `input === undefined`. The process's
+     * real policy resolves the authorized scope id FROM the input, which is why this feature applies the decorator after its own parser. Installed the other way
+     * round, the authorization check, the scope-lineage guard and the audit row would all see nothing and every guard would still report green.
      */
     it("hands the policy the parsed input, not undefined", async () => {
       const seen: unknown[] = [];
@@ -313,10 +301,9 @@ describe("OrganizationTrpcApi", () => {
     });
 
     /**
-     * The personal workspace, the withdrawn join request and the signup
-     * notification are all non-fatal: the membership is the durable outcome
-     * and a failure in any of them must not cost the caller the organization
-     * they just joined.
+     * The personal workspace, the withdrawn join request and the signup notification are all
+     * non-fatal: the membership is the durable outcome and a failure in any of them must not
+     * cost the caller the organization they just joined.
      */
     describe("given provisioning the personal workspace fails", () => {
       it("still accepts, and reports the failure", async () => {

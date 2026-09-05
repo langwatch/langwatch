@@ -1,8 +1,5 @@
 /**
  * StoredObjectsRepository — ClickHouse I/O for the stored_objects table.
- *
- * All queries scope to project_id first (tenant isolation) per
- * dev/docs/best_practices/clickhouse-queries.md.
  */
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
@@ -17,9 +14,6 @@ const tracer = getLangWatchTracer("langwatch.stored-objects.repository");
 
 /**
  * ClickHouse repository for stored_objects rows.
- *
- * Clients are resolved at call time through the App's resolver so
- * per-tenant private ClickHouse routing is always respected.
  */
 export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
   static create(clickhouse: StoredObjectsClickHousePort): ClickHouseStoredObjectsRepository {
@@ -74,13 +68,11 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
             },
           ],
           format: "JSONEachRow",
-          // wait_for_async_insert=1: surface insert errors synchronously to
-          // the caller. Without this, async_insert acknowledges immediately
-          // and a later batching/network failure is dropped silently — the
-          // service would then return success while no row was written. We
-          // already pay for a storage PUT before the insert, so making the
-          // insert synchronous is the only way the compensating-cleanup
-          // path (delete bytes if insert fails) can fire reliably.
+          // wait_for_async_insert=1: surface insert errors synchronously to the caller. Without
+          // this, async_insert acknowledges immediately and a later batching/network failure is
+          // dropped silently — the service would then return success while no row was written. We
+          // already pay for a storage PUT before the insert, so making the insert synchronous is the
+          // only way the compensating-cleanup path (delete bytes if insert fails) can fire reliably.
           clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
         });
       },
@@ -89,10 +81,6 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
 
   /**
    * Returns the stored_objects row with the given id, or null if not found.
-   *
-   * Uses the scalar-subquery single-row dedup pattern recommended by
-   * dev/docs/best_practices/clickhouse-queries.md for ReplacingMergeTree.
-   * The table's version column is `inserted_at`.
    */
   async findById({
     projectId,
@@ -174,12 +162,6 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
 
   /**
    * Streams (id, storage_uri) pairs for every live row owned by the project.
-   *
-   * Used by `deleteOwnedBy` to enumerate the bytes that need to be
-   * deleted from the storage backend before the rows themselves are removed.
-   * Uses the scalar-subquery dedup pattern so ReplacingMergeTree-soft-deleted
-   * tombstones are filtered out before the cascade tries to delete bytes that
-   * may already be gone.
    */
   async findAllByProject({
     projectId,
@@ -199,22 +181,11 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
       async (span) => {
         const client = await this.clickhouse.resolveClient(projectId);
 
-        // Project-scoped enumeration. Two notes on cost:
-        //
-        //   1. Dedup uses the IN-tuple pattern, not a correlated scalar
-        //      subquery — the inner GROUP BY runs once and produces the
-        //      (id, max(inserted_at)) set, then the outer matches against
-        //      it. The previous correlated form (`inserted_at = (SELECT
-        //      max(s.inserted_at) WHERE s.id = t.id)`) re-ran the inner
-        //      query for every row.
-        //   2. No `created_at` (partition) predicate is possible here —
-        //      cascade-delete needs every row that has ever existed for
-        //      this project, including very old objects sitting in cold
-        //      S3 partitions. The scan is bounded by `project_id IN
-        //      ORDER BY` so it walks only that project's granules within
-        //      each partition, but the partition fan-out itself is
-        //      unavoidable. Run sparingly; this is a project-deletion
-        //      cascade, not a hot path.
+        // Project-scoped enumeration. Two notes on cost: 1. Dedup uses the IN-tuple pattern, not a correlated scalar subquery — the inner GROUP BY runs once and produces
+        // the (id, max(inserted_at)) set, then the outer matches against it. The previous correlated form (`inserted_at = (SELECT max(s.inserted_at) WHERE s.id = t.id)`)
+        // re-ran the inner query for every row. 2. No `created_at` (partition) predicate is possible here — cascade-delete needs every row that has ever existed for this
+        // project, including very old objects sitting in cold S3 partitions. The scan is bounded by `project_id IN ORDER BY` so it walks only that project's granules
+        // within each partition, but the partition fan-out itself is unavoidable. Run sparingly; this is a project-deletion cascade, not a hot path.
         const result = await client.query({
           query: `
             SELECT
@@ -242,10 +213,6 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
 
   /**
    * Returns every latest stored-object row for one project.
-   *
-   * This is intentionally a migration/admin surface rather than a hot-path
-   * query. Provider migration must preserve every column when it appends a
-   * newer ReplacingMergeTree version with a different storage URI.
    */
   async findLiveRowsByProjectPage({
     projectId,
@@ -302,12 +269,6 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
   /**
    * Sums `size_bytes` of the live rows owned by a project, optionally scoped to
    * one `purpose`, as the storage-accounting byte ledger (ADR-040).
-   *
-   * Dedup uses the IN-tuple `(project_id, id, max(inserted_at))` pattern so
-   * only the latest version of each content-addressed row is counted - never
-   * summing across stale ReplacingMergeTree versions. project_id is the first
-   * predicate for tenant isolation and to keep the scan on the project's
-   * granules.
    */
   async sumSizeBytesByProject({
     projectId,
@@ -370,17 +331,6 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
   /**
    * Deletes every stored_objects row for a project (and optionally a single
    * owner) via ClickHouse ALTER TABLE DELETE.
-   *
-   * ALTER TABLE DELETE is an async mutation in ClickHouse — the SELECT-side
-   * effect is immediate (rows disappear from query results once the mutation
-   * is queued), but the actual disk reclamation runs in the background.
-   * Callers do NOT need to wait for the mutation to finalize; the rows are
-   * not observable through `findById` / `findAllByProject` after this call.
-   *
-   * This is irreversible at the data-plane level: callers MUST have already
-   * deleted the underlying bytes from the storage backend before invoking
-   * this method, otherwise the byte content orphans in S3/disk with no row
-   * pointing at it.
    */
   async deleteByProject({ projectId }: { projectId: string }): Promise<void> {
     return tracer.withActiveSpan(
@@ -417,17 +367,6 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
 
   /**
    * Deletes a specific subset of stored-objects rows by id within a project.
-   *
-   * Used by `deleteOwnedBy` to remove ONLY the rows whose underlying byte
-   * deletes succeeded. Rows whose byte-delete failed are intentionally left
-   * behind as retryable tombstones — the operator can re-run the cascade,
-   * and the lingering rows still point at the leaked `storage_uri` so the
-   * GC sweep knows what to chase. Dropping those rows along with the
-   * succeeded ones would lose the address of the orphaned bytes
-   * irrecoverably (Sergio review 2026-05-20).
-   *
-   * Same caveats as `deleteByProject`: callers MUST have already deleted
-   * the underlying bytes for the ids passed here.
    */
   async deleteByIds({ projectId, ids }: { projectId: string; ids: string[] }): Promise<void> {
     if (ids.length === 0) return;

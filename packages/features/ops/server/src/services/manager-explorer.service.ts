@@ -19,11 +19,9 @@ import type { ProcessOpsRepository } from "../ports/process-ops.repository";
 import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port";
 
 /**
- * One global knob each, per the visibility plan: a wake this far past due
- * means the wake worker is starved or dead, and a pending message this far
- * past its next attempt with no live lease means delivery is not happening.
- * The table shows raw ages either way, so the thresholds only decide what
- * counts as trouble in the summary.
+ * One global knob each, per the visibility plan: a wake this far past due means the wake worker is starved or
+ * dead, and a pending message this far past its next attempt with no live lease means delivery is not happening.
+ * The table shows raw ages either way, so the thresholds only decide what counts as trouble in the summary.
  */
 export const OVERDUE_WAKE_MS = 60 * 1000;
 export const OVERDUE_PENDING_MS = 5 * 60 * 1000;
@@ -32,10 +30,6 @@ export const OVERDUE_PENDING_MS = 5 * 60 * 1000;
  * Reads the process-manager state machines for a single aggregate: the machine
  * definition (from the live pipeline introspection) joined to this aggregate's
  * persisted instance and the intents it has emitted.
- *
- * The machine itself is implicit in `evolve` (no declared state set), so the
- * "state machine" shown is the definition surface plus the instance's current
- * position — its state JSON, revision, and next wake.
  */
 const logger = createLogger("langwatch:ops:manager-explorer");
 
@@ -156,12 +150,6 @@ export class ManagerExplorerService {
 
   /**
    * Retired messages across the whole fleet.
-   *
-   * `getOutbox` needs a full process ref, so before this the only way to a
-   * dead message was to already know which instance held it — and the fleet
-   * table only ever reported a count. Work that has permanently stopped is
-   * the most urgent thing this substrate can tell an operator, so it gets a
-   * read that does not require knowing where to look.
    */
   async getDeadLetters(params: { processName?: string; page: number; pageSize: number }): Promise<{
     messages: DeadOutboxMessageView[];
@@ -279,10 +267,9 @@ export class ManagerExplorerService {
   }
 
   /**
-   * Dead letters back to pending — one process name, or every process when
-   * omitted. Bounded per call by the repository, so the returned count is
-   * what moved rather than what existed; pressing again takes the next
-   * batch. The count is the blast radius the audit row records.
+   * Dead letters back to pending — one process name, or every process when omitted. Bounded per call by
+   * the repository, so the returned count is what moved rather than what existed; pressing again takes
+   * the next batch. The count is the blast radius the audit row records.
    */
   async redriveDeadLetters(params: {
     processName?: string;
@@ -340,11 +327,9 @@ export class ManagerExplorerService {
   }
 
   /**
-   * Clear a LAPSED lease so the message is due now instead of waiting out
-   * the lease window. The repository's write guards on the lapse, so a live
-   * delivery keeps its lease; the residual risk — the holder is alive and
-   * slow, and completion after this release re-delivers — is absorbed by the
-   * message-key idempotency and stated in the confirm copy.
+   * Clear a LAPSED lease so the message is due now instead of waiting out the lease window. The repository's write guards on the
+   * lapse, so a live delivery keeps its lease; the residual risk — the holder is alive and slow, and completion after this
+   * release re-delivers — is absorbed by the message-key idempotency and stated in the confirm copy.
    */
   async tryReleaseLapsedLease(params: {
     ref: ProcessRef;
@@ -430,10 +415,9 @@ export class ManagerExplorerService {
   }
 
   /**
-   * Dead-letter recovery for one process instance's outbox: dead rows go
-   * back to pending with a fresh attempt budget, due immediately. Narrow
-   * with `messageKeyPrefix` to requeue one target's messages (e.g. a single
-   * webhook endpoint's batches) without resurrecting unrelated failures.
+   * Dead-letter recovery for one process instance's outbox: dead rows go back to pending with a fresh
+   * attempt budget, due immediately. Narrow with `messageKeyPrefix` to requeue one target's messages
+   * (e.g. a single webhook endpoint's batches) without resurrecting unrelated failures.
    */
   async requeueDeadMessages(params: {
     processName: string;

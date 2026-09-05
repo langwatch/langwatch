@@ -1,16 +1,5 @@
 /**
  * Whether everything a workbench state points at still exists.
- *
- * A workbench state names prompts, agents, evaluators, workflows and
- * datasets by id. Saving one whose references have since been deleted would
- * store a configuration that cannot run, and the customer would not find out
- * until they pressed the button — by which point the edit that broke it is
- * several saves back. So the save is refused, naming the type and the id.
- *
- * Each feature answers "does this exist" in its own way, and two of them do it
- * by throwing. Their not-found errors are caught and turned into `false`;
- * anything else is rethrown, because a workflow service that is DOWN must not
- * read as a workflow that is GONE.
  */
 
 import type { AgentService } from "@langwatch/agent-contract";

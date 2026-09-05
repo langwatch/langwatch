@@ -1,17 +1,7 @@
 /**
+ * Issue #6087 — the byte paths that must keep working when Azure is configured
+ * with an identity instead of an account key.
  * @vitest-environment node
- *
- * Issue #6087 — the byte paths that must keep working when Azure is
- * configured with an identity instead of an account key.
- *
- * The failure these guard against is a WIRING bug rather than a signing one,
- * and it is invisible to the driver's own tests: a keyless install used to
- * resolve Azure as the write destination and then refuse every PUT as an
- * unregistered scheme. Destination resolution and driver registration now
- * read the same `resolveAzureCredentials`, so both answers move together.
- *
- * `@azure/identity` is mocked: what is under test is which credentials each
- * byte path ends up holding, not the exchange itself.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

@@ -1,17 +1,5 @@
 /**
  * Combinatorial test for experiment run fold ordering.
- *
- * Proves that the fold produces correct final state regardless of
- * event processing order. Simulates the incremental fold pattern:
- * store.get() → apply(event) → store.store() for each event.
- *
- * The in-memory store mimics ClickHouse ReplacingMergeTree behavior:
- * multiple rows coexist, get() returns the one with highest UpdatedAt.
- *
- * Production pattern (verified from prod data):
- * - All events are bulk-inserted with the same CreatedAt
- * - started, target_result, evaluator_result, and completed can
- *   have nearly identical or even inverted occurredAt timestamps
  */
 
 import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";

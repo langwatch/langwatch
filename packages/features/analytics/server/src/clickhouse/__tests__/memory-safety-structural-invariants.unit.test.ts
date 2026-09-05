@@ -1,12 +1,5 @@
 /**
  * Memory safety regression tests for ClickHouse analytics queries.
- *
- * Validates structural invariants that prevent OOM in production:
- * - No bare SpanAttributes in outermost SELECT
- * - LIMIT clauses on discovery queries
- * - Memory spill-to-disk settings on all query paths
- * - Column-pruning test coverage for all metric prefixes
- *
  * @see specs/analytics/clickhouse-memory-safety.feature (Layer 1: @unit scenarios)
  */
 
@@ -34,11 +27,8 @@ describe("memory-safety", () => {
   // -------------------------------------------------------------------------
   describe("SpanAttributes access in builder-generated queries", () => {
     /**
-     * Regex that matches bare "SpanAttributes" NOT followed by ['key'] access.
-     * We check the outermost SELECT by splitting on subquery boundaries.
-     *
-     * A bare SpanAttributes reference means the full Map column is being read,
-     * which can be gigabytes for wide attribute sets.
+     * Regex that matches bare "SpanAttributes" NOT followed by ['key'] access. We
+     * check the outermost SELECT by splitting on subquery boundaries.
      */
     const bareSpanAttributesPattern = /SpanAttributes(?!\s*\[)/;
 
@@ -307,17 +297,11 @@ describe("memory-safety", () => {
         }
       });
 
-      // PORT NOTE (needs-design-review, spec-rebind): the original assertion
-      // pinned that the trace service resolved clients through
-      // `clickhouse.resolveClient(` — the one construction path that wrapped
-      // every client with `wrapWithDefaultSettings` so memory-safety defaults
-      // were injected automatically. `wrapWithDefaultSettings` no longer
-      // exists anywhere in the tree (grepped `packages/` and `apps/`), and
-      // `trace-legacy-read.repository.ts` now resolves its client via an
-      // injected `resolveClickHouseClient` factory instead. Whether that
-      // factory still guarantees the memory-safety defaults needs a design
-      // decision, not a mechanical rename — left unported rather than
-      // rewriting the claim to fit the new shape.
+      // PORT NOTE (needs-design-review, spec-rebind): the original assertion pinned that the trace service resolved clients through `clickhouse.resolveClient(` — the
+      // one construction path that wrapped every client with `wrapWithDefaultSettings` so memory-safety defaults were injected automatically. `wrapWithDefaultSettings`
+      // no longer exists anywhere in the tree (grepped `packages/` and `apps/`), and `trace-legacy-read.repository.ts` now resolves its client via an injected
+      // `resolveClickHouseClient` factory instead. Whether that factory still guarantees the memory-safety defaults needs a design decision, not a mechanical rename —
+      // left unported rather than rewriting the claim to fit the new shape.
       it.skip("clickhouse-trace.service.ts resolves through the App, which wraps with default settings", () => {});
     });
   });

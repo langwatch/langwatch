@@ -1,18 +1,5 @@
 /**
  * How often one invitation may put mail in somebody's inbox (D11).
- *
- * The limit is per INVITATION rather than per admin or per organization,
- * because the thing being protected is the recipient. An admin with three
- * invitations out may send all three; nobody gets the same invitation over
- * and over. Three within the window leaves room for the honest retries — a
- * typo'd domain fixed by re-inviting, a "did you get it?" — while a click
- * held down, a stuck retry loop, or somebody using an invitation as a way
- * to mail a stranger runs out immediately.
- *
- * Both directions land here: the admin resending from the members table, and
- * the invitee asking for a fresh one from an expired link. They share the
- * counter on purpose — two routes to the same inbox is exactly the gap a
- * per-route limit would leave open.
  */
 import { InviteThrottledError } from "./invite.errors";
 import type { OrganizationInviteRateLimitPort } from "../ports/invite.port";
@@ -22,10 +9,6 @@ export const INVITE_SENDS_PER_WINDOW = 3;
 
 /**
  * The window, spent against whichever counter the process composed.
- *
- * The counter arrives as a port rather than being reached for, because the
- * platform application's module-level `rateLimit` import is exactly what made
- * this unreachable from any process that meters differently.
  */
 export class InviteSendThrottleService {
   private constructor(private readonly rateLimit: OrganizationInviteRateLimitPort) {}
@@ -36,11 +19,6 @@ export class InviteSendThrottleService {
 
   /**
    * Refuses when this invitation has already been sent its fill for now.
-   *
-   * Called BEFORE the send, so a refused attempt changes nothing: resend
-   * rotates the code, and rotation is the old link's revocation, so a
-   * throttled click that still rotated would break the link already in the
-   * invitee's inbox to no purpose.
    */
   async assertInviteSendAllowed({
     inviteId,

@@ -1,18 +1,7 @@
 /**
- * @vitest-environment node
- *
  * What the `/api/model-providers` door makes of the failures its service
  * raises.
- *
- * The write route used to wrap `upsert` in `catch (error) { if (error
- * instanceof Error) throw new HTTPException(400, ...) }`. Every failure the
- * service raises is a `HandledError`, and a `HandledError` is an `Error`, so
- * that caught all of them: a 404 left as a 400, a 409 left as a 400, and the
- * code the client keys its copy off replaced by `http_error` — the framework
- * boundary discards an `HTTPException`'s message, so even the prose it tried
- * to pass through never arrived.
- *
- * These cases assert the statuses and codes reach the caller intact.
+ * @vitest-environment node
  */
 import {
   createAppRestSecurity,

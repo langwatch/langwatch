@@ -7,16 +7,6 @@ const logger = createLogger("langwatch:experiment:workbench-target-names");
 
 /**
  * What each column of a saved workbench is called, keyed by target id.
- *
- * The names a run's own errors use ("Waiting on category_classifier") come from
- * the prompt handle, the agent name or the evaluator name, none of which the
- * saved state holds. A reader given only ids cannot match an error to a column,
- * so the read path resolves the same three sources the run does and hands them
- * to the projection, which applies the same "(1)" / "(2)" suffixing.
- *
- * Never throws. A name that cannot be resolved is left out and the projection
- * falls back to the column's own id, which is still the key every other field
- * is stated in.
  */
 export class ExperimentWorkbenchTargetNamesService {
   private constructor() {}
@@ -35,10 +25,6 @@ export class ExperimentWorkbenchTargetNamesService {
     targets: TargetConfig[];
     /**
      * The process's own Prompt service, injected rather than built here.
-     *
-     * This module used to compose a second Prompt service out of the module
-     * global client every time a saved workbench was read, so a handle resolved
-     * here went through a different graph than the one the run itself used.
      */
     prompts: PromptService;
     /** Agent and evaluator names, which are rows this feature does not own. */

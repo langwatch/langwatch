@@ -29,10 +29,6 @@ export interface QueueAuditRedis {
 
 /**
  * Read-only cutover gate for GroupQueue.
- *
- * Registry membership is supplemented by a bounded SCAN of `*:gq:ready` so
- * queues created by an older release cannot escape the audit. The one-off
- * migration deliberately favors completeness over hot-path cost.
  */
 export class GroupQueueObjectStorageMigrationAdapter {
   static create(): GroupQueueObjectStorageMigrationAdapter {

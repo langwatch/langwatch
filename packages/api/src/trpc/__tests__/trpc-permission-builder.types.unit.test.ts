@@ -1,13 +1,14 @@
 /**
- * The compile-time half of the declaring builder: after `.input()` a pending
- * builder offers only the declaring methods, and its `.use()` escape hatch
- * accepts only a branded declared check. Mirrors
- * `packages/api/type-tests/trpc-public-api.ts`, wrapped as a runtime-visible
- * scenario so the sweep no longer needs to walk a live router to prove it.
+ * The compile-time half of the declaring builder: after `.input()` a pending builder offers only the declaring methods, and
+ * its `.use()` escape hatch accepts only a branded declared check. Mirrors `packages/api/type-tests/trpc-public-api.ts`,
+ * wrapped as a runtime-visible scenario so the sweep no longer needs to walk a live router to prove it.
  */
 import type { DeclaredAuthzMiddleware } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
-import type { PendingPermissionProcedureBuilder, TrpcCheckMiddleware } from "../trpc-permission-builder.js";
+import type {
+  PendingPermissionProcedureBuilder,
+  TrpcCheckMiddleware,
+} from "../trpc-permission-builder.js";
 
 type Equal<Left, Right> =
   (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2

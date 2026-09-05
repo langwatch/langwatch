@@ -1,12 +1,5 @@
 /**
  * The organization fence on the audit trail.
- *
- * Project-level rows carry `organizationId = NULL`, so the only thing that can
- * re-anchor them to a tenant is their project. Matching "any project row
- * written by a member of this organization" anchored them to nothing: every
- * user has a personal organization, so a member of two organizations made the
- * other one's project rows — action, target and the full payload — readable
- * from this one.
  */
 
 import type { AuthzGrantsService } from "@langwatch/authz-contract";

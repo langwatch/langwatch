@@ -175,11 +175,10 @@ export class ClickHouseExperimentRunStateRepository<
     try {
       const client = await this.clickhouse.resolveClient(context.tenantId);
       // IN-tuple dedup over the ReplacingMergeTree (see
-      // dev/docs/best_practices/clickhouse-queries.md). UpdatedAt is
-      // referenced via table alias because it's also projected as
-      // `toUnixTimestamp64Milli(...) AS UpdatedAt` — without the alias the
-      // IN-tuple comparison resolves to the projected UInt64 instead of the
-      // raw DateTime64.
+      // dev/docs/best_practices/clickhouse-queries.md). UpdatedAt is referenced via
+      // table alias because it's also projected as `toUnixTimestamp64Milli(...) AS
+      // UpdatedAt` — without the alias the IN-tuple comparison resolves to the
+      // projected UInt64 instead of the raw DateTime64.
       const result = await client.query({
         query: `
           SELECT

@@ -1,20 +1,7 @@
 /**
+ * Two rules that only a real Postgres can settle, exercised through the real repository.
  * @vitest-environment node
- *
- * Two rules that only a real Postgres can settle, exercised through the real
- * repository.
- *
- * The routing handle is the name that addresses ONE model provider instance in
- * a gateway model string. The unique index over (organizationId, routingHandle)
- * is what actually makes the name unique inside an organization, so a mock that
- * agreed with whatever the repository believed would prove nothing.
- *
- * The change feed is how a credential rotation reaches a running gateway: every
- * write appends MODEL_PROVIDER_UPDATED, the gateway's change poller evicts every
- * cached bundle naming that provider, and the next request re-materialises.
- *
  * Spec: specs/ai-gateway/instance-routing-handle.feature
- *       specs/ai-gateway/governance/provider-credential-rotation.feature
  */
 import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

@@ -1,26 +1,5 @@
 /**
  * `POST /api/dspy/log_steps` — the DSPy optimizer's own progress log.
- *
- * A run posts each batch of steps as it finishes; the app renders them as the
- * run's score curve. It resolves the experiment through the SAME
- * {@link ExperimentFindOrCreateService} `/api/experiment/init` and the batch
- * result log resolve theirs, so an optimizer that initialised a run through
- * one door and reports through this one writes into one experiment.
- *
- * ## Why the cost catalogue is a port
- *
- * Every LLM call in a step is priced before it is stored, so the optimizer
- * dashboard can show what a run cost. Pricing reads the project's OWN cost
- * rules — a customer's negotiated rate for a model — which live in the model
- * provider vertical, and an experiment package may not reach into it. So the
- * rules arrive as a port, and the arithmetic is the model-provider contract's
- * `matchModelCost`/`estimateCost`, which is what the trace fold and the gateway
- * price spans with.
- *
- * The port is REQUIRED rather than optional, and that is the whole reason this
- * door was not moved earlier: a step recorded with every `cost` null is a step
- * an optimizer dashboard renders as a free run, which is a wrong fact rather
- * than a missing one. A process with no catalogue does not mount the family.
  */
 import { handlerManagedAuth } from "@langwatch/api";
 import { bodyLimit, type AppRestSecurity, type MountableRestApp } from "@langwatch/api/rest";
@@ -306,10 +285,9 @@ const hashOf = (data: object): string =>
   createHash("md5").update(JSON.stringify(data)).digest("hex");
 
 /**
- * A DSPy LLM call's `response` is a JSON dump of an arbitrary Python object, so
- * the contract types it as an opaque record. Cost accounting reads only the
- * OpenAI chat-completion fields below, and reads them through this schema so a
- * malformed dump produces no cost rather than a wrong one.
+ * A DSPy LLM call's `response` is a JSON dump of an arbitrary Python object, so the contract types it
+ * as an opaque record. Cost accounting reads only the OpenAI chat-completion fields below, and reads
+ * them through this schema so a malformed dump produces no cost rather than a wrong one.
  */
 const llmCallCostFieldsSchema = z.object({
   model: z.string().optional(),

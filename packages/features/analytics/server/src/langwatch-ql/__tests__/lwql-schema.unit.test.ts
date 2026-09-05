@@ -1,14 +1,5 @@
 /**
  * What the schema-discovery endpoint publishes.
- *
- * Two claims carry the file. First, a withheld column says *which* permission
- * withholds it rather than collapsing to a boolean — the decision this slice
- * settled, and the difference between an agent that knows what to ask for and
- * one that only knows it was refused. Second, the published `available` flag
- * and the validator's answer are the same answer: a schema that advertised a
- * column the validator then refused would send every caller down a dead end,
- * and that is the one inconsistency this endpoint must not have.
- *
  * @see specs/analytics/lwql-api.feature
  */
 
@@ -229,10 +220,9 @@ describe("given the LangWatchQL schema catalog", () => {
     });
 
     /**
-     * The server pins every query to one tenant, so `TenantId` is a single
-     * repeated value — an example selecting it teaches a member to select a
-     * constant. The column stays published and selectable; only the example
-     * skips it.
+     * The server pins every query to one tenant, so `TenantId` is a single repeated value — an
+     * example selecting it teaches a member to select a constant. The column stays published
+     * and selectable; only the example skips it.
      */
     it("never puts the tenant scope column in its projection", () => {
       for (const dataset of schemaFor(FULLY_PERMITTED).datasets) {
@@ -244,11 +234,9 @@ describe("given the LangWatchQL schema catalog", () => {
   });
 
   /**
-   * A dataset a caller may read nothing in. Exercised on the shared fixture
-   * (`./gatedDatasetFixture`), because no shipped dataset is gated as a whole —
-   * the catalog suite pins that — and a case written against the shipped
-   * catalog would be asserting that nothing happens. The code under test is the
-   * endpoint's, and it is the same code.
+   * A dataset a caller may read nothing in. Exercised on the shared fixture (`./gatedDatasetFixture`), because no
+   * shipped dataset is gated as a whole — the catalog suite pins that — and a case written against the shipped
+   * catalog would be asserting that nothing happens. The code under test is the endpoint's, and it is the same code.
    */
   describe("when a dataset is outside the caller's permissions", () => {
     const views = [...LWQL_VIEW_CATALOG, GATED_DATASET];
@@ -285,10 +273,9 @@ describe("given the LangWatchQL schema catalog", () => {
     });
 
     /**
-     * The example is generated from columns' own gates, not the combined
-     * dataset-plus-column ones — combined, a whole-gated dataset has no
-     * ungated column and the example degenerates to `SELECT ` with nothing
-     * to select, published as "a runnable query over this dataset".
+     * The example is generated from columns' own gates, not the combined dataset-plus-column
+     * ones — combined, a whole-gated dataset has no ungated column and the example degenerates
+     * to `SELECT ` with nothing to select, published as "a runnable query over this dataset".
      */
     it("publishes a runnable example for the gated dataset", () => {
       const dataset = schemaWith(FULLY_PERMITTED).datasets.find(

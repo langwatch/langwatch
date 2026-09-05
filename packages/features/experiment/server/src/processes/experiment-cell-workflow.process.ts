@@ -54,12 +54,8 @@ type EvaluatorDbConfig = {
 };
 
 /**
- * Builds a mini-workflow for executing a single cell (row + target + evaluators).
- *
- * The workflow structure:
- * - Entry node: Contains the single row of dataset data
- * - Target node: Either a signature (prompt) or code (agent) node
- * - Evaluator nodes: One per evaluator, connected to both entry and target
+ * Builds a mini-workflow for executing a single cell (row + target +
+ * evaluators).
  */
 export const buildCellWorkflow = (
   input: WorkflowBuilderInput,
@@ -127,12 +123,6 @@ export const buildCellWorkflow = (
 
 /**
  * The edge carrying one dataset column into a node's input.
- *
- * A mapping names the column the way the user sees it while the entry node
- * exposes it by id, so the name is resolved here; a column that is no longer in
- * the dataset keeps its name rather than dropping the edge. Both that
- * resolution and the `outputs.` / `inputs.` handle naming the engine expects
- * live in this one place, so the two workflow builders cannot drift apart.
  */
 const datasetEdge = ({
   entryNodeId,
@@ -160,13 +150,6 @@ const datasetEdge = ({
 
 /**
  * Builds a mini-workflow holding only the cell's evaluators.
- *
- * A workflow target runs its whole Studio graph through execute_flow rather
- * than as one component, so there is no single target node to hang the
- * evaluators off. They are dispatched one at a time with explicit inputs, so
- * what they need from a workflow is the entry row and their own nodes; the
- * edges that would have carried the target's output stand for a node that is
- * not in this graph and are left out.
  */
 export const buildEvaluatorCellWorkflow = ({
   cell,
@@ -355,12 +338,11 @@ const buildTargetNode = (
             targetNodeId,
           };
         case "workflow":
-          // A workflow-type agent has no code of its own — the orchestrator
-          // must resolve its linked workflow and dispatch it to
-          // executeWorkflowCell before ever reaching buildTargetNode. Reaching
-          // here means that resolution was skipped (e.g. the linked workflow
-          // failed to load), so fail loudly instead of silently building an
-          // empty code node.
+          // A workflow-type agent has no code of its own — the orchestrator must resolve
+          // its linked workflow and dispatch it to executeWorkflowCell before ever
+          // reaching buildTargetNode. Reaching here means that resolution was skipped
+          // (e.g. the linked workflow failed to load), so fail loudly instead of
+          // silently building an empty code node.
           throw new Error(
             `Workflow agent target ${targetConfig.id} has no loaded workflow — it must be dispatched to executeWorkflowCell, not buildTargetNode`,
           );
@@ -490,14 +472,11 @@ export const buildSignatureNodeFromPrompt = ({
     verbosity: prompt.verbosity,
   });
 
-  // The VersionedPrompt read model prepends a synthesized
-  // `{role:"system", content: prompt.prompt}` to `messages` (storage keeps
-  // system text only in the `prompt` column — see hoistSystemMessage).
-  // `instructions` below already carries that same text, so forwarding the
-  // synthesized entry would send the system prompt twice. Strip system
-  // roles here: for a prompt with no template messages this leaves the
-  // list empty, which makes the engine fold the scalar inputs into a user
-  // turn instead of sending a request with no user message at all.
+  // The VersionedPrompt read model prepends a synthesized `{role:"system", content: prompt.prompt}` to `messages`
+  // (storage keeps system text only in the `prompt` column — see hoistSystemMessage). `instructions` below already
+  // carries that same text, so forwarding the synthesized entry would send the system prompt twice. Strip system
+  // roles here: for a prompt with no template messages this leaves the list empty, which makes the engine fold the
+  // scalar inputs into a user turn instead of sending a request with no user message at all.
   const messages: ChatMessage[] = prompt.messages
     .filter((m) => m.role !== "system")
     .map((m) => ({
@@ -511,13 +490,11 @@ export const buildSignatureNodeFromPrompt = ({
     position: { x: 200, y: 0 },
     data: {
       name: prompt.handle ?? prompt.name ?? "Prompt",
-      // Forward the prompt's identity so nlpgo emits the
-      // PromptApiService.get + Prompt.compile spans that let the trace
-      // drawer's "Open in Prompts" resume this exact (handle, version,
-      // variables) in the playground. Without configId, nlpgo treats the
-      // node as an inline prompt and emits no prompt ancestry.
-      // (services/nlpgo/app/engine/dsl/types.go reads configId / handle /
-      // versionMetadata; signatureComponentSchema mirrors the shape.)
+      // Forward the prompt's identity so nlpgo emits the PromptApiService.get + Prompt.compile
+      // spans that let the trace drawer's "Open in Prompts" resume this exact (handle, version,
+      // variables) in the playground. Without configId, nlpgo treats the node as an inline
+      // prompt and emits no prompt ancestry. (services/nlpgo/app/engine/dsl/types.go reads
+      // configId / handle / versionMetadata; signatureComponentSchema mirrors the shape.)
       ...buildPromptIdentity({
         configId: prompt.id,
         handle: prompt.handle,
@@ -549,13 +526,9 @@ export const buildSignatureNodeFromPrompt = ({
 };
 
 /**
- * Builds the prompt-identity fields (configId / handle / versionMetadata)
- * that nlpgo reads to emit PromptApiService.get + Prompt.compile spans.
- * Mirrors signatureComponentSchema in @langwatch/workflow-contract and
- * the Go-side dsl.Component (PromptConfigID / PromptHandle / VersionMetadata).
- *
- * Returns an empty object when there is no configId, so non-prompt targets
- * (agents, inline edits with no saved base) stay free of prompt ancestry.
+ * Builds the prompt-identity fields (configId / handle / versionMetadata) that nlpgo reads to emit
+ * PromptApiService.get + Prompt.compile spans. Mirrors signatureComponentSchema in @langwatch/workflow-contract
+ * and the Go-side dsl.Component (PromptConfigID / PromptHandle / VersionMetadata).
  */
 const buildPromptIdentity = (identity: {
   configId?: string | null;
@@ -654,13 +627,11 @@ export const buildSignatureNodeFromLocalConfig = ({
     position: { x: 200, y: 0 },
     data: {
       name,
-      // Inline-edited draft: keep the BASE prompt's identity so the trace
-      // drawer can still resume "Open <handle>:<version>", and flag
-      // promptDraft so nlpgo stamps langwatch.prompt.draft=true (the
-      // "(unsaved edits)" label). When there's no saved base (a brand-new
-      // local prompt) we forward nothing, so no prompt ancestry is emitted.
-      // (specs/nlp-go/prompt-spans-unsaved-version.feature — wire format
-      // locked on the channel.)
+      // Inline-edited draft: keep the BASE prompt's identity so the trace drawer can still
+      // resume "Open <handle>:<version>", and flag promptDraft so nlpgo stamps
+      // langwatch.prompt.draft=true (the "(unsaved edits)" label). When there's no saved base (a
+      // brand-new local prompt) we forward nothing, so no prompt ancestry is emitted.
+      // (specs/nlp-go/prompt-spans-unsaved-version.feature — wire format locked on the channel.)
       ...(basePrompt
         ? {
             ...buildPromptIdentity({
@@ -701,11 +672,6 @@ export const buildSignatureNodeFromLocalConfig = ({
 
 /**
  * Builds a signature node from a TypedAgent with type "signature".
- *
- * Signature agents store config in SignatureComponentConfig format:
- * - llm: top-level or in parameters array
- * - prompt: top-level or as "instructions" in parameters
- * - messages: top-level or in parameters array
  */
 export const buildSignatureNodeFromAgent = (
   nodeId: string,
@@ -745,13 +711,6 @@ export const buildSignatureNodeFromAgent = (
 
 /**
  * Builds parameters array for signature node from agent config.
- *
- * Signature-type agents can store config in two formats:
- * 1. Top-level fields (llm, prompt, messages) - agent drawer format
- * 2. Parameters array with llm/instructions/messages entries - workflow node format
- *
- * This function normalizes both formats into the parameters array
- * so Workflow event enrichment can process them consistently.
  */
 const buildSignatureNodeParameters = (config: TypedAgent["config"]): Field[] => {
   // Only the studio node kinds carry node fields as parameters; a connected
@@ -806,10 +765,6 @@ const buildSignatureNodeParameters = (config: TypedAgent["config"]): Field[] => 
 
 /**
  * Builds a code node from a TypedAgent with type "code" or "workflow".
- *
- * Code agents contain a Python class (with a `__call__` method) that handles
- * its own LLM calls. Parameters are passed directly - no LLM config
- * normalization needed.
  */
 export const buildCodeNodeFromAgent = (
   nodeId: string,
@@ -854,11 +809,8 @@ export const buildCodeNodeFromAgent = (
 const HTTP_AGENT_FIXED_INPUTS = ["threadId", "messages", "input"] as const;
 
 /**
- * Builds an HTTP node from a TypedAgent with type "http".
- * The HTTP config is read directly from the agent, not duplicated on the target.
- *
- * HTTP config is stored in `parameters` like other node types (Code, Signature, etc.)
- * This ensures consistent handling in the Python parser via parse_fields().
+ * Builds an HTTP node from a TypedAgent with type "http". The HTTP config is
+ * read directly from the agent, not duplicated on the target.
  */
 export const buildHttpNodeFromAgent = (
   nodeId: string,
@@ -965,7 +917,6 @@ const buildEvaluatorNodes = (
 };
 
 /**
- * Builds a single evaluator node.
  * @param settings - Evaluator settings from DB (always fetched fresh, not from workbench state)
  * @param dbEvaluatorId - Database evaluator ID for using evaluators/{id} path
  * @param name - Display name for the evaluator (from loaded DB evaluator)

@@ -1,15 +1,6 @@
 /**
+ * The cohort's eligibility predicate against real rows: the unit suite pins the Prisma where-shape, but only a database proves the shape means what it says — that an enterprise subscription (active or pending) keeps its organization out of the pool, an enrollment row keeps its organization out, and a plain organization stays in.
  * @vitest-environment node
- *
- * The cohort's eligibility predicate against real rows: the unit suite pins
- * the Prisma where-shape, but only a database proves the shape means what it
- * says — that an enterprise subscription (active or pending) keeps its
- * organization out of the pool, an enrollment row keeps its organization out,
- * and a plain organization stays in.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it so the
- * suite stays runnable on a box with no database.
- *
  * @see specs/migration/system-migrations-runner.feature
  */
 import { randomUUID } from "node:crypto";

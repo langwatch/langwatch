@@ -56,10 +56,6 @@ function teamResponse(team: {
 
 /**
  * REST for the organization's teams, their members and their projects.
- *
- * The organization, authorization and project capabilities arrive as services
- * rather than being read off the request, so this family can be mounted into
- * any process that has them.
  */
 export function createTeamsRestApp(options: {
   security: AppRestSecurity;

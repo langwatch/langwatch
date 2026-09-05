@@ -1,18 +1,7 @@
 /**
- * @vitest-environment node
- *
- * @see specs/model-providers/provider-configuration.feature
- *
  * Real-Postgres coverage for the credential a customer never retyped.
- *
- * Azure's credential schema is `.passthrough()` with every field optional, so
- * a save that names only an extra header used to be accepted without a word
- * and the row came back holding no credentials at all.
- * `ModelProviderKeysService.assertCredentialsCanBeSaved` refuses that shape
- * now; only real Postgres proves the write is actually rolled back rather
- * than partially applied.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it.
+ * @vitest-environment node
+ * @see specs/model-providers/provider-configuration.feature
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";

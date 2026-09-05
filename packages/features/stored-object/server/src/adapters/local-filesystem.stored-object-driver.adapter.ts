@@ -1,19 +1,6 @@
 /**
- * LocalFilesystemStoredObjectDriverAdapter — byte operations over the local filesystem.
- *
- * **Single-replica only.** This driver stores objects under `file:///root/...`
- * paths on the local filesystem. Multi-pod Kubernetes deployments MUST NOT use
- * this driver because pods do not share a local filesystem. Single-replica
- * self-host installs (small footprints, hobbyist / air-gapped / pre-pilot
- * deployments) and `make quickstart` local-dev environments can use it safely;
- * the Helm chart enforces the constraint by refusing to render
- * `localFilesystem.enabled=true` together with `replicaCount > 1`. Operators
- * who outgrow single-replica should switch to the S3 or Azure Blob driver.
- *
- * Atomicity invariant: PUT writes to a `.tmp.<rand>` sibling first, then uses
- * `fs.rename` (POSIX rename(2)) to atomically replace the final path. The final
- * path always reflects a complete write; a process crash mid-write orphans the
- * tmp file (negligible cost) but never leaves torn bytes at the final path.
+ * LocalFilesystemStoredObjectDriverAdapter — byte operations over the local
+ * filesystem.
  */
 import crypto from "node:crypto";
 import { createReadStream } from "node:fs";
@@ -29,13 +16,6 @@ const logger = createLogger("langwatch:stored-objects:local-filesystem-driver");
 
 /**
  * Converts a `file:` URI to an absolute filesystem path.
- *
- * Handles both `file:///abs/path` (authority + abs path) and `file:/abs/path`
- * (no authority) per RFC 8089, and percent-decodes the path. Using a hand
- * rolled `uri.slice("file://".length)` is brittle: `file:/tmp/foo` becomes
- * `tmp/foo` (a relative path) and percent-escaped characters survive.
- *
- * @throws if the URI does not use the `file:` scheme.
  */
 function parseFileUri(uri: string): string {
   const scheme = getStoredObjectStorageScheme(uri);
@@ -47,27 +27,11 @@ function parseFileUri(uri: string): string {
   const parsed = new URL(uri);
   const decoded = decodeURIComponent(parsed.pathname);
 
-  // Containment check, deliberately AFTER the decode.
-  //
-  // `new URL()` leaves `%2F` encoded, so a URI can look confined and stop being
-  // confined one line later: `…/spool/proj/..%2F..%2Fetc/span` has a single
-  // path segment as far as the URL parser is concerned, and becomes
-  // `…/spool/proj/../../etc/span` the moment it is decoded — which is what
-  // `mkdir`/`writeFile` would then act on. A caller that percent-encodes its
-  // segments is therefore NOT protected by having done so.
-  //
-  // Callers should still keep each segment a single component; this is the
-  // backstop that makes a mistake there fail loudly instead of writing outside
-  // the object root.
-  //
-  // The check is on `..` segments specifically, NOT on "is the decoded path
-  // already canonical". Those are not the same test, and the stricter one is
-  // wrong: a storage root configured with a trailing slash mints
-  // `file:///root//project/object`, whose decoded form is non-canonical and
-  // completely harmless. Refusing it would break every local-filesystem write
-  // (dataset uploads, scenario media, the queue's durable blob tier) on those
-  // installs, none of which is what this guard is here for. A redundant
-  // separator is sloppy; only `..` escapes.
+  // Containment check, deliberately AFTER the decode. `new URL()` leaves `%2F` encoded, so a URI can look confined and stop being confined one line later: `…/spool/proj/..%2F..%2Fetc/span` has a single path segment as far as the URL parser is
+  // concerned, and becomes `…/spool/proj/../../etc/span` the moment it is decoded — which is what `mkdir`/`writeFile` would then act on. A caller that percent-encodes its segments is therefore NOT protected by having done so. Callers should still
+  // keep each segment a single component; this is the backstop that makes a mistake there fail loudly instead of writing outside the object root. The check is on `..` segments specifically, NOT on "is the decoded path already canonical". Those are
+  // not the same test, and the stricter one is wrong: a storage root configured with a trailing slash mints `file:///root//project/object`, whose decoded form is non-canonical and completely harmless. Refusing it would break every local-filesystem
+  // write (dataset uploads, scenario media, the queue's durable blob tier) on those installs, none of which is what this guard is here for. A redundant separator is sloppy; only `..` escapes.
   if (decoded.split("/").includes("..")) {
     throw new Error(
       `LocalFilesystemStoredObjectDriverAdapter refuses a file: URI whose decoded path contains a ".." segment — ` +
@@ -111,10 +75,6 @@ export class LocalFilesystemStoredObjectDriverAdapter implements StoredObjectSto
 
   /**
    * Atomically writes `bytes` to the given `file://` URI.
-   *
-   * `mediaType` is unused — the filesystem stores raw bytes without metadata.
-   * Atomicity is achieved by writing to a `.tmp.<rand>` sibling and then
-   * renaming it into place.
    */
   async put(uri: string, bytes: Buffer, _mediaType: string): Promise<void> {
     const finalPath = parseFileUri(uri);

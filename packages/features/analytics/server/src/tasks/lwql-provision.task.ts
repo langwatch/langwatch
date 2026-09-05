@@ -1,21 +1,5 @@
 /**
- * Deploy-time provisioning for LangWatchQL: creates the ClickHouse-native
- * views and the PostgreSQL approved views, and backfills the key-map table
- * from every project's `lwqlKey`. The ClickHouse access model (restricted
- * user, settings profile, grants, row policies) and the PostgreSQL-mapped
- * views are infra's job — terraform provisions both out of band, and this
- * task never touches either.
- *
- * Runs after `clickhouse-migrate` (migration 00084 creates the key-map table
- * this task writes into) as `pnpm --filter @langwatch/tasks task
- * lwql-provision`. A deploy with no `LWQL_*` environment configured is
- * unaffected: {@link lwqlConnectionFromEnv} returns `null` and this task
- * exits immediately. Idempotent every run — every generator emits
- * `IF NOT EXISTS`/`OR REPLACE`/`CREATE OR REPLACE` DDL, and the key-map
- * backfill only inserts rows missing from the table.
- *
  * @see ../langwatch-ql/production-provisioning.ts — the pure composition
- *   this orchestrates
  * @see ../../../../../clickhouse-client/migrations/00084_create_lwql_api_key_tenant_map.sql
  * @see specs/analytics/lwql-api.feature
  */
@@ -44,10 +28,6 @@ const logger = createLogger("langwatch:task:lwql-provision");
 
 /**
  * Exactly the two Postgres operations this task performs.
- *
- * A narrow shape rather than the whole client: the statements are catalog-wide
- * DDL and one unfiltered project scan, and naming that much makes it plain
- * that nothing here reads a tenant's rows.
  */
 export type LwqlProvisioningDatabase = {
   $executeRawUnsafe(statement: string): Promise<number>;
@@ -212,12 +192,11 @@ export async function runLwqlProvisioningTask({
       database,
       statements: productionPostgresApprovedViewStatements({ schema: postgresSchema }),
     });
-    // Immediately after creation, in the same step: the reader role is
-    // provisioned out of band and its grants were issued against whatever
-    // views existed then, so a view added by this deploy would otherwise have
-    // no grant on it and every query touching it would fail ACCESS_DENIED
-    // until someone re-ran the out-of-band job by hand. A no-op where the
-    // role does not exist.
+    // Immediately after creation, in the same step: the reader role is provisioned
+    // out of band and its grants were issued against whatever views existed then,
+    // so a view added by this deploy would otherwise have no grant on it and every
+    // query touching it would fail ACCESS_DENIED until someone re-ran the
+    // out-of-band job by hand. A no-op where the role does not exist.
     await runPostgresStatements({
       database,
       statements: productionPostgresReaderGrantStatements({
@@ -251,19 +230,11 @@ export async function runLwqlProvisioningTask({
       }
     }
 
-    // Fatal, exactly like the views above. The inline sync on project
-    // creation only ever covers projects created *after* a failure, so a
-    // backfill that fails on the first deploy leaves every pre-existing
-    // project without a key-map row until some later deploy happens to
-    // re-run this task. That state is not a degraded LangWatchQL, it is a
-    // silently wrong one: the row policies resolve an absent hash to an
-    // empty tenant set, so queries return zero rows with HTTP 200 rather
-    // than `lwql_unavailable`, and nothing in the request path detects it.
-    //
-    // Failing the deploy costs nothing extra in availability terms: this
-    // runs on the same admin client as the ClickHouse objects above, so any
-    // outage able to fail the backfill has already failed those and aborted
-    // the deploy one step earlier.
+    // Fatal, exactly like the views above. The inline sync on project creation only ever covers projects created *after* a failure, so a backfill that fails on the
+    // first deploy leaves every pre-existing project without a key-map row until some later deploy happens to re-run this task. That state is not a degraded
+    // LangWatchQL, it is a silently wrong one: the row policies resolve an absent hash to an empty tenant set, so queries return zero rows with HTTP 200 rather than
+    // `lwql_unavailable`, and nothing in the request path detects it. Failing the deploy costs nothing extra in availability terms: this runs on the same admin client
+    // as the ClickHouse objects above, so any outage able to fail the backfill has already failed those and aborted the deploy one step earlier.
     await backfillKeyMap({ client, database, names, sourceDatabase });
   });
 
@@ -271,12 +242,9 @@ export async function runLwqlProvisioningTask({
 }
 
 /**
- * The task-launcher entry — `pnpm --filter @langwatch/tasks task
- * lwql-provision`. A thin wrapper over {@link runLwqlProvisioningTask}: the
- * body above is the whole contract, and this class is only the seam the
- * catalogue resolves by name. `database` is composed by the catalogue from
- * the process's real Prisma handle (`TaskHostPort.requirePrisma()`), which
- * satisfies {@link LwqlProvisioningDatabase} structurally.
+ * The task-launcher entry — `pnpm --filter @langwatch/tasks task lwql-provision`. A thin wrapper over {@link runLwqlProvisioningTask}: the body above
+ * is the whole contract, and this class is only the seam the catalogue resolves by name. `database` is composed by the catalogue from the process's
+ * real Prisma handle (`TaskHostPort.requirePrisma()`), which satisfies {@link LwqlProvisioningDatabase} structurally.
  */
 export class LwqlProvisionTask extends Task {
   readonly name = "lwql-provision";
@@ -291,17 +259,9 @@ export class LwqlProvisionTask extends Task {
   }
 
   /**
-   * `database` is a thunk rather than a resolved value: the launcher builds
-   * the whole catalogue before it knows which task was asked for, and a
-   * process with no `DATABASE_URL` must still be able to list its task names
-   * or run a task that needs no database. Resolving (and so possibly
-   * throwing `TaskInfrastructureUnavailableError`) is deferred to `run()`,
-   * which only happens once this task was actually the one selected by name.
-   */
-  /**
-   * `skipped` is the boot chain's `SKIP_LWQL_PROVISION=true` opt-out, resolved
-   * by the catalogue so the environment dependency is visible at the one call
-   * site that builds this. Exactly `"true"`, like the sibling migrate tasks.
+   * `database` is a thunk, not a resolved value, since resolving it (which
+   * can throw) is deferred to `run()`. `skipped` is the boot chain's
+   * `SKIP_LWQL_PROVISION=true` opt-out.
    */
   static create({
     database,

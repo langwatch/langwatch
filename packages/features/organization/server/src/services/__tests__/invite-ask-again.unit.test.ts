@@ -10,10 +10,6 @@ import type {
 /**
  * D11 — the wrong account, and asking again
  * (specs/identity/resilient-invitations.feature).
- *
- * The mask, the shared send throttle, and the invitee's ask for a fresh
- * invitation. All three are pure enough to run with no datastore: the ask
- * reaches Prisma and the mailer through mocks.
  */
 
 const sendInviteReRequestEmail = vi.fn();

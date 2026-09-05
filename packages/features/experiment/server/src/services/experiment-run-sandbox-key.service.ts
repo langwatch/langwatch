@@ -1,8 +1,7 @@
 /**
- * The run's own sandbox credential: minted once per run when a target
- * executes Python, and set onto a studio event's workflow so its code
- * nodes authenticate as this run. One key for the whole run — a key per
- * row would leave a ledger of live credentials behind.
+ * The run's own sandbox credential: minted once per run when a target executes Python, and
+ * set onto a studio event's workflow so its code nodes authenticate as this run. One key
+ * for the whole run — a key per row would leave a ledger of live credentials behind.
  */
 
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";

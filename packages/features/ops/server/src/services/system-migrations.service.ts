@@ -18,17 +18,9 @@ import {
 } from "@langwatch/ops-contract";
 
 /**
- * The statuses a tenant may be rolled back from. The same pair as
- * the AuthZ package's cutover adapter, but the premise
- * is weaker than "already on the ledger": what `migrated` MEANS is each
- * migration's own business (the cutover parks tenants in `migrated` while
- * they merely WAIT on prerequisites or a cohort, and those never touched
- * the ledger at all). The status check here is therefore only the generic
- * floor - per-migration preconditions live in `rollbackGuards`, which is
- * where "this migrated tenant has nothing to roll back" and "another
- * migration still depends on this one" are refused. `parked` never did any
- * work worth undoing, and `rolled_back` is accepted only as a RETRY of a
- * standing pin.
+ * The statuses a tenant may be rolled back from. The same pair as the AuthZ package's cutover adapter, but the premise is weaker than "already on the ledger": what `migrated` MEANS is each migration's own business (the cutover parks tenants in
+ * `migrated` while they merely WAIT on prerequisites or a cohort, and those never touched the ledger at all). The status check here is therefore only the generic floor - per-migration preconditions live in `rollbackGuards`, which is where "this
+ * migrated tenant has nothing to roll back" and "another migration still depends on this one" are refused. `parked` never did any work worth undoing, and `rolled_back` is accepted only as a RETRY of a standing pin.
  */
 const ROLLBACK_EFFECT_STATUSES: readonly TenantMigrationStatus[] = [
   "migrated",
@@ -39,19 +31,7 @@ const ROLLBACK_EFFECT_STATUSES: readonly TenantMigrationStatus[] = [
 const logger = createLogger("langwatch:ops:system-migrations");
 
 /**
- * The ops model over stored migration state. Deliberately narrower than the
- * runner's own port: the runner reads and writes one tenant at a time; the
- * dashboard reads across them, and its writes are the operator's levers -
- * the rollback (migrated or finalized → rolled_back, the state machine's
- * only human-driven edge) and, on cloud, the enrollment rows that pace the
- * migrations still asking to be paced.
- */
-/**
  * One enrollment row as the ops page lists it.
- *
- * The shape lives in `@langwatch/ops-contract` because the transport port has
- * to name it — declaring it only here is what left that port saying
- * `Promise<unknown>` and the page reading fields off `unknown`.
  */
 export type MigrationEnrollmentRecord = OpsMigrationEnrollmentRecord;
 
@@ -115,10 +95,6 @@ const ATTENTION_LIMIT = 50;
 
 /**
  * One migration as the operator dashboard lists it.
- *
- * Declared in `@langwatch/ops-contract` for the same reason as
- * {@link MigrationEnrollmentRecord}: the transport port returns it, and a port
- * that cannot name its answer publishes `unknown` to the browser.
  */
 export type MigrationOverview = OpsMigrationOverview;
 
@@ -154,12 +130,9 @@ type SystemMigrationsServiceDependencies = {
      */
     enrolledAutomatically: boolean;
     /**
-     * Which axis the runner drives this migration over. Organization
-     * migrations form the ordered per-organization pipeline; a user
+     * Which axis the runner drives this migration over. Organization migrations form the ordered per-organization pipeline; a user enrollment but its
+     * tenants are the organization's MEMBERS, so it is neither a step in that pipeline nor readable back by organization id. Omitted means organization.
      * migration (ADR-101 §6) is paced by the same organization
-     * enrollment but its tenants are the organization's MEMBERS, so it
-     * is neither a step in that pipeline nor readable back by
-     * organization id. Omitted means organization.
      */
     tenant?: "organization" | "user";
   }>;
@@ -167,18 +140,15 @@ type SystemMigrationsServiceDependencies = {
   isSaaS: () => boolean;
   enrollments: SystemMigrationEnrollmentStore;
   /**
-   * The organizations whose data plane is a private ClickHouse instance,
-   * read from the environment's routing table. A cohort must never sweep
-   * one up, and the environment - not a list in code - is what names
-   * them.
+   * The organizations whose data plane is a private ClickHouse instance, read
+   * from the environment's routing table. A cohort must never sweep one up, and
+   * the environment - not a list in code - is what names them.
    */
   privateDataplaneOrganizationIds: () => string[];
   /**
-   * The ops audit trail. Enrollment decides which organizations the
-   * platform migrates, so both actions are recorded the way the
-   * backfill's own writes are - and the enrollment LISTING is recorded
-   * too, because it returns the enrollers' display names (personal
-   * data). A platform-scope entry carries no organizationId.
+   * The ops audit trail. Enrollment decides which organizations the platform migrates, so both actions are recorded
+   * the way the backfill's own writes are - and the enrollment LISTING is recorded too, because it returns the
+   * enrollers' display names (personal data). A platform-scope entry carries no organizationId.
    */
   audit: (entry: {
     userId: string;
@@ -188,56 +158,33 @@ type SystemMigrationsServiceDependencies = {
   }) => Promise<void>;
   runPass: () => Promise<MigrationPassSummary>;
   /**
-   * One migration for one organization, now, under the same
-   * per-organization claim as a full pass (the summary's `claimed`
-   * says another pass is already working the organization). The
-   * composition supplies it because only the composition can build a
-   * runner scoped to a single (tenant, migration) pair.
+   * One migration for one organization, now, under the same per-organization claim as a full pass (the
+   * summary's `claimed` says another pass is already working the organization). The composition supplies
+   * it because only the composition can build a runner scoped to a single (tenant, migration) pair.
    */
   runTargetedPass: (args: {
     organizationId: string;
     migrationName: string;
   }) => Promise<MigrationPassSummary>;
   /**
-   * Whether a migration's stored report means it merely WAITED, per
-   * migration name. The state machine has no waiting status, so a
-   * migration that is waiting on something records `migrated` exactly
-   * as a held one does, and only the migration's own composition can
-   * tell the two apart by reading its report - so the predicate lives
-   * there, like `rollbackGuards`. A migration that never waits has no
-   * entry, and its `migrated` always means held.
+   * Whether a migration's stored report means it merely WAITED, per migration name. The state machine has no waiting status, so a migration that is
+   * waiting on something records `migrated` exactly as a held one does, and only the migration's own composition can tell the two apart by reading its
+   * report - so the predicate lives there, like `rollbackGuards`. A migration that never waits has no entry, and its `migrated` always means held.
    */
   waitingReports?: Record<string, (report: unknown) => boolean>;
   /**
-   * What else a rollback has to DO, per migration name. The generic
-   * rollback is a state write; a migration whose finalization changed
-   * how the running fleet behaves needs that change undone too, and
-   * only the migration's own composition knows how (for the authz
-   * cutover: the projection flipped off synchronously, the epoch bumped,
-   * the gate cache dropped, a `cutover_rolled_back` fact appended).
-   * Migrations with nothing to undo simply have no entry.
-   *
-   * An effect MUST be idempotent, because `rollBack` re-runs it on every
-   * retry (see the method's own doc). `decidedAt` is what makes that
-   * cheap: it is the moment the rollback was DECIDED (the pin's
-   * timestamp), stable across every retry of that decision and fresh for
-   * a later rollback of a re-cutover organization, so an effect can
-   * derive a deduplicating id from it rather than from the clock.
+   * What else a rollback has to DO, per migration name. The generic rollback is a state write; a migration whose finalization changed how the running fleet behaves
+   * needs that change undone too, and only the migration's own composition knows how (for the authz cutover: the projection flipped off synchronously, the epoch
+   * bumped, the gate cache dropped, a `cutover_rolled_back` fact appended). Migrations with nothing to undo simply have no entry.
    */
   rollbackEffects?: Record<
     string,
     (args: { tenantId: string; actorUserId: string; decidedAt: string }) => Promise<void>
   >;
   /**
-   * What must HOLD before a rollback may even be pinned, per migration
-   * name. The generic service knows the state machine; it does not know
-   * that one migration's state depends on another's, or that a status
-   * can be technically eligible while there is nothing behind it to
-   * undo - that is domain knowledge, and it lives in the composition
-   * (runtime.ts) exactly like `rollbackEffects` does. A guard refuses
-   * by throwing (a `HandledError` the operator can act on); it runs
-   * BEFORE the pin is written, and on retries too - a refusal must hold
-   * however the operator arrived here.
+   * What must HOLD before a rollback may even be pinned, per migration name. The generic service knows the state machine; it does not know that one migration's state depends on another's, or that a
+   * status can be technically eligible while there is nothing behind it to undo - that is domain knowledge, and it lives in the composition (runtime.ts) exactly like `rollbackEffects` does. A guard
+   * refuses by throwing (a `HandledError` the operator can act on); it runs BEFORE the pin is written, and on retries too - a refusal must hold however the operator arrived here.
    */
   rollbackGuards?: Record<
     string,
@@ -264,10 +211,9 @@ export class SystemMigrationsService {
   private constructor(private readonly deps: SystemMigrationsServiceDependencies) {}
 
   /**
-   * Per migration: the status rollup, plus the tenants needing attention -
-   * held (`migrated`, parity disagreements in the report) and `parked`
-   * (errored, retried next pass). Finalized tenants are a count, not a
-   * listing, and neither are rolled-back ones.
+   * Per migration: the status rollup, plus the tenants needing attention - held (`migrated`,
+   * parity disagreements in the report) and `parked` (errored, retried next pass). Finalized
+   * tenants are a count, not a listing, and neither are rolled-back ones.
    */
   async getOverview(): Promise<MigrationOverview[]> {
     const isSaaS = this.deps.isSaaS();
@@ -321,12 +267,9 @@ export class SystemMigrationsService {
   }
 
   /**
-   * The enrollment listing for the ops page: every migration's, newest
-   * first, with whatever names still resolve. `isSaaS` rides along so the
-   * page can say honestly that a self-hosted installation has nothing to
-   * enroll. The read is audited because the records carry the enrollers'
-   * display names - personal data leaves through here, so the trail says
-   * who read it.
+   * The enrollment listing for the ops page: every migration's, newest first, with whatever names still resolve. `isSaaS` rides
+   * along so the page can say honestly that a self-hosted installation has nothing to enroll. The read is audited because the
+   * records carry the enrollers' display names - personal data leaves through here, so the trail says who read it.
    */
   async getEnrollments({ requestedBy }: { requestedBy: string }): Promise<{
     isSaaS: boolean;
@@ -360,15 +303,9 @@ export class SystemMigrationsService {
   }
 
   /**
-   * Enroll one organization for one registered migration
-   * (specs/migration/system-migrations-runner.feature, the enrollment scenarios).
-   * Takes effect on the next pass - the runner reads enrollment fresh each
-   * time - and refuses rather than lies: off cloud (where a row would change
-   * nothing, see MigrationEnrollmentCloudOnlyError), for a migration that
-   * admits every organization already (`enrolledAutomatically`), for a
-   * migration nothing registered answers to, for an organization that does
-   * not exist, and for one already enrolled (the store's unique key raises
-   * that refusal).
+   * Enroll one organization for one registered migration (specs/migration/system-migrations-runner.feature, the enrollment scenarios). Takes effect on the next pass - the runner reads enrollment fresh
+   * each time - and refuses rather than lies: off cloud (where a row would change nothing, see MigrationEnrollmentCloudOnlyError), for a migration that admits every organization already
+   * (`enrolledAutomatically`), for a migration nothing registered answers to, for an organization that does not exist, and for one already enrolled (the store's unique key raises that refusal).
    */
   async enroll({
     organizationId,
@@ -410,28 +347,9 @@ export class SystemMigrationsService {
   }
 
   /**
-   * Enroll a sampled cohort for one migration in a single action
-   * (specs/migration/system-migrations-runner.feature, the cohort scenarios).
-   * The pool is every organization not yet enrolled for the migration,
-   * minus the ones the platform already knows to leave alone by data
-   * rather than by a hand-kept list: an active enterprise subscription, or
-   * a private ClickHouse route in the environment. The sample is drawn at
-   * random so a cohort is a spread of the long tail, not the same head of
-   * some fixed order every time - and the result names every organization
-   * it picked, because an action over N organizations is only auditable if
-   * it says which N.
-   *
-   * Both exclusions are DEFAULTS, not laws. They exist so an experimental
-   * cohort cannot sweep up the organizations we would least like to
-   * surprise; once a migration has proven itself across the long tail,
-   * finishing the rollout means taking those two classes over too, and an
-   * operator who has decided that should not have to enroll them one id at
-   * a time (the single-organization `enroll` never applied either
-   * exclusion). Each is lifted SEPARATELY and named in the audit trail:
-   * they carry different risks - an enterprise organization is a
-   * commercial one, a private-dataplane organization has its events in a
-   * ClickHouse instance of its own - and one checkbox for both would hide
-   * that.
+   * Enroll a sampled cohort for one migration in a single action (specs/migration/system-migrations-runner.feature, the cohort scenarios). The pool is every organization not yet enrolled for the migration, minus the ones the
+   * platform already knows to leave alone by data rather than by a hand-kept list: an active enterprise subscription, or a private ClickHouse route in the environment. The sample is drawn at random so a cohort is a spread of
+   * the long tail, not the same head of some fixed order every time - and the result names every organization it picked, because an action over N organizations is only auditable if it says which N.
    */
   async enrollCohort({
     migrationName,
@@ -527,12 +445,9 @@ export class SystemMigrationsService {
   }
 
   /**
-   * Withdraw an enrollment: the row is deleted, and the next pass simply no
-   * longer processes the organization for that migration. State already
-   * recorded stays exactly as it is - withdrawal pauses the rollout, it does
-   * not roll anything back (that is the operator rollback's job). Refused
-   * for a migration that admits every organization anyway, where deleting a
-   * row would pause nothing.
+   * Withdraw an enrollment: the row is deleted, and the next pass simply no longer processes the organization for that migration. State
+   * already recorded stays exactly as it is - withdrawal pauses the rollout, it does not roll anything back (that is the operator rollback's
+   * job). Refused for a migration that admits every organization anyway, where deleting a row would pause nothing.
    */
   async withdraw({
     organizationId,
@@ -562,16 +477,9 @@ export class SystemMigrationsService {
   }
 
   /**
-   * Run one migration for one organization now
-   * (specs/migration/system-migrations-runner.feature, "An operator runs one
-   * migration for one organization now"). Awaited rather than
-   * fire-and-forget - the operator asked about one organization and wants
-   * its outcome. The cohort stays the source of truth on cloud: an
-   * organization outside it is refused, never quietly migrated - though for
-   * a migration that admits everyone the run only brings this organization's
-   * turn forward. The organization's own claim still applies, so a run while
-   * another pass is working that organization is refused with a retry-shaped
-   * error instead of double-driving it.
+   * Run one migration for one organization now (specs/migration/system-migrations-runner.feature, "An operator runs one migration for one organization now"). Awaited rather than fire-and-forget - the operator asked about one
+   * organization and wants its outcome. The cohort stays the source of truth on cloud: an organization outside it is refused, never quietly migrated - though for a migration that admits everyone the run only brings this
+   * organization's turn forward. The organization's own claim still applies, so a run while another pass is working that organization is refused with a retry-shaped error instead of double-driving it.
    */
   async runForOrganization({
     organizationId,
@@ -598,13 +506,11 @@ export class SystemMigrationsService {
       organizationId,
       migrationName,
     });
-    // Every tenant the run covered was claimed elsewhere, so this run did
-    // nothing and the operator should retry. For an organization-rooted run
-    // that is one tenant, so `claimed > 0` and this condition are the same
-    // thing. For a USER-rooted run the tenants are the organization's
-    // members, and one contended member is partial progress: aborting on it
-    // would discard the outcomes of every member that finalized, and the
-    // operator would be told to retry a run that mostly succeeded.
+    // Every tenant the run covered was claimed elsewhere, so this run did nothing and the operator should
+    // retry. For an organization-rooted run that is one tenant, so `claimed > 0` and this condition are
+    // the same thing. For a USER-rooted run the tenants are the organization's members, and one contended
+    // member is partial progress: aborting on it would discard the outcomes of every member that
+    // finalized, and the operator would be told to retry a run that mostly succeeded.
     if (summary.claimed > 0 && summary.claimed === summary.tenantsSeen) {
       throw new MigrationPassAlreadyRunningError();
     }
@@ -686,11 +592,9 @@ export class SystemMigrationsService {
   }
 
   /**
-   * Whether acting on this migration takes the typed destructive
-   * confirmation. Read from the migration's own declaration so the gate and
-   * the page that renders it can never disagree about which migration is
-   * dangerous; an unknown name is refused before any confirmation question
-   * arises.
+   * Whether acting on this migration takes the typed destructive confirmation. Read from the migration's
+   * own declaration so the gate and the page that renders it can never disagree about which migration is
+   * dangerous; an unknown name is refused before any confirmation question arises.
    */
   requiresOperatorConfirmation({ migrationName }: { migrationName: string }): boolean {
     return this.requireRegisteredMigration(migrationName).requiresOperatorConfirmation;
@@ -710,13 +614,6 @@ export class SystemMigrationsService {
 
   /**
    * The `rolled_back` pin, written unless a retry already carries it.
-   *
-   * A retry writes no second pin and mints no second decision moment: it
-   * exists to finish the one already recorded. A standing pin with NO stamp
-   * (it predates the stamp, or its report write was lost) does get this
-   * moment persisted onto it - otherwise every retry mints a fresh
-   * `decidedAt`, and an effect's decidedAt-keyed dedupe treats each retry as
-   * a new decision instead of finishing the recorded one.
    */
   private async writePin({
     pin,
@@ -764,15 +661,9 @@ export class SystemMigrationsService {
   }
 
   /**
-   * Refuses an enrollment action on a migration that admits every
-   * organization anyway. Withdrawal asks this too: pausing a rollout is what
-   * an operator withdraws FOR, and a migration outside enrollment's reach
-   * cannot be paused that way - the per-organization rollback is the lever
-   * that still works on it.
-   *
-   * An unregistered name passes here and is refused by
-   * `requireRegisteredMigration` where the caller checks it, so this guard
-   * never turns "unknown migration" into the wrong refusal.
+   * Refuses an enrollment action on a migration that admits every organization anyway. Withdrawal asks
+   * this too: pausing a rollout is what an operator withdraws FOR, and a migration outside enrollment's
+   * reach cannot be paused that way - the per-organization rollback is the lever that still works on it.
    */
   private requireEnrollmentDecidesSomething(migrationName: string): void {
     const migration = this.deps.migrations().find((candidate) => candidate.name === migrationName);
@@ -782,11 +673,9 @@ export class SystemMigrationsService {
   }
 
   /**
-   * Kick a pass now instead of waiting for the next worker boot - the lever
-   * for processing a fresh enrollment right away or re-verifying held
-   * tenants after remediation. Fire-and-forget: per-organization claims keep
-   * two passes off the same organization, so the worst case for a double
-   * click is a pass that finds everything claimed and does nothing.
+   * Kick a pass now instead of waiting for the next worker boot - the lever for processing a fresh enrollment right away or
+   * re-verifying held tenants after remediation. Fire-and-forget: per-organization claims keep two passes off the same
+   * organization, so the worst case for a double click is a pass that finds everything claimed and does nothing.
    */
   startPass(): void {
     void this.deps.runPass().catch((error) => {
@@ -856,58 +745,9 @@ export class SystemMigrationsService {
   }
 
   /**
-   * The operator's rollback: pin a migrated or finalized organization back
-   * onto its legacy path (specs/migration/system-migrations-runner.feature, "An
-   * operator rolls a finalized organization back to its legacy path", "An
-   * operator rolls a migrated organization back to its legacy path"), then
-   * apply whatever that migration's rollback has to DO.
-   *
-   * The pin is the lever, and it is the ONLY runtime lever: a migration that
-   * enrols automatically has no enrollment to withdraw, so this is how an
-   * operator takes one organization out of a rollout without a deploy. It
-   * therefore accepts every status, and no record at all:
-   *
-   *   `migrated`     held on the ledger with parity still disagreeing —
-   *   `finalized`    parity clean. Both may be live on ledger writes
-   *                  (engine-gate.ts), so both are the operator's to pull
-   *                  back, effect and all.
-   *   `rolled_back`  a RETRY of a rollback whose effect did not fully apply.
-   *                  The pin already stands and is left exactly as it is
-   *                  (including who decided and when); only the effect
-   *                  re-fires. Without this an effect that threw halfway
-   *                  stranded the organization: the status said rolled back,
-   *                  the fleet still served it from the engine, and every
-   *                  retry bounced off an eligibility refusal.
-   *   `parked`       erroring every pass. This is the case a status gate got
-   *                  WRONG: an organization whose migration throws — its
-   *                  ledger unreachable, its data plane down — is precisely
-   *                  the one an operator needs to stop, and the convergence
-   *                  loop now re-drives it up to `MAX_PASSES` times per boot
-   *                  until they can.
-   *   no record      never attempted, or not reached yet. Pinning ahead of
-   *                  the pass is how an organization is held out of a
-   *                  rollout that would otherwise reach it automatically.
-   *
-   * The pin is written FIRST in every case — the stored `rolled_back` status
-   * is what stops the next pass, so it must land even if an effect cannot —
-   * and the effect runs after it, for the statuses that could have reached
-   * the ledger (`ROLLBACK_EFFECT_STATUSES`). A `parked` organization and one
-   * with no record get the pin alone: there is no cutover to undo, and an
-   * effect written for a tenant that cut over has no defined meaning against
-   * one that never did.
-   *
-   * Because a retry re-runs the effect, effects must be idempotent. They are
-   * handed `decidedAt` — the pin's own timestamp, unchanged across retries —
-   * so an effect can key a deduplicating command id off the DECISION rather
-   * than off the clock. A later rollback (after the organization was cut over
-   * again) writes a new pin and therefore gets a new `decidedAt`, so it is a
-   * distinct decision rather than a duplicate of the old one.
-   *
-   * The ledger-write gate always picks the change up within its cache window;
-   * the legacy-fallback gate only mattered once the organization was
-   * finalized, since that is the only status it treats specially. Later
-   * passes leave the organization alone (rolled_back is terminal until an
-   * operator intervenes again).
+   * The operator's rollback: pin a migrated or finalized organization back onto its legacy path
+   * (specs/migration/system-migrations-runner.feature, "An operator rolls a finalized organization back to its legacy path", "An
+   * operator rolls a migrated organization back to its legacy path"), then apply whatever that migration's rollback has to DO.
    */
   async rollBack({
     migrationName,
@@ -931,12 +771,11 @@ export class SystemMigrationsService {
       record?.report != null && typeof record.report === "object"
         ? (record.report as Record<string, unknown>)
         : {};
-    // A fresh decision for an organization still on the ledger, the recorded
-    // one for a retry. The status is what distinguishes them: a migrated or
-    // finalized record that still carries a stamp from an earlier rollback
-    // has since been cut over again, and rolling it back now is a NEW
-    // decision that must not reuse the old moment (and so must not dedupe
-    // against the old event).
+    // A fresh decision for an organization still on the ledger, the recorded one
+    // for a retry. The status is what distinguishes them: a migrated or finalized
+    // record that still carries a stamp from an earlier rollback has since been
+    // cut over again, and rolling it back now is a NEW decision that must not
+    // reuse the old moment (and so must not dedupe against the old event).
     const isRetry = record?.status === "rolled_back";
     const decidedAt = (isRetry ? rollbackDecidedAt(priorReport) : null) ?? new Date().toISOString();
     const pin = {
@@ -949,13 +788,11 @@ export class SystemMigrationsService {
       },
     };
 
-    // The pin FIRST, its effects after — deliberately in that order. The
-    // stored `rolled_back` status is what stops the next pass re-finalizing
-    // the tenant, so it must land even if the effect cannot. An effect that
-    // throws therefore leaves the pin standing and propagates to the
-    // operator, who sees a rollback that was recorded but not fully applied
-    // and can retry it; the reverse order could leave a tenant the runner
-    // re-finalizes minutes later.
+    // The pin FIRST, its effects after — deliberately in that order. The stored `rolled_back`
+    // status is what stops the next pass re-finalizing the tenant, so it must land even if the
+    // effect cannot. An effect that throws therefore leaves the pin standing and propagates to
+    // the operator, who sees a rollback that was recorded but not fully applied and can retry
+    // it; the reverse order could leave a tenant the runner re-finalizes minutes later.
     await this.writePin({ pin, record, isRetry, priorReport, actorUserId });
 
     // Only for a status that could have reached the ledger. A `parked`
@@ -974,11 +811,9 @@ export class SystemMigrationsService {
 }
 
 /**
- * When this rollback was decided, read back off the pin a previous call
- * wrote. Null when the report carries no usable stamp — a record pinned by
- * something other than this method, or by a version of it that predates the
- * stamp — in which case the caller falls back to now and the retry simply
- * does not dedupe.
+ * When this rollback was decided, read back off the pin a previous call wrote. Null when the report carries no
+ * usable stamp — a record pinned by something other than this method, or by a version of it that predates the
+ * stamp — in which case the caller falls back to now and the retry simply does not dedupe.
  */
 function rollbackDecidedAt(report: Record<string, unknown>): string | null {
   const rolledBack = report.rolledBack;
@@ -992,17 +827,9 @@ function rollbackDecidedAt(report: Record<string, unknown>): string | null {
 }
 
 /**
- * One status for a targeted run over an organization's members: the WORST
- * outcome wins (parked over held over finalized), because the operator is
- * deciding whether the organization needs attention, and null when no
- * member was in the cohort at all. Members already terminal before the run
- * keep their terminal color: rolled-back members answer "rolled_back" (an
- * operator's pin is never a successful finalization), and a membership
- * finished earlier answers "finalized" - done, not "nobody was in the
- * cohort".
- *
- * A member another pass was working reads as held, for the same reason: the
- * organization is not finished, and the next pass picks that member up.
+ * One status for a targeted run over an organization's members: the WORST outcome wins (parked over held over finalized), because the operator is deciding whether the
+ * organization needs attention, and null when no member was in the cohort at all. Members already terminal before the run keep their terminal color: rolled-back members
+ * answer "rolled_back" (an operator's pin is never a successful finalization), and a membership finished earlier answers "finalized" - done, not "nobody was in the cohort".
  */
 function statusOfMemberSummary(summary: MigrationPassSummary): TenantMigrationStatus | null {
   if (summary.parked > 0) {

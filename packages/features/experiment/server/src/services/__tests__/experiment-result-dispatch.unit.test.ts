@@ -1,7 +1,6 @@
 /**
- * Unit tests for the result-dispatch helpers: the judge model recorded for
- * an evaluator target (pinned from the run, not read live), and what a
- * non-processed evaluation may carry into storage — no score, but the money it spent.
+ * Unit tests for the result-dispatch helpers: the judge model recorded for an evaluator target (pinned from the run, not read
+ * live), and what a non-processed evaluation may carry into storage — no score, but the money it spent.
  * @see specs/experiments/comparison.feature
  */
 import { describe, expect, it } from "vitest";

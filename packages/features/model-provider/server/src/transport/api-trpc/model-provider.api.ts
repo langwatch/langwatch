@@ -1,35 +1,5 @@
 /**
  * The Model Provider surface over the process's tRPC transport.
- *
- * Three families share one router:
- *
- *   read paths      getAllForProject, getAllForProjectForFrontend,
- *                   listAllForProjectForFrontend,
- *                   listAllForOrganizationForFrontend, codexStatus,
- *                   isManagedProvider.
- *   write paths     update, delete, validateApiKey, testConnection, and the
- *                   Codex device sign-in pair.
- *   default models  the role/feature-keyed defaults and the cascade reads
- *                   behind the Default Models settings page.
- *
- * Credentials: every tRPC response lands in a browser, so each read goes
- * through the service method that masks stored keys — the decrypted
- * `customKeys` are only ever handed to server-internal callers of
- * `getExecutionProviders`. Nothing here ever writes a credential value into
- * an audit record: the process's `auditLogMutations` redacts `customKeys`,
- * `providerConfig` and `extraHeaders` by field name, and the one audit entry
- * written by hand below (`codexSignInPoll`) carries the plan tier and the
- * scopes, never the token set or the account email.
- *
- * Transport only: input parsing, the authorization declarations, and
- * delegation to {@link ModelProviderApp}. No handler stamps the caller onto a
- * write any more — the application does, once, for every write. The provider
- * probes, the Codex device flow and the audit trail arrive as ports because
- * they are process capabilities rather than the feature's own persistence.
- *
- * Specs: specs/model-providers/codex-account-provider.feature,
- * specs/model-providers/role-based-default-models.feature,
- * specs/model-providers/model-default-config-cascade.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { CustomModelList } from "../../rules/custom-model-list.rules";
@@ -62,10 +32,6 @@ import type { ModelProviderApp } from "#app/model-provider.app";
 /**
  * The process supplies authentication and the permission decision engine;
  * authorization declarations arrive as the `policy` bag below.
- *
- * `app` is the slice of the process's application this feature reaches, not
- * the feature's application itself, because a tRPC root is shared by every
- * feature mounted on it and so carries all of them.
  */
 export type ModelProviderTrpcContext = Readonly<{
   app: Readonly<{ modelProviders: ModelProviderApp }>;
@@ -74,11 +40,6 @@ export type ModelProviderTrpcContext = Readonly<{
 
 /**
  * A process middleware chain applied to one already-parsed procedure.
- *
- * Every member of the policy bag returns one of these rather than a composed
- * builder, because tRPC appends the input parser at the point `.input()` is
- * called: a check installed before it reads `input === undefined`, and every
- * declaration below reads its scope id out of the validated input.
  */
 type ProcedureDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
 
@@ -95,10 +56,9 @@ type ModelProviderTrpcProcedures<
    */
   policy(permission: AuthzPermission): ProcedureDecorator;
   /**
-   * The tenant gate for a provider write that may arrive with either handle:
-   * the project permission when a project is named, organization membership
-   * otherwise. What the caller may actually write is then decided per scope
-   * inside the service.
+   * The tenant gate for a provider write that may arrive with either handle: the project
+   * permission when a project is named, organization membership otherwise. What the caller
+   * may actually write is then decided per scope inside the service.
    */
   tenantWritePolicy(permission: "project:update" | "project:delete"): ProcedureDecorator;
   /**
@@ -122,19 +82,6 @@ type ModelProviderTrpcProcedures<
  * The process capabilities this transport needs that are not the Model
  * Provider service's own: the outbound credential probes, the Codex device
  * flow, and the audit trail.
- *
- * The two credential-probe verdicts are type PARAMETERS rather than
- * `unknown`, because a generic constraint does not carry a concrete shape out
- * to the caller. `create` used to declare `TPorts extends
- * ModelProviderTrpcPorts` and take `ports: TPorts`: a generic body is checked
- * once against its constraint, so `ports.validateProviderApiKey(...)` was
- * `Promise<unknown>` at the declaration site and the router's output type
- * baked in `unknown` whatever the process wired in — which is what left
- * `useModelProviderApiKeyValidation` reading `result.valid` off `unknown`.
- * Naming them here and passing `ports:
- * ModelProviderTrpcPorts<TApiKeyValidation, TStoredKeyValidation>` instead
- * lets inference fill them from the object the process actually passes, and
- * the verdict union reaches the browser.
  */
 export type ModelProviderTrpcPorts<
   TApiKeyValidation = unknown,
@@ -162,10 +109,6 @@ export type ModelProviderTrpcPorts<
   }>;
   /**
    * Codex sign-in step 2..n: one poll of the pending device authorization.
-   *
-   * A completed exchange carries the full `CodexTokenKeys` set, so the account
-   * email and plan tier the response hands back are known strings rather than
-   * maybes.
    */
   pollCodexDeviceSignIn(input: {
     deviceAuthId: string;
@@ -191,30 +134,22 @@ type CanonicalProvider = {
   id: string;
   provider: string;
   /**
-   * The row's own display name. Carried because a multi-instance setup names
-   * its rows ("OpenAI" at organization scope, "OpenAI2" on a project) and every
-   * surface that lists providers labels them with it: the settings table, the
-   * routing-policy credential picker, the budget drawer's provider select. With
-   * it narrowed away those all fell back to the registry name, so two rows for
-   * the same vendor rendered identically. Not sensitive: a name is what an
-   * admin typed into the form, never a credential.
+   * The row's own display name. Carried because a multi-instance setup names its rows ("OpenAI" at organization scope, "OpenAI2" on a project) and every surface that lists
+   * providers labels them with it: the settings table, the routing-policy credential picker, the budget drawer's provider select. With it narrowed away those all fell back to
+   * the registry name, so two rows for the same vendor rendered identically. Not sensitive: a name is what an admin typed into the form, never a credential.
    */
   name: string;
   enabled: boolean;
   /**
-   * When set, an admin has withdrawn the credential. Carried because the
-   * gateway pickers fail closed on it — `isRoutable` in
-   * `components/gateway/eligibleModelProviders.ts` requires
-   * `enabled === true && !disabledAt` — and a row that arrives without the
-   * field reads as "never withdrawn", so a disabled credential was being
-   * advertised as eligible. The routing-policy picker renders it too.
+   * When set, an admin has withdrawn the credential. Carried because the gateway pickers fail closed on it — `isRoutable` in
+   * `components/gateway/eligibleModelProviders.ts` requires `enabled === true && !disabledAt` — and a row that arrives without the field
+   * reads as "never withdrawn", so a disabled credential was being advertised as eligible. The routing-policy picker renders it too.
    */
   disabledAt?: Date | null;
   /**
-   * Last known reachability of the credential. The routing-policy credential
-   * picker renders it per row (`useRoutingPolicyDrawerForm`), and defaults to
-   * "UNKNOWN" when absent — which is what every row showed while this was
-   * narrowed away.
+   * Last known reachability of the credential. The routing-policy credential picker renders
+   * it per row (`useRoutingPolicyDrawerForm`), and defaults to "UNKNOWN" when absent — which
+   * is what every row showed while this was narrowed away.
    */
   healthStatus?: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN";
   customKeys: Record<string, unknown> | null;
@@ -223,24 +158,16 @@ type CanonicalProvider = {
   models?: string[] | null;
   embeddingsModels?: string[] | null;
   /**
-   * Where the provider is attached. Carried because the model-providers
-   * settings page filters and orders by it — narrowing it away here left
-   * `filterProvidersByScope` nothing to read, so picking any scope but "all"
-   * emptied the table. Not sensitive: a scope says which organization, team or
-   * project a provider belongs to, never anything about its credentials.
+   * Where the provider is attached. Carried because the model-providers settings page filters and orders by it — narrowing it
+   * away here left `filterProvidersByScope` nothing to read, so picking any scope but "all" emptied the table. Not sensitive: a
+   * scope says which organization, team or project a provider belongs to, never anything about its credentials.
    */
   scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
 };
 
 /**
- * The list projection the browser renders, as one declaration both halves read.
- *
- * The return type is `@langwatch/model-provider-contract`'s
- * `ModelProviderListEntry` rather than whatever this function happens to build:
- * `@langwatch/model-provider-web`'s providers table used to name this shape
- * through `inferRouterOutputs<AppRouter>`, which a feature-web package cannot
- * do, and an annotation here is what lets it name the contract instead without
- * the two being free to drift.
+ * The list projection the browser renders, as one declaration both halves
+ * read.
  */
 function toLegacyProvider(provider: CanonicalProvider): ModelProviderListEntry {
   return {
@@ -269,12 +196,9 @@ function toLegacyProvider(provider: CanonicalProvider): ModelProviderListEntry {
 }
 
 /**
- * The entry is `as const` so `Object.fromEntries` sees a two-tuple and takes
- * its typed overload. Without it the call is only one refactor away from the
- * `Iterable<readonly any[]>: any` overload — today's tuple is inferred from
- * the callback's contextual type, and a hoisted `const entries` is enough to
- * lose it. An erased map answers `any` for both provider reads, which
- * `toLegacyProvider`'s annotation cannot catch: `any` satisfies it.
+ * The entry is `as const` so `Object.fromEntries` sees a two-tuple and takes its typed overload. Without it the call is only one refactor away from
+ * the `Iterable<readonly any[]>: any` overload — today's tuple is inferred from the callback's contextual type, and a hoisted `const entries` is
+ * enough to lose it. An erased map answers `any` for both provider reads, which `toLegacyProvider`'s annotation cannot catch: `any` satisfies it.
  */
 function toLegacyProviderMap(providers: Record<string, CanonicalProvider>) {
   return Object.fromEntries(
@@ -283,10 +207,9 @@ function toLegacyProviderMap(providers: Record<string, CanonicalProvider>) {
 }
 
 /**
- * Installs the complete `modelProvider.*` tRPC surface on a process-owned
- * root. The procedure and the policy bag are injected by the process so its
- * auth, audit, error, logging and tracing policies wrap every feature
- * procedure consistently.
+ * Installs the complete `modelProvider.*` tRPC surface on a process-owned root. The
+ * procedure and the policy bag are injected by the process so its auth, audit, error,
+ * logging and tracing policies wrap every feature procedure consistently.
  */
 export class ModelProviderTrpcApi {
   static create<
@@ -330,12 +253,9 @@ export class ModelProviderTrpcApi {
       }),
 
       /**
-       * List shape: one entry per stored ModelProvider row, no collapsing
-       * by provider key. Use this for surfaces that need to render every
-       * row (the settings page Model Providers table) rather than the
-       * narrowest-scope-per-provider view returned by
-       * `getAllForProjectForFrontend`. Multi-instance setups (e.g. two
-       * "OpenAI" rows at different scopes) appear as two distinct entries.
+       * List shape: one entry per stored ModelProvider row, no collapsing by provider key. Use this for surfaces that need to render every row
+       * (the settings page Model Providers table) rather than the narrowest-scope-per-provider view returned by `getAllForProjectForFrontend`.
+       * Multi-instance setups (e.g. two "OpenAI" rows at different scopes) appear as two distinct entries.
        */
       listAllForProjectForFrontend: policy("project:view")(
         procedure.input(modelProviderProjectTrpcInputSchema),
@@ -346,11 +266,9 @@ export class ModelProviderTrpcApi {
       }),
 
       /**
-       * Org-wide variant: returns every ModelProvider attached anywhere
-       * inside the organization (org + every team + every project),
-       * including env-fed pseudo-rows. The model-providers settings page
-       * uses this for the "All you can see" view so an admin sees the
-       * providers a sibling project's owner has configured.
+       * Org-wide variant: returns every ModelProvider attached anywhere inside the organization (org + every team +
+       * every project), including env-fed pseudo-rows. The model-providers settings page uses this for the "All you can
+       * see" view so an admin sees the providers a sibling project's owner has configured.
        */
       listAllForOrganizationForFrontend: policy("organization:view")(
         procedure.input(modelProviderOrganizationTrpcInputSchema),
@@ -407,14 +325,6 @@ export class ModelProviderTrpcApi {
 
       /**
        * Validates an API key for a given model provider.
-       *
-       * A mutation despite changing nothing, because tRPC sends queries as GET
-       * with their input encoded into the URL — and the input here is the
-       * customer's API key. A secret in a URL is written to access logs, proxy
-       * logs and browser history, and proxies that strip credential-shaped query
-       * parameters leave the server parsing an absent input, which surfaces to
-       * the customer as a validation error against a key that is perfectly good.
-       * POSTing the key in a body avoids all of it.
        */
       validateApiKey: credentialProbePolicy(
         procedure.input(modelProviderValidateApiKeyTrpcInputSchema),
@@ -425,18 +335,6 @@ export class ModelProviderTrpcApi {
 
       /**
        * Checks a credential that is already saved.
-       *
-       * A mutation despite reading rather than writing, for reasons the shape of
-       * a query would defeat rather than merely fail to help. A query is a GET
-       * that react-query refetches on window focus and replays from cache inside
-       * `staleTime` — so a customer could read a verdict this page never asked
-       * for, about a moment that has passed. And `ProviderUnreachableError` is a
-       * 502, which the client's retry policy does not exclude, so one click at a
-       * hanging provider would become five outbound requests. The same reasoning
-       * is written out above for `validateApiKey`.
-       *
-       * The input carries a row id and no endpoint. See `testConnection` in the
-       * service for why the absence is the point.
        */
       testConnection: tenantWritePolicy("project:update")(
         procedure.input(modelProviderTestConnectionTrpcInputSchema),
@@ -445,9 +343,8 @@ export class ModelProviderTrpcApi {
       }),
 
       /**
-       * Codex sign-in, step 1: ask OpenAI for a device code. Nothing is stored —
-       * the pending sign-in's identifiers travel to the client and come back on
-       * every poll, so polling works across server instances.
+       * Codex sign-in, step 1: ask OpenAI for a device code. Nothing is stored — the pending sign-in's identifiers
+       * travel to the client and come back on every poll, so polling works across server instances.
        * Spec: specs/model-providers/codex-account-provider.feature
        */
       codexSignInStart: policy("project:update")(
@@ -457,13 +354,9 @@ export class ModelProviderTrpcApi {
       }),
 
       /**
-       * Codex sign-in, step 2..n: one poll of the pending device authorization.
-       * While the user hasn't approved yet this returns `{ status: "pending" }`.
-       * On approval it exchanges the code, saves the provider row with the
-       * encrypted token set at the requested scopes (service authz fails closed
-       * on any non-manageable scope), and — when the caller asks — writes the
-       * coding-assistant defaults so Langy and the tiny assists start using the
-       * account immediately.
+       * Codex sign-in, step 2..n: one poll of the pending device authorization. While the user hasn't approved yet this returns `{ status: "pending" }`. On approval it
+       * exchanges the code, saves the provider row with the encrypted token set at the requested scopes (service authz fails closed on any non-manageable scope), and —
+       * when the caller asks — writes the coding-assistant defaults so Langy and the tiny assists start using the account immediately.
        */
       codexSignInPoll: policy("project:update")(
         procedure.input(modelProviderCodexSignInPollTrpcInputSchema),
@@ -518,10 +411,9 @@ export class ModelProviderTrpcApi {
       }),
 
       /**
-       * Point the coding-assistant roles (LANGY + FAST) at the codex model,
-       * after the fact. The settings-page connect flow doesn't write defaults
-       * during sign-in; it asks with a dialog once connected and calls this on
-       * "yes" — the same role writes the Langy/onboarding flows perform inline.
+       * Point the coding-assistant roles (LANGY + FAST) at the codex model, after the fact. The
+       * settings-page connect flow doesn't write defaults during sign-in; it asks with a dialog once
+       * connected and calls this on "yes" — the same role writes the Langy/onboarding flows perform inline.
        */
       codexApplyCodingDefaults: policy("project:update")(
         procedure.input(modelProviderCodexApplyCodingDefaultsTrpcInputSchema),
@@ -538,12 +430,9 @@ export class ModelProviderTrpcApi {
       }),
 
       /**
-       * The connected Codex account for a project, for the setup surfaces'
-       * connected state. Never returns tokens, and deliberately NOT the account
-       * email: this is a project:view query, so a plain member must not read the
-       * (often personal) OpenAI address the connecting admin signed in with. The
-       * plan tier is non-identifying. The connector still sees their own email at
-       * connect time from the sign-in mutation's result.
+       * The connected Codex account for a project, for the setup surfaces' connected state. Never returns tokens, and deliberately NOT the account email:
+       * this is a project:view query, so a plain member must not read the (often personal) OpenAI address the connecting admin signed in with. The plan tier
+       * is non-identifying. The connector still sees their own email at connect time from the sign-in mutation's result.
        */
       codexStatus: policy("project:view")(
         procedure.input(modelProviderProjectTrpcInputSchema),
@@ -578,21 +467,16 @@ export class ModelProviderTrpcApi {
         });
       }),
 
-      // ────────────────────────────────────────────────────────────────────────
-      // Role + feature-keyed default models (Area B3.2). Writes go through
-      // The canonical Model Provider service so they land in the new `ModelDefault`
-      // table; the legacy Organization/Team/Project scalar columns become
-      // read-only fallback during the compat window.
-      // See specs/model-providers/role-based-default-models.feature.
+      // ──────────────────────────────────────────────────────────────────────── Role + feature-keyed
+      // default models (Area B3.2). Writes go through The canonical Model Provider service so they land in
+      // the new `ModelDefault` table; the legacy Organization/Team/Project scalar columns become read-only
+      // fallback during the compat window. See specs/model-providers/role-based-default-models.feature.
       // ────────────────────────────────────────────────────────────────────────
 
       /**
-       * Cascade-resolve a single feature key for a project. Wraps
-       * `resolveModelForFeature` for frontend consumers that used to read
-       * `project.defaultModel` / etc directly. Returns null when nothing
-       * is configured at any scope rather than throwing, so the caller can
-       * render a placeholder selector + a "configure a default" hint
-       * without an exception-based control flow.
+       * Cascade-resolve a single feature key for a project. Wraps `resolveModelForFeature` for frontend consumers that used to read
+       * `project.defaultModel` / etc directly. Returns null when nothing is configured at any scope rather than throwing, so the
+       * caller can render a placeholder selector + a "configure a default" hint without an exception-based control flow.
        */
       getResolvedDefault: policy("project:view")(
         procedure.input(modelDefaultResolvedTrpcInputSchema),
@@ -605,18 +489,6 @@ export class ModelProviderTrpcApi {
 
       /**
        * Snapshot for the Default Models settings page.
-       *
-       * Shape mirrors RBAC: three effective default models for THIS
-       * project at the top (the resolver's "what would I actually use
-       * here" answer), then a flat list of `ModelDefaultConfig` rows —
-       * each carrying its cascading JSON payload + the scopes it
-       * attaches to. The UI groups, filters, or pivots this list itself
-       * (per-scope drilldown is a client-side filter, not a separate
-       * server call).
-       *
-       * `available` carries the scopes the caller can write to (RBAC-
-       * filtered) so the drawer's chip picker can be the source of truth
-       * without a redundant authz check.
        */
       getDefaultModelsForProject: policy("project:view")(
         procedure.input(modelProviderProjectTrpcInputSchema),
@@ -628,21 +500,9 @@ export class ModelProviderTrpcApi {
       }),
 
       /**
-       * Single-key writers used by the provider-create "Set as default"
-       * flow and any tactical "change just this role at this scope" UI.
-       * Both go through the canonical Model Provider service which finds the (newest)
-       * config attached at the scope and updates the matching key in
-       * place, or creates a new config if none exists.
-       *
-       * Scope-aware authz: the tier the caller names picks the permission, and
-       * the SERVICE is what applies it —
-       * `ModelProviderAuthorizationService.writePermission` maps organization
-       * to `organization:manage`, team to `team:manage` and project to
-       * `project:update`. The declaration below names `project:manage`
-       * instead, so on the project tier the declared permission and the
-       * enforced one are not the same; the enforced one is what runs. Pinned
-       * by model-provider-authorization.service.unit.test.ts so the pair
-       * cannot drift further unnoticed.
+       * Single-key writers used by the provider-create "Set as default" flow and any tactical "change just this role at
+       * this scope" UI. Both go through the canonical Model Provider service which finds the (newest) config attached at
+       * the scope and updates the matching key in place, or creates a new config if none exists.
        */
       setRoleAssignmentForScope: serviceAuthorizedPolicy({
         reason:
@@ -681,22 +541,8 @@ export class ModelProviderTrpcApi {
       ),
 
       /**
-       * Full-config writer: save (create or update) a whole policy
-       * including its scope attachments. The drawer's "Save" button
-       * funnels through here.
-       *
-       * - `id` omitted → create a new config.
-       * - `id` provided → update that config's JSON + scope attachments.
-       *
-       * Either way the attached scopes are claimed exclusively: a scope
-       * belongs to at most one config, so whichever config held one of
-       * them before loses that attachment (and is deleted once nothing
-       * keeps it alive). See the one-config-per-scope invariant in
-       * specs/model-providers/model-default-config-cascade.feature.
-       *
-       * Scope-aware authz: the caller must hold the matching manage
-       * permission on every scope they are attaching to OR removing from,
-       * so a project admin can't silently push a default up to org level.
+       * Full-config writer: save (create or update) a whole policy including its
+       * scope attachments. The drawer's "Save" button funnels through here.
        */
       saveDefaultModelsConfig: serviceAuthorizedPolicy({
         reason:
@@ -726,25 +572,9 @@ export class ModelProviderTrpcApi {
       ),
 
       /**
-       * "What would the cascade hand back for these scopes if I had no
-       * value here?" — drives the drawer's inherited-as-placeholder + the
-       * "Inherit (from organization) [openai/gpt-5.5]" dropdown entry.
-       *
-       * The cascade walk is computed for the most-specific picked scope
-       * (project beats team beats org), excluding any config attached to
-       * the picked scopes themselves (and, when editing, optionally an
-       * `excludeConfigId` so the in-progress draft is treated as "not
-       * yet saved"). For each role + each registered feature key, the
-       * response carries the model the cascade would resolve to + the
-       * scope tier it came from.
-       *
-       * When the cascade has nothing AND there's a provider visible to
-       * the caller that could fulfill a role, the response surfaces an
-       * `inferred` suggestion from the registry's latest-flagship /
-       * mini / embedding heuristic — same logic the onboarding seed
-       * uses. The drawer can show this as the dropdown's first entry so
-       * the user always has SOMETHING to pick, even on a brand-new
-       * organization.
+       * "What would the cascade hand back for these scopes if I had no value here?"
+       * — drives the drawer's inherited-as-placeholder + the "Inherit (from
+       * organization) [openai/gpt-5.5]" dropdown entry.
        */
       getInheritedValuesForScopes: policy("project:view")(
         procedure.input(modelDefaultInheritedValuesTrpcInputSchema),

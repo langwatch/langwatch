@@ -9,22 +9,8 @@ import { createLogger } from "@langwatch/observability";
 import { CodexTokenRefresher } from "../ports/model-provider.port";
 
 /**
- * Sign in with your OpenAI account for the Codex provider, so requests bill
- * the user's ChatGPT plan instead of API credits. This is OpenAI's own
- * device-code flow, the one the codex CLI ships (and the same client id, so
- * approvals land on OpenAI's official "Codex CLI" grant screen):
- *
- *   1. POST {auth}/api/accounts/deviceauth/usercode {client_id}
- *      -> {device_auth_id, user_code, interval}
- *   2. The user opens {auth}/codex/device and enters the one-time code.
- *   3. Poll POST {auth}/api/accounts/deviceauth/token {device_auth_id,
- *      user_code}; 403/404 = still pending; success returns a server-made
- *      PKCE pair + authorization code.
- *   4. POST {auth}/oauth/token (form) -> id/access/refresh tokens.
- *
- * The id token's `https://api.openai.com/auth` claim carries the ChatGPT
- * account id (sent as a header on every codex request) and the plan.
- *
+ * Sign in with your OpenAI account for the Codex provider, so requests bill the user's ChatGPT plan instead of API credits. This is OpenAI's own
+ * device-code flow, the one the codex CLI ships (and the same client id, so approvals land on OpenAI's official "Codex CLI" grant screen):
  * Spec: specs/model-providers/codex-account-provider.feature
  */
 
@@ -42,10 +28,9 @@ export interface CodexDeviceCode {
 export type CodexPollResult = { status: "pending" } | { status: "complete"; keys: CodexTokenKeys };
 
 /**
- * A HandledError (not a bare Error) so the tRPC error formatter serializes
- * it as an expected failure — the sign-in UI shows `message` verbatim and
- * nothing logs as an unhandled 500. `kind` discriminates the poll loop's
- * "keep waiting" cases from terminal ones.
+ * A HandledError (not a bare Error) so the tRPC error formatter serializes it as an expected failure —
+ * the sign-in UI shows `message` verbatim and nothing logs as an unhandled 500. `kind` discriminates
+ * the poll loop's "keep waiting" cases from terminal ones.
  */
 export class CodexAuthError extends HandledError {
   /** The issuer's HTTP status for kind "http" — what separates an OAuth
@@ -138,10 +123,9 @@ export class CodexAccountService {
   }
 
   /**
-   * One poll of the pending sign-in. 403/404 from the endpoint mean "the user
-   * hasn't approved yet" — reported as pending, never as failure. Approval
-   * returns the server-made PKCE pair, which is exchanged for tokens
-   * immediately (the authorization code is single-use).
+   * One poll of the pending sign-in. 403/404 from the endpoint mean "the user hasn't approved yet" —
+   * reported as pending, never as failure. Approval returns the server-made PKCE pair, which is
+   * exchanged for tokens immediately (the authorization code is single-use).
    */
   async pollDeviceSignIn(args: {
     deviceAuthId: string;
@@ -173,13 +157,9 @@ export class CodexAccountService {
   }
 
   /**
-   * Refresh an expired access token. Only a CONFIRMED OAuth rejection (the
-   * issuer answering 4xx with `invalid_grant`: revoked, or the refresh token
-   * aged out) becomes `refresh_rejected` — the terminal signal that sends the
-   * user back to sign-in. A timeout, DNS failure, issuer 5xx, rate limit or
-   * malformed body stays a retryable failure: the session may be perfectly
-   * valid, and telling its owner to re-authenticate for OpenAI's outage
-   * would sign them out for nothing.
+   * Refresh an expired access token. Only a CONFIRMED OAuth rejection (the issuer answering 4xx with `invalid_grant`: revoked, or the refresh token aged out)
+   * becomes `refresh_rejected` — the terminal signal that sends the user back to sign-in. A timeout, DNS failure, issuer 5xx, rate limit or malformed body stays a
+   * retryable failure: the session may be perfectly valid, and telling its owner to re-authenticate for OpenAI's outage would sign them out for nothing.
    */
   async refresh(keys: CodexTokenKeys): Promise<CodexTokenKeys> {
     const form = new URLSearchParams({
@@ -294,10 +274,9 @@ export class CodexAccountService {
 }
 
 /**
- * True only for the issuer's own rejection of the grant: a 4xx answer whose
- * body names `invalid_grant` (revoked session / rotated-away refresh token).
- * Everything else — 5xx, 429, network failures, malformed bodies — is a
- * provider problem, not a dead session.
+ * True only for the issuer's own rejection of the grant: a 4xx answer whose body names
+ * `invalid_grant` (revoked session / rotated-away refresh token). Everything else — 5xx,
+ * 429, network failures, malformed bodies — is a provider problem, not a dead session.
  */
 function isTerminalOAuthRejection(error: unknown): error is CodexAuthError {
   return (
@@ -318,13 +297,6 @@ export interface CodexClaims {
 
 /**
  * The Codex refresher, over the device-flow account service above.
- *
- * The two are separate because they answer different callers: the account
- * service runs the sign-in ceremony a person walks through, while this is what
- * the gateway asks when a stored session's access token has aged out. A
- * rejected refresh is a session that expired rather than a failure — the
- * customer signs in again — and everything else is still a fault, so it
- * propagates.
  */
 export class CodexOAuthModelProviderTokenRefresherAdapter extends CodexTokenRefresher {
   static create(input: { issuer?: string } = {}): CodexOAuthModelProviderTokenRefresherAdapter {

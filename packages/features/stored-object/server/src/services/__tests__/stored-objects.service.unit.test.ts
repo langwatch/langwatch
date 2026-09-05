@@ -197,13 +197,11 @@ describe("storeFromBytes", () => {
     });
 
     it("dedup probe goes through findById (by deterministic id), not by sha256 — a regression to the scan-all-partitions path would surface here", async () => {
-      // Lock the dedup-probe contract: the hot path computes
-      // id = deriveStoredObjectId(projectId, sha256) and looks up via
-      // findById. findById uses the (project_id, id) primary key seek; the
-      // old sha256 path scanned every weekly partition incl. cold S3.
-      // Asserting the *exact* derived id so a future change to the id
-      // derivation (e.g. salt swap, hash family change) is caught here
-      // rather than later in the dedup correctness.
+      // Lock the dedup-probe contract: the hot path computes id = deriveStoredObjectId(projectId, sha256)
+      // and looks up via findById. findById uses the (project_id, id) primary key seek; the old sha256 path
+      // scanned every weekly partition incl. cold S3. Asserting the *exact* derived id so a future change to
+      // the id derivation (e.g. salt swap, hash family change) is caught here rather than later in the dedup
+      // correctness.
       vi.mocked(repo.findById).mockResolvedValue(null);
 
       const expectedSha256 = createHash("sha256").update(TEST_BYTES).digest("hex");
@@ -303,12 +301,11 @@ describe("storeFromBytes", () => {
   describe("when the ClickHouse insert returns an error (case from CH async_insert path)", () => {
     /** @scenario "ClickHouse insert errors surface synchronously to the caller" */
     it("the service rejects with the underlying error and does not swallow", async () => {
-      // The repository wraps ClickHouse `client.insert()` with the
-      // `wait_for_async_insert=1` setting (configured in
-      // stored-objects.repository.ts) precisely so that CH errors come
-      // back to the caller synchronously instead of being silently
-      // dropped on the async_insert queue. The service must surface that
-      // error untouched — no try/catch swallow, no degraded fallback.
+      // The repository wraps ClickHouse `client.insert()` with the `wait_for_async_insert=1`
+      // setting (configured in stored-objects.repository.ts) precisely so that CH errors come
+      // back to the caller synchronously instead of being silently dropped on the async_insert
+      // queue. The service must surface that error untouched — no try/catch swallow, no degraded
+      // fallback.
       const chError = new Error("DB::NetException: connection refused");
       vi.mocked(repo.insert).mockRejectedValueOnce(chError);
 

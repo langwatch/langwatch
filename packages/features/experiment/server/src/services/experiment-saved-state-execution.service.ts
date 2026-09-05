@@ -29,10 +29,9 @@ type LoadedExecutionData = Extract<
 >;
 
 /**
- * Everything a run from the SAVED workbench state needs, resolved and loaded.
- * Shared by `POST /api/experiments/:slug/run` and the UI-action backend
- * executor, so a run started with no browser attached goes through exactly
- * the load path a CI run does.
+ * Everything a run from the SAVED workbench state needs, resolved and loaded. Shared by
+ * `POST /api/experiments/:slug/run` and the UI-action backend executor, so a run started
+ * with no browser attached goes through exactly the load path a CI run does.
  */
 export interface SavedStateExecution {
   experiment: { id: string; slug: string };
@@ -64,12 +63,6 @@ export class ExperimentSavedStateExecutionService {
 
   /**
    * The saved outputs a scoped run may reuse instead of producing again.
-   *
-   * A run with no browser attached starts from a state whose results are empty by
-   * construction, so a candidate-only run had nothing for the comparison judge to
-   * read for the OTHER variants and Phase 2 reported every one of them as
-   * "Waiting on …". The saved cells are exactly what an open page would have
-   * seeded, so the two paths read the same comparison the same way.
    */
   static planSavedRunSeeding({
     prepared,
@@ -91,10 +84,6 @@ export class ExperimentSavedStateExecutionService {
 
   /**
    * The board cells a run with no page attached carries rather than produces.
-   *
-   * Its board is the saved workbench state, which is the only board there is
-   * when no tab is open. A full run carries nothing, because it covers every
-   * cell itself; a run given a row subset carries the rows it leaves alone.
    */
   static planSavedRunCarryOver({
     prepared,
@@ -136,10 +125,9 @@ export class ExperimentSavedStateExecutionService {
   }
 
   /**
-   * Resolve the experiment, parse its saved state, and load everything the
-   * orchestrator needs. Throws `ExperimentNotFoundError` and
-   * `InvalidExperimentConfigurationError` like the run route always has; the
-   * loader's own refusals come back as `{error, status}` for the caller to map.
+   * Resolve the experiment, parse its saved state, and load everything the orchestrator needs. Throws
+   * `ExperimentNotFoundError` and `InvalidExperimentConfigurationError` like the run route always has;
+   * the loader's own refusals come back as `{error, status}` for the caller to map.
    */
   static async prepareSavedStateExecution({
     experiments,
@@ -197,9 +185,6 @@ type SavedWorkbench = {
 
 /**
  * Read the experiment's saved state and the dataset the run is pinned to.
- *
- * Kept apart from the loader below so each half answers one question: this one
- * is only about what was stored and whether it can be run at all.
  */
 async function readSavedWorkbench({
   experiments,

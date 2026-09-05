@@ -1,27 +1,5 @@
 /**
  * `POST /api/playground` — the model playground's streaming proxy.
- *
- * A `handlerManagedAuth({ credential: "session" })` family: it resolves the
- * signed-in person itself and answers a bare `{ error }` at 401, 400 and 403.
- * The session arrives as a port for that reason.
- *
- * The playground is the one surface that dispatches a model the CALLER named
- * rather than one a feature key resolved, which is why it resolves the
- * provider itself instead of going through the execution handle: the wire
- * accepts both the canonical `{mpId}/{model}` spelling and the legacy
- * `{provider}/{model}` one, and it must tell a provider that is not configured
- * apart from one that is configured and switched off — two different sentences
- * a customer acts on differently.
- *
- * ## The one-shot credential-error cache
- *
- * A 401/403 from the upstream provider is remembered per project+model and
- * replayed ONCE on the next request, then dropped. It is transcribed as it
- * was: the streaming response has already begun by the time the provider
- * refuses, so the refusal cannot be turned into a status code on the request
- * that caused it, and the next request is the only place the customer can be
- * shown what happened. Process-local and unbounded in principle, bounded in
- * practice by one entry per project+model that has failed.
  */
 import { createOpenAI } from "@ai-sdk/openai";
 import { handlerManagedAuth } from "@langwatch/api";

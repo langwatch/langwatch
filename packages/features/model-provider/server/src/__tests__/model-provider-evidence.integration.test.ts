@@ -1,17 +1,7 @@
 /**
+ * The setup checklist's `setupModelProviders` step reads `ModelProviderEvidenceService.hasEnabledProvider`, which cascades PROJECT -> TEAM -> ORGANIZATION: a provider attached anywhere in that chain counts, and a disabled one never does. `model-provider-evidence.service.unit.test.ts` pins the WHERE clause shape against a mocked Prisma client; only a real Postgres proves the cascade actually resolves per scope level, since the mock returns the same row regardless of which scope matched.
  * @vitest-environment node
- *
  * @see specs/home/onboarding-progress-backend.feature
- *
- * The setup checklist's `setupModelProviders` step reads
- * `ModelProviderEvidenceService.hasEnabledProvider`, which cascades
- * PROJECT -> TEAM -> ORGANIZATION: a provider attached anywhere in that chain
- * counts, and a disabled one never does. `model-provider-evidence.service.unit.test.ts`
- * pins the WHERE clause shape against a mocked Prisma client; only a real
- * Postgres proves the cascade actually resolves per scope level, since the
- * mock returns the same row regardless of which scope matched.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it.
  */
 import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

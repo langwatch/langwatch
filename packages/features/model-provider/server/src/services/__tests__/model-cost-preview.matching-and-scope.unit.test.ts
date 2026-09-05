@@ -1,9 +1,6 @@
 /**
- * `previewCostRuleMatchingSpans` takes its span reader as a structural port
- * (`ModelCostPreviewSpanReader`), so the matching cascade and the tenant
- * scoping it relies on are testable with a fake reader instead of a live
- * ClickHouse-backed one.
- *
+ * `previewCostRuleMatchingSpans` takes its span reader as a structural port (`ModelCostPreviewSpanReader`), so the matching
+ * cascade and the tenant scoping it relies on are testable with a fake reader instead of a live ClickHouse-backed one.
  * Spec: specs/model-providers/model-cost-matching-spans-preview.feature
  */
 import { describe, expect, it } from "vitest";

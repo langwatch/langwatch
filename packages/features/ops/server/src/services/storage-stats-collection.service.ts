@@ -1,18 +1,5 @@
 /**
  * What the install's ClickHouse is actually holding.
- *
- * The rows, bytes and part counts behind every size alert, the per-disk
- * headroom behind the capacity ones, and the backup log behind "Backup
- * Reporting Absent". Nothing else in the fleet reads them: a deployment
- * running no collector has no producer for those gauges at all, and an alert
- * with no series looks exactly like an alert that is not firing.
- *
- * EVERY CONFIGURED ENDPOINT, not just the shared one. An install with private
- * organization routes keeps a tenant's data on its own ClickHouse, and a
- * collector that read only the shared endpoint would report that install as
- * far smaller than it is. Each series therefore carries the endpoint it came
- * from.
- *
  * @see specs/ops/clickhouse-storage-metrics.feature
  */
 
@@ -61,11 +48,6 @@ export interface StorageStatsCollectionOptions {
   metrics: StorageStatsMetricsPort;
   /**
    * Whether the backup log is read at all.
-   *
-   * On unless a deployment opts out: the gauges predate the switch and the
-   * production alerts already depend on them, while the deployments that emit
-   * them set nothing. Defaulting to off would silently disarm live backup
-   * monitoring on the next deploy.
    */
   collectBackups: boolean;
   intervalMs?: number;
@@ -206,11 +188,6 @@ export class StorageStatsCollectionService {
 
   /**
    * The backup log, read from `system.backup_log` rather than `system.backups`.
-   *
-   * `system.backups` is in-memory and is wiped on every ClickHouse restart,
-   * which happens on each deploy: a freshly rolled pod would see zero rows,
-   * emit no gauge, and trip "Backup Reporting Absent" while backups were
-   * perfectly healthy.
    */
   private async collectBackups(instance: StorageStatsInstance): Promise<void> {
     try {
@@ -301,9 +278,6 @@ export class StorageStatsCollectionService {
 
 /**
  * Whether ClickHouse refused because `system.backup_log` is not there.
- *
- * The table is created by the first backup, so an instance that has never
- * taken one answers `UNKNOWN_TABLE` (error code 60) rather than failing.
  */
 function isMissingBackupLog(error: unknown): boolean {
   const detail = error as { code?: unknown; type?: unknown; message?: unknown };

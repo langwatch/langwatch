@@ -6,11 +6,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LWQL_FLAG, lwqlEnabled } from "../access";
 
 /**
- * `lwqlEnabled` takes the project service as a parameter, so the gate can be
- * asked in isolation. It used to be asked through `createTestApp().projects`
- * with `vi.spyOn`, which needed a Prisma connection to build an app it then
- * stubbed — and stopped working entirely once the composed service was wrapped
- * for tracing, since `spyOn` cannot replace a method reached through a proxy.
+ * `lwqlEnabled` takes the project service as a parameter, so the gate can be asked in isolation. It used to be asked through
+ * `createTestApp().projects` with `vi.spyOn`, which needed a Prisma connection to build an app it then stubbed — and stopped working
+ * entirely once the composed service was wrapped for tracing, since `spyOn` cannot replace a method reached through a proxy.
  */
 function projectsIn(organizationId: string): ProjectService {
   return {

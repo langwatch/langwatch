@@ -6,13 +6,6 @@ const auditMetadataSchema = z.record(z.string(), z.json());
 
 /**
  * The audit log's target kinds for these acts, keyed by action.
- *
- * A drain or an unblock operates on the live queue, not on its dead-letter
- * side, so filing them under `queue_dlq` would put them in front of an
- * operator filtering for dead-letter activity and hide them from one
- * filtering for the queue. Derived from the action rather than fixed, so the
- * two dead-letter acts keep the kind they have always written and nothing
- * already filtering on it is reclassified underneath.
  */
 const TARGET_KIND_BY_ACTION: Record<QueueControlAction, string> = {
   queue_redrive_dlq_groups: "queue_dlq",

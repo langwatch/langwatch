@@ -1,15 +1,6 @@
 /**
- * @vitest-environment node
- *
  * Characterisation of `GET /api/files/:id` through the real Hono family.
- *
- * The route is the only door between a browser and another tenant's bytes, so
- * what is driven here is the ORDER of its steps as much as its statuses: the
- * throttle is keyed on the caller before any cross-tenant lookup runs, the
- * owning project is resolved from the row and then pinned for both the
- * membership gate and the read, and a storage outage is answered as a 502
- * rather than masked as a deletion.
- *
+ * @vitest-environment node
  * Spec: specs/features/scenarios/externalize-event-byte-content.feature
  */
 import { Readable } from "node:stream";

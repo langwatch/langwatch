@@ -1,16 +1,5 @@
 /**
  * Both shapes a custom model list has ever been sent in.
- *
- * The field started as an array of model-id strings and later took
- * `{ modelId, displayName }` objects. Both are still accepted, and this used
- * to be read by two byte-identical copies — one in the REST write, one in the
- * tRPC write — so the same request could come to be read differently
- * depending on which door it arrived through. There is one reader now, and
- * these pin what it accepts.
- *
- * The drop-rather-than-refuse rule is the other half: a custom model list is a
- * convenience field on an otherwise valid provider write, so a malformed entry
- * costs that entry and not the write.
  */
 
 import { describe, expect, it } from "vitest";

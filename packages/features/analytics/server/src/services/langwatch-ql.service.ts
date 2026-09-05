@@ -1,9 +1,7 @@
 /**
- * Orders catalog-derived policy, validation, reserved-window resolution,
- * restricted execution, then advisory diagnostics. It does not recreate their
- * decisions. Database row policy is the isolation boundary; this service is
- * defence in depth. Server ceilings throw coded errors, result ceilings truncate
- * and mark the response, and neither is caller-controlled.
+ * Orders catalog-derived policy, validation, reserved-window resolution, restricted execution, then advisory diagnostics. It
+ * does not recreate their decisions. Database row policy is the isolation boundary; this service is defence in depth. Server
+ * ceilings throw coded errors, result ceilings truncate and mark the response, and neither is caller-controlled.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -48,23 +46,9 @@ import { type AcceptedLangWatchQL, validateLangWatchQL } from "../langwatch-ql/v
 const logger = createLogger("langwatch:analytics:lwql");
 
 /**
- * The run-path half of the reserved-parameter contract, as one step: resolve
- * what the caller's window and step mean for this request, then refuse when
- * any declared reserved name would still reach the
- * database without a value — one refusal naming everything the surface forgot
- * rather than only its first omission.
- *
- * An unvalued declared name cannot simply ride along: ClickHouse answers a
- * missing substitution with `UNKNOWN_QUERY_PARAMETER`, which reaches the caller
- * as an unknown 500 for something a surface can fix by sending its window or
- * step. Refusing here, before execution, is what turns that into a named code.
- *
- * @throws {LangWatchQLReservedGranularityTypeError} for a mistyped declaration
- *   or malformed step, {@link LangWatchQLReservedParameterSuppliedError} when
- *   the request carries a surface-owned value,
- *   {@link LangWatchQLGranularityTooFineError} on bucket-budget overflow, and
- *   {@link LangWatchQLParameterMissingError} when a declared reserved name has
- *   no value.
+ * The run-path half of the reserved-parameter contract, as one step: resolve what the caller's window and step
+ * mean for this request, then refuse when any declared reserved name would still reach the database without a
+ * value — one refusal naming everything the surface forgot rather than only its first omission.
  */
 function resolveRunGranularityOrRefuseUnfilled({
   declared,
@@ -93,12 +77,11 @@ function resolveRunGranularityOrRefuseUnfilled({
    */
   readonly awaitingTimeWindow: readonly string[];
 }): LangWatchQLGranularityResolution {
-  // Caller-owned doors resolve the granularity contract with refuse on
-  // overflow: whoever is asking picked the step, so coarsening it for them
-  // would change the answer they asked for. A surface that picked the step on
-  // the member's behalf rather than at their request — the dashboard, whose
-  // period is dragged around by a control the widget does not own — passes
-  // "coarsen" instead, and reports the substitution rather than hiding it.
+  // Caller-owned doors resolve the granularity contract with refuse on overflow: whoever is
+  // asking picked the step, so coarsening it for them would change the answer they asked
+  // for. A surface that picked the step on the member's behalf rather than at their request
+  // — the dashboard, whose period is dragged around by a control the widget does not own —
+  // passes "coarsen" instead, and reports the substitution rather than hiding it.
   const granularity = resolveLangWatchQLGranularity({
     declared,
     ...(parameters ? { parameters } : {}),
@@ -145,34 +128,19 @@ export interface LangWatchQLExecuteInput {
   /** Values for the parameters the SQL declares. */
   readonly parameters?: Readonly<Record<string, unknown>>;
   /**
-   * The period the surface is showing, supplied by the surface and never by the
-   * caller's own parameters. Injected into the reserved names the statement
-   * declares, and ignored by a statement that declares neither.
-   *
+   * The period the surface is showing, supplied by the surface and never by the caller's own parameters. Injected
+   * into the reserved names the statement declares, and ignored by a statement that declares neither.
    * @see ./timeWindow.ts
    */
   readonly timeWindow?: LangWatchQLTimeWindow;
   /**
    * The datapoint step the surface chose, in seconds, for a statement that
    * declares `{period_granularity_seconds:UInt32}`. Injected like the window.
-   *
-   * Ignored by a statement that does not declare the parameter.
    */
   readonly granularitySeconds?: number;
   /**
    * What to do when the period at the chosen step would exceed the bucket
    * ceiling. Defaults to `"refuse"`.
-   *
-   * Refusing is right wherever the member picked the step for the question
-   * they are asking — the workbench, the REST door — because silently widening
-   * their buckets answers a different question than the one they wrote.
-   *
-   * `"coarsen"` belongs to a surface whose period moves independently of the
-   * step: a dashboard widget's step is saved once, and the dashboard's period
-   * control can later be dragged wide enough to overflow it. Refusing there
-   * would blank a card the member never touched, so it coarsens to the finest
-   * step that fits and reports `coarsenedFromSeconds` so the widget can say so
-   * rather than quietly redraw.
    */
   readonly onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
 }
@@ -180,10 +148,6 @@ export interface LangWatchQLExecuteInput {
 /**
  * A statement that passed the gate, plus what the surface's time window means
  * for it.
- *
- * The two extra facts are here rather than on {@link AcceptedLangWatchQL}
- * because they are not properties of the parse: they depend on what the caller
- * sent and on which surface is asking.
  */
 export interface ValidatedLangWatchQL extends AcceptedLangWatchQL {
   /** Whether the statement declares the reserved time-window parameters. */
@@ -195,10 +159,6 @@ export interface ValidatedLangWatchQL extends AcceptedLangWatchQL {
   readonly boundParameters?: Readonly<Record<string, unknown>>;
   /**
    * Reserved names the statement declares that no window filled.
-   *
-   * Never a refusal here: validating for a *save* has no window and must not be
-   * refused for it, because the window belongs to whoever later renders the
-   * chart. {@link LangWatchQLService.execute} is what cannot proceed with one.
    */
   readonly awaitingTimeWindow: readonly string[];
 }
@@ -216,45 +176,14 @@ export interface LangWatchQLServiceDependencies {
   readonly limits?: LangWatchQLResultLimits;
   /**
    * The clock the diagnostics ask "has this period finished yet" against.
-   *
-   * A dependency rather than a call to `Date.now()` inside the rule, so that
-   * the diagnostics a result earns are a function of the result and the instant
-   * — which is what lets a suite pin the unfinished-period rule to a seeded
-   * fixture instead of to whenever it happens to run.
    */
   readonly now?: () => Date;
 }
 
 /**
- * The LangWatchQL analytics SQL API's application service.
- *
- * Holds no SQL of its own and opens no connection: it derives policy from the
- * catalog and hands the caller's statement, untouched, to the executor.
- */
-/**
- * ## Why this is not on the application container — do not copy the pattern
- *
- * The house rule is that a server-side caller obtains a service from
- * `getApp()`, and a module-level cache with an exported setter is a second
- * dependency-injection mechanism. This slice keeps the local one anyway, and
- * the reason is the container's lifecycle rather than a preference:
- *
- *  - `App`'s fields are `readonly` and it is built once by `initializeApp`.
- *    There is no per-field override, so a suite swapping the executor means
- *    `resetApp()` plus a full re-initialisation with different dependencies.
- *  - The endpoint suites swap the executor *between describe blocks* — a
- *    Testcontainers-backed one, a throwing one, a lowered-ceilings one — half a
- *    dozen times per file. On the container that is half a dozen full app
- *    teardowns, each closing the event-sourcing and Redis handles the rest of
- *    the file still needs.
- *
- * Migrating is therefore a change to `dependencies.ts`, `presets.ts`, `app.ts`,
- * the barrel, the route and both endpoint suites, and it changes their
- * lifecycle rather than only their wiring. That is a slice of its own, not a
- * late edit to this one.
- *
- * The setter is reachable from anything importing the barrel, and that is a
- * real cost: nothing but a test should ever call it.
+ * The LangWatchQL analytics SQL API's application service, cached at module
+ * scope rather than on the app container so test suites can swap the
+ * executor between describe blocks without a full app teardown and rebuild.
  */
 let cached: LangWatchQLService | null = null;
 
@@ -265,9 +194,6 @@ export class LangWatchQLService {
 
   /**
    * Releases the transport the executor holds, where it holds one.
-   *
-   * The service does not own the executor's construction, but it is the only
-   * thing that reaches it, so it is the only place that can hand it back.
    */
   async close(): Promise<void> {
     await this.deps.executor?.close?.();
@@ -285,9 +211,6 @@ export class LangWatchQLService {
 
   /**
    * Builds the service from the environment.
-   *
-   * The database name defaults to the namespace the catalog documents, so a
-   * deployment that provisions the standard objects needs only the credentials.
    */
   static fromEnvironment(
     overrides: Partial<LangWatchQLServiceDependencies> = {},
@@ -311,11 +234,6 @@ export class LangWatchQLService {
   /**
    * Replaces the process-wide service, or clears it so the next read rebuilds
    * from the environment.
-   *
-   * **Tests only.** The seam the endpoint suites wire a Testcontainers-provisioned
-   * executor through. Production code builds its service from the environment and
-   * never calls this — see the note above for why the container is not the seam
-   * in this slice.
    */
   static setShared(service: LangWatchQLService | null): void {
     cached = service;
@@ -323,13 +241,6 @@ export class LangWatchQLService {
 
   /**
    * Clears the process-wide service, releasing the transport it holds first.
-   *
-   * Separate from {@link LangWatchQLService.setShared}, and awaitable, because closing a
-   * connection pool is asynchronous and that setter is not. Making the setter
-   * async would change every call site; having it start a close it cannot await
-   * would leave an unobserved promise in a teardown path, which is the one place
-   * a rejection has nowhere to go. So the suites that swap the service several
-   * times per file call this between swaps and get the sockets back.
    */
   static async closeShared(): Promise<void> {
     const previous = cached;
@@ -339,11 +250,6 @@ export class LangWatchQLService {
 
   /**
    * Whether this deployment has a LangWatchQL identity to run a query as.
-   *
-   * The capability read the workbench navigation gates on, so an unprovisioned
-   * deployment never offers a surface it would then refuse. Fail-closed by
-   * construction: it reports the presence of the executor, which is the same
-   * fact {@link execute} refuses on, so the two can never disagree.
    */
   get available(): boolean {
     return this.deps.executor != null;
@@ -351,10 +257,6 @@ export class LangWatchQLService {
 
   /**
    * The LangWatchQL schema this caller's permissions unlock.
-   *
-   * Needs no executor: the schema is the catalog, and a deployment with no
-   * LangWatchQL identity can still describe what the API would expose. Answering
-   * it does not disclose anything a caller could not read in the docs.
    */
   describeSchema({ protections }: { protections: LangWatchQLProtections }): LangWatchQLSchema {
     return describeLangWatchQLSchema({
@@ -367,27 +269,6 @@ export class LangWatchQLService {
   /**
    * Decides whether a statement may run for these permissions, without running
    * it — steps 2 and 3 of the order this file documents.
-   *
-   * Exposed as its own step because a second caller needs the verdict and not
-   * the rows: saving a workbench chart stores SQL that will be executed later,
-   * by whoever opens it, and must refuse at write what the query endpoint would
-   * refuse at run (`runtime/app/features/dashboard-saved-workbench-chart-policy.adapter.ts`,
-   * the Dashboard feature's `SavedWorkbenchChartPolicy`). That caller
-   * asking this rather than re-deriving the policy is what keeps one refusal
-   * decision in the codebase — and {@link execute} calling it too is what stops
-   * the two drifting apart.
-   *
-   * Needs no executor: a deployment with no restricted identity still knows
-   * what it would have refused.
-   *
-   * @throws the validator's handled error when the policy refuses the query,
-   *   {@link LangWatchQLParameterMissingError} when a declared parameter has no
-   *   value, the two time-window refusals in `./timeWindow.ts` when a
-   *   reserved name is supplied by the caller or declared as a non-date-time,
-   *   {@link LangWatchQLReservedGranularityTypeError} when the granularity
-   *   declaration or a surface-supplied step is malformed, and
-   *   {@link LangWatchQLGranularityRequiresTimeWindowError} when granularity
-   *   is declared without both period bounds.
    */
   validate({
     projectId,
@@ -406,11 +287,10 @@ export class LangWatchQLService {
   }): ValidatedLangWatchQL {
     const validation = validateLangWatchQL({
       sql,
-      // The datasets this caller can reach, not every dataset the catalog has.
-      // A dataset gated as a whole is absent from the schema endpoint, and
-      // `allowedTables` is what makes it *unnameable* rather than merely
-      // unlisted: derived from the full catalog, a caller could name a hidden
-      // dataset and read its row-policed rows despite holding none of the
+      // The datasets this caller can reach, not every dataset the catalog has. A dataset gated
+      // as a whole is absent from the schema endpoint, and `allowedTables` is what makes it
+      // *unnameable* rather than merely unlisted: derived from the full catalog, a caller could
+      // name a hidden dataset and read its row-policed rows despite holding none of the
       // permissions that dataset requires.
       allowedTables: lwqlAllowedTables({
         database: this.deps.database,
@@ -477,14 +357,6 @@ export class LangWatchQLService {
   /**
    * Validates a submitted statement against this caller's permissions, then
    * executes it as the restricted identity.
-   *
-   * @throws the validator's handled error when the policy refuses the query,
-   *   {@link LangWatchQLParameterMissingError} when a declared parameter has no
-   *   value — including a declared granularity with no step supplied —
-   *   {@link LangWatchQLGranularityTooFineError} when the period at the
-   *   supplied step overflows the bucket ceiling, and
-   *   {@link LangWatchQLUnavailableError} when no LangWatchQL identity
-   *   is provisioned.
    */
   async execute({
     project,
@@ -537,10 +409,6 @@ export class LangWatchQLService {
   /**
    * Runs a statement that passed every gate as the restricted identity, and
    * shapes what came back with the facts those gates recorded.
-   *
-   * Split from {@link execute} because it is the half of the order that has no
-   * more decisions to make — only the database call, the advisory diagnostics
-   * over its answer, and the result both of them describe.
    */
   private async executeValidated({
     executor,

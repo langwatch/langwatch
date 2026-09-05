@@ -1,9 +1,6 @@
 /**
- * Coverage completeness, not behaviour: every metric prefix `metric-translator`
- * branches on must appear in `column-pruning.test.ts`. Both files are read off
- * disk, so adding a prefix without a pruning test fails here rather than
- * shipping an unpruned query.
- *
+ * Coverage completeness, not behaviour: every metric prefix `metric-translator` branches on must appear in `column-pruning.test.ts`. Both
+ * files are read off disk, so adding a prefix without a pruning test fails here rather than shipping an unpruned query.
  * @see specs/analytics/clickhouse-memory-safety.feature
  */
 

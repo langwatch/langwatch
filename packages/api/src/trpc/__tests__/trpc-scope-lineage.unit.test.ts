@@ -1,15 +1,11 @@
 /** @vitest-environment node */
 
 /**
- * The tRPC adapter for the lineage guard: it hands the input to the
- * authorization port's `checkScopeLineage` and shapes the refusal. The
- * lineage DECISION itself — which organizations a mismatched request touches
- * — is `@langwatch/authz-contract`'s own business.
+ * The tRPC adapter for the lineage guard: it hands the input to the authorization port's
+ * `checkScopeLineage` and shapes the refusal. The lineage DECISION itself — which organizations a
+ * mismatched request touches — is `@langwatch/authz-contract`'s own business.
  */
-import type {
-  AuthzScopeLineageInput,
-  AuthzScopeLineageResult,
-} from "@langwatch/authz-contract";
+import type { AuthzScopeLineageInput, AuthzScopeLineageResult } from "@langwatch/authz-contract";
 import { PermissionDeniedError } from "@langwatch/authz-contract";
 import type { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
@@ -48,10 +44,10 @@ describe("createScopeLineageGuard", () => {
       const checkScopeLineage = vi
         .fn<(input: AuthzScopeLineageInput) => Promise<AuthzScopeLineageResult>>()
         .mockResolvedValue({
-        kind: "mismatch",
-        widest: { tier: "organization", id: "org_victim" },
-        entries: [],
-      });
+          kind: "mismatch",
+          widest: { tier: "organization", id: "org_victim" },
+          entries: [],
+        });
       const guard = createScopeLineageGuard(makePorts(checkScopeLineage));
       const next = vi.fn();
 
@@ -82,10 +78,10 @@ describe("createScopeLineageGuard", () => {
       const checkScopeLineage = vi
         .fn<(input: AuthzScopeLineageInput) => Promise<AuthzScopeLineageResult>>()
         .mockResolvedValue({
-        kind: "mismatch",
-        widest: { tier: "project", id: "project_ghost" },
-        entries: [],
-      });
+          kind: "mismatch",
+          widest: { tier: "project", id: "project_ghost" },
+          entries: [],
+        });
       const guard = createScopeLineageGuard(makePorts(checkScopeLineage));
       const next = vi.fn();
 
