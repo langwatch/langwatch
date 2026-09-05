@@ -3269,6 +3269,14 @@ model ApiKey {
   lastUsedAt      DateTime?
   revokedAt       DateTime?
 
+  /// Why the key was revoked, set with `revokedAt`: "user" when a person
+  /// revoked it (the API-keys page, the REST API), "rotation" when a hard-cut
+  /// mint replaced it, "cap" when the personal ingest-key cap retired it. The
+  /// CLI reads it to decide whether a dead ingest key may be re-minted: a key
+  /// a person revoked stays dead. NULL for live keys and for keys revoked
+  /// before the cause was recorded.
+  revocationCause String?
+
   /// Non-null marks this key as an "ingestion key": a project-scoped,
   /// ingest-only ApiKey the unified `langwatch <tool>` CLI (and template
   /// installs) mint for OTLP Path B. The slug (claude_code / codex / gemini /
