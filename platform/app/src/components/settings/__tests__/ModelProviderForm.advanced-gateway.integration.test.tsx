@@ -15,9 +15,7 @@
  * second-"Save Advanced" button is gone: a single Save funnels basic +
  * advanced to one `api.modelProvider.update` mutation.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type {
@@ -25,82 +23,20 @@ import type {
   UseModelProviderFormState,
 } from "../../../hooks/useModelProviderForm";
 import type { MaybeStoredModelProvider } from "../../../server/modelProviders/registry";
-
-const {
-  mockUseModelProviderForm,
-  mockUseModelProvidersSettings,
-  mockUseFeatureFlag,
-  mockListAllForOrgQuery,
-  mockListAllForProjectQuery,
-} = vi.hoisted(() => ({
-  mockUseModelProviderForm: vi.fn(),
-  mockUseModelProvidersSettings: vi.fn(),
-  mockUseFeatureFlag: vi.fn(),
-  mockListAllForOrgQuery: vi.fn(),
-  mockListAllForProjectQuery: vi.fn(),
-}));
-
-vi.mock("../../../hooks/useModelProviderForm", () => ({
-  useModelProviderForm: (...args: unknown[]) =>
-    mockUseModelProviderForm(...args),
-}));
-
-vi.mock("../../../hooks/useModelProvidersSettings", () => ({
-  useModelProvidersSettings: (...args: unknown[]) =>
-    mockUseModelProvidersSettings(...args),
-}));
-
-vi.mock("../../../hooks/useDrawer", () => ({
-  useDrawer: () => ({
-    closeDrawer: vi.fn(),
-    openDrawer: vi.fn(),
-  }),
-}));
-
-vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    project: { id: "proj-1", slug: "test-project", defaultModel: null },
-    organization: { id: "org-1" },
-    hasPermission: () => true,
-  }),
-}));
-
-vi.mock("../../../hooks/useModelProviderApiKeyValidation", () => ({
-  useModelProviderApiKeyValidation: () => ({
-    validate: vi.fn().mockResolvedValue(true),
-    validateWithCustomUrl: vi.fn().mockResolvedValue(true),
-    isValidating: false,
-    validationError: undefined,
-    clearError: vi.fn(),
-  }),
-}));
-
-vi.mock("../../../hooks/useFeatureFlag", () => ({
-  useFeatureFlag: (...args: unknown[]) => mockUseFeatureFlag(...args),
-}));
-
-vi.mock("../../../utils/api", () => ({
-  api: {
-    modelProvider: {
-      isManagedProvider: {
-        useQuery: () => ({ data: { managed: false } }),
-      },
-      // EditModelProviderForm resolves its edit target from the flat
-      // (uncollapsed) provider list via useAllModelProvidersList (#5380).
-      // primeHooks seeds both with the same mp_existing fixture the
-      // collapsed-record mock below uses, so the id lookup still finds
-      // the row this suite has always intended to render.
-      listAllForOrganizationForFrontend: { useQuery: mockListAllForOrgQuery },
-      listAllForProjectForFrontend: { useQuery: mockListAllForProjectQuery },
-    },
-  },
-}));
-
+import {
+  modelProviderDrawerMocks,
+  resetModelProviderDrawerMocks,
+  Wrapper,
+} from "./modelProviderDrawerHarness";
 import { EditModelProviderForm } from "../ModelProviderForm";
 
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
+const {
+  mockUseFeatureFlag,
+  mockListAllForOrganizationForFrontendQuery: mockListAllForOrgQuery,
+  mockListAllForProjectForFrontendQuery: mockListAllForProjectQuery,
+  mockUseModelProviderForm,
+  mockUseModelProvidersSettings,
+} = modelProviderDrawerMocks;
 
 function buildState(
   overrides: Partial<UseModelProviderFormState> = {},
@@ -203,7 +139,7 @@ function primeHooks({ gatewayEnabled }: { gatewayEnabled: boolean }) {
 
 describe("Feature: Advanced (Gateway) accordion on ModelProvider drawer", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    resetModelProviderDrawerMocks();
   });
 
   afterEach(() => {
