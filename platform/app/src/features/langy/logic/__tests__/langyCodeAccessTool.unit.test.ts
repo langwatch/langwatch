@@ -7,11 +7,35 @@ import { describe, expect, it } from "vitest";
 
 import {
   codeAccessCallId,
+  LANGY_CODE_ACCESS_CARD_ANSWER,
   latestCodeAccessCallId,
 } from "../langyCodeAccessTool";
 
 function call(id: string, state = "input-available") {
   return { type: "tool-code_access", state, toolCallId: id, input: {} };
+}
+
+/** A call the tool answered itself, because the folder was already connected. */
+function answeredItself(id: string) {
+  return {
+    type: "tool-code_access",
+    state: "output-available",
+    toolCallId: id,
+    input: {},
+    output:
+      "The user's folder is connected. Work with the local_* tools.\nfolder: /work/acme",
+  };
+}
+
+/** A call that put the card up. */
+function raisedTheCard(id: string) {
+  return {
+    type: "tool-code_access",
+    state: "output-available",
+    toolCallId: id,
+    input: {},
+    output: `${LANGY_CODE_ACCESS_CARD_ANSWER}\nThe card shows this command: npx langwatch langy --share-control`,
+  };
 }
 
 describe("given one message", () => {
@@ -57,6 +81,37 @@ describe("given a conversation", () => {
         { role: "assistant", parts: [{ type: "text", text: "hello back" }] },
       ];
       expect(latestCodeAccessCallId(messages)).toBeNull();
+    });
+  });
+});
+
+describe("given a folder that is already connected", () => {
+  describe("when Langy calls for code access again", () => {
+    /** @scenario "Only the call that asked carries a card" */
+    it("draws no card for the call the tool answered itself", () => {
+      expect(codeAccessCallId([answeredItself("b")])).toBeNull();
+    });
+
+    /** @scenario "Only the call that asked carries a card" */
+    it("leaves the card on the call that asked", () => {
+      const messages = [
+        { role: "assistant", parts: [raisedTheCard("a")] },
+        {
+          role: "user",
+          parts: [{ type: "text", text: "Local folder connected" }],
+        },
+        { role: "assistant", parts: [answeredItself("b")] },
+        { role: "assistant", parts: [answeredItself("c")] },
+      ];
+      expect(latestCodeAccessCallId(messages)).toBe("a");
+    });
+
+    it("still moves the card when the reader is asked again", () => {
+      const messages = [
+        { role: "assistant", parts: [raisedTheCard("a")] },
+        { role: "assistant", parts: [raisedTheCard("b")] },
+      ];
+      expect(latestCodeAccessCallId(messages)).toBe("b");
     });
   });
 });

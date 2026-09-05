@@ -33,6 +33,7 @@ import type {
   AgentStateStore,
   Unsubscribe,
 } from "~/server/connected-agents/state-store";
+import { LANGY_LOCAL_CONNECT_NOTICE } from "~/shared/langy/langyLocalNotices";
 import type { LocalCallDispatcher } from "./call.dispatcher";
 import { workspaceNudgeSchema } from "./call.dispatcher";
 import { PRESENCE_HEARTBEAT_MS } from "./constants";
@@ -811,14 +812,13 @@ export function grantedPatterns(frame: PermissionRequiredFrame): string[] {
 /**
  * The message the connected folder starts the next turn with.
  *
- * Four words, and no facts. The code access card sits directly above this line
- * and already carries the whole path, the machine and the branch, so a line
- * that named the folder again said the same thing twice, one bubble apart. The
- * model reads the path, the machine and the branch off the workspace facts the
- * code access tool hands it, so nothing is lost.
+ * Four words, and no facts. The model reads the path, the machine and the
+ * branch off the workspace facts the code access tool hands it, so nothing is
+ * lost, and the panel draws no bubble for it at all: the header chip and the
+ * code access card above it already say the folder is connected.
  */
 export function connectMessage(): string {
-  return "Local folder connected";
+  return LANGY_LOCAL_CONNECT_NOTICE;
 }
 
 /**

@@ -403,7 +403,14 @@ describe("the local workspace tools", () => {
       expect(calls[1]?.method).toBe("POST");
       expect(calls[1]?.url).toBe("http://app.test/api/langy/local/requests");
       expect(calls[1]?.body).toEqual({ conversationId: "langyconv_1" });
-      expect(text).toContain("code access card is shown");
+      // The panel reads this first line to tell a call that RAISED the card
+      // from one the tool answered itself, and draws a card only for the
+      // first. `LANGY_CODE_ACCESS_CARD_ANSWER` in
+      // platform/app/src/features/langy/logic/langyCodeAccessTool.ts is the
+      // same words; change one and change the other.
+      expect(text.startsWith("The code access card is shown to the user.")).toBe(
+        true,
+      );
       expect(text).toContain("npx langwatch@latest langy --share-control");
       expect(text).toContain("END YOUR TURN");
     });

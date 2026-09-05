@@ -69,6 +69,7 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
 // drifted, `safeParse` silently dropped `pageContext` on every single turn and
 // nobody found out for weeks.
 import type { LangyResourceContext } from "~/server/app-layer/langy/langyTurnContext.schema";
+import { isLangyHiddenLocalNotice } from "~/shared/langy/langyLocalNotices";
 import { api, trpcClient } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
@@ -2264,9 +2265,20 @@ function LangyPanel({
       }),
     [devRecords, devScrubSeq, historyMessages, activeConversationId],
   );
-  const displayMessages = timeTravel
-    ? (timeTravel.messages as unknown as typeof messages)
-    : messages;
+  // The transcript, without the platform's own connect notice (ADR-129). That
+  // notice is a user message because it is what starts the next turn and what
+  // the model reads, but the developer did not write it and the header chip and
+  // the code access card above it already say the folder is connected: as a
+  // bubble it said the same thing a third time, and again on every reconnect.
+  const shownMessages = useMemo(
+    () =>
+      (timeTravel
+        ? (timeTravel.messages as unknown as typeof messages)
+        : messages
+      ).filter((message) => !isLangyHiddenLocalNotice(message)),
+    [timeTravel, messages],
+  );
+  const displayMessages = shownMessages;
 
   // The ordered timeline the choices lock state derives from (ADR-060 §6) —
   // built from whatever is being DISPLAYED, so time travel shows a question

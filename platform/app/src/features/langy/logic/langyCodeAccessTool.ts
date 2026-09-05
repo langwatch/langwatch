@@ -23,7 +23,25 @@ interface CodeAccessPartLike {
   state?: string;
   toolCallId?: string;
   input?: unknown;
+  output?: unknown;
 }
+
+/**
+ * The first words of the answer a call gets when it RAISED the card.
+ *
+ * `code_access` answers itself whenever it can: a folder that is already
+ * connected comes back as the workspace facts, and a remembered GitHub choice
+ * comes back as one line about GitHub. Neither asked the reader anything, and a
+ * card for one of them repeated a connect the chip and the first card already
+ * carried, at the bottom of the transcript, after the pull request. Langy calls
+ * the tool once per stretch of work, so a long turn drew that card three times.
+ *
+ * The words are the worker's, in
+ * `services/langyworker/src/tools/local-workspace.ts`, and a test on each side
+ * pins them.
+ */
+export const LANGY_CODE_ACCESS_CARD_ANSWER =
+  "The code access card is shown to the user.";
 
 /**
  * States whose `input` is COMPLETE. A call still streaming its input has not
@@ -56,9 +74,24 @@ export function codeAccessCallId(parts: readonly unknown[]): string | null {
     if (!isCodeAccessToolPart(part)) continue;
     const p = part as CodeAccessPartLike;
     if (!COMPLETE_INPUT_STATES.has(p.state ?? "")) continue;
+    if (!codeAccessAsked(p)) continue;
     found = p.toolCallId ?? found ?? LANGY_CODE_ACCESS_TOOL_NAME;
   }
   return found;
+}
+
+/**
+ * Whether one `code_access` call put the card up.
+ *
+ * A call whose answer has not landed yet counts as asking: the card belongs on
+ * screen while the tool is deciding, and the first ask is the one the reader is
+ * waiting on. A call that answered itself carries that answer, and the answer
+ * is what says it asked nothing.
+ */
+function codeAccessAsked(part: CodeAccessPartLike): boolean {
+  const output = part.output;
+  if (typeof output !== "string" || output === "") return true;
+  return output.startsWith(LANGY_CODE_ACCESS_CARD_ANSWER);
 }
 
 /**
