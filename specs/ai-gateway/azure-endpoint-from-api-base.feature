@@ -47,3 +47,34 @@ Feature: Azure OpenAI provider routing through in-app dispatch paths
     Given an Azure provider slot on a virtual key whose endpoint arrives under "endpoint"
     When a chat completion is sent through the gateway
     Then the upstream request is sent to the configured Azure resource endpoint
+
+  Rule: The gateway resolves the Azure deployment the same way the in-app paths do
+
+    An Azure provider row carries an explicit deployment mapping only when the
+    deployment name differs from the model id, which is the exception rather
+    than the rule. The in-app dispatch paths fill the gap by defaulting the
+    deployment to the model id; the gateway did not, so the same provider that
+    served the playground failed through a virtual key on every request, before
+    anything left the box.
+
+    Background:
+      Given an Azure provider credential with a correct endpoint and API key reaches dispatch
+      And the credential carries no explicit deployment mapping
+
+    @integration
+    Scenario: Gateway chat completion for an Azure model reaches the deployment named by the model id
+      When a chat completion for that model is dispatched
+      Then the upstream request targets the deployment named by the model id
+      And the dispatch is not refused as a provider-configuration error
+
+    @integration
+    Scenario: Gateway streaming chat completion for an Azure model reaches the deployment named by the model id
+      When a streaming chat completion for that model is dispatched
+      Then the upstream request targets the deployment named by the model id
+      And the stream drains without error
+
+    @integration
+    Scenario: An explicit deployment mapping still decides the deployment on the gateway lane
+      Given the credential maps the model to a deployment name that differs from the model id
+      When a chat completion for that model is dispatched
+      Then the upstream request targets the mapped deployment name
