@@ -78,6 +78,19 @@ export interface LangyChatTransportDeps {
    * lookup all live in the panel's orchestration (`executeUiAction`).
    */
   onUiAction?: (entry: Extract<LangyStreamEntry, { type: "ui" }>) => void;
+  /**
+   * A card the developer has to answer while the turn runs (ADR-129) — a
+   * permission ask, or a question. Bare passthrough like `onUiAction`: the
+   * durable `user_wait_started` event is the truth, and this is the fast path
+   * that puts the card on screen before the tail arrives.
+   */
+  onLocalWait?: (
+    entry: Extract<LangyStreamEntry, { type: "local_permission" | "question" }>,
+  ) => void;
+  /** The shared folder came or went while the turn ran. */
+  onLocalWorkspace?: (
+    entry: Extract<LangyStreamEntry, { type: "local_workspace" }>,
+  ) => void;
   /** Fired when a turn stream terminates — the reconcile trigger. */
   onTurnSettled?: (info: { reason: LangyTurnSettleReason }) => void;
   /**
@@ -169,6 +182,10 @@ export function createLangyChatTransport(
         onSignal: deps.onSignal,
         ...(deps.onNavigate ? { onNavigate: deps.onNavigate } : {}),
         ...(deps.onUiAction ? { onUiAction: deps.onUiAction } : {}),
+        ...(deps.onLocalWait ? { onLocalWait: deps.onLocalWait } : {}),
+        ...(deps.onLocalWorkspace
+          ? { onLocalWorkspace: deps.onLocalWorkspace }
+          : {}),
         onSettled: deps.onTurnSettled,
         ...(deps.onWireEntry ? { onWireEntry: deps.onWireEntry } : {}),
         abortSignal: options.abortSignal,
@@ -195,6 +212,8 @@ function subscribeTurnStream({
   onSignal,
   onNavigate,
   onUiAction,
+  onLocalWait,
+  onLocalWorkspace,
   onSettled,
   onWireEntry,
   abortSignal,
@@ -205,6 +224,12 @@ function subscribeTurnStream({
   onSignal: (signal: LangyTurnSignalEntry) => void;
   onNavigate?: (entry: Extract<LangyStreamEntry, { type: "navigate" }>) => void;
   onUiAction?: (entry: Extract<LangyStreamEntry, { type: "ui" }>) => void;
+  onLocalWait?: (
+    entry: Extract<LangyStreamEntry, { type: "local_permission" | "question" }>,
+  ) => void;
+  onLocalWorkspace?: (
+    entry: Extract<LangyStreamEntry, { type: "local_workspace" }>,
+  ) => void;
   onSettled?: (info: { reason: LangyTurnSettleReason }) => void;
   onWireEntry?: (entry: LangyStreamEntry, turnId: string) => void;
   abortSignal?: AbortSignal;
@@ -312,6 +337,16 @@ function subscribeTurnStream({
             // never a message part. The panel owns dedup, the claim, and the
             // handler execution.
             onUiAction?.(entry);
+            return;
+          case "local_permission":
+          case "question":
+            // A card the turn is waiting on. It never retires the cold-start
+            // status, because a turn that is waiting for a person has produced
+            // no output yet and the status line still reads correctly.
+            onLocalWait?.(entry);
+            return;
+          case "local_workspace":
+            onLocalWorkspace?.(entry);
             return;
           case "error":
             controller.enqueue({ type: "error", errorText: entry.error });

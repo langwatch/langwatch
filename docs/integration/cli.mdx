@@ -277,11 +277,11 @@ langwatch agent delete <id>
 
 ### Point an HTTP agent at your machine
 
-`langwatch agent dev` (alias `langwatch agent tunnel`) fronts a local port with a public tunnel, points a registered HTTP agent's URL at it, and restores the previous URL on Ctrl-C.
+`langwatch agent tunnel` (alias `langwatch agent dev`) fronts a local port with a public tunnel, points a registered HTTP agent's URL at it, and restores the previous URL on Ctrl-C.
 
 ```bash
-langwatch agent dev --port 8010
-langwatch agent dev --port 8010 --agent <id or name>
+langwatch agent tunnel --port 8010
+langwatch agent tunnel --port 8010 --agent <id or name>
 ```
 
 | Flag | Effect |
@@ -296,6 +296,85 @@ langwatch agent dev --port 8010 --agent <id or name>
 The command is a live session with no machine-readable output, so it refuses `-o json`.
 
 A connected agent needs none of this: it reaches out from your machine, so a local process is already a target. See [Other ways to connect](/agent-testing/other-ways-to-connect) for when each one applies.
+
+## Share your local folder with Langy
+
+`langwatch langy --share-control` shares this folder with the Langy conversation that asked for it, so Langy can read and change files here, with your toolchain.
+
+```bash
+langwatch langy --share-control
+```
+
+Ask Langy for a code change in the LangWatch panel first. Its request appears in the terminal:
+
+```
+╭─ Langy wants to work in acme-support ───────────────────────────────────────╮
+│                                                                             │
+│   Instrument traces with LangWatch                                          │
+│   Project ACME Support, asked 2 minutes ago.                                │
+│   /Users/dev/acme-support                                                   │
+│                                                                             │
+│   Do you want to share this folder?                                         │
+│ ❯ 1. Share this folder with Langy                                           │
+│   2. Cancel this request                                                    │
+│                                                                             │
+│   Enter or a number to answer · ↑↓ to choose · Esc to leave the request     │
+│   open                                                                      │
+╰─────────────────────────────────────────────────────────────────────────────╯
+```
+
+When two conversations asked for the same folder, you pick one first. After you share it, the command prints what Langy does, one line per call:
+
+```
+⏺ Read(app/main.py)
+  ⎿  Read 84 lines
+⏺ Edit(app/main.py)
+  ⎿  Added 3 lines, removed 1 line
+⏺ Bash(uv run pytest)
+  ⎿  2 passed in 3.1s
+```
+
+Reading files and running read-only commands needs no answer. Everything else stops and asks:
+
+```
+╭─ Langy wants to run in acme-support ────────────────────────────────────────╮
+│                                                                             │
+│   uv run pytest                                                             │
+│   This runs checks. Stops after 5 minutes if it has not finished.           │
+│                                                                             │
+│   Do you want to allow this?                                                │
+│ ❯ 1. Yes, allow "uv run" for this session                                   │
+│   2. Yes, this time only                                                    │
+│   3. No, and tell Langy what to do instead                                  │
+│                                                                             │
+│   The session grant covers every command that starts with "uv run".         │
+│                                                                             │
+│   Enter or a number to answer · ↑↓ to choose · Esc to deny · or answer on   │
+│   the card in LangWatch                                                     │
+╰─────────────────────────────────────────────────────────────────────────────╯
+```
+
+A number answers at once. The arrow keys move the highlight and Enter confirms it, and Escape denies with no reason. Choosing the third option reads one line of text and sends it to Langy as the reason, so you can say what to do instead.
+
+The same question also appears as a card in the LangWatch panel, and the first answer wins. When the card is answered first, the selector closes and the line under the call says the answer came from the card.
+
+With the output piped or redirected there is no selector, because there is no terminal to draw it on. The command prints the question and the card in the panel is the only way to answer it.
+
+A session grant is the program and its first argument, so `uv run` allows the tests and not `uv pip install`, and `.venv/bin/python -c` allows a one-line program and not every python command. The line under the options says what it covers.
+
+Paths outside the folder and `sudo` are refused whatever you answer. A grant lives with this run of the command: stop it and start it again, and Langy asks once more.
+
+A file that may hold secrets always asks, whether Langy reads it directly or through a shell command: `.env` and `.envrc`, keys and keystores, `.netrc`, `.npmrc`, `.pgpass`, `.git-credentials`, anything named for a token or a secret, `.git/config`, and anything under `.ssh/`, `.aws/` or `.docker/`. A committed `.env.example` still reads without a question.
+
+A command inherits only what a toolchain needs from your machine:
+
+- the shell and the locale: `PATH`, `HOME`, `SHELL`, `USER`, `TMPDIR`, `TERM`, `LANG`, and the `LC_*` and `XDG_*` families
+- where the toolchains live: `GOPATH`, `GOROOT`, `NVM_DIR`, `PYENV_ROOT`, `VIRTUAL_ENV`, `CONDA_PREFIX`, the `HOMEBREW_*` paths, and every `*_HOME` such as `JAVA_HOME`, `PNPM_HOME` or `CARGO_HOME`
+- how it reaches the network and what it trusts: `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `ALL_PROXY`, `SSL_CERT_FILE`, `SSL_CERT_DIR`, `NODE_EXTRA_CA_CERTS`, `REQUESTS_CA_BUNDLE` and `CURL_CA_BUNDLE`
+
+Everything else your terminal holds stays behind, and a name that ends in `_KEY`, `_TOKEN`, `_SECRET` or `_PASSWORD` never passes even when it belongs to one of those families. Your project reads its own `.env` file itself, so it keeps working with the smaller environment.
+
+The command is a live session with no machine-readable output, so it refuses `-o json`. Press Ctrl-C to stop sharing; commands Langy started in the background keep running, and the terminal prints their process id and log path.
 
 ## Run scenario tests
 

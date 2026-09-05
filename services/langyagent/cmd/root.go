@@ -63,17 +63,16 @@ func Root(ctx context.Context, _ []string) error {
 	// accepting traffic and binds worker subprocesses to the pool-lifetime
 	// context. The egress guard is consulted around each worker's lifecycle.
 	pool, err := workerpool.New(ctx, workerpool.Options{
-		MaxWorkers:         cfg.MaxWorkers,
-		WorkerIdle:         cfg.WorkerIdle(),
-		ReadinessTimeout:   cfg.ReadinessTimeout(),
-		ReaperInterval:     cfg.ReaperInterval(),
-		SessionsRoot:       cfg.SessionsRoot,
-		WorkspaceRoot:      cfg.WorkspaceRoot,
-		OpenCodeBinaryPath: cfg.OpenCodeBinaryPath,
-		PiBinaryPath:       cfg.PiWorkerBinaryPath,
-		Runner:             runner,
-		Telemetry:          deps.Telemetry,
-		Egress:             mgr.EgressGuard(),
+		MaxWorkers:       cfg.MaxWorkers,
+		WorkerIdle:       cfg.WorkerIdle(),
+		ReadinessTimeout: cfg.ReadinessTimeout(),
+		ReaperInterval:   cfg.ReaperInterval(),
+		SessionsRoot:     cfg.SessionsRoot,
+		WorkspaceRoot:    cfg.WorkspaceRoot,
+		PiBinaryPath:     cfg.PiWorkerBinaryPath,
+		Runner:           runner,
+		Telemetry:        deps.Telemetry,
+		Egress:           mgr.EgressGuard(),
 		// Revoke-only. The manager can destroy a session key it was handed; it can
 		// never ask for one to be minted. It reuses the SAME shared secret the
 		// control plane authenticates to us with, so this direction adds no new

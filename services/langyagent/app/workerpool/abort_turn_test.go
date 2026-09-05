@@ -20,7 +20,7 @@ type abortRecordingAgent struct {
 	abortErr error
 }
 
-func (a *abortRecordingAgent) AbortTurn(_ context.Context, _ app.Endpoint, sessionID, turnID string) error {
+func (a *abortRecordingAgent) AbortTurn(_ context.Context, sessionID, turnID string) error {
 	a.aborts = append(a.aborts, turnID)
 	a.sessions = append(a.sessions, sessionID)
 	return a.abortErr
@@ -34,10 +34,9 @@ var _ app.TurnAborter = (*abortRecordingAgent)(nil)
 func claimedWorker(t *testing.T, p *Pool, conversationID, turnID string, agent app.CodingAgent) *Worker {
 	t.Helper()
 	w := &Worker{
-		conversationID:    conversationID,
-		agent:             agent,
-		endpoint:          app.Endpoint{BaseURL: "http://127.0.0.1:0", BearerToken: "b"},
-		openCodeSessionID: "sess",
+		conversationID: conversationID,
+		agent:          agent,
+		sessionID:      "sess",
 	}
 	require.Equal(t, app.ClaimGranted, w.ClaimTurn(turnID))
 	p.mu.Lock()
@@ -104,7 +103,7 @@ func TestPoolCancelTurn_IdleWorkerIsANoOp(t *testing.T) {
 	}
 }
 
-// An agent WITHOUT the abort capability — opencode today — is fail-open: the
+// An agent WITHOUT the abort capability is fail-open: the
 // cancel is a silent no-op and nothing about the running turn changes.
 func TestWorkerAbortTurn_NonAbortingAgentIsANoOp(t *testing.T) {
 	p := newTestPool(4)

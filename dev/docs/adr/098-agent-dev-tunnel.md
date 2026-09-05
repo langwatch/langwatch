@@ -32,6 +32,10 @@ The "authenticated outbound relay through our own infrastructure, auth via the e
 
 What changes is the recommendation. Docs, skills and MCP descriptions offer the decorator first and `agent dev` under HTTP agents.
 
+## Amendment: the primary name is `agent tunnel`
+
+[ADR-129](129-langy-local-control.md) gives Langy a way to work in the developer's own folder through `langwatch langy --share-control`. The word "dev" in `agent dev` reads as that feature, so the tunnel is documented as `langwatch agent tunnel` from now on. `agent dev` stays as a hidden alias and keeps this ADR's behaviour unchanged.
+
 ## References
 
 - Related ADRs: ADR-097 (scenario remote-trace judging), ADR-128 (connected agents)

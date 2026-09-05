@@ -203,7 +203,7 @@ Feature: Langy drives the open page through typed UI actions
 
   @unit
   Scenario: The worker env carries the conversation id for the UI channel
-    Given a worker is spawned for a conversation on either harness
+    Given a worker is spawned for a conversation
     Then its environment names that conversation for the CLI's ui call
 
   @unit

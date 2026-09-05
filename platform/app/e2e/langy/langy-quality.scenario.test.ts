@@ -11,7 +11,7 @@
  *   #1098  40% zero-tool, 58% under 120 characters               -> "answers from the project, not from memory"
  *   #1099  AGENTS.md:149 calls the working langwatch.* tools     -> "owns the tools it actually has"
  *          hallucinations
- *   #1100  opencode coding-agent persona bleeding through        -> "does not narrate a checkout it never obtained"
+ *   #1100  a stock coding-agent persona bleeding through          -> "does not narrate a checkout it never obtained"
  *   #1101  langwatch.monitor.create fails on 48% of calls        -> "a monitor it says it made really exists"
  *   #1102  p90 380s, p99 31min                                   -> "answers a simple question inside the budget"
  *
@@ -283,8 +283,8 @@ describe("Langy quality bar", () => {
   });
 
   /**
-   * #1100 — the base system prompt is opencode's coding agent with one word
-   * rewritten, while AGENTS.md rule 24 restricts bash to the `langwatch` CLI.
+   * #1100 — the stock coding-agent persona leaks back in through the model's
+   * priors, while AGENTS.md rule 24 restricts bash to the `langwatch` CLI.
    * Prod shows the coding persona winning sometimes: 144 `read` calls across 7
    * projects, 68 `edit` calls — against a workspace that was never cloned.
    *

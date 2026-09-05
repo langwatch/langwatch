@@ -68,6 +68,66 @@ Feature: Langy conversation titles are derived, then generated once by a cheap m
     Then the title is left unchanged
     And the turn's outcome is unaffected
 
+  @unit
+  Scenario: A model failure is retried instead of losing the title
+    Given the title model fails on a provider blip
+    When the title is generated
+    Then the failure is raised so the process outbox retries it
+    And the turn's outcome is unaffected
+
+  @unit
+  Scenario: A project with no model for titles is not retried
+    Given the project has no model configured for titles
+    When the title is generated
+    Then no title is produced and nothing is retried
+
+  @unit
+  Scenario: A conversation with nothing to read is not retried
+    Given a conversation whose transcript holds no text
+    When the title is generated
+    Then no title is produced and nothing is retried
+
+  # ============================================================================
+  # One title style, wherever the title came from
+  # ============================================================================
+
+  # Recent chats showed three styles at once: "Instrument Traces With LangWatch",
+  # "Instrument Traces with LangWatch" and the raw first message
+  # "instrument my traces with langwatch". Every title, generated or derived,
+  # goes through the same normaliser: sentence case, no trailing period, no
+  # surrounding quotes, at most sixty characters.
+
+  @unit
+  Scenario: A title in title case is rewritten in sentence case
+    Given the model answers with "Instrument Traces With LangWatch"
+    When the title is generated
+    Then the conversation title reads "Instrument traces with LangWatch"
+
+  @unit
+  Scenario: Product names and acronyms keep their own capitalisation
+    Given the model answers with "Fix The GitHub API Token"
+    When the title is generated
+    Then the conversation title reads "Fix the GitHub API token"
+
+  @unit
+  Scenario: Quotes and a trailing period are removed from a title
+    Given the model answers with a quoted title ending in a period
+    When the title is generated
+    Then the conversation title carries no quotes and no trailing period
+
+  @unit
+  Scenario: A title longer than sixty characters is cut on a word boundary
+    Given the model answers with a title far longer than sixty characters
+    When the title is generated
+    Then the conversation title ends on a whole word within sixty characters
+
+  @unit
+  Scenario: The placeholder title follows the same rules as a generated one
+    Given the first message reads "instrument my traces with langwatch"
+    When the placeholder title is derived from it
+    Then the conversation title reads "Instrument my traces with langwatch"
+    And the placeholder title is capped at sixty characters too
+
   # ============================================================================
   # A manual rename always wins
   # ============================================================================

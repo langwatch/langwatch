@@ -1,7 +1,7 @@
 ---
 title: Other Ways to Connect
 sidebarTitle: Other ways to connect
-keywords: langwatch, agent simulations, http agent, code agent, langwatch agent dev, tunnel, body template, output path, traceparent
+keywords: langwatch, agent simulations, http agent, code agent, langwatch agent tunnel, agent dev, tunnel, body template, output path, traceparent
 description: Register an agent by its HTTP endpoint, front a local process with a tunnel, or run a small piece of Python as the target, when the SDK cannot run inside your agent.
 ---
 
@@ -12,7 +12,7 @@ description: Register an agent by its HTTP endpoint, front a local process with 
 | Path | Use it when |
 |---|---|
 | **HTTP agent** | The agent is written in a language with no LangWatch SDK, or you cannot change its code and only have a URL. |
-| **`langwatch agent dev`** | An HTTP agent runs on your own machine and the platform needs a reachable URL for the session. |
+| **`langwatch agent tunnel`** | An HTTP agent runs on your own machine and the platform needs a reachable URL for the session. |
 | **Code agent** | The target is a few lines of glue: a credential exchange, or a call into an API that needs no repository of its own. |
 
 ## HTTP agents
@@ -158,19 +158,19 @@ langwatch test-suite run 'Smoke' --target http:<agent-id> --wait
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| The run fails with a connection error | The URL is not reachable from the LangWatch backend: an internal hostname, a firewall, or a stopped service. | Deploy the endpoint to a reachable URL, or use `langwatch agent dev` below for a local process. |
+| The run fails with a connection error | The URL is not reachable from the LangWatch backend: an internal hostname, a firewall, or a stopped service. | Deploy the endpoint to a reachable URL, or use `langwatch agent tunnel` below for a local process. |
 | Every turn fails with 401 or 403 | The credential is missing or wrong: no header row or `auth` block, or the `{{ secrets.NAME }}` reference points at a secret the project does not have. | Add the header row or `auth` block, and check the secret's name and project in **Settings > Secrets**. |
 | The transcript shows empty replies or raw JSON | `outputPath` does not match the response shape, so no reply text is found. | Set `outputPath` to the JSONPath of the reply text in your endpoint's real response. |
 | Trace-dependent criteria come back inconclusive, and turns have no trace link | The server does not adopt the incoming `traceparent`, or it reports traces to a different LangWatch project. | Adopt the context as in step 4, and point the agent's tracing at the same project's API key. |
 
-## A local HTTP agent: `langwatch agent dev`
+## A local HTTP agent: `langwatch agent tunnel`
 
-`langwatch agent dev` starts a tunnel in front of a local port, points a registered HTTP agent's URL at the tunnel, and restores the previous URL when you stop it with Ctrl-C. While it runs, every scenario run against that agent calls straight into the process on your machine.
+`langwatch agent tunnel` starts a tunnel in front of a local port, points a registered HTTP agent's URL at the tunnel, and restores the previous URL when you stop it with Ctrl-C. While it runs, every scenario run against that agent calls straight into the process on your machine.
 
-A connected agent needs none of this: it reaches out from your machine, so a local process is a target with no tunnel and no URL rewrite. `agent dev` is for HTTP agents.
+A connected agent needs none of this: it reaches out from your machine, so a local process is a target with no tunnel and no URL rewrite. `agent tunnel` is for HTTP agents.
 
 ```bash
-langwatch agent dev --port 8010
+langwatch agent tunnel --port 8010
 ```
 
 ```text
@@ -180,7 +180,7 @@ Run your scenarios: https://app.langwatch.ai/my-project/agent-testing
 Ctrl-C restores the previous URL.
 ```
 
-With no `--agent` flag, the command lists the project's HTTP agents to pick from, and remembers the choice per project directory in `~/.langwatch/config.json`. `langwatch agent tunnel` is an alias for the same command.
+With no `--agent` flag, the command lists the project's HTTP agents to pick from, and remembers the choice per project directory in `~/.langwatch/config.json`. `langwatch agent dev` is an alias for the same command.
 
 | Flag | Effect |
 |---|---|
@@ -193,7 +193,7 @@ With no `--agent` flag, the command lists the project's HTTP agents to pick from
 
 ### How the tunnel is protected
 
-The tunnel URL is public, and your local agent process usually holds real model provider keys. `langwatch agent dev` mints a per-session secret, fronts your local port with a proxy that rejects any request missing the `X-LangWatch-Dev-Secret` header, and writes that header onto the agent's configuration for the session. Only the platform's scenario calls send the secret. On exit, the command removes both the proxy and the header row.
+The tunnel URL is public, and your local agent process usually holds real model provider keys. `langwatch agent tunnel` mints a per-session secret, fronts your local port with a proxy that rejects any request missing the `X-LangWatch-Dev-Secret` header, and writes that header onto the agent's configuration for the session. Only the platform's scenario calls send the secret. On exit, the command removes both the proxy and the header row.
 
 `--no-auth` turns the proxy off, for a server that already authenticates every request. A bring-your-own tunnel (`--tunnel-url`) also runs without the proxy, so that tunnel endpoint must supply its own access control. The agent's own configured authentication headers pass through the tunnel unchanged either way.
 
@@ -209,7 +209,7 @@ The default transport is a Cloudflare quick tunnel on `trycloudflare.com`. The c
 
 `--tunnel-url` swaps in your own tunnel when you hit these limits.
 
-A crash or a kill signal the process cannot catch skips the restore, and the agent keeps pointing at a dead tunnel. Calls to it then fail with an error saying the tunnel session probably ended, and the **local tunnel** badge stays visible. Run `langwatch agent dev` again to take the agent over with a fresh tunnel, or set the agent's URL back by hand in the agent editor.
+A crash or a kill signal the process cannot catch skips the restore, and the agent keeps pointing at a dead tunnel. Calls to it then fail with an error saying the tunnel session probably ended, and the **local tunnel** badge stays visible. Run `langwatch agent tunnel` again to take the agent over with a fresh tunnel, or set the agent's URL back by hand in the agent editor.
 
 ## Code agents
 

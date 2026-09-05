@@ -62,7 +62,7 @@ func New() *Telemetry {
 		atCapacity:       f.int64Counter("langy.pool.at_capacity", "Count of requests rejected because MAX_WORKERS is reached."),
 		turnDuration:     f.float64Histogram("langy.turn.duration", "Wall-clock duration of a chat turn, tagged by outcome."),
 		spawnDuration:    f.float64Histogram("langy.worker.spawn_duration", "Wall-clock duration of a worker spawn, tagged by outcome."),
-		readinessSeconds: f.float64Histogram("langy.worker.readiness_duration", "Wall-clock time until a spawned worker's harness is ready, tagged by outcome."),
+		readinessSeconds: f.float64Histogram("langy.worker.readiness_duration", "Wall-clock time until a spawned worker is ready, tagged by outcome."),
 	}
 }
 
@@ -124,7 +124,7 @@ func (t *Telemetry) StartSpawn(ctx context.Context, conversationID string) (cont
 }
 
 // StartPhase opens a child span for one phase of a worker spawn — egress prep,
-// home/skills provision, opencode spawn, readiness wait. Deliberately generic: the
+// home/skills provision, worker spawn, readiness wait. Deliberately generic: the
 // phases share no attributes and the langy.* span name is the only thing that
 // varies, so the spawn waterfall stays one cheap helper instead of a near-identical
 // method per phase. Callers defer span.End() and set any per-phase attribute (e.g.

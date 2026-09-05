@@ -74,6 +74,13 @@ Feature: Langy renders domain-capability cards for tool calls
     And the card links to Simulations
 
   @integration
+  Scenario: A scenario card names the scenario and its status, never the payload
+    When Langy fetches a scenario and the result is a structured payload
+    Then the card titles itself with the scenario name
+    And the card shows the scenario status when the payload carries one
+    And the card shows no line of the serialised payload
+
+  @integration
   Scenario: Every LangWatch action Langy takes shows a result card
     When Langy runs any LangWatch action and it returns a result
     Then Langy shows a result card for that action

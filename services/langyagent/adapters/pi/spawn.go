@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/langwatch/langwatch/services/langyagent/adapters/opencode"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 	"github.com/langwatch/langwatch/services/langyagent/internal/workerenv"
@@ -20,9 +19,7 @@ import (
 const configFileName = ".langy-worker.json"
 
 // The env var NAMES the wrapper config references for the LLM base URL and
-// key. The same names the opencode worker env uses, so the manager's env
-// assembly stays one shape across harnesses; secrets stay in env, the config
-// file carries only these names.
+// key. Secrets stay in env; the config file carries only these names.
 const (
 	llmBaseURLEnv = "OPENAI_BASE_URL"
 	llmAPIKeyEnv  = "OPENAI_API_KEY"
@@ -30,15 +27,35 @@ const (
 
 // mediatedLLMPlaceholderKey is what a mediated worker sends as its LLM key.
 // NOT a credential: the manager's LLM relay replaces the credential headers on
-// the forward. Same value as the opencode adapter's placeholder; the relay
-// replaces it regardless of value.
+// the forward, regardless of the value sent.
 const mediatedLLMPlaceholderKey = "langy-mediated"
 
-// defaultModel mirrors adapters/opencode's default for a turn naming no model.
+// defaultModel is what a turn that names no model runs on.
 const defaultModel = "openai/gpt-5-mini"
 
+// langyAgentPrompt is the agent's own system prompt, the whole persona slot.
+// The operating contract stays in AGENTS.md, which the wrapper appends as an
+// instructions file regardless of this prompt: keep the two non-overlapping,
+// persona here, rules there.
+const langyAgentPrompt = "You are Langy, the AI assistant built into LangWatch, operating the user's " +
+	"LangWatch project from inside the product. You work by running the `langwatch` " +
+	"CLI in your shell and reading its JSON output. The AGENTS.md instructions " +
+	"document is your operating contract and applies to every reply. When a request " +
+	"maps to a real action, you act first and answer from the result. " +
+	// Without this the stock coding-agent persona leaks back in through the
+	// model's priors: asked to refactor a file, Langy answers "I can't find
+	// src/agent.py in this workspace, paste the contents and I'll fix it" -
+	// claiming to have searched a checkout it never had. Working on the user's
+	// source IS the job when they ask for it; the GitHub skill clones the
+	// repository first (see AGENTS.md). What is wrong is narrating a workspace
+	// that was never obtained, so this fixes the premise, not the capability.
+	"Your shell does not start with a copy of the user's code in it. When their " +
+	"source is the ask, the repository is cloned first and the work happens there, " +
+	"so never report a file as missing, never describe reading or editing one you " +
+	"have not obtained, and never ask the user to paste their code."
+
 // ProvisionInput is everything Provision needs to lay down a worker's home.
-// Mirrors opencode.ProvisionInput; Runner selects the isolation substrate.
+// Runner selects the isolation substrate.
 type ProvisionInput struct {
 	Home          string
 	WorkspaceRoot string // holds the materialized skills/ tree the config points at
@@ -70,8 +87,7 @@ type SpawnInput struct {
 	// (virtual key + traceparent injected on the forward). Empty ⇒ unmediated
 	// fallback: the gateway URL and virtual key go into the worker env directly.
 	LLMBaseURL string
-	// Capabilities fold their own env into the worker process, exactly as on
-	// the opencode spawn path.
+	// Capabilities fold their own env into the worker process.
 	Capabilities []app.Capability
 }
 
@@ -157,8 +173,8 @@ func modelLane(model string) workerModelConfig {
 
 // skillsDir is where the config points the wrapper's skill loading: the shared
 // materialized tree under WorkspaceRoot (root-owned, world-readable, workers
-// can read, none can mutate). Unlike opencode, the wrapper takes the path from
-// config, so no per-home symlink is needed.
+// can read, none can mutate). The wrapper takes the path from config, so no
+// per-home symlink is needed.
 func skillsDir(workspaceRoot string) string {
 	return filepath.Join(workspaceRoot, "skills")
 }
@@ -206,8 +222,8 @@ func provisionSessionDir(in ProvisionInput) error {
 }
 
 // Provision creates a per-worker home with the wrapper's config file, the
-// substituted AGENTS.md, and the pi session dir. Same isolation ordering as
-// adapters/opencode: every directory is chown'd (via the runner) to the
+// substituted AGENTS.md, and the pi session dir. Isolation ordering: every
+// directory is chown'd (via the runner) to the
 // per-conversation UID and chmod'd 0700/0600 BEFORE per-worker material lands,
 // so a sibling worker (a different UID) can never open(2) this worker's files.
 // The config file itself carries no secret (env var NAMES only) but is owned
@@ -222,7 +238,7 @@ func (a *Agent) Provision(in ProvisionInput) error {
 	}
 
 	// Per-worker tmp dir: scratch gets the same UID-enforced boundary as the
-	// config (mirrors opencode's TMPDIR posture).
+	// config.
 	tmpDir := filepath.Join(in.Home, "tmp")
 	if err := os.MkdirAll(tmpDir, 0o700); err != nil {
 		return fmt.Errorf("mkdir tmp: %w", err)
@@ -238,11 +254,10 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		return err
 	}
 
-	// The operating contract, written through byte for byte, from the same
-	// template the opencode provision writes (embedded assets, read once at pool
-	// boot), so the contract is identical across harnesses. Nothing is
-	// substituted into it: the prompt reaches the user through the reply, so an
-	// address only the worker can use must never enter it.
+	// The operating contract, written through byte for byte from the embedded
+	// template (read once at pool boot). Nothing is substituted into it: the
+	// prompt reaches the user through the reply, so an address only the worker
+	// can use must never enter it.
 	if in.AgentsTemplate == "" {
 		return fmt.Errorf("AGENTS.md template unavailable")
 	}
@@ -263,10 +278,8 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		// The spike's verified setting: reasoning summaries stream on the
 		// Responses lane and Anthropic thinking maps through the gateway at
 		// this level; trivial prompts legitimately produce no summary.
-		ThinkingLevel: "medium",
-		// The ONE Langy persona, shared with the opencode provision so the
-		// persona cannot drift between harnesses.
-		PersonaPrompt:  opencode.LangyAgentPrompt,
+		ThinkingLevel:  "medium",
+		PersonaPrompt:  langyAgentPrompt,
 		AgentsFilePath: agentsPath,
 		SkillsDir:      skillsDir(in.WorkspaceRoot),
 		SessionDir:     in.SessionDir,
@@ -291,13 +304,12 @@ func (a *Agent) Provision(in ProvisionInput) error {
 // child ends are closed after Start so the reader sees EOF the moment the
 // process dies. cmd.Stderr stays nil (os/exec wires /dev/null itself, an
 // io.Discard pipe there would block Wait on grandchildren, and worker stderr
-// is the same PII surface opencode's spawn discards).
+// is a PII surface the manager does not read).
 //
 // The adapter NEVER calls cmd.Wait(): the pool's exit watcher owns it.
 //
-// ctx is the POOL-LIFETIME context, exactly as on the opencode path: the
-// worker outlives the turn that spawned it, and a pool shutdown still
-// propagates to the subprocess.
+// ctx is the POOL-LIFETIME context: the worker outlives the turn that spawned
+// it, and a pool shutdown still propagates to the subprocess.
 func (a *Agent) Spawn(ctx context.Context, in SpawnInput) (*exec.Cmd, error) {
 	stdinR, stdinW, err := os.Pipe()
 	if err != nil {
@@ -359,13 +371,12 @@ func (a *Agent) Close() {
 // and side-effect free apart from reading the manager's own env, factored out
 // of Spawn so it is unit-testable without spawning a real subprocess.
 //
-// Contract, relative to the opencode worker env:
-//   - Same LLM wiring: mediated ⇒ the loopback relay URL plus a non-credential
+// Contract:
+//   - LLM wiring: mediated ⇒ the loopback relay URL plus a non-credential
 //     placeholder key; unmediated fallback ⇒ gateway URL + virtual key direct.
-//   - Same LANGWATCH_API_KEY/LANGWATCH_ENDPOINT pair for the langwatch CLI.
-//   - NO OPENCODE_* variables and NO OTLP export variables: there is no
-//     opencode process and pi exports no OTLP (the LLM relay synthesizes the
-//     gen_ai spans instead).
+//   - The LANGWATCH_API_KEY/LANGWATCH_ENDPOINT pair for the langwatch CLI.
+//   - NO OTLP export variables: pi exports no OTLP (the LLM relay synthesizes
+//     the gen_ai spans instead).
 //   - NO_PROXY/no_proxy are ALWAYS set (not only when the egress proxy runs):
 //     the bun-compiled wrapper honors proxy env on its LLM fetches, and any
 //     proxy variable reaching the process from anywhere else would otherwise
@@ -390,8 +401,7 @@ func buildWorkerEnv(in SpawnInput) []string {
 		llmBaseURLEnv+"="+llmBaseURL,
 		llmAPIKeyEnv+"="+llmKey,
 		// The langwatch CLI is the worker's only LangWatch transport; the key
-		// is a short-lived, revocable, per-conversation session key (same
-		// deliberate stance as the opencode worker env).
+		// is a short-lived, revocable, per-conversation session key.
 		"LANGWATCH_API_KEY="+in.Creds.LangwatchAPIKey,
 		"LANGWATCH_ENDPOINT="+in.Creds.LangwatchEndpoint,
 		// Long provider-cache retention: only takes effect on lanes whose
@@ -422,7 +432,7 @@ func buildWorkerEnv(in SpawnInput) []string {
 		"no_proxy="+noProxy,
 	)
 	// The wrapper is a Bun-compiled binary: it trusts only its bundled CA
-	// roots plus this var, same as opencode. Dev-only in practice.
+	// roots plus this var. Dev-only in practice.
 	if ca := os.Getenv("NODE_EXTRA_CA_CERTS"); ca != "" {
 		env = append(env, "NODE_EXTRA_CA_CERTS="+ca)
 	}

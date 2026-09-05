@@ -1,3 +1,4 @@
+import { LANGY_ANSWER_HERE_OR_TERMINAL } from "./langyLocalWaits";
 import { describeToolCall, effectiveToolName } from "./langyToolLabel";
 
 /**
@@ -47,6 +48,10 @@ export type LangyThinkingTone =
   /** Long enough with nothing that the honest word is "stuck". */
   | "stuck";
 
+/** What the line says while a card is holding the turn (ADR-129). */
+export const LANGY_AWAITING_ANSWER_LINE =
+  "Waiting for your answer on the card above";
+
 export interface LangyThinkingLine {
   /** The line to render. Always true at the moment it is produced. */
   text: string;
@@ -79,13 +84,14 @@ export interface ThinkingMessage {
 /**
  * How long we wait before admitting nothing is happening.
  *
- * A cold spawn legitimately takes a few seconds (fork the worker, lay out the
- * home, install skills, wait for readiness), so silence is normal at first. The
- * first two steps name the startup's real phases — the control plane prepares
- * the worker's workspace, then the agent starts — so the wait reads as
- * progress, not one frozen line. It stops being normal quickly, and by 75s a
- * spawn that has produced NOTHING has almost certainly failed — the manager's
- * own readiness budget is long gone.
+ * The clock these read is SILENCE, not turn length: it restarts every time the
+ * turn produces something (see `langyTurnActivityKey`). A cold spawn
+ * legitimately takes a few seconds (fork the worker, lay out the home, install
+ * skills, wait for readiness), so silence is normal at first. The first two
+ * steps name the startup's real phases, the control plane prepares the
+ * worker's workspace and then the agent starts, so the wait reads as progress,
+ * not one frozen line. It stops being normal quickly, and by 75s a turn that
+ * has produced NOTHING for that long has almost certainly failed.
  */
 export const THINKING_STARTING_LANGY_MS = 6_000;
 export const THINKING_STILL_STARTING_MS = 12_000;
@@ -138,6 +144,79 @@ export function settledTool(message: ThinkingMessage | undefined): boolean {
       part.type.startsWith("tool-") &&
       (part.state === "output-available" || part.state === "output-error"),
   );
+}
+
+/**
+ * Everything that counts as the turn making progress.
+ *
+ * A local command runs on the developer's own machine and a tab that adopted a
+ * running turn has no live stream at all, so the assistant message can stay
+ * empty for minutes while the turn is working perfectly well. Those turns are
+ * visible in the durable record instead, in its tool calls and the cards they
+ * raised, and in the plan the agent keeps.
+ */
+export interface LangyTurnActivity {
+  messages: ThinkingMessage[];
+  /**
+   * The turn's durable tool calls. This is what a reloaded tab has and the
+   * live stream does not, and it is what proves a local command is running.
+   */
+  toolCalls?:
+    | readonly { toolCallId: string; status: string }[]
+    | null
+    | undefined;
+  /** The cards the turn raised, and whether the developer has answered them. */
+  waits?: readonly { waitId: string; status: string }[] | null | undefined;
+  /** The latest snapshot of the plan the agent is following. */
+  planItems?: readonly { content: string; status: string }[] | null | undefined;
+  /** The model's live reasoning so far. It grows with every delta. */
+  reasoning?: string | null | undefined;
+  /** The manager's latest status line for the turn. */
+  status?: string | null | undefined;
+  /** What the page Langy is driving reports it is doing. */
+  pageActivity?: string | null | undefined;
+}
+
+/**
+ * A fingerprint of everything the turn has produced so far.
+ *
+ * The escalation used to measure the time since the line MOUNTED, so a turn
+ * that ran a local command for two minutes, with a settled permission card on
+ * screen and output arriving in the terminal, was told it "may be stuck". The
+ * caller restarts its clock whenever this value changes, which turns the
+ * ladder into a measure of silence: a turn that really is silent still
+ * escalates, and a turn that is working never does.
+ *
+ * Only provable things go in, parts on the wire and rows in the durable
+ * record, so this can no more invent progress than the line itself can.
+ */
+export function langyTurnActivityKey(activity: LangyTurnActivity): string {
+  const parts = currentTurnAssistant(activity.messages)?.parts ?? [];
+  const shape = parts
+    .map((part) => `${part.type ?? ""}/${part.state ?? ""}`)
+    .join(",");
+  const prose = parts.reduce(
+    (total, part) =>
+      total + (part.type === "text" ? (part.text?.length ?? 0) : 0),
+    0,
+  );
+  const calls = (activity.toolCalls ?? [])
+    .map((call) => `${call.toolCallId}/${call.status}`)
+    .join(",");
+  const waits = (activity.waits ?? [])
+    .map((wait) => `${wait.waitId}/${wait.status}`)
+    .join(",");
+  const plan = (activity.planItems ?? []).map((item) => item.status).join(",");
+  return [
+    shape,
+    prose,
+    calls,
+    waits,
+    plan,
+    activity.reasoning?.length ?? 0,
+    activity.status ?? "",
+    activity.pageActivity ?? "",
+  ].join("|");
 }
 
 /** Has the model actually produced any prose yet? */
@@ -199,7 +278,7 @@ function waitingLine({
     return (
       silenceEscalation({
         elapsedMs,
-        stuckText: "Langy still hasn't answered — it may be stuck.",
+        stuckText: "Langy still has not answered. It may be stuck.",
       }) ?? { text: "Thinking…", tone: "waiting", allowWhimsy: false }
     );
   }
@@ -208,7 +287,7 @@ function waitingLine({
   // worker that has not started, and we must not pretend otherwise.
   const escalated = silenceEscalation({
     elapsedMs,
-    stuckText: "Langy still hasn't started — it may be stuck.",
+    stuckText: "Langy still has not started. It may be stuck.",
   });
   if (escalated) return escalated;
 
@@ -242,9 +321,15 @@ export function langyThinkingLine({
   hasLiveReasoning = false,
   workerReady = false,
   pageActivity = null,
+  awaitingAnswer = false,
+  terminalConnected = false,
 }: {
   messages: ThinkingMessage[];
-  /** Time since the turn was sent. */
+  /**
+   * How long the turn has been SILENT: the time since it last produced
+   * anything (`langyTurnActivityKey`), which on a turn that has produced
+   * nothing at all is the time since it was sent.
+   */
   elapsedMs: number;
   /**
    * What the page Langy is driving is doing right now, in the page's own
@@ -264,6 +349,19 @@ export function langyThinkingLine({
    */
   hasLiveReasoning?: boolean;
   /**
+   * A card is open and the turn is holding for the developer's answer
+   * (ADR-129). Nothing is running, and nothing is late: the panel used to
+   * escalate through "This is taking longer than usual" to "Langy still
+   * hasn't answered, it may be stuck", every word of it about Langy, while
+   * the turn was waiting on the reader.
+   */
+  awaitingAnswer?: boolean;
+  /**
+   * A folder is shared from a terminal, so the ask that is holding the turn is
+   * open there as well and either place answers it.
+   */
+  terminalConnected?: boolean;
+  /**
    * A panel-open warm proved this conversation's worker alive before the send
    * (`warmed: true` from `langy.warmWorker`). A first message then skips the
    * startup ladder — the workspace it would claim to be preparing already
@@ -275,7 +373,21 @@ export function langyThinkingLine({
 }): LangyThinkingLine | null {
   const last = currentTurnAssistant(messages);
 
-  // 0. THE PAGE IS DOING SOMETHING. It reports its own work, so this is both
+  // 0. A CARD IS WAITING FOR THE READER. The turn is holding on purpose, so
+  //    nothing about it is slow and nothing about it is stuck. This outranks
+  //    every line below, including the tool that reads as still running: that
+  //    tool IS the card.
+  if (awaitingAnswer) {
+    return {
+      text: terminalConnected
+        ? LANGY_ANSWER_HERE_OR_TERMINAL
+        : LANGY_AWAITING_ANSWER_LINE,
+      tone: "waiting",
+      allowWhimsy: false,
+    };
+  }
+
+  // 0b. THE PAGE IS DOING SOMETHING. It reports its own work, so this is both
   //    true and more specific than anything below: the column being run and
   //    the rows already back, rather than the poll the agent is blocked on.
   const reported = pageActivity?.trim();
@@ -293,7 +405,7 @@ export function langyThinkingLine({
       input: tool.input,
     });
     return {
-      text: detail ? `${title} — ${detail}` : title,
+      text: detail ? `${title}: ${detail}` : title,
       tone: "working",
       allowWhimsy: false,
     };

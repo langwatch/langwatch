@@ -24,7 +24,7 @@ func TestStartOrphanReaper_DoesNotStartOffPID1(t *testing.T) {
 func TestStartOrphanReaper_StartsOnPID1(t *testing.T) {
 	started, stop := startReaperForTest(t, 1)
 	if !started {
-		t.Fatal("reaper did not start as PID 1; orphaned opencode children would leak")
+		t.Fatal("reaper did not start as PID 1; orphaned worker children would leak")
 	}
 	// Tear the loop down HERE rather than leaving it to the t.Cleanup safety
 	// net. Cleanups run as part of this test's own teardown, before the next

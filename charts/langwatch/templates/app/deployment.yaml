@@ -235,10 +235,10 @@ spec:
             {{- end }}
 
             {{- if (index .Values "langyagent").chartManaged }}
-            # Langy agent pod. The app POSTs chats to OPENCODE_AGENT_URL with
+            # Langy agent pod. The app POSTs chats to LANGY_AGENT_URL with
             # LANGY_INTERNAL_SECRET as the Bearer token; the agent verifies it
             # against the same Secret. Subchart values key read via index (aliased subchart).
-            - name: OPENCODE_AGENT_URL
+            - name: LANGY_AGENT_URL
               value: {{ (index .Values "langyagent").controlPlane.agentUrl | default (printf "http://%s-langyagent:80" .Release.Name) | quote }}
             - name: LANGY_INTERNAL_SECRET
               valueFrom:

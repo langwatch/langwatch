@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { carryLangyConversation } from "~/features/langy/logic/langyConversationDeepLink";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -160,17 +161,24 @@ export function useLandingRedirect(): void {
 
   useEffect(() => {
     replaceOnce(
-      landingDestination({
-        resolved: toResolvedHome(resolved),
-        isReachableLoading,
-        reachableProducts,
-        rememberedProduct: organization
-          ? readLastVisitedProduct({ organizationId: organization.id })
-          : null,
-        projectSlug: project?.slug ?? null,
-        projectHomeSlug: llmOpsProjectSlug,
-        isOrgless:
-          !isLoading && !organization && (organizations?.length ?? 0) === 0,
+      // `/` is the only link the Langy command line can build, because it knows
+      // the conversation and not the project the reader lands in. This redirect
+      // drops the query string, so the one parameter that names a conversation
+      // travels with it.
+      carryLangyConversation({
+        destination: landingDestination({
+          resolved: toResolvedHome(resolved),
+          isReachableLoading,
+          reachableProducts,
+          rememberedProduct: organization
+            ? readLastVisitedProduct({ organizationId: organization.id })
+            : null,
+          projectSlug: project?.slug ?? null,
+          projectHomeSlug: llmOpsProjectSlug,
+          isOrgless:
+            !isLoading && !organization && (organizations?.length ?? 0) === 0,
+        }),
+        search: window.location.search,
       }),
     );
   }, [

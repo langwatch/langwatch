@@ -57,8 +57,28 @@ export function LangyThinkingLine({
   messages,
   hasLiveReasoning = false,
   workerReady = false,
+  awaitingAnswer = false,
+  terminalConnected = false,
+  activityKey = "",
 }: {
   messages: UIMessage[];
+  /**
+   * A fingerprint of everything the turn has produced so far
+   * (`logic/langyThinkingLine`'s `langyTurnActivityKey`). The clock below
+   * restarts whenever it changes, so the escalation measures how long the turn
+   * has been SILENT rather than how long it has been running.
+   */
+  activityKey?: string;
+  /**
+   * A card is holding the turn for the developer's answer (ADR-129), so the
+   * line says that instead of escalating toward "Langy may be stuck".
+   */
+  awaitingAnswer?: boolean;
+  /**
+   * A folder is shared from a terminal, so the ask that holds the turn is open
+   * there too and the line says both places.
+   */
+  terminalConnected?: boolean;
   /**
    * The model's ephemeral reasoning is streaming right now. Reasoning deltas
    * never become message parts, so without this signal a reasoning-but-no-prose
@@ -75,22 +95,27 @@ export function LangyThinkingLine({
 }) {
   const reduceMotion = useReducedMotion();
 
-  // Time since this line appeared, which is when the turn went in flight (the
-  // panel mounts it on `isBusy`). This is what lets silence escalate.
+  // What the page Langy is driving says it is doing. Subscribed, not read
+  // once: the report changes as rows come back, and the line is the only
+  // place that shows it. It is also one of the turn's events, so it belongs in
+  // the clock below.
+  const pageActivity = useLangyStore((state) => state.pageActivity);
+
+  // How long the turn has been silent. The clock starts when the line appears
+  // and starts again on every event the turn produces, so "This is taking
+  // longer than usual" and "Langy may be stuck" describe silence rather than
+  // turn length. Without that, a turn running a local command for two minutes,
+  // with its output arriving in the terminal, was told it may be stuck.
   const [elapsedMs, setElapsedMs] = useState(0);
   useEffect(() => {
     const startedAt = Date.now();
+    setElapsedMs(0);
     const id = setInterval(
       () => setElapsedMs(Date.now() - startedAt),
       ELAPSED_TICK_MS,
     );
     return () => clearInterval(id);
-  }, []);
-
-  // What the page Langy is driving says it is doing. Subscribed, not read
-  // once: the report changes as rows come back, and the line is the only
-  // place that shows it.
-  const pageActivity = useLangyStore((state) => state.pageActivity);
+  }, [activityKey, pageActivity]);
 
   const line = langyThinkingLine({
     messages,
@@ -98,6 +123,8 @@ export function LangyThinkingLine({
     hasLiveReasoning,
     workerReady,
     pageActivity,
+    awaitingAnswer,
+    terminalConnected,
   });
 
   // Whimsy ONLY where the truth signal permits it — i.e. the model is genuinely

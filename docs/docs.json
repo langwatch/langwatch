@@ -961,6 +961,7 @@
               "langy/prompt-optimization",
               "langy/scenario-tests-and-evals",
               "langy/pull-requests",
+              "langy/local-development",
               "langy/insights"
             ]
           },

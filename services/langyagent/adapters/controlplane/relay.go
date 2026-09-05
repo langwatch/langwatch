@@ -28,7 +28,7 @@ var (
 // rest of adapters/controlplane). The manager is the SOLE signer: it SIGNS each
 // frame with the conversation's runToken (frameauth) before it leaves the
 // process, so the relay can verify possession without the secret ever crossing
-// the wire. opencode never holds the runToken and never reaches the relay.
+// the wire. The agent never holds the runToken and never reaches the relay.
 //
 // One RelayClient is shared; each turn Opens its own RelayStream (the worker holds
 // one connection per turn — the load balancer pins it, keeping frames in order).

@@ -58,8 +58,8 @@ func TestLoadConfig_DefaultsWhenOnlySecretSet(t *testing.T) {
 	if cfg.Server.MaxRequestBodyBytes != defaultMaxBodyBytes {
 		t.Errorf("MaxRequestBodyBytes default = %d, want %d", cfg.Server.MaxRequestBodyBytes, defaultMaxBodyBytes)
 	}
-	if cfg.OpenCodeBinaryPath != "opencode" {
-		t.Errorf("OpenCodeBinaryPath default = %q, want opencode", cfg.OpenCodeBinaryPath)
+	if cfg.PiWorkerBinaryPath != "langy-worker" {
+		t.Errorf("PiWorkerBinaryPath default = %q, want langy-worker", cfg.PiWorkerBinaryPath)
 	}
 	if cfg.WorkspaceRoot != "/workspace" {
 		t.Errorf("WorkspaceRoot default = %q, want /workspace", cfg.WorkspaceRoot)

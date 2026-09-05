@@ -32,7 +32,7 @@ func NewRPC(application *app.App, maxBodyBytes int64) *RPC {
 
 // HandleWarm boots the conversation's worker ahead of the turn. The control plane
 // calls it the instant it knows a turn is coming and does not await the answer;
-// spawning opencode is the expensive part of a cold turn, so doing it in parallel
+// spawning a worker is the expensive part of a cold turn, so doing it in parallel
 // with the rest of the request (persist the message, reserve the permit, dispatch
 // the command) takes it off the critical path.
 //
@@ -86,7 +86,7 @@ func (rpc *RPC) HandleProbe(ctx context.Context, req *probeRequest) (*probeRespo
 	// never a real token — because a capability's SignatureKey encodes presence, not
 	// the secret.
 	caps := []app.Capability{github.New(githubTokenSentinel(req.HasGithubAuth), "", req.GithubRepoScopeKey)}
-	sig := domain.SignatureOf(req.ProjectID, req.ActorUserID, req.Model, req.EgressAllowlist, app.SignatureKeys(caps), req.MirrorTier, req.Harness)
+	sig := domain.SignatureOf(req.ProjectID, req.ActorUserID, req.Model, req.EgressAllowlist, app.SignatureKeys(caps), req.MirrorTier)
 	return &probeResponse{Alive: rpc.app.HasLiveWorker(req.ConversationID, sig)}, nil
 }
 
@@ -94,7 +94,7 @@ func (rpc *RPC) HandleProbe(ctx context.Context, req *probeRequest) (*probeRespo
 // in-flight turn, the token-burn half of the user's Stop (ADR-078). The stop
 // is already truthful before this arrives (the durable stopped terminal is
 // recorded, the stream ended), so the cancel is fire-and-forget: any miss
-// (no worker, the turn already finished, a harness without abort support) is
+// (no worker, the turn already finished, an agent without abort support) is
 // a 204 that halted nothing, and only the wasted tokens are the cost.
 func (rpc *RPC) HandleCancel(ctx context.Context, req *cancelRequest) error {
 	if !domain.IsValidConversationID(req.ConversationID) {

@@ -21,6 +21,12 @@
 		"userPrompt": "How is my agent performing?"
 	},
 	{
+		"id": "code-changes",
+		"label": "Code changes",
+		"description": "Change the user's own program, on their machine or through GitHub. Use when a request needs a change to the user's code (instrument tracing, wire the SDK, fix the agent behind a failing scenario, add a run parameter to a connected agent, version a hardcoded prompt) and not when the platform alone can do it (create a scenario, an evaluation, a prompt version, read traces).",
+		"category": "skill"
+	},
+	{
 		"id": "connect-agent",
 		"label": "Connect agent",
 		"description": "Connect the codebase's AI agent to LangWatch agent simulations, so test suites run against the real agent process. Adds a small connect function beside the service startup that calls the agent already in the codebase, which opens an outbound connection and registers the agent with its environment and its run parameters, confirms the agent is Online, and runs the first test suite. Falls back to an HTTP registration when the agent cannot import the SDK. Use when the user wants platform scenarios to test their real agent.",

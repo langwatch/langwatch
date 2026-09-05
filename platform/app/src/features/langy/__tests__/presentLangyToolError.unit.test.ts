@@ -327,4 +327,53 @@ describe("presentLangyToolError", () => {
       expect(present(stderr).raw).toContain("ECONNRESET");
     });
   });
+
+  describe("given the sandbox's own gh with no login", () => {
+    const ghOutput = [
+      "To get started with GitHub CLI, please run: gh auth login",
+      "Alternatively, populate the GH_TOKEN environment variable.",
+    ].join("\n");
+
+    const presentGh = () =>
+      presentLangyToolError({
+        title: "Running a command",
+        errorText: ghOutput,
+        toolName: "bash",
+      });
+
+    /** @scenario "The sandbox's own gh never tells the customer to log in" */
+    it("says the LangWatch GitHub App is not installed", () => {
+      expect(presentGh().title).toBe("Install the GitHub App to continue");
+      expect(presentGh().message).toContain("GitHub App");
+    });
+
+    /** @scenario "The sandbox's own gh never tells the customer to log in" */
+    it("carries the code for a missing GitHub App and points at Settings", () => {
+      expect(presentGh().code).toBe("langy_github_not_connected");
+      expect(presentGh().tips?.join(" ")).toContain("Integrations");
+    });
+
+    /** @scenario "The sandbox's own gh never tells the customer to log in" */
+    it("never repeats the instruction as card copy", () => {
+      const presentation = presentGh();
+      expect(presentation.message).not.toContain("gh auth login");
+      expect(presentation.detail).toBeUndefined();
+      // The engine's own words stay behind the disclosure, as they always do.
+      expect(presentation.raw).toContain("gh auth login");
+    });
+  });
+
+  describe("given the developer's own gh in the shared folder", () => {
+    /** @scenario "The developer's own gh keeps its own instruction" */
+    it("keeps gh's instruction, because that shell is theirs", () => {
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        errorText: "To get started with GitHub CLI, please run: gh auth login",
+        toolName: "local_bash",
+      });
+
+      expect(presentation.code).toBeUndefined();
+      expect(presentation.detail).toContain("gh auth login");
+    });
+  });
 });

@@ -37,7 +37,6 @@ import {
   renderLangyConversationMemory,
   renderLangyConversationTranscript,
 } from "~/server/app-layer/langy/langyConversationMemory";
-import type { LangyHarness } from "~/server/app-layer/langy/langyHarness";
 import {
   LANGY_PROMPT_HANDLES,
   LANGY_TURN_OVERRIDE_FALLBACK,
@@ -56,6 +55,7 @@ import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/la
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import type { Session } from "~/server/auth";
 import { featureFlagService } from "~/server/featureFlag";
+import { cancelLocalWorkForTurn } from "~/server/langy-local-control/runtime";
 import { getLangyTurnsCounter } from "~/server/metrics";
 import type { PromptService } from "~/server/prompt-config/prompt.service";
 import {
@@ -74,6 +74,7 @@ import { buildFinalAssistantParts } from "./langy-final-parts";
 import { extractTextFromParts } from "./langy-message.service";
 import { LangyTurnAttempt } from "./langy-turn-attempt";
 import { resolveLangyTurnBaseDependencies } from "./langy-turn-base-dependencies";
+import { normalizeLangyConversationTitle } from "./langyConversationTitle";
 import type { LangyTurnAdmissionRepository } from "./repositories/langy-turn-admission.repository";
 
 const logger = createLogger("langwatch:langy:turn-service");
@@ -199,8 +200,8 @@ const LANGY_UI_ACTIONS_FLAG = "release_langy_ui_actions" as const;
  * off. Resolved here so the two ends agree: an agent told about a command that
  * answers "never deployed" spends the turn on a surface it cannot reach.
  *
- * Never throws — the same contract `resolveLangyHarness` holds. A flag-store
- * blip must not keep a turn from starting, so it resolves to closed: the turn
+ * Never throws: a flag-store blip must not keep a turn from starting, so it
+ * resolves to closed: the turn
  * runs without live page control, which is the flag's own rollback position.
  * Resolving to open would be the worse half of the trade, because it is the
  * one answer that can send the agent to a surface answering "never deployed".
@@ -382,18 +383,6 @@ export interface LangyTurnServiceDeps {
    * open. Optional: absent means the warm assumes the cap is not reached.
    */
   checkPermit?: (args: { userId: string }) => Promise<{ allowed: boolean }>;
-  /**
-   * Which worker harness serves this turn (`release_langy_pi_harness`),
-   * resolved once per turn in the base-dependency phase. Contract:
-   * never throws (see `resolveLangyHarness`). Optional: absent (tests,
-   * minimal compositions) leaves `credentials.harness` unset, which the
-   * manager treats as its default harness.
-   */
-  resolveHarness?: (args: {
-    userId: string;
-    projectId: string;
-    organizationId: string;
-  }) => Promise<LangyHarness>;
   perDayPrCap: number;
   /** Mint the per-turn session key (prisma pre-bound at composition). */
   mintSessionKey: (args: {
@@ -425,8 +414,8 @@ export interface LangyTurnServiceDeps {
  * capability fields into the worker signature, so any drift between the two
  * callers would make every warm boot a worker the turn cannot reuse. The model
  * is part of the signature (a model change is a probe MISS and the worker
- * re-provisions), as are the GitHub scope, the egress list, the ADR-061 mirror
- * tier and the harness.
+ * re-provisions), as are the GitHub scope, the egress list and the ADR-061
+ * mirror tier.
  */
 function buildWorkerProbeArgs({
   projectId,
@@ -454,7 +443,6 @@ function buildWorkerProbeArgs({
       ? { egressAllowlist: credentials.egressAllowlist }
       : {}),
     ...(credentials.mirrorTier ? { mirrorTier: credentials.mirrorTier } : {}),
-    ...(credentials.harness ? { harness: credentials.harness } : {}),
   };
 }
 
@@ -525,7 +513,8 @@ export class LangyTurnService {
     turnId: string;
     userId: string;
   }): Promise<void> {
-    const { tokenBuffer, worker, conversations, accessStore } = this.deps;
+    const { tokenBuffer, worker, conversations, accessStore, handoffStore } =
+      this.deps;
 
     const isActor = accessStore
       ? await accessStore.isTurnActor({
@@ -558,6 +547,20 @@ export class LangyTurnService {
       }
     }
 
+    // Before the terminal, so a dispatch racing this stop reads the marker
+    // rather than the handoff alone: a turn can be admitted (and its handoff
+    // stashed) seconds before any worker runs it, and the outbox re-drives that
+    // handoff on its own schedule. Best-effort — the durable terminal below is
+    // what makes the stop true, and a Redis blip may not hold it up.
+    await handoffStore
+      ?.markStopped({ conversationId, turnId })
+      .catch((error: unknown) => {
+        logger.warn(
+          { error, projectId, conversationId, turnId },
+          "could not record the langy stop marker; a redrive may still dispatch this turn",
+        );
+      });
+
     const partialText = tokenBuffer
       ? await reconstructPartialAnswer(tokenBuffer, { conversationId, turnId })
       : "";
@@ -574,10 +577,15 @@ export class LangyTurnService {
     // End the stream and chase the token burn. Both are best-effort and
     // independent of the durable terminal above; neither may throw back into the
     // mutation, and a wedged worker must not delay the stop the user already got.
+    //
+    // The developer's machine is on the same footing: a command the turn
+    // started keeps running until the command line is told, and a card the turn
+    // raised would wait for an answer nobody will read (ADR-129).
     await Promise.allSettled([
       tokenBuffer?.markEnd({ conversationId, turnId }) ?? Promise.resolve(),
       worker?.cancel({ conversationId, turnId, projectId }) ??
         Promise.resolve(),
+      cancelLocalWorkForTurn({ conversationId, turnId }),
     ]);
   }
 
@@ -905,9 +913,11 @@ export class LangyTurnService {
       // started while the previous reply streamed), and those must not become
       // the title.
       const title =
-        extractTextFromParts(
-          messages.find((message) => message.role === "user")?.parts,
-        ).slice(0, 80) || null;
+        normalizeLangyConversationTitle(
+          extractTextFromParts(
+            messages.find((message) => message.role === "user")?.parts,
+          ),
+        ) || null;
 
       // The per-conversation frame-signing key is created from resolved
       // conversation state, never from a caller-supplied "new" flag.

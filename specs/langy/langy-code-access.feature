@@ -1,0 +1,243 @@
+Feature: Langy asks how to reach the customer's code, once
+  As a developer chatting with Langy about my own application
+  I want Langy to offer to make the change itself, on my machine or through GitHub
+  So that "instrument my traces" ends with a pull request and not with a page of instructions
+
+  # Langy has two ways to change a customer's program: the organization
+  # GitHub App (specs/langy/langy-github-prs.feature) and a folder the
+  # developer shares from their machine (specs/langy/langy-local-control.feature).
+  # This file covers the choice between them: when Langy asks, what it asks
+  # with, what a remembered answer does, and when it never asks at all.
+  #
+  # The card is a choices card (ADR-060). Picking an option is the next user
+  # message, so the turn ends on the question and the answer starts the next
+  # turn. See dev/docs/adr/129-langy-local-control.md.
+
+  Background:
+    Given I am signed in with Langy enabled for a project
+    And the Langy panel is open on a conversation
+
+  Rule: Work that changes the customer's program asks for code access first
+
+    @e2e
+    Scenario: Instrumenting traces offers the two ways to reach the code
+      Given a project with no traces yet
+      When I ask Langy to instrument my traces with LangWatch
+      Then Langy says it can make the change itself
+      And Langy's reply ends with a code access card offering to share my local folder or to use GitHub
+      And the turn settles with no in-flight work awaiting the answer
+
+    @integration
+    Scenario: The card explains each option in the customer's words
+      When the code access card renders
+      Then the local option says it runs the tools I already have on my machine
+      And the GitHub option says it opens a pull request through the LangWatch GitHub App
+      And the GitHub option shows whether the app is installed for my organization
+
+    @integration
+    Scenario: Choosing GitHub continues on the existing pull request path
+      Given an open code access card
+      When I choose to use GitHub
+      Then my choice appears as my own message in the conversation
+      And the next turn carries GitHub credentials the way a pull request turn does
+      And no local folder is requested
+
+    @integration
+    Scenario: Choosing GitHub without the app installed shows the install card
+      Given my organization has not installed the LangWatch GitHub App
+      And an open code access card
+      When I choose to use GitHub
+      Then Langy renders the in-chat Install GitHub App card
+      And no pull request is attempted
+
+    @integration
+    Scenario: The remembered choice is stored before the install card opens
+      Given my organization has not installed the LangWatch GitHub App
+      And an open code access card with the remember option ticked
+      When I choose to use GitHub
+      Then GitHub is remembered for the next conversation
+      And Langy renders the in-chat Install GitHub App card
+
+    @integration
+    Scenario: Choosing the local folder turns the card into the waiting state
+      Given an open code access card
+      When I choose to share my local folder
+      Then the card shows the one command to run in my folder, with a copy button
+      And the card says it is waiting for my approval in the terminal
+      And the card shows when the request expires
+
+    @integration
+    Scenario: A fresh card asks even though the request to share a folder exists
+      Given Langy recorded a request to share a folder when it asked
+      When the code access card renders
+      Then the card offers to share my local folder or to use GitHub
+      And the card shows the command only after I choose the local folder
+
+    @integration
+    Scenario: A card left waiting is still waiting after a reload
+      Given I chose to share my local folder
+      When I reopen the conversation before the folder connects
+      Then the card still shows the command and the countdown
+
+    @integration
+    Scenario: A card that cannot read the folder state says so and offers to try again
+      Given the read of my folder state fails
+      When the code access card renders
+      Then the card says the folder state could not be read
+      And the card offers to try again
+      And the card never keeps its loading line for a read that failed
+
+    @integration
+    Scenario: Only the newest code access card can be answered
+      Given Langy asked for code access earlier in this conversation
+      When Langy asks again
+      Then the earlier card reads as closed and offers no way to answer it
+      And it says the question was asked again further down
+      And only the newest card offers to share my local folder or to use GitHub
+
+    @e2e
+    Scenario: Langy does not ask twice in one conversation
+      Given a conversation with my local folder connected
+      When I ask Langy for a second change to the same application
+      Then Langy makes the change through the connected folder
+      And no code access card is rendered
+
+  Rule: Platform-only work never asks for code access
+
+    @e2e
+    Scenario: Creating a scenario on the platform needs no code
+      When I ask Langy to create a scenario for the refunds flow
+      Then Langy creates the scenario on the platform
+      And no code access card is rendered
+
+    @unit
+    Scenario: The skill names the work that needs code and the work that does not
+      Given the code changes skill
+      When its decision table is read
+      Then instrumenting tracing, wiring the SDK, fixing the agent behind a failing scenario and adding a run parameter to a connected agent need code access
+      And creating a scenario, an evaluation, a prompt version and reading traces do not
+
+  Rule: The skill says how to work in a folder that is connected
+
+    @unit
+    Scenario: The workspace facts are the answer, not something to probe
+      Given the code changes skill
+      When its exploration step is read
+      Then it says the facts the code access tool returned are the answer
+      And it names the GitHub sign-in fact as one of them
+      And it says not to probe for a fact that was already handed over
+
+    @unit
+    Scenario: The sandbox tools are not for the customer's project
+      Given the code changes skill
+      When its exploration step is read
+      Then it says the project lives only in the shared folder
+      And it says the sandbox shell holds none of the project
+      And it says a flag the CLI calls unknown is not retried under another spelling
+
+    @unit
+    Scenario: A change to a connect call is restarted and read back
+      Given the code changes skill
+      When its restart step is read
+      Then it says to restart the process through the local shell in the background
+      And it says to read the agent back until the new parameter is listed
+      And it says never to claim a registration the read does not show
+
+    @unit
+    Scenario: The user's own offer of a choice is a question
+      Given the code changes skill
+      When its asking guidance is read
+      Then it says an explicit offer of the choice is asked with the question tool
+      And it says a choice that picks what gets tested is asked too
+      And it still says to decide routine things without asking
+
+    @unit
+    Scenario: A branch name is picked from the names the folder already has
+      Given the code changes skill
+      When its branching step is read
+      Then it says to list the existing langy branches first
+      And it says to pick a name that is not among them, so one checkout is enough
+
+    @unit
+    Scenario: A pull request body of more than one line goes in a file
+      Given the code changes skill
+      When its pull request step is read
+      Then it says to write the body to a file and pass it with --body-file
+      And it bans the shell quoting that puts escaped newlines on the permission card
+
+    @unit
+    Scenario: The pull request title is the commit subject
+      Given the code changes skill
+      When its pull request step is read
+      Then it says the title is the commit subject with the type prefix removed
+      And it bans adjectives such as comprehensive
+
+    @unit
+    Scenario: A checklist runs before the pull request is opened
+      Given the code changes skill
+      When its pull request step is read
+      Then it says the body may only state what a command in this conversation printed
+      And it says a connect change carries the restart and the agent read in the body
+      And it says to write that the restart is left to the user when it could not run
+      And it says the final message carries the pull request address the command printed
+
+    @unit
+    Scenario: The connected agent skill repeats the same checklist
+      Given the connect agent skill
+      When its reporting step is read
+      Then it says to restart the service and read the parameters back before opening the pull request
+      And it says a registration claim needs the agent read behind it
+
+    @unit
+    Scenario: Every documentation page a skill names exists
+      Given the set of skills Langy ships with
+      When each documentation path they tell the agent to fetch is resolved
+      Then every one of them is a page in the documentation tree
+
+  Rule: A remembered choice skips the question and stays visible
+
+    @integration
+    Scenario: Remembering GitHub answers the next conversation without a card
+      Given I chose GitHub with the remember option in an earlier conversation
+      When Langy needs code access in a new conversation
+      Then no code access card is rendered
+      And a status card reads that Langy is using GitHub because I remembered it
+      And the status card offers to change the choice
+
+    @integration
+    Scenario: Changing the remembered choice stops the turn and asks again
+      Given a status card that reads Langy is using GitHub
+      And a turn is in flight
+      When I choose to change the choice
+      Then the turn stops
+      And the remembered choice is cleared
+      And the next turn renders the code access card
+
+    @integration
+    Scenario: The remembered choice can be cleared from the integrations settings
+      Given I remembered GitHub for code access
+      When I open the integrations settings
+      Then the GitHub section shows that Langy uses GitHub for code changes
+      And clearing it makes the next code change ask again
+
+    @unit
+    Scenario: The local folder is never remembered
+      Given an open code access card
+      When I choose to share my local folder with the remember option
+      Then no preference is stored, because a folder must be shared again each time
+
+  Rule: A shared folder belongs to one conversation
+
+    @integration
+    Scenario: A folder connected in another conversation does not count
+      Given my local folder is connected to a different conversation
+      When Langy needs code access in this conversation
+      Then the code access card is rendered
+      And approving the new request connects the folder to this conversation
+
+    @integration
+    Scenario: A disconnected folder is asked for again
+      Given my local folder was connected to this conversation and the CLI exited
+      When Langy needs code access again
+      Then Langy says the folder is no longer connected
+      And the code access card is rendered with a fresh request

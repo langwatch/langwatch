@@ -72,6 +72,25 @@ export function langyTranscriptRuns(
   return runs;
 }
 
+/** The roles the transcript draws. */
+const TRANSCRIPT_ROLES = new Set<string>(["user", "assistant", "system"]);
+
+/**
+ * Does the panel draw this message?
+ *
+ * `user` and `assistant` are the conversation itself. `system` is a notice the
+ * platform wrote into the transcript, such as the shared folder disconnecting:
+ * the reader must see it, so it is durable and it is drawn, but it is neither a
+ * question nor an answer. Every other role (a `tool` result) belongs to the
+ * activity cards, which read the parts of the message they hang on.
+ *
+ * Both the engine's hydration and the panel's count of durable messages read
+ * this, so the two can never fall out of step.
+ */
+export function isLangyTranscriptMessage(message: { role: string }): boolean {
+  return TRANSCRIPT_ROLES.has(message.role);
+}
+
 /** The prose of an answer run: its text parts, one paragraph break apart. */
 export function langyRunText(parts: readonly unknown[]): string {
   return parts

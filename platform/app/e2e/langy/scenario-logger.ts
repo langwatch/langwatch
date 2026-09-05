@@ -114,7 +114,10 @@ export async function runScenarioAndLog({
 
   try {
     await fs.mkdir(LOG_DIR, { recursive: true });
-    const slug = slugify(testName);
+    const slug = uniqueSlug({
+      testName,
+      runName: (config as { name?: string }).name,
+    });
     const filePath = path.join(LOG_DIR, `${slug}.md`);
     await fs.writeFile(
       filePath,
@@ -125,6 +128,33 @@ export async function runScenarioAndLog({
     // intentionally silent — see jsdoc above.
   }
   return result;
+}
+
+/** Every transcript this process has written, so a second one keeps the first. */
+const writtenSlugs = new Set<string>();
+
+/**
+ * The file one transcript lands in.
+ *
+ * A test that runs several scenarios wrote them all to the same name, so the
+ * closing run stood for the whole test: a passing test could leave a FAIL
+ * transcript on disk, because that closing run is graded on criteria the
+ * asserted one never carried. The first run of a test keeps the plain name,
+ * and the ones after it carry the run's own name.
+ */
+function uniqueSlug({
+  testName,
+  runName,
+}: {
+  testName: string;
+  runName?: string;
+}): string {
+  const base = slugify(testName);
+  const slug = writtenSlugs.has(base)
+    ? `${base}--${slugify(runName ?? String(writtenSlugs.size))}`
+    : base;
+  writtenSlugs.add(slug);
+  return slug;
 }
 
 function slugify(name: string): string {

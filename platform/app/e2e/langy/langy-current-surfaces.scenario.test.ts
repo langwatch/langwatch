@@ -98,7 +98,7 @@ describe("Langy current-surfaces coverage", () => {
 
     // "guardrails" and "cache-rules" scenarios were DROPPED here — verified
     // directly against the `langwatch` CLI (Langy's only LangWatch transport,
-    // see services/langyagent/adapters/opencode/provision.go) that neither
+    // see services/langyagent/adapters/pi/spawn.go) that neither
     // has a CLI surface at all (`langwatch --help` lists no such subcommand,
     // unlike `virtual-keys` and `gateway-budgets` which do exist and ARE
     // covered above/below). Testing an absent capability doesn't exercise

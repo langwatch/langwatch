@@ -1,8 +1,8 @@
 // Package pi drives a langy-worker subprocess, the TypeScript wrapper
 // embedding the pi coding agent, over the stdio JSONL protocol documented in
-// services/langyworker/PROTOCOL.md. It is the sibling of adapters/opencode:
-// the pool provisions + spawns through it, and the app drives each turn
-// through the app.CodingAgent port it implements.
+// services/langyworker/PROTOCOL.md. The pool provisions and spawns through it,
+// and the app drives each turn through the app.CodingAgent port it
+// implements.
 package pi
 
 import "encoding/json"

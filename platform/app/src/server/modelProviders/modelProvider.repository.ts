@@ -77,6 +77,28 @@ function routingHandleWrite({
   return routingHandle === undefined ? {} : { routingHandle };
 }
 
+/**
+ * The Langy skip-permissions field of a write, or nothing when the caller left
+ * it out. An explicit null writes DB null, which is how the operator clears
+ * their list and returns the provider to the registry default. `Prisma.JsonNull`
+ * rather than a bare null, which `InputJsonValue` refuses.
+ */
+function langySkipPermissionsModelsWrite({
+  langySkipPermissionsModels,
+}: {
+  langySkipPermissionsModels: string[] | null | undefined;
+}): {
+  langySkipPermissionsModels?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+} {
+  if (langySkipPermissionsModels === undefined) return {};
+  return {
+    langySkipPermissionsModels:
+      langySkipPermissionsModels === null
+        ? Prisma.JsonNull
+        : (langySkipPermissionsModels as Prisma.InputJsonValue),
+  };
+}
+
 export class ModelProviderRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -266,6 +288,8 @@ export class ModelProviderRepository {
       rateLimitRpd?: number | null;
       fallbackPriorityGlobal?: number | null;
       providerConfig?: Record<string, unknown> | null;
+      /** Regex sources; null clears the column and restores the default. */
+      langySkipPermissionsModels?: string[] | null;
     },
     tx?: Prisma.TransactionClient,
   ): Promise<ModelProviderWithScopes> {
@@ -323,6 +347,9 @@ export class ModelProviderRepository {
               ? Prisma.JsonNull
               : (data.providerConfig as Prisma.InputJsonValue),
         }),
+        ...langySkipPermissionsModelsWrite({
+          langySkipPermissionsModels: data.langySkipPermissionsModels,
+        }),
         scopes: {
           create: scopes.map((scope) => ({
             id: generate(KSUID_RESOURCES.MODEL_PROVIDER_SCOPE).toString(),
@@ -357,11 +384,14 @@ export class ModelProviderRepository {
       rateLimitRpd?: number | null;
       fallbackPriorityGlobal?: number | null;
       providerConfig?: Record<string, unknown> | null;
+      /** Regex sources; null clears the column and restores the default. */
+      langySkipPermissionsModels?: string[] | null;
     },
     tx?: Prisma.TransactionClient,
   ): Promise<ModelProviderWithScopes> {
     const encryptedKeys = this.encryptCustomKeys(data.customKeys);
-    const { scopes, providerConfig, ...rest } = data;
+    const { scopes, providerConfig, langySkipPermissionsModels, ...rest } =
+      data;
 
     const runUpdate = async (workingTx: Prisma.TransactionClient) => {
       if (scopes) {
@@ -412,6 +442,7 @@ export class ModelProviderRepository {
                 ? Prisma.JsonNull
                 : (providerConfig as Prisma.InputJsonValue),
           }),
+          ...langySkipPermissionsModelsWrite({ langySkipPermissionsModels }),
         },
         include: { scopes: true },
       });

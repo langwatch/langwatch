@@ -36227,6 +36227,8 @@ Connect the agent in this codebase to LangWatch, so test suites run from the pla
 
 Three steps: install the SDK, add the connect function where the service starts, start the service the way the user always starts it. Work through them in order, confirm the agent reads Online, run one test suite, then report what changed and the result.
 
+In Langy, do not print the change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 Use the HTTP fallback at the bottom of this skill ONLY when the agent cannot import the SDK: the agent is written in a language with no LangWatch SDK, or you have no access to its code.
 
 ## Step 1: Set up the LangWatch CLI
@@ -36478,6 +36480,16 @@ Report to the user:
 
 Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can contain secrets and tell the user nothing they can act on. Do NOT claim a scenario or a test suite ran when it did not.
 
+### When the change goes into a pull request
+
+A change to the connect call is not live until the process that holds it starts again, so the registration you report has to come from a process you restarted in this conversation. Before you run `gh pr create`:
+
+1. Restart the service that holds the connect call, on the same port.
+2. Run `langwatch agent get <name>` and read the parameter list back.
+3. Put that list in the pull request body, as the command printed it.
+
+When you could not restart the process, write in the body, in one line, that the restart is left to the user and that the parameters are not registered yet. A sentence such as "confirmed the connected agent registered both options" is false unless the `agent get` output in this conversation lists both options. Copy the pull request address that `gh pr create` prints into your reply as well, character for character.
+
 A connected setup shows, on the run page: the conversation transcript, a trace link on each turn opening the agent's own spans, and judge reasoning that cites spans.
 
 ## Plan Limits
@@ -36557,7 +36569,7 @@ Confirm the agent reports its traces to the same LangWatch project that runs the
 
 Ask the user for the URL where this service is deployed, and wait for the answer. A staging deployment is the recommended target: it exercises the real system without touching production data. Any URL the LangWatch backend can reach works; an internal hostname or a firewalled service does not.
 
-If the agent only runs on the user's machine, register it as below and then run `langwatch agent dev --port <port> --agent <agent-id>`, which opens a tunnel to the local port and points the registered agent at it for the session. Keep it running while test suites execute; Ctrl-C restores the previous URL.
+If the agent only runs on the user's machine, register it as below and then run `langwatch agent tunnel --port <port> --agent <agent-id>`, which opens a tunnel to the local port and points the registered agent at it for the session. Keep it running while test suites execute; Ctrl-C restores the previous URL.
 
 ### Register and run
 
@@ -36613,6 +36625,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 - Do NOT stop the agent process while a run is executing. Every turn of the run calls it.
 - Do NOT reach for the HTTP fallback because the decorator looks like more work. It is fewer steps: no public URL, no body template, no credential in the agent configuration, no middleware.
 - Do NOT report success when a command failed. An unreachable platform or a failed run is part of the report, named per step.
+- Do NOT write a registration into a pull request body without the `langwatch agent get` output that shows it. A body that states what no command in the conversation printed is a false report.
 ````
 
         </div>
@@ -37176,7 +37189,7 @@ The process on your machine reaches out to LangWatch, so there is no tunnel, no 
 The row stays after the process stops. It keeps the agent identity, the declared parameters and the run history, so the next process that connects under the same name and environment continues the same row.
 
 <Note>
-  An HTTP agent that runs on your machine is a different case: the platform calls it, so it needs a reachable URL. `langwatch agent dev` covers that, see [Other ways to connect](/agent-testing/other-ways-to-connect).
+  An HTTP agent that runs on your machine is a different case: the platform calls it, so it needs a reachable URL. `langwatch agent tunnel` covers that, see [Other ways to connect](/agent-testing/other-ways-to-connect).
 </Note>
 
 ## Compare production against your machine
@@ -37436,7 +37449,7 @@ For the full SDK reference, see the [Scenario documentation](https://langwatch.a
 ---
 title: Other Ways to Connect
 sidebarTitle: Other ways to connect
-keywords: langwatch, agent simulations, http agent, code agent, langwatch agent dev, tunnel, body template, output path, traceparent
+keywords: langwatch, agent simulations, http agent, code agent, langwatch agent tunnel, agent dev, tunnel, body template, output path, traceparent
 description: Register an agent by its HTTP endpoint, front a local process with a tunnel, or run a small piece of Python as the target, when the SDK cannot run inside your agent.
 ---
 
@@ -37447,7 +37460,7 @@ description: Register an agent by its HTTP endpoint, front a local process with 
 | Path | Use it when |
 |---|---|
 | **HTTP agent** | The agent is written in a language with no LangWatch SDK, or you cannot change its code and only have a URL. |
-| **`langwatch agent dev`** | An HTTP agent runs on your own machine and the platform needs a reachable URL for the session. |
+| **`langwatch agent tunnel`** | An HTTP agent runs on your own machine and the platform needs a reachable URL for the session. |
 | **Code agent** | The target is a few lines of glue: a credential exchange, or a call into an API that needs no repository of its own. |
 
 ## HTTP agents
@@ -37595,19 +37608,19 @@ langwatch test-suite run 'Smoke' --target http:<agent-id> --wait
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| The run fails with a connection error | The URL is not reachable from the LangWatch backend: an internal hostname, a firewall, or a stopped service. | Deploy the endpoint to a reachable URL, or use `langwatch agent dev` below for a local process. |
+| The run fails with a connection error | The URL is not reachable from the LangWatch backend: an internal hostname, a firewall, or a stopped service. | Deploy the endpoint to a reachable URL, or use `langwatch agent tunnel` below for a local process. |
 | Every turn fails with 401 or 403 | The credential is missing or wrong: no header row or `auth` block, or the `{{ secrets.NAME }}` reference points at a secret the project does not have. | Add the header row or `auth` block, and check the secret's name and project in **Settings > Secrets**. |
 | The transcript shows empty replies or raw JSON | `outputPath` does not match the response shape, so no reply text is found. | Set `outputPath` to the JSONPath of the reply text in your endpoint's real response. |
 | Trace-dependent criteria come back inconclusive, and turns have no trace link | The server does not adopt the incoming `traceparent`, or it reports traces to a different LangWatch project. | Adopt the context as in step 4, and point the agent's tracing at the same project's API key. |
 
-## A local HTTP agent: `langwatch agent dev`
+## A local HTTP agent: `langwatch agent tunnel`
 
-`langwatch agent dev` starts a tunnel in front of a local port, points a registered HTTP agent's URL at the tunnel, and restores the previous URL when you stop it with Ctrl-C. While it runs, every scenario run against that agent calls straight into the process on your machine.
+`langwatch agent tunnel` starts a tunnel in front of a local port, points a registered HTTP agent's URL at the tunnel, and restores the previous URL when you stop it with Ctrl-C. While it runs, every scenario run against that agent calls straight into the process on your machine.
 
-A connected agent needs none of this: it reaches out from your machine, so a local process is a target with no tunnel and no URL rewrite. `agent dev` is for HTTP agents.
+A connected agent needs none of this: it reaches out from your machine, so a local process is a target with no tunnel and no URL rewrite. `agent tunnel` is for HTTP agents.
 
 ```bash
-langwatch agent dev --port 8010
+langwatch agent tunnel --port 8010
 ```
 
 ```text
@@ -37617,7 +37630,7 @@ Run your scenarios: https://app.langwatch.ai/my-project/agent-testing
 Ctrl-C restores the previous URL.
 ```
 
-With no `--agent` flag, the command lists the project's HTTP agents to pick from, and remembers the choice per project directory in `~/.langwatch/config.json`. `langwatch agent tunnel` is an alias for the same command.
+With no `--agent` flag, the command lists the project's HTTP agents to pick from, and remembers the choice per project directory in `~/.langwatch/config.json`. `langwatch agent dev` is an alias for the same command.
 
 | Flag | Effect |
 |---|---|
@@ -37630,7 +37643,7 @@ With no `--agent` flag, the command lists the project's HTTP agents to pick from
 
 ### How the tunnel is protected
 
-The tunnel URL is public, and your local agent process usually holds real model provider keys. `langwatch agent dev` mints a per-session secret, fronts your local port with a proxy that rejects any request missing the `X-LangWatch-Dev-Secret` header, and writes that header onto the agent's configuration for the session. Only the platform's scenario calls send the secret. On exit, the command removes both the proxy and the header row.
+The tunnel URL is public, and your local agent process usually holds real model provider keys. `langwatch agent tunnel` mints a per-session secret, fronts your local port with a proxy that rejects any request missing the `X-LangWatch-Dev-Secret` header, and writes that header onto the agent's configuration for the session. Only the platform's scenario calls send the secret. On exit, the command removes both the proxy and the header row.
 
 `--no-auth` turns the proxy off, for a server that already authenticates every request. A bring-your-own tunnel (`--tunnel-url`) also runs without the proxy, so that tunnel endpoint must supply its own access control. The agent's own configured authentication headers pass through the tunnel unchanged either way.
 
@@ -37646,7 +37659,7 @@ The default transport is a Cloudflare quick tunnel on `trycloudflare.com`. The c
 
 `--tunnel-url` swaps in your own tunnel when you hit these limits.
 
-A crash or a kill signal the process cannot catch skips the restore, and the agent keeps pointing at a dead tunnel. Calls to it then fail with an error saying the tunnel session probably ended, and the **local tunnel** badge stays visible. Run `langwatch agent dev` again to take the agent over with a fresh tunnel, or set the agent's URL back by hand in the agent editor.
+A crash or a kill signal the process cannot catch skips the restore, and the agent keeps pointing at a dead tunnel. Calls to it then fail with an error saying the tunnel session probably ended, and the **local tunnel** badge stays visible. Run `langwatch agent tunnel` again to take the agent over with a fresh tunnel, or set the agent's URL back by hand in the agent editor.
 
 ## Code agents
 
@@ -39254,7 +39267,7 @@ The parameters of a run reach the target: an HTTP agent reads them as `{{ params
 
 ## Local tunnel
 
-While `langwatch agent dev` runs, the HTTP agent points at a developer's machine, and the agents list and the run dialog show a **Local tunnel** mark on it. See [Local development](/agent-testing/other-ways-to-connect).
+While `langwatch agent tunnel` runs, the HTTP agent points at a developer's machine, and the agents list and the run dialog show a **Local tunnel** mark on it. See [Local development](/agent-testing/other-ways-to-connect).
 
 ## Targets of scenarios written in code
 
@@ -52434,6 +52447,8 @@ If the user's request is **specific** ("add tracing to the payment function", "t
 
 This skill is code-only: there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation.
 
+In Langy, do not print the change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 ## Step 1: Read the Integration Docs
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
@@ -52480,12 +52495,15 @@ LangWatch.
 Then fetch the integration guide for this project's framework:
 
 ```bash
-langwatch docs integration/python/guide        # Python (general)
-langwatch docs integration/typescript/guide    # TypeScript (general)
-langwatch docs integration/python/langgraph    # Framework-specific (example)
+langwatch docs integration/python/guide                      # Python (general)
+langwatch docs integration/typescript/guide                  # TypeScript (general)
+langwatch docs integration/python/integrations/open-ai       # Framework page
+langwatch docs integration/typescript/integrations/mastra    # Framework page
 ```
 
-Pick the page matching the project's framework (OpenAI, LangGraph, Vercel AI, Agno, Mastra, etc.) and read it before writing any code.
+A framework page lives at `integration/<language>/integrations/<framework>`, never at `integration/<language>/<framework>`. The framework slug is the vendor's name with a hyphen between the words: `open-ai`, `open-ai-agents`, `open-ai-azure`, `aws-bedrock`, `google-ai`, `vertex-ai`, `lite-llm`, `crew-ai`, `pydantic-ai`, `strand-agents`, `vercel-ai-sdk`, plus the one-word ones (`langchain`, `langgraph`, `agno`, `anthropic`, `mastra`, `haystack`, `llamaindex`, `instructor`, `dspy`, `autogen`, `smolagents`, `semantic-kernel`, `promptflow`, `azure-ai`).
+
+Run `langwatch docs` with no path when you are unsure: it prints the index of every page. `docs` prints the page as markdown and takes no `--output`, `--json`, `--jq` or `--format`; if a fetch returns 404 the path is wrong, so read the index rather than guessing another spelling.
 
 CRITICAL: Do NOT guess how to instrument. Different frameworks have different instrumentation patterns; always read the framework-specific guide first.
 
@@ -53122,7 +53140,7 @@ For a guardrail:
         </span>
         <div className="lw-prompt-source">
 
-`````text
+````text
 Help me evaluate my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
@@ -53143,23 +53161,7 @@ Classify the user's intent:
 
 If the request remains ambiguous after inspecting context (a bare "make me an eval" that names neither a dataset nor live traffic), do not create anything yet. This choice picks what gets tested, so it is the user's to make, not a default's. Ask it as a question card and stop; the answer arrives as the next message.
 
-Where `langy-card` blocks render, ask it as a `choices` block (the only sanctioned question format) last in the reply:
-
-````markdown
-```langy-card
-{
-  "kind": "choices",
-  "blockId": "eval-kind",
-  "question": "What should this evaluate?",
-  "options": [
-    { "id": "experiment", "label": "A dataset, before deployment" },
-    { "id": "online", "label": "Live production traffic" }
-  ]
-}
-```
-````
-
-Neither option names an existing entity, so neither carries a `ref`. Without that channel, ask the same question as one short line of prose.
+In Langy, ask it with the `question` tool and stop; the options are the concrete alternatives, for example "A dataset, before deployment" and "Live production traffic". Elsewhere, ask the same question as one short line of prose.
 
 A rejected field value is not this kind of choice. If a create later fails with a `validation_error` whose reason names the field and an `expected` list, correct that exact field from the list and retry once. Never turn a fixable slug into a question for the user.
 
@@ -53180,7 +53182,7 @@ Then hand off:
    ```
 
 Do not recreate the companion skill's instructions from memory. Load the focused skill so its current workflow, safety checks, and verification steps are used.
-`````
+````
 
         </div>
       </div>
@@ -53295,6 +53297,8 @@ A failing test tells you WHERE the agent fails, not that the prompt is where to 
 6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
 
 Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+
+In Langy, do not print the fix for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 
@@ -54295,6 +54299,8 @@ Connect the agent in this codebase to LangWatch, so test suites run from the pla
 
 Three steps: install the SDK, add the connect function where the service starts, start the service the way the user always starts it. Work through them in order, confirm the agent reads Online, run one test suite, then report what changed and the result.
 
+In Langy, do not print the change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 Use the HTTP fallback at the bottom of this skill ONLY when the agent cannot import the SDK: the agent is written in a language with no LangWatch SDK, or you have no access to its code.
 
 ## Step 1: Set up the LangWatch CLI
@@ -54546,6 +54552,16 @@ Report to the user:
 
 Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can contain secrets and tell the user nothing they can act on. Do NOT claim a scenario or a test suite ran when it did not.
 
+### When the change goes into a pull request
+
+A change to the connect call is not live until the process that holds it starts again, so the registration you report has to come from a process you restarted in this conversation. Before you run `gh pr create`:
+
+1. Restart the service that holds the connect call, on the same port.
+2. Run `langwatch agent get <name>` and read the parameter list back.
+3. Put that list in the pull request body, as the command printed it.
+
+When you could not restart the process, write in the body, in one line, that the restart is left to the user and that the parameters are not registered yet. A sentence such as "confirmed the connected agent registered both options" is false unless the `agent get` output in this conversation lists both options. Copy the pull request address that `gh pr create` prints into your reply as well, character for character.
+
 A connected setup shows, on the run page: the conversation transcript, a trace link on each turn opening the agent's own spans, and judge reasoning that cites spans.
 
 ## Plan Limits
@@ -54625,7 +54641,7 @@ Confirm the agent reports its traces to the same LangWatch project that runs the
 
 Ask the user for the URL where this service is deployed, and wait for the answer. A staging deployment is the recommended target: it exercises the real system without touching production data. Any URL the LangWatch backend can reach works; an internal hostname or a firewalled service does not.
 
-If the agent only runs on the user's machine, register it as below and then run `langwatch agent dev --port <port> --agent <agent-id>`, which opens a tunnel to the local port and points the registered agent at it for the session. Keep it running while test suites execute; Ctrl-C restores the previous URL.
+If the agent only runs on the user's machine, register it as below and then run `langwatch agent tunnel --port <port> --agent <agent-id>`, which opens a tunnel to the local port and points the registered agent at it for the session. Keep it running while test suites execute; Ctrl-C restores the previous URL.
 
 ### Register and run
 
@@ -54681,6 +54697,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 - Do NOT stop the agent process while a run is executing. Every turn of the run calls it.
 - Do NOT reach for the HTTP fallback because the decorator looks like more work. It is fewer steps: no public URL, no body template, no credential in the agent configuration, no middleware.
 - Do NOT report success when a command failed. An unreachable platform or a failed run is part of the report, named per step.
+- Do NOT write a registration into a pull request body without the `langwatch agent get` output that shows it. A body that states what no command in the conversation printed is a false report.
 ````
 
         </div>
@@ -54754,6 +54771,8 @@ If the user's request is **specific** ("version this prompt", "create a new prom
 - Focus on the specific prompt
 - Create or update the managed prompt
 - Update the relevant code to use `langwatch.prompts.get()`
+
+In Langy, do not print the code change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 
@@ -55776,6 +55795,8 @@ If the user's request is **specific** ("add tracing to the payment function", "t
 
 This skill is code-only: there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation.
 
+In Langy, do not print the change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 ## Step 1: Read the Integration Docs
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
@@ -55822,12 +55843,15 @@ LangWatch.
 Then fetch the integration guide for this project's framework:
 
 ```bash
-langwatch docs integration/python/guide        # Python (general)
-langwatch docs integration/typescript/guide    # TypeScript (general)
-langwatch docs integration/python/langgraph    # Framework-specific (example)
+langwatch docs integration/python/guide                      # Python (general)
+langwatch docs integration/typescript/guide                  # TypeScript (general)
+langwatch docs integration/python/integrations/open-ai       # Framework page
+langwatch docs integration/typescript/integrations/mastra    # Framework page
 ```
 
-Pick the page matching the project's framework (OpenAI, LangGraph, Vercel AI, Agno, Mastra, etc.) and read it before writing any code.
+A framework page lives at `integration/<language>/integrations/<framework>`, never at `integration/<language>/<framework>`. The framework slug is the vendor's name with a hyphen between the words: `open-ai`, `open-ai-agents`, `open-ai-azure`, `aws-bedrock`, `google-ai`, `vertex-ai`, `lite-llm`, `crew-ai`, `pydantic-ai`, `strand-agents`, `vercel-ai-sdk`, plus the one-word ones (`langchain`, `langgraph`, `agno`, `anthropic`, `mastra`, `haystack`, `llamaindex`, `instructor`, `dspy`, `autogen`, `smolagents`, `semantic-kernel`, `promptflow`, `azure-ai`).
+
+Run `langwatch docs` with no path when you are unsure: it prints the index of every page. `docs` prints the page as markdown and takes no `--output`, `--json`, `--jq` or `--format`; if a fetch returns 404 the path is wrong, so read the index rather than guessing another spelling.
 
 CRITICAL: Do NOT guess how to instrument. Different frameworks have different instrumentation patterns; always read the framework-specific guide first.
 
@@ -55895,6 +55919,8 @@ If the user's request is **specific** ("version this prompt", "create a new prom
 - Focus on the specific prompt
 - Create or update the managed prompt
 - Update the relevant code to use `langwatch.prompts.get()`
+
+In Langy, do not print the code change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 
@@ -56439,6 +56465,8 @@ A failing test tells you WHERE the agent fails, not that the prompt is where to 
 6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
 
 Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+
+In Langy, do not print the fix for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 
@@ -59605,6 +59633,8 @@ A failing test tells you WHERE the agent fails, not that the prompt is where to 
 
 Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
 
+In Langy, do not print the fix for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 ## Plan Limits
 
 LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments, and datasets. When you hit a limit, the API returns `"Free plan limit of N reached..."` with an upgrade link.
@@ -60565,7 +60595,7 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
         </span>
         <div className="lw-prompt-source">
 
-`````text
+````text
 Help me evaluate my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
@@ -60586,23 +60616,7 @@ Classify the user's intent:
 
 If the request remains ambiguous after inspecting context (a bare "make me an eval" that names neither a dataset nor live traffic), do not create anything yet. This choice picks what gets tested, so it is the user's to make, not a default's. Ask it as a question card and stop; the answer arrives as the next message.
 
-Where `langy-card` blocks render, ask it as a `choices` block (the only sanctioned question format) last in the reply:
-
-````markdown
-```langy-card
-{
-  "kind": "choices",
-  "blockId": "eval-kind",
-  "question": "What should this evaluate?",
-  "options": [
-    { "id": "experiment", "label": "A dataset, before deployment" },
-    { "id": "online", "label": "Live production traffic" }
-  ]
-}
-```
-````
-
-Neither option names an existing entity, so neither carries a `ref`. Without that channel, ask the same question as one short line of prose.
+In Langy, ask it with the `question` tool and stop; the options are the concrete alternatives, for example "A dataset, before deployment" and "Live production traffic". Elsewhere, ask the same question as one short line of prose.
 
 A rejected field value is not this kind of choice. If a create later fails with a `validation_error` whose reason names the field and an `expected` list, correct that exact field from the list and retry once. Never turn a fixable slug into a question for the user.
 
@@ -60623,7 +60637,7 @@ Then hand off:
    ```
 
 Do not recreate the companion skill's instructions from memory. Load the focused skill so its current workflow, safety checks, and verification steps are used.
-`````
+````
 
         </div>
       </div>
@@ -60897,15 +60911,15 @@ keywords:
 
 ---
 title: How Langy works
-description: "Each Langy conversation is one opencode worker in a gVisor sandbox: it reads LangWatch through the langwatch CLI, calls models through the LangWatch AI Gateway, and ships code only as pull requests."
+description: "Each Langy conversation is one agent worker in a gVisor sandbox: it reads LangWatch through the langwatch CLI, calls models through the LangWatch AI Gateway, and ships code only as pull requests."
 sidebarTitle: How Langy works
 keywords:
   - how langy works
   - ai agent architecture
-  - opencode harness
+  - langy agent worker
 ---
 
-Langy runs on [opencode](https://github.com/anomalyco/opencode) as a separate service, `langyagent`, next to the LangWatch app. The app dispatches each chat turn to it; `langyagent` keeps one opencode process per conversation and reaps it when the conversation goes idle.
+Langy runs as a separate service, `langyagent`, next to the LangWatch app. The app dispatches each chat turn to it; `langyagent` keeps one agent worker process per conversation and reaps it when the conversation goes idle.
 
 The worker does the actual reading, testing, and code editing. Every tool call it makes streams back into the chat as a typed activity, and every turn is a traced run in your project.
 
@@ -60920,7 +60934,7 @@ graph LR
   browser["Browser<br/>(event-sourced chat UI)"]
   control["LangWatch control plane<br/>(turn processor, event log)"]
   manager["langyagent pod<br/>(Go manager)"]
-  worker["opencode worker<br/>(one per conversation, gVisor-sandboxed)"]
+  worker["Agent worker<br/>(one per conversation, gVisor-sandboxed)"]
   cli["langwatch CLI<br/>&rarr; LangWatch API"]
   gateway["LangWatch AI Gateway<br/>(model calls)"]
   github["GitHub App<br/>(bot-authored PRs)"]
@@ -60938,8 +60952,8 @@ graph LR
 |---|---|
 | Browser | The chat panel. Event-sourced: a refresh resumes the conversation, an in-flight turn keeps streaming. |
 | Control plane | The turn processor in the LangWatch app. Admits each turn, dispatches it to the agent, logs every tool call as a typed event. |
-| `langyagent` | The agent service. Spawns one opencode worker per conversation. Single replica; scale vertically. |
-| opencode worker | The coding agent itself, inside the gVisor sandbox, holding that conversation's credentials, repo clone, and skills. Reaped after ~10 minutes idle, home wiped. |
+| `langyagent` | The agent service. Spawns one worker per conversation. Single replica; scale vertically. |
+| Agent worker | The coding agent itself, inside the gVisor sandbox, holding that conversation's credentials, repo clone, and skills. Reaped after ~10 minutes idle, home wiped. |
 
 The agent service is cluster-internal only, never exposed outside; auth and networking details are on the [self-hosting overview](/self-hosting/langy/overview).
 
@@ -61018,6 +61032,106 @@ When something is worth watching past a single question, ask Langy to set up an 
 Langy sets these up with `langwatch monitor create` and `langwatch trigger create`, so the alert or automation lives in your project like any other, not inside the chat. You change or remove it the same way you would one you made yourself.
 
 <Note>These are things you ask Langy to do, on the window and metric you name. Langy analyzes your traces and sets up monitors when you ask; it does not watch and act on its own.</Note>
+
+---
+
+# FILE: ./langy/local-development.mdx
+
+---
+title: Local development
+description: "Share a folder on your machine with Langy: it edits your code there, runs your own toolchain, and opens the pull request from your git identity, with every command checked in the chat."
+sidebarTitle: Local development
+keywords:
+  - langy share control
+  - ai agent local folder
+  - langwatch langy cli
+---
+
+Langy reaches your code in two ways. It can open a [pull request through the GitHub App](/langy/pull-requests), or it can work in a folder you share from your machine. The shared folder is the faster path when you sit at your computer: there is no clone, the checks run with the toolchain you already have, and the pull request opens from your own `gh` login.
+
+Langy asks which way to use the first time a request needs a code change. Requests that the platform can do on its own, such as creating a scenario or an evaluation, never ask.
+
+<Info>**Also check:** [Pull requests](/langy/pull-requests) (the GitHub path), [The sandbox](/langy/security/sandbox) (where Langy itself runs), [CLI](/integration/cli) (the `langwatch` command).</Info>
+
+## How a shared folder works
+
+<Steps>
+  <Step title="Ask for a change">
+    Ask Langy for something that lives in your code: "instrument my traces", "fix the agent behind this failing scenario", "add a plan parameter to my connected agent". Langy explains what it will change and shows the code access card with two options: share your local folder, or use GitHub.
+  </Step>
+  <Step title="Run the command in the folder">
+    Pick "Share my local folder". The card shows one command. Run it in the folder you want Langy to work in:
+
+    ```bash
+    npx langwatch@latest langy --share-control
+    ```
+
+    The command signs you in when you are not signed in yet, then shows the request from your conversation and asks you to approve it in the terminal. The request expires after 15 minutes.
+  </Step>
+  <Step title="Langy works in the folder">
+    Once approved, the card shows the connected folder and the branch, and Langy starts. It explores the project, creates a branch from the latest default branch, makes the change, runs the project's own checks, commits in your git identity, pushes, and opens the pull request when `gh` is signed in. When it is not, Langy reports the branch name instead.
+  </Step>
+  <Step title="Disconnect">
+    Press Ctrl-C in the terminal to disconnect. The chat shows the folder as disconnected. The next request that needs code access asks again.
+  </Step>
+</Steps>
+
+The connection belongs to one conversation. A second code change in the same conversation uses the folder that is already connected. A new conversation asks again.
+
+{/* TODO screenshot: the code access card in the waiting state next to the terminal approve prompt */}
+
+## What Langy can do in the folder
+
+Every action runs on your machine, inside the shared folder, through the CLI. Langy cannot see or touch anything outside it.
+
+| Action | Asks first |
+|---|---|
+| Read a file, list a directory, search for text or files | No |
+| Edit a file, write a new file | No |
+| Run a read-only command (`ls`, `cat`, `git status`, `git diff`, `git log`, `node -v`, and similar) | No |
+| Run any other command (`pnpm test`, `git push`, `rm`) | Yes |
+| Read a secret file (`.env`, `*.pem`, `*.key`, `id_rsa`, `.netrc`) | Yes, even to read |
+| Reach a path outside the folder, or use `sudo` | Refused in every mode |
+
+Edits inside the folder run without a question because Langy works on its own branch: your working state and your default branch stay untouched, and the pull request is where you review the change.
+
+A refused action is not silent. The CLI tells Langy why it was refused, and Langy finds another way inside the folder or says what it could not do.
+
+## Permissions
+
+When a command needs approval, you can answer in the terminal or in the chat. The terminal shows a selector under the transcript, and the chat shows a permission card with the command, the folder and the machine name. Both offer the same three answers:
+
+- **Allow this pattern this session** runs this command and, until you disconnect, every command that starts the same way, for example `pnpm *`. This is the first option in the terminal, so Enter takes it.
+- **Allow once** runs this command.
+- **Deny** refuses it. Langy does not run it again in that turn. In the terminal you can add one line saying what to do instead.
+
+The first answer wins. Answer in the terminal and the card settles and says so, for example "Answered in the terminal: allowed "uv" for this session". Answer on the card and the terminal closes its selector and prints the answer.
+
+When the command line is not running in a terminal, in a pipe or in CI, it shows no selector and the card is the only way to answer.
+
+A card that gets no answer within 10 minutes expires, and Langy ends its turn and says what it still needs.
+
+### Skip permission checks
+
+The permission card carries a switch to skip all permission checks for the rest of the connection. It is on the card only, because the model gate behind it lives on the server. Refusals for paths outside the folder and for `sudo` still apply.
+
+The switch is enabled only for models your provider settings allow. Open the provider in **Settings > Model providers**, section **Advanced**, field **Models allowed to skip permission checks**: one pattern per line. The defaults allow the frontier OpenAI and Anthropic models and no others. When the conversation's model is not on the list, the switch is disabled and says so.
+
+## Remembering GitHub
+
+The code access card has a "Remember this choice" option for GitHub. With it on, later requests skip the card and show a status line, "Using GitHub", with a **Change** link that clears the choice and asks again.
+
+The same choice is visible in **Settings > Integrations**, next to the GitHub connection. A shared local folder is never remembered: it is one command away and belongs to one conversation.
+
+## What the CLI does and does not do
+
+- The connection is outbound only, from your machine to LangWatch. The CLI opens no listening port and accepts no inbound connection.
+- The CLI receives a key scoped to the one conversation. Ctrl-C ends it. You can also disconnect from the chat.
+- Command output returns to Langy when the command ends, capped at 64 KiB. Longer output is kept in a log file under `.langwatch/langy-logs/` in the folder, and Langy gets the path.
+- A server Langy starts in the background keeps running after the CLI exits. Langy reports its process id and log path.
+- The CLI is not installed on your machine. `npx langwatch@latest` runs it from the registry.
+
+Self-hosting? The CLI connects to your instance's base URL. See [Networking and egress](/self-hosting/langy/networking-and-egress#local-control-connections) for the one route your ingress must pass through.
 
 ---
 
@@ -61126,7 +61240,7 @@ Langy uses your own model accounts and API keys. Every turn it takes is itself a
     Enable Langy, pick a model or sign in with Codex, and review the first pull request.
   </Card>
   <Card title="How Langy works" icon="diagram-project" href="/langy/how-langy-works">
-    The mechanism: a gVisor-sandboxed opencode worker whose only interface to LangWatch is the `langwatch` CLI.
+    The mechanism: a gVisor-sandboxed agent worker whose only interface to LangWatch is the `langwatch` CLI.
   </Card>
   <Card title="Ask Langy" icon="comments" href="/langy/chat">
     The chat panel and the kinds of questions Langy answers, from regressions to cost spikes.
@@ -61259,7 +61373,21 @@ keywords:
 
 Langy changes code in exactly one way: it opens a pull request. It pushes only to the branch it creates for that PR, never to your default or existing branches, and it never merges its own PR.
 
-<Info>**Also check:** [GitHub access](/langy/security/github-access) (the scopes and the boundary), [GitHub App setup](/self-hosting/langy/github-app) (registering the app when self-hosting), [Scenario tests and evals](/langy/scenario-tests-and-evals) (what runs in CI on the PR).</Info>
+<Info>**Also check:** [Local development](/langy/local-development) (the same result from a folder on your machine), [GitHub access](/langy/security/github-access) (the scopes and the boundary), [GitHub App setup](/self-hosting/langy/github-app) (registering the app when self-hosting), [Scenario tests and evals](/langy/scenario-tests-and-evals) (what runs in CI on the PR).</Info>
+
+## Two ways to reach your code
+
+The first time a request needs a code change, Langy asks how to reach the code.
+
+| | GitHub App | Shared local folder |
+|---|---|---|
+| Where the work runs | In Langy's sandbox, on a fresh clone | On your machine, in the folder you share |
+| Checks | Your CI, on the pull request | Your own toolchain, before the push |
+| Commits | The bot, with you as co-author | Your git identity |
+| Setup | Install the GitHub App once | Run one command per conversation |
+| Remembered | Yes, with "Remember this choice" | No, one conversation at a time |
+
+This page covers the GitHub App path. The shared folder is described in [Local development](/langy/local-development). Both end in a pull request that a person reviews.
 
 ## How a Langy PR is made
 
@@ -61278,7 +61406,7 @@ Langy changes code in exactly one way: it opens a pull request. It pushes only t
   </Step>
 </Steps>
 
-<Note>Langy contributes to your codebase exclusively through pull requests. Nothing touches your code without a human approving the merge.</Note>
+<Note>Langy contributes to your codebase exclusively through pull requests. Your code changes only when a human approves the merge.</Note>
 
 {/* TODO screenshot: a Langy-authored GitHub PR page showing the Co-authored-by / "Requested by @login" trailer and the in-chat card that produced it */}
 
@@ -61775,7 +61903,7 @@ keywords:
   - ai agent security
 ---
 
-Each conversation runs as a separate `opencode` worker process inside a single agent pod. gVisor is a user-space kernel that sits between the worker and the host kernel, so a worker that runs arbitrary shell (Langy workers spawn `git`, `gh`, and `npm`) has a much smaller pod-to-host escape surface than a normal container.
+Each conversation runs as a separate worker process inside a single agent pod. gVisor is a user-space kernel that sits between the worker and the host kernel, so a worker that runs arbitrary shell (Langy workers spawn `git`, `gh`, and `npm`) has a much smaller pod-to-host escape surface than a normal container.
 
 On LangWatch Cloud the pod always runs under gVisor. Self-hosted, the chart pins the pod to a `gvisor` RuntimeClass by default; on a cluster without one the pod waits rather than silently dropping to the node's runtime. Any sandboxed RuntimeClass works (a Kata class on AKS, for example).
 
@@ -61789,7 +61917,7 @@ Langy is isolated at several layers, from the pod boundary down to the walls bet
 |---|---|---|
 | Pod to host | gVisor (`runsc`) user-space kernel; required RuntimeClass with a render-time chart guard | Kubernetes + chart |
 | Worker to worker (files) | Each conversation gets a distinct Unix UID and a `0700` home; homes are chowned before any secret is written; `/proc/<pid>/environ` is `0400` owned by the worker UID, so a sibling UID gets `EACCES` | Linux file permissions (DAC) |
-| Worker to worker (control port) | Each worker gets a distinct random `OPENCODE_SERVER_PASSWORD`; a per-worker auth proxy terminates the external token and swaps in HTTP Basic upstream; a fail-closed guard refuses to start a worker whose control server does not return `401` to an unauthenticated request | Go auth proxy + opencode |
+| Worker to worker (control port) | A worker binds no listener at all. The manager drives it over a private stdio pipe pair, so there is no port for a sibling worker to reach | Go manager |
 | Worker to external (L7) | Per-worker egress adapter: require-TLS, per-destination throttle, the project's allow-list, an operator FQDN floor, and a TLS SNI cross-check against the CONNECT authority | Go adapter (cooperative, see below) |
 | Worker to external (L3/L4) | Deny-by-default `NetworkPolicy`; outbound `:443` to anywhere is off by default; RFC 1918 private ranges, CGNAT, and the cloud metadata endpoint are carved out and blocked | Container network interface (CNI) |
 | Worker to external (optional, hard) | Cilium `toFQDNs` on the floor, or a per-worker network namespace (ADR-033 Fix B) | Cilium / netns (planned, see below) |
@@ -61834,7 +61962,7 @@ For a self-hosted install, egress is **denied by default**: `networkPolicy.allow
 - **Can reach (when configured):** the LangWatch API (through the per-session `langwatch` CLI credentials), the LangWatch AI Gateway for LLM traffic, and `github.com` / `api.github.com` / `codeload.github.com` when external HTTPS is enabled.
 - **Cannot reach:** RFC 1918 private ranges, CGNAT, and the cloud metadata endpoint. These are blocked at L3/L4 to prevent SSRF and IMDS credential theft, so the block holds regardless of what the worker attempts.
 - **Reaches only through the adapter, by cooperation:** any other external host goes through the L7 egress adapter, which enforces the project allow-list and the operator floor. In the stock pod that path is cooperative, not mandatory: a worker that ignores `HTTPS_PROXY` and dials a public address on `:443` directly is monitored rather than blocked, per the limits above.
-- **Does not keep at rest:** nothing durable lives worker-side. The manager wipes the sessions root on boot, and the idle reaper deletes a worker's home once it has been idle for 10 minutes, so clones and injected credentials do not survive.
+- **Does not keep at rest:** the worker writes only to disposable storage. The manager wipes the sessions root on boot, and the idle reaper deletes a worker's home once it has been idle for 10 minutes, so clones and injected credentials do not survive.
 
 <Info>
 **Also check:** [Data flow and privacy](/langy/security/data-flow-and-privacy), [What Langy can do in your GitHub](/langy/security/github-access), [Self-hosting: networking and egress](/self-hosting/langy/networking-and-egress).
@@ -65161,7 +65289,7 @@ keywords:
   - langy_internal_secret
 ---
 
-The agent-side variables (`LANGY_*`, and `OPENCODE_*` apart from the one below) are set on the `langyagent` pod through the `charts/langyagent` ConfigMap and Secret. The control-plane variables (`OPENCODE_AGENT_URL`, `GITHUB_LANGY_*`, `CREDENTIALS_SECRET`) are set on the LangWatch app. Defaults shown are the values the chart or the Go service uses out of the box.
+The agent-side variables (`LANGY_*` apart from the one below) are set on the `langyagent` pod through the `charts/langyagent` ConfigMap and Secret. The control-plane variables (`LANGY_AGENT_URL`, `GITHUB_LANGY_*`, `CREDENTIALS_SECRET`) are set on the LangWatch app. Defaults shown are the values the chart or the Go service uses out of the box.
 
 <Info>
 **Also check:** [Setup](/self-hosting/langy/setup), [Register the GitHub App](/self-hosting/langy/github-app), [Networking and egress](/self-hosting/langy/networking-and-egress).
@@ -65176,7 +65304,7 @@ Many `LANGY_*` names in the `packages/langy` and frontend code are exported Type
 | Variable | Description | Required | Default |
 |---|---|---|---|
 | `LANGY_INTERNAL_SECRET` | Shared bearer secret for app-to-agent auth (and the per-frame HMAC base). Lives in the app Secret and is injected into the app, the workers, and the agent pod. The chart generates it when `autogen.enabled` is on; with your own Secret, add the key yourself. | Yes | chart-generated |
-| `OPENCODE_AGENT_URL` | App-side URL of the agent pod (`http://<release>-langyagent:80`). Turns on the Langy backend when set. Wired automatically when `langyagent.chartManaged=true`. | When agent on | unset (chart-set) |
+| `LANGY_AGENT_URL` | App-side URL of the agent pod (`http://<release>-langyagent:80`). Turns on the Langy backend when set. Wired automatically when `langyagent.chartManaged=true`. | When agent on | unset (chart-set) |
 | `ENVIRONMENT` | Deployment environment. Gates the dev-only isolation bypass, so keep it production-like. | No | `production` |
 
 <Warning>
@@ -65187,9 +65315,9 @@ Many `LANGY_*` names in the `packages/langy` and frontend code are exported Type
 
 | Variable | Description | Required | Default |
 |---|---|---|---|
-| `LANGY_MAX_WORKERS` | Max concurrent opencode subprocesses before the pod returns 503. | No | `20` |
+| `LANGY_MAX_WORKERS` | Max concurrent worker subprocesses before the pod returns 503. | No | `20` |
 | `LANGY_WORKER_IDLE_MS` | Idle-worker reap timeout. | No | `600000` (10 min) |
-| `LANGY_READINESS_TIMEOUT_MS` | How long to wait for a freshly spawned worker's opencode to bind. The Go default is 15000; the chart raises it to 60000 for gVisor cold boot. | No | `60000` (chart) |
+| `LANGY_READINESS_TIMEOUT_MS` | How long to wait for a freshly spawned worker to report ready. The Go default is 15000; the chart raises it to 60000 for gVisor cold boot. | No | `60000` (chart) |
 | `LANGY_WORKSPACE_ROOT` | Writable workspace root (an `emptyDir` mount). | Yes | `/workspace` |
 
 ## Egress
@@ -65228,7 +65356,7 @@ Set these on the control plane to enable bot-authored pull requests and coding-a
 | `GITHUB_LANGY_WEBHOOK_SECRET` | Verifies the `X-Hub-Signature-256` on inbound webhooks. Optional: without it the instance still connects, mints tokens and opens pull requests, but it reconciles late. Linkage then waits for the outbound recheck, and an uninstall clears only when a live read gets a 404. See [Restricted networks](/self-hosting/langy/github-app#restricted-networks). | No | unset |
 | `GITHUB_LANGY_APP_SLUG` | App slug for the install deep-link. | For GitHub | unset |
 | `GITHUB_LANGY_HOST` | The GitHub host this instance connects to. Set it to a GitHub Enterprise Server hostname (no scheme, no path) to bind the instance to that server. One instance connects to one host. | No | `github.com` |
-| `CREDENTIALS_SECRET` | Signs the GitHub install state round-trip and encrypts provider keys at rest. Already required in production, so nothing new is needed for GitHub. | Yes (prod) | none |
+| `CREDENTIALS_SECRET` | Signs the GitHub install state round-trip and encrypts provider keys at rest. Already required in production, so GitHub adds no new variable. | Yes (prod) | none |
 
 <Warning>
 `GITHUB_LANGY_PRIVATE_KEY` grants write access to installed repositories. Keep it in a secrets manager and never let it reach a worker.
@@ -65471,6 +65599,20 @@ Everything above is outbound. The one inbound path GitHub uses is the webhook, d
 
 It is optional. An instance GitHub cannot reach still connects and works, and reconciles late instead. For what changes, see [Restricted networks](/self-hosting/langy/github-app#restricted-networks).
 
+## Local control connections
+
+[Local development](/langy/local-development) lets a developer share a folder on their machine with Langy. The `langwatch langy --share-control` command opens one outbound connection from the developer's machine to the LangWatch app, not to the agent pod. The agent pod needs no new egress: the worker reaches the app in-cluster, on the path it already uses.
+
+| Route | Direction | Purpose |
+|---|---|---|
+| `<BASE_URL>/api/v1/langy/control/connect` | Developer machine to app, WebSocket upgrade | The live relay for file and command calls |
+| `<BASE_URL>/api/v1/langy/control/connect/*` | Developer machine to app, HTTPS | Long-poll fallback when the upgrade is refused |
+| `<BASE_URL>/api/v1/langy/control/requests` | Developer machine to app, HTTPS | List, approve and cancel control requests |
+
+An ingress that does not pass WebSocket upgrades still works: the CLI falls back to long-polling on its own. Each poll holds for up to 20 seconds, so keep the ingress read timeout at 30 seconds or more. The same timeout already applies to [connected agents](/agent-testing/connect-your-agent).
+
+The developer authenticates with their device session to approve a request, and the CLI then holds a Langy session key scoped to one conversation. The key stops working when the CLI disconnects or the conversation's workspace is disconnected from the chat.
+
 ## Enable outbound egress
 
 The stock `charts/langyagent` chart keeps `networkPolicy.allowExternalHttps: false`. To allow `git`, `gh`, and `npm`, turn it on:
@@ -65543,14 +65685,14 @@ The default pins the pod to a `gvisor` RuntimeClass. On a cluster without one, o
 
 The GitHub App and outbound network egress are both optional and off until you configure them.
 
-The `langyagent` pod is a single Go "manager" process that spawns one gVisor-sandboxed [opencode](/langy/how-langy-works) worker per conversation. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
+The `langyagent` pod is a single Go "manager" process that spawns one gVisor-sandboxed [agent worker](/langy/how-langy-works) per conversation. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
 
 <Info>
 **Also check:** [Setup](/self-hosting/langy/setup), [Environment variables](/self-hosting/langy/environment-variables), [Networking and egress](/self-hosting/langy/networking-and-egress), [The sandbox](/langy/security/sandbox).
 </Info>
 
 <Note>
-**Turning Langy off.** Set `langyagent.chartManaged: false`: the agent pod and every reference to it are removed on the next upgrade, and nothing else in the install changes. For opening Langy to a few projects before everyone, see [staged rollout](/self-hosting/langy/setup#staged-rollout). On LangWatch Cloud, availability is managed for you.
+**Turning Langy off.** Set `langyagent.chartManaged: false`: the agent pod and every reference to it are removed on the next upgrade, and every other part of the install is left as it was. For opening Langy to a few projects before everyone, see [staged rollout](/self-hosting/langy/setup#staged-rollout). On LangWatch Cloud, availability is managed for you.
 </Note>
 
 ## At a glance
@@ -65570,7 +65712,10 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 
 ## Hard requirements
 
-- **A sandboxed runtime.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), so the default pins the pod to gVisor. GKE ships the RuntimeClass managed (GKE Sandbox; Autopilot schedules `gvisor` pods directly). On AKS, point `runtimeClassName` at your Kata VM isolation class; any sandboxed RuntimeClass works. EKS has no managed option: install gVisor on the node group, or accept unsandboxed explicitly with `runtimeClassName: ""` plus `acceptUnsandboxedRuntime: true`. On a cluster without the RuntimeClass, the pod waits with a `RuntimeClass not found` event and the install notes explain the choice. See [The sandbox](/langy/security/sandbox).
+- **A sandboxed runtime.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), so the default pins the pod to gVisor. On a cluster without the RuntimeClass, the pod waits with a `RuntimeClass not found` event and the install notes explain the choice. See [The sandbox](/langy/security/sandbox).
+  - GKE ships the RuntimeClass managed (GKE Sandbox; Autopilot schedules `gvisor` pods directly).
+  - On AKS, point `runtimeClassName` at your Kata VM isolation class; any sandboxed RuntimeClass works.
+  - EKS has no managed option: install gVisor on the node group, or accept unsandboxed explicitly with `runtimeClassName: ""` plus `acceptUnsandboxedRuntime: true`.
 - **A separate pod and service.** The agent is its own Deployment, ConfigMap, ClusterIP Service, and NetworkPolicy (plus an optional PodDisruptionBudget and CiliumNetworkPolicy). It runs a single replica with `strategy: Recreate` and no HPA, sized for roughly 5 to 15 concurrent sessions at 500m to 2 CPU and 1 to 4Gi. Scale it vertically, not horizontally.
 - **The shared internal secret.** The app and the agent authenticate to each other with a bearer token, `LANGY_INTERNAL_SECRET`. The chart materialises it in the app Secret when `autogen.enabled` is on; with your own Secret, add the key yourself and the install checks for it before starting. See [Setup](/self-hosting/langy/setup#bringing-your-own-secrets).
 
@@ -65586,7 +65731,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 graph LR
     Browser["Browser<br/>(event-sourced UI)"] -->|"HTTPS"| App["LangWatch App<br/>(control plane)"]
     App -->|"Bearer LANGY_INTERNAL_SECRET<br/>ClusterIP only"| Agent["langyagent pod<br/>(Go manager)"]
-    Agent -->|"one per conversation"| Worker["gVisor-sandboxed<br/>opencode worker"]
+    Agent -->|"one per conversation"| Worker["gVisor-sandboxed<br/>agent worker"]
     Worker -->|"langwatch CLI<br/>(per-session key)"| App
     Worker -->|"LLM traffic<br/>(virtual key)"| Gateway["LangWatch AI Gateway"]
     Gateway -->|"completions"| Providers["LLM Providers<br/>(your accounts / BYOK)"]
@@ -65594,7 +65739,9 @@ graph LR
     App -->|"install tokens"| GitHubAPI["api.github.com"]
 ```
 
-The control plane reaches the agent over cluster DNS at `http://<release>-langyagent:80` (`OPENCODE_AGENT_URL`), authenticated with `LANGY_INTERNAL_SECRET`. The Service is ClusterIP only; a render-time guard blocks any other type, so the agent is never exposed outside the cluster. Each worker's only path to LangWatch data is the `langwatch` CLI, and its only path to the internet is the [L7 egress adapter](/self-hosting/langy/networking-and-egress). LLM traffic goes through the [LangWatch AI Gateway](/ai-gateway/self-hosting/helm), never direct to providers, so every Langy LLM call is traced, budgeted, and policed like any other.
+The control plane reaches the agent over cluster DNS at `http://<release>-langyagent:80` (`LANGY_AGENT_URL`), authenticated with `LANGY_INTERNAL_SECRET`. The Service is ClusterIP only; a render-time guard blocks any other type, so the agent is never exposed outside the cluster.
+
+Each worker's only path to LangWatch data is the `langwatch` CLI, and its only path to the internet is the [L7 egress adapter](/self-hosting/langy/networking-and-egress). LLM traffic goes through the [LangWatch AI Gateway](/ai-gateway/self-hosting/helm), never direct to providers, so every Langy LLM call is traced, budgeted, and policed like any other.
 
 ## Where to go next
 
@@ -65661,10 +65808,10 @@ credentials of the person who asked. Two controls bound that, both on by
 default on every cluster:
 
 - **Per-worker identity.** Each conversation's worker runs under its own UID
-  with its own credentials and its own opencode password. Workers cannot read
+  with its own credentials and no listener a sibling could dial. Workers cannot read
   each other's keys or reach each other's control ports.
 - **Network.** A default-deny NetworkPolicy. Workers reach the control plane and
-  the gateway, and nothing else. Egress to the internet is off until you turn it
+  the gateway, and no other destination. Egress to the internet is off until you turn it
   on, and private ranges plus the cloud metadata endpoint stay blocked even
   then.
 
@@ -65694,7 +65841,7 @@ silently lose its sandbox.
 
 Your cluster has to define that class first, and if it does not, the pod is
 rejected at admission: no pod is created at all, `kubectl get pods -l
-app.kubernetes.io/name=langyagent` lists nothing, and the reason sits on the
+app.kubernetes.io/name=langyagent` returns an empty list, and the reason sits on the
 Deployment.
 
 ```bash
@@ -65943,8 +66090,8 @@ langyagent:
   chartManaged: false
 ```
 
-The agent pod and every reference to it are removed on the next upgrade. Nothing
-else in your install changes.
+The agent pod and every reference to it are removed on the next upgrade. Every
+other part of your install is left as it was.
 
 ---
 

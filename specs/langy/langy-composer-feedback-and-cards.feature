@@ -96,11 +96,25 @@ Feature: Langy composer, feedback, and card polish
       Then it says Langy is working and the message sends when it stops
 
     @integration
+    Scenario: The message field points at the card while one is waiting
+      Given a turn held by a card waiting for the customer's answer
+      When the customer looks at the message field
+      Then it says to answer the card above
+      And it does not say Langy is working
+
+    @integration
     Scenario: Enter during a turn keeps the message instead of sending it
       Given a Langy turn is in flight
       When the customer types a message and presses Enter
       Then no message is sent
       And the message is still in the field
+
+    @unit
+    Scenario: A failed send gives back only what the customer typed
+      Given a send that failed
+      Then the message field gets the text back when the customer typed it
+      And it gets nothing back when the panel sent that message itself
+      And it gets nothing back when the customer has started writing something else
 
     @integration
     Scenario: The kept message sends once the turn ends

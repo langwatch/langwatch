@@ -1,8 +1,8 @@
 // Package workerenv holds the parts of a worker subprocess environment that
-// are identical for every harness: the inherited-variable allowlist and the
-// NO_PROXY host list. Both adapters (opencode and pi) spawn the same kind of
+// are identical for every worker: the inherited-variable allowlist and the
+// NO_PROXY host list. The adapter spawns the same kind of
 // process into the same cluster, so one copy per adapter would let a key added
-// on one side change what only one harness leaks into a worker.
+// on one side change what leaks into a worker.
 package workerenv
 
 import (

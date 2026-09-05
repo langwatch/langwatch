@@ -73,6 +73,8 @@ If the user's request is **specific** ("add tracing to the payment function", "t
 
 This skill is code-only: there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation.
 
+In Langy, do not print the change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 ## Step 1: Read the Integration Docs
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
@@ -119,12 +121,15 @@ LangWatch.
 Then fetch the integration guide for this project's framework:
 
 ```bash
-langwatch docs integration/python/guide        # Python (general)
-langwatch docs integration/typescript/guide    # TypeScript (general)
-langwatch docs integration/python/langgraph    # Framework-specific (example)
+langwatch docs integration/python/guide                      # Python (general)
+langwatch docs integration/typescript/guide                  # TypeScript (general)
+langwatch docs integration/python/integrations/open-ai       # Framework page
+langwatch docs integration/typescript/integrations/mastra    # Framework page
 ```
 
-Pick the page matching the project's framework (OpenAI, LangGraph, Vercel AI, Agno, Mastra, etc.) and read it before writing any code.
+A framework page lives at `integration/<language>/integrations/<framework>`, never at `integration/<language>/<framework>`. The framework slug is the vendor's name with a hyphen between the words: `open-ai`, `open-ai-agents`, `open-ai-azure`, `aws-bedrock`, `google-ai`, `vertex-ai`, `lite-llm`, `crew-ai`, `pydantic-ai`, `strand-agents`, `vercel-ai-sdk`, plus the one-word ones (`langchain`, `langgraph`, `agno`, `anthropic`, `mastra`, `haystack`, `llamaindex`, `instructor`, `dspy`, `autogen`, `smolagents`, `semantic-kernel`, `promptflow`, `azure-ai`).
+
+Run `langwatch docs` with no path when you are unsure: it prints the index of every page. `docs` prints the page as markdown and takes no `--output`, `--json`, `--jq` or `--format`; if a fetch returns 404 the path is wrong, so read the index rather than guessing another spelling.
 
 CRITICAL: Do NOT guess how to instrument. Different frameworks have different instrumentation patterns; always read the framework-specific guide first.
 
@@ -761,7 +766,7 @@ For a guardrail:
         </span>
         <div className="lw-prompt-source">
 
-`````text
+````text
 Help me evaluate my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
@@ -782,23 +787,7 @@ Classify the user's intent:
 
 If the request remains ambiguous after inspecting context (a bare "make me an eval" that names neither a dataset nor live traffic), do not create anything yet. This choice picks what gets tested, so it is the user's to make, not a default's. Ask it as a question card and stop; the answer arrives as the next message.
 
-Where `langy-card` blocks render, ask it as a `choices` block (the only sanctioned question format) last in the reply:
-
-````markdown
-```langy-card
-{
-  "kind": "choices",
-  "blockId": "eval-kind",
-  "question": "What should this evaluate?",
-  "options": [
-    { "id": "experiment", "label": "A dataset, before deployment" },
-    { "id": "online", "label": "Live production traffic" }
-  ]
-}
-```
-````
-
-Neither option names an existing entity, so neither carries a `ref`. Without that channel, ask the same question as one short line of prose.
+In Langy, ask it with the `question` tool and stop; the options are the concrete alternatives, for example "A dataset, before deployment" and "Live production traffic". Elsewhere, ask the same question as one short line of prose.
 
 A rejected field value is not this kind of choice. If a create later fails with a `validation_error` whose reason names the field and an `expected` list, correct that exact field from the list and retry once. Never turn a fixable slug into a question for the user.
 
@@ -819,7 +808,7 @@ Then hand off:
    ```
 
 Do not recreate the companion skill's instructions from memory. Load the focused skill so its current workflow, safety checks, and verification steps are used.
-`````
+````
 
         </div>
       </div>
@@ -934,6 +923,8 @@ A failing test tells you WHERE the agent fails, not that the prompt is where to 
 6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
 
 Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+
+In Langy, do not print the fix for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 
@@ -1934,6 +1925,8 @@ Connect the agent in this codebase to LangWatch, so test suites run from the pla
 
 Three steps: install the SDK, add the connect function where the service starts, start the service the way the user always starts it. Work through them in order, confirm the agent reads Online, run one test suite, then report what changed and the result.
 
+In Langy, do not print the change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 Use the HTTP fallback at the bottom of this skill ONLY when the agent cannot import the SDK: the agent is written in a language with no LangWatch SDK, or you have no access to its code.
 
 ## Step 1: Set up the LangWatch CLI
@@ -2185,6 +2178,16 @@ Report to the user:
 
 Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can contain secrets and tell the user nothing they can act on. Do NOT claim a scenario or a test suite ran when it did not.
 
+### When the change goes into a pull request
+
+A change to the connect call is not live until the process that holds it starts again, so the registration you report has to come from a process you restarted in this conversation. Before you run `gh pr create`:
+
+1. Restart the service that holds the connect call, on the same port.
+2. Run `langwatch agent get <name>` and read the parameter list back.
+3. Put that list in the pull request body, as the command printed it.
+
+When you could not restart the process, write in the body, in one line, that the restart is left to the user and that the parameters are not registered yet. A sentence such as "confirmed the connected agent registered both options" is false unless the `agent get` output in this conversation lists both options. Copy the pull request address that `gh pr create` prints into your reply as well, character for character.
+
 A connected setup shows, on the run page: the conversation transcript, a trace link on each turn opening the agent's own spans, and judge reasoning that cites spans.
 
 ## Plan Limits
@@ -2264,7 +2267,7 @@ Confirm the agent reports its traces to the same LangWatch project that runs the
 
 Ask the user for the URL where this service is deployed, and wait for the answer. A staging deployment is the recommended target: it exercises the real system without touching production data. Any URL the LangWatch backend can reach works; an internal hostname or a firewalled service does not.
 
-If the agent only runs on the user's machine, register it as below and then run `langwatch agent dev --port <port> --agent <agent-id>`, which opens a tunnel to the local port and points the registered agent at it for the session. Keep it running while test suites execute; Ctrl-C restores the previous URL.
+If the agent only runs on the user's machine, register it as below and then run `langwatch agent tunnel --port <port> --agent <agent-id>`, which opens a tunnel to the local port and points the registered agent at it for the session. Keep it running while test suites execute; Ctrl-C restores the previous URL.
 
 ### Register and run
 
@@ -2320,6 +2323,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 - Do NOT stop the agent process while a run is executing. Every turn of the run calls it.
 - Do NOT reach for the HTTP fallback because the decorator looks like more work. It is fewer steps: no public URL, no body template, no credential in the agent configuration, no middleware.
 - Do NOT report success when a command failed. An unreachable platform or a failed run is part of the report, named per step.
+- Do NOT write a registration into a pull request body without the `langwatch agent get` output that shows it. A body that states what no command in the conversation printed is a false report.
 ````
 
         </div>
@@ -2393,6 +2397,8 @@ If the user's request is **specific** ("version this prompt", "create a new prom
 - Focus on the specific prompt
 - Create or update the managed prompt
 - Update the relevant code to use `langwatch.prompts.get()`
+
+In Langy, do not print the code change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 
@@ -3415,6 +3421,8 @@ If the user's request is **specific** ("add tracing to the payment function", "t
 
 This skill is code-only: there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation.
 
+In Langy, do not print the change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 ## Step 1: Read the Integration Docs
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
@@ -3461,12 +3469,15 @@ LangWatch.
 Then fetch the integration guide for this project's framework:
 
 ```bash
-langwatch docs integration/python/guide        # Python (general)
-langwatch docs integration/typescript/guide    # TypeScript (general)
-langwatch docs integration/python/langgraph    # Framework-specific (example)
+langwatch docs integration/python/guide                      # Python (general)
+langwatch docs integration/typescript/guide                  # TypeScript (general)
+langwatch docs integration/python/integrations/open-ai       # Framework page
+langwatch docs integration/typescript/integrations/mastra    # Framework page
 ```
 
-Pick the page matching the project's framework (OpenAI, LangGraph, Vercel AI, Agno, Mastra, etc.) and read it before writing any code.
+A framework page lives at `integration/<language>/integrations/<framework>`, never at `integration/<language>/<framework>`. The framework slug is the vendor's name with a hyphen between the words: `open-ai`, `open-ai-agents`, `open-ai-azure`, `aws-bedrock`, `google-ai`, `vertex-ai`, `lite-llm`, `crew-ai`, `pydantic-ai`, `strand-agents`, `vercel-ai-sdk`, plus the one-word ones (`langchain`, `langgraph`, `agno`, `anthropic`, `mastra`, `haystack`, `llamaindex`, `instructor`, `dspy`, `autogen`, `smolagents`, `semantic-kernel`, `promptflow`, `azure-ai`).
+
+Run `langwatch docs` with no path when you are unsure: it prints the index of every page. `docs` prints the page as markdown and takes no `--output`, `--json`, `--jq` or `--format`; if a fetch returns 404 the path is wrong, so read the index rather than guessing another spelling.
 
 CRITICAL: Do NOT guess how to instrument. Different frameworks have different instrumentation patterns; always read the framework-specific guide first.
 
@@ -3534,6 +3545,8 @@ If the user's request is **specific** ("version this prompt", "create a new prom
 - Focus on the specific prompt
 - Create or update the managed prompt
 - Update the relevant code to use `langwatch.prompts.get()`
+
+In Langy, do not print the code change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 
@@ -4078,6 +4091,8 @@ A failing test tells you WHERE the agent fails, not that the prompt is where to 
 6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
 
 Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+
+In Langy, do not print the fix for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 

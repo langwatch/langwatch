@@ -22,6 +22,7 @@ import {
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { GitHub } from "react-feather";
+import { showErrorToast } from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";
 
 import SettingsLayout from "../../components/SettingsLayout";
@@ -133,11 +134,56 @@ function IntegrationsContent({ organizationId }: { organizationId: string }) {
                   </Button>
                 </VStack>
               )}
+
+              <LangyCodeAccessPreference />
             </VStack>
           </Card.Body>
         </Card.Root>
       </VStack>
     </SettingsLayout>
+  );
+}
+
+/**
+ * The remembered answer to "how should Langy reach my code" (ADR-129). The
+ * choice is made in the chat, so this line only appears once one is stored,
+ * and its one job is to let the reader take it back.
+ */
+function LangyCodeAccessPreference() {
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id;
+  const preference = api.langy.getCodeAccessPreference.useQuery(
+    { projectId: projectId ?? "" },
+    { enabled: !!projectId, retry: false },
+  );
+  const clear = api.langy.setCodeAccessPreference.useMutation({
+    onSuccess: () => void preference.refetch(),
+    onError: (error) =>
+      showErrorToast({ error, title: "Could not clear the choice" }),
+  });
+
+  if (preference.data?.preference !== "github" || !projectId) return null;
+
+  return (
+    <HStack
+      gap={3}
+      justifyContent="space-between"
+      borderTopWidth="1px"
+      borderColor="border.muted"
+      paddingTop={3}
+    >
+      <Text fontSize="sm" color="fg.muted">
+        Langy uses GitHub for code changes
+      </Text>
+      <Button
+        size="sm"
+        variant="outline"
+        loading={clear.isPending}
+        onClick={() => clear.mutate({ projectId, preference: null })}
+      >
+        Change
+      </Button>
+    </HStack>
   );
 }
 

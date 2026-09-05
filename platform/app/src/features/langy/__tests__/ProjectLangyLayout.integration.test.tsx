@@ -100,6 +100,13 @@ vi.mock("../components/LangyPanel", () => ({
   LangySidecar: () => <LangySidecarStub />,
 }));
 
+// The follow-along deep link reads a tRPC query, and this suite renders the
+// layout with no tRPC provider. Its own behaviour is pinned by
+// langyConversationDeepLink.unit.test.tsx.
+vi.mock("../hooks/useLangyConversationDeepLink", () => ({
+  useLangyConversationDeepLink: () => undefined,
+}));
+
 import { useEffect } from "react";
 import ProjectLangyLayout from "../ProjectLangyLayout";
 import { useLangyStore } from "../stores/langyStore";

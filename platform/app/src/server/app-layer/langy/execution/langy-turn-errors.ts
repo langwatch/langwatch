@@ -10,7 +10,7 @@
  *
  * Content rule (same as `app-layer/langy/errors.ts`): `meta` carries ONLY what
  * a user or the UI can act on or safely see — an HTTP status, the timeout we
- * gave up at. NEVER the raw manager/opencode message, a stack, a URL, or an
+ * gave up at. NEVER the raw manager or agent message, a stack, a URL, or an
  * internal identifier. The raw detail keeps going to the server log, which is
  * where it belongs.
  *
@@ -65,7 +65,7 @@ export class LangyAgentAtCapacityError extends HandledError {
 }
 
 /**
- * The worker's opencode session vanished mid-turn (`session-not-found`). The
+ * The worker's agent session vanished mid-turn (`session-not-found`). The
  * manager recycles the worker; the next turn gets a fresh session, so the user
  * only has to send the message again.
  */
@@ -146,7 +146,7 @@ export class LangyGithubRepoNotAccessibleError extends HandledError {
  *
  * Distinct from `at-capacity` (there was no free slot) and from `unavailable`
  * (the manager did not answer at all): the manager answered, tried, and the
- * opencode subprocess never came up — a readiness timeout, a failed skill
+ * worker subprocess never came up — a readiness timeout, a failed skill
  * install, a home-directory or egress-guard failure.
  *
  * This is what was landing in `unknown`. The manager emits it as a typed error
@@ -171,7 +171,7 @@ export class LangyWorkerSpawnFailedError extends HandledError {
  * The worker STOPPED before the turn finished, and the control plane has
  * exhausted its own recovery for it. Two roads reach this:
  *
- *   - the manager observed the worker's stream die mid-reply (the opencode
+ *   - the manager observed the worker's stream die mid-reply (the worker
  *     subprocess crashed / was OOM-killed / the pod went away) and emitted a
  *     `worker_stopped` error frame; or
  *   - the liveness subscriber re-dispatched the silent turn across its whole
@@ -319,7 +319,7 @@ export function langyAgentErrorFromFrame(frame: string): Error {
       return new LangyAgentSessionLostError();
     // The worker stopped mid-turn. `worker_stopped` is the deliberate signal;
     // `post_error` (the worker would not accept the prompt) is the older code
-    // for the same thing — the opencode process died or is broken.
+    // for the same thing — the worker process died or is broken.
     case "worker_stopped":
     case "post_error":
       return new LangyWorkerStoppedError();
