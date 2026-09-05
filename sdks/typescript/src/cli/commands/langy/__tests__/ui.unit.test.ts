@@ -12,6 +12,7 @@ import type {
 import {
   callHeadline,
   conversationLink,
+  createConsoleWriter,
   createUi,
   editCounts,
   elapsedLabel,
@@ -50,6 +51,33 @@ function recordingWriter({ interactive = false } = {}) {
     },
     interactive,
   };
+}
+
+const ESC = String.fromCharCode(27);
+const ERASE = new RegExp(`^${ESC}\\[(\\d+)A${ESC}\\[0J`);
+
+/**
+ * A terminal that keeps the rows that are on it.
+ *
+ * The real writer is driven, rather than a copy of its rules, so the row
+ * counting and the cursor movement are what the test reads back.
+ */
+function fakeTty() {
+  const rows: string[] = [];
+  const stream = {
+    isTTY: true,
+    write: (chunk: string): boolean => {
+      let text = chunk;
+      const erased = ERASE.exec(text);
+      if (erased) {
+        rows.splice(rows.length - Number(erased[1]), Number(erased[1]));
+        text = text.slice(erased[0].length);
+      }
+      for (const row of text.split("\n").slice(0, -1)) rows.push(plain(row));
+      return true;
+    },
+  } as unknown as NodeJS.WriteStream;
+  return { stream, rows };
 }
 
 const envelope = {
@@ -661,5 +689,121 @@ describe("the notice that says the folder connected", () => {
     expect(
       writer.lines.filter((line) => line.includes("Permission questions")),
     ).toHaveLength(1);
+  });
+});
+
+describe("given a question and a running command on the same screen", () => {
+  /** @scenario "A question on the screen survives a command that finishes under it" */
+  it("keeps the question on the screen and prints the result after the answer", () => {
+    const { stream, rows } = fakeTty();
+    const writer = createConsoleWriter(stream);
+    const ui = createUi(writer);
+    const call = bashCall("pnpm test");
+
+    ui.call(call);
+    const stopSpinner = ui.startRunning();
+    expect(rows).toEqual(["⏺ Bash(pnpm test)", "  ⎿  Running… 0s"]);
+
+    // The question takes the bottom of the screen while the command runs.
+    writer.draw?.(["╭─ question ─╮", "│ answer me │", "╰───────────╯"], "box");
+    ui.hold();
+    expect(rows.slice(-3)).toEqual([
+      "╭─ question ─╮",
+      "│ answer me │",
+      "╰───────────╯",
+    ]);
+
+    // The command finishes under it: the spinner erases its own row and no
+    // more, and the result waits for the answer.
+    stopSpinner();
+    ui.callOutcome({
+      call,
+      output: bashOutput({ stdout: "2 passed in 3.1s" }),
+    });
+    expect(rows.slice(-3)).toEqual([
+      "╭─ question ─╮",
+      "│ answer me │",
+      "╰───────────╯",
+    ]);
+
+    writer.erase?.("box");
+    ui.release();
+    expect(rows.join("\n")).not.toContain("answer me");
+    expect(rows[rows.length - 1]).toBe("  ⎿  2 passed in 3.1s");
+  });
+
+  it("draws no spinner while the question owns the screen", () => {
+    const { stream, rows } = fakeTty();
+    const writer = createConsoleWriter(stream);
+    const ui = createUi(writer);
+
+    writer.draw?.(["│ answer me │"], "box");
+    const stop = ui.startRunning();
+    expect(rows).toEqual(["│ answer me │"]);
+
+    stop();
+    expect(rows).toEqual(["│ answer me │"]);
+  });
+});
+
+describe("when the conversation title is wider than the terminal", () => {
+  /** @scenario "A notice wraps on word boundaries at the terminal width" */
+  it("breaks the connected notice where the words end", () => {
+    const writer = recordingWriter({ interactive: true });
+    const ui = createUi(writer, { width: () => 40 });
+
+    ui.connected({
+      root: "/Users/dev/acme-support-dogfood",
+      conversationTitle: "Instrument traces with LangWatch",
+      conversationUrl: "http://localhost:5570/acme?langyConversation=conv_1",
+    });
+
+    const words = "Instrument traces with LangWatch";
+    expect(writer.lines.join(" ").replace(/\s+/g, " ")).toContain(words);
+    for (const line of writer.lines) {
+      // A single word wider than the terminal keeps its own line, and only
+      // such a line may be longer than the terminal.
+      if (line.trim().split(" ").length > 1) {
+        expect(line.length).toBeLessThanOrEqual(40);
+      }
+    }
+    // The link is one word, so it keeps its own line rather than being cut.
+    expect(writer.lines).toContainEqual(
+      "     http://localhost:5570/acme?langyConversation=conv_1",
+    );
+  });
+});
+
+describe("when results arrive in another order than the calls", () => {
+  /** @scenario "A result of a call that is not the last one repeats its call line" */
+  it("prints the call line again for a result that is not under its own call", () => {
+    const writer = recordingWriter();
+    const ui = createUi(writer);
+    const first = { ...bashCall("git log -8 --oneline"), callId: "call_1" };
+    const second = { ...bashCall("pnpm test"), callId: "call_2" };
+
+    ui.call(first);
+    ui.call(second);
+    ui.callOutcome({ call: second, output: bashOutput({ stdout: "2 passed" }) });
+    ui.callOutcome({ call: first, output: bashOutput({ stdout: "252c7d4 first" }) });
+
+    expect(writer.lines).toEqual([
+      "⏺ Bash(git log -8 --oneline)",
+      "⏺ Bash(pnpm test)",
+      "  ⎿  2 passed",
+      "⏺ Bash(git log -8 --oneline)",
+      "  ⎿  252c7d4 first",
+    ]);
+  });
+
+  it("prints no second call line when the result is under its own call", () => {
+    const writer = recordingWriter();
+    const ui = createUi(writer);
+    const call = { ...bashCall("pnpm test"), callId: "call_9" };
+
+    ui.call(call);
+    ui.callOutcome({ call, output: bashOutput({ stdout: "2 passed" }) });
+
+    expect(writer.lines).toEqual(["⏺ Bash(pnpm test)", "  ⎿  2 passed"]);
   });
 });

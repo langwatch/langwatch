@@ -695,11 +695,13 @@ describe("given a folder connected to a Langy conversation", () => {
       lines.length = 0;
 
       socket.deliver({ type: "policy", skipPermissions: true });
-      const notice = lines.join("\n");
-      expect(notice).toContain("Permission checks are off for this session");
+      const notice = lines.join(" ").replace(/\s+/g, " ");
       // chalk paints red as the SGR 31 escape when colour is on, and leaves
-      // the words alone when it is off; either way the sentence is one line.
-      expect(lines).toHaveLength(1);
+      // the words alone when it is off. The sentence takes as many rows as
+      // the terminal width needs, and no word is cut in half.
+      expect(notice).toContain(
+        "Permission checks are off for this session. Langy runs commands here without asking.",
+      );
 
       socket.deliver(
         callFrame({ tool: "local_bash", params: { command: "echo hi" } }),

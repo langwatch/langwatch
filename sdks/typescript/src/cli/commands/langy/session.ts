@@ -176,7 +176,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
       ui.callResult({ call, text });
       sendResult({ callId: call.callId, text });
     } catch (error) {
-      ui.callFailed({ message: failureMessage(error) });
+      ui.callFailed({ call, message: failureMessage(error) });
       sendFailure({
         callId: call.callId,
         code: failureCode(error),
@@ -199,7 +199,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
         ...(call.params.background === true ? { background: true } : {}),
       });
     } catch (error) {
-      ui.callFailed({ message: failureMessage(error) });
+      ui.callFailed({ call, message: failureMessage(error) });
       sendFailure({
         callId: call.callId,
         code: failureCode(error),
@@ -219,7 +219,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
       sendResult({ callId: call.callId, output });
     } catch (error) {
       stopSpinner();
-      ui.callFailed({ message: failureMessage(error) });
+      ui.callFailed({ call, message: failureMessage(error) });
       sendFailure({
         callId: call.callId,
         code: failureCode(error),
@@ -240,7 +240,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
     });
     ui.call(call);
     if (decision.kind === "refuse") {
-      ui.callRefused({ message: decision.message });
+      ui.callRefused({ call, message: decision.message });
       sendFailure({
         callId: call.callId,
         code: decision.code,
@@ -362,6 +362,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
       ...(decision === "allow_pattern" ? { patterns: waiting.patterns } : {}),
     });
     ui.permissionSettled({
+      call: waiting.call,
       text: settledLine({
         decision,
         patterns: waiting.patterns,
@@ -401,6 +402,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
     waiting.closeSelector?.();
     ui.release();
     ui.permissionSettled({
+      call: waiting.call,
       text: settledLine({
         decision: decision as PermissionDecision,
         patterns: waiting.patterns,

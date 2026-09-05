@@ -137,6 +137,26 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       And that line is replaced by the result when the command ends
 
     @unit
+    Scenario: A question on the screen survives a command that finishes under it
+      Given a permission question on the screen and a command still running
+      When the command finishes under the question
+      Then the question stays on the screen
+      And the result of the command prints only after the question is answered
+
+    @unit
+    Scenario: A notice wraps on word boundaries at the terminal width
+      Given a conversation title that is wider than the terminal
+      When the terminal prints that the folder is connected
+      Then every line breaks where the words end, with no word cut in half
+
+    @unit
+    Scenario: A result of a call that is not the last one repeats its call line
+      Given two calls Langy made at the same time
+      When the result of the first call arrives after the second call line
+      Then the terminal prints the first call line again, dim
+      And the result under that line
+
+    @unit
     Scenario: A platform notice has no tool name
       Given a connected folder
       When LangWatch connects the folder or closes it
