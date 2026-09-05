@@ -9,12 +9,12 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useMemo, useState } from "react";
-
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useRegisterTourActions } from "~/features/guided-onboarding/tour/tourRegistry";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
@@ -313,6 +313,37 @@ export function VirtualKeyCreateDrawer({
     }
   };
 
+  // The guided tour types the name and submits through the drawer's own
+  // state and submit, so the key it mints is a real one. The submit is read
+  // through a ref: the handlers register once, the submit closes over the
+  // latest form. Spec: specs/features/onboarding/guided-tour.feature
+  const submitRef = useRef(handleSubmit);
+  submitRef.current = handleSubmit;
+  const typingTimers = useRef<number[]>([]);
+  useEffect(
+    () => () => {
+      for (const t of typingTimers.current) clearTimeout(t);
+    },
+    [],
+  );
+  const tourActions = useMemo(
+    () => ({
+      typeVirtualKeyName: (typed: string) => {
+        for (const t of typingTimers.current) clearTimeout(t);
+        typingTimers.current = [];
+        setName("");
+        for (let i = 1; i <= typed.length; i++) {
+          typingTimers.current.push(
+            window.setTimeout(() => setName(typed.slice(0, i)), i * 60),
+          );
+        }
+      },
+      submitVirtualKeyCreate: () => void submitRef.current(),
+    }),
+    [],
+  );
+  useRegisterTourActions(tourActions);
+
   return (
     <Drawer.Root
       open={open}
@@ -336,6 +367,7 @@ export function VirtualKeyCreateDrawer({
                 />
               </Field.Label>
               <Input
+                data-tour="vk-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. codex-prod"
@@ -446,6 +478,7 @@ export function VirtualKeyCreateDrawer({
             ) : (
               <Button
                 colorPalette="orange"
+                data-tour="vk-create"
                 onClick={handleSubmit}
                 loading={createMutation.isPending}
               >

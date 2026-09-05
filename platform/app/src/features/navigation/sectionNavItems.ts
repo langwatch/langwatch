@@ -35,6 +35,8 @@ export interface SectionNavItemData {
    * presentations agree on what exists.
    */
   featureFlag?: FrontendFeatureFlag;
+  /** The `data-tour` target the guided tour spotlights on this entry. */
+  tourId?: string;
 }
 
 export const gatewayNavItems: readonly SectionNavItemData[] = [
@@ -43,6 +45,7 @@ export const gatewayNavItems: readonly SectionNavItemData[] = [
     href: "/gateway/virtual-keys",
     includePath: "/gateway/virtual-keys",
     icon: KeyRound,
+    tourId: "nav-virtual-keys",
   },
   {
     label: "Model Providers",

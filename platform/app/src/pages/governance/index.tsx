@@ -32,6 +32,7 @@ import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
+import { GuidedOnboardingOffer } from "~/features/guided-onboarding/home/GuidedOnboardingOffer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Permission } from "~/server/api/rbac";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -199,6 +200,7 @@ function GovernanceOverviewPage() {
             Preview
           </Badge>
         </HStack>
+        <GuidedOnboardingOffer space="governance" />
 
         {orgId && <QuarantineFillAlert organizationId={orgId} />}
 

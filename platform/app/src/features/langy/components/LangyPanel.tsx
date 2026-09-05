@@ -2955,6 +2955,8 @@ function LangyPanel({
       />
       <MotionBox
         ref={panelRef}
+        // The guided tour's handoff spotlight finds the panel by this.
+        data-tour="langy-panel"
         {...contextDropProps}
         // Capture phase, at the root: a link that leaves LangWatch is caught
         // here before whatever rendered it can act on the click.
