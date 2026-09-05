@@ -57,8 +57,6 @@ function mountBridge(
   return { bridge, framePort: transferredPort! };
 }
 
-const flush = () => new Promise((resolve) => setTimeout(resolve));
-
 afterEach(() => {
   document.body.innerHTML = "";
 });
@@ -82,13 +80,19 @@ describe("given a frame that keeps opening queries without them settling", () =>
           params: {},
         });
       }
-      await flush();
+      // Each postMessage dispatches its "message" event asynchronously, so
+      // wait for the executor to actually observe all MAX_CONCURRENT calls
+      // rather than assuming a single flush drains every pending dispatch.
+      await vi.waitFor(() => {
+        expect(executeQuery).toHaveBeenCalledTimes(MAX_CONCURRENT);
+      });
 
       // The first MAX_CONCURRENT reached the executor; the next did not.
-      expect(executeQuery).toHaveBeenCalledTimes(MAX_CONCURRENT);
-      const overloaded = replies.find(
-        (reply) => reply.type === "lw:query-error",
-      );
+      const overloaded = await vi.waitFor(() => {
+        const reply = replies.find((r) => r.type === "lw:query-error");
+        expect(reply).toBeDefined();
+        return reply;
+      });
       expect(overloaded?.error?.code).toBe("dashboard_widget_query_overloaded");
     });
   });
