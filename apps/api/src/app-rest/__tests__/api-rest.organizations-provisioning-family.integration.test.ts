@@ -282,7 +282,7 @@ function inMemoryDirectory() {
       return { organization, team: { id: `team_${organization.id}`, name: "Default" } };
     },
     listProvisioningSummaries: async () => [...rows],
-    getProvisioningSummary: async (organizationId) =>
+    tryGetProvisioningSummary: async (organizationId) =>
       rows.find((row) => row.id === organizationId) ?? null,
     deleteProvisionedOrganization: async ({ organizationId }) => {
       const index = rows.findIndex((row) => row.id === organizationId);

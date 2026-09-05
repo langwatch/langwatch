@@ -371,10 +371,10 @@ describe("storage_uri persisted on the stored_objects row is the authoritative b
 
       // And mintStorageUri is for writes only — there must not be a read
       // path that calls mintStorageUri to construct a fetch URI. Verify
-      // that no usage of mintStorageUri appears inside the getById method
-      // (the read path). We pick out the getById block by source-position
+      // that no usage of mintStorageUri appears inside the tryGetById method
+      // (the read path). We pick out the tryGetById block by source-position
       // and check that mintStorageUri does not appear inside it.
-      const getByIdStart = service.indexOf("async getById(");
+      const getByIdStart = service.indexOf("async tryGetById(");
       expect(getByIdStart).toBeGreaterThan(0);
       // The next `async ` after getByIdStart marks the end of getById's body.
       const nextMethodStart = service.indexOf("\n  async ", getByIdStart + 1);

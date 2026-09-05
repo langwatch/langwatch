@@ -102,7 +102,7 @@ integration("ClickHouseSimulationRunStateRepository.storeProjection", () => {
         context,
       );
 
-      const projection = await repo.getProjection(scenarioRunId, context);
+      const projection = await repo.tryGetProjection(scenarioRunId, context);
 
       expect(projection).not.toBeNull();
       expect(projection!.data.ScenarioId).toBe(data.ScenarioId);

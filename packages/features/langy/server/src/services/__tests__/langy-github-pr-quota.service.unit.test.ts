@@ -18,7 +18,7 @@ const expire = vi.fn();
 
 /** The composed counter, when a deployment has one. */
 class FakeCounter extends LangyGithubPrCounterPort {
-  get(key: string) {
+  tryGet(key: string) {
     return get(key) as Promise<string | null>;
   }
   incr(key: string) {

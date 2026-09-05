@@ -41,11 +41,11 @@ function pluginIdsFor(overrides: Partial<BetterAuthDeploymentConfiguration>): st
     } as never,
     identity: {
       beforeUserDelete: async () => undefined,
-      beforeAccountCreate: async () => undefined,
+      tryBeforeAccountCreate: async () => undefined,
       beforeAccountDelete: async () => undefined,
     } as never,
     invites: {
-      findPendingByOrganizationAndEmail: async () => null,
+      tryFindPendingByOrganizationAndEmail: async () => null,
       applyInvite: async () => undefined,
     } as never,
     announcements: {

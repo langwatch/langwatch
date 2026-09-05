@@ -11,6 +11,7 @@ import {
 import type {
   GovernanceCliCaller,
   GovernanceCliRestPorts,
+  GovernanceDirectoryPort,
 } from "@langwatch/enterprise-governance-server";
 import { Hono, type ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
@@ -78,18 +79,13 @@ function virtualKeyWorld(
     organization_id: ORGANIZATION_ID,
   };
 
-  const database = {
-    user: {
-      findUnique: () =>
-        Promise.resolve({
-          deactivatedAt: null,
-          name: "Rogerio",
-          email: "rogerio@example.test",
-        }),
-    },
-    organizationUser: { findFirst: () => Promise.resolve({ userId: USER_ID }) },
-    organization: { findUnique: () => Promise.resolve({ supportContact: null }) },
-    project: { findFirst: () => Promise.resolve(null) },
+  const directory: GovernanceDirectoryPort = {
+    membershipStatus: () => Promise.resolve("active"),
+    tryFindPersonProfile: () => Promise.resolve({ name: "Rogerio", email: "rogerio@example.test" }),
+    tryFindOrganizationIdByProjectApiKey: () => Promise.resolve(null),
+    tryFindMemberIdByEmail: () => Promise.resolve(null),
+    tryFindLiveProjectBySlug: () => Promise.resolve(null),
+    tryFindLiveProjectByRef: () => Promise.resolve(null),
   };
 
   world.ports = {
@@ -119,7 +115,8 @@ function virtualKeyWorld(
           });
         },
       }) as never,
-    database: () => database as never,
+    directory: () => directory,
+    supportContacts: () => ({ tryResolveSupportContact: () => Promise.resolve(null) }) as never,
     ensurePersonalWorkspace: () =>
       Promise.resolve({
         team: { id: "team-personal" },

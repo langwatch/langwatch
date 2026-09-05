@@ -85,7 +85,7 @@ class StubFederationPort implements BetterAuthFederationPort {
 }
 
 class StubInvitesPort implements BetterAuthPendingInvitePort {
-  findPendingByOrganizationAndEmail(): Promise<null> {
+  tryFindPendingByOrganizationAndEmail(): Promise<null> {
     return Promise.resolve(null);
   }
   applyInvite(): Promise<void> {

@@ -54,7 +54,7 @@ class PrismaContacts extends CliAdminContactPort {
   tryResolveAdminEmail(organizationId: string): Promise<string | null> {
     return OrganizationSupportContactService.create({
       repository: PrismaOrganizationSupportContactRepository.create({ prisma }),
-    }).resolveOrgAdminEmail({
+    }).tryResolveOrgAdminEmail({
       organizationId,
     });
   }

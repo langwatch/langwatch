@@ -54,7 +54,7 @@ function makeService(): StoredObjectsService {
   return StoredObjectsService.create({
     repository: {
       insert: vi.fn(async () => undefined),
-      findById: vi.fn(async () => row),
+      tryFindById: vi.fn(async () => row),
       findAllByProject: vi.fn(async () => []),
       deleteByProject: vi.fn(async () => undefined),
       deleteByIds: vi.fn(async () => undefined),
@@ -100,9 +100,9 @@ describe("StoredObjectsService tracing", () => {
   describe("when the file surface reads an object back", () => {
     /** @scenario "OpenTelemetry spans wrap extraction during ingest and reads via /api/files/:id" */
     it("opens a span named for the read", async () => {
-      await makeService().getById({ projectId: PROJECT_ID, id: "obj-1" });
+      await makeService().tryGetById({ projectId: PROJECT_ID, id: "obj-1" });
 
-      expect(spanNames).toContain("StoredObjectsService.getById");
+      expect(spanNames).toContain("StoredObjectsService.tryGetById");
     });
   });
 });

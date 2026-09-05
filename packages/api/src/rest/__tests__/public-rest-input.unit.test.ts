@@ -29,10 +29,6 @@ describe("public REST input parsing", () => {
       tag: ["error", "llm"],
     });
   });
-  /**
-   * @scenario "A chunked body past the cap is refused without being buffered"
-   * @scenario "A body past the cap under a non-integer Content-Length is refused"
-   */
   describe("given a body larger than the cap", () => {
     const CAP = 1_024;
     const CHUNK = 256;
@@ -85,6 +81,7 @@ describe("public REST input parsing", () => {
     }
 
     describe("when the request is chunked and declares no length", () => {
+      /** @scenario "A chunked body past the cap is refused without being buffered" */
       it("refuses it as too large and stops reading at the cap", async () => {
         const { code, pulled } = await post({ "transfer-encoding": "chunked" });
 
@@ -94,6 +91,7 @@ describe("public REST input parsing", () => {
     });
 
     describe("when the declared Content-Length is not a whole number", () => {
+      /** @scenario "A body past the cap under a non-integer Content-Length is refused" */
       it("refuses it as too large rather than skipping the check", async () => {
         const { code, pulled } = await post({ "content-length": "100, 5000000000" });
 

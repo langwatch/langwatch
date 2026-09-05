@@ -27,7 +27,7 @@ function makeService({ registered = false }: { registered?: boolean } = {}) {
       issue: async (record) => {
         issued.push(record);
       },
-      claim: async ({ token, now }) => {
+      tryClaim: async ({ token, now }) => {
         const index = issued.findIndex((record) => record.token === token);
         if (index === -1) return null;
         const [record] = issued.splice(index, 1);

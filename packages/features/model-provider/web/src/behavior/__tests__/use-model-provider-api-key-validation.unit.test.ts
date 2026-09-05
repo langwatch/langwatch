@@ -93,6 +93,43 @@ describe("useModelProviderApiKeyValidation", () => {
         expect(result.current.validationError).toBeTruthy();
         expect(result.current.validationError).not.toContain("Failed to fetch");
       });
+
+      // The regression this pins is invisible server-side: the sentence the
+      // constructor writes is real there, and only the wire replaces it with
+      // the code. So the payload the probe adapter serialises is driven
+      // through the genuine hook, and what the drawer would render is read
+      // back off it.
+      /** @scenario An unreachable provider is explained, not named by its code */
+      it("explains an unreachable provider instead of showing its error code", async () => {
+        mockMutateAsync.mockRejectedValue({
+          data: {
+            error: {
+              code: "provider_unreachable",
+              httpStatus: 502,
+              fault: "provider",
+              meta: { provider: "gemini", hasConfigurableEndpoint: true },
+              tips: [
+                "Check your network connection.",
+                "Check the base URL is correct and reachable.",
+              ],
+            },
+          },
+        });
+        const { result } = renderValidation();
+
+        await act(async () => {
+          await result.current.validate();
+        });
+
+        expect(result.current.validationError).toBe(
+          "Couldn't reach the provider. " +
+            "Nothing answered, so this API key was not checked. " +
+            "Check your network connection, and check the base URL is " +
+            "correct and reachable.",
+        );
+        // The defect was this slug reaching the customer verbatim.
+        expect(result.current.validationError).not.toContain("provider_unreachable");
+      });
     });
   });
 

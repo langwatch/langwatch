@@ -336,7 +336,7 @@ describe("BlobLeases", () => {
 
     describe("given a holder token written by a pre-lease release", () => {
       describe("when the last lease is released", () => {
-        /** @scenario "A holder from a pre-lease release withholds the grace window" */
+        /** @scenario "An unreferenced blob is put on the grace window even though a stale holder token withheld it" */
         it("withholds the grace window because that holder has no deadline to read", async () => {
           await redis.set(BLOB_KEY, "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
           await leases.take({
@@ -421,7 +421,7 @@ describe("BlobLeases", () => {
 
     describe("given an S3-tier blob whose only holder retires", () => {
       describe("when that holder releases its lease", () => {
-        /** @scenario "An S3-tier release leaves the object to the durable-store sweep" */
+        /** @scenario "An S3-tier release leaves the object to the GroupQueue durable-tier sweep" */
         it("graces the bookkeeping keys without touching any object store", async () => {
           await leases.take({
             projectId: PROJECT,

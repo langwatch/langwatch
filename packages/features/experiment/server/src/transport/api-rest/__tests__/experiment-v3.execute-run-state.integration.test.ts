@@ -33,7 +33,7 @@ vi.mock("../../../services/experiment-execution-data.service", () => ({
 }));
 
 vi.mock("../../../services/experiment-run-results-writer.service", () => ({
-  ExperimentRunResultsWriterService: { writerFor: () => undefined },
+  ExperimentRunResultsWriterService: { tryWriterFor: () => undefined },
 }));
 
 import { createExperimentV3RestApp } from "../experiment-v3.api";

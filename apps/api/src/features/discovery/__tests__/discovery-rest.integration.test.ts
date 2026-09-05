@@ -111,6 +111,7 @@ describe("given the API process's discovery locations", () => {
     });
 
     /** @scenario "A caller that already holds the document is told so" */
+    /** @scenario "A caller holding a stale tag gets the document" */
     it("answers 304 with no body when the caller already holds those bytes", async () => {
       const api = await startApi();
       const first = await api.fetch("/api/openapi.json");
@@ -132,7 +133,6 @@ describe("given the API process's discovery locations", () => {
 
       expect([strong.status, weak.status, wildcard.status]).toEqual([304, 304, 304]);
       expect(await strong.text()).toBe("");
-      /** @scenario "A caller holding a stale tag gets the document" */
       expect(stale.status).toBe(200);
       expect((await stale.text()).length).toBeGreaterThan(0);
     });

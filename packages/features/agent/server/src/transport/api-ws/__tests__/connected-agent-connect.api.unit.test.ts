@@ -337,7 +337,7 @@ describe("ConnectGateway socket lifecycle", () => {
   });
 });
 
-describe("AgentSessionService.readCallForSession", () => {
+describe("AgentSessionService.tryReadCallForSession", () => {
   describe("given an instance that registered agent A only, and a call routed at it for agent B", () => {
     /** @scenario "An instance never receives a call for an agent it did not register" */
     it("is not handed the call, and the call is marked undelivered for a retry elsewhere", async () => {
@@ -388,10 +388,10 @@ describe("AgentSessionService.readCallForSession", () => {
       };
       await store.set("agent_call:v1:proj_1:call_1", JSON.stringify(stored), 60);
 
-      const call = await core.readCallForSession(session, "call_1");
+      const call = await core.tryReadCallForSession(session, "call_1");
 
       expect(call).toBeNull();
-      const result = await store.get("agent_result:v1:proj_1:call_1");
+      const result = await store.tryGet("agent_result:v1:proj_1:call_1");
       expect(result && JSON.parse(result)).toMatchObject({
         instanceId: "inst_1",
         undelivered: true,

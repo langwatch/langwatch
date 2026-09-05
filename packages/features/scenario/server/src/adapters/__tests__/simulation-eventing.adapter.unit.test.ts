@@ -92,7 +92,7 @@ describe("SimulationRunStateStoreAdapter fold store", () => {
 
       await store.store(state, { tenantId: TENANT_ID, aggregateId: RUN_ID });
 
-      const stored = await adapter.getProjection(RUN_ID, { tenantId: TENANT_ID });
+      const stored = await adapter.tryGetProjection(RUN_ID, { tenantId: TENANT_ID });
       expect(stored).toBeNull();
     });
   });
@@ -107,12 +107,12 @@ describe("SimulationRunStateStoreAdapter fold store", () => {
       let state = projection.init();
       state = projection.apply(state, metricsComputedEvent(1.25));
       await store.store(state, { tenantId: TENANT_ID, aggregateId: RUN_ID });
-      expect(await adapter.getProjection(RUN_ID, { tenantId: TENANT_ID })).toBeNull();
+      expect(await adapter.tryGetProjection(RUN_ID, { tenantId: TENANT_ID })).toBeNull();
 
       state = projection.apply(state, startedEvent());
       await store.store(state, { tenantId: TENANT_ID, aggregateId: RUN_ID });
 
-      const stored = await adapter.getProjection(RUN_ID, { tenantId: TENANT_ID });
+      const stored = await adapter.tryGetProjection(RUN_ID, { tenantId: TENANT_ID });
       expect(stored).not.toBeNull();
       const data = stored!.data as SimulationRunStateData;
       expect(data.ScenarioRunId).toBe(RUN_ID);
@@ -133,7 +133,7 @@ describe("SimulationRunStateStoreAdapter fold store", () => {
 
       await store.store(state, { tenantId: TENANT_ID, aggregateId: RUN_ID });
 
-      const stored = await adapter.getProjection(RUN_ID, { tenantId: TENANT_ID });
+      const stored = await adapter.tryGetProjection(RUN_ID, { tenantId: TENANT_ID });
       expect(stored).not.toBeNull();
       const data = stored!.data as SimulationRunStateData;
       expect(data.Name).toBe("checkout flow");

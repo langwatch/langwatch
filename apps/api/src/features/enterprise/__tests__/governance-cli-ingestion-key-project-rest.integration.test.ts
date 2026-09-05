@@ -6,6 +6,7 @@ import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest
 import type {
   GovernanceCliCaller,
   GovernanceCliRestPorts,
+  GovernanceDirectoryPort,
 } from "@langwatch/enterprise-governance-server";
 import { Hono, type ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
@@ -185,32 +186,28 @@ function ingestionKeyWorld(
 
   // Only the caller's own organization holds a project. The other tenant's
   // project is deliberately absent from what an org-scoped lookup can see.
-  const database = {
-    user: {
-      findUnique: () => Promise.resolve({ deactivatedAt: null, name: "Jane", email: "j@e.test" }),
-    },
-    organizationUser: { findFirst: () => Promise.resolve({ userId: USER_ID }) },
-    organization: { findUnique: () => Promise.resolve({ supportContact: null }) },
-    project: {
-      findFirst: (query: {
-        where: { id?: string; slug?: string; team?: { organizationId?: string } };
-      }) => {
-        world.lookups.push(query.where.team?.organizationId ?? "");
-        const matches =
-          query.where.team?.organizationId === ORGANIZATION_ID &&
-          (query.where.id === PROJECT_ID || query.where.slug === PROJECT_SLUG);
-        return Promise.resolve(
-          matches
-            ? {
-                id: PROJECT_ID,
-                slug: PROJECT_SLUG,
-                name: "Checkout API",
-                isPersonal: false,
-                ownerUserId: null,
-              }
-            : null,
-        );
-      },
+  const directory: GovernanceDirectoryPort = {
+    membershipStatus: () => Promise.resolve("active"),
+    tryFindPersonProfile: () => Promise.resolve({ name: "Jane", email: "j@e.test" }),
+    tryFindOrganizationIdByProjectApiKey: () => Promise.resolve(null),
+    tryFindMemberIdByEmail: () => Promise.resolve(null),
+    tryFindLiveProjectBySlug: () => Promise.resolve(null),
+    tryFindLiveProjectByRef: ({ projectRef, organizationId }) => {
+      world.lookups.push(organizationId);
+      const matches =
+        organizationId === ORGANIZATION_ID &&
+        (projectRef === PROJECT_ID || projectRef === PROJECT_SLUG);
+      return Promise.resolve(
+        matches
+          ? {
+              id: PROJECT_ID,
+              slug: PROJECT_SLUG,
+              name: "Checkout API",
+              isPersonal: false,
+              ownerUserId: null,
+            }
+          : null,
+      );
     },
   };
 
@@ -234,7 +231,8 @@ function ingestionKeyWorld(
           return Promise.resolve({ token: "ik-lw-minted-token", prefix: "ik-lw-minted" });
         },
       }) as never,
-    database: () => database as never,
+    directory: () => directory,
+    supportContacts: () => ({ tryResolveSupportContact: () => Promise.resolve(null) }) as never,
     ensurePersonalWorkspace: () => {
       throw new Error("unreachable: every scenario here names a project.");
     },

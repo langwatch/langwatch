@@ -125,7 +125,7 @@ class MemoryIdentityRepository extends AgentRepository {
     /* not used by these scenarios */
   }
 
-  async findByIdentityKey(input: {
+  async tryFindByIdentityKey(input: {
     projectId: string;
     identityKey: string;
   }): Promise<Agent | null> {

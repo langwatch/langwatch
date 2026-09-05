@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  backfillAgentAuditLogIds,
-  type AgentAuditLogBackfillDatabase,
-} from "../agent-audit-log-ids-backfill.task";
+import { backfillAgentAuditLogIds } from "../agent-audit-log-ids-backfill.task";
+import type { AgentAuditLogBackfillDatabase } from "../../repositories/prisma/prisma.agent-audit-log-backfill.repository";
 
 const AT = new Date("2026-08-01T12:00:00Z");
 

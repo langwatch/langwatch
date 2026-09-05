@@ -36,6 +36,7 @@ const GHES = "github.acme-corp.internal";
 
 describe("the GitHub host this instance is bound to", () => {
   describe("given the instance names no GitHub host", () => {
+    /** @scenario "An instance that names no host talks to github.com" */
     it("resolves github.com, its public API and its app page", () => {
       expect(getGithubHost()).toBe("github.com");
       expect(getGithubApiBase()).toBe("https://api.github.com");
@@ -63,6 +64,7 @@ describe("the GitHub host this instance is bound to", () => {
   describe("given the instance names a GitHub Enterprise Server host", () => {
     const config = { host: GHES };
 
+    /** @scenario "An instance that names an Enterprise Server host talks to that host" */
     it("resolves that host, its API and its App page", () => {
       expect(getGithubHost(config)).toBe(GHES);
       expect(getGithubApiBase(config)).toBe(`https://${GHES}/api/v3`);

@@ -84,7 +84,7 @@ describe("given a bearer token being resolved to its project", () => {
         prisma: { project: { findUnique } } as unknown as PrismaClient,
       });
 
-      await lookup.findLiveProjectByApiKey({ apiKey: "lw_key" });
+      await lookup.tryFindLiveProjectByApiKey({ apiKey: "lw_key" });
 
       expect(findUnique).toHaveBeenCalledExactlyOnceWith({
         where: { apiKey: "lw_key", archivedAt: null },

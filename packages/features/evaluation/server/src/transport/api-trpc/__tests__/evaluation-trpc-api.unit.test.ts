@@ -69,7 +69,7 @@ function harness({
     {
       mappingsSchema,
       tryResolveAzureSafetyEnv: async () => null,
-      evaluatorUnavailability: () => undefined,
+      tryEvaluatorUnavailability: () => undefined,
       missingEnvironmentVariables: (envVars) => envVars.filter((envVar) => !process.env[envVar]),
       listCustomEvaluators: async () => [],
       runEvaluationForTrace: async () => PROCESSED_RESULT,
@@ -102,7 +102,7 @@ describe("EvaluationTrpcApi", () => {
         {
           mappingsSchema,
           tryResolveAzureSafetyEnv: async () => null,
-          evaluatorUnavailability: () => undefined,
+          tryEvaluatorUnavailability: () => undefined,
           missingEnvironmentVariables: (envVars) =>
             envVars.filter((envVar) => !process.env[envVar]),
           listCustomEvaluators: async () => [],
@@ -229,7 +229,7 @@ describe("EvaluationTrpcApi", () => {
       };
       const { caller } = harness({
         ports: {
-          evaluatorUnavailability: ({ evaluatorType }) =>
+          tryEvaluatorUnavailability: ({ evaluatorType }) =>
             evaluatorType.startsWith("presidio/") ? unavailability : undefined,
         },
       });
@@ -297,7 +297,7 @@ describe("EvaluationTrpcApi", () => {
         {
           mappingsSchema,
           tryResolveAzureSafetyEnv: async () => null,
-          evaluatorUnavailability: () => undefined,
+          tryEvaluatorUnavailability: () => undefined,
           missingEnvironmentVariables: (envVars) =>
             envVars.filter((envVar) => !process.env[envVar]),
           listCustomEvaluators: async () => [],

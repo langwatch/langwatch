@@ -92,8 +92,8 @@ async function probeAddress(headers: Record<string, string>): Promise<string> {
 }
 
 describe("the tRPC surface's per-caller rate-limit key", () => {
-  /** @scenario "A caller whose address cannot be resolved gets its own bucket" */
   describe("when a call is resolved with no transport to read an address from", () => {
+    /** @scenario "A caller whose address cannot be resolved gets its own bucket" */
     it("names the unresolved bucket rather than a resolved caller's key", async () => {
       const application = ApiApplication.create({
         features: new AddressProbeFeatures(),
@@ -116,8 +116,8 @@ describe("the tRPC surface's per-caller rate-limit key", () => {
     });
   });
 
-  /** @scenario "The signed-out tRPC surface keys on the resolved address" */
   describe("when a caller supplies a forwarding header from an untrusted peer", () => {
+    /** @scenario "The signed-out tRPC surface keys on the resolved address" */
     it("keys on the socket address rather than on the constant every caller shared", async () => {
       const resolved = await probeAddress({ "cf-connecting-ip": "203.0.113.7" });
 

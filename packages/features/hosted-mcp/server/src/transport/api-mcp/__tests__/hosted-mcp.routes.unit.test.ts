@@ -14,7 +14,7 @@ import {
 } from "../../../index";
 
 class NoProjects extends McpProjectLookupPort {
-  findLiveProjectByApiKey(): Promise<{ id: string; teamId: string } | null> {
+  tryFindLiveProjectByApiKey(): Promise<{ id: string; teamId: string } | null> {
     return Promise.resolve(null);
   }
 }

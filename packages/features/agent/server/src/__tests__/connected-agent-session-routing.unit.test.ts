@@ -77,7 +77,7 @@ function storedCallFor(agentId: string): StoredCall {
   };
 }
 
-describe("AgentSessionService.readCallForSession", () => {
+describe("AgentSessionService.tryReadCallForSession", () => {
   describe("when a call is routed at an instance that did not register the agent", () => {
     /** @scenario "An instance never receives a call for an agent it did not register" */
     it("does not send the call to it and marks it undelivered", async () => {
@@ -86,11 +86,11 @@ describe("AgentSessionService.readCallForSession", () => {
       await store.set(callKey(projectId, callId), JSON.stringify(stored), 60);
       const session = sessionRegisteredFor("agent_stranger");
 
-      const call = await core.readCallForSession(session, callId);
+      const call = await core.tryReadCallForSession(session, callId);
 
       expect(call).toBeNull();
       const result = JSON.parse(
-        (await store.get(resultKey(projectId, callId))) ?? "null",
+        (await store.tryGet(resultKey(projectId, callId))) ?? "null",
       ) as StoredResult | null;
       expect(result).toMatchObject({ instanceId, undelivered: true });
     });

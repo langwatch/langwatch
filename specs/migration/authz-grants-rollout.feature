@@ -64,6 +64,12 @@ Feature: Moving an organization onto the grants projection
     When it is stated as a fact
     Then the fact carries the row's original time, not the migration's clock
 
+  @unit
+  Scenario: Reassigning a grant's role clears the role it was imported with
+    Given a grant imported with a legacy role alongside its new custom role
+    When the grant is reassigned to a different role
+    Then the projected row no longer carries the legacy role it was imported with
+
   # ═══ How it runs ══════════════════════════════════════════════════════
 
   @unit

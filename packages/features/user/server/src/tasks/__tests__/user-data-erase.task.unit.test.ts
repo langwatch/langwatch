@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  runGdprUserDataErase,
-  UserDataEraseTask,
-  type GdprUserDataEraseDatabase,
-} from "../user-data-erase.task";
+import { runGdprUserDataErase, UserDataEraseTask } from "../user-data-erase.task";
+import type { GdprUserDataEraseDatabase } from "../../repositories/prisma/prisma.user-data-erase.repository";
 
 const emptyMany = () => vi.fn(async () => ({ count: 0 }));
 

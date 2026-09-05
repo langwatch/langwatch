@@ -1,5 +1,5 @@
 /**
- * The run's sandbox credential must reach the workflow a code node executes — `mintRunSandboxApiKey` and `withSandboxApiKey`
+ * The run's sandbox credential must reach the workflow a code node executes — `tryMintRunSandboxApiKey` and `withSandboxApiKey`
  * existed but were never wired together. Pins the wiring: the dispatched event carries `sandbox_api_key`.
  * @see specs/experiments-v3/evaluation-execution.feature
  */
@@ -88,7 +88,7 @@ describe("given a run that minted a sandbox credential", () => {
   });
 
   describe("when the run minted no credential", () => {
-    /** @scenario "The run's sandbox credential reaches the code it executes" */
+    /** @scenario "A run with no minted credential dispatches no credential field" */
     it("dispatches the workflow with no sandbox_api_key field", async () => {
       const loadedData = { sandboxApiKey: undefined };
 

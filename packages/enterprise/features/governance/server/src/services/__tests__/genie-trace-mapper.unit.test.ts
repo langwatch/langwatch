@@ -141,7 +141,7 @@ function attrsOf(span: { attributes?: unknown[] }) {
 }
 
 function spansOf(events: NormalizedPullEvent[]) {
-  const request = GenieTraceMapperService.toTraceRequest({
+  const request = GenieTraceMapperService.tryToTraceRequest({
     events: events,
     origin: ORIGIN,
   });
@@ -340,7 +340,7 @@ describe("given events that are not conversations", () => {
       action: "usage_bucket",
     };
     expect(
-      GenieTraceMapperService.toTraceRequest({ events: [aggregate], origin: ORIGIN }),
+      GenieTraceMapperService.tryToTraceRequest({ events: [aggregate], origin: ORIGIN }),
     ).toBeNull();
   });
 });
@@ -350,7 +350,7 @@ describe("given a message a sweep caught mid-answer", () => {
     it("routes nothing — the trace door keeps the FIRST write per span id, and a pinned mid-flight capture can never be repaired", () => {
       const inFlight = genieEvent(completedMessage({ status: "ASKING_AI", attachments: [] }));
       expect(
-        GenieTraceMapperService.toTraceRequest({ events: [inFlight], origin: ORIGIN }),
+        GenieTraceMapperService.tryToTraceRequest({ events: [inFlight], origin: ORIGIN }),
       ).toBeNull();
     });
   });
@@ -358,7 +358,7 @@ describe("given a message a sweep caught mid-answer", () => {
   describe("when the re-read finds the status settled", () => {
     it("routes the message", () => {
       const settled = genieEvent(completedMessage());
-      const request = GenieTraceMapperService.toTraceRequest({
+      const request = GenieTraceMapperService.tryToTraceRequest({
         events: [settled],
         origin: ORIGIN,
       });
@@ -370,7 +370,7 @@ describe("given a message a sweep caught mid-answer", () => {
     it("treats it as still in flight — the puller's polarity: wrong that way costs a re-read, routing it costs a permanently wrong trace", () => {
       const unknown = genieEvent(completedMessage({ status: "SOMETHING_NEW", attachments: [] }));
       expect(
-        GenieTraceMapperService.toTraceRequest({ events: [unknown], origin: ORIGIN }),
+        GenieTraceMapperService.tryToTraceRequest({ events: [unknown], origin: ORIGIN }),
       ).toBeNull();
     });
   });
@@ -378,7 +378,7 @@ describe("given a message a sweep caught mid-answer", () => {
   describe("when there is no status at all", () => {
     it("routes the message as it stands — the puller never holds the watermark for it, so skipping would drop it outright", () => {
       const statusless = genieEvent(completedMessage({ status: undefined, attachments: [] }));
-      const request = GenieTraceMapperService.toTraceRequest({
+      const request = GenieTraceMapperService.tryToTraceRequest({
         events: [statusless],
         origin: ORIGIN,
       });
@@ -395,7 +395,7 @@ describe("given two ingestion sources routing into one destination project", () 
   const message = completedMessage();
 
   function rootOf(origin: typeof ORIGIN) {
-    const request = GenieTraceMapperService.toTraceRequest({
+    const request = GenieTraceMapperService.tryToTraceRequest({
       events: [genieEvent(message)],
       origin: origin,
     });

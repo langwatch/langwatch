@@ -105,7 +105,7 @@ async function connectInstance({
       received.push(callId);
       void (async () => {
         const stored = storedCallSchema.parse(
-          JSON.parse((await runtime.store.get(callKey(projectId, callId)))!),
+          JSON.parse((await runtime.store.tryGet(callKey(projectId, callId)))!),
         );
         await behavior(callId, {
           ack: async () => {

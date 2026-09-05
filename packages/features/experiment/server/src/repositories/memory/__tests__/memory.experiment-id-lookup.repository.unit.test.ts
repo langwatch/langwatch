@@ -6,7 +6,7 @@ describe("MemoryExperimentIdLookupRepository", () => {
     const repository = MemoryExperimentIdLookupRepository.create();
 
     await expect(
-      repository.findExperimentId({ tenantId: "tenant-1", runId: "run-1" }),
+      repository.tryFindExperimentId({ tenantId: "tenant-1", runId: "run-1" }),
     ).resolves.toBeNull();
   });
 });

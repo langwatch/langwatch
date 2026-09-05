@@ -1,6 +1,6 @@
 /**
  * Unit tests for StoredObjectsRepository — verifies that queries are project-scoped and
- * that insert/findById delegate to the ClickHouse client with the expected shape.
+ * that insert/tryFindById delegate to the ClickHouse client with the expected shape.
  * @vitest-environment node
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -106,7 +106,7 @@ describe("StoredObjectsRepository", () => {
     });
   });
 
-  describe("findById", () => {
+  describe("tryFindById", () => {
     describe("when the row exists in ClickHouse", () => {
       it("returns the parsed StoredObject with project_id scoping", async () => {
         const rawRow = {
@@ -124,7 +124,7 @@ describe("StoredObjectsRepository", () => {
         };
         mockQueryResult.json.mockResolvedValue([rawRow]);
 
-        const result = await repo.findById({
+        const result = await repo.tryFindById({
           projectId: "proj-1",
           id: "test-id",
         });
@@ -149,7 +149,7 @@ describe("StoredObjectsRepository", () => {
       it("returns null", async () => {
         mockQueryResult.json.mockResolvedValue([]);
 
-        const result = await repo.findById({
+        const result = await repo.tryFindById({
           projectId: "proj-1",
           id: "missing-id",
         });

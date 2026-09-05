@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
@@ -115,8 +116,12 @@ function providerRow() {
   };
 }
 
-function database() {
-  return {
+/**
+ * The delegate slice these compositions touch. Built untyped and cast at this
+ * one seam: the real options take a typed `PrismaClient`.
+ */
+function database(): PrismaClient {
+  const fake = {
     modelProvider: {
       findMany: vi.fn(async () => [providerRow()]),
       findFirst: vi.fn(async () => providerRow()),
@@ -128,6 +133,7 @@ function database() {
     $executeRaw: vi.fn(async () => 0),
     $transaction: vi.fn(async (run: (tx: unknown) => unknown) => run({})),
   };
+  return fake as unknown as PrismaClient;
 }
 
 function tenancy(): WorkerModelProviderTenancy {

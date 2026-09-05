@@ -146,8 +146,8 @@ describe("the project fence of connected agent state", () => {
       await expect(core.ack(sessionOf(attackerProjectId), callId)).rejects.toBeInstanceOf(
         AgentCallForeignProjectError,
       );
-      expect(await store.get(callAckKey(attackerProjectId, callId))).toBeNull();
-      expect(await store.get(callAckKey(victimProjectId, callId))).toBeNull();
+      expect(await store.tryGet(callAckKey(attackerProjectId, callId))).toBeNull();
+      expect(await store.tryGet(callAckKey(victimProjectId, callId))).toBeNull();
     });
 
     /** @scenario "An ack for a call of another project is refused" */
@@ -165,8 +165,8 @@ describe("the project fence of connected agent state", () => {
           session: null,
         }),
       ).rejects.toMatchObject({ code: "agent_call_foreign_project" });
-      expect(await store.get(resultKey(victimProjectId, callId))).toBeNull();
-      expect(await store.get(resultKey(attackerProjectId, callId))).toBeNull();
+      expect(await store.tryGet(resultKey(victimProjectId, callId))).toBeNull();
+      expect(await store.tryGet(resultKey(attackerProjectId, callId))).toBeNull();
     });
   });
 
@@ -179,7 +179,7 @@ describe("the project fence of connected agent state", () => {
 
       await core.ack(sessionOf(victimProjectId), callId);
 
-      expect(await store.get(callAckKey(victimProjectId, callId))).toBe("1");
+      expect(await store.tryGet(callAckKey(victimProjectId, callId))).toBe("1");
     });
   });
 
@@ -214,8 +214,8 @@ describe("the project fence of connected agent state", () => {
       });
 
       expect(answer).toEqual({ frames: [] });
-      expect(await store.get(callKey(victimProjectId, callId))).not.toBeNull();
-      expect(await store.get(resultKey(victimProjectId, callId))).toBeNull();
+      expect(await store.tryGet(callKey(victimProjectId, callId))).not.toBeNull();
+      expect(await store.tryGet(resultKey(victimProjectId, callId))).toBeNull();
       expect(await store.zrangebyscore(pendingKey(victimProjectId, instanceId), 0)).toEqual([
         callId,
       ]);

@@ -108,6 +108,7 @@ describe("usePromptConfigForm — system-prompt-required save flow (Issue #3196)
 
     describe("when the user types a non-empty system message into the empty form", () => {
       /** @scenario Save becomes enabled once the user fills in a system prompt */
+      /** @scenario "Workflow with a valid system prompt saves successfully (happy-path regression)" */
       it("clears the inline error, re-enables Save, and fires the mutation with the typed content", async () => {
         const calls: MutationCall[] = [];
         const user = userEvent.setup();

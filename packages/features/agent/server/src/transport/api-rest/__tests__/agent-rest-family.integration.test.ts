@@ -131,7 +131,7 @@ function inMemoryAgentRepository(): AgentRepository {
     },
     findCopies: async () => [],
     updateNameAndConfig: async () => {},
-    findByIdentityKey: async () => null,
+    tryFindByIdentityKey: async () => null,
     findConnectedByNameAndEnvironment: async () => [],
     reregisterConnected: async () => {
       throw new Error("not used by these tests");

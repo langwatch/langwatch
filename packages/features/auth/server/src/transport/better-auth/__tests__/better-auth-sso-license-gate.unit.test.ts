@@ -61,7 +61,7 @@ class StubIdentityPort implements BetterAuthIdentityCeremoniesPort {
   beforeUserDelete(): Promise<void> {
     return Promise.reject(new Error("unused"));
   }
-  beforeAccountCreate(): Promise<{ data: { id: string } } | undefined> {
+  tryBeforeAccountCreate(): Promise<{ data: { id: string } } | undefined> {
     return Promise.reject(new Error("unused"));
   }
   beforeAccountDelete(): Promise<void> {

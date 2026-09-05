@@ -117,7 +117,7 @@ class MemoryAgentRepository extends AgentRepository {
     /* not used by these scenarios */
   }
 
-  async findByIdentityKey(): Promise<Agent | null> {
+  async tryFindByIdentityKey(): Promise<Agent | null> {
     return null;
   }
 

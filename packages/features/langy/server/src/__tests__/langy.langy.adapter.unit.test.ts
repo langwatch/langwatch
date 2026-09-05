@@ -84,7 +84,7 @@ describe("PostgresLangyAdapter", () => {
         mint: vi.fn(),
         revoke: vi.fn(),
       },
-      context: { render: vi.fn(() => null) },
+      context: { tryRender: vi.fn(() => null) },
       uiActionSurface: { resolve: vi.fn(async () => true) },
       metrics: { count: vi.fn() },
     });
@@ -179,7 +179,7 @@ function compositionOptions() {
     permits: { reserve: vi.fn(), release: vi.fn(), check: vi.fn() },
     perDayPrCap: 0,
     sessionKeys: { mint: vi.fn(), revoke: vi.fn() },
-    context: { render: vi.fn(() => null) },
+    context: { tryRender: vi.fn(() => null) },
     uiActionSurface: { resolve: vi.fn(async () => true) },
     metrics: { count: vi.fn() },
   });

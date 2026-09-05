@@ -66,7 +66,7 @@ describe("ClickHouseSuiteRunRepository", () => {
   it("reads and writes the same row shape used by the Eventing fold store", async () => {
     const { repository, insert } = setup([projectionRow]);
     await expect(
-      repository.getProjection("batch_1", { tenantId: createTenantId("project_1") }),
+      repository.tryGetProjection("batch_1", { tenantId: createTenantId("project_1") }),
     ).resolves.toMatchObject({
       id: "projection_1",
       aggregateId: "batch_1",
@@ -136,7 +136,7 @@ describe("ClickHouseSuiteRunRepository", () => {
       defaultRetentionDays: 30,
     });
     await expect(
-      repository.getProjection("b", { tenantId: createTenantId("p") }),
+      repository.tryGetProjection("b", { tenantId: createTenantId("p") }),
     ).rejects.toBeInstanceOf(StoreError);
   });
 

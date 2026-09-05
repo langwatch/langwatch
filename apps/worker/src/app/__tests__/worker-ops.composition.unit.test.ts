@@ -37,7 +37,7 @@ function config(overrides: { saas?: boolean; disableUsageStats?: boolean } = {})
 /** Enough Redis for the rate tracker and the anomaly state store to construct. */
 const redis = {
   pipeline: () => ({ exec: async () => [] }),
-  hgetall: async () => ({}),
+  tryHgetall: async () => ({}),
   get: async () => null,
   set: async () => "OK",
   del: async () => 0,
@@ -80,7 +80,7 @@ describe("given a worker holding its substrates", () => {
 
       const close = await OpsWorkerFeatureInstaller.create({
         workers: {
-          startAnomalyWorker: () => {
+          tryStartAnomalyWorker: () => {
             started.push("anomaly");
             return {
               stop: () => {
@@ -88,7 +88,7 @@ describe("given a worker holding its substrates", () => {
               },
             };
           },
-          startUsageStatsWorker: () => {
+          tryStartUsageStatsWorker: () => {
             started.push("usage-stats");
             return {
               stop: () => {
@@ -127,9 +127,9 @@ describe("given a worker holding its substrates", () => {
     it("does not start the usage report and still runs the other two", async () => {
       const ops = compose({ saas: true });
 
-      const anomaly = ops.workers.startAnomalyWorker();
+      const anomaly = ops.workers.tryStartAnomalyWorker();
 
-      expect(ops.workers.startUsageStatsWorker()).toBeUndefined();
+      expect(ops.workers.tryStartUsageStatsWorker()).toBeUndefined();
       expect(anomaly).toBeDefined();
       expect(ops.storageStats).toBeDefined();
       await anomaly?.stop();
@@ -139,7 +139,7 @@ describe("given a worker holding its substrates", () => {
   describe("when an operator disabled usage statistics", () => {
     /** @scenario "An operator's opt-out stops the usage report" */
     it("does not start the usage report", () => {
-      expect(compose({ disableUsageStats: true }).workers.startUsageStatsWorker()).toBeUndefined();
+      expect(compose({ disableUsageStats: true }).workers.tryStartUsageStatsWorker()).toBeUndefined();
     });
   });
 });
@@ -153,7 +153,7 @@ describe("given a worker composed without the queue's Redis", () => {
       const ops = compose({ withRedis: false, absence });
 
       expect(absence.reasons).toEqual(["anomaly-detection"]);
-      expect(ops.workers.startAnomalyWorker()).toBeUndefined();
+      expect(ops.workers.tryStartAnomalyWorker()).toBeUndefined();
     });
   });
 });

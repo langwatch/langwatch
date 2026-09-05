@@ -33,7 +33,7 @@ import { ApiEventingIdentityAdapter } from "../../../app/api-identity-eventing.a
 import { composeApiIdentityPipelines } from "../../../app/api-identity-pipelines.composition";
 import { ApiAuditPort } from "../../../api-request.policy";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
-import type { ApiTrpcInfrastructure } from "../../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../../platform/infrastructure/api-trpc.infrastructure";
 import { composeUserFeature } from "../../user/user.composition";
 import { composeOrganizationFeature } from "../organization.composition";
 import {

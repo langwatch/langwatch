@@ -100,7 +100,7 @@ describe("given the v1 trace reads over this process's read stack", () => {
 
   describe("when the trace the caller asked for is gone", () => {
     it("answers the sentence this endpoint has always answered", async () => {
-      const { api } = mount({ read: { getById: vi.fn(async () => undefined) } });
+      const { api } = mount({ read: { tryGetById: vi.fn(async () => undefined) } });
 
       const response = await api.fetch(`/api/traces/${TRACE_ID}`);
 
@@ -370,7 +370,7 @@ function readStackStub(read: Partial<Record<string, unknown>>): ApiTraceReadStac
   const readers = {
     read: {
       getAllTracesForProject: async () => ({ groups: [], traceChecks: {}, totalHits: 0 }),
-      getById: async () => traceRow(),
+      tryGetById: async () => traceRow(),
       getEvaluationsMultiple: async () => ({}),
       ...read,
     },

@@ -126,7 +126,7 @@ describe("given a deployment whose object storage is Azure Blob and nothing else
           insert: vi.fn(async ({ row }: { row: StoredObject }) => {
             rows.set(row.id, row);
           }),
-          findById: vi.fn(async ({ id }: { id: string }) => rows.get(id) ?? null),
+          tryFindById: vi.fn(async ({ id }: { id: string }) => rows.get(id) ?? null),
           findAllByProject: vi.fn(async () => []),
           deleteByProject: vi.fn(async () => undefined),
           deleteByIds: vi.fn(async () => undefined),
@@ -162,7 +162,7 @@ describe("given a deployment whose object storage is Azure Blob and nothing else
           .digest("hex")}`,
       );
 
-      const read = await service.getById({ projectId: PROJECT_ID, id: stored.id });
+      const read = await service.tryGetById({ projectId: PROJECT_ID, id: stored.id });
       expect(read && "stream" in read).toBe(true);
       await expect(drain((read as { stream: Readable }).stream)).resolves.toBe(bytes.toString());
     });

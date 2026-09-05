@@ -1,7 +1,7 @@
 /**
  * Structural regression test for the simulation-run-state projection read.
  *
- * getProjection() reads the latest version of a single run from
+ * tryGetProjection() reads the latest version of a single run from
  * simulation_runs (ReplacingMergeTree(UpdatedAt)). It must resolve the latest
  * version with a scalar `UpdatedAt = (SELECT max(...))` subquery, NOT the
  * `(TenantId, ScenarioRunId, UpdatedAt) IN (max-subquery)` tuple form: the
@@ -18,7 +18,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
 
-describe("simulationRunState.clickhouse.repository getProjection OOM safety", () => {
+describe("simulationRunState.clickhouse.repository tryGetProjection OOM safety", () => {
   const source = fs.readFileSync(
     path.resolve(
       __dirname,

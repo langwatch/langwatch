@@ -211,3 +211,91 @@ describe("given an announcement that a label was added to a pull request", () =>
     });
   });
 });
+
+const GHES = "github.acme-corp.internal";
+
+/** An instance bound to a GitHub Enterprise Server host, and to nothing else. */
+class EnterpriseHost extends GithubHostPort {
+  getHost(): string {
+    return GHES;
+  }
+  getApiBase(): string {
+    return `https://${GHES}/api/v3`;
+  }
+  getWebBase(): string {
+    return `https://${GHES}`;
+  }
+  getAppInstallUrl(): string {
+    return `https://${GHES}/github-apps/x`;
+  }
+  isMappable(repositoryHost: string): boolean {
+    return repositoryHost === "" || repositoryHost.toLowerCase() === GHES;
+  }
+  normalize(): string {
+    return GHES;
+  }
+}
+
+function enterpriseService(
+  repository: FakeRepository,
+  appTokens = new FakeAppTokens(),
+  installations = new FakeInstallations(),
+) {
+  return GithubBranchMappingService.create({
+    repository,
+    installations,
+    appTokens,
+    host: new EnterpriseHost(),
+    now: () => NOW,
+  });
+}
+
+describe("given an instance bound to a GitHub Enterprise Server host", () => {
+  describe("when GitHub announces a pull request", () => {
+    /** @scenario "A pull request announced over the webhook is recorded under the configured host" */
+    it("records it under the configured host, not github.com", async () => {
+      const repository = new FakeRepository();
+      const installations = new FakeInstallations();
+      installations.installation = { organizationId: "org-1" };
+
+      const applied = await enterpriseService(
+        repository,
+        new FakeAppTokens(),
+        installations,
+      ).applyPullRequestEvent(pullRequestEvent);
+
+      expect(applied).toBe(true);
+      expect(repository.upserts[0]).toMatchObject({
+        organizationId: "org-1",
+        repositoryHost: GHES,
+        repositoryFullName: "langwatch/langwatch",
+      });
+    });
+  });
+
+  describe("when a branch on that host is mapped", () => {
+    /** @scenario "A repository on the configured host is mapped" */
+    it("asks GitHub and keys the answer by that host", async () => {
+      const repository = new FakeRepository();
+
+      await enterpriseService(repository).map({ ...target, repositoryHost: GHES });
+
+      expect(repository.upserts[0]).toMatchObject({ repositoryHost: GHES });
+    });
+  });
+
+  describe("when a branch on github.com is mapped", () => {
+    /** @scenario "A repository on github.com is not mapped by an Enterprise Server instance" */
+    it("asks GitHub nothing, because this instance has no connection there", async () => {
+      const repository = new FakeRepository();
+
+      const recorded = await enterpriseService(repository).map({
+        ...target,
+        repositoryHost: "github.com",
+      });
+
+      expect(recorded).toBe(0);
+      expect(repository.upserts).toHaveLength(0);
+    });
+  });
+});

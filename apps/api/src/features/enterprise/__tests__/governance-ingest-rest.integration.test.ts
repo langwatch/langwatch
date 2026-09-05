@@ -165,7 +165,7 @@ function ingestWorld(options: { sourceType?: string } = {}) {
         ensureInternal: () => Promise.resolve({ id: GOVERNANCE_PROJECT_ID }),
       }) as never,
     traceCollection: ingest.otlp.traces!,
-    database: () => ({}) as never,
+    directory: () => ({}) as never,
     keyProvenance: ApiGovernanceIngestKeyProvenance.create(),
   };
 

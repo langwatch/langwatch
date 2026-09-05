@@ -108,7 +108,7 @@ function testTraceReaders(): TraceAppDependencies["traces"] {
       getTracesWithSpans: async () => [trace],
     },
     list: { getNewCount: async () => 7 },
-    editOverlay: { getByTraceId: async () => overlay },
+    editOverlay: { tryGetByTraceId: async () => overlay },
     summary: { getByTraceId: async () => ({ redactedByVisibilityWindow: false }) },
   });
 }
@@ -166,7 +166,7 @@ function testTraceGroupPorts(): ApiTracePorts {
       isTraceNotFound: () => false,
       tryGetShareViewerProtections: async () => null,
     }),
-    llmModelCost: stub("llmModelCost", { isSafeRegex: () => true, getModelLimits: () => null }),
+    llmModelCost: stub("llmModelCost", { isSafeRegex: () => true, tryGetModelLimits: () => null }),
     modelProvider: stub("modelProvider", { recordAudit: () => undefined }),
     modelProviderChecks: {
       tenantWrite: () => passthroughCheck,

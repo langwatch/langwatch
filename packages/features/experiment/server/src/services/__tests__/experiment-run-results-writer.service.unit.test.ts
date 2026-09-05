@@ -10,7 +10,7 @@ import { ExperimentRunResultsWriterService } from "../experiment-run-results-wri
 const recordWorkbenchRunResults = vi.fn();
 const getWorkbenchState = vi.fn();
 
-const writerFor = () =>
+const tryWriterFor = () =>
   ExperimentRunResultsWriterService.create({
     persistence: {
       experiments: {
@@ -25,7 +25,7 @@ const writerFor = () =>
   });
 
 const feed = async (events: EvaluationV3Event[]) => {
-  const writer = writerFor();
+  const writer = tryWriterFor();
   for (const event of events) await writer.record(event);
   return writer;
 };

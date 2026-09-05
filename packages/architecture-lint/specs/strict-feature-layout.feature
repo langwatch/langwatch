@@ -42,6 +42,12 @@ Feature: Strict versioned feature source layout
     And standalone factories do not replace the class
 
   @unit @architecture
+  Scenario: A rules/ module is a pure package of functions
+    Given a layout-version-0 feature server's rules/ directory
+    When a module there exports only functions and constants, with no class
+    Then architecture lint accepts it as a rules module
+
+  @unit @architecture
   Scenario: Strict services, ports, and contract builds remain mechanically bounded
     Given a layout-version-0 feature service, port, or declaration build
     When architecture lint and scoped Oxlint check it

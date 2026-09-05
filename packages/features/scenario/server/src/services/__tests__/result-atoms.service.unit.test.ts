@@ -36,7 +36,7 @@ interface FakeData {
 
 function makeRepo(data: FakeData) {
   return {
-    aggregateTotals: vi.fn().mockResolvedValue(
+    tryAggregateTotals: vi.fn().mockResolvedValue(
       data.totals === undefined
         ? {
             Atoms: "0",

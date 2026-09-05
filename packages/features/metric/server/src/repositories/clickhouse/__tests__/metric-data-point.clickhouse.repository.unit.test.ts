@@ -241,6 +241,7 @@ describe("MetricDataPointClickHouseRepository", () => {
     expect(queryCalls[0]).not.toContain("TenantId = {tenantId:String}");
   });
 
+  /** @scenario "A folded rollup read leaves the stored payload behind" */
   it("keeps rollup reads flat as a coalesced chunk grows", async () => {
     const queries: string[] = [];
     const query: MetricClickHouseClient["query"] = async ({ query: sql }) => {
@@ -265,6 +266,7 @@ describe("MetricDataPointClickHouseRepository", () => {
     expect(queries[1]).not.toContain("CanonicalPayload");
   });
 
+  /** @scenario "A folded rollup read keeps its encoded request inside a budget" */
   it("chunks successor parameters below the URL budget", async () => {
     const queryCalls: Array<{ query: string; query_params?: Record<string, unknown> }> = [];
     const query: MetricClickHouseClient["query"] = async (request) => {
@@ -285,6 +287,7 @@ describe("MetricDataPointClickHouseRepository", () => {
     expect(encodedParamLength(queryCalls[0]?.query_params ?? {})).toBeLessThan(3_600);
   });
 
+  /** @scenario "A folded rollup read sends a fixed-size request" */
   it.each([1, 12, 64, 130, 260])(
     "keeps the successor statement and parameter count fixed for %i points",
     async (count) => {
@@ -322,6 +325,7 @@ describe("MetricDataPointClickHouseRepository", () => {
     },
   );
 
+  /** @scenario "A folded rollup read binds a fixed number of parameters" */
   it("splits successor reads by encoded parameter bytes without dropping series", async () => {
     const requests: Array<Record<string, unknown>> = [];
     const query: MetricClickHouseClient["query"] = async (request) => {
@@ -349,6 +353,7 @@ describe("MetricDataPointClickHouseRepository", () => {
     }
   });
 
+  /** @scenario "A rollup bucket read sends the window size and retention span once" */
   it("derives affected bucket bounds from retention and rollup width", async () => {
     const bucketParams: Record<string, unknown>[] = [];
     const query: MetricClickHouseClient["query"] = async (request) => {
@@ -489,6 +494,7 @@ describe("MetricDataPointClickHouseRepository", () => {
     for (const params of bucketParams) expect(encodedParamLength(params)).toBeLessThan(4_096);
   });
 
+  /** @scenario "A folded rollup read resolves the successors a per-point read did" */
   it("keeps successors tied to their own series across distant hours", async () => {
     const early = pointAt({ seriesId: "1".padStart(64, "0"), timeUnixMs: base + 1_000 });
     const late = pointAt({

@@ -24,3 +24,8 @@ Feature: Every settings page keeps the settings chrome
     Scenario: No page the Settings menu opens is left without it
       Given every page that Settings can open
       Then each of them keeps the settings chrome
+
+    @unit
+    Scenario: No settings page wraps itself in a second copy of the sidebar
+      Given every route file under a settings section
+      Then none of them re-applies a page-level settings layout of its own

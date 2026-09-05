@@ -19,7 +19,7 @@ class FakeStateRepository implements SystemMigrationStateRepository {
     );
   }
 
-  async findRecord({
+  async tryFindRecord({
     migrationName,
     tenantId,
   }: {
@@ -190,8 +190,8 @@ describe("SystemMigrationRunnerService", () => {
   describe("when reading one tenant's state throws", () => {
     it("parks that tenant in the summary and finishes the rest of the pass", async () => {
       const failingState = new FakeStateRepository();
-      const originalFindRecord = failingState.findRecord.bind(failingState);
-      failingState.findRecord = async (args) => {
+      const originalFindRecord = failingState.tryFindRecord.bind(failingState);
+      failingState.tryFindRecord = async (args) => {
         if (args.tenantId === "acme") throw new Error("postgres blinked");
         return originalFindRecord(args);
       };
@@ -212,7 +212,7 @@ describe("SystemMigrationRunnerService", () => {
       expect(summary.parked).toBe(1);
       expect(summary.finalized).toBe(2);
       expect(
-        await failingState.findRecord({
+        await failingState.tryFindRecord({
           migrationName: "m1",
           tenantId: "globex",
         }),
@@ -237,7 +237,7 @@ describe("SystemMigrationRunnerService", () => {
       expect(migrate).toHaveBeenCalledTimes(1);
       expect(migrate).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "acme" }));
       expect(summary?.skipped).toBe(1);
-      expect(await state.findRecord({ migrationName: "m1", tenantId: "globex" })).toBeNull();
+      expect(await state.tryFindRecord({ migrationName: "m1", tenantId: "globex" })).toBeNull();
     });
   });
 
@@ -263,7 +263,7 @@ describe("SystemMigrationRunnerService", () => {
       const first = await runner.runPass();
       expect(first?.parked).toBe(1);
       expect(first?.finalized).toBe(1);
-      const parked = await state.findRecord({
+      const parked = await state.tryFindRecord({
         migrationName: "m1",
         tenantId: "acme",
       });
@@ -275,7 +275,7 @@ describe("SystemMigrationRunnerService", () => {
 
       const second = await runner.runPass();
       expect(second?.finalized).toBe(1);
-      const healed = await state.findRecord({
+      const healed = await state.tryFindRecord({
         migrationName: "m1",
         tenantId: "acme",
       });
@@ -337,7 +337,7 @@ describe("SystemMigrationRunnerService", () => {
       // migration whose proof still passes and undo the rollback.
       expect(migrate).not.toHaveBeenCalled();
       expect(summary?.alreadyRolledBack).toBe(1);
-      expect((await state.findRecord({ migrationName: "m1", tenantId: "acme" }))?.status).toBe(
+      expect((await state.tryFindRecord({ migrationName: "m1", tenantId: "acme" }))?.status).toBe(
         "rolled_back",
       );
     });
@@ -374,7 +374,7 @@ describe("SystemMigrationRunnerService", () => {
       // it came from.
       expect(migrate).not.toHaveBeenCalled();
       expect(summary?.alreadyRolledBack).toBe(1);
-      expect((await state.findRecord({ migrationName: "m1", tenantId: "acme" }))?.status).toBe(
+      expect((await state.tryFindRecord({ migrationName: "m1", tenantId: "acme" }))?.status).toBe(
         "rolled_back",
       );
     });
@@ -410,7 +410,7 @@ describe("SystemMigrationRunnerService", () => {
 
       const summary = await runner.runPass();
 
-      const record = await state.findRecord({
+      const record = await state.tryFindRecord({
         migrationName: "m1",
         tenantId: "acme",
       });
@@ -450,7 +450,7 @@ describe("SystemMigrationRunnerService", () => {
 
       // A `parked` row would be retried on the next pass and re-finalized -
       // the exact undo the pin exists to prevent.
-      expect((await state.findRecord({ migrationName: "m1", tenantId: "acme" }))?.status).toBe(
+      expect((await state.tryFindRecord({ migrationName: "m1", tenantId: "acme" }))?.status).toBe(
         "rolled_back",
       );
     });
@@ -519,7 +519,7 @@ describe("SystemMigrationRunnerService", () => {
       expect(touched).toContain("m1:globex");
       expect(touched).toContain("m2:globex");
       expect(summary.tenantsSeen).toBe(2);
-      expect(await state.findRecord({ migrationName: "m2", tenantId: "acme" })).toBeNull();
+      expect(await state.tryFindRecord({ migrationName: "m2", tenantId: "acme" })).toBeNull();
     });
   });
 
@@ -546,7 +546,7 @@ describe("SystemMigrationRunnerService", () => {
 
       const first = await runner.runPass();
       expect(first?.held).toBe(1);
-      const held = await state.findRecord({
+      const held = await state.tryFindRecord({
         migrationName: "m1",
         tenantId: "acme",
       });
@@ -580,7 +580,7 @@ describe("SystemMigrationRunnerService", () => {
       const summary = await runner.runPass({ signal: controller.signal });
 
       expect(summary?.tenantsSeen).toBe(1);
-      expect(await state.findRecord({ migrationName: "m1", tenantId: "globex" })).toBeNull();
+      expect(await state.tryFindRecord({ migrationName: "m1", tenantId: "globex" })).toBeNull();
       // Every claim released, aborted mid-pass or not.
       expect(lease.heldNames()).toEqual([]);
     });

@@ -6,6 +6,7 @@ import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest
 import type {
   GovernanceCliCaller,
   GovernanceCliRestPorts,
+  GovernanceDirectoryPort,
 } from "@langwatch/enterprise-governance-server";
 import { Hono, type ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
@@ -258,31 +259,35 @@ function governanceCliWorld(
     organization_id: ORGANIZATION_ID,
   };
 
-  const database = {
-    user: {
-      findUnique: () =>
-        Promise.resolve({
-          deactivatedAt: options.deactivated ? new Date("2026-01-01T00:00:00Z") : null,
-          name: "Bob",
-          email: "bob@example.test",
-        }),
-    },
-    organizationUser: {
-      findFirst: () =>
-        Promise.resolve(options.activeMembership === false ? null : { userId: USER_ID }),
-    },
-    project: {
-      findFirst: () =>
-        Promise.resolve({
-          id: "project-shared",
-          slug: "shared",
-          name: "Shared",
-          apiKey: "shared-key",
-          isPersonal: options.projectIsPersonal ?? false,
-          ownerUserId: options.projectOwnerUserId ?? null,
-        }),
-    },
-    organization: { findUnique: () => Promise.resolve({ supportContact: null }) },
+  const directory: GovernanceDirectoryPort = {
+    membershipStatus: () =>
+      Promise.resolve(
+        options.deactivated
+          ? "user_deactivated"
+          : options.activeMembership === false
+            ? "not_org_member"
+            : "active",
+      ),
+    tryFindPersonProfile: () => Promise.resolve({ name: "Bob", email: "bob@example.test" }),
+    tryFindOrganizationIdByProjectApiKey: () => Promise.resolve(null),
+    tryFindMemberIdByEmail: () => Promise.resolve(null),
+    tryFindLiveProjectBySlug: () =>
+      Promise.resolve({
+        id: "project-shared",
+        slug: "shared",
+        name: "Shared",
+        apiKey: "shared-key",
+        isPersonal: options.projectIsPersonal ?? false,
+        ownerUserId: options.projectOwnerUserId ?? null,
+      }),
+    tryFindLiveProjectByRef: () =>
+      Promise.resolve({
+        id: "project-shared",
+        slug: "shared",
+        name: "Shared",
+        isPersonal: options.projectIsPersonal ?? false,
+        ownerUserId: options.projectOwnerUserId ?? null,
+      }),
   };
 
   world.ports = {
@@ -311,7 +316,8 @@ function governanceCliWorld(
           ]);
         },
       }) as never,
-    database: () => database as never,
+    directory: () => directory,
+    supportContacts: () => ({ tryResolveSupportContact: () => Promise.resolve(null) }) as never,
     ensurePersonalWorkspace: () => {
       world.ensureWorkspaceCalls += 1;
       return Promise.resolve({

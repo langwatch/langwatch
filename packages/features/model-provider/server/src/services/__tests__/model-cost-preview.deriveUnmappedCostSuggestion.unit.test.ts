@@ -23,11 +23,11 @@ function fakeCosts({
   };
 }
 
-describe("ModelCostPreviewService.deriveUnmappedCostSuggestion", () => {
+describe("ModelCostPreviewService.tryDeriveUnmappedCostSuggestion", () => {
   describe("given a span whose cost was already computed", () => {
     /** @scenario Span with a computed cost shows no suggestion */
     it("returns null when a cost was already computed", async () => {
-      const suggestion = await preview.deriveUnmappedCostSuggestion({
+      const suggestion = await preview.tryDeriveUnmappedCostSuggestion({
         costs: fakeCosts(),
         projectId: "proj-1",
         model: "acme-internal-llm",
@@ -43,7 +43,7 @@ describe("ModelCostPreviewService.deriveUnmappedCostSuggestion", () => {
   describe("given a span with no token usage recorded", () => {
     /** @scenario Span without token counts shows no suggestion */
     it("returns null when the span has no token usage", async () => {
-      const suggestion = await preview.deriveUnmappedCostSuggestion({
+      const suggestion = await preview.tryDeriveUnmappedCostSuggestion({
         costs: fakeCosts(),
         projectId: "proj-1",
         model: "acme-internal-llm",

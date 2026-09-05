@@ -676,6 +676,7 @@ describe("ProjectService", () => {
     expect(repository.create).not.toHaveBeenCalled();
   });
 
+  /** @scenario ProjectService.update with no teamId leaves team unchanged */
   it("updates without looking up a destination team when teamId is absent", async () => {
     const repository = new StubRepository();
 
@@ -693,6 +694,7 @@ describe("ProjectService", () => {
     });
   });
 
+  /** @scenario ProjectService.update rejects archived destination team */
   it("rejects an unavailable destination team", async () => {
     const repository = new StubRepository();
     repository.tryFindActiveTeamInOrganization.mockResolvedValue(null);
@@ -707,16 +709,13 @@ describe("ProjectService", () => {
     expect(repository.update).not.toHaveBeenCalled();
   });
 
-  it.each([
-    {
-      current: projectWithTeam({ isPersonal: true, teamId: "personal" }),
-      destination: { id: "shared", isPersonal: false },
-    },
-    {
-      current: projectWithTeam({ isPersonal: false, teamId: "shared" }),
-      destination: { id: "personal", isPersonal: true },
-    },
-  ])("rejects moves across the personal-workspace boundary", async ({ current, destination }) => {
+  const refusesBoundaryMove = async ({
+    current,
+    destination,
+  }: {
+    current: ProjectWithTeam;
+    destination: { id: string; isPersonal: boolean };
+  }) => {
     const repository = new StubRepository();
     repository.tryGetWithTeam.mockResolvedValue(current);
     repository.tryFindActiveTeamInOrganization.mockResolvedValue(destination);
@@ -728,6 +727,64 @@ describe("ProjectService", () => {
         data: { teamId: destination.id },
       }),
     ).rejects.toBeInstanceOf(PersonalWorkspaceBoundaryError);
+    expect(repository.update).not.toHaveBeenCalled();
+  };
+
+  /** @scenario Editing a project cannot move it out of a personal workspace */
+  it("refuses to move a personal project into a shared team", async () => {
+    await refusesBoundaryMove({
+      current: projectWithTeam({ isPersonal: true, teamId: "personal" }),
+      destination: { id: "shared", isPersonal: false },
+    });
+  });
+
+  /** @scenario Editing a project cannot move it into a personal workspace */
+  it("refuses to move a shared project into a personal workspace", async () => {
+    await refusesBoundaryMove({
+      current: projectWithTeam({ isPersonal: false, teamId: "shared" }),
+      destination: { id: "personal", isPersonal: true },
+    });
+  });
+
+  /** @scenario ProjectService.update changes teamId with same-org validation */
+  /** @scenario tRPC project.update accepts optional teamId */
+  it("moves the project to a live team in the same organization", async () => {
+    const repository = new StubRepository();
+    repository.tryGetWithTeam.mockResolvedValue(projectWithTeam({ teamId: "team_1" }));
+    repository.tryFindActiveTeamInOrganization.mockResolvedValue({
+      id: "team_2",
+      isPersonal: false,
+    });
+
+    await createService(repository).update({
+      id: applicationProject.id,
+      organizationId: "org",
+      data: { teamId: "team_2" },
+    });
+
+    expect(repository.tryFindActiveTeamInOrganization).toHaveBeenCalledWith({
+      teamId: "team_2",
+      organizationId: "org",
+    });
+    expect(repository.update).toHaveBeenCalledWith({
+      id: applicationProject.id,
+      organizationId: "org",
+      data: { teamId: "team_2" },
+    });
+  });
+
+  /** @scenario tRPC project.update rejects cross-org team */
+  it("refuses a destination team that belongs to another organization", async () => {
+    const repository = new StubRepository();
+    repository.tryFindActiveTeamInOrganization.mockResolvedValue(null);
+
+    await expect(
+      createService(repository).update({
+        id: applicationProject.id,
+        organizationId: "org",
+        data: { teamId: "team-of-another-org" },
+      }),
+    ).rejects.toBeInstanceOf(DestinationTeamNotFoundError);
     expect(repository.update).not.toHaveBeenCalled();
   });
 
@@ -750,6 +807,7 @@ describe("ProjectService", () => {
     ).resolves.toBe(applicationProject);
   });
 
+  /** @scenario Deleting a project cannot empty a personal workspace */
   it("refuses to archive a personal project", async () => {
     const repository = new StubRepository();
     repository.tryGetWithTeam.mockResolvedValue(projectWithTeam({ isPersonal: true }));

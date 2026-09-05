@@ -86,7 +86,7 @@ describe("given a conversation the customer never named", () => {
       });
 
       await expect(
-        service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
+        service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
       ).resolves.toEqual({ title: "Debugging A Failing Evaluation", model: "openai/gpt-5-mini" });
     });
 
@@ -96,7 +96,7 @@ describe("given a conversation the customer never named", () => {
         records: [{ role: "user", content: "hello" }],
       });
 
-      await service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID });
+      await service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID });
 
       expect((models as RecordingTitleModel).asked).toEqual([
         {
@@ -117,7 +117,7 @@ describe("given a conversation the customer never named", () => {
         })),
       });
 
-      await service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID });
+      await service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID });
 
       const prompt = String(mockGenerateText.mock.calls[0]?.[0]?.prompt);
       const lines = prompt.split("\n").filter((line) => line.startsWith("user: "));
@@ -145,7 +145,7 @@ describe("given a conversation the customer never named", () => {
       const { service } = generatorOver({ records: [{ role: "user", content: "hello" }] });
 
       await expect(
-        service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
+        service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
       ).resolves.toMatchObject({ title: expected });
     });
 
@@ -155,7 +155,7 @@ describe("given a conversation the customer never named", () => {
       } as never);
       const { service } = generatorOver({ records: [{ role: "user", content: "hello" }] });
 
-      const generated = await service.generate({
+      const generated = await service.tryGenerate({
         projectId: PROJECT_ID,
         conversationId: CONVERSATION_ID,
       });
@@ -169,7 +169,7 @@ describe("given a conversation the customer never named", () => {
       const { service } = generatorOver({ records: [{ role: "user", content: "   " }] });
 
       await expect(
-        service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
+        service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
       ).resolves.toBeNull();
       expect(mockGenerateText).not.toHaveBeenCalled();
     });
@@ -187,7 +187,7 @@ describe("given a conversation the customer never named", () => {
       });
 
       await expect(
-        service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
+        service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
       ).resolves.toBeNull();
     });
 
@@ -196,7 +196,7 @@ describe("given a conversation the customer never named", () => {
       const { service } = generatorOver({ records: [{ role: "user", content: "hello" }] });
 
       await expect(
-        service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
+        service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
       ).resolves.toBeNull();
     });
   });

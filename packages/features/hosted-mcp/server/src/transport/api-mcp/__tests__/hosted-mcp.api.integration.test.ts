@@ -53,7 +53,7 @@ const mockRedis = {
  * handler instead of intercepting what the handler reached for.
  */
 class FakeProjectLookup extends McpProjectLookupPort {
-  findLiveProjectByApiKey({ apiKey }: { apiKey: string }) {
+  tryFindLiveProjectByApiKey({ apiKey }: { apiKey: string }) {
     return mockPrisma.project.findUnique({ where: { apiKey, archivedAt: null } }) as Promise<{
       id: string;
       teamId: string;

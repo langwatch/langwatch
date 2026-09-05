@@ -90,7 +90,7 @@ describe("Redis ownership", () => {
       expect(offenders.map(({ file }) => show(file))).toEqual([]);
     }, 60_000);
 
-    /** @scenario No source file still names a retired module-scope singleton */
+    /** @scenario The retired singleton module is gone */
     it("has no reference to a retired ~/server/redis-shaped singleton", () => {
       const referrers = allSources()
         // This file is the one legitimate exception: the fixtures below have

@@ -108,7 +108,7 @@ describe("given the workbench's run doors", () => {
     it("answers not-found rather than confirming the run exists elsewhere", async () => {
       const requestAbort = vi.fn(async () => {});
       const api = mount({
-        abort: { getRunningProjectId: async () => "project-2", requestAbort },
+        abort: { tryGetRunningProjectId: async () => "project-2", requestAbort },
       });
 
       const response = await api.fetch("/api/experiments/abort", {
@@ -127,7 +127,7 @@ describe("given the workbench's run doors", () => {
     it("signals the stop through the composed abort port", async () => {
       const requestAbort = vi.fn(async () => {});
       const api = mount({
-        abort: { getRunningProjectId: async () => "project-1", requestAbort },
+        abort: { tryGetRunningProjectId: async () => "project-1", requestAbort },
       });
 
       const response = await api.fetch("/api/experiments/abort", {
@@ -144,8 +144,8 @@ describe("given the workbench's run doors", () => {
 
   describe("when nobody is signed in", () => {
     it("refuses the abort at 401 before any run is looked up", async () => {
-      const getRunningProjectId = vi.fn();
-      const api = mount({ session: null, abort: { getRunningProjectId } });
+      const tryGetRunningProjectId = vi.fn();
+      const api = mount({ session: null, abort: { tryGetRunningProjectId } });
 
       const response = await api.fetch("/api/experiments/abort", {
         method: "POST",
@@ -154,7 +154,7 @@ describe("given the workbench's run doors", () => {
       });
 
       expect(response.status).toBe(401);
-      expect(getRunningProjectId).not.toHaveBeenCalled();
+      expect(tryGetRunningProjectId).not.toHaveBeenCalled();
     });
   });
 
@@ -203,7 +203,7 @@ type MountOptions = {
   session?: { user: { id: string } } | null;
   runLoop?: boolean;
   abort?: {
-    getRunningProjectId: (...args: never[]) => unknown;
+    tryGetRunningProjectId: (...args: never[]) => unknown;
     requestAbort?: () => Promise<void>;
   };
 };
@@ -227,7 +227,7 @@ function mount(options: MountOptions = {}) {
     ports: hasRunLoop
       ? {
           abort: {
-            getRunningProjectId: options.abort?.getRunningProjectId ?? (async () => null),
+            tryGetRunningProjectId: options.abort?.tryGetRunningProjectId ?? (async () => null),
             requestAbort: options.abort?.requestAbort ?? (async () => {}),
           },
         }

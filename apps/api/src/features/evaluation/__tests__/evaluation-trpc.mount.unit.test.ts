@@ -101,7 +101,7 @@ function harness() {
     ports: {
       mappingsSchema,
       tryResolveAzureSafetyEnv: async () => null,
-      evaluatorUnavailability: () => undefined,
+      tryEvaluatorUnavailability: () => undefined,
       missingEnvironmentVariables: () => [],
       runEvaluationForTrace: async () => PROCESSED_RESULT,
       trackEvaluationRan: () => {},

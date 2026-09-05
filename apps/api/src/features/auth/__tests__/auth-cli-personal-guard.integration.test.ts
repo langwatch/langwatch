@@ -8,6 +8,7 @@ import {
   CliDeviceSessionService,
   CliDeviceSessionStorePort,
   type AuthCliDeviceFlowRestPorts,
+  type AuthDirectoryPort,
 } from "@langwatch/auth-server";
 import { Hono, type ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
@@ -374,35 +375,19 @@ function guardWorld(
     ports: undefined as unknown as AuthCliDeviceFlowRestPorts,
   };
 
-  const database = {
-    user: {
-      findUnique: () => Promise.resolve({ id: USER_ID, name: "Bob", email: "bob@example.test" }),
-    },
-    organization: {
-      findUnique: () =>
-        Promise.resolve({
-          id: ORGANIZATION_ID,
-          name: "Acme",
-          slug: "acme",
-          maxSessionDurationDays: 0,
-        }),
-    },
-    organizationUser: {
-      findFirst: () => Promise.resolve(world.activeMembership ? { userId: USER_ID } : null),
-    },
-    project: {
-      findFirst: (query: { where: { id?: string; slug?: string } }) =>
-        Promise.resolve(
-          PROJECTS.find(
-            (project) => project.id === query.where.id || project.slug === query.where.slug,
-          ) ?? null,
-        ),
-    },
+  const directory: AuthDirectoryPort = {
+    tryFindOrganizationIdBySsoDomain: () => Promise.resolve(null),
+    tryFindPerson: () => Promise.resolve({ id: USER_ID, name: "Bob", email: "bob@example.test" }),
+    tryFindOrganization: () => Promise.resolve({ id: ORGANIZATION_ID, name: "Acme", slug: "acme" }),
+    maxSessionDurationDays: () => Promise.resolve(0),
+    hasActiveMembership: () => Promise.resolve(world.activeMembership),
+    tryFindLiveProject: ({ projectId }) =>
+      Promise.resolve(PROJECTS.find((project) => project.id === projectId) ?? null),
   };
 
   world.ports = {
     sessions: CliDeviceSessionService.create({ store: new InMemoryDeviceSessionStore() }),
-    database: () => database as never,
+    directory: () => directory,
     session: () => Promise.resolve({ id: USER_ID, name: "Bob", email: "bob@example.test" }),
     apiKeys: () =>
       ({

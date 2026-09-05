@@ -5,7 +5,7 @@
  */
 import { EventEmitter } from "node:events";
 import { z } from "zod";
-import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";
 import type { ApiTrpcCollaborators } from "../../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcFeatureApplicationSlices } from "../api-trpc-features.composition";
 import { createGatewayTrpcRouters } from "../../features/gateway/gateway-trpc.mount";

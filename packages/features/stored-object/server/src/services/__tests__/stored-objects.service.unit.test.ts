@@ -57,7 +57,7 @@ import { deriveStoredObjectId, StoredObjectsService } from "../stored-objects.se
 function makeRepository(): StoredObjectsRepository {
   return {
     insert: vi.fn().mockResolvedValue(undefined),
-    findById: vi.fn().mockResolvedValue(null),
+    tryFindById: vi.fn().mockResolvedValue(null),
     findAllByProject: vi.fn().mockResolvedValue([]),
     deleteByProject: vi.fn().mockResolvedValue(undefined),
     deleteByIds: vi.fn().mockResolvedValue(undefined),
@@ -184,7 +184,7 @@ describe("storeFromBytes", () => {
     /** @scenario "Duplicate content within a project reuses the existing stored_objects id" */
     it("returns the existing id with isDuplicate true and does not call storage put or repository insert", async () => {
       const existingId = "existing-uuid";
-      vi.mocked(repo.findById).mockResolvedValue(makeRow({ id: existingId }));
+      vi.mocked(repo.tryFindById).mockResolvedValue(makeRow({ id: existingId }));
 
       const result = await service.storeFromBytes(STORE_PARAMS);
 
@@ -196,13 +196,13 @@ describe("storeFromBytes", () => {
       expect(result.mediaType).toBe("text/plain");
     });
 
-    it("dedup probe goes through findById (by deterministic id), not by sha256 — a regression to the scan-all-partitions path would surface here", async () => {
+    it("dedup probe goes through tryFindById (by deterministic id), not by sha256 — a regression to the scan-all-partitions path would surface here", async () => {
       // Lock the dedup-probe contract: the hot path computes id = deriveStoredObjectId(projectId, sha256)
-      // and looks up via findById. findById uses the (project_id, id) primary key seek; the old sha256 path
+      // and looks up via tryFindById. tryFindById uses the (project_id, id) primary key seek; the old sha256 path
       // scanned every weekly partition incl. cold S3. Asserting the *exact* derived id so a future change to
       // the id derivation (e.g. salt swap, hash family change) is caught here rather than later in the dedup
       // correctness.
-      vi.mocked(repo.findById).mockResolvedValue(null);
+      vi.mocked(repo.tryFindById).mockResolvedValue(null);
 
       const expectedSha256 = createHash("sha256").update(TEST_BYTES).digest("hex");
       const expectedId = deriveStoredObjectId({
@@ -212,8 +212,8 @@ describe("storeFromBytes", () => {
 
       await service.storeFromBytes(STORE_PARAMS);
 
-      expect(repo.findById).toHaveBeenCalledOnce();
-      const call = vi.mocked(repo.findById).mock.calls[0]![0];
+      expect(repo.tryFindById).toHaveBeenCalledOnce();
+      const call = vi.mocked(repo.tryFindById).mock.calls[0]![0];
       expect(call.projectId).toBe(PROJECT_ID);
       expect(call.id).toBe(expectedId);
     });
@@ -353,7 +353,7 @@ describe("storeFromBytes", () => {
   });
 });
 
-describe("getById", () => {
+describe("tryGetById", () => {
   let repo: StoredObjectsRepository;
   let registry: StoredObjectStoragePort;
   let service: StoredObjectsService;
@@ -368,10 +368,10 @@ describe("getById", () => {
     it("returns the row and a readable stream", async () => {
       const row = makeRow({ id: "obj-1" });
       const stream = Readable.from(["data"]);
-      vi.mocked(repo.findById).mockResolvedValue(row);
+      vi.mocked(repo.tryFindById).mockResolvedValue(row);
       vi.mocked(registry.get).mockResolvedValue(stream);
 
-      const result = await service.getById({
+      const result = await service.tryGetById({
         projectId: PROJECT_ID,
         id: "obj-1",
       });
@@ -385,12 +385,12 @@ describe("getById", () => {
   describe("when the row exists but storage 404s", () => {
     it("returns row plus status missing", async () => {
       const row = makeRow({ id: "obj-1" });
-      vi.mocked(repo.findById).mockResolvedValue(row);
+      vi.mocked(repo.tryFindById).mockResolvedValue(row);
       vi.mocked(registry.get).mockRejectedValue(
         new ObjectNotFoundError("file:///var/lib/langwatch/objects/proj-1/abc"),
       );
 
-      const result = await service.getById({
+      const result = await service.tryGetById({
         projectId: PROJECT_ID,
         id: "obj-1",
       });
@@ -403,9 +403,9 @@ describe("getById", () => {
 
   describe("when the row does not exist", () => {
     it("returns null", async () => {
-      vi.mocked(repo.findById).mockResolvedValue(null);
+      vi.mocked(repo.tryFindById).mockResolvedValue(null);
 
-      const result = await service.getById({
+      const result = await service.tryGetById({
         projectId: PROJECT_ID,
         id: "unknown-id",
       });
@@ -418,10 +418,10 @@ describe("getById", () => {
     it("rethrows", async () => {
       const row = makeRow({ id: "obj-1" });
       const networkError = new Error("network timeout");
-      vi.mocked(repo.findById).mockResolvedValue(row);
+      vi.mocked(repo.tryFindById).mockResolvedValue(row);
       vi.mocked(registry.get).mockRejectedValue(networkError);
 
-      await expect(service.getById({ projectId: PROJECT_ID, id: "obj-1" })).rejects.toThrow(
+      await expect(service.tryGetById({ projectId: PROJECT_ID, id: "obj-1" })).rejects.toThrow(
         "network timeout",
       );
     });
@@ -526,7 +526,7 @@ describe("headById", () => {
     /** @scenario "headById returns a tri-state distinguishing not_found, missing, and available" */
     it("returns status available with the media type", async () => {
       const row = makeRow({ id: "obj-1", media_type: "audio/mp3" });
-      vi.mocked(repo.findById).mockResolvedValue(row);
+      vi.mocked(repo.tryFindById).mockResolvedValue(row);
       vi.mocked(registry.exists).mockResolvedValue(true);
 
       const result = await service.headById({
@@ -541,7 +541,7 @@ describe("headById", () => {
   describe("when the row exists but storage reports the blob is gone", () => {
     it("returns status missing with the media type", async () => {
       const row = makeRow({ id: "obj-1", media_type: "audio/mp3" });
-      vi.mocked(repo.findById).mockResolvedValue(row);
+      vi.mocked(repo.tryFindById).mockResolvedValue(row);
       vi.mocked(registry.exists).mockResolvedValue(false);
 
       const result = await service.headById({
@@ -555,7 +555,7 @@ describe("headById", () => {
 
   describe("when the row does not exist", () => {
     it("returns status not_found and does not probe storage", async () => {
-      vi.mocked(repo.findById).mockResolvedValue(null);
+      vi.mocked(repo.tryFindById).mockResolvedValue(null);
 
       const result = await service.headById({
         projectId: PROJECT_ID,
@@ -569,15 +569,15 @@ describe("headById", () => {
 });
 
 describe("StoredObjectsService surface", () => {
-  /** @scenario "StoredObjectsService exposes storeFromBytes, getById, headById, deleteOwnedBy" */
-  it("exposes storeFromBytes, getById, deleteOwnedBy", () => {
+  /** @scenario "StoredObjectsService exposes storeFromBytes, tryGetById, headById, deleteOwnedBy" */
+  it("exposes storeFromBytes, tryGetById, deleteOwnedBy", () => {
     const service = makeService({
       repository: makeRepository(),
       registry: makeRegistry(),
     });
 
     expect(typeof service.storeFromBytes).toBe("function");
-    expect(typeof service.getById).toBe("function");
+    expect(typeof service.tryGetById).toBe("function");
     expect(typeof service.headById).toBe("function");
     expect(typeof service.deleteOwnedBy).toBe("function");
   });

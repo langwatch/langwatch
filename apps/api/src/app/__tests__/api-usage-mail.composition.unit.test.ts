@@ -147,7 +147,7 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
         processName: "langwatch-api-test",
       });
 
-      const notification = await usage.ports().checkAndSendWarning(undefined as never, {
+      const notification = await usage.ports().tryCheckAndSendWarning(undefined as never, {
         organizationId: "org-1",
         ...CROSSED_95_PERCENT,
       });
@@ -172,7 +172,7 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
         processName: "langwatch-api-test",
       });
 
-      await usage.ports().checkAndSendWarning(undefined as never, {
+      await usage.ports().tryCheckAndSendWarning(undefined as never, {
         organizationId: "org-1",
         ...CROSSED_95_PERCENT,
       });
@@ -200,7 +200,7 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
         processName: "langwatch-api-test",
       });
 
-      await usage.ports().checkAndSendWarning(undefined as never, {
+      await usage.ports().tryCheckAndSendWarning(undefined as never, {
         organizationId: "org-1",
         ...CROSSED_95_PERCENT,
       });
@@ -227,7 +227,7 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
         processName: "langwatch-api-test",
       });
 
-      const notification = await usage.ports().checkAndSendWarning(undefined as never, {
+      const notification = await usage.ports().tryCheckAndSendWarning(undefined as never, {
         organizationId: "org-1",
         ...CROSSED_95_PERCENT,
       });
@@ -277,7 +277,7 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
         processName: "langwatch-api-test",
       });
 
-      await usage.ports().checkAndSendWarning(undefined as never, {
+      await usage.ports().tryCheckAndSendWarning(undefined as never, {
         organizationId: "org-1",
         ...CROSSED_95_PERCENT,
       });
@@ -307,7 +307,7 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
         processName: "langwatch-api-test",
       });
 
-      const notification = await usage.ports().checkAndSendWarning(undefined as never, {
+      const notification = await usage.ports().tryCheckAndSendWarning(undefined as never, {
         organizationId: "org-1",
         ...CROSSED_95_PERCENT,
       });
@@ -333,7 +333,7 @@ describe("composeApiUsageStats, the approaching-limit mail", () => {
       });
 
       await expect(
-        usage.ports().checkAndSendWarning(undefined as never, {
+        usage.ports().tryCheckAndSendWarning(undefined as never, {
           organizationId: "org-1",
           ...CROSSED_95_PERCENT,
         }),

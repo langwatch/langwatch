@@ -28,7 +28,7 @@ describe("InMemorySessionContextMemoAdapter", () => {
         const memo = new InMemorySessionContextMemoAdapter(() => 0);
         await memo.set({ tenantId: "p1", sessionId: "s1", context });
 
-        expect(await memo.get({ tenantId: "p1", sessionId: "s1" })).toEqual(context);
+        expect(await memo.tryGet({ tenantId: "p1", sessionId: "s1" })).toEqual(context);
       });
     });
 
@@ -41,7 +41,7 @@ describe("InMemorySessionContextMemoAdapter", () => {
 
         now = 181 * DAY;
 
-        expect(await memo.get({ tenantId: "p1", sessionId: "s1" })).toBeNull();
+        expect(await memo.tryGet({ tenantId: "p1", sessionId: "s1" })).toBeNull();
       });
     });
   });
@@ -60,9 +60,9 @@ describe("InMemorySessionContextMemoAdapter", () => {
           });
         }
 
-        expect(await memo.get({ tenantId: "p1", sessionId: "s0" })).toBeNull();
-        expect(await memo.get({ tenantId: "p1", sessionId: "s1" })).toEqual(context);
-        expect(await memo.get({ tenantId: "p1", sessionId: "s10000" })).toEqual(context);
+        expect(await memo.tryGet({ tenantId: "p1", sessionId: "s0" })).toBeNull();
+        expect(await memo.tryGet({ tenantId: "p1", sessionId: "s1" })).toEqual(context);
+        expect(await memo.tryGet({ tenantId: "p1", sessionId: "s10000" })).toEqual(context);
       });
     });
   });
@@ -78,10 +78,10 @@ describe("InMemorySessionContextMemoAdapter", () => {
           context: { ...context, branch: "feat/other" },
         });
 
-        expect((await memo.get({ tenantId: "p1", sessionId: "shared" }))?.branch).toBe(
+        expect((await memo.tryGet({ tenantId: "p1", sessionId: "shared" }))?.branch).toBe(
           "feat/split",
         );
-        expect((await memo.get({ tenantId: "p2", sessionId: "shared" }))?.branch).toBe(
+        expect((await memo.tryGet({ tenantId: "p2", sessionId: "shared" }))?.branch).toBe(
           "feat/other",
         );
       });

@@ -714,7 +714,7 @@ describe("given the four privacy variables the ingestion path reads", () => {
     });
   });
 
-  /** @scenario "Azure dataset normalization reads the same AZURE_BLOB_* block as the App" */
+  /** @scenario "The worker refuses the insecure token endpoint escape hatch in production, like the App does" */
   it("refuses the insecure token endpoint escape hatch in production, like the App does", () => {
     expect(
       resolveWorkerConfig({

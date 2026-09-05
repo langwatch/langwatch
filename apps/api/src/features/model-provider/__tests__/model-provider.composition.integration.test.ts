@@ -93,7 +93,7 @@ describe("given an API process composed with the provider surfaces", () => {
     it("answers the registry's own limits rather than null", async () => {
       const { application } = composeApplication({ host: realHost() });
 
-      const { status, body } = await callTrpc(application, "llmModelCost.getModelLimits", {
+      const { status, body } = await callTrpc(application, "llmModelCost.tryGetModelLimits", {
         projectId: "project-1",
         model: "openai/gpt-5-mini",
       });

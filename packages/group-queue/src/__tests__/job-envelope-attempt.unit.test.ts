@@ -142,7 +142,7 @@ describe("job envelope retry attempt", () => {
 
   describe("given a job in a format that keeps its attempt inside the body", () => {
     describe("when its attempt is read from the message alone", () => {
-      /** @scenario A job in a format that predates the readable attempt reports no attempt rather than a wrong one */
+      /** @scenario "A job sent for the first time carries no attempt on its message" */
       it("reports no attempt and does not throw", () => {
         // A GQ1 envelope lifts only the routing trio into the header.
         const gq1 = 'GQ1|29|{"v":1,"e":"j","t":"subscriber"}{"__attempt":9}';
@@ -151,7 +151,7 @@ describe("job envelope retry attempt", () => {
         expect(withJobAttempt({ value: gq1, attempt: 10 })).toBe(gq1);
       });
 
-      /** @scenario A job in a format that predates the readable attempt reports no attempt rather than a wrong one */
+      /** @scenario "A job sent for the first time carries no attempt on its message" */
       it("survives a value it cannot parse at all", () => {
         expect(readJobAttempt("GQ2|not-an-envelope")).toBeNull();
         expect(readJobAttempt("{ broken json")).toBeNull();

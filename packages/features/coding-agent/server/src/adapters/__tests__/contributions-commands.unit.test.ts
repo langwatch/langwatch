@@ -340,7 +340,7 @@ describe("EventingContributeLogFactsAdapter", () => {
     /** @scenario "A record whose memo cannot be read is contributed unstamped" */
     it("contributes the record unstamped rather than failing it", async () => {
       const failing: CodingAgentSessionContextMemoPort = {
-        get: async () => {
+        tryGet: async () => {
           throw new Error("redis away");
         },
         set: async () => {
@@ -361,7 +361,7 @@ describe("EventingContributeLogFactsAdapter", () => {
     /** @scenario "A declaration whose memo cannot be written is still contributed" */
     it("contributes the declaration itself rather than failing it", async () => {
       const failing: CodingAgentSessionContextMemoPort = {
-        get: async () => null,
+        tryGet: async () => null,
         set: async () => {
           throw new Error("redis away");
         },

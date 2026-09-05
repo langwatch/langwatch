@@ -18,6 +18,7 @@ describe("beforeSessionCreate", () => {
   describe("given a user account with a non-null deactivatedAt", () => {
     describe("when a session is about to be created for them", () => {
       /** @scenario "Deactivated user is blocked from signing in" */
+      /** @scenario "Deactivated user is blocked" */
       it("denies the sign-in", async () => {
         const { prisma } = prismaAnswering(new Date("2026-01-01T00:00:00.000Z"));
 

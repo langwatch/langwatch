@@ -110,6 +110,28 @@ describe("the private S3 routing table", () => {
     });
   });
 
+  describe("given a resolver asking the table for one organization", () => {
+    /** @scenario Org with private S3 gets dedicated config */
+    it("hands back that organization's own account", () => {
+      const { routes } = parseDataplaneS3RoutingTable({
+        DATAPLANE_S3__acme__org123: JSON.stringify(ACME),
+        DATAPLANE_S3__beta__org456: JSON.stringify(BETA),
+      });
+
+      expect(routes.get("org123")).toEqual(ACME);
+    });
+
+    /** @scenario Org without private S3 gets shared config */
+    it("hands back nothing for an organization the deployment never routed", () => {
+      const { routes } = parseDataplaneS3RoutingTable({
+        DATAPLANE_S3__acme__org123: JSON.stringify(ACME),
+      });
+
+      expect(routes.get("org456")).toBeUndefined();
+      expect(routes.has("org456")).toBe(false);
+    });
+  });
+
   describe("given no route variables at all", () => {
     it("routes nobody, which is how the shared bucket stays the default", () => {
       const { routes } = parseDataplaneS3RoutingTable({});

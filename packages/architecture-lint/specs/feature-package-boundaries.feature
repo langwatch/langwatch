@@ -154,6 +154,71 @@ Feature: Feature package boundary lint
     And ordinary consumers remain limited to the feature service contract
 
   @unit @architecture
+  Scenario: A repository reached through a star-exported adapter is still private
+    Given an adapter re-exports a repository with a wildcard export
+    And the server root re-exports that adapter with a wildcard export
+    When architecture lint checks the source layout
+    Then it rejects the private runtime export
+
+  @unit @architecture
+  Scenario: A repository reached through a named re-export chain is still private
+    Given an adapter imports a repository and re-exports it by name
+    And the server root re-exports that adapter's named export
+    When architecture lint checks the source layout
+    Then it rejects the private runtime export
+
+  @unit @architecture
+  Scenario: A repository reached through a #app/ self-import alias is still private
+    Given a feature server package declares a #app/ self-import alias in its package.json
+    And the server root re-exports a repository through that alias
+    When architecture lint checks the source layout
+    Then it rejects the private runtime export
+
+  @unit @architecture
+  Scenario: Every declared package entrypoint is checked, not only src/index.ts
+    Given a feature server package declares a secondary export entrypoint
+    And that entrypoint re-exports a repository
+    When architecture lint checks the source layout
+    Then it rejects the private runtime export
+
+  @unit @architecture
+  Scenario: testing.ts may export a memory repository double
+    Given a feature server's testing.ts exports a repository under repositories/memory
+    When architecture lint checks the source layout
+    Then it does not reject the export as a private runtime export
+
+  @unit @architecture
+  Scenario: testing.ts may export a fake/stub/null-named repository double
+    Given a feature server's testing.ts exports a repository named Fake, Stub, or Null
+    When architecture lint checks the source layout
+    Then it does not reject the export as a private runtime export
+
+  @unit @architecture
+  Scenario: testing.ts still rejects a real repository, store, or projection
+    Given a feature server's testing.ts exports a real Prisma-backed repository
+    When architecture lint checks the source layout
+    Then it rejects the private runtime export
+
+  @unit @architecture
+  Scenario: A memory repository double still cannot escape through index.ts
+    Given a feature server's index.ts, not testing.ts, exports a memory repository double
+    When architecture lint checks the source layout
+    Then it rejects the private runtime export
+
+  @unit @architecture
+  Scenario: A type-only export of a repository's database type is allowed
+    Given a feature server root exports only the type of a repository's database shape
+    When architecture lint checks the source layout
+    Then it does not reject the export as a private runtime export
+
+  @unit @architecture
+  Scenario: An adapter that merely uses a repository is not itself private
+    Given a feature server root exports an adapter that uses a repository internally
+    And the adapter does not re-export the repository itself
+    When architecture lint checks the source layout
+    Then it does not reject the export as a private runtime export
+
+  @unit @architecture
   Scenario: Prisma imports stay in concrete adapters
     Given generated Prisma code is imported outside server/src/repositories/prisma
     When architecture lint checks the source

@@ -189,6 +189,22 @@ Feature: Evaluation execution - Backend
     Then it emits evaluator_result with status="error"
     And other evaluators in the cell continue
 
+  # ==========================================================================
+  # Sandbox credential
+  # ==========================================================================
+
+  @integration
+  Scenario: The run's sandbox credential reaches the code it executes
+    Given a run that minted a sandbox credential
+    When a cell dispatches its target event
+    Then the dispatched workflow carries the credential
+
+  @integration
+  Scenario: A run with no minted credential dispatches no credential field
+    Given a run that minted no sandbox credential
+    When a cell dispatches its target event
+    Then the dispatched workflow carries no credential field
+
   @unimplemented
   Scenario: Workflow execution failure emits error event
     Given the langwatch_nlp service is unreachable
