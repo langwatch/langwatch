@@ -345,7 +345,7 @@ langwatch run-plan archive <id>
 | `--param key=value` | A value for a parameter the scenarios declare, repeatable. |
 | `--note <text>` | One line about this run, up to 200 characters. It belongs to the run, not to the plan. |
 | `--idempotency-key <key>` | Repeat it to make a retry join the first run instead of starting a second one. |
-| `--wait` | Block until the batch is complete, and exit non-zero when a run failed. |
+| `--wait [minutes]` | Block until the batch is complete, for up to 45 minutes or the number of minutes given, and exit non-zero when a run failed. |
 
 A target is written `<type>:<referenceId>`. A **connected** agent takes a second form, `connected:<name>@<environment>`, which reads better in a CI job than an id and survives a project rebuild:
 
@@ -969,7 +969,9 @@ Agents must ask the user for permission first, then pass `--user-approved`. Secr
 
 ## The background daemon
 
-Non-interactive invocations (an agent piping output, CI, any call whose stdin/stdout/stderr is not a TTY) are served by a warm background daemon instead of paying node's cold start on every call. Interactive (terminal) invocations always run in-process and are unaffected, as are commands that mutate auth or take over stdio (`login`, `logout`, `config`, `open`, `instrument`, `report`, the `claude`/`codex`/`copilot`/`code`/`cursor`/`gemini`/`opencode` wrappers, `daemon` itself) and long-running flags (`--follow`, `--watch`). Windows is excluded too: the daemon is not supported there, so on Windows every invocation runs in-process.
+Non-interactive invocations (an agent piping output, CI, any call whose stdin/stdout/stderr is not a TTY) are served by a warm background daemon instead of paying node's cold start on every call. Interactive (terminal) invocations always run in-process and are unaffected.
+
+So are the commands that mutate auth or take over stdio (`login`, `logout`, `config`, `open`, `instrument`, `report`, the `claude`/`codex`/`copilot`/`code`/`cursor`/`gemini`/`opencode` wrappers, `daemon` itself) and the long-running flags (`--follow`, `--watch`, `--wait`). Windows is excluded too: the daemon is not supported there, so on Windows every invocation runs in-process.
 
 What to know:
 

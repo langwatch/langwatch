@@ -36157,6 +36157,8 @@ langwatch test-suite run "Refunds" \
   --wait
 ```
 
+A connected agent is named the same way: `connected:<name>?plan=free`, or `connected:<name>@<environment>?plan=free` to pick the environment.
+
 On the REST API the same values go in `runParameters` on each target, and `parameters` at the run level sets the values every target shares. See [Run from CI](/agent-testing/run-from-ci#compare-two-agents-or-one-agent-on-two-settings) for the request body.
 
 Also check: [Run plans](/agent-testing/run-plans), [Results](/agent-testing/results), [Run parameters](/agent-testing/run-parameters).
@@ -36443,10 +36445,10 @@ langwatch scenario create 'Order status question' \
   --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate" \
   --test-suite 'Smoke'
 
-langwatch test-suite run 'Smoke' --target connected:support-agent@development --wait
+langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 ```
 
-- `--target connected:<name>@<environment>` names the agent by identity. `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints both.
+- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id.
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
@@ -36458,8 +36460,8 @@ When the first run is green and the agent declares a parameter with an option li
 
 ```bash
 langwatch run-plan run --test-suite 'Smoke' \
-  --target 'connected:support-agent@development?model=gpt-5' \
-  --target 'connected:support-agent@development?model=gpt-5-mini' \
+  --target 'connected:support-agent?model=gpt-5' \
+  --target 'connected:support-agent?model=gpt-5-mini' \
   --name 'Smoke: model comparison' --format json
 ```
 
@@ -36737,13 +36739,13 @@ The agent appears on the **Agents** page with a green **Online** mark, its envir
 langwatch agent list
 ```
 
-Run a test suite against it by name and environment:
+Run a test suite against it by name:
 
 ```bash
-langwatch test-suite run 'Smoke' --target connected:support-agent@development --wait
+langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 ```
 
-`connected:<agent-id>` is the same target. `langwatch agent list --format json` prints both forms.
+`connected:<name>` runs the agent in `development`. When no process is connected there but one other environment is online, the run uses that one. When several are online, or none, the run is refused with `agent_environment_unresolved` and names them: pick one as `connected:<name>@<environment>`. `connected:<agent-id>` is the same target, and `langwatch agent list --format json` prints the id.
 
 ## What the agent receives
 
@@ -37018,7 +37020,7 @@ The decorator never stops the application from starting. Every problem is one wa
 
     | Option | Default | Effect |
     |---|---|---|
-    | `name` | required | The agent's name, and the first half of a `connected:<name>@<environment>` target. |
+    | `name` | required | The agent's name, and the `connected:<name>` target. |
     | `environment` | resolved, see above | Which environment row this process registers under. |
     | `parameters` | read from the signature | An explicit parameter declaration that replaces what the signature declares. |
     | `enabled` | `True`, `False` under `CI` | Whether this process connects at all. Takes any boolean, and replaces the `CI` default rather than adding to it. |
@@ -37038,7 +37040,7 @@ The decorator never stops the application from starting. Every problem is one wa
 
     | Option | Default | Effect |
     |---|---|---|
-    | `name` | required | The agent's name, and the first half of a `connected:<name>@<environment>` target. |
+    | `name` | required | The agent's name, and the `connected:<name>` target. |
     | `environment` | resolved, see above | Which environment row this process registers under. |
     | `parameters` | none | A zod schema, a definition map, or a JSON Schema object. |
     | `enabled` | `true`, `false` under `CI` | Whether this process connects at all. Takes any boolean, and replaces the `CI` default rather than adding to it. |
@@ -38112,7 +38114,9 @@ A CI job starts a test suite, stores the batch id from the response, then polls 
 langwatch test-suite run "Checkout regression" --target http:agent_abc123 --wait
 ```
 
-`--wait` polls until the batch is complete, for up to ten minutes, and exits non-zero when a run failed, which is what fails the job. A batch that needs longer, such as a suite with repeats, is polled with the batch endpoint below. The test suite is named by its id or by its name.
+A connected agent is `connected:<name>`, which runs it in `development` or in the one other environment it is online in. `connected:<name>@<environment>` names the environment.
+
+`--wait` polls until the batch is complete, for up to 45 minutes, and exits non-zero when a run failed, which is what fails the job. `--wait 90` raises the limit to ninety minutes. The test suite is named by its id or by its name.
 
 Add `--format json` (or `-o json`) to get one final document on stdout instead of the progress lines. It contains `outcome`, `tallies` and the per-run `results`, so a job step can read the verdict without parsing prose.
 
@@ -41944,7 +41948,7 @@ sidebarTitle: Custom Optimizer Tracking
 description: Track custom DSPy optimizer logic in LangWatch to visualize optimization steps and improve AI agent testing workflows.
 ---
 
-LangWatch does not track a custom DSPy optimizer out of the box. The three steps below add tracking to any custom optimizer.
+`langwatch.dspy.init` tracks `BootstrapFewShot`, `BootstrapFewShotWithRandomSearch`, `COPRO`, `MIPROv2` and `GEPA` out of the box. The three steps below add tracking to any other optimizer.
 
 ## 1. Initialize LangWatch DSPy with optimizer=None
 
@@ -42044,6 +42048,8 @@ langwatch.dspy.init(experiment="my-awesome-experiment", optimizer=optimizer)
 
 compiled_rag = optimizer.compile(RAG(), trainset=trainset)
 ```
+
+`init` tracks `BootstrapFewShot`, `BootstrapFewShotWithRandomSearch`, `COPRO`, `MIPROv2` and `GEPA`, and a `dspy.Evaluate` through the `evaluator` parameter. A GEPA run gets one step for the seed program and one for every candidate evaluated on the validation set, with the candidate's instructions and the score of each validation example. For any other optimizer, see [Custom optimizer tracking](/dspy-visualization/custom-optimizer).
 
 ## Follow your experiment
 
@@ -54507,10 +54513,10 @@ langwatch scenario create 'Order status question' \
   --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate" \
   --test-suite 'Smoke'
 
-langwatch test-suite run 'Smoke' --target connected:support-agent@development --wait
+langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 ```
 
-- `--target connected:<name>@<environment>` names the agent by identity. `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints both.
+- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id.
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
@@ -54522,8 +54528,8 @@ When the first run is green and the agent declares a parameter with an option li
 
 ```bash
 langwatch run-plan run --test-suite 'Smoke' \
-  --target 'connected:support-agent@development?model=gpt-5' \
-  --target 'connected:support-agent@development?model=gpt-5-mini' \
+  --target 'connected:support-agent?model=gpt-5' \
+  --target 'connected:support-agent?model=gpt-5-mini' \
   --name 'Smoke: model comparison' --format json
 ```
 

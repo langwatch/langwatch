@@ -7,7 +7,11 @@ import { parseRunNoteFlag } from "../../utils/runNote";
 import type { RawOutputFlags } from "../../utils/output";
 import { createCliTestSuitesService } from "./cli-test-suites-service";
 import { resolveSuiteId } from "./resolveSuite";
-import { parseRepeat, parseTargets } from "../run-plans/scopeFlags";
+import {
+  parseRepeat,
+  parseTargets,
+  parseWait,
+} from "../run-plans/scopeFlags";
 import { emitRunResult } from "../run-plans/reportRun";
 
 export interface RunTestSuiteOptions extends RawOutputFlags {
@@ -19,7 +23,7 @@ export interface RunTestSuiteOptions extends RawOutputFlags {
   param?: string[];
   note?: string;
   idempotencyKey?: string;
-  wait?: boolean;
+  wait?: boolean | string;
 }
 
 /**
@@ -44,6 +48,7 @@ export const runTestSuiteCommand = async ({
   const note = parseRunNoteFlag({ note: options.note });
   const targets = parseTargets(options.target);
   const repeatCount = parseRepeat(options.repeat);
+  const wait = parseWait(options.wait);
 
   const service = createCliTestSuitesService();
   const id = await resolveSuiteId({ reference, service });
@@ -71,7 +76,13 @@ export const runTestSuiteCommand = async ({
       `Run scheduled under "${result.planName}": ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} (batch: ${result.batchRunId}${note ? `, note: "${note}"` : ""})`,
     );
 
-    await emitRunResult({ result, note, options, subject: "test suite run" });
+    await emitRunResult({
+      result,
+      note,
+      options,
+      wait,
+      subject: "test suite run",
+    });
   } catch (error) {
     failSpinner({ spinner, error, action: "run the test suite" });
     process.exit(1);

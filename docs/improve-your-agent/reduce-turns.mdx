@@ -33,17 +33,17 @@ Paste this into Langy or into your coding agent:
 
 ```text
 Reduce the number of turns my agent takes without failing any scenario.
-Use the langwatch CLI to read the last run of the test suite I ran last; ask me which one if it is
+Use the langwatch CLI to read the last run of the last test suite I ran; ask me which one if it is
 not clear from our conversation. Start from the longest conversations, tell me what causes the
 extra turns and the extra model calls, and make one change in the prompt, the tool descriptions
 or the code for me to evaluate. Change nothing else.
 ```
 
-The agent comes back with a hypothesis, the conversations it was found in, and the change that follows from it, and the next step proves with the suite whether the change made the agent better.
+The agent comes back with a hypothesis, the conversations it found it in, and a change for it, which you test with the suite in the next step to prove the agent got better.
 
-The hypothesis usually lands on one of a few causes, and it helps to recognise them when you read the proposal:
+Most hypotheses come down to one of a few causes, and it helps to recognise them when you read the proposal:
 
-- **A tool rejects the input and the agent retries with different wording**, because the tool description does not say which values it accepts. The fix is in the tool contract: see [Fix tool calls](/improve-your-agent/fix-tool-calls).
+- **The tool rejects the input and the agent retries with different wording**, because the tool description does not say which values it accepts. The fix is in the tool contract: see [Fix tool calls](/improve-your-agent/fix-tool-calls).
 - **The agent asks the user for something a tool already returns**, because the description does not say what the tool returns.
 - **The agent calls tools one per turn** when the model could call them in parallel, or the prompt tells it to check one thing at a time.
 - **The agent narrates before it acts**, spending a turn on "Let me check that for you".
@@ -68,7 +68,7 @@ Be careful with the cost and the latency charts on a single pass: over six scena
 <img className="block" src="/images/improve-your-agent/comparison-run-detail.png" alt="A comparison run of the returns agent in production against development: the four charts, one column per target with its pass rate, duration and cost, and one row per scenario" />
 </Frame>
 
-To lock the gain in, add a criterion that counts the replies, such as `The agent completes the return within four replies`. The judge counts the replies in the conversation and fails the scenario when your agent takes more.
+To keep the gain, add a criterion that counts the replies, such as `The agent completes the return within four replies`. The judge counts the replies in the conversation and fails the scenario when your agent takes more.
 
 ## Step 4: Keep it in CI
 
@@ -78,13 +78,13 @@ Run the suite on every pull request that touches the agent, so a later change ca
 langwatch test-suite run "Returns" --target connected:returns-agent --wait
 ```
 
-The command exits 1 when a scenario fails. `--wait` gives up after ten minutes, and a suite with repeats can take longer than that, so poll the batch for those: see [Run from CI](/agent-testing/run-from-ci).
+The command exits 1 when a scenario fails, which is what fails the job: see [Run from CI](/agent-testing/run-from-ci).
 
 ## Common failures
 
 - **The pass rate dropped.** Revert the change and hand the judge's reasoning of the failed criterion to Langy or your coding agent: the reasoning quotes the turn where your agent stopped doing something it did before, such as confirming the refund method before it created the return.
 - **The turns did not move.** The cause is in a tool rather than in the prompt: the agent keeps retrying because the tool still rejects the input, so fix the tool contract first.
-- **A criterion about the agent's behaviour is inconclusive, with `no agent spans arrived` in the reasoning.** The judge waits thirty seconds for the trace after the conversation ends, and under load the trace arrives later than that, so the judge read an empty one. Rerun the scenario. If the trace shows `[REDACTED]` for the tool names and contents instead, the data privacy policy of the project hides them from the judge as well: see [Linking your traces](/agent-testing/linking-your-traces).
+- **The judge reports `no agent spans arrived` and marks a criterion about the agent's behaviour inconclusive.** The judge waits thirty seconds for the trace after the conversation ends, and under load the trace arrives later than that, so the judge reads an empty trace. Rerun the scenario. If the trace shows `[REDACTED]` for the tool names and contents instead, the data privacy policy of the project hides them from the judge as well: see [Linking your traces](/agent-testing/linking-your-traces).
 - **The latency dropped and the cost did not.** Your agent takes fewer turns but with longer prompts. Read the token count on the trace and shorten the context: see [Reduce cost and latency](/improve-your-agent/reduce-cost-and-latency).
 
 <Info>**Also check:** [Compare agents](/agent-testing/compare-agents), [Results](/agent-testing/results), [Linking your traces](/agent-testing/linking-your-traces) (what the judge reads).</Info>
