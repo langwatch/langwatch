@@ -539,14 +539,17 @@ secured
 
 // ── GET /scenarios ───────────────────────────────────────────────────
 
-// Fires a real scenario run for the run plan named by `?runPlanId=<SimulationSuite
-// id>` (a `run_plan` suite holding exactly one scenario and one target) and
-// reports what broke. The plan's own row supplies the project, scenario and
-// target — nothing else on the request can redirect the run. Authenticated by
-// the shared internal secret (a status-page poller has no user session and no
-// project API key), checked BEFORE the run plan is read or any run is queued.
+// Fires a real scenario run for the run plan named by
+// `?projectId=<project id>&runPlanId=<SimulationSuite id>` (a `run_plan` suite
+// holding exactly one scenario and one target) and reports what broke. The plan
+// is looked up scoped to `projectId` (the multitenancy guard rejects an
+// unscoped read), and the plan's own row supplies the scenario and target — a
+// runPlanId that does not belong to `projectId` resolves to nothing and reports
+// `run_failed`. Authenticated by the shared internal secret (a status-page
+// poller has no user session and no project API key), checked BEFORE the run
+// plan is read or any run is queued.
 //
-//   400 { message }                                         no runPlanId given
+//   400 { message }                              projectId or runPlanId missing
 //   200 { status: "ok", scenarioRunId, durationMs }         healthy
 //   503 { status: "unhealthy", reason, scenarioRunId?, durationMs }
 //   429 { status: "busy" }                                  already in flight
@@ -578,15 +581,28 @@ secured
       return c.json({ message: "Invalid auth token." }, { status: 403 });
     }
 
+    // Both are required and both come from the query string: `projectId` scopes
+    // the run plan lookup (the multitenancy guard rejects an unscoped read) and
+    // `runPlanId` names the plan. A missing/blank either is a bad request,
+    // distinct from the 503 a plan that does not resolve reports.
+    const projectId = c.req.query("projectId")?.trim();
     const runPlanId = c.req.query("runPlanId")?.trim();
-    if (!runPlanId) {
+    if (!projectId || !runPlanId) {
+      const missing = [
+        ...(projectId ? [] : ["projectId"]),
+        ...(runPlanId ? [] : ["runPlanId"]),
+      ];
       return c.json(
-        { message: "runPlanId query parameter is required." },
+        {
+          message: `${missing.join(" and ")} query parameter${
+            missing.length > 1 ? "s are" : " is"
+          } required.`,
+        },
         { status: 400 },
       );
     }
 
-    const result = await runScenarioHealthCanary(runPlanId);
+    const result = await runScenarioHealthCanary({ projectId, runPlanId });
 
     if ("busy" in result) {
       return c.json({ status: "busy" }, { status: 429 });

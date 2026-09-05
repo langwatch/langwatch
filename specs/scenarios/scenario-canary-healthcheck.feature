@@ -179,6 +179,29 @@ Feature: A scenario canary health check that fires a real run and says what brok
     And no scenario run is queued
 
   @integration
+  Scenario: A request with no projectId is a bad request
+    Given a request carrying the correct internal secret and a runPlanId but no projectId
+    When the scenario canary endpoint is called
+    Then the response is 400
+    And no scenario run is queued
+
+  @unit
+  Scenario: A run plan belonging to another project reports run_failed without launching a run
+    Given a runPlanId that names a valid run plan owned by a different project
+    When the run plan is resolved scoped to the requested project
+    Then the plan does not resolve under the wrong project
+    And the outcome is unhealthy with reason "run_failed"
+    And no run is launched
+
+  @unit
+  Scenario: A run plan lookup failure degrades to run_failed, not a raw error
+    Given the run plan lookup itself throws (the multitenancy guard, or the database is down)
+    When the probe resolves the run plan
+    Then the throw is caught rather than escaping as a raw error
+    And the outcome is unhealthy with reason "run_failed"
+    And no run is launched
+
+  @integration
   Scenario: The scenario canary route is declared internal-secret, never public
     Given the scenario canary route gates in-handler on the internal secret
     When its registered access policy is read

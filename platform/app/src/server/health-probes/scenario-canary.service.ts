@@ -19,8 +19,9 @@
  *    second call for the same run plan while one is in flight starts no second
  *    run — a different run plan is unaffected.
  *  - {@link runScenarioHealthCanary} is the production entrypoint the route
- *    crosses: it looks up the run plan named by `?runPlanId=`, validates it,
- *    builds the real deps and drives the single-flight guard.
+ *    crosses: it looks up the run plan named by `?runPlanId=`, scoped to
+ *    `?projectId=`, validates it, builds the real deps and drives the
+ *    single-flight guard.
  *
  * Two failure modes the injected clock alone cannot bound are handled with a
  * real timer instead: a boundary await (`queueRun` / `getScenarioRunData`) that
@@ -273,10 +274,13 @@ export async function runScenarioCanary(
  */
 export function createSingleFlightScenarioCanary(
   run: (deps: ScenarioCanaryDeps) => Promise<CanaryOutcome>,
-): (key: string, deps: ScenarioCanaryDeps) => Promise<CanaryResult> {
+): (options: {
+  key: string;
+  deps: ScenarioCanaryDeps;
+}) => Promise<CanaryResult> {
   const inFlight = new Map<string, Promise<CanaryOutcome>>();
 
-  return (key, deps) => {
+  return ({ key, deps }) => {
     if (inFlight.has(key)) return Promise.resolve({ busy: true });
     const attempt = run(deps).finally(() => {
       inFlight.delete(key);
@@ -318,13 +322,17 @@ export function parseRunPlanConfig(
   if (suite.scenarioIds.length !== 1) {
     return { invalid: "run plan must have exactly one scenario" };
   }
-  let targets: SimulationTarget[] | null;
+  let targets: SimulationTarget[];
   try {
     targets = parseSuiteTargets(suite.targets);
   } catch {
-    targets = null;
+    // An unparseable target is a distinct misconfiguration from a plan holding
+    // the wrong NUMBER of targets: the operator wrote a target the schema does
+    // not recognise, not too many/few. A separate reason keeps the two apart in
+    // the logs so the fix (fix the target vs. trim the list) is unambiguous.
+    return { invalid: "run plan target is not a valid simulation target" };
   }
-  if (targets?.length !== 1) {
+  if (targets.length !== 1) {
     return { invalid: "run plan must have exactly one target" };
   }
   const target = targets[0]!;
@@ -335,18 +343,48 @@ export function parseRunPlanConfig(
   };
 }
 
-/** Reads and validates the canary config off the named run plan's suite row. */
-async function resolveCanaryConfigFromRunPlan(
-  runPlanId: string,
-): Promise<CanaryConfig | { invalid: string }> {
-  const suite = await prisma.simulationSuite.findFirst({
-    // `kind: "run_plan"` and `archivedAt: null` are load-bearing filters, not
-    // conveniences: a 1×1 `test_suite` or an archived plan would otherwise
-    // launch a real run the operator meant to retire. Filtering in the query
-    // keeps that decision in one place instead of re-checking it after the read.
-    where: { id: runPlanId, archivedAt: null, kind: "run_plan" },
-  });
-  return parseRunPlanConfig(suite);
+/**
+ * Reads and validates the canary config off the named run plan's suite row,
+ * scoped to `projectId`.
+ *
+ * `projectId` is required, not optional: the multitenancy guard
+ * ({@link dbMultiTenancyProtection}) rejects any `SimulationSuite` read whose
+ * `where` carries no project scope, so an unscoped lookup here throws deep in
+ * Prisma and — before this — escaped the route as a raw 500. Scoping the query
+ * both satisfies the guard and confines the canary to a plan the named project
+ * actually owns: a runPlanId belonging to another project resolves to `null`
+ * and is reported `run_failed`, never run in the wrong project.
+ *
+ * The whole read is wrapped: the guard throw is only one way this can fail (a
+ * datastore outage is another), and a probe that answers `run_failed` on any
+ * lookup failure is strictly better than one that leaks a 500 outside the
+ * documented 200/503/429 contract.
+ */
+async function resolveCanaryConfigFromRunPlan({
+  projectId,
+  runPlanId,
+}: {
+  projectId: string;
+  runPlanId: string;
+}): Promise<CanaryConfig | { invalid: string }> {
+  try {
+    const suite = await prisma.simulationSuite.findFirst({
+      // `projectId` scopes the read to a plan the caller's project owns and
+      // satisfies the multitenancy guard. `kind: "run_plan"` and
+      // `archivedAt: null` are load-bearing too: a 1×1 `test_suite` or an
+      // archived plan would otherwise launch a real run the operator meant to
+      // retire. Filtering in the query keeps every one of those decisions in a
+      // single place instead of re-checking them after the read.
+      where: { id: runPlanId, projectId, archivedAt: null, kind: "run_plan" },
+    });
+    return parseRunPlanConfig(suite);
+  } catch (error) {
+    logger.error(
+      { error, projectId, runPlanId },
+      "Scenario canary run plan lookup failed; reporting unhealthy without launching a run",
+    );
+    return { invalid: "run plan lookup failed" };
+  }
 }
 
 /**
@@ -389,30 +427,39 @@ const singleFlightCanary = createSingleFlightScenarioCanary(runScenarioCanary);
 
 /**
  * The route's single entrypoint. Takes the id of the run plan (a
- * `SimulationSuite` with `kind: "run_plan"`) the canary is pointed at. The
- * canary project, scenario and target all come from that plan's own row — never
- * from any other value on the caller's request — so pointing at a plan cannot
- * redirect a run into a customer project the plan does not own. A missing
- * runPlanId or a plan that does not resolve to exactly one scenario and one
- * target reports unhealthy `run_failed` without launching anything.
+ * `SimulationSuite` with `kind: "run_plan"`) the canary is pointed at and the
+ * `projectId` that plan belongs to. The run plan is looked up scoped to that
+ * project (both to satisfy the multitenancy guard and to confine the canary to
+ * a plan the project owns), and the canary's own scenario and target come from
+ * that plan's row — so a runPlanId that does not belong to `projectId`, or a
+ * plan that does not resolve to exactly one scenario and one target, reports
+ * unhealthy `run_failed` without launching anything.
  */
-export async function runScenarioHealthCanary(
-  runPlanId: string | undefined,
-): Promise<CanaryResult> {
-  logger.info({ runPlanId }, "Running scenario canary health check");
-  if (!runPlanId) {
+export async function runScenarioHealthCanary({
+  projectId,
+  runPlanId,
+}: {
+  projectId: string;
+  runPlanId: string;
+}): Promise<CanaryResult> {
+  logger.info({ projectId, runPlanId }, "Running scenario canary health check");
+  if (!runPlanId || !projectId) {
     logger.error(
-      "Scenario canary called with no runPlanId; reporting unhealthy without launching a run",
+      { projectId, runPlanId },
+      "Scenario canary called with no projectId/runPlanId; reporting unhealthy without launching a run",
     );
     return { healthy: false, reason: "run_failed", durationMs: 0 };
   }
-  const config = await resolveCanaryConfigFromRunPlan(runPlanId);
+  const config = await resolveCanaryConfigFromRunPlan({ projectId, runPlanId });
   if ("invalid" in config) {
     logger.error(
-      { runPlanId, reason: config.invalid },
+      { projectId, runPlanId, reason: config.invalid },
       "Scenario canary run plan invalid; reporting unhealthy without launching a run",
     );
     return { healthy: false, reason: "run_failed", durationMs: 0 };
   }
-  return singleFlightCanary(runPlanId, buildProductionDeps(config));
+  return singleFlightCanary({
+    key: runPlanId,
+    deps: buildProductionDeps(config),
+  });
 }

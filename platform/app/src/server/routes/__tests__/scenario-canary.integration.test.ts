@@ -126,9 +126,10 @@ describe("GET /api/health/scenarios", () => {
       });
       const app = await getApp();
 
-      const res = await app.request("/api/health/scenarios?runPlanId=plan-1", {
-        headers: { authorization: `Bearer ${SECRET}` },
-      });
+      const res = await app.request(
+        "/api/health/scenarios?projectId=proj-1&runPlanId=plan-1",
+        { headers: { authorization: `Bearer ${SECRET}` } },
+      );
       const body = (await res.json()) as Record<string, unknown>;
 
       expect(res.status).toBe(200);
@@ -137,7 +138,10 @@ describe("GET /api/health/scenarios", () => {
         scenarioRunId: "canary-run-abc",
         durationMs: 4200,
       });
-      expect(runScenarioHealthCanary).toHaveBeenCalledWith("plan-1");
+      expect(runScenarioHealthCanary).toHaveBeenCalledWith({
+        projectId: "proj-1",
+        runPlanId: "plan-1",
+      });
     });
 
     it.each([
@@ -153,9 +157,10 @@ describe("GET /api/health/scenarios", () => {
       });
       const app = await getApp();
 
-      const res = await app.request("/api/health/scenarios?runPlanId=plan-1", {
-        headers: { authorization: `Bearer ${SECRET}` },
-      });
+      const res = await app.request(
+        "/api/health/scenarios?projectId=proj-1&runPlanId=plan-1",
+        { headers: { authorization: `Bearer ${SECRET}` } },
+      );
       const body = (await res.json()) as Record<string, unknown>;
 
       expect(res.status).toBe(503);
@@ -167,9 +172,10 @@ describe("GET /api/health/scenarios", () => {
       runScenarioHealthCanary.mockResolvedValue({ busy: true });
       const app = await getApp();
 
-      const res = await app.request("/api/health/scenarios?runPlanId=plan-1", {
-        headers: { authorization: `Bearer ${SECRET}` },
-      });
+      const res = await app.request(
+        "/api/health/scenarios?projectId=proj-1&runPlanId=plan-1",
+        { headers: { authorization: `Bearer ${SECRET}` } },
+      );
       const body = (await res.json()) as Record<string, unknown>;
 
       expect(res.status).toBe(429);
@@ -180,7 +186,7 @@ describe("GET /api/health/scenarios", () => {
     it("responds 400 and queues no run when runPlanId is absent", async () => {
       const app = await getApp();
 
-      const res = await app.request("/api/health/scenarios", {
+      const res = await app.request("/api/health/scenarios?projectId=proj-1", {
         headers: { authorization: `Bearer ${SECRET}` },
       });
 
@@ -192,8 +198,8 @@ describe("GET /api/health/scenarios", () => {
 
     /** @scenario "A blank runPlanId is a bad request" */
     it.each([
-      ["empty", "?runPlanId="],
-      ["whitespace-only", "?runPlanId=%20%20"],
+      ["empty", "?projectId=proj-1&runPlanId="],
+      ["whitespace-only", "?projectId=proj-1&runPlanId=%20%20"],
     ])("responds 400 and queues no run when runPlanId is %s", async (_label, query) => {
       const app = await getApp();
 
@@ -216,9 +222,10 @@ describe("GET /api/health/scenarios", () => {
       });
       const app = await getApp();
 
-      const res = await app.request("/api/health/scenarios?runPlanId=plan-1", {
-        headers: { authorization: `Bearer ${SECRET}` },
-      });
+      const res = await app.request(
+        "/api/health/scenarios?projectId=proj-1&runPlanId=plan-1",
+        { headers: { authorization: `Bearer ${SECRET}` } },
+      );
 
       expect(res.status).toBe(200);
       expect(res.headers.get("cache-control")).toBe("no-store");
@@ -234,16 +241,17 @@ describe("GET /api/health/scenarios", () => {
       });
       const app = await getApp();
 
-      const res = await app.request("/api/health/scenarios?runPlanId=plan-1", {
-        headers: { authorization: `Bearer ${SECRET}` },
-      });
+      const res = await app.request(
+        "/api/health/scenarios?projectId=proj-1&runPlanId=plan-1",
+        { headers: { authorization: `Bearer ${SECRET}` } },
+      );
 
       expect(res.status).toBe(503);
       expect(res.headers.get("cache-control")).toBe("no-store");
     });
 
     /** @scenario "Canary runs are confined to the run plan's own project regardless of caller input" */
-    it("passes only the runPlanId to the entrypoint, never a caller-supplied project id", async () => {
+    it("passes the projectId and runPlanId query params through to the entrypoint", async () => {
       runScenarioHealthCanary.mockResolvedValue({
         healthy: true,
         scenarioRunId: "canary-run-abc",
@@ -252,15 +260,32 @@ describe("GET /api/health/scenarios", () => {
       const app = await getApp();
 
       await app.request(
-        "/api/health/scenarios?runPlanId=plan-1&projectId=some-customer-project-id",
+        "/api/health/scenarios?projectId=proj-1&runPlanId=plan-1",
         { headers: { authorization: `Bearer ${SECRET}` } },
       );
 
-      // The entrypoint is handed the runPlanId and nothing else — the canary
-      // project id comes from the run plan's own row, never from the request,
-      // so no query/body value can redirect a canary run into a customer
-      // project.
-      expect(runScenarioHealthCanary).toHaveBeenCalledWith("plan-1");
+      // The route forwards exactly the two query params. Confinement is enforced
+      // one layer down: the run plan is looked up scoped to `projectId`, and the
+      // launched run's project comes from the resolved plan's own row — so a
+      // runPlanId that does not belong to `projectId` resolves to nothing and no
+      // run is launched (proven in the service unit test), and no request value
+      // can redirect a canary run into a project the plan does not own.
+      expect(runScenarioHealthCanary).toHaveBeenCalledWith({
+        projectId: "proj-1",
+        runPlanId: "plan-1",
+      });
+    });
+
+    /** @scenario "A request with no projectId is a bad request" */
+    it("responds 400 and queues no run when projectId is absent", async () => {
+      const app = await getApp();
+
+      const res = await app.request("/api/health/scenarios?runPlanId=plan-1", {
+        headers: { authorization: `Bearer ${SECRET}` },
+      });
+
+      expect(res.status).toBe(400);
+      expect(runScenarioHealthCanary).not.toHaveBeenCalled();
     });
   });
 });

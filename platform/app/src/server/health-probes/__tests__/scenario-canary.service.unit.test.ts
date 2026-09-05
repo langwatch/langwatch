@@ -375,8 +375,8 @@ describe("createSingleFlightScenarioCanary", () => {
 
       const singleFlight = createSingleFlightScenarioCanary(runScenarioCanary);
 
-      const first = singleFlight("plan-a", deps);
-      const second = await singleFlight("plan-a", deps);
+      const first = singleFlight({ key: "plan-a", deps });
+      const second = await singleFlight({ key: "plan-a", deps });
 
       expect(second).toEqual({ busy: true });
       expect(queueRunCalls).toBe(1);
@@ -408,8 +408,8 @@ describe("createSingleFlightScenarioCanary", () => {
       const singleFlight = createSingleFlightScenarioCanary(runScenarioCanary);
 
       const [resultA, resultB] = await Promise.all([
-        singleFlight("plan-a", makeDeps()),
-        singleFlight("plan-b", makeDeps()),
+        singleFlight({ key: "plan-a", deps: makeDeps() }),
+        singleFlight({ key: "plan-b", deps: makeDeps() }),
       ]);
 
       expect(queueRunCalls).toBe(2);
@@ -473,7 +473,7 @@ describe("runScenarioCanary with a wedged boundary await", () => {
         const singleFlight =
           createSingleFlightScenarioCanary(runScenarioCanary);
 
-        const firstCall = singleFlight("wedged-plan", deps);
+        const firstCall = singleFlight({ key: "wedged-plan", deps });
         await vi.advanceTimersByTimeAsync(
           SCENARIO_CANARY_TOTAL_BUDGET_MS + SCENARIO_CANARY_ATTEMPT_BUDGET_MS,
         );
@@ -486,7 +486,7 @@ describe("runScenarioCanary with a wedged boundary await", () => {
 
         // Lock released: a following call runs a real attempt (queueRun fires
         // again) rather than being short-circuited to busy.
-        const secondCall = singleFlight("wedged-plan", deps);
+        const secondCall = singleFlight({ key: "wedged-plan", deps });
         await vi.advanceTimersByTimeAsync(
           SCENARIO_CANARY_TOTAL_BUDGET_MS + SCENARIO_CANARY_ATTEMPT_BUDGET_MS,
         );
@@ -595,7 +595,7 @@ describe("parseRunPlanConfig", () => {
       });
 
       expect(result).toEqual({
-        invalid: "run plan must have exactly one target",
+        invalid: "run plan target is not a valid simulation target",
       });
     });
   });
@@ -616,11 +616,12 @@ type FakeSuiteRow = {
 
 /**
  * Drives `prisma.simulationSuite.findFirst` off an in-memory table that HONOURS
- * the `where` (id + `archivedAt: null` + `kind: "run_plan"`). Returning `null`
- * unconditionally would make an "archived plan is rejected" test pass even if
- * the filter were dropped; making the fake obey the filter is what proves each
- * clause is load-bearing — a row that would match without one clause is
- * filtered out by it.
+ * the `where` (id + `projectId` + `archivedAt: null` + `kind: "run_plan"`).
+ * Returning `null` unconditionally would make an "archived plan is rejected"
+ * test pass even if the filter were dropped; making the fake obey the filter is
+ * what proves each clause is load-bearing — a row that would match without one
+ * clause is filtered out by it, including a plan queried under the wrong
+ * projectId.
  */
 function fakeSuiteTable(rows: FakeSuiteRow[]) {
   vi.mocked(prisma.simulationSuite.findFirst).mockImplementation((async (
@@ -630,6 +631,7 @@ function fakeSuiteTable(rows: FakeSuiteRow[]) {
     const match = rows.find(
       (row) =>
         (where.id === undefined || row.id === where.id) &&
+        (where.projectId === undefined || row.projectId === where.projectId) &&
         (where.archivedAt === undefined ||
           row.archivedAt === where.archivedAt) &&
         (where.kind === undefined || row.kind === where.kind),
@@ -645,10 +647,13 @@ describe("runScenarioHealthCanary", () => {
     vi.mocked(getApp).mockReset();
   });
 
-  describe("given no runPlanId", () => {
+  describe("given a blank runPlanId", () => {
     /** @scenario "A misconfigured run plan reports unhealthy without launching a run" */
     it("reports run_failed without reading any run plan", async () => {
-      const result = await runScenarioHealthCanary(undefined);
+      const result = await runScenarioHealthCanary({
+        projectId: "canary-project",
+        runPlanId: "",
+      });
 
       expect(result).toEqual({
         healthy: false,
@@ -661,14 +666,63 @@ describe("runScenarioHealthCanary", () => {
 
   describe("given a runPlanId that resolves to no active run plan", () => {
     /** @scenario "A misconfigured run plan reports unhealthy without launching a run" */
-    it("looks the plan up by id, unarchived and kind run_plan, then reports run_failed", async () => {
+    it("looks the plan up by id, project, unarchived and kind run_plan, then reports run_failed", async () => {
       fakeSuiteTable([]);
 
-      const result = await runScenarioHealthCanary("missing-plan");
+      const result = await runScenarioHealthCanary({
+        projectId: "canary-project",
+        runPlanId: "missing-plan",
+      });
 
       expect(prisma.simulationSuite.findFirst).toHaveBeenCalledWith({
-        where: { id: "missing-plan", archivedAt: null, kind: "run_plan" },
+        where: {
+          id: "missing-plan",
+          projectId: "canary-project",
+          archivedAt: null,
+          kind: "run_plan",
+        },
       });
+      expect(result).toMatchObject({ healthy: false, reason: "run_failed" });
+      expect(launchScenarioRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a runPlanId that belongs to a different project", () => {
+    /** @scenario "A run plan belonging to another project reports run_failed without launching a run" */
+    it("does not resolve the plan under the wrong projectId, so reports run_failed without launching", async () => {
+      fakeSuiteTable([
+        {
+          id: "cross-project-plan",
+          projectId: "owner-project",
+          scenarioIds: ["plan-scenario"],
+          targets: [{ type: "prompt", referenceId: "plan-prompt" }],
+          kind: "run_plan",
+          archivedAt: null,
+        },
+      ]);
+
+      const result = await runScenarioHealthCanary({
+        projectId: "some-other-project",
+        runPlanId: "cross-project-plan",
+      });
+
+      expect(result).toMatchObject({ healthy: false, reason: "run_failed" });
+      expect(launchScenarioRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the run plan lookup itself throws", () => {
+    /** @scenario "A run plan lookup failure degrades to run_failed, not a raw error" */
+    it("reports run_failed without launching, never letting the throw escape", async () => {
+      vi.mocked(prisma.simulationSuite.findFirst).mockRejectedValue(
+        new Error("database unavailable"),
+      );
+
+      const result = await runScenarioHealthCanary({
+        projectId: "canary-project",
+        runPlanId: "any-plan",
+      });
+
       expect(result).toMatchObject({ healthy: false, reason: "run_failed" });
       expect(launchScenarioRun).not.toHaveBeenCalled();
     });
@@ -688,7 +742,10 @@ describe("runScenarioHealthCanary", () => {
         },
       ]);
 
-      const result = await runScenarioHealthCanary("archived-plan");
+      const result = await runScenarioHealthCanary({
+        projectId: "plan-project",
+        runPlanId: "archived-plan",
+      });
 
       expect(result).toMatchObject({ healthy: false, reason: "run_failed" });
       expect(launchScenarioRun).not.toHaveBeenCalled();
@@ -709,7 +766,10 @@ describe("runScenarioHealthCanary", () => {
         },
       ]);
 
-      const result = await runScenarioHealthCanary("test-suite");
+      const result = await runScenarioHealthCanary({
+        projectId: "plan-project",
+        runPlanId: "test-suite",
+      });
 
       expect(result).toMatchObject({ healthy: false, reason: "run_failed" });
       expect(launchScenarioRun).not.toHaveBeenCalled();
@@ -719,13 +779,21 @@ describe("runScenarioHealthCanary", () => {
   describe("given a runPlanId whose plan has more than one scenario", () => {
     /** @scenario "A misconfigured run plan reports unhealthy without launching a run" */
     it("reports run_failed without launching a run", async () => {
-      vi.mocked(prisma.simulationSuite.findFirst).mockResolvedValue({
-        projectId: "p",
-        scenarioIds: ["a", "b"],
-        targets: [{ type: "prompt", referenceId: "r" }],
-      } as Awaited<ReturnType<typeof prisma.simulationSuite.findFirst>>);
+      fakeSuiteTable([
+        {
+          id: "bad-plan",
+          projectId: "plan-project",
+          scenarioIds: ["a", "b"],
+          targets: [{ type: "prompt", referenceId: "r" }],
+          kind: "run_plan",
+          archivedAt: null,
+        },
+      ]);
 
-      const result = await runScenarioHealthCanary("bad-plan");
+      const result = await runScenarioHealthCanary({
+        projectId: "plan-project",
+        runPlanId: "bad-plan",
+      });
 
       expect(result).toMatchObject({ healthy: false, reason: "run_failed" });
       expect(launchScenarioRun).not.toHaveBeenCalled();
@@ -735,11 +803,16 @@ describe("runScenarioHealthCanary", () => {
   describe("given a runPlanId whose plan has exactly one scenario and target", () => {
     /** @scenario "An authenticated request triggers a real run through the shared queue path" */
     it("launches through the plan's project and reports healthy on a SUCCESS run", async () => {
-      vi.mocked(prisma.simulationSuite.findFirst).mockResolvedValue({
-        projectId: "plan-project",
-        scenarioIds: ["plan-scenario"],
-        targets: [{ type: "prompt", referenceId: "plan-prompt" }],
-      } as Awaited<ReturnType<typeof prisma.simulationSuite.findFirst>>);
+      fakeSuiteTable([
+        {
+          id: "good-plan",
+          projectId: "plan-project",
+          scenarioIds: ["plan-scenario"],
+          targets: [{ type: "prompt", referenceId: "plan-prompt" }],
+          kind: "run_plan",
+          archivedAt: null,
+        },
+      ]);
       vi.mocked(launchScenarioRun).mockResolvedValue({
         scenarioRunId: "canary-run-1",
       } as Awaited<ReturnType<typeof launchScenarioRun>>);
@@ -754,7 +827,10 @@ describe("runScenarioHealthCanary", () => {
         },
       } as unknown as ReturnType<typeof getApp>);
 
-      const result = await runScenarioHealthCanary("good-plan");
+      const result = await runScenarioHealthCanary({
+        projectId: "plan-project",
+        runPlanId: "good-plan",
+      });
 
       expect(result).toMatchObject({
         healthy: true,
