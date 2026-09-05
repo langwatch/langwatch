@@ -78,7 +78,7 @@ function buildApi(options: { allowedAtOrganization: readonly string[] }) {
     groupMemberCounts: async () => new Map<string, number>(),
   } as unknown as GatewayApp;
 
-  const { hono } = createGatewayPlatformRestApp({
+  const hono = createGatewayPlatformRestApp({
     security: testSecurity(),
     gateway: () => app,
   });

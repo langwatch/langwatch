@@ -130,7 +130,7 @@ function buildApp(): void {
 }
 
 async function get(path: string): Promise<Response> {
-  return await app.hono.fetch(new Request(`http://api.test${path}`));
+  return await app.fetch(new Request(`http://api.test${path}`));
 }
 
 function spendRow(requestId: string, overrides: Partial<SpendEventRow> = {}): SpendEventRow {

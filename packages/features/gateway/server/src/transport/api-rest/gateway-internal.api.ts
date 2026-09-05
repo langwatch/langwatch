@@ -6,7 +6,11 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
 import { internalSecret } from "@langwatch/api";
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import {
+  type AppRestSecurity,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+} from "@langwatch/api/rest";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -799,626 +803,681 @@ export function createGatewayInternalRestApp(options: {
   ports: GatewayInternalRestPorts;
 }): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "gateway-internal",
     basePath: "/api/internal/gateway",
+    // The Go data plane dials these exact paths; a control plane between two
+    // halves of one deployment has no dated contract to negotiate.
+    staticGeneration: "v1",
+    errorEnvelope: "legacy",
     verifySecret: verifyGatewaySignature(ports.internalSecret),
   });
+
+  /** Every answer here is the data plane's own contract, written by the handler. */
+  const GATEWAY_INTERNAL_ANSWER =
+    "the Go data plane reads this family's own bodies and statuses: the error envelope " +
+    "it already parses, a 304 carrying its ETag, and the 204 that ends a long poll";
 
   /**
    * §4.7: connectivity probe for the public /health endpoint. The Go gateway's statusprobe calls this every 15s and serves the cached verdict to the status page — riding the signed channel is the point, since a 200 proves the shared HMAC secret matches too (the misconfig where every pod looks green while every VK resolve is refused). Body deliberately static; only the status code is read.
    */
-  secured.access(gatewayPolicy()).get("/health", (c) => {
-    return c.json({ status: "ok" });
-  });
+  return service
+    .registerRoute(
+      "get",
+      "/health",
+      MANAGEMENT_API_VERSION,
+      (c) => {
+        return c.json({ status: "ok" });
+      },
+      (b) => policy(gatewayPolicy())(b).withRawResponse(GATEWAY_INTERNAL_ANSWER),
+    )
+    .registerRoute(
+      "post",
+      "/resolve-key",
+      MANAGEMENT_API_VERSION,
+      async (c) => {
+        const body = (await c.req.json().catch(() => ({}))) as {
+          key_presented?: string;
+          gateway_node_id?: string;
+        };
+        const presented = body.key_presented;
+        if (!presented || typeof presented !== "string") {
+          return c.json(
+            {
+              error: {
+                type: "bad_request",
+                code: "missing_key_presented",
+                message: "key_presented is required",
+              },
+            },
+            400,
+          );
+        }
 
-  secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
-    const body = (await c.req.json().catch(() => ({}))) as {
-      key_presented?: string;
-      gateway_node_id?: string;
-    };
-    const presented = body.key_presented;
-    if (!presented || typeof presented !== "string") {
-      return c.json(
-        {
-          error: {
-            type: "bad_request",
-            code: "missing_key_presented",
-            message: "key_presented is required",
-          },
-        },
-        400,
-      );
-    }
+        const parseRejection = virtualKeyParseRejection(presented);
+        if (parseRejection) {
+          logAuthDecision(c, parseRejection.code, parseRejection.status);
+          return c.json(rejectionBody(parseRejection), parseRejection.status);
+        }
 
-    const parseRejection = virtualKeyParseRejection(presented);
-    if (parseRejection) {
-      logAuthDecision(c, parseRejection.code, parseRejection.status);
-      return c.json(rejectionBody(parseRejection), parseRejection.status);
-    }
+        const service = ports.virtualKeys();
+        const vk = await service.tryGetBySecretInternal(presented);
+        if (!vk) {
+          logAuthDecision(c, "virtual_key_not_found", 401);
+          return c.json(
+            {
+              error: {
+                type: "invalid_api_key",
+                code: "virtual_key_not_found",
+                message: "unknown virtual key",
+              },
+            },
+            401,
+          );
+        }
+        const statusRejection = virtualKeyStatusRejection({
+          status: vk.status,
+          expiresAt: vk.expiresAt,
+        });
+        if (statusRejection) {
+          logAuthDecision(c, statusRejection.code, statusRejection.status, {
+            vkId: vk.id,
+          });
+          return c.json(rejectionBody(statusRejection), statusRejection.status);
+        }
 
-    const service = ports.virtualKeys();
-    const vk = await service.tryGetBySecretInternal(presented);
-    if (!vk) {
-      logAuthDecision(c, "virtual_key_not_found", 401);
-      return c.json(
-        {
-          error: {
-            type: "invalid_api_key",
-            code: "virtual_key_not_found",
-            message: "unknown virtual key",
-          },
-        },
-        401,
-      );
-    }
-    const statusRejection = virtualKeyStatusRejection({
-      status: vk.status,
-      expiresAt: vk.expiresAt,
-    });
-    if (statusRejection) {
-      logAuthDecision(c, statusRejection.code, statusRejection.status, {
-        vkId: vk.id,
-      });
-      return c.json(rejectionBody(statusRejection), statusRejection.status);
-    }
+        // Where this key's traces land, read off the key. Null for a key written
+        // before the destination was stored in an organization with no governance
+        // project to fall back to; the gateway then skips span export rather than
+        // failing the auth handshake.
+        const traceProject = vk.traceProjectId
+          ? await ports.projects().tryGetTraceDestination(vk.traceProjectId)
+          : null;
 
-    // Where this key's traces land, read off the key. Null for a key written
-    // before the destination was stored in an organization with no governance
-    // project to fall back to; the gateway then skips span export rather than
-    // failing the auth handshake.
-    const traceProject = vk.traceProjectId
-      ? await ports.projects().tryGetTraceDestination(vk.traceProjectId)
-      : null;
+        // notAfter ends the token at the key's expiration date when that arrives
+        // before the ordinary 15 minute TTL, and travels on as the vk_expires_at
+        // claim. Without it the gateway holds a token that outlives the key, and its
+        // auth cache keeps serving that key while the control plane is unreachable.
+        const { jwt } = ports.jwt().sign({
+          vk_id: vk.id,
+          project_id: traceProject?.id ?? null,
+          team_id: traceProject?.teamId ?? null,
+          org_id: vk.organizationId,
+          principal_id: vk.principalUserId,
+          revision: vk.revision.toString(),
+          notAfter: vk.expiresAt,
+        });
 
-    // notAfter ends the token at the key's expiration date when that arrives
-    // before the ordinary 15 minute TTL, and travels on as the vk_expires_at
-    // claim. Without it the gateway holds a token that outlives the key, and its
-    // auth cache keeps serving that key while the control plane is unreachable.
-    const { jwt } = ports.jwt().sign({
-      vk_id: vk.id,
-      project_id: traceProject?.id ?? null,
-      team_id: traceProject?.teamId ?? null,
-      org_id: vk.organizationId,
-      principal_id: vk.principalUserId,
-      revision: vk.revision.toString(),
-      notAfter: vk.expiresAt,
-    });
+        // Fire-and-forget last-used bump. Failures here must not deny the request.
+        void service.touchUsage(vk.id).catch(() => {});
 
-    // Fire-and-forget last-used bump. Failures here must not deny the request.
-    void service.touchUsage(vk.id).catch(() => {});
+        return c.json({
+          jwt,
+          revision: vk.revision.toString(),
+          key_id: vk.id,
+          display_prefix: vk.displayPrefix,
+        });
+      },
+      (b) => policy(gatewayPolicy())(b).withRawResponse(GATEWAY_INTERNAL_ANSWER),
+    )
+    .registerRoute(
+      "post",
+      "/codex/refresh",
+      MANAGEMENT_API_VERSION,
+      async (c) => {
+        const parsed = codexRefreshRequestSchema.safeParse(await c.req.json().catch(() => null));
+        if (!parsed.success) {
+          return c.json(
+            {
+              error: {
+                type: "bad_request",
+                code: "missing_provider_row_id",
+                message: "provider_row_id is required",
+              },
+            },
+            400,
+          );
+        }
+        const refreshCodex = ports.refreshCodex;
+        if (!refreshCodex) {
+          // Refused by name rather than reported as a dead session: telling a
+          // customer to sign in to Codex again would send them round a loop that
+          // cannot end, because this deployment composes no provider service to
+          // refresh against.
+          return c.json(
+            {
+              error: {
+                type: "unavailable",
+                code: "codex_refresh_unavailable",
+                message:
+                  "this deployment composes no model provider service to refresh a Codex session",
+              },
+            },
+            503,
+          );
+        }
+        const result = await refreshCodex({ providerRowId: parsed.data.provider_row_id });
+        if (result.status === "not_connected") {
+          return c.json(
+            {
+              error: {
+                type: "codex_not_connected",
+                code: "codex_not_connected",
+                message: "no connected Codex account on this provider",
+              },
+            },
+            404,
+          );
+        }
+        if (result.status === "session_expired") {
+          logger.warn(
+            { providerRowId: parsed.data.provider_row_id },
+            "codex session expired; user must sign in again",
+          );
+          return c.json(
+            {
+              error: {
+                type: "codex_session_expired",
+                code: "codex_session_expired",
+                message: "OpenAI session expired; sign in to Codex again",
+              },
+            },
+            401,
+          );
+        }
+        return c.json({
+          access_token: result.accessToken,
+          account_id: result.accountId,
+        });
+      },
+      (b) => policy(gatewayPolicy())(b).withRawResponse(GATEWAY_INTERNAL_ANSWER),
+    )
+    .registerRoute(
+      "get",
+      "/config/:vk_id",
+      MANAGEMENT_API_VERSION,
+      async (c, input: { vk_id: string }) => {
+        const vkId = input.vk_id;
+        const vk = await ports.store().tryFindVirtualKeyForConfig(vkId);
+        if (!vk) {
+          return c.json(
+            {
+              error: {
+                type: "invalid_api_key",
+                code: "virtual_key_not_found",
+                message: "unknown virtual key",
+              },
+            },
+            404,
+          );
+        }
 
-    return c.json({
-      jwt,
-      revision: vk.revision.toString(),
-      key_id: vk.id,
-      display_prefix: vk.displayPrefix,
-    });
-  });
+        const materialiser = ports.config();
 
-  /**
-   * Spec: specs/model-providers/codex-account-provider.feature
-   * Codex token refresh — the gateway's recovery road for a 401 from OpenAI's codex backend. Refreshes the provider row's stored OAuth session (single issuer round-trip under concurrent 401 bursts) and returns a fresh access token; a dead session answers codex_session_expired, forwarded so Langy renders the re-authenticate card. Request: {provider_row_id}. Response: {access_token, account_id} | error.
-   */
-  secured.access(gatewayPolicy()).post("/codex/refresh", async (c) => {
-    const parsed = codexRefreshRequestSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(
-        {
-          error: {
-            type: "bad_request",
-            code: "missing_provider_row_id",
-            message: "provider_row_id is required",
-          },
-        },
-        400,
-      );
-    }
-    const refreshCodex = ports.refreshCodex;
-    if (!refreshCodex) {
-      // Refused by name rather than reported as a dead session: telling a
-      // customer to sign in to Codex again would send them round a loop that
-      // cannot end, because this deployment composes no provider service to
-      // refresh against.
-      return c.json(
-        {
-          error: {
-            type: "unavailable",
-            code: "codex_refresh_unavailable",
-            message:
-              "this deployment composes no model provider service to refresh a Codex session",
-          },
-        },
-        503,
-      );
-    }
-    const result = await refreshCodex({ providerRowId: parsed.data.provider_row_id });
-    if (result.status === "not_connected") {
-      return c.json(
-        {
-          error: {
-            type: "codex_not_connected",
-            code: "codex_not_connected",
-            message: "no connected Codex account on this provider",
-          },
-        },
-        404,
-      );
-    }
-    if (result.status === "session_expired") {
-      logger.warn(
-        { providerRowId: parsed.data.provider_row_id },
-        "codex session expired; user must sign in again",
-      );
-      return c.json(
-        {
-          error: {
-            type: "codex_session_expired",
-            code: "codex_session_expired",
-            message: "OpenAI session expired; sign in to Codex again",
-          },
-        },
-        401,
-      );
-    }
-    return c.json({
-      access_token: result.accessToken,
-      account_id: result.accountId,
-    });
-  });
+        const ifNoneMatch = c.req.header("If-None-Match");
+        const currentETag = await materialiser.versionToken(vk);
+        if (ifNoneMatch && ifNoneMatch === currentETag) {
+          return c.body(null, 304, {
+            ETag: currentETag,
+            "Cache-Control": "no-store",
+          });
+        }
 
-  /**
-   * §4.2 — full warm-cache config by vk_id with `If-None-Match: <revision>`.
-   * Returns 304 Not Modified when client has current revision.
-   */
-  secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
-    const vkId = c.req.param("vk_id");
-    const vk = await ports.store().tryFindVirtualKeyForConfig(vkId);
-    if (!vk) {
-      return c.json(
-        {
-          error: {
-            type: "invalid_api_key",
-            code: "virtual_key_not_found",
-            message: "unknown virtual key",
-          },
-        },
-        404,
-      );
-    }
+        // EC4 — the CH repo lets the materialiser stamp current-period spend
+        // (sumMerge from the rollup) onto each applicable budget, so the
+        // gateway's existing Precheck path sees fresh state on every
+        // re-materialise after a BUDGET_UPDATED eviction — without this the
+        // wire output reads the stale spentUsd PG column no writer updates.
+        const payload = await materialiser.materialise(vk);
+        return c.json(payload, 200, {
+          ETag: currentETag,
+          "Cache-Control": "no-store",
+        });
+      },
+      (b) =>
+        policy(gatewayPolicy())(b)
+          .withParams(z.object({ vk_id: z.string().min(1) }))
+          .withRawResponse(GATEWAY_INTERNAL_ANSWER),
+    )
+    .registerRoute(
+      "get",
+      "/changes",
+      MANAGEMENT_API_VERSION,
+      async (c) => {
+        const sinceParam = c.req.query("since") ?? "0";
+        const orgId = c.req.query("organization_id");
+        if (!orgId) {
+          return c.json(
+            {
+              error: {
+                type: "bad_request",
+                code: "missing_organization_id",
+                message: "organization_id query param is required",
+              },
+            },
+            400,
+          );
+        }
 
-    const materialiser = ports.config();
+        let since: bigint;
+        try {
+          since = BigInt(sinceParam);
+        } catch {
+          return c.json(
+            {
+              error: {
+                type: "bad_request",
+                code: "invalid_since",
+                message: "since must be an integer",
+              },
+            },
+            400,
+          );
+        }
 
-    const ifNoneMatch = c.req.header("If-None-Match");
-    const currentETag = await materialiser.versionToken(vk);
-    if (ifNoneMatch && ifNoneMatch === currentETag) {
-      return c.body(null, 304, {
-        ETag: currentETag,
-        "Cache-Control": "no-store",
-      });
-    }
-
-    // EC4 — the CH repo lets the materialiser stamp current-period spend
-    // (sumMerge from the rollup) onto each applicable budget, so the
-    // gateway's existing Precheck path sees fresh state on every
-    // re-materialise after a BUDGET_UPDATED eviction — without this the
-    // wire output reads the stale spentUsd PG column no writer updates.
-    const payload = await materialiser.materialise(vk);
-    return c.json(payload, 200, {
-      ETag: currentETag,
-      "Cache-Control": "no-store",
-    });
-  });
-
-  /**
-   * §4.3 — mutations since a given revision. Short, polite long-poll: Hono isn't right for 25s held sockets, so this loops briefly (2s sleeps, ~10s max); the Go client falls straight back into the next long-poll on 204. Query: ?since=<revision>&timeout_s=10. Response: {current_revision, changes:[{kind,vk_id,revision}]}. 204 when no diff within timeout.
-   */
-  secured.access(gatewayPolicy()).get("/changes", async (c) => {
-    const sinceParam = c.req.query("since") ?? "0";
-    const orgId = c.req.query("organization_id");
-    if (!orgId) {
-      return c.json(
-        {
-          error: {
-            type: "bad_request",
-            code: "missing_organization_id",
-            message: "organization_id query param is required",
-          },
-        },
-        400,
-      );
-    }
-
-    let since: bigint;
-    try {
-      since = BigInt(sinceParam);
-    } catch {
-      return c.json(
-        {
-          error: {
-            type: "bad_request",
-            code: "invalid_since",
-            message: "since must be an integer",
-          },
-        },
-        400,
-      );
-    }
-
-    const timeoutSeconds = Math.max(
-      1,
-      Math.min(25, Number.parseInt(c.req.query("timeout_s") ?? "10", 10) || 10),
-    );
-    const repo = ports.changes();
-    const deadline = Date.now() + timeoutSeconds * 1000;
-
-    while (Date.now() < deadline) {
-      const { events, currentRevision } = await repo.since(orgId, since, 500);
-      if (events.length > 0) {
-        return c.json(
-          {
-            current_revision: currentRevision.toString(),
-            changes: events.map((e) => ({
-              kind: e.kind,
-              virtual_key_id: e.virtualKeyId,
-              budget_id: e.budgetId,
-              model_provider_id: e.modelProviderId,
-              project_id: e.projectId,
-              revision: e.revision.toString(),
-            })),
-          },
-          200,
+        const timeoutSeconds = Math.max(
+          1,
+          Math.min(25, Number.parseInt(c.req.query("timeout_s") ?? "10", 10) || 10),
         );
-      }
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
+        const repo = ports.changes();
+        const deadline = Date.now() + timeoutSeconds * 1000;
 
-    const current = await repo.currentRevision(orgId);
-    return c.body(null, 204, {
-      "X-LangWatch-Revision": current.toString(),
-    });
-  });
+        while (Date.now() < deadline) {
+          const { events, currentRevision } = await repo.since(orgId, since, 500);
+          if (events.length > 0) {
+            return c.json(
+              {
+                current_revision: currentRevision.toString(),
+                changes: events.map((e) => ({
+                  kind: e.kind,
+                  virtual_key_id: e.virtualKeyId,
+                  budget_id: e.budgetId,
+                  model_provider_id: e.modelProviderId,
+                  project_id: e.projectId,
+                  revision: e.revision.toString(),
+                })),
+              },
+              200,
+            );
+          }
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
 
-  /**
-   * §4.6 — inline guardrail pipeline. Request: {vk_id, project_id, direction, guardrail_ids, content, metadata}. Response: {decision, reason, modified_content, policies_triggered}. Runs every referenced guardrail in parallel and aggregates (any block blocks); an evaluator that can't verdict falls to its own failure mode rather than passing, so a broken evaluator can't quietly disable protection. project_id is required — it scopes the lookup so one project's key can't name another's guardrail; a key with no trace project materialises none.
-   */
-  secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json(
-        {
-          error: {
-            type: "bad_request",
-            code: "invalid_json",
-            message: "guardrail/check requires a JSON body",
-          },
-        },
-        400,
-      );
-    }
-    const parsed = guardrailCheckRequestSchema.safeParse(body);
-    if (!parsed.success) {
-      return c.json(
-        {
-          error: {
-            type: "bad_request",
-            code: "validation_error",
-            message: parsed.error.message,
-          },
-        },
-        400,
-      );
-    }
-    const guardrails = ports.guardrails?.();
-    if (!guardrails) {
-      // Refused, never allowed. A guardrail whose evaluator cannot produce a
-      // verdict falls to its own failure mode rather than passing, and the same
-      // rule holds one level up: a deployment with no evaluator runtime says so
-      // instead of waving every request through an active protection.
-      return c.json(
-        {
-          error: {
-            type: "unavailable",
-            code: "guardrail_evaluation_unavailable",
-            message: "this deployment composes no evaluator runtime to check a guardrail with",
-          },
-        },
-        503,
-      );
-    }
-    const verdict = await GatewayGuardrailEvaluationService.create({
-      repository: guardrails.repository,
-      monitors: guardrails.monitors,
-      runEvaluator: guardrails.runEvaluator,
-    }).check({
-      projectId: parsed.data.project_id,
-      guardrailIds: parsed.data.guardrail_ids,
-      direction: parsed.data.direction,
-      content: parsed.data.content,
-    });
-    if (verdict.decision !== "allow") {
-      logger.info(
-        {
-          vkId: parsed.data.vk_id,
+        const current = await repo.currentRevision(orgId);
+        return c.body(null, 204, {
+          "X-LangWatch-Revision": current.toString(),
+        });
+      },
+      (b) => policy(gatewayPolicy())(b).withRawResponse(GATEWAY_INTERNAL_ANSWER),
+    )
+    .registerRoute(
+      "post",
+      "/guardrail/check",
+      MANAGEMENT_API_VERSION,
+      async (c) => {
+        let body: unknown;
+        try {
+          body = await c.req.json();
+        } catch {
+          return c.json(
+            {
+              error: {
+                type: "bad_request",
+                code: "invalid_json",
+                message: "guardrail/check requires a JSON body",
+              },
+            },
+            400,
+          );
+        }
+        const parsed = guardrailCheckRequestSchema.safeParse(body);
+        if (!parsed.success) {
+          return c.json(
+            {
+              error: {
+                type: "bad_request",
+                code: "validation_error",
+                message: parsed.error.message,
+              },
+            },
+            400,
+          );
+        }
+        const guardrails = ports.guardrails?.();
+        if (!guardrails) {
+          // Refused, never allowed. A guardrail whose evaluator cannot produce a
+          // verdict falls to its own failure mode rather than passing, and the same
+          // rule holds one level up: a deployment with no evaluator runtime says so
+          // instead of waving every request through an active protection.
+          return c.json(
+            {
+              error: {
+                type: "unavailable",
+                code: "guardrail_evaluation_unavailable",
+                message: "this deployment composes no evaluator runtime to check a guardrail with",
+              },
+            },
+            503,
+          );
+        }
+        const verdict = await GatewayGuardrailEvaluationService.create({
+          repository: guardrails.repository,
+          monitors: guardrails.monitors,
+          runEvaluator: guardrails.runEvaluator,
+        }).check({
           projectId: parsed.data.project_id,
+          guardrailIds: parsed.data.guardrail_ids,
           direction: parsed.data.direction,
-          decision: verdict.decision,
-          policiesTriggered: verdict.policies_triggered,
-        },
-        "guardrail check did not allow the request",
-      );
-    }
-    return c.json(verdict);
-  });
+          content: parsed.data.content,
+        });
+        if (verdict.decision !== "allow") {
+          logger.info(
+            {
+              vkId: parsed.data.vk_id,
+              projectId: parsed.data.project_id,
+              direction: parsed.data.direction,
+              decision: verdict.decision,
+              policiesTriggered: verdict.policies_triggered,
+            },
+            "guardrail check did not allow the request",
+          );
+        }
+        return c.json(verdict);
+      },
+      (b) => policy(gatewayPolicy())(b).withRawResponse(GATEWAY_INTERNAL_ANSWER),
+    )
+    .registerRoute(
+      "get",
+      "/budget-bucket-spend",
+      MANAGEMENT_API_VERSION,
+      async (c) => {
+        const budgetId = c.req.query("budget_id") ?? "";
+        const endUserId = c.req.query("end_user_id") ?? "";
+        if (!budgetId || !endUserId) {
+          return c.json(
+            {
+              error: {
+                type: "bad_request",
+                code: "missing_parameter",
+                message: "budget_id and end_user_id are required",
+              },
+            },
+            400,
+          );
+        }
+        const store = ports.store();
+        const budget = await store.tryFindBudget(budgetId);
+        if (!budget || budget.archivedAt || budget.scopeType !== "ATTRIBUTED_USER") {
+          return c.json(
+            {
+              error: {
+                type: "not_found",
+                code: "budget_not_found",
+                message: "unknown attributed-user budget",
+              },
+            },
+            404,
+          );
+        }
+        const budgetRepository = ports.budgetSpend();
+        if (!budgetRepository) {
+          // Without the ledger there is no bucket figure; report zero spend so
+          // enforcement stays permissive rather than inventing a number.
+          return c.json({ spent_micro_usd: 0, bucket: null });
+        }
+        const bucketScopeId = bucketScopeIdFor(
+          budget,
+          attributedUserBucketScopeId(budget.scopeId, endUserId),
+        );
+        const boundary = await store.tryFindBucketBoundary({ budgetId: budget.id, bucketScopeId });
+        const spentMicroUsd = await bucketSpentMicroUsd({
+          store,
+          budgetRepository,
+          budget,
+          bucketScopeId,
+          periodFloorMs: bucketPeriodFloorMs(budget, boundary?.periodStartedAt),
+        });
+        return c.json({ spent_micro_usd: spentMicroUsd, bucket: bucketScopeId });
+      },
+      (b) => policy(gatewayPolicy())(b).withRawResponse(GATEWAY_INTERNAL_ANSWER),
+    )
+    .registerRoute(
+      "post",
+      "/spend-commands",
+      MANAGEMENT_API_VERSION,
+      async (c) => {
+        const parsed = spendCommandBatchSchema.safeParse(await c.req.json().catch(() => null));
+        if (!parsed.success) {
+          return c.json(
+            {
+              error: {
+                type: "bad_request",
+                code: "invalid_batch",
+                message: "records[] of {command, payload, pod_id, pod_seq} required",
+              },
+            },
+            400,
+          );
+        }
 
-  secured.access(gatewayPolicy()).get("/budget-bucket-spend", async (c) => {
-    const budgetId = c.req.query("budget_id") ?? "";
-    const endUserId = c.req.query("end_user_id") ?? "";
-    if (!budgetId || !endUserId) {
-      return c.json(
-        {
-          error: {
-            type: "bad_request",
-            code: "missing_parameter",
-            message: "budget_id and end_user_id are required",
-          },
-        },
-        400,
-      );
-    }
-    const store = ports.store();
-    const budget = await store.tryFindBudget(budgetId);
-    if (!budget || budget.archivedAt || budget.scopeType !== "ATTRIBUTED_USER") {
-      return c.json(
-        {
-          error: {
-            type: "not_found",
-            code: "budget_not_found",
-            message: "unknown attributed-user budget",
-          },
-        },
-        404,
-      );
-    }
-    const budgetRepository = ports.budgetSpend();
-    if (!budgetRepository) {
-      // Without the ledger there is no bucket figure; report zero spend so
-      // enforcement stays permissive rather than inventing a number.
-      return c.json({ spent_micro_usd: 0, bucket: null });
-    }
-    const bucketScopeId = bucketScopeIdFor(
-      budget,
-      attributedUserBucketScopeId(budget.scopeId, endUserId),
-    );
-    const boundary = await store.tryFindBucketBoundary({ budgetId: budget.id, bucketScopeId });
-    const spentMicroUsd = await bucketSpentMicroUsd({
-      store,
-      budgetRepository,
-      budget,
-      bucketScopeId,
-      periodFloorMs: bucketPeriodFloorMs(budget, boundary?.periodStartedAt),
-    });
-    return c.json({ spent_micro_usd: spentMicroUsd, bucket: bucketScopeId });
-  });
+        const pipeline = ports.spend?.();
+        if (!pipeline) {
+          return c.json(
+            {
+              error: {
+                type: "unavailable",
+                code: "spend_pipeline_disabled",
+                message: "gateway spend pipeline is not registered (ClickHouse disabled)",
+              },
+            },
+            503,
+          );
+        }
 
-  /**
-   * Async spend-command ingest: the drainer posts spooled batches at-least-once; every command carries a per-(request,step) idempotency key at the event store, so redelivery is a no-op and the whole batch retries safely. Per-record acceptance — one malformed record must not wedge the spool, so bad records are reported by index while the rest append (rejects are counted; a nonzero rate is a contract bug, and a rejected outcome still surfaces later via reconciliation). Admissions are enriched before appending, the one thing that can fail the whole batch — an unreadable database answers 500 rather than appending a guessed attribution.
-   */
-  secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
-    const parsed = spendCommandBatchSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(
-        {
-          error: {
-            type: "bad_request",
-            code: "invalid_batch",
-            message: "records[] of {command, payload, pod_id, pod_seq} required",
-          },
-        },
-        400,
-      );
-    }
+        const { perCommand, rejected } = groupSpendCommands(parsed.data.records, pipeline.rating);
 
-    const pipeline = ports.spend?.();
-    if (!pipeline) {
-      return c.json(
-        {
-          error: {
-            type: "unavailable",
-            code: "spend_pipeline_disabled",
-            message: "gateway spend pipeline is not registered (ClickHouse disabled)",
-          },
-        },
-        503,
-      );
-    }
+        await enrichAttributedCommands({
+          store: ports.store(),
+          admits: perCommand.admitSpend,
+          outcomes: [...perCommand.confirmSpend, ...perCommand.failSpend],
+        });
 
-    const { perCommand, rejected } = groupSpendCommands(parsed.data.records, pipeline.rating);
+        const unregistered = await sendSpendCommands(pipeline.commands, perCommand);
+        if (unregistered) {
+          return c.json(
+            {
+              error: {
+                type: "unavailable",
+                code: "spend_command_missing",
+                message: `command ${unregistered} is not registered`,
+              },
+            },
+            503,
+          );
+        }
 
-    await enrichAttributedCommands({
-      store: ports.store(),
-      admits: perCommand.admitSpend,
-      outcomes: [...perCommand.confirmSpend, ...perCommand.failSpend],
-    });
-
-    const unregistered = await sendSpendCommands(pipeline.commands, perCommand);
-    if (unregistered) {
-      return c.json(
-        {
-          error: {
-            type: "unavailable",
-            code: "spend_command_missing",
-            message: `command ${unregistered} is not registered`,
-          },
-        },
-        503,
-      );
-    }
-
-    return c.json({
-      accepted: parsed.data.records.length - rejected.length,
-      rejected,
-    });
-  });
-
-  /**
-   * Books a voice session and decides the key's open-session cap in the same transaction that inserts the row. The gateway calls this BEFORE minting and refuses the mint when this refuses — that ordering is what makes the cap real, since minting first would hand out a working credential before the count said no.
-   */
-  secured.access(gatewayPolicy()).post("/realtime-sessions", async (c) => {
-    const parsed = reserveRealtimeSessionSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(
-        {
-          error: {
-            type: "bad_request",
-            code: "invalid_reservation",
-            message: "a session reservation names the session, its tenancy, its key and its vendor",
-          },
-        },
-        400,
-      );
-    }
-    const body = parsed.data;
-    const realtimeSessions = ports.realtimeSessions?.();
-    if (!realtimeSessions) {
-      return c.json(realtimeSessionsUnavailable, 503);
-    }
-    const result = await realtimeSessionService.reserveRealtimeSession({
-      collaborators: realtimeSessions,
-      sessionId: body.session_id,
-      projectId: body.project_id,
-      organizationId: body.organization_id,
-      virtualKeyId: body.virtual_key_id,
-      modelProviderId: body.model_provider_id,
-      vendor: body.vendor,
-      agentId: body.agent_id,
-      model: body.model,
-      traceId: body.trace_id,
-      requestedModel: body.requested_model,
-    });
-    if (!result.ok) {
-      return c.json(
-        {
-          error: {
-            type: "rate_limited",
-            code: "realtime_session_limit",
-            message:
-              "this virtual key already holds the most realtime voice sessions it may keep open at once",
-            open: result.open,
-            limit: result.limit,
-          },
-        },
-        429,
-      );
-    }
-    return c.json({ session_id: body.session_id, status: "OPEN" });
-  });
-
-  /**
-   * Records the vendor's own conversation id on a booked session, or closes a
-   * booking whose mint never produced a credential.
-   */
-  secured.access(gatewayPolicy()).patch("/realtime-sessions/:session_id", async (c) => {
-    const parsed = patchRealtimeSessionSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(
-        {
-          error: {
-            type: "bad_request",
-            code: "invalid_session_patch",
-            message: "project_id is required, with a vendor_conversation_id or a terminal status",
-          },
-        },
-        400,
-      );
-    }
-    const sessionId = c.req.param("session_id");
-    const body = parsed.data;
-    const realtimeSessions = ports.realtimeSessions?.();
-    if (!realtimeSessions) {
-      return c.json(realtimeSessionsUnavailable, 503);
-    }
-    let applied = false;
-    if (body.vendor_conversation_id) {
-      applied = await realtimeSessionService.correlateRealtimeSession({
-        collaborators: realtimeSessions,
-        sessionId,
-        projectId: body.project_id,
-        vendorConversationId: body.vendor_conversation_id,
-      });
-    }
-    if (body.status) {
-      applied =
-        (await realtimeSessionService.releaseRealtimeSession({
+        return c.json({
+          accepted: parsed.data.records.length - rejected.length,
+          rejected,
+        });
+      },
+      (b) => policy(gatewayPolicy())(b).withRawResponse(GATEWAY_INTERNAL_ANSWER),
+    )
+    .registerRoute(
+      "post",
+      "/realtime-sessions",
+      MANAGEMENT_API_VERSION,
+      async (c) => {
+        const parsed = reserveRealtimeSessionSchema.safeParse(await c.req.json().catch(() => null));
+        if (!parsed.success) {
+          return c.json(
+            {
+              error: {
+                type: "bad_request",
+                code: "invalid_reservation",
+                message:
+                  "a session reservation names the session, its tenancy, its key and its vendor",
+              },
+            },
+            400,
+          );
+        }
+        const body = parsed.data;
+        const realtimeSessions = ports.realtimeSessions?.();
+        if (!realtimeSessions) {
+          return c.json(realtimeSessionsUnavailable, 503);
+        }
+        const result = await realtimeSessionService.reserveRealtimeSession({
+          collaborators: realtimeSessions,
+          sessionId: body.session_id,
+          projectId: body.project_id,
+          organizationId: body.organization_id,
+          virtualKeyId: body.virtual_key_id,
+          modelProviderId: body.model_provider_id,
+          vendor: body.vendor,
+          agentId: body.agent_id,
+          model: body.model,
+          traceId: body.trace_id,
+          requestedModel: body.requested_model,
+        });
+        if (!result.ok) {
+          return c.json(
+            {
+              error: {
+                type: "rate_limited",
+                code: "realtime_session_limit",
+                message:
+                  "this virtual key already holds the most realtime voice sessions it may keep open at once",
+                open: result.open,
+                limit: result.limit,
+              },
+            },
+            429,
+          );
+        }
+        return c.json({ session_id: body.session_id, status: "OPEN" });
+      },
+      (b) => policy(gatewayPolicy())(b).withRawResponse(GATEWAY_INTERNAL_ANSWER),
+    )
+    .registerRoute(
+      "patch",
+      "/realtime-sessions/:session_id",
+      MANAGEMENT_API_VERSION,
+      async (c, input: { session_id: string }) => {
+        const parsed = patchRealtimeSessionSchema.safeParse(await c.req.json().catch(() => null));
+        if (!parsed.success) {
+          return c.json(
+            {
+              error: {
+                type: "bad_request",
+                code: "invalid_session_patch",
+                message:
+                  "project_id is required, with a vendor_conversation_id or a terminal status",
+              },
+            },
+            400,
+          );
+        }
+        const sessionId = input.session_id;
+        const body = parsed.data;
+        const realtimeSessions = ports.realtimeSessions?.();
+        if (!realtimeSessions) {
+          return c.json(realtimeSessionsUnavailable, 503);
+        }
+        let applied = false;
+        if (body.vendor_conversation_id) {
+          applied = await realtimeSessionService.correlateRealtimeSession({
+            collaborators: realtimeSessions,
+            sessionId,
+            projectId: body.project_id,
+            vendorConversationId: body.vendor_conversation_id,
+          });
+        }
+        if (body.status) {
+          applied =
+            (await realtimeSessionService.releaseRealtimeSession({
+              collaborators: realtimeSessions,
+              sessionId,
+              projectId: body.project_id,
+              status: body.status,
+              reason: body.reason ?? "released by the gateway",
+            })) || applied;
+        }
+        if (!applied) {
+          return c.json(
+            {
+              error: {
+                type: "not_found",
+                code: "realtime_session_not_found",
+                message: "no session with that id belongs to this project",
+              },
+            },
+            404,
+          );
+        }
+        return c.json({ session_id: sessionId, updated: true });
+      },
+      (b) =>
+        policy(gatewayPolicy())(b)
+          .withParams(z.object({ session_id: z.string().min(1) }))
+          .withRawResponse(GATEWAY_INTERNAL_ANSWER),
+    )
+    .registerRoute(
+      "post",
+      "/realtime-sessions/:session_id/usage",
+      MANAGEMENT_API_VERSION,
+      async (c, input: { session_id: string }) => {
+        const parsed = reportRealtimeUsageSchema.safeParse(await c.req.json().catch(() => null));
+        if (!parsed.success) {
+          return c.json(
+            {
+              error: {
+                type: "bad_request",
+                code: "invalid_usage_report",
+                message:
+                  "project_id, virtual_key_id and a usage object of integer quantities are required",
+              },
+            },
+            400,
+          );
+        }
+        const sessionId = input.session_id;
+        const realtimeSessions = ports.realtimeSessions?.();
+        if (!realtimeSessions) {
+          return c.json(realtimeSessionsUnavailable, 503);
+        }
+        const outcome = await realtimeSessionService.reportRealtimeSessionUsage({
           collaborators: realtimeSessions,
           sessionId,
-          projectId: body.project_id,
-          status: body.status,
-          reason: body.reason ?? "released by the gateway",
-        })) || applied;
-    }
-    if (!applied) {
-      return c.json(
-        {
-          error: {
-            type: "not_found",
-            code: "realtime_session_not_found",
-            message: "no session with that id belongs to this project",
-          },
-        },
-        404,
-      );
-    }
-    return c.json({ session_id: sessionId, updated: true });
-  });
-
-  /**
-   * Closes an OpenAI voice session with the usage its socket reported. OpenAI reports usage over a socket running client-to-vendor, so the client posting it back is the only path those numbers reach billing; the gateway has already made audio and text counts disjoint.
-   */
-  secured.access(gatewayPolicy()).post("/realtime-sessions/:session_id/usage", async (c) => {
-    const parsed = reportRealtimeUsageSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json(
-        {
-          error: {
-            type: "bad_request",
-            code: "invalid_usage_report",
-            message:
-              "project_id, virtual_key_id and a usage object of integer quantities are required",
-          },
-        },
-        400,
-      );
-    }
-    const sessionId = c.req.param("session_id");
-    const realtimeSessions = ports.realtimeSessions?.();
-    if (!realtimeSessions) {
-      return c.json(realtimeSessionsUnavailable, 503);
-    }
-    const outcome = await realtimeSessionService.reportRealtimeSessionUsage({
-      collaborators: realtimeSessions,
-      sessionId,
-      projectId: parsed.data.project_id,
-      virtualKeyId: parsed.data.virtual_key_id,
-      usage: parsed.data.usage,
-    });
-    if (outcome === "not_found") {
-      return c.json(
-        {
-          error: {
-            type: "not_found",
-            code: "realtime_session_not_found",
-            message: "no session with that id belongs to this project",
-          },
-        },
-        404,
-      );
-    }
-    return c.json({ session_id: sessionId, status: "CLOSED" });
-  });
-
-  secured.access(gatewayPolicy()).get("/bootstrap", (c) => notImplemented(c));
-
-  return secured.hono;
+          projectId: parsed.data.project_id,
+          virtualKeyId: parsed.data.virtual_key_id,
+          usage: parsed.data.usage,
+        });
+        if (outcome === "not_found") {
+          return c.json(
+            {
+              error: {
+                type: "not_found",
+                code: "realtime_session_not_found",
+                message: "no session with that id belongs to this project",
+              },
+            },
+            404,
+          );
+        }
+        return c.json({ session_id: sessionId, status: "CLOSED" });
+      },
+      (b) =>
+        policy(gatewayPolicy())(b)
+          .withParams(z.object({ session_id: z.string().min(1) }))
+          .withRawResponse(GATEWAY_INTERNAL_ANSWER),
+    )
+    .registerRoute(
+      "get",
+      "/bootstrap",
+      MANAGEMENT_API_VERSION,
+      (c) => notImplemented(c),
+      (b) => policy(gatewayPolicy())(b).withRawResponse(GATEWAY_INTERNAL_ANSWER),
+    )
+    .build();
 }

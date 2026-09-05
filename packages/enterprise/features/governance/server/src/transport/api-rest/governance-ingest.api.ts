@@ -39,7 +39,14 @@
  * receiver-auth-rate-limit.feature.
  */
 import { handlerManagedAuth } from "@langwatch/api";
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import { z } from "zod";
+import {
+  type AppRestSecurity,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  type ServiceContext,
+} from "@langwatch/api/rest";
 import {
   type CanonicalCostEvent,
   type GovernanceIngestionSource,
@@ -388,7 +395,20 @@ export function createGovernanceIngestRestApp(options: {
   ports: GovernanceIngestRestPorts;
 }): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({ basePath: "/api/ingest" });
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "ingest",
+    basePath: "/api/ingest",
+    // An exporter is configured with `{base}/api/ingest/otel/{sourceId}` and
+    // appends OTLP's own suffix: the path is the contract, not a dated
+    // namespace.
+    staticGeneration: "v1",
+    errorEnvelope: "legacy",
+  });
+
+  /** Every answer here is the receiver's own, in OTLP's partial-success shape. */
+  const INGEST_ANSWER =
+    "an OTLP exporter reads this receiver's own bodies: the partial-success document, " +
+    "the { error, error_description } refusals and the 429 that carries Retry-After";
 
   const ingestAuth = handlerManagedAuth({
     reason: "ingestion source bearer secret resolved in-handler against IngestionSource",
@@ -462,92 +482,101 @@ export function createGovernanceIngestRestApp(options: {
   // the organization's hidden governance project, stamp origin metadata on
   // every span, and hand off to the existing trace pipeline with that project
   // as the tenant. The receiver never writes storage directly.
-  secured.access(ingestAuth).post("/otel/:sourceId", async (c) => {
-    const resolved = await resolveSource(c);
-    if ("refusal" in resolved) return resolved.refusal;
-    const { source } = resolved;
+  service.registerRoute(
+    "post",
+    "/otel/:sourceId",
+    MANAGEMENT_API_VERSION,
+    async (c: ServiceContext<EndpointVariables>) => {
+      const resolved = await resolveSource(c);
+      if ("refusal" in resolved) return resolved.refusal;
+      const { source } = resolved;
 
-    if (
-      source.sourceType !== "otel_generic" &&
-      source.sourceType !== "claude_cowork" &&
-      source.sourceType !== "claude_code"
-    ) {
-      return c.json(
-        {
-          error: "wrong_endpoint",
-          error_description:
-            "OTLP path is only valid for otel_generic, claude_cowork, and claude_code sources",
-        },
-        400,
-      );
-    }
-
-    let bodyBytes = 0;
-    let eventCount = 0;
-    let rejectedSpans = 0;
-    let parseHint: string | undefined;
-    try {
-      const body = await readOtlpBody(c.req.raw);
-      bodyBytes = body.byteLength;
-      const parsed = parseOtlpTraces(body, c.req.header("content-type"));
-      if (!parsed.ok) {
-        parseHint = parsed.error;
-      } else {
-        const spans = (parsed.request.resourceSpans ?? []).flatMap((rs) =>
-          (rs.scopeSpans ?? []).flatMap((ss) => ss.spans ?? []),
+      if (
+        source.sourceType !== "otel_generic" &&
+        source.sourceType !== "claude_cowork" &&
+        source.sourceType !== "claude_code"
+      ) {
+        return c.json(
+          {
+            error: "wrong_endpoint",
+            error_description:
+              "OTLP path is only valid for otel_generic, claude_cowork, and claude_code sources",
+          },
+          400,
         );
-        eventCount = spans.length;
-
-        if (eventCount > 0) {
-          const govProject = await ports.projects().ensureInternal({
-            organizationId: source.organizationId,
-            kind: "internal_governance",
-          });
-          stampOriginAttrs(parsed.request, source);
-          ports.keyProvenance.dropOnTraceRequest(parsed.request);
-          const result = await ports.traceCollection({
-            tenantId: govProject.id,
-            traceRequest: parsed.request,
-          });
-          rejectedSpans = result?.rejectedSpans ?? 0;
-        }
       }
-    } catch (err) {
-      parseHint = String(err);
-      logger.warn(
-        { sourceId: source.id, err: String(err) },
-        "otel ingest receive failed (still ack'ing)",
-      );
-    }
 
-    await ports.governance().ingestionSourceRecordEventReceived(source.id);
-    logger.info(
-      {
-        sourceId: source.id,
-        sourceType: source.sourceType,
+      let bodyBytes = 0;
+      let eventCount = 0;
+      let rejectedSpans = 0;
+      let parseHint: string | undefined;
+      try {
+        const body = await readOtlpBody(c.req.raw);
+        bodyBytes = body.byteLength;
+        const parsed = parseOtlpTraces(body, c.req.header("content-type"));
+        if (!parsed.ok) {
+          parseHint = parsed.error;
+        } else {
+          const spans = (parsed.request.resourceSpans ?? []).flatMap((rs) =>
+            (rs.scopeSpans ?? []).flatMap((ss) => ss.spans ?? []),
+          );
+          eventCount = spans.length;
+
+          if (eventCount > 0) {
+            const govProject = await ports.projects().ensureInternal({
+              organizationId: source.organizationId,
+              kind: "internal_governance",
+            });
+            stampOriginAttrs(parsed.request, source);
+            ports.keyProvenance.dropOnTraceRequest(parsed.request);
+            const result = await ports.traceCollection({
+              tenantId: govProject.id,
+              traceRequest: parsed.request,
+            });
+            rejectedSpans = result?.rejectedSpans ?? 0;
+          }
+        }
+      } catch (err) {
+        parseHint = String(err);
+        logger.warn(
+          { sourceId: source.id, err: String(err) },
+          "otel ingest receive failed (still ack'ing)",
+        );
+      }
+
+      await ports.governance().ingestionSourceRecordEventReceived(source.id);
+      logger.info(
+        {
+          sourceId: source.id,
+          sourceType: source.sourceType,
+          bytes: bodyBytes,
+          events: eventCount,
+          rejectedSpans,
+        },
+        "otel ingest landed in unified trace pipeline",
+      );
+
+      const responseBody: Record<string, unknown> = {
+        accepted: true,
         bytes: bodyBytes,
         events: eventCount,
-        rejectedSpans,
-      },
-      "otel ingest landed in unified trace pipeline",
-    );
-
-    const responseBody: Record<string, unknown> = {
-      accepted: true,
-      bytes: bodyBytes,
-      events: eventCount,
-    };
-    if (rejectedSpans > 0) responseBody.rejectedSpans = rejectedSpans;
-    if (eventCount === 0 && (parseHint || bodyBytes > 0)) {
-      responseBody.hint = parseHint
-        ? `Body did not parse as OTLP/HTTP: ${parseHint}. See https://docs.langwatch.ai/observability/trace-vs-activity-ingestion for the canonical shape.`
-        : "Body received but no spans extracted. OTLP/HTTP expects " +
-          "resource_spans[].scope_spans[].spans[] with non-empty spans " +
-          "arrays. See https://docs.langwatch.ai/ai-gateway/governance/" +
-          "ingestion-sources/otel-generic for a copy-paste curl.";
-    }
-    return c.json(responseBody, 202);
-  });
+      };
+      if (rejectedSpans > 0) responseBody.rejectedSpans = rejectedSpans;
+      if (eventCount === 0 && (parseHint || bodyBytes > 0)) {
+        responseBody.hint = parseHint
+          ? `Body did not parse as OTLP/HTTP: ${parseHint}. See https://docs.langwatch.ai/observability/trace-vs-activity-ingestion for the canonical shape.`
+          : "Body received but no spans extracted. OTLP/HTTP expects " +
+            "resource_spans[].scope_spans[].spans[] with non-empty spans " +
+            "arrays. See https://docs.langwatch.ai/ai-gateway/governance/" +
+            "ingestion-sources/otel-generic for a copy-paste curl.";
+      }
+      return c.json(responseBody, 202);
+    },
+    (b) =>
+      policy(ingestAuth)(b)
+        .withParams(z.object({ sourceId: z.string().min(1) }))
+        .withRawResponse(INGEST_ANSWER),
+  );
 
   const logCollection = ports.logCollection;
   if (logCollection) {
@@ -557,67 +586,76 @@ export function createGovernanceIngestRestApp(options: {
     // no parent-child tree — and handed to the existing log pipeline. Same
     // store, same drill-down; the origin metadata is what separates it from
     // application logs.
-    secured.access(ingestAuth).post("/webhook/:sourceId", async (c) => {
-      const resolved = await resolveSource(c);
-      if ("refusal" in resolved) return resolved.refusal;
-      const { source } = resolved;
+    service.registerRoute(
+      "post",
+      "/webhook/:sourceId",
+      MANAGEMENT_API_VERSION,
+      async (c: ServiceContext<EndpointVariables>) => {
+        const resolved = await resolveSource(c);
+        if ("refusal" in resolved) return resolved.refusal;
+        const { source } = resolved;
 
-      if (
-        source.sourceType !== "workato" &&
-        source.sourceType !== "otel_generic" &&
-        source.sourceType !== "s3_custom"
-      ) {
-        return c.json(
-          {
-            error: "wrong_endpoint",
-            error_description:
-              "Webhook path is only valid for workato, otel_generic, and s3_custom (callback-mode) sources",
-          },
-          400,
-        );
-      }
-
-      let bodyBytes = 0;
-      let envelopeId = "";
-      let handoffOk = false;
-      try {
-        const raw = await c.req.text();
-        bodyBytes = raw.length;
-        envelopeId = `envelope-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-
-        if (bodyBytes > 0) {
-          const govProject = await ports.projects().ensureInternal({
-            organizationId: source.organizationId,
-            kind: "internal_governance",
-          });
-          await logCollection({
-            tenantId: govProject.id,
-            organizationId: source.organizationId,
-            logRequest: buildWebhookLogRequest(raw, source),
-          });
-          handoffOk = true;
+        if (
+          source.sourceType !== "workato" &&
+          source.sourceType !== "otel_generic" &&
+          source.sourceType !== "s3_custom"
+        ) {
+          return c.json(
+            {
+              error: "wrong_endpoint",
+              error_description:
+                "Webhook path is only valid for workato, otel_generic, and s3_custom (callback-mode) sources",
+            },
+            400,
+          );
         }
-      } catch (err) {
-        logger.warn(
-          { sourceId: source.id, err: String(err) },
-          "webhook ingest receive failed (still ack'ing)",
+
+        let bodyBytes = 0;
+        let envelopeId = "";
+        let handoffOk = false;
+        try {
+          const raw = await c.req.text();
+          bodyBytes = raw.length;
+          envelopeId = `envelope-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+          if (bodyBytes > 0) {
+            const govProject = await ports.projects().ensureInternal({
+              organizationId: source.organizationId,
+              kind: "internal_governance",
+            });
+            await logCollection({
+              tenantId: govProject.id,
+              organizationId: source.organizationId,
+              logRequest: buildWebhookLogRequest(raw, source),
+            });
+            handoffOk = true;
+          }
+        } catch (err) {
+          logger.warn(
+            { sourceId: source.id, err: String(err) },
+            "webhook ingest receive failed (still ack'ing)",
+          );
+        }
+
+        await ports.governance().ingestionSourceRecordEventReceived(source.id);
+        logger.info(
+          {
+            sourceId: source.id,
+            sourceType: source.sourceType,
+            bytes: bodyBytes,
+            envelopeId,
+            handoffOk,
+          },
+          "webhook ingest landed in unified log pipeline",
         );
-      }
 
-      await ports.governance().ingestionSourceRecordEventReceived(source.id);
-      logger.info(
-        {
-          sourceId: source.id,
-          sourceType: source.sourceType,
-          bytes: bodyBytes,
-          envelopeId,
-          handoffOk,
-        },
-        "webhook ingest landed in unified log pipeline",
-      );
-
-      return c.json({ accepted: true, bytes: bodyBytes, eventId: envelopeId }, 202);
-    });
+        return c.json({ accepted: true, bytes: bodyBytes, eventId: envelopeId }, 202);
+      },
+      (b) =>
+        policy(ingestAuth)(b)
+          .withParams(z.object({ sourceId: z.string().min(1) }))
+          .withRawResponse(INGEST_ANSWER),
+    );
 
     // ---------- POST /api/ingest/otel/:sourceId/v1/logs ----------
     // OTLP-emitting tools post per-request events on the standard sub-path: an
@@ -625,103 +663,112 @@ export function createGovernanceIngestRestApp(options: {
     // appends the suffix. Two things happen: the records reach the log
     // pipeline for forensics, and the cost events inside them are priced into
     // the ledger so budgets and anomaly rules fire on third-party traffic.
-    secured.access(ingestAuth).post("/otel/:sourceId/v1/logs", async (c) => {
-      const resolved = await resolveSource(c);
-      if ("refusal" in resolved) return resolved.refusal;
-      const { source } = resolved;
+    service.registerRoute(
+      "post",
+      "/otel/:sourceId/v1/logs",
+      MANAGEMENT_API_VERSION,
+      async (c: ServiceContext<EndpointVariables>) => {
+        const resolved = await resolveSource(c);
+        if ("refusal" in resolved) return resolved.refusal;
+        const { source } = resolved;
 
-      let bodyBytes = 0;
-      let logRecordCount = 0;
-      let costEventCount = 0;
-      let ledgerRowsWritten = 0;
-      let parseHint: string | undefined;
+        let bodyBytes = 0;
+        let logRecordCount = 0;
+        let costEventCount = 0;
+        let ledgerRowsWritten = 0;
+        let parseHint: string | undefined;
 
-      try {
-        const body = await readOtlpBody(c.req.raw);
-        bodyBytes = body.byteLength;
-        const contentType = c.req.header("content-type");
-        const parsed = parseOtlpLogs(body, contentType);
-        if (!parsed.ok) {
-          parseHint = parsed.error;
-        } else {
-          logRecordCount = (parsed.request.resourceLogs ?? []).reduce(
-            (acc, rl) =>
-              acc + (rl.scopeLogs ?? []).reduce((a, sl) => a + (sl.logRecords?.length ?? 0), 0),
-            0,
-          );
+        try {
+          const body = await readOtlpBody(c.req.raw);
+          bodyBytes = body.byteLength;
+          const contentType = c.req.header("content-type");
+          const parsed = parseOtlpLogs(body, contentType);
+          if (!parsed.ok) {
+            parseHint = parsed.error;
+          } else {
+            logRecordCount = (parsed.request.resourceLogs ?? []).reduce(
+              (acc, rl) =>
+                acc + (rl.scopeLogs ?? []).reduce((a, sl) => a + (sl.logRecords?.length ?? 0), 0),
+              0,
+            );
 
-          if (logRecordCount > 0) {
-            const govProject = await ports.projects().ensureInternal({
-              organizationId: source.organizationId,
-              kind: "internal_governance",
-            });
-            stampLogOriginAttrs(parsed.request, source);
-            ports.keyProvenance.dropOnLogRequest(parsed.request);
-            try {
-              await logCollection({
-                tenantId: govProject.id,
+            if (logRecordCount > 0) {
+              const govProject = await ports.projects().ensureInternal({
                 organizationId: source.organizationId,
-                logRequest: parsed.request,
+                kind: "internal_governance",
               });
-            } catch (handoffErr) {
-              logger.warn(
-                { sourceId: source.id, err: String(handoffErr) },
-                "log pipeline handoff failed (cost extraction continues)",
-              );
-            }
+              stampLogOriginAttrs(parsed.request, source);
+              ports.keyProvenance.dropOnLogRequest(parsed.request);
+              try {
+                await logCollection({
+                  tenantId: govProject.id,
+                  organizationId: source.organizationId,
+                  logRequest: parsed.request,
+                });
+              } catch (handoffErr) {
+                logger.warn(
+                  { sourceId: source.id, err: String(handoffErr) },
+                  "log pipeline handoff failed (cost extraction continues)",
+                );
+              }
 
-            const events = await extractCostEventsForSource({
-              source,
-              parsed: parsed.request,
-              rawBody: body,
-              contentType,
-              governance: ports.governance(),
-            });
-            costEventCount = events.length;
-
-            const spend = ports.spend;
-            if (events.length > 0 && spend) {
-              ledgerRowsWritten += await priceCostEvents({
-                events,
+              const events = await extractCostEventsForSource({
                 source,
-                spend,
-                directory: ports.directory(),
-                governanceProjectId: govProject.id,
+                parsed: parsed.request,
+                rawBody: body,
+                contentType,
+                governance: ports.governance(),
               });
+              costEventCount = events.length;
+
+              const spend = ports.spend;
+              if (events.length > 0 && spend) {
+                ledgerRowsWritten += await priceCostEvents({
+                  events,
+                  source,
+                  spend,
+                  directory: ports.directory(),
+                  governanceProjectId: govProject.id,
+                });
+              }
             }
           }
+        } catch (err) {
+          parseHint = String(err);
+          logger.warn(
+            { sourceId: source.id, err: String(err) },
+            "otel logs ingest receive failed (still ack'ing)",
+          );
         }
-      } catch (err) {
-        parseHint = String(err);
-        logger.warn(
-          { sourceId: source.id, err: String(err) },
-          "otel logs ingest receive failed (still ack'ing)",
-        );
-      }
 
-      await ports.governance().ingestionSourceRecordEventReceived(source.id);
-      logger.info(
-        {
-          sourceId: source.id,
-          sourceType: source.sourceType,
+        await ports.governance().ingestionSourceRecordEventReceived(source.id);
+        logger.info(
+          {
+            sourceId: source.id,
+            sourceType: source.sourceType,
+            bytes: bodyBytes,
+            logRecords: logRecordCount,
+            costEvents: costEventCount,
+            ledgerRows: ledgerRowsWritten,
+          },
+          "otel logs ingest landed",
+        );
+
+        const responseBody: Record<string, unknown> = {
+          accepted: true,
           bytes: bodyBytes,
           logRecords: logRecordCount,
           costEvents: costEventCount,
           ledgerRows: ledgerRowsWritten,
-        },
-        "otel logs ingest landed",
-      );
-
-      const responseBody: Record<string, unknown> = {
-        accepted: true,
-        bytes: bodyBytes,
-        logRecords: logRecordCount,
-        costEvents: costEventCount,
-        ledgerRows: ledgerRowsWritten,
-      };
-      if (parseHint) responseBody.hint = parseHint;
-      return c.json(responseBody, 202);
-    });
+        };
+        if (parseHint) responseBody.hint = parseHint;
+        return c.json(responseBody, 202);
+      },
+      (b) =>
+        policy(ingestAuth)(b)
+          .withParams(z.object({ sourceId: z.string().min(1) }))
+          .withRawResponse(INGEST_ANSWER),
+    );
   }
 
   const metricCollection = ports.metricCollection;
@@ -777,76 +824,85 @@ export function createGovernanceIngestRestApp(options: {
     };
 
     // ---------- POST /api/ingest/otel/:sourceId/v1/metrics ----------
-    secured.access(ingestAuth).post("/otel/:sourceId/v1/metrics", async (c) => {
-      const resolved = await resolveSource(c);
-      if ("refusal" in resolved) return resolved.refusal;
-      const { source } = resolved;
+    service.registerRoute(
+      "post",
+      "/otel/:sourceId/v1/metrics",
+      MANAGEMENT_API_VERSION,
+      async (c: ServiceContext<EndpointVariables>) => {
+        const resolved = await resolveSource(c);
+        if ("refusal" in resolved) return resolved.refusal;
+        const { source } = resolved;
 
-      let bodyBytes = 0;
-      let metricCount = 0;
-      let rejectedDataPoints = 0;
-      let acceptedDataPoints = 0;
-      let parseHint: string | undefined;
-      try {
-        const body = await readOtlpBody(c.req.raw);
-        bodyBytes = body.byteLength;
-        const parsed = parseOtlpMetrics(body, c.req.header("content-type"));
-        if (!parsed.ok) {
-          parseHint = parsed.error;
-        } else {
-          metricCount = countMetricDataPoints(parsed.request);
-          // Gate on the payload carrying metrics AT ALL, not on its data-point
-          // arrays being well-formed: a request whose metrics all have
-          // malformed data points has a zero pre-count, and skipping
-          // validation would acknowledge it as fully accepted with nothing
-          // rejected.
-          const resourceMetrics = parsed.request.resourceMetrics;
-          const hasMetricPayload = Array.isArray(resourceMetrics)
-            ? resourceMetrics.length > 0
-            : resourceMetrics != null;
-          if (hasMetricPayload) {
-            // Scoped away from the outer catch, which turns anything it sees
-            // into a `hint` on a 202. Past parsing, a throw is no longer the
-            // sender's bad payload — it is ours, and acknowledging it drops
-            // the batch for good.
-            const collected = await collectParsedMetrics(parsed.request, source);
-            if (collected.outcome === "unavailable") {
-              return c.json({ accepted: false, error: collected.errorMessage }, 503);
+        let bodyBytes = 0;
+        let metricCount = 0;
+        let rejectedDataPoints = 0;
+        let acceptedDataPoints = 0;
+        let parseHint: string | undefined;
+        try {
+          const body = await readOtlpBody(c.req.raw);
+          bodyBytes = body.byteLength;
+          const parsed = parseOtlpMetrics(body, c.req.header("content-type"));
+          if (!parsed.ok) {
+            parseHint = parsed.error;
+          } else {
+            metricCount = countMetricDataPoints(parsed.request);
+            // Gate on the payload carrying metrics AT ALL, not on its data-point
+            // arrays being well-formed: a request whose metrics all have
+            // malformed data points has a zero pre-count, and skipping
+            // validation would acknowledge it as fully accepted with nothing
+            // rejected.
+            const resourceMetrics = parsed.request.resourceMetrics;
+            const hasMetricPayload = Array.isArray(resourceMetrics)
+              ? resourceMetrics.length > 0
+              : resourceMetrics != null;
+            if (hasMetricPayload) {
+              // Scoped away from the outer catch, which turns anything it sees
+              // into a `hint` on a 202. Past parsing, a throw is no longer the
+              // sender's bad payload — it is ours, and acknowledging it drops
+              // the batch for good.
+              const collected = await collectParsedMetrics(parsed.request, source);
+              if (collected.outcome === "unavailable") {
+                return c.json({ accepted: false, error: collected.errorMessage }, 503);
+              }
+              if (collected.outcome === "error") {
+                return c.json({ accepted: false, error: "failed to record data point" }, 503);
+              }
+              rejectedDataPoints = collected.rejectedDataPoints;
+              acceptedDataPoints = collected.acceptedDataPoints;
+              parseHint = collected.parseHint;
             }
-            if (collected.outcome === "error") {
-              return c.json({ accepted: false, error: "failed to record data point" }, 503);
-            }
-            rejectedDataPoints = collected.rejectedDataPoints;
-            acceptedDataPoints = collected.acceptedDataPoints;
-            parseHint = collected.parseHint;
           }
+        } catch (err) {
+          parseHint = String(err);
         }
-      } catch (err) {
-        parseHint = String(err);
-      }
 
-      await ports.governance().ingestionSourceRecordEventReceived(source.id);
-      logger.info(
-        { sourceId: source.id, bytes: bodyBytes, metrics: metricCount },
-        "otel metrics ingest landed",
-      );
+        await ports.governance().ingestionSourceRecordEventReceived(source.id);
+        logger.info(
+          { sourceId: source.id, bytes: bodyBytes, metrics: metricCount },
+          "otel metrics ingest landed",
+        );
 
-      const responseBody: Record<string, unknown> = {
-        accepted: true,
-        bytes: bodyBytes,
-        metrics: metricCount,
-        acceptedDataPoints,
-        partialSuccess: {
-          rejectedDataPoints,
-          ...(parseHint ? { errorMessage: parseHint } : {}),
-        },
-      };
-      if (parseHint) responseBody.hint = parseHint;
-      return c.json(responseBody, 202);
-    });
+        const responseBody: Record<string, unknown> = {
+          accepted: true,
+          bytes: bodyBytes,
+          metrics: metricCount,
+          acceptedDataPoints,
+          partialSuccess: {
+            rejectedDataPoints,
+            ...(parseHint ? { errorMessage: parseHint } : {}),
+          },
+        };
+        if (parseHint) responseBody.hint = parseHint;
+        return c.json(responseBody, 202);
+      },
+      (b) =>
+        policy(ingestAuth)(b)
+          .withParams(z.object({ sourceId: z.string().min(1) }))
+          .withRawResponse(INGEST_ANSWER),
+    );
   }
 
-  return secured.hono;
+  return service.build();
 }
 
 /** Every data point in a metrics export, across all five point shapes. */

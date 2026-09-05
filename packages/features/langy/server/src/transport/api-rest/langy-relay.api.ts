@@ -3,7 +3,13 @@
  * relay service).
  */
 
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import {
+  type AppRestSecurity,
+  MANAGEMENT_API_VERSION,
+  type EndpointVariables,
+  type MountableRestApp,
+  type ServiceContext,
+} from "@langwatch/api/rest";
 import type { LangyRelayConnection } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 
@@ -44,8 +50,14 @@ export function createLangyRelayRestApp(options: {
   ports: LangyRelayRestPorts;
 }): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({
+
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "langy-relay",
     basePath: "/api/internal/langy",
+    // The worker dials this exact path; a control plane between two halves of
+    // one deployment has no dated contract to negotiate.
+    staticGeneration: "v1",
+    errorEnvelope: "legacy",
     verifySecret: verifyLangyInternalSecret(ports.internalSecret),
   });
 
@@ -54,7 +66,7 @@ export function createLangyRelayRestApp(options: {
    * frames. Responds once the stream ends (fire-and-forget frames need no
    * per-frame ack; the dedup set makes redelivery safe), with a tally.
    */
-  secured.access(langyInternalPolicy()).post("/relay/frames", async (c) => {
+  const framesHandler = async (c: ServiceContext<EndpointVariables>) => {
     // No Redis ⇒ no live buffer and no dedup set; refuse rather than silently
     // dropping the turn's live edge.
     if (!ports.hasLiveBuffer()) {
@@ -110,9 +122,16 @@ export function createLangyRelayRestApp(options: {
     logger.info({ ...tally, ...relay.pinnedTurn }, "langy relay stream closed");
 
     return c.json(tally, 200);
-  });
+  };
 
-  return secured.hono;
+  return service
+    .registerRoute("post", "/relay/frames", MANAGEMENT_API_VERSION, framesHandler, (b) =>
+      policy(langyInternalPolicy())(b).withRawResponse(
+        "the worker streams ndjson frames in and reads the tally back; the body is " +
+          "consumed as a stream by the relay itself, so nothing may parse it first",
+      ),
+    )
+    .build();
 }
 
 async function applyLine(

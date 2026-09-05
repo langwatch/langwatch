@@ -16,7 +16,13 @@
  * organization with a matching SSO domain.
  */
 import { internalSecret } from "@langwatch/api";
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import {
+  type AppRestSecurity,
+  MANAGEMENT_API_VERSION,
+  type EndpointVariables,
+  type MountableRestApp,
+  type ServiceContext,
+} from "@langwatch/api/rest";
 
 import { ScimWebhookApi } from "./scim-webhook.api";
 import {
@@ -77,53 +83,69 @@ export function createScimWebhookRestApp(options: {
   ports: ScimWebhookRestPorts;
 }): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({ basePath: "/api/webhooks" });
+
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "scim-webhook",
+    basePath: "/api/webhooks",
+    // Auth0 holds this exact URL; a provider callback has no dated contract to
+    // negotiate.
+    staticGeneration: "v1",
+    errorEnvelope: "legacy",
+  });
   const scimWebhookApi = ScimWebhookApi.create();
   const replays = new ScimWebhookReplayWindow();
   const clock = ports.now ?? (() => new Date());
 
-  secured
-    .access(
-      internalSecret(
-        "auth0 SCIM webhook: signed with the deployment secret, tenanted by the presented SCIM token",
-      ),
-    )
-    .post("/auth0-scim", async (c) => {
-      const secret = ports.webhookSecret();
-      if (!secret) return c.json({ error: "Webhook not configured" }, { status: 404 });
+  const intakeHandler = async (c: ServiceContext<EndpointVariables>, input: { body: string }) => {
+    const secret = ports.webhookSecret();
+    if (!secret) return c.json({ error: "Webhook not configured" }, { status: 404 });
 
-      const raw = await c.req.text();
-      const nowSeconds = Math.floor(clock().getTime() / 1000);
-      const signature = verifyScimWebhookSignature({
-        secret,
-        body: raw,
-        header: c.req.header(SCIM_WEBHOOK_SIGNATURE_HEADER),
-        nowSeconds,
-      });
-      if (!signature.verified) return c.json({ error: "Unauthorized" }, { status: 401 });
-      if (!replays.claim(signature.nonce, nowSeconds))
-        return c.json({ error: "Unauthorized" }, { status: 401 });
-
-      const token = bearerToken(c.req.header("authorization"));
-      if (!token) return c.json({ error: "Unauthorized" }, { status: 401 });
-      const entitlement = await ports.scim().verifyToken({ token });
-      if (entitlement.status === "invalid_token")
-        return c.json({ error: "Unauthorized" }, { status: 401 });
-      if (entitlement.status !== "ok") return c.json({ error: "Forbidden" }, { status: 403 });
-
-      let body: unknown;
-      try {
-        body = JSON.parse(raw);
-      } catch {
-        return c.json({ error: "Invalid JSON" }, { status: 400 });
-      }
-      await scimWebhookApi.handle({
-        service: ports.scim(),
-        organizationId: entitlement.organizationId,
-        events: Array.isArray(body) ? body : [body],
-      });
-      return c.json({ received: true });
+    const raw = input.body;
+    const nowSeconds = Math.floor(clock().getTime() / 1000);
+    const signature = verifyScimWebhookSignature({
+      secret,
+      body: raw,
+      header: c.req.header(SCIM_WEBHOOK_SIGNATURE_HEADER),
+      nowSeconds,
     });
+    if (!signature.verified) return c.json({ error: "Unauthorized" }, { status: 401 });
+    if (!replays.claim(signature.nonce, nowSeconds))
+      return c.json({ error: "Unauthorized" }, { status: 401 });
 
-  return secured.hono;
+    const token = bearerToken(c.req.header("authorization"));
+    if (!token) return c.json({ error: "Unauthorized" }, { status: 401 });
+    const entitlement = await ports.scim().verifyToken({ token });
+    if (entitlement.status === "invalid_token")
+      return c.json({ error: "Unauthorized" }, { status: 401 });
+    if (entitlement.status !== "ok") return c.json({ error: "Forbidden" }, { status: 403 });
+
+    let body: unknown;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return c.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+    await scimWebhookApi.handle({
+      service: ports.scim(),
+      organizationId: entitlement.organizationId,
+      events: Array.isArray(body) ? body : [body],
+    });
+    return c.json({ received: true });
+  };
+
+  return service
+    .registerRoute("post", "/auth0-scim", MANAGEMENT_API_VERSION, intakeHandler, (b) =>
+      policy(
+        internalSecret(
+          "auth0 SCIM webhook: signed with the deployment secret, tenanted by the presented SCIM token",
+        ),
+      )(b)
+        // The HMAC is computed over these exact characters.
+        .withRawBody("text")
+        .withRawResponse(
+          "the intake keeps its own bodies: 404 for an install with no secret, 401/403 " +
+            "for a refused delivery, { received: true } for an accepted one",
+        ),
+    )
+    .build();
 }

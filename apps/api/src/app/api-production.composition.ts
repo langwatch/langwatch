@@ -1504,7 +1504,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         (createGatewayPlatformRestApp({
           security: restSecurity,
           gateway: () => gatewayApp,
-        }).hono as unknown as Hono)
+        }) as unknown as Hono)
       : undefined;
     // The billing reconciliation family, over the SAME spend ledger the gateway
     // application prices a budget against. Mounted beside the platform family

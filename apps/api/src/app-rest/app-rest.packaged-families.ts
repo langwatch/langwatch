@@ -373,7 +373,7 @@ export function mountApiPackagedRestFamilies(options: {
             security,
             agents,
             agentPlatformUrl: ports.agentPlatformUrl,
-          }).hono
+          })
       : null,
   );
 
@@ -390,7 +390,7 @@ export function mountApiPackagedRestFamilies(options: {
             agents,
             agentPlatformUrl: ports.agentPlatformUrl,
             ...(agentsV1 ? agentsV1() : {}),
-          }).hono
+          })
       : null,
   );
 
@@ -404,7 +404,7 @@ export function mountApiPackagedRestFamilies(options: {
             security,
             app: codingAgents,
             audit: codingAgentAudit,
-          }).hono
+          })
       : null,
   );
 
@@ -421,7 +421,7 @@ export function mountApiPackagedRestFamilies(options: {
             security,
             app: codingAgents,
             audit: codingAgentAudit,
-          }).hono
+          })
       : null,
   );
 
@@ -464,14 +464,14 @@ export function mountApiPackagedRestFamilies(options: {
             app: evaluators,
             platformUrl: ports.platformUrl,
             organizationMiddleware: ports.organizationMiddleware,
-          }).hono
+          })
       : null,
   );
 
   const experiments = services.experiments;
   mount(
     "experiments",
-    experiments ? () => createExperimentsRestApp({ security, app: experiments }).hono : null,
+    experiments ? () => createExperimentsRestApp({ security, app: experiments }) : null,
   );
 
   const storedObjects = services.storedObjects;
@@ -531,7 +531,7 @@ export function mountApiPackagedRestFamilies(options: {
     "model-providers",
     modelProviders && organizations
       ? () => [
-          createModelDefaultsRestApp({ security, modelProviders }).hono,
+          createModelDefaultsRestApp({ security, modelProviders }),
           createModelProvidersRestApp({ security, modelProviders, organizations }),
         ]
       : null,
@@ -547,7 +547,7 @@ export function mountApiPackagedRestFamilies(options: {
             app: monitors,
             platformUrl: ports.platformUrl,
             mappingsSchema: ports.monitorMappingsSchema,
-          }).hono
+          })
       : null,
   );
 
@@ -622,7 +622,7 @@ export function mountApiPackagedRestFamilies(options: {
             traceUsageGuard: ports.traceUsageGuard,
             bodyLimit,
             platformUrl: ports.platformUrl,
-          }).hono
+          })
       : null,
   );
 
@@ -630,7 +630,7 @@ export function mountApiPackagedRestFamilies(options: {
   mount(
     "scenarios",
     scenarios
-      ? () => createScenariosRestApp({ security, scenarios, platformUrl: ports.platformUrl }).hono
+      ? () => createScenariosRestApp({ security, scenarios, platformUrl: ports.platformUrl })
       : null,
   );
 
@@ -659,7 +659,7 @@ export function mountApiPackagedRestFamilies(options: {
             security,
             simulations,
             scenarioRunPlatformUrl: ports.scenarioRunPlatformUrl,
-          }).hono
+          })
       : null,
   );
 
@@ -681,7 +681,7 @@ export function mountApiPackagedRestFamilies(options: {
   mount(
     "suites",
     suites
-      ? () => createSuiteRestApp({ security, suites, platformUrl: ports.platformUrl }).hono
+      ? () => createSuiteRestApp({ security, suites, platformUrl: ports.platformUrl })
       : null,
   );
   // The published families a run plan and a test suite each own — `suites`
@@ -691,13 +691,13 @@ export function mountApiPackagedRestFamilies(options: {
   mount(
     "run-plans",
     suites
-      ? () => createRunPlansV1RestApp({ security, suites, platformUrl: ports.platformUrl }).hono
+      ? () => createRunPlansV1RestApp({ security, suites, platformUrl: ports.platformUrl })
       : null,
   );
   mount(
     "test-suites",
     suites
-      ? () => createTestSuitesV1RestApp({ security, suites, platformUrl: ports.platformUrl }).hono
+      ? () => createTestSuitesV1RestApp({ security, suites, platformUrl: ports.platformUrl })
       : null,
   );
 
@@ -728,7 +728,7 @@ export function mountApiPackagedRestFamilies(options: {
           const canonical = createEventsRestApp({
             security,
             ports: trackedEvents(),
-          }).hono as unknown as MountableRestApp;
+          });
           return [canonical, mountTrackedEventLegacyPathRest({ canonical })];
         }
       : null,
@@ -758,7 +758,7 @@ export function mountApiPackagedRestFamilies(options: {
             security,
             webhooks,
             canonicalError: ports.canonicalError,
-          }).hono
+          })
       : null,
   );
 
@@ -775,7 +775,7 @@ export function mountApiPackagedRestFamilies(options: {
               requireApiKeyPermission: ports.requireApiKeyPermission,
               triggerEvaluation: ports.triggerWorkflowEvaluation,
             },
-          }).hono
+          })
       : null,
   );
 

@@ -3,7 +3,11 @@
  */
 
 import { internalSecret, isInternalSecretValid } from "@langwatch/api";
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import {
+  type AppRestSecurity,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+} from "@langwatch/api/rest";
 import { ValidationError } from "@langwatch/handled-error";
 import { type CliToolResult, cliToolResultSchema } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
@@ -116,17 +120,25 @@ export function createLangyInternalRestApp(options: {
   ports: LangyInternalRestPorts;
 }): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({
+
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "langy-internal",
     basePath: "/api/internal/langy",
+    // The Go agent calls these exact paths; a control plane between two halves
+    // of one deployment has no dated contract to negotiate.
+    staticGeneration: "v1",
+    errorEnvelope: "legacy",
     verifySecret: verifyLangyInternalSecret(ports.internalSecret),
   });
+
+  const internal = policy(langyInternalPolicy());
 
   /**
    * The agent's durable final for a turn. Idempotent on `turnId`: re-posting the same final
    * (the agent's bounded retry, or a final the relay already recorded) collapses to one event
    * at the store.
    */
-  secured.access(langyInternalPolicy()).post("/turn/:turnId/result", async (c) => {
+  const turnResultHandler = async (c: Context) => {
     const turnId = c.req.param("turnId");
     if (!turnId) {
       throw new ValidationError("turnId is required", {
@@ -187,7 +199,7 @@ export function createLangyInternalRestApp(options: {
     );
 
     return c.json({ status: "accepted" }, 202);
-  });
+  };
 
   // ── credentials/revoke (relocated from /api/langy) ────────────────────────
 
@@ -196,7 +208,7 @@ export function createLangyInternalRestApp(options: {
    * app can only revoke — never mint — keeping the trust boundary where it was.
    * `revokeWorkerSessionKey` refuses any key that is not a Langy session key.
    */
-  secured.access(langyInternalPolicy()).post("/credentials/revoke", async (c) => {
+  const revokeHandler = async (c: Context) => {
     const parsed = revokeCredentialsSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) {
       throw ValidationError.fromZodError(parsed.error);
@@ -224,7 +236,22 @@ export function createLangyInternalRestApp(options: {
         ports.metrics.sessionKeyRevokeRefused();
         return c.json({ error: "Not a Langy session key" }, 403);
     }
-  });
+  };
 
-  return secured.hono;
+  return service
+    .registerRoute("post", "/turn/:turnId/result", MANAGEMENT_API_VERSION, turnResultHandler, (b) =>
+      internal(b)
+        .withParams(z.object({ turnId: z.string().min(1) }))
+        .withRawResponse(
+          "the agent reads the ingest's own statuses: 202 accepted, 404 for an " +
+            "unknown (project, conversation, turn) triple",
+        ),
+    )
+    .registerRoute("post", "/credentials/revoke", MANAGEMENT_API_VERSION, revokeHandler, (b) =>
+      internal(b).withRawResponse(
+        "the manager reads the revoke outcome and its status: 200 revoked or already " +
+          "revoked, 404 not found (treated as success), 403 for a key that is not ours",
+      ),
+    )
+    .build();
 }

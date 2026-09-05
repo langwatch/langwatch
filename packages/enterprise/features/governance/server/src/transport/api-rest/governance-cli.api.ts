@@ -45,7 +45,13 @@
  * and must, like it, be registered BEFORE the `/api/auth/*` catch-all.
  */
 import { handlerManagedAuth } from "@langwatch/api";
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import {
+  type AppRestSecurity,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  type ServiceContext,
+} from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "@langwatch/enterprise-plan-gate";
@@ -227,7 +233,18 @@ export function createGovernanceCliRestApp(options: {
   ports: GovernanceCliRestPorts;
 }): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({ basePath: "/api/auth/cli" });
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "auth-cli",
+    basePath: "/api/auth/cli",
+    // Released `langwatch` CLI builds call these exact paths; the device flow
+    // has no dated contract to negotiate.
+    staticGeneration: "v1",
+    errorEnvelope: "legacy",
+  });
+
+  /** Every answer here is the CLI's own contract, written by the handler. */
+  const CLI_ANSWER =
+    "released CLI builds parse this family's own bodies and statuses as they stand";
 
   // The bearer authenticates the caller and gates on no RBAC permission.
   const cliPolicy = handlerManagedAuth({
@@ -422,229 +439,259 @@ export function createGovernanceCliRestApp(options: {
   // Pre-flight called by `langwatch claude` / `codex` / `cursor` / `gemini`
   // before exec'ing the underlying tool, so the wrapper can render the
   // budget-exceeded box without making any real model calls.
-  secured.access(cliPolicy).get("/budget/status", async (c) => {
-    const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
-    if (!caller) return unauthorized(c);
+  service.registerRoute(
+    "get",
+    "/budget/status",
+    MANAGEMENT_API_VERSION,
+    async (c: ServiceContext<EndpointVariables>) => {
+      const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
+      if (!caller) return unauthorized(c);
 
-    // No personal workspace yet (first login, CLI never activated) means
-    // nothing can be over budget: answer 200 and let the wrapper exec.
-    const workspace = await ports.tryFindPersonalWorkspace({
-      organizationId: caller.organization_id,
-      userId: caller.user_id,
-    });
-    if (!workspace) return c.json({ ok: true }, 200);
+      // No personal workspace yet (first login, CLI never activated) means
+      // nothing can be over budget: answer 200 and let the wrapper exec.
+      const workspace = await ports.tryFindPersonalWorkspace({
+        organizationId: caller.organization_id,
+        userId: caller.user_id,
+      });
+      if (!workspace) return c.json({ ok: true }, 200);
 
-    // Same graceful fallback for the virtual key: no key means no traffic
-    // flowing, so nothing to block on.
-    const keys = await ports.governance().personalVirtualKeyList({
-      userId: caller.user_id,
-      organizationId: caller.organization_id,
-    });
-    const personalVk = keys[0];
-    if (!personalVk) return c.json({ ok: true }, 200);
+      // Same graceful fallback for the virtual key: no key means no traffic
+      // flowing, so nothing to block on.
+      const keys = await ports.governance().personalVirtualKeyList({
+        userId: caller.user_id,
+        organizationId: caller.organization_id,
+      });
+      const personalVk = keys[0];
+      if (!personalVk) return c.json({ ok: true }, 200);
 
-    const budgets = ports.budgets;
-    if (!budgets) return c.json({ ok: true }, 200);
+      const budgets = ports.budgets;
+      if (!budgets) return c.json({ ok: true }, 200);
 
-    const decision = await budgets.check({
-      organizationId: caller.organization_id,
-      teamId: workspace.team.id,
-      projectId: workspace.project.id,
-      virtualKeyId: personalVk.id,
-      principalUserId: caller.user_id,
-      projectedCostUsd: 0,
-    });
+      const decision = await budgets.check({
+        organizationId: caller.organization_id,
+        teamId: workspace.team.id,
+        projectId: workspace.project.id,
+        virtualKeyId: personalVk.id,
+        principalUserId: caller.user_id,
+        projectedCostUsd: 0,
+      });
 
-    if (decision.decision !== "hard_block" || decision.blockedBy.length === 0) {
-      return c.json({ ok: true }, 200);
-    }
+      if (decision.decision !== "hard_block" || decision.blockedBy.length === 0) {
+        return c.json({ ok: true }, 200);
+      }
 
-    // The most restrictive blocker. The check result orders by strictness, so
-    // the first entry is the binding one.
-    const blocker = decision.blockedBy[0]!;
-    const adminEmail = await ports
-      .supportContacts()
-      .tryResolveSupportContact({ organizationId: caller.organization_id });
-    const params = new URLSearchParams({
-      scope: blocker.scope.toLowerCase(),
-      scope_id: blocker.scopeId,
-      limit_usd: blocker.limitUsd,
-      spent_usd: blocker.spentUsd,
-    });
+      // The most restrictive blocker. The check result orders by strictness, so
+      // the first entry is the binding one.
+      const blocker = decision.blockedBy[0]!;
+      const adminEmail = await ports
+        .supportContacts()
+        .tryResolveSupportContact({ organizationId: caller.organization_id });
+      const params = new URLSearchParams({
+        scope: blocker.scope.toLowerCase(),
+        scope_id: blocker.scopeId,
+        limit_usd: blocker.limitUsd,
+        spent_usd: blocker.spentUsd,
+      });
 
-    return c.json(
-      {
-        error: {
-          type: "budget_exceeded",
-          scope: blocker.scope.toLowerCase(),
-          limit_usd: blocker.limitUsd,
-          spent_usd: blocker.spentUsd,
-          period: blocker.window.toLowerCase(),
-          request_increase_url: `${baseUrl()}/me/budget/request?${params.toString()}`,
-          admin_email: adminEmail,
+      return c.json(
+        {
+          error: {
+            type: "budget_exceeded",
+            scope: blocker.scope.toLowerCase(),
+            limit_usd: blocker.limitUsd,
+            spent_usd: blocker.spentUsd,
+            period: blocker.window.toLowerCase(),
+            request_increase_url: `${baseUrl()}/me/budget/request?${params.toString()}`,
+            admin_email: adminEmail,
+          },
         },
-      },
-      402,
-    );
-  });
+        402,
+      );
+    },
+    (b) => policy(cliPolicy)(b).withRawResponse(CLI_ANSWER),
+  );
 
   // ---------- GET /api/auth/cli/bootstrap ----------
   // The login-completion ceremony: inherited providers plus the monthly
   // budget. The wire shape matches the tRPC `user.cliBootstrap` procedure
   // byte for byte — both read one service — so the SDK renders identically
   // whichever path it took.
-  secured.access(cliPolicy).get("/bootstrap", async (c) => {
-    const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
-    if (!caller) return unauthorized(c);
-    const result = await ports.governance().cliBootstrapResolve({
-      userId: caller.user_id,
-      organizationId: caller.organization_id,
-    });
-    return c.json(result, 200);
-  });
+  service.registerRoute(
+    "get",
+    "/bootstrap",
+    MANAGEMENT_API_VERSION,
+    async (c: ServiceContext<EndpointVariables>) => {
+      const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
+      if (!caller) return unauthorized(c);
+      const result = await ports.governance().cliBootstrapResolve({
+        userId: caller.user_id,
+        organizationId: caller.organization_id,
+      });
+      return c.json(result, 200);
+    },
+    (b) => policy(cliPolicy)(b).withRawResponse(CLI_ANSWER),
+  );
 
   // ---------- GET /api/auth/cli/budget-overview ----------
   // Every budget that binds the caller's own keys, labelled per scope, for the
   // `langwatch login` epilogue. Matches the tRPC `user.budgetOverview`
   // procedure byte for byte, replacing the single collapsed number the
   // bootstrap `budget` field carries for older CLIs.
-  secured.access(cliPolicy).get("/budget-overview", async (c) => {
-    const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
-    if (!caller) return unauthorized(c);
-    const result = await ports.governance().personalBudgetOverviewForUser({
-      userId: caller.user_id,
-      organizationId: caller.organization_id,
-    });
-    return c.json(result, 200);
-  });
+  service.registerRoute(
+    "get",
+    "/budget-overview",
+    MANAGEMENT_API_VERSION,
+    async (c: ServiceContext<EndpointVariables>) => {
+      const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
+      if (!caller) return unauthorized(c);
+      const result = await ports.governance().personalBudgetOverviewForUser({
+        userId: caller.user_id,
+        organizationId: caller.organization_id,
+      });
+      return c.json(result, 200);
+    },
+    (b) => policy(cliPolicy)(b).withRawResponse(CLI_ANSWER),
+  );
 
   // ---------- GET /api/auth/cli/personal-project ----------
   // Lazy personal-key exchange for device sessions minted before the exchange
   // started shipping the personal project. The CLI calls it once, persists the
   // key, and never asks again.
-  secured.access(cliPolicy).get("/personal-project", async (c) => {
-    const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
-    if (!caller) return unauthorized(c);
-    // Tenancy boundary BEFORE the ensure, which would otherwise recreate a
-    // personal workspace in a former tenant and hand its key to an offboarded
-    // person.
-    const denied = await refuseInactiveMember(c, caller);
-    if (denied) return denied;
+  service.registerRoute(
+    "get",
+    "/personal-project",
+    MANAGEMENT_API_VERSION,
+    async (c: ServiceContext<EndpointVariables>) => {
+      const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
+      if (!caller) return unauthorized(c);
+      // Tenancy boundary BEFORE the ensure, which would otherwise recreate a
+      // personal workspace in a former tenant and hand its key to an offboarded
+      // person.
+      const denied = await refuseInactiveMember(c, caller);
+      if (denied) return denied;
 
-    const user = await ports.directory().tryFindPersonProfile(caller.user_id);
-    try {
-      const workspace = await ports.ensurePersonalWorkspace({
-        organizationId: caller.organization_id,
-        userId: caller.user_id,
-        displayName: user?.name,
-        displayEmail: user?.email,
-      });
-      return c.json(
-        {
-          project: {
-            id: workspace.project.id,
-            slug: workspace.project.slug,
-            name: workspace.project.name,
-            api_key: workspace.project.apiKey,
+      const user = await ports.directory().tryFindPersonProfile(caller.user_id);
+      try {
+        const workspace = await ports.ensurePersonalWorkspace({
+          organizationId: caller.organization_id,
+          userId: caller.user_id,
+          displayName: user?.name,
+          displayEmail: user?.email,
+        });
+        return c.json(
+          {
+            project: {
+              id: workspace.project.id,
+              slug: workspace.project.slug,
+              name: workspace.project.name,
+              api_key: workspace.project.apiKey,
+            },
           },
-        },
-        200,
-      );
-    } catch (err) {
-      logger.error(
-        { err, userId: caller.user_id },
-        "[governance-cli] personal-project resolution failed",
-      );
-      return c.json(
-        {
-          error: "server_error",
-          error_description: "Could not resolve your personal project",
-        },
-        500,
-      );
-    }
-  });
+          200,
+        );
+      } catch (err) {
+        logger.error(
+          { err, userId: caller.user_id },
+          "[governance-cli] personal-project resolution failed",
+        );
+        return c.json(
+          {
+            error: "server_error",
+            error_description: "Could not resolve your personal project",
+          },
+          500,
+        );
+      }
+    },
+    (b) => policy(cliPolicy)(b).withRawResponse(CLI_ANSWER),
+  );
 
   // ---------- POST /api/auth/cli/virtual-key ----------
   // Issues the caller's personal virtual key on demand. This is the only way
   // the CLI obtains one: it asks the first time a tool resolves to gateway
   // mode, so a login that never routes a model call leaves no key behind, and
   // a re-login on a machine that already holds one adds nothing.
-  secured.access(cliPolicy).post("/virtual-key", async (c) => {
-    const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
-    if (!caller) return unauthorized(c);
-    // Same tenancy boundary as `/personal-project`: this mints a credential.
-    const denied = await refuseInactiveMember(c, caller);
-    if (denied) return denied;
+  service.registerRoute(
+    "post",
+    "/virtual-key",
+    MANAGEMENT_API_VERSION,
+    async (c: ServiceContext<EndpointVariables>) => {
+      const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
+      if (!caller) return unauthorized(c);
+      // Same tenancy boundary as `/personal-project`: this mints a credential.
+      const denied = await refuseInactiveMember(c, caller);
+      if (denied) return denied;
 
-    const body = await c.req.json().catch(() => ({}));
-    const parsed = issueVirtualKeySchema.safeParse(body);
-    if (!parsed.success) {
-      return c.json(
-        { error: "invalid_request", error_description: "device_label must be a string" },
-        400,
-      );
-    }
-
-    const user = await ports.directory().tryFindPersonProfile(caller.user_id);
-
-    try {
-      const issued = await issuePersonalVirtualKey({
-        governance: ports.governance(),
-        ensurePersonalWorkspace: ports.ensurePersonalWorkspace,
-        userId: caller.user_id,
-        organizationId: caller.organization_id,
-        displayName: user?.name,
-        displayEmail: user?.email,
-        deviceLabel: sanitizeDeviceLabel(parsed.data.device_label),
-      });
-      return c.json(
-        {
-          id: issued.virtualKey.id,
-          secret: issued.secret,
-          prefix: issued.virtualKey.displayPrefix,
-        },
-        201,
-      );
-    } catch (err) {
-      // Both empty-provider causes collapse into one 409: whether the
-      // organization has no provider at all or pinned a policy holding none,
-      // the person's next step is the same, and a key minted anyway would fail
-      // on its first request.
-      if (
-        err instanceof NoEligibleProvidersError ||
-        err instanceof RoutingPolicyHasNoProvidersError
-      ) {
-        logger.info(
-          {
-            userId: caller.user_id,
-            organizationId: caller.organization_id,
-            reason:
-              err instanceof NoEligibleProvidersError
-                ? "no_eligible_providers"
-                : "routing_policy_has_no_providers",
-          },
-          "[governance-cli] refusing personal virtual key: no provider to route to",
-        );
+      const body = await c.req.json().catch(() => ({}));
+      const parsed = issueVirtualKeySchema.safeParse(body);
+      if (!parsed.success) {
         return c.json(
-          {
-            error: "no_eligible_providers",
-            error_description:
-              "Your organization has no AI providers configured for the gateway. Ask an admin to add one at Settings → Model Providers.",
-          },
-          409,
+          { error: "invalid_request", error_description: "device_label must be a string" },
+          400,
         );
       }
-      logger.error(
-        { err, userId: caller.user_id },
-        "[governance-cli] personal virtual key issuance failed",
-      );
-      return c.json(
-        { error: "server_error", error_description: "Could not issue a personal virtual key" },
-        500,
-      );
-    }
-  });
+
+      const user = await ports.directory().tryFindPersonProfile(caller.user_id);
+
+      try {
+        const issued = await issuePersonalVirtualKey({
+          governance: ports.governance(),
+          ensurePersonalWorkspace: ports.ensurePersonalWorkspace,
+          userId: caller.user_id,
+          organizationId: caller.organization_id,
+          displayName: user?.name,
+          displayEmail: user?.email,
+          deviceLabel: sanitizeDeviceLabel(parsed.data.device_label),
+        });
+        return c.json(
+          {
+            id: issued.virtualKey.id,
+            secret: issued.secret,
+            prefix: issued.virtualKey.displayPrefix,
+          },
+          201,
+        );
+      } catch (err) {
+        // Both empty-provider causes collapse into one 409: whether the
+        // organization has no provider at all or pinned a policy holding none,
+        // the person's next step is the same, and a key minted anyway would fail
+        // on its first request.
+        if (
+          err instanceof NoEligibleProvidersError ||
+          err instanceof RoutingPolicyHasNoProvidersError
+        ) {
+          logger.info(
+            {
+              userId: caller.user_id,
+              organizationId: caller.organization_id,
+              reason:
+                err instanceof NoEligibleProvidersError
+                  ? "no_eligible_providers"
+                  : "routing_policy_has_no_providers",
+            },
+            "[governance-cli] refusing personal virtual key: no provider to route to",
+          );
+          return c.json(
+            {
+              error: "no_eligible_providers",
+              error_description:
+                "Your organization has no AI providers configured for the gateway. Ask an admin to add one at Settings → Model Providers.",
+            },
+            409,
+          );
+        }
+        logger.error(
+          { err, userId: caller.user_id },
+          "[governance-cli] personal virtual key issuance failed",
+        );
+        return c.json(
+          { error: "server_error", error_description: "Could not issue a personal virtual key" },
+          500,
+        );
+      }
+    },
+    (b) => policy(cliPolicy)(b).withRawResponse(CLI_ANSWER),
+  );
 
   // ---------- POST /api/auth/cli/project-key ----------
   // Non-interactive project login: `langwatch login --project <slug>` in a
@@ -653,155 +700,197 @@ export function createGovernanceCliRestApp(options: {
   // existing key is returned. The caller's OWN personal project is allowed,
   // exactly like an explicit pick on the authorize page; anyone else's is
   // refused.
-  secured.access(cliPolicy).post("/project-key", async (c) => {
-    const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
-    if (!caller) return unauthorized(c);
-    const denied = await refuseInactiveMember(c, caller);
-    if (denied) return denied;
+  service.registerRoute(
+    "post",
+    "/project-key",
+    MANAGEMENT_API_VERSION,
+    async (c: ServiceContext<EndpointVariables>) => {
+      const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
+      if (!caller) return unauthorized(c);
+      const denied = await refuseInactiveMember(c, caller);
+      if (denied) return denied;
 
-    const body = await c.req.json().catch(() => ({}));
-    const parsed = projectKeyRequestSchema.safeParse(body);
-    if (!parsed.success) {
-      return c.json({ error: "invalid_request", error_description: "slug is required" }, 400);
-    }
-    const project = await ports.directory().tryFindLiveProjectBySlug({
-      slug: parsed.data.slug,
-      organizationId: caller.organization_id,
-    });
-    if (!project) {
+      const body = await c.req.json().catch(() => ({}));
+      const parsed = projectKeyRequestSchema.safeParse(body);
+      if (!parsed.success) {
+        return c.json({ error: "invalid_request", error_description: "slug is required" }, 400);
+      }
+      const project = await ports.directory().tryFindLiveProjectBySlug({
+        slug: parsed.data.slug,
+        organizationId: caller.organization_id,
+      });
+      if (!project) {
+        return c.json(
+          {
+            error: "not_found",
+            error_description: `No project with slug "${parsed.data.slug}" in your organization`,
+          },
+          404,
+        );
+      }
+      const refusal = await refuseProjectKeyHandout(c, project, caller.user_id);
+      if (refusal) return refusal;
       return c.json(
         {
-          error: "not_found",
-          error_description: `No project with slug "${parsed.data.slug}" in your organization`,
+          api_key: project.apiKey,
+          project: { id: project.id, slug: project.slug, name: project.name },
         },
-        404,
+        200,
       );
-    }
-    const refusal = await refuseProjectKeyHandout(c, project, caller.user_id);
-    if (refusal) return refusal;
-    return c.json(
-      {
-        api_key: project.apiKey,
-        project: { id: project.id, slug: project.slug, name: project.name },
-      },
-      200,
-    );
-  });
+    },
+    (b) => policy(cliPolicy)(b).withRawResponse(CLI_ANSWER),
+  );
 
   // ---------- GET /api/auth/cli/governance/ingest/sources ----------
-  secured.access(cliIngestionSourcesAuth).get("/governance/ingest/sources", async (c) => {
-    const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
-    if (!caller) return unauthorized(c);
-    const gate = await refuseWithoutEnterprise(
-      c,
-      caller.organization_id,
-      ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
-    );
-    if (gate) return gate;
-    const denied = await refuseWithoutPermission(c, caller, "ingestionSources:view");
-    if (denied) return denied;
+  service.registerRoute(
+    "get",
+    "/governance/ingest/sources",
+    MANAGEMENT_API_VERSION,
+    async (c: ServiceContext<EndpointVariables>) => {
+      const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
+      if (!caller) return unauthorized(c);
+      const gate = await refuseWithoutEnterprise(
+        c,
+        caller.organization_id,
+        ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
+      );
+      if (gate) return gate;
+      const denied = await refuseWithoutPermission(c, caller, "ingestionSources:view");
+      if (denied) return denied;
 
-    const includeArchived = c.req.query("include_archived") === "1";
-    const sources = await ports.governance().ingestionSourceList(caller.organization_id);
-    const filtered = includeArchived
-      ? sources
-      : sources.filter((source) => source.archivedAt === null);
-    return c.json({
-      sources: filtered.map((source) => ({
-        id: source.id,
-        name: source.name,
-        sourceType: source.sourceType,
-        description: source.description,
-        status: source.status,
-        lastEventAt: source.lastEventAt?.toISOString() ?? null,
-        createdAt: source.createdAt.toISOString(),
-        archivedAt: source.archivedAt?.toISOString() ?? null,
-      })),
-    });
-  });
+      const includeArchived = c.req.query("include_archived") === "1";
+      const sources = await ports.governance().ingestionSourceList(caller.organization_id);
+      const filtered = includeArchived
+        ? sources
+        : sources.filter((source) => source.archivedAt === null);
+      return c.json({
+        sources: filtered.map((source) => ({
+          id: source.id,
+          name: source.name,
+          sourceType: source.sourceType,
+          description: source.description,
+          status: source.status,
+          lastEventAt: source.lastEventAt?.toISOString() ?? null,
+          createdAt: source.createdAt.toISOString(),
+          archivedAt: source.archivedAt?.toISOString() ?? null,
+        })),
+      });
+    },
+    (b) => policy(cliIngestionSourcesAuth)(b).withRawResponse(CLI_ANSWER),
+  );
 
   // ---------- GET /api/auth/cli/governance/ingest/sources/:id/events ----------
-  secured.access(cliActivityMonitorAuth).get("/governance/ingest/sources/:id/events", async (c) => {
-    const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
-    if (!caller) return unauthorized(c);
-    const gate = await refuseWithoutEnterprise(
-      c,
-      caller.organization_id,
-      ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR,
-    );
-    if (gate) return gate;
-    const denied = await refuseWithoutPermission(c, caller, "activityMonitor:view");
-    if (denied) return denied;
+  service.registerRoute(
+    "get",
+    "/governance/ingest/sources/:id/events",
+    MANAGEMENT_API_VERSION,
+    async (c: ServiceContext<EndpointVariables>) => {
+      const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
+      if (!caller) return unauthorized(c);
+      const gate = await refuseWithoutEnterprise(
+        c,
+        caller.organization_id,
+        ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR,
+      );
+      if (gate) return gate;
+      const denied = await refuseWithoutPermission(c, caller, "activityMonitor:view");
+      if (denied) return denied;
 
-    const sourceId = c.req.param("id");
-    if (!sourceId) {
-      return c.json({ error: "invalid_request", error_description: "source id is required" }, 400);
-    }
-    const limitRaw = c.req.query("limit");
-    const beforeIso = c.req.query("before_iso") ?? undefined;
-    const limit = limitRaw ? Math.min(Math.max(1, parseInt(limitRaw, 10)), 200) : 50;
+      const sourceId = c.req.param("id");
+      if (!sourceId) {
+        return c.json(
+          { error: "invalid_request", error_description: "source id is required" },
+          400,
+        );
+      }
+      const limitRaw = c.req.query("limit");
+      const beforeIso = c.req.query("before_iso") ?? undefined;
+      const limit = limitRaw ? Math.min(Math.max(1, parseInt(limitRaw, 10)), 200) : 50;
 
-    // Ownership is proved before the analytics read, so a valid bearer
-    // cannot walk source ids belonging to another tenant even though the
-    // read below also filters by organization.
-    await ports.governance().ingestionSourceGetById({
-      id: sourceId,
-      organizationId: caller.organization_id,
-    });
+      // Ownership is proved before the analytics read, so a valid bearer
+      // cannot walk source ids belonging to another tenant even though the
+      // read below also filters by organization.
+      await ports.governance().ingestionSourceGetById({
+        id: sourceId,
+        organizationId: caller.organization_id,
+      });
 
-    const events = await ports.governance().activityEventsForSource({
-      organizationId: caller.organization_id,
-      sourceId,
-      limit,
-      beforeIso,
-    });
-    return c.json({ events });
-  });
+      const events = await ports.governance().activityEventsForSource({
+        organizationId: caller.organization_id,
+        sourceId,
+        limit,
+        beforeIso,
+      });
+      return c.json({ events });
+    },
+    (b) =>
+      policy(cliActivityMonitorAuth)(b)
+        .withParams(z.object({ id: z.string().min(1) }))
+        .withRawResponse(CLI_ANSWER),
+  );
 
   // ---------- GET /api/auth/cli/governance/ingest/sources/:id/health ----------
-  secured.access(cliActivityMonitorAuth).get("/governance/ingest/sources/:id/health", async (c) => {
-    const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
-    if (!caller) return unauthorized(c);
-    const gate = await refuseWithoutEnterprise(
-      c,
-      caller.organization_id,
-      ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
-    );
-    if (gate) return gate;
-    const denied = await refuseWithoutPermission(c, caller, "activityMonitor:view");
-    if (denied) return denied;
+  service.registerRoute(
+    "get",
+    "/governance/ingest/sources/:id/health",
+    MANAGEMENT_API_VERSION,
+    async (c: ServiceContext<EndpointVariables>) => {
+      const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
+      if (!caller) return unauthorized(c);
+      const gate = await refuseWithoutEnterprise(
+        c,
+        caller.organization_id,
+        ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
+      );
+      if (gate) return gate;
+      const denied = await refuseWithoutPermission(c, caller, "activityMonitor:view");
+      if (denied) return denied;
 
-    const sourceId = c.req.param("id");
-    if (!sourceId) {
-      return c.json({ error: "invalid_request", error_description: "source id is required" }, 400);
-    }
-    const source = await ports.governance().ingestionSourceGetById({
-      id: sourceId,
-      organizationId: caller.organization_id,
-    });
-    const health = await ports.governance().activitySourceHealthMetrics({
-      organizationId: caller.organization_id,
-      sourceId,
-    });
-    return c.json({
-      source: { id: source.id, name: source.name, status: source.status },
-      health,
-    });
-  });
+      const sourceId = c.req.param("id");
+      if (!sourceId) {
+        return c.json(
+          { error: "invalid_request", error_description: "source id is required" },
+          400,
+        );
+      }
+      const source = await ports.governance().ingestionSourceGetById({
+        id: sourceId,
+        organizationId: caller.organization_id,
+      });
+      const health = await ports.governance().activitySourceHealthMetrics({
+        organizationId: caller.organization_id,
+        sourceId,
+      });
+      return c.json({
+        source: { id: source.id, name: source.name, status: source.status },
+        health,
+      });
+    },
+    (b) =>
+      policy(cliActivityMonitorAuth)(b)
+        .withParams(z.object({ id: z.string().min(1) }))
+        .withRawResponse(CLI_ANSWER),
+  );
 
   // ---------- GET /api/auth/cli/governance/status ----------
-  secured.access(cliPolicy).get("/governance/status", async (c) => {
-    const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
-    if (!caller) return unauthorized(c);
-    const gate = await refuseWithoutEnterprise(
-      c,
-      caller.organization_id,
-      ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
-    );
-    if (gate) return gate;
-    const setup = await ports.governance().resolveSetupState(caller.organization_id);
-    return c.json({ setup });
-  });
+  service.registerRoute(
+    "get",
+    "/governance/status",
+    MANAGEMENT_API_VERSION,
+    async (c: ServiceContext<EndpointVariables>) => {
+      const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
+      if (!caller) return unauthorized(c);
+      const gate = await refuseWithoutEnterprise(
+        c,
+        caller.organization_id,
+        ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
+      );
+      if (gate) return gate;
+      const setup = await ports.governance().resolveSetupState(caller.organization_id);
+      return c.json({ setup });
+    },
+    (b) => policy(cliPolicy)(b).withRawResponse(CLI_ANSWER),
+  );
 
   // ---------- GET /api/auth/cli/governance/ingestion-templates ----------
   // The wrapper reads these from a device-session context. The project-scoped
@@ -809,28 +898,34 @@ export function createGovernanceCliRestApp(options: {
   // token with 401; this adapter resolves the organization from the validated
   // bearer and delegates to the same service. The snake_case envelope is what
   // the CLI expects, distinct from the project-key REST's `{ data: [...] }`.
-  secured.access(cliPolicy).get("/governance/ingestion-templates", async (c) => {
-    const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
-    if (!caller) return unauthorized(c);
-    const rows = await ports.governance().templateListForUser({
-      organizationId: caller.organization_id,
-    });
-    return c.json({
-      ingestion_templates: rows.map((template) => ({
-        id: template.id,
-        organization_id: template.organizationId,
-        slug: template.slug,
-        source_type: template.sourceType,
-        display_name: template.displayName,
-        description: template.description,
-        icon_asset: template.iconAsset,
-        credential_schema: template.credentialSchema,
-        ottl_rules: template.ottlRules,
-        platform_published: template.platformPublished,
-        enabled: template.enabled,
-      })),
-    });
-  });
+  service.registerRoute(
+    "get",
+    "/governance/ingestion-templates",
+    MANAGEMENT_API_VERSION,
+    async (c: ServiceContext<EndpointVariables>) => {
+      const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
+      if (!caller) return unauthorized(c);
+      const rows = await ports.governance().templateListForUser({
+        organizationId: caller.organization_id,
+      });
+      return c.json({
+        ingestion_templates: rows.map((template) => ({
+          id: template.id,
+          organization_id: template.organizationId,
+          slug: template.slug,
+          source_type: template.sourceType,
+          display_name: template.displayName,
+          description: template.description,
+          icon_asset: template.iconAsset,
+          credential_schema: template.credentialSchema,
+          ottl_rules: template.ottlRules,
+          platform_published: template.platformPublished,
+          enabled: template.enabled,
+        })),
+      });
+    },
+    (b) => policy(cliPolicy)(b).withRawResponse(CLI_ANSWER),
+  );
 
   // ---------- POST /api/auth/cli/governance/ingestion-key ----------
   // Mints a write-only `ik-lw-` key and OTLP endpoint for the device-session
@@ -839,64 +934,70 @@ export function createGovernanceCliRestApp(options: {
   // Without `project`, rotate the key for the caller's personal project. With
   // an authorised project id or slug, create a key for that project instead so
   // separate machines can retain their own key. Both return `/api/otel`.
-  secured.access(cliPolicy).post("/governance/ingestion-key", async (c) => {
-    const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
-    if (!caller) return unauthorized(c);
-    // This mints a credential, so an offboarded caller's pre-removal token
-    // must not reach it — the same boundary `/virtual-key` holds.
-    const denied = await refuseInactiveMember(c, caller);
-    if (denied) return denied;
+  service.registerRoute(
+    "post",
+    "/governance/ingestion-key",
+    MANAGEMENT_API_VERSION,
+    async (c: ServiceContext<EndpointVariables>) => {
+      const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
+      if (!caller) return unauthorized(c);
+      // This mints a credential, so an offboarded caller's pre-removal token
+      // must not reach it — the same boundary `/virtual-key` holds.
+      const denied = await refuseInactiveMember(c, caller);
+      if (denied) return denied;
 
-    const parsed = mintIngestionKeySchema.safeParse(await c.req.json());
-    if (!parsed.success) {
-      return c.json({ error: "invalid_request", error_description: parsed.error.message }, 400);
-    }
-
-    // Apply the declared tool's direct-OTLP policy: a mint naming a tool the
-    // organization turned off is refused, which catches an old CLI, a stale
-    // cached policy, or a hand-run of the documented flow. The declaration is
-    // trusted; the issued key still carries only the caller's existing
-    // `traces:create` grant, so this is a policy backstop rather than a tenant
-    // boundary. Only source types a wrapped tool stamps are governed; anything
-    // else has no per-tool policy to apply and must stay mintable.
-    //
-    // `Object.hasOwn` rather than a plain lookup: the key is request-
-    // controlled, so `"toString"` would otherwise resolve an inherited
-    // function, pass a truthy check, and index the policy map with nothing.
-    const policedSlug = Object.hasOwn(PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE, parsed.data.source_type)
-      ? PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE[parsed.data.source_type]
-      : undefined;
-    if (policedSlug) {
-      const policy = await ports.governance().aiToolResolvePolicy({
-        organizationId: caller.organization_id,
-        userId: caller.user_id,
-        slug: policedSlug,
-      });
-      if (!policy.allowOtelDirect) {
-        return c.json(
-          {
-            error: "direct_otel_not_allowed",
-            error_description: `Your organization does not allow ${policedSlug} to send telemetry directly. Run \`langwatch ${policedSlug}\`, which routes through the gateway.`,
-          },
-          403,
-        );
+      const parsed = mintIngestionKeySchema.safeParse(await c.req.json());
+      if (!parsed.success) {
+        return c.json({ error: "invalid_request", error_description: parsed.error.message }, 400);
       }
-    }
 
-    if (parsed.data.project) {
-      return await mintProjectIngestionKey(c, {
+      // Apply the declared tool's direct-OTLP policy: a mint naming a tool the
+      // organization turned off is refused, which catches an old CLI, a stale
+      // cached policy, or a hand-run of the documented flow. The declaration is
+      // trusted; the issued key still carries only the caller's existing
+      // `traces:create` grant, so this is a policy backstop rather than a tenant
+      // boundary. Only source types a wrapped tool stamps are governed; anything
+      // else has no per-tool policy to apply and must stay mintable.
+      //
+      // `Object.hasOwn` rather than a plain lookup: the key is request-
+      // controlled, so `"toString"` would otherwise resolve an inherited
+      // function, pass a truthy check, and index the policy map with nothing.
+      const policedSlug = Object.hasOwn(PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE, parsed.data.source_type)
+        ? PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE[parsed.data.source_type]
+        : undefined;
+      if (policedSlug) {
+        const policy = await ports.governance().aiToolResolvePolicy({
+          organizationId: caller.organization_id,
+          userId: caller.user_id,
+          slug: policedSlug,
+        });
+        if (!policy.allowOtelDirect) {
+          return c.json(
+            {
+              error: "direct_otel_not_allowed",
+              error_description: `Your organization does not allow ${policedSlug} to send telemetry directly. Run \`langwatch ${policedSlug}\`, which routes through the gateway.`,
+            },
+            403,
+          );
+        }
+      }
+
+      if (parsed.data.project) {
+        return await mintProjectIngestionKey(c, {
+          caller,
+          projectRef: parsed.data.project,
+          sourceType: parsed.data.source_type,
+          deviceLabel: parsed.data.device_label ?? null,
+        });
+      }
+
+      return await mintPersonalIngestionKey(c, {
         caller,
-        projectRef: parsed.data.project,
         sourceType: parsed.data.source_type,
-        deviceLabel: parsed.data.device_label ?? null,
       });
-    }
-
-    return await mintPersonalIngestionKey(c, {
-      caller,
-      sourceType: parsed.data.source_type,
-    });
-  });
+    },
+    (b) => policy(cliPolicy)(b).withRawResponse(CLI_ANSWER),
+  );
 
   /**
    * The named-project branch of the ingestion-key mint.
@@ -1065,26 +1166,32 @@ export function createGovernanceCliRestApp(options: {
   // the identifier embedded in the token prefix (`ik-lw-{lookupId}_…`), so the
   // CLI can match a cached token against a live entry without possessing the
   // full secret.
-  secured.access(cliPolicy).get("/governance/ingestion-keys", async (c) => {
-    const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
-    if (!caller) return unauthorized(c);
-    const keys = await ports.governance().ingestionKeyListForPersonalProject({
-      userId: caller.user_id,
-      organizationId: caller.organization_id,
-    });
-    return c.json(
-      {
-        keys: keys.map((key) => ({
-          source_type: key.sourceType,
-          lookup_id: key.lookupId,
-          ingestion_template_id: key.ingestionTemplateId,
-        })),
-      },
-      200,
-    );
-  });
+  service.registerRoute(
+    "get",
+    "/governance/ingestion-keys",
+    MANAGEMENT_API_VERSION,
+    async (c: ServiceContext<EndpointVariables>) => {
+      const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
+      if (!caller) return unauthorized(c);
+      const keys = await ports.governance().ingestionKeyListForPersonalProject({
+        userId: caller.user_id,
+        organizationId: caller.organization_id,
+      });
+      return c.json(
+        {
+          keys: keys.map((key) => ({
+            source_type: key.sourceType,
+            lookup_id: key.lookupId,
+            ingestion_template_id: key.ingestionTemplateId,
+          })),
+        },
+        200,
+      );
+    },
+    (b) => policy(cliPolicy)(b).withRawResponse(CLI_ANSWER),
+  );
 
-  return secured.hono;
+  return service.build();
 }
 
 /**

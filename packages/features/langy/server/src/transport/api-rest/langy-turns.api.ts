@@ -4,7 +4,12 @@
  */
 
 import { handlerManagedAuth } from "@langwatch/api";
-import { bodyLimit, type AppRestSecurity, type MountableRestApp } from "@langwatch/api/rest";
+import {
+  bodyLimit,
+  type AppRestSecurity,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+} from "@langwatch/api/rest";
 import { LangyApiRequestInvalidError, langyMessagePartSchema } from "@langwatch/langy-contract";
 import type { Context } from "hono";
 import { z } from "zod";
@@ -119,10 +124,22 @@ export function createLangyTurnsRestApp(options: {
   ports: LangyTurnsRestPorts;
 }): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({
+
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "langy",
     basePath: "/api/langy",
+    // Released CLI builds and scenario HTTP agents post these exact paths;
+    // the turn surface serves one generation rather than a dated namespace.
+    staticGeneration: "v1",
     errorEnvelope: "canonical",
   });
+
+  const turnDoor = policy(langyTurnAuth);
+
+  /** A turn answers 202, or 200 with the settled reply, or a dark 404. */
+  const TURN_ANSWER =
+    "the turn surface answers 202 with the accepted turn, 200 with the settled reply " +
+    "under Prefer: wait, and Hono's own 404 when the rollout is dark for the project";
 
   /**
    * Start or continue a turn. Nothing is caught.
@@ -206,19 +223,28 @@ export function createLangyTurnsRestApp(options: {
     return c.json(result, 202);
   };
 
-  secured
-    .access(langyTurnAuth)
-    .post("/conversations", bodyLimit({ maxSize: MAX_TURN_BODY_BYTES }), async (c) =>
-      startTurn({ c, conversationId: null }),
-    );
-
-  secured
-    .access(langyTurnAuth)
-    .post(
+  return service
+    .registerRoute(
+      "post",
+      "/conversations",
+      MANAGEMENT_API_VERSION,
+      async (c: Context) => startTurn({ c, conversationId: null }),
+      (b) =>
+        turnDoor(b)
+          .withMiddleware(bodyLimit({ maxSize: MAX_TURN_BODY_BYTES }))
+          .withRawResponse(TURN_ANSWER),
+    )
+    .registerRoute(
+      "post",
       "/conversations/:conversationId/messages",
-      bodyLimit({ maxSize: MAX_TURN_BODY_BYTES }),
-      async (c) => startTurn({ c, conversationId: c.req.param("conversationId") }),
-    );
-
-  return secured.hono;
+      MANAGEMENT_API_VERSION,
+      async (c: Context, input: { conversationId: string }) =>
+        startTurn({ c, conversationId: input.conversationId }),
+      (b) =>
+        turnDoor(b)
+          .withParams(z.object({ conversationId: z.string().min(1) }))
+          .withMiddleware(bodyLimit({ maxSize: MAX_TURN_BODY_BYTES }))
+          .withRawResponse(TURN_ANSWER),
+    )
+    .build();
 }

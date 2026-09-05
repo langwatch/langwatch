@@ -4,7 +4,11 @@
  */
 
 import { publicEndpoint } from "@langwatch/api";
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import {
+  type AppRestSecurity,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+} from "@langwatch/api/rest";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { AuthDirectoryPort } from "../../ports/auth-directory.port";
 import { createLogger } from "@langwatch/observability";
@@ -81,13 +85,28 @@ export function createAuthRestApp(options: {
   // No `/api/v1` twin: Better Auth builds its own callback, cookie and
   // redirect URLs from one configured base, so a second address for the
   // sign-in door would be half-wired rather than equivalent.
-  const secured = security.createServiceApp({ basePath: "/api", v1Alias: false });
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "auth",
+    basePath: "/api",
+    // Better Auth's own callback, cookie and redirect URLs are built from one
+    // configured base, so this door serves one generation at the path it has.
+    staticGeneration: "v1",
+    errorEnvelope: "legacy",
+    v1Alias: false,
+  });
 
   const authPolicy = () =>
     publicEndpoint("BetterAuth session/OAuth handshake; framework manages its own session");
 
+  const authDoor = policy(authPolicy());
+
+  /** Every answer here is the sign-in door's own, cookies and redirects included. */
+  const AUTH_ANSWER =
+    "the sign-in door answers Better Auth's own responses — Set-Cookie headers, 302 " +
+    "redirects and the session shape the browser polls — which are passed through untouched";
+
   // ---------- POST /api/auth/validate ----------
-  secured.access(authPolicy()).post("/auth/validate", async (c) => {
+  const validateHandler = async (c: Context) => {
     const authToken = c.req.header("x-auth-token");
 
     if (!authToken) {
@@ -101,10 +120,10 @@ export function createAuthRestApp(options: {
     }
 
     return c.json({ projectSlug });
-  });
+  };
 
   // ---------- GET /api/auth/session ----------
-  secured.access(authPolicy()).get("/auth/session", async (c) => {
+  const sessionHandler = async (c: Context) => {
     c.header("Cache-Control", "no-store, must-revalidate");
 
     const session = await ports.resolveSession(c.req.raw);
@@ -126,7 +145,7 @@ export function createAuthRestApp(options: {
         impersonator: session.user.impersonator,
       },
     });
-  });
+  };
 
   // ---------- GET|POST /api/auth/logout ----------
   const logoutHandler = async (c: Context) => {
@@ -181,9 +200,6 @@ export function createAuthRestApp(options: {
     return c.json({ success: true });
   };
 
-  secured.access(authPolicy()).get("/auth/logout", logoutHandler);
-  secured.access(authPolicy()).post("/auth/logout", logoutHandler);
-
   // ---------- /api/auth/* catch-all (BetterAuth) ----------
   const betterAuthCatchAll = async (c: Context) => {
     // Origin gate for state-changing requests
@@ -231,14 +247,29 @@ export function createAuthRestApp(options: {
     return ports.betterAuth().handler(c.req.raw);
   };
 
-  // `.all` (not a 5-verb loop) so OPTIONS/HEAD and CORS preflight reach
-  // BetterAuth — it terminates the request itself. Registered with method
-  // "ALL" + a wildcard path, this is intentionally outside the router
-  // introspection cross-check (a wildcard mount can't be enumerated), but it
-  // still carries a declared policy because it goes through `.access(...)`.
-  secured.access(authPolicy()).all("/auth/*", betterAuthCatchAll);
-
-  return secured.hono;
+  return (
+    service
+      .registerRoute("post", "/auth/validate", MANAGEMENT_API_VERSION, validateHandler, (b) =>
+        authDoor(b).withRawResponse(AUTH_ANSWER),
+      )
+      .registerRoute("get", "/auth/session", MANAGEMENT_API_VERSION, sessionHandler, (b) =>
+        authDoor(b).withRawResponse(AUTH_ANSWER),
+      )
+      .registerRoute("get", "/auth/logout", MANAGEMENT_API_VERSION, logoutHandler, (b) =>
+        authDoor(b).withRawResponse(AUTH_ANSWER),
+      )
+      .registerRoute("post", "/auth/logout", MANAGEMENT_API_VERSION, logoutHandler, (b) =>
+        authDoor(b).withRawResponse(AUTH_ANSWER),
+      )
+      // An any-method route (not a 5-verb loop) so OPTIONS/HEAD and CORS
+      // preflight reach BetterAuth — it terminates the request itself, and the
+      // whole Request is handed to its own fetch handler. Registered last, so
+      // the four named routes above resolve first.
+      .registerAnyMethodRoute("/auth/*", MANAGEMENT_API_VERSION, betterAuthCatchAll, (b) =>
+        authDoor(b),
+      )
+      .build()
+  );
 }
 
 function extractCookie(cookieHeader: string, name: string): string | null {

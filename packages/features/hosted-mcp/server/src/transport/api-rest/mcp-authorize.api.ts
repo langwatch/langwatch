@@ -3,7 +3,13 @@
  * posts here once a signed-in person has approved a client's request.
  */
 import { handlerManagedAuth } from "@langwatch/api";
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import {
+  type AppRestSecurity,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  type ServiceContext,
+} from "@langwatch/api/rest";
 import { randomUUID } from "node:crypto";
 
 import type { HostedMcpRedis } from "../../ports/hosted-mcp.port";
@@ -83,191 +89,204 @@ export function createMcpAuthorizeRestApp(options: {
   ports: McpAuthorizeRestPorts;
 }): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({ basePath: "/api" });
 
-  secured
-    .access(
-      handlerManagedAuth({
-        reason: "user session validated in-handler",
-        // OAuth authorize step; no RBAC permission gates it.
-        permissions: [],
-        credential: "session",
-      }),
-    )
-    .post("/mcp/authorize", async (c) => {
-      const session = await ports.resolveSession(c.req.raw);
-      if (!session) {
-        return c.json({ error: "Not authenticated" }, 401);
-      }
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "mcp-authorize",
+    basePath: "/api",
+    // The consent page and every registered OAuth client hold this exact
+    // path; the flow has no dated contract to negotiate.
+    staticGeneration: "v1",
+    errorEnvelope: "legacy",
+  });
 
-      let body: Record<string, unknown>;
-      try {
-        body = (await c.req.json()) as Record<string, unknown>;
-      } catch {
-        return c.json({ error: "Invalid body" }, 400);
-      }
+  const authorizeHandler = async (c: ServiceContext<EndpointVariables>) => {
+    const session = await ports.resolveSession(c.req.raw);
+    if (!session) {
+      return c.json({ error: "Not authenticated" }, 401);
+    }
 
-      const projectId = asString(body.projectId);
-      const redirectUri = asString(body.redirect_uri);
-      const clientId = asString(body.client_id);
-      const state = asString(body.state);
-      const codeChallenge = asString(body.code_challenge);
-      const codeChallengeMethod = asString(body.code_challenge_method);
+    let body: Record<string, unknown>;
+    try {
+      body = (await c.req.json()) as Record<string, unknown>;
+    } catch {
+      return c.json({ error: "Invalid body" }, 400);
+    }
 
-      if (!projectId || !redirectUri || !clientId) {
-        return c.json({ error: "projectId, redirect_uri and client_id are required" }, 400);
-      }
+    const projectId = asString(body.projectId);
+    const redirectUri = asString(body.redirect_uri);
+    const clientId = asString(body.client_id);
+    const state = asString(body.state);
+    const codeChallenge = asString(body.code_challenge);
+    const codeChallengeMethod = asString(body.code_challenge_method);
 
-      try {
-        new URL(redirectUri);
-      } catch {
-        return c.json({ error: "Invalid redirect_uri" }, 400);
-      }
-      if (!isAllowedRedirectScheme(redirectUri)) {
-        return c.json({ error: "redirect_uri uses a disallowed scheme" }, 400);
-      }
+    if (!projectId || !redirectUri || !clientId) {
+      return c.json({ error: "projectId, redirect_uri and client_id are required" }, 400);
+    }
 
-      // RFC 6749 §10.6: an authorization server must only ever issue a code to a redirect_uri
-      // that was registered for this client_id — otherwise whoever crafts the authorization
-      // request (which can be an attacker, not the approving user) can point it at a URI they
-      // control and the approved code is exfiltrated there.
-      const registeredClient = await RedisOAuthClientRepository.tryGet({
-        redis: ports.redis,
-        clientId,
-      });
-      if (!registeredClient) {
-        return c.json({ error: "Unknown or unregistered client_id" }, 400);
-      }
-      if (!registeredClient.redirectUris.includes(redirectUri)) {
-        return c.json(
-          { error: "redirect_uri does not match any redirect URI registered for this client_id" },
-          400,
-        );
-      }
+    try {
+      new URL(redirectUri);
+    } catch {
+      return c.json({ error: "Invalid redirect_uri" }, 400);
+    }
+    if (!isAllowedRedirectScheme(redirectUri)) {
+      return c.json({ error: "redirect_uri uses a disallowed scheme" }, 400);
+    }
 
-      // Past this point the client_id is registered and the redirect_uri is one of the URIs it
-      // registered, so RFC 6749 §4.1.2.1 says a failure belongs back at the client rather than
-      // on this page: the client is waiting on its redirect and an error rendered here leaves
-      // it hanging forever. The checks above deliberately stay local — an unverified
-      // redirect_uri is exactly what an attacker would supply, so nothing is ever sent to it.
-      const errorRedirect = ({ error, description }: { error: string; description: string }) => {
-        const url = new URL(redirectUri);
-        url.searchParams.set("error", error);
-        url.searchParams.set("error_description", description);
-        if (state) url.searchParams.set("state", state);
-        return url.toString();
-      };
+    // RFC 6749 §10.6: an authorization server must only ever issue a code to a redirect_uri
+    // that was registered for this client_id — otherwise whoever crafts the authorization
+    // request (which can be an attacker, not the approving user) can point it at a URI they
+    // control and the approved code is exfiltrated there.
+    const registeredClient = await RedisOAuthClientRepository.tryGet({
+      redis: ports.redis,
+      clientId,
+    });
+    if (!registeredClient) {
+      return c.json({ error: "Unknown or unregistered client_id" }, 400);
+    }
+    if (!registeredClient.redirectUris.includes(redirectUri)) {
+      return c.json(
+        { error: "redirect_uri does not match any redirect URI registered for this client_id" },
+        400,
+      );
+    }
 
-      if (!codeChallenge) {
-        const description = "code_challenge is required (PKCE S256)";
-        return c.json(
-          {
-            error: "invalid_request",
-            error_description: description,
-            redirect: errorRedirect({ error: "invalid_request", description }),
-          },
-          400,
-        );
-      }
+    // Past this point the client_id is registered and the redirect_uri is one of the URIs it
+    // registered, so RFC 6749 §4.1.2.1 says a failure belongs back at the client rather than
+    // on this page: the client is waiting on its redirect and an error rendered here leaves
+    // it hanging forever. The checks above deliberately stay local — an unverified
+    // redirect_uri is exactly what an attacker would supply, so nothing is ever sent to it.
+    const errorRedirect = ({ error, description }: { error: string; description: string }) => {
+      const url = new URL(redirectUri);
+      url.searchParams.set("error", error);
+      url.searchParams.set("error_description", description);
+      if (state) url.searchParams.set("state", state);
+      return url.toString();
+    };
 
-      // S256 is the only method the discovery document advertises, and the
-      // token endpoint verifies every code as S256 regardless of what was
-      // requested. Accepting another method here would mint a code that can
-      // never be redeemed, so the client learns now rather than at the
-      // exchange.
-      if (codeChallengeMethod && codeChallengeMethod !== "S256") {
-        const description = "code_challenge_method must be S256";
-        return c.json(
-          {
-            error: "invalid_request",
-            error_description: description,
-            redirect: errorRedirect({ error: "invalid_request", description }),
-          },
-          400,
-        );
-      }
+    if (!codeChallenge) {
+      const description = "code_challenge is required (PKCE S256)";
+      return c.json(
+        {
+          error: "invalid_request",
+          error_description: description,
+          redirect: errorRedirect({ error: "invalid_request", description }),
+        },
+        400,
+      );
+    }
 
-      const noAccessDescription = "Project not found or you don't have access";
-      const noAccessResponse = () =>
-        c.json(
-          {
+    // S256 is the only method the discovery document advertises, and the
+    // token endpoint verifies every code as S256 regardless of what was
+    // requested. Accepting another method here would mint a code that can
+    // never be redeemed, so the client learns now rather than at the
+    // exchange.
+    if (codeChallengeMethod && codeChallengeMethod !== "S256") {
+      const description = "code_challenge_method must be S256";
+      return c.json(
+        {
+          error: "invalid_request",
+          error_description: description,
+          redirect: errorRedirect({ error: "invalid_request", description }),
+        },
+        400,
+      );
+    }
+
+    const noAccessDescription = "Project not found or you don't have access";
+    const noAccessResponse = () =>
+      c.json(
+        {
+          error: "access_denied",
+          error_description: noAccessDescription,
+          redirect: errorRedirect({
             error: "access_denied",
-            error_description: noAccessDescription,
-            redirect: errorRedirect({
-              error: "access_denied",
-              description: noAccessDescription,
-            }),
-          },
-          403,
-        );
-
-      if (ports.isDemoProject(projectId)) {
-        return noAccessResponse();
-      }
-
-      const project = await ports.tryGetProject(projectId);
-      if (
-        !project ||
-        project.archivedAt !== null ||
-        !(await ports.probeProjectPermission({
-          session,
-          projectId,
-          permission: MCP_AUTHORIZE_PERMISSION,
-        }))
-      ) {
-        // A single 403 whether the project is missing, archived, or simply
-        // inaccessible — never disclose the existence of a project the caller
-        // cannot reach.
-        return noAccessResponse();
-      }
-
-      const redis = ports.redis;
-      if (!redis) {
-        const description = "Authorization is temporarily unavailable";
-        return c.json(
-          {
-            error: "server_error",
-            error_description: description,
-            redirect: errorRedirect({ error: "server_error", description }),
-          },
-          500,
-        );
-      }
-
-      const code = randomUUID();
-      await redis.set(
-        `${REDIS_AUTH_CODE_PREFIX}${code}`,
-        JSON.stringify({
-          projectId: project.id,
-          encryptedApiKey: ports.encrypt(project.apiKey),
-          // Captured here so MCP tools that need a caller identity (governance
-          // install/uninstall/rotate) can attribute audit rows to the actual
-          // OAuth-flowing user instead of falling back to a project-wide
-          // identity. Read at the token-exchange step.
-          userId: session.user.id,
-          codeChallenge,
-          codeChallengeMethod: codeChallengeMethod ?? "S256",
-          // Bound here so the token endpoint can require the exchange to
-          // present the exact same client_id + redirect_uri this authorization
-          // was validated and approved against (RFC 6749 §4.1.3 / §3.2.1) — a
-          // code minted for one client's registered URI must never be
-          // redeemable against another.
-          clientId,
-          redirectUri,
-          expiresAt: Date.now() + AUTH_CODE_TTL_SECONDS * 1000,
-        }),
-        "EX",
-        AUTH_CODE_TTL_SECONDS,
+            description: noAccessDescription,
+          }),
+        },
+        403,
       );
 
-      const redirectUrl = new URL(redirectUri);
-      redirectUrl.searchParams.set("code", code);
-      if (state) redirectUrl.searchParams.set("state", state);
+    if (ports.isDemoProject(projectId)) {
+      return noAccessResponse();
+    }
 
-      return c.json({ redirect: redirectUrl.toString() });
-    });
+    const project = await ports.tryGetProject(projectId);
+    if (
+      !project ||
+      project.archivedAt !== null ||
+      !(await ports.probeProjectPermission({
+        session,
+        projectId,
+        permission: MCP_AUTHORIZE_PERMISSION,
+      }))
+    ) {
+      // A single 403 whether the project is missing, archived, or simply
+      // inaccessible — never disclose the existence of a project the caller
+      // cannot reach.
+      return noAccessResponse();
+    }
 
-  return secured.hono;
+    const redis = ports.redis;
+    if (!redis) {
+      const description = "Authorization is temporarily unavailable";
+      return c.json(
+        {
+          error: "server_error",
+          error_description: description,
+          redirect: errorRedirect({ error: "server_error", description }),
+        },
+        500,
+      );
+    }
+
+    const code = randomUUID();
+    await redis.set(
+      `${REDIS_AUTH_CODE_PREFIX}${code}`,
+      JSON.stringify({
+        projectId: project.id,
+        encryptedApiKey: ports.encrypt(project.apiKey),
+        // Captured here so MCP tools that need a caller identity (governance
+        // install/uninstall/rotate) can attribute audit rows to the actual
+        // OAuth-flowing user instead of falling back to a project-wide
+        // identity. Read at the token-exchange step.
+        userId: session.user.id,
+        codeChallenge,
+        codeChallengeMethod: codeChallengeMethod ?? "S256",
+        // Bound here so the token endpoint can require the exchange to
+        // present the exact same client_id + redirect_uri this authorization
+        // was validated and approved against (RFC 6749 §4.1.3 / §3.2.1) — a
+        // code minted for one client's registered URI must never be
+        // redeemable against another.
+        clientId,
+        redirectUri,
+        expiresAt: Date.now() + AUTH_CODE_TTL_SECONDS * 1000,
+      }),
+      "EX",
+      AUTH_CODE_TTL_SECONDS,
+    );
+
+    const redirectUrl = new URL(redirectUri);
+    redirectUrl.searchParams.set("code", code);
+    if (state) redirectUrl.searchParams.set("state", state);
+
+    return c.json({ redirect: redirectUrl.toString() });
+  };
+
+  return service
+    .registerRoute("post", "/mcp/authorize", MANAGEMENT_API_VERSION, authorizeHandler, (b) =>
+      policy(
+        handlerManagedAuth({
+          reason: "user session validated in-handler",
+          // OAuth authorize step; no RBAC permission gates it.
+          permissions: [],
+          credential: "session",
+        }),
+      )(b).withRawResponse(
+        "the consent page reads the OAuth error shape RFC 6749 §4.1.2.1 defines — " +
+          "error, error_description and the redirect to send the client back to",
+      ),
+    )
+    .build();
 }
 
 /** The value where the body carried a string, and nothing where it did not. */

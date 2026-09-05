@@ -356,7 +356,7 @@ function mountProcessTailFamilies(options: {
     createGatewayPlatformRestApp({
       security,
       gateway: refuse("The gateway control plane"),
-    }).hono as unknown as Hono,
+    }) as unknown as Hono,
   );
 
   app.route(
@@ -366,7 +366,7 @@ function mountProcessTailFamilies(options: {
       billingPlanGate: noopMiddleware,
       canonicalError: refuse("Canonical error rendering") as never,
       spend: refuse("Gateway spend"),
-    }).hono as unknown as Hono,
+    }) as unknown as Hono,
   );
 
   options.absences.push(

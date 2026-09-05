@@ -3,7 +3,12 @@
  * /api/bug-reports`.
  */
 import { publicEndpoint } from "@langwatch/api";
-import { bodyLimit, type AppRestSecurity, type MountableRestApp } from "@langwatch/api/rest";
+import {
+  bodyLimit,
+  type AppRestSecurity,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+} from "@langwatch/api/rest";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { Context } from "hono";
@@ -81,54 +86,71 @@ export function createBugReportsRestApp(options: {
   ports: BugReportRestPorts;
 }): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({ basePath: "/api/bug-reports" });
 
-  secured
-    .access(
-      publicEndpoint(
-        "Agent issue-report intake; reporters may have no working credentials, an API key only enriches the report with a project link",
-      ),
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "bug-reports",
+    basePath: "/api/bug-reports",
+    // Released CLI and MCP builds POST this exact path; the intake has no
+    // dated contract to negotiate.
+    staticGeneration: "v1",
+    errorEnvelope: "legacy",
+  });
+
+  const intakeDoor = policy(
+    publicEndpoint(
+      "Agent issue-report intake; reporters may have no working credentials, an API key only enriches the report with a project link",
+    ),
+  );
+
+  const submitHandler = async (c: Context) => {
+    let json: unknown;
+    try {
+      json = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid body, expecting JSON" }, 400);
+    }
+
+    const parsed = bugReportBodySchema.safeParse(json);
+    if (!parsed.success) {
+      return c.json({ error: "Invalid report", details: parsed.error.flatten() }, 400);
+    }
+
+    const credentials = ports.credentials(c.req.raw);
+    const apiKeys = ports.apiKeys?.();
+
+    try {
+      const intake = BugReportIntakeService.create({
+        reports: ports.reports(),
+        rateLimiter: ports.rateLimiter,
+        notifier: ports.notifier,
+      });
+      const { id } = await intake.submit({
+        input: parsed.data,
+        callerKey: callerKey(c),
+        ...(credentials ? { apiToken: credentials.token } : {}),
+        ...(credentials ? { projectIdHint: credentials.projectId } : {}),
+        ...(apiKeys ? { apiKeys } : {}),
+      });
+      return c.json({ id }, 201);
+    } catch (error) {
+      if (HandledError.isHandled(error)) {
+        return c.json(
+          { error: error.message, code: error.code },
+          error.httpStatus as 400 | 429 | 500,
+        );
+      }
+      throw error;
+    }
+  };
+
+  return service
+    .registerRoute("post", "/", MANAGEMENT_API_VERSION, submitHandler, (b) =>
+      intakeDoor(b)
+        .withMiddleware(bodyLimit({ maxSize: MAX_BODY_BYTES }))
+        .withRawResponse(
+          "released CLI and MCP builds parse the intake's own bodies: { id } on 201, " +
+            "{ error, details } on a rejected report, { error, code } on a handled refusal",
+        ),
     )
-    .post("/", bodyLimit({ maxSize: MAX_BODY_BYTES }), async (c) => {
-      let json: unknown;
-      try {
-        json = await c.req.json();
-      } catch {
-        return c.json({ error: "Invalid body, expecting JSON" }, 400);
-      }
-
-      const parsed = bugReportBodySchema.safeParse(json);
-      if (!parsed.success) {
-        return c.json({ error: "Invalid report", details: parsed.error.flatten() }, 400);
-      }
-
-      const credentials = ports.credentials(c.req.raw);
-      const apiKeys = ports.apiKeys?.();
-
-      try {
-        const intake = BugReportIntakeService.create({
-          reports: ports.reports(),
-          rateLimiter: ports.rateLimiter,
-          notifier: ports.notifier,
-        });
-        const { id } = await intake.submit({
-          input: parsed.data,
-          callerKey: callerKey(c),
-          ...(credentials ? { apiToken: credentials.token } : {}),
-          ...(credentials ? { projectIdHint: credentials.projectId } : {}),
-          ...(apiKeys ? { apiKeys } : {}),
-        });
-        return c.json({ id }, 201);
-      } catch (error) {
-        if (HandledError.isHandled(error)) {
-          return c.json(
-            { error: error.message, code: error.code },
-            error.httpStatus as 400 | 429 | 500,
-          );
-        }
-        throw error;
-      }
-    });
-
-  return secured.hono;
+    .build();
 }

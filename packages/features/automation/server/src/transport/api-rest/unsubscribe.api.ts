@@ -11,7 +11,11 @@
  */
 
 import { publicEndpoint } from "@langwatch/api";
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import {
+  type AppRestSecurity,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+} from "@langwatch/api/rest";
 import { InvalidUnsubscribeTokenError } from "@langwatch/automation-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
@@ -48,60 +52,87 @@ export function createUnsubscribeRestApp(options: {
   ports: UnsubscribeRestPorts;
 }): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({ basePath: "/api" });
 
-  secured
-    .access(
-      publicEndpoint(
-        "RFC 8058 one-click unsubscribe; HMAC token in ?token= is the authorization, no session",
-      ),
-    )
-    .post("/unsubscribe", async (c) => {
-      const ip = ports.clientAddress(c);
-      const limit = await ports.rateLimit({
-        key: `unsubscribe:one-click:${ip ?? "unknown"}`,
-        windowSeconds: 60,
-        max: 10,
-      });
-      if (!limit.allowed) {
-        return c.json({ error: "Too many requests" }, 429);
-      }
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "unsubscribe",
+    basePath: "/api",
+    // The mail client's link is the contract, not a dated namespace: the
+    // family answers at `/api/unsubscribe`, exactly where every already-sent
+    // message points.
+    staticGeneration: "v1",
+    errorEnvelope: "legacy",
+  });
 
-      const token = c.req.query("token") ?? null;
-      if (!token) {
-        return c.json({ error: "Missing token" }, 400);
-      }
+  const oneClick = policy(
+    publicEndpoint(
+      "RFC 8058 one-click unsubscribe; HMAC token in ?token= is the authorization, no session",
+    ),
+  );
 
-      try {
-        await ports.automation().confirmUnsubscribe({
-          token,
-          scope: "trigger",
-        });
-      } catch (err) {
-        // Distinguish a bad/tampered token (4xx) from a downstream persistence
-        // failure (5xx) — a DB blip must not be reported to the mail client as an
-        // invalid link.
-        if (err instanceof InvalidUnsubscribeTokenError) {
-          return c.json({ error: "Invalid token" }, 400);
-        }
-        logger.error({ error: err }, "One-click unsubscribe failed");
-        return c.json({ error: "Internal server error" }, 500);
-      }
+  const guard = policy(
+    publicEndpoint("RFC 8058 one-click unsubscribe; method guard returns 405 for non-POST"),
+  );
 
-      logger.info("One-click unsubscribe processed");
-      return c.json({ ok: true });
-    });
+  return (
+    service
+      .registerRoute(
+        "post",
+        "/unsubscribe",
+        MANAGEMENT_API_VERSION,
+        async (c: Context) => {
+          const ip = ports.clientAddress(c);
+          const limit = await ports.rateLimit({
+            key: `unsubscribe:one-click:${ip ?? "unknown"}`,
+            windowSeconds: 60,
+            max: 10,
+          });
+          if (!limit.allowed) {
+            return c.json({ error: "Too many requests" }, 429);
+          }
 
-  // RFC 8058 one-click is POST-only. Registered AFTER the POST route so that a
-  // POST request resolves to the handler above; every other method falls through
-  // to here for a 405 with an Allow header (matching the legacy contract) rather
-  // than a bare 404.
-  secured
-    .access(publicEndpoint("RFC 8058 one-click unsubscribe; method guard returns 405 for non-POST"))
-    .all("/unsubscribe", (c) => {
-      c.header("Allow", "POST");
-      return c.json({ error: "Method not allowed" }, 405);
-    });
+          const token = c.req.query("token") ?? null;
+          if (!token) {
+            return c.json({ error: "Missing token" }, 400);
+          }
 
-  return secured.hono;
+          try {
+            await ports.automation().confirmUnsubscribe({
+              token,
+              scope: "trigger",
+            });
+          } catch (err) {
+            // Distinguish a bad/tampered token (4xx) from a downstream persistence
+            // failure (5xx) — a DB blip must not be reported to the mail client as an
+            // invalid link.
+            if (err instanceof InvalidUnsubscribeTokenError) {
+              return c.json({ error: "Invalid token" }, 400);
+            }
+            logger.error({ error: err }, "One-click unsubscribe failed");
+            return c.json({ error: "Internal server error" }, 500);
+          }
+
+          logger.info("One-click unsubscribe processed");
+          return c.json({ ok: true });
+        },
+        (b) =>
+          oneClick(b).withRawResponse(
+            "the mail client reads a status, not a schema: one shape for success and " +
+              "one for each refusal, unchanged since the links were sent",
+          ),
+      )
+      // RFC 8058 one-click is POST-only. Registered AFTER the POST route so that a
+      // POST request resolves to the handler above; every other method falls through
+      // to here for a 405 with an Allow header (matching the legacy contract) rather
+      // than a bare 404.
+      .registerAnyMethodRoute(
+        "/unsubscribe",
+        MANAGEMENT_API_VERSION,
+        (c: Context) => {
+          c.header("Allow", "POST");
+          return c.json({ error: "Method not allowed" }, 405);
+        },
+        (b) => guard(b),
+      )
+      .build()
+  );
 }

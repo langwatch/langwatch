@@ -4,7 +4,13 @@
 import { timingSafeEqual } from "node:crypto";
 
 import { handlerManagedAuth } from "@langwatch/api";
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import {
+  type AppRestSecurity,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  type ServiceContext,
+} from "@langwatch/api/rest";
 
 import type { OpsExplainService } from "../../services/ops-clickhouse-explain.service";
 import { explainBodySchema } from "../../adapters/ops-clickhouse-explain.adapter";
@@ -37,69 +43,87 @@ export function createOpsClickHouseExplainRestApp(options: {
   ports: OpsClickHouseExplainRestPorts;
 }): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({ basePath: "/api" });
 
-  secured
-    .access(
-      handlerManagedAuth({
-        reason:
-          "Bearer LANGWATCH_OPS_API_KEY constant-time compared; missing or wrong key returns 401. Operator-only endpoint for the clickhouse-optimizer agent.",
-        // Operator secret, not an RBAC permission.
-        permissions: [],
-        credential: "internal",
-      }),
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "ops-clickhouse-explain",
+    basePath: "/api",
+    // The operator tool calls one fixed path; there is no dated contract to
+    // negotiate, so the family serves one generation at the path it has.
+    staticGeneration: "v1",
+    errorEnvelope: "legacy",
+  });
+
+  const operator = policy(
+    handlerManagedAuth({
+      reason:
+        "Bearer LANGWATCH_OPS_API_KEY constant-time compared; missing or wrong key returns 401. Operator-only endpoint for the clickhouse-optimizer agent.",
+      // Operator secret, not an RBAC permission.
+      permissions: [],
+      credential: "internal",
+    }),
+  );
+
+  return service
+    .registerRoute(
+      "post",
+      "/ops/clickhouse/explain",
+      MANAGEMENT_API_VERSION,
+      async (c: ServiceContext<EndpointVariables>) => {
+        if (!bearerTokenMatches(c.req.header("authorization"), ports.opsApiKey())) {
+          return c.json({ message: "Unauthorized" }, 401);
+        }
+
+        let body: unknown;
+        try {
+          body = await c.req.json();
+        } catch {
+          return c.json({ message: "request body must be JSON" }, 400);
+        }
+        const parsed = explainBodySchema.safeParse(body);
+        if (!parsed.success) {
+          const issue = parsed.error.issues[0];
+          const path = issue?.path?.length ? `${issue.path.join(".")}: ` : "";
+          return c.json({ message: `${path}${issue?.message ?? "invalid body"}` }, 400);
+        }
+
+        const built = buildExplainQuery(parsed.data.query, parsed.data.type);
+        if (!built.ok) {
+          return c.json({ message: built.reason }, 400);
+        }
+
+        const outcome = await ports.explain().explain({
+          wrappedQuery: built.wrapped!,
+          type: built.type!,
+          isProduction: ports.isProduction,
+          auditFields: redactQueryForAudit(parsed.data.query),
+        });
+
+        switch (outcome.status) {
+          case "not_configured_in_production":
+            return c.json(
+              {
+                message:
+                  "ClickHouse ops user is not configured on this instance (CLICKHOUSE_OPS_URL unset in production).",
+              },
+              503,
+            );
+          case "unavailable":
+            return c.json({ message: "ClickHouse is not configured on this instance" }, 503);
+          case "error":
+            // The engine's own prose names cluster internals; the explain
+            // service logs it.
+            return c.json({ message: "ClickHouse refused the EXPLAIN" }, 502);
+          case "ok":
+            return c.json({ type: built.type, rows: outcome.rows });
+        }
+      },
+      (b) =>
+        operator(b).withRawResponse(
+          "the operator tool reads a status and a message: 401, 400, 502, 503 and the " +
+            "EXPLAIN rows all keep the exact bodies the agent already parses",
+        ),
     )
-    .post("/ops/clickhouse/explain", async (c) => {
-      if (!bearerTokenMatches(c.req.header("authorization"), ports.opsApiKey())) {
-        return c.json({ message: "Unauthorized" }, 401);
-      }
-
-      let body: unknown;
-      try {
-        body = await c.req.json();
-      } catch {
-        return c.json({ message: "request body must be JSON" }, 400);
-      }
-      const parsed = explainBodySchema.safeParse(body);
-      if (!parsed.success) {
-        const issue = parsed.error.issues[0];
-        const path = issue?.path?.length ? `${issue.path.join(".")}: ` : "";
-        return c.json({ message: `${path}${issue?.message ?? "invalid body"}` }, 400);
-      }
-
-      const built = buildExplainQuery(parsed.data.query, parsed.data.type);
-      if (!built.ok) {
-        return c.json({ message: built.reason }, 400);
-      }
-
-      const outcome = await ports.explain().explain({
-        wrappedQuery: built.wrapped!,
-        type: built.type!,
-        isProduction: ports.isProduction,
-        auditFields: redactQueryForAudit(parsed.data.query),
-      });
-
-      switch (outcome.status) {
-        case "not_configured_in_production":
-          return c.json(
-            {
-              message:
-                "ClickHouse ops user is not configured on this instance (CLICKHOUSE_OPS_URL unset in production).",
-            },
-            503,
-          );
-        case "unavailable":
-          return c.json({ message: "ClickHouse is not configured on this instance" }, 503);
-        case "error":
-          // The engine's own prose names cluster internals; the explain
-          // service logs it.
-          return c.json({ message: "ClickHouse refused the EXPLAIN" }, 502);
-        case "ok":
-          return c.json({ type: built.type, rows: outcome.rows });
-      }
-    });
-
-  return secured.hono;
+    .build();
 }
 
 function bearerTokenMatches(headerValue: string | undefined, expected: string): boolean {

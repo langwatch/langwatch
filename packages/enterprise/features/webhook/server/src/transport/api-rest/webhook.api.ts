@@ -4,7 +4,6 @@ import { requires } from "@langwatch/api";
 import {
   type ApiErrorBody,
   apiErrorSchema,
-  type AppRestOrganizationVariables,
   type AppRestSecurity,
   BadRequestError,
   canonicalBaseResponses,
@@ -16,8 +15,12 @@ import {
   idempotentReplayHeaders,
   IDEMPOTENCY_KEY_HEADER,
   readIdempotencyKey,
-  type SecuredApp,
-  validator as zValidator,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  type OrganizationScopedContext,
+  organizationOf,
+  resolver,
+  type EndpointVariables,
 } from "@langwatch/api/rest";
 import {
   WEBHOOK_EVENT_TYPES,
@@ -31,7 +34,6 @@ import { toStoredEnum, toWireEnum } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Context, Next } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 
 import type { WebhookApp } from "#app/webhook.app";
@@ -482,21 +484,8 @@ export function createWebhookRestApp(options: {
     error: unknown,
     c: Context<any>,
   ) => { status: ContentfulStatusCode; body: ApiErrorBody };
-}): SecuredApp<{ Variables: AppRestOrganizationVariables }> {
+}): MountableRestApp {
   const { security, webhooks, canonicalError } = options;
-
-  const secured = security.createOrgApp({
-    basePath: "/api/webhooks/v1",
-    errorEnvelope: "canonical",
-  });
-
-  secured.hono.onError(
-    createCanonicalFamilyErrorHandler({
-      loggerName: "langwatch:api:webhooks:errors",
-      label: "Webhooks API Error",
-      mapError: canonicalError,
-    }),
-  );
 
   /**
    * Enterprise gate for the whole surface, delegating to the one shared
@@ -516,412 +505,429 @@ export function createWebhookRestApp(options: {
     await next();
   };
 
-  secured.access(requires("webhookEndpoints:manage")).post(
-    "/endpoints",
-    requireWebhookPlan,
-    describeRoute({
-      tags: ["Webhooks"],
-      summary: "Create a webhook endpoint",
-      description:
-        "Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for `destination_kind: sqs`. Naming the other kind's field is a 400 that says which field does not belong, rather than a 201 that saved half the body. `destination_kind` may be omitted and then means `http`. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
-      parameters: [idempotencyKeyParameter],
-      responses: {
-        ...canonicalBaseResponses,
-        ...canonicalConflictResponses,
-        201: {
-          description: "The endpoint, with the signing secret this body alone carries",
-          headers: idempotentReplayHeaders,
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ data: endpointWithSecretDtoSchema })),
-            },
+  const { service, policy } = security.createVersionedApp({
+    name: "webhooks",
+    // The generation is the contract: `/api/webhooks/v1` has been live since
+    // 2026-08, so its routes answer exactly where they answer today with no
+    // dated namespace and no `/api/v1` twin beside them.
+    basePath: "/api/webhooks/v1",
+    staticGeneration: "v1",
+    errorEnvelope: "canonical",
+    errorHandler: () =>
+      createCanonicalFamilyErrorHandler({
+        loggerName: "langwatch:api:webhooks:errors",
+        label: "Webhooks API Error",
+        mapError: canonicalError,
+      }),
+    routeMiddleware: [requireWebhookPlan],
+  });
+
+  type WebhookContext = OrganizationScopedContext<EndpointVariables>;
+
+  const endpointIdParams = z.object({ id: z.string().min(1) });
+
+  return service
+    .registerRoute(
+      "post",
+      "/endpoints",
+      MANAGEMENT_API_VERSION,
+      async (c: WebhookContext, body: z.infer<typeof createEndpointSchema>) => {
+        const organization = organizationOf(c);
+        const services = webhooks();
+        // Scoped to the organization, not a project: this family authenticates at
+        // the org, so that is the tenancy a key is unique within.
+        const outcome = await services.runIdempotent({
+          operation: "webhooks.v1.endpoints.create",
+          scopeId: organization.id,
+          key: readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER)),
+          validatedBody: body,
+          handler: async () => {
+            const { endpoint, secret } = await services.endpoints.create({
+              organizationId: organization.id,
+              ...destinationFromBody(body),
+              enabledEvents: body.enabled_events,
+              maxBatchSize: body.max_batch_size,
+              maxBatchDelayMs: body.max_batch_delay_ms,
+              maxInFlight: body.max_in_flight,
+            });
+            return {
+              status: 201,
+              body: { data: { ...endpointResponse(endpoint), secret } },
+            };
           },
-        },
+        });
+        return idempotentJson({ c, outcome });
       },
-    }),
-    zValidator("json", createEndpointSchema),
-    async (c) => {
-      const organization = c.get("organization");
-      const body = c.req.valid("json");
-      const services = webhooks();
-      // Scoped to the organization, not a project: this family authenticates at
-      // the org, so that is the tenancy a key is unique within.
-      const outcome = await services.runIdempotent({
-        operation: "webhooks.v1.endpoints.create",
-        scopeId: organization.id,
-        key: readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER)),
-        validatedBody: body,
-        handler: async () => {
-          const { endpoint, secret } = await services.endpoints.create({
+      (b) =>
+        policy(requires("webhookEndpoints:manage"))(b)
+          .withInput(createEndpointSchema)
+          // The ledger writes the replay from the STORED bytes, so the answer
+          // is written through rather than re-serialised: a replay of a lost
+          // create is the only way to recover its signing secret.
+          .withRawResponse(
+            "a replayable create answers the ORIGINAL stored response, marked with " +
+              "X-Idempotent-Replay, so it cannot drift from the answer it stands in for",
+          )
+          .withDocs({
+            tags: ["Webhooks"],
+            summary: "Create a webhook endpoint",
+            parameters: [idempotencyKeyParameter],
+            description:
+              "Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for `destination_kind: sqs`. Naming the other kind's field is a 400 that says which field does not belong, rather than a 201 that saved half the body. `destination_kind` may be omitted and then means `http`. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+            responses: {
+              ...canonicalBaseResponses,
+              ...canonicalConflictResponses,
+              201: {
+                description: "The endpoint, with the signing secret this body alone carries",
+                headers: idempotentReplayHeaders,
+                content: {
+                  "application/json": {
+                    schema: resolver(z.object({ data: endpointWithSecretDtoSchema })),
+                  },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "get",
+      "/endpoints",
+      MANAGEMENT_API_VERSION,
+      async (c: WebhookContext) => {
+        const organization = organizationOf(c);
+        const list = await webhooks().endpoints.getAll({ organizationId: organization.id });
+        return { data: list.map(endpointResponse) };
+      },
+      (b) =>
+        policy(requires("webhookEndpoints:view"))(b)
+          .withOutput(z.object({ data: z.array(endpointDtoSchema) }))
+          .withDocs({
+            tags: ["Webhooks"],
+            summary: "List webhook endpoints",
+            description: "List the organization's webhook endpoints",
+            responses: canonicalBaseResponses,
+          }),
+    )
+    .registerRoute(
+      "get",
+      "/endpoints/:id",
+      MANAGEMENT_API_VERSION,
+      async (c: WebhookContext, input: { id: string }) => {
+        const organization = organizationOf(c);
+        const endpoint = await webhooks().endpoints.getById({
+          organizationId: organization.id,
+          endpointId: input.id,
+        });
+        return { data: endpointResponse(endpoint) };
+      },
+      (b) =>
+        policy(requires("webhookEndpoints:view"))(b)
+          .withParams(endpointIdParams)
+          .withOutput(z.object({ data: endpointDtoSchema }))
+          .withDocs({
+            tags: ["Webhooks"],
+            summary: "Get a webhook endpoint",
+            description: "Get one webhook endpoint",
+            responses: { ...canonicalBaseResponses, ...notFoundResponse },
+          }),
+    )
+    .registerRoute(
+      "patch",
+      "/endpoints/:id",
+      MANAGEMENT_API_VERSION,
+      async (c: WebhookContext, input: { id: string } & z.infer<typeof updateEndpointSchema>) => {
+        const organization = organizationOf(c);
+        const endpointId = input.id;
+        const body = input;
+        const endpoints = webhooks().endpoints;
+
+        const hasFieldUpdate =
+          body.destination_kind !== undefined ||
+          body.url !== undefined ||
+          body.sqs !== undefined ||
+          body.enabled_events !== undefined ||
+          body.max_batch_size !== undefined ||
+          body.max_batch_delay_ms !== undefined ||
+          body.max_in_flight !== undefined;
+        let endpoint = hasFieldUpdate
+          ? await endpoints.update({
+              organizationId: organization.id,
+              endpointId,
+              destinationKind: body.destination_kind,
+              url: body.url,
+              ...(body.sqs !== undefined ? { sqs: sqsFromBody(body.sqs) } : {}),
+              enabledEvents: body.enabled_events,
+              maxBatchSize: body.max_batch_size,
+              maxBatchDelayMs: body.max_batch_delay_ms,
+              maxInFlight: body.max_in_flight,
+            })
+          : await endpoints.getById({
+              organizationId: organization.id,
+              endpointId,
+            });
+        const requestedStatus = body.status && toStoredEnum(body.status);
+        if (requestedStatus === "DISABLED" && endpoint.status === "ACTIVE") {
+          endpoint = await endpoints.disable({
             organizationId: organization.id,
-            ...destinationFromBody(body),
-            enabledEvents: body.enabled_events,
-            maxBatchSize: body.max_batch_size,
-            maxBatchDelayMs: body.max_batch_delay_ms,
-            maxInFlight: body.max_in_flight,
+            endpointId,
+          });
+        } else if (requestedStatus === "ACTIVE" && endpoint.status === "DISABLED") {
+          endpoint = await endpoints.enable({
+            organizationId: organization.id,
+            endpointId,
+          });
+        }
+        return { data: endpointResponse(endpoint) };
+      },
+      (b) =>
+        policy(requires("webhookEndpoints:manage"))(b)
+          .withParams(endpointIdParams)
+          .withInput(updateEndpointSchema)
+          .withOutput(z.object({ data: endpointDtoSchema }))
+          .withDocs({
+            tags: ["Webhooks"],
+            summary: "Update a webhook endpoint",
+            description:
+              "Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it). `destination_kind` cannot change: batches already planned against the old transport are in flight, so a move means a new endpoint alongside this one until it has drained.",
+            responses: { ...canonicalBaseResponses, ...notFoundResponse },
+          }),
+    )
+    .registerRoute(
+      "delete",
+      "/endpoints/:id",
+      MANAGEMENT_API_VERSION,
+      async (c: WebhookContext, input: { id: string }) => {
+        const organization = organizationOf(c);
+        await webhooks().endpoints.archive({
+          organizationId: organization.id,
+          endpointId: input.id,
+        });
+        return { data: { archived: true as const } };
+      },
+      (b) =>
+        policy(requires("webhookEndpoints:manage"))(b)
+          .withParams(endpointIdParams)
+          .withOutput(z.object({ data: z.object({ archived: z.literal(true) }) }))
+          .withDocs({
+            tags: ["Webhooks"],
+            summary: "Archive a webhook endpoint",
+            description: "Archive a webhook endpoint",
+            responses: { ...canonicalBaseResponses, ...notFoundResponse },
+          }),
+    )
+    .registerRoute(
+      "post",
+      "/endpoints/:id/roll-secret",
+      MANAGEMENT_API_VERSION,
+      async (c: WebhookContext, input: { id: string }) => {
+        const organization = organizationOf(c);
+        const { endpoint, secret } = await webhooks().endpoints.rollSecret({
+          organizationId: organization.id,
+          endpointId: input.id,
+        });
+        return { data: { ...endpointResponse(endpoint), secret } };
+      },
+      (b) =>
+        policy(requires("webhookEndpoints:manage"))(b)
+          .withParams(endpointIdParams)
+          .withOutput(z.object({ data: endpointWithSecretDtoSchema }))
+          .withDocs({
+            tags: ["Webhooks"],
+            summary: "Roll an endpoint's signing secret",
+            description:
+              "Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately.",
+            responses: { ...canonicalBaseResponses, ...notFoundResponse },
+          }),
+    )
+    .registerRoute(
+      "post",
+      "/endpoints/:id/test",
+      MANAGEMENT_API_VERSION,
+      async (c: WebhookContext, input: { id: string }) => {
+        const organization = organizationOf(c);
+        const endpointId = input.id;
+        const services = webhooks();
+        const [secrets, destination] = await Promise.all([
+          services.endpoints.getSigningSecrets({
+            organizationId: organization.id,
+            endpointId,
+          }),
+          services.endpoints.getDestinationConfig({
+            organizationId: organization.id,
+            endpointId,
+          }),
+        ]);
+        const dispatchId = `test:${randomUUID()}`;
+        try {
+          // The test has to reach exactly what real delivery reaches, including
+          // the transport: a queue endpoint's test must land on the queue, not
+          // on a URL it does not have.
+          const result = await services.dispatch({
+            destination,
+            organizationId: organization.id,
+            endpointId,
+            body: testFireBody(new Date()),
+            batchId: dispatchId,
+            attempt: 1,
+            signingSecrets: secrets,
+            isTestFire: true,
+          });
+          const delivered = result.verdict === "success";
+          await recordTestFire(services.endpoints, {
+            organizationId: organization.id,
+            endpointId,
+            dispatchId,
+            outcome: delivered ? "success" : "terminal",
+            ...(result.status !== null ? { responseStatus: result.status } : {}),
           });
           return {
-            status: 201,
-            body: { data: { ...endpointResponse(endpoint), secret } },
+            data: {
+              delivered,
+              // Null on a transport with no status of its own: a queue accepted
+              // the message or it did not, and there is no code to report.
+              response_status: result.status,
+              // `body` is `unknown` on the dispatch result — a queue transport
+              // answers with whatever its client returned — so it is rendered
+              // rather than sliced directly, which would throw on a non-string.
+              response_body: String(delivered ? (result.body ?? "") : (result.error ?? "")).slice(
+                0,
+                500,
+              ),
+            },
           };
-        },
-      });
-      return idempotentJson({ c, outcome });
-    },
-  );
-
-  secured.access(requires("webhookEndpoints:view")).get(
-    "/endpoints",
-    requireWebhookPlan,
-    describeRoute({
-      tags: ["Webhooks"],
-      summary: "List webhook endpoints",
-      description: "List the organization's webhook endpoints",
-      responses: okResponse(
-        "Every endpoint the organization has, archived ones excluded",
-        z.object({ data: z.array(endpointDtoSchema) }),
-      ),
-    }),
-    async (c) => {
-      const organization = c.get("organization");
-      const list = await webhooks().endpoints.getAll({ organizationId: organization.id });
-      return c.json({ data: list.map(endpointResponse) });
-    },
-  );
-
-  secured.access(requires("webhookEndpoints:view")).get(
-    "/endpoints/:id",
-    requireWebhookPlan,
-    describeRoute({
-      tags: ["Webhooks"],
-      summary: "Get a webhook endpoint",
-      description: "Get one webhook endpoint",
-      responses: {
-        ...okResponse("The endpoint", z.object({ data: endpointDtoSchema })),
-        ...notFoundResponse,
-      },
-    }),
-    async (c) => {
-      const organization = c.get("organization");
-      const endpoint = await webhooks().endpoints.getById({
-        organizationId: organization.id,
-        endpointId: c.req.param("id"),
-      });
-      return c.json({ data: endpointResponse(endpoint) });
-    },
-  );
-
-  secured.access(requires("webhookEndpoints:manage")).patch(
-    "/endpoints/:id",
-    requireWebhookPlan,
-    describeRoute({
-      tags: ["Webhooks"],
-      summary: "Update a webhook endpoint",
-      description:
-        "Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it). `destination_kind` cannot change: batches already planned against the old transport are in flight, so a move means a new endpoint alongside this one until it has drained.",
-      responses: {
-        ...okResponse("The endpoint as it now stands", z.object({ data: endpointDtoSchema })),
-        ...notFoundResponse,
-      },
-    }),
-    zValidator("json", updateEndpointSchema),
-    async (c) => {
-      const organization = c.get("organization");
-      const endpointId = c.req.param("id");
-      const body = c.req.valid("json");
-      const endpoints = webhooks().endpoints;
-
-      const hasFieldUpdate =
-        body.destination_kind !== undefined ||
-        body.url !== undefined ||
-        body.sqs !== undefined ||
-        body.enabled_events !== undefined ||
-        body.max_batch_size !== undefined ||
-        body.max_batch_delay_ms !== undefined ||
-        body.max_in_flight !== undefined;
-      let endpoint = hasFieldUpdate
-        ? await endpoints.update({
+        } catch (error) {
+          // The full message goes to the delivery log for the operator; the
+          // response carries a sanitized summary so internal dispatch wording
+          // and transport details never reach the caller verbatim.
+          await recordTestFire(services.endpoints, {
             organizationId: organization.id,
             endpointId,
-            destinationKind: body.destination_kind,
-            url: body.url,
-            ...(body.sqs !== undefined ? { sqs: sqsFromBody(body.sqs) } : {}),
-            enabledEvents: body.enabled_events,
-            maxBatchSize: body.max_batch_size,
-            maxBatchDelayMs: body.max_batch_delay_ms,
-            maxInFlight: body.max_in_flight,
-          })
-        : await endpoints.getById({
-            organizationId: organization.id,
-            endpointId,
+            dispatchId,
+            outcome: "terminal",
+            error: error instanceof Error ? error.message.slice(0, 500) : String(error),
           });
-      const requestedStatus = body.status && toStoredEnum(body.status);
-      if (requestedStatus === "DISABLED" && endpoint.status === "ACTIVE") {
-        endpoint = await endpoints.disable({
-          organizationId: organization.id,
-          endpointId,
-        });
-      } else if (requestedStatus === "ACTIVE" && endpoint.status === "DISABLED") {
-        endpoint = await endpoints.enable({
-          organizationId: organization.id,
-          endpointId,
-        });
-      }
-      return c.json({ data: endpointResponse(endpoint) });
-    },
-  );
-
-  secured.access(requires("webhookEndpoints:manage")).delete(
-    "/endpoints/:id",
-    requireWebhookPlan,
-    describeRoute({
-      tags: ["Webhooks"],
-      summary: "Archive a webhook endpoint",
-      description: "Archive a webhook endpoint",
-      responses: {
-        ...okResponse(
-          "Archived: the endpoint is gone from every read and delivers nothing",
-          z.object({ data: z.object({ archived: z.literal(true) }) }),
-        ),
-        ...notFoundResponse,
-      },
-    }),
-    async (c) => {
-      const organization = c.get("organization");
-      await webhooks().endpoints.archive({
-        organizationId: organization.id,
-        endpointId: c.req.param("id"),
-      });
-      return c.json({ data: { archived: true } });
-    },
-  );
-
-  secured.access(requires("webhookEndpoints:manage")).post(
-    "/endpoints/:id/roll-secret",
-    requireWebhookPlan,
-    describeRoute({
-      tags: ["Webhooks"],
-      summary: "Roll an endpoint's signing secret",
-      description:
-        "Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately.",
-      responses: {
-        ...okResponse(
-          "The endpoint, with the new signing secret this body alone carries",
-          z.object({ data: endpointWithSecretDtoSchema }),
-        ),
-        ...notFoundResponse,
-      },
-    }),
-    async (c) => {
-      const organization = c.get("organization");
-      const { endpoint, secret } = await webhooks().endpoints.rollSecret({
-        organizationId: organization.id,
-        endpointId: c.req.param("id"),
-      });
-      return c.json({ data: { ...endpointResponse(endpoint), secret } });
-    },
-  );
-
-  secured.access(requires("webhookEndpoints:manage")).post(
-    "/endpoints/:id/test",
-    requireWebhookPlan,
-    describeRoute({
-      tags: ["Webhooks"],
-      summary: "Send a test event to an endpoint",
-      description:
-        "Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code.",
-      responses: {
-        ...okResponse(
-          "The test ran; `data.delivered` carries the receiver's verdict",
-          z.object({ data: testFireResultSchema }),
-        ),
-        ...notFoundResponse,
-      },
-    }),
-    async (c) => {
-      const organization = c.get("organization");
-      const endpointId = c.req.param("id");
-      const services = webhooks();
-      const [secrets, destination] = await Promise.all([
-        services.endpoints.getSigningSecrets({
-          organizationId: organization.id,
-          endpointId,
-        }),
-        services.endpoints.getDestinationConfig({
-          organizationId: organization.id,
-          endpointId,
-        }),
-      ]);
-      const dispatchId = `test:${randomUUID()}`;
-      try {
-        // The test has to reach exactly what real delivery reaches, including
-        // the transport: a queue endpoint's test must land on the queue, not
-        // on a URL it does not have.
-        const result = await services.dispatch({
-          destination,
-          organizationId: organization.id,
-          endpointId,
-          body: testFireBody(new Date()),
-          batchId: dispatchId,
-          attempt: 1,
-          signingSecrets: secrets,
-          isTestFire: true,
-        });
-        const delivered = result.verdict === "success";
-        await recordTestFire(services.endpoints, {
-          organizationId: organization.id,
-          endpointId,
-          dispatchId,
-          outcome: delivered ? "success" : "terminal",
-          ...(result.status !== null ? { responseStatus: result.status } : {}),
-        });
-        return c.json({
-          data: {
-            delivered,
-            // Null on a transport with no status of its own: a queue accepted
-            // the message or it did not, and there is no code to report.
-            response_status: result.status,
-            // `body` is `unknown` on the dispatch result — a queue transport
-            // answers with whatever its client returned — so it is rendered
-            // rather than sliced directly, which would throw on a non-string.
-            response_body: String(delivered ? (result.body ?? "") : (result.error ?? "")).slice(
-              0,
-              500,
-            ),
-          },
-        });
-      } catch (error) {
-        // The full message goes to the delivery log for the operator; the
-        // response carries a sanitized summary so internal dispatch wording
-        // and transport details never reach the caller verbatim.
-        await recordTestFire(services.endpoints, {
-          organizationId: organization.id,
-          endpointId,
-          dispatchId,
-          outcome: "terminal",
-          error: error instanceof Error ? error.message.slice(0, 500) : String(error),
-        });
-        return c.json({
-          data: {
-            delivered: false,
-            response_status: null,
-            error:
-              "The test delivery could not reach the receiver; see the endpoint's delivery log for details.",
-          },
-        });
-      }
-    },
-  );
-
-  secured.access(requires("webhookEndpoints:view")).get(
-    "/endpoints/:id/deliveries",
-    requireWebhookPlan,
-    describeRoute({
-      tags: ["Webhooks"],
-      summary: "List an endpoint's delivery attempts",
-      description:
-        "The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error",
-      responses: {
-        ...okResponse(
-          "One page of delivery attempts, newest first",
-          z.object({
-            data: z.array(deliveryDtoSchema),
-            next_cursor: nextCursorSchema,
-          }),
-        ),
-        ...notFoundResponse,
-      },
-    }),
-    zValidator("query", deliveriesQuerySchema),
-    async (c) => {
-      const organization = c.get("organization");
-      const { limit } = c.req.valid("query");
-      const cursorParam = c.req.valid("query").cursor;
-      let cursor: { firedAt: Date; id: string } | undefined;
-      if (cursorParam) {
-        const [firedAtMs, id] = cursorParam.split("~");
-        const parsedMs = Number(firedAtMs);
-        if (!Number.isInteger(parsedMs) || !id) {
-          throw new BadRequestError("invalid cursor");
+          return {
+            data: {
+              delivered: false,
+              response_status: null,
+              error:
+                "The test delivery could not reach the receiver; see the endpoint's delivery log for details.",
+            },
+          };
         }
-        cursor = { firedAt: new Date(parsedMs), id };
-      }
-      const page = await webhooks().endpoints.getDeliveries({
-        organizationId: organization.id,
-        endpointId: c.req.param("id"),
-        limit,
-        cursor,
-      });
-      return c.json({
-        next_cursor: page.nextCursor
-          ? `${page.nextCursor.firedAt.getTime()}~${page.nextCursor.id}`
-          : null,
-        data: page.deliveries.map((r) => ({
-          id: r.id,
-          dispatch_id: r.dispatchId,
-          attempt: r.attempt,
-          event_count: r.eventCount,
-          outcome: r.outcome,
-          response_status: r.responseStatus,
-          latency_ms: r.latencyMs,
-          error: r.error,
-          fired_at: r.firedAt.toISOString(),
-        })),
-      });
-    },
-  );
-
-  secured.access(requires("webhookEndpoints:view")).get(
-    "/endpoints/:id/health",
-    requireWebhookPlan,
-    describeRoute({
-      tags: ["Webhooks"],
-      summary: "Read an endpoint's delivery health",
-      description:
-        "Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour.",
-      responses: {
-        ...okResponse("The endpoint's delivery health", z.object({ data: healthDtoSchema })),
-        ...notFoundResponse,
       },
-    }),
-    async (c) => {
-      const organization = c.get("organization");
-      const report = await webhooks().health.health({
-        organizationId: organization.id,
-        endpointId: c.req.param("id"),
-      });
-      return c.json({
-        data: {
-          status: toWireEnum(report.status),
-          disabled_reason: report.disabledReason,
-          failing_since: report.failingSince?.toISOString() ?? null,
-          last_success_at: report.lastSuccessAt?.toISOString() ?? null,
-          last_failure_at: report.lastFailureAt?.toISOString() ?? null,
-          oldest_undelivered_age_ms: report.oldestUndeliveredAgeMs,
-          dlq_depth: report.dlqDepth,
-          sends_per_minute: report.sendsPerMinute,
-          success_rate: report.successRate,
-          p95_latency_ms: report.p95LatencyMs,
-        },
-      });
-    },
-  );
-
-  secured.access(requires("webhookEndpoints:view")).get(
-    "/event-types",
-    requireWebhookPlan,
-    describeRoute({
-      tags: ["Webhooks"],
-      summary: "List subscribable event types",
-      description:
-        "The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet",
-      responses: okResponse(
-        "Every subscribable event type",
-        z.object({ data: z.array(eventTypeDtoSchema) }),
-      ),
-    }),
-    async (c) => {
-      return c.json({
+      (b) =>
+        policy(requires("webhookEndpoints:manage"))(b)
+          .withParams(endpointIdParams)
+          .withOutput(z.object({ data: testFireResultSchema }))
+          .withDocs({
+            tags: ["Webhooks"],
+            summary: "Send a test event to an endpoint",
+            description:
+              "Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code.",
+            responses: { ...canonicalBaseResponses, ...notFoundResponse },
+          }),
+    )
+    .registerRoute(
+      "get",
+      "/endpoints/:id/deliveries",
+      MANAGEMENT_API_VERSION,
+      async (c: WebhookContext, input: { id: string } & z.infer<typeof deliveriesQuerySchema>) => {
+        const organization = organizationOf(c);
+        const { limit } = input;
+        const cursorParam = input.cursor;
+        let cursor: { firedAt: Date; id: string } | undefined;
+        if (cursorParam) {
+          const [firedAtMs, cursorId] = cursorParam.split("~");
+          const parsedMs = Number(firedAtMs);
+          if (!Number.isInteger(parsedMs) || !cursorId) {
+            throw new BadRequestError("invalid cursor");
+          }
+          cursor = { firedAt: new Date(parsedMs), id: cursorId };
+        }
+        const page = await webhooks().endpoints.getDeliveries({
+          organizationId: organization.id,
+          endpointId: input.id,
+          limit,
+          cursor,
+        });
+        return {
+          next_cursor: page.nextCursor
+            ? `${page.nextCursor.firedAt.getTime()}~${page.nextCursor.id}`
+            : null,
+          data: page.deliveries.map((r) => ({
+            id: r.id,
+            dispatch_id: r.dispatchId,
+            attempt: r.attempt,
+            event_count: r.eventCount,
+            outcome: r.outcome,
+            response_status: r.responseStatus,
+            latency_ms: r.latencyMs,
+            error: r.error,
+            fired_at: r.firedAt.toISOString(),
+          })),
+        };
+      },
+      (b) =>
+        policy(requires("webhookEndpoints:view"))(b)
+          .withParams(endpointIdParams)
+          .withQuery(deliveriesQuerySchema)
+          .withOutput(
+            z.object({
+              data: z.array(deliveryDtoSchema),
+              next_cursor: nextCursorSchema,
+            }),
+          )
+          .withDocs({
+            tags: ["Webhooks"],
+            summary: "List an endpoint's delivery attempts",
+            description:
+              "The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error",
+            responses: { ...canonicalBaseResponses, ...notFoundResponse },
+          }),
+    )
+    .registerRoute(
+      "get",
+      "/endpoints/:id/health",
+      MANAGEMENT_API_VERSION,
+      async (c: WebhookContext, input: { id: string }) => {
+        const organization = organizationOf(c);
+        const report = await webhooks().health.health({
+          organizationId: organization.id,
+          endpointId: input.id,
+        });
+        return {
+          data: {
+            status: toWireEnum(report.status),
+            disabled_reason: report.disabledReason,
+            failing_since: report.failingSince?.toISOString() ?? null,
+            last_success_at: report.lastSuccessAt?.toISOString() ?? null,
+            last_failure_at: report.lastFailureAt?.toISOString() ?? null,
+            oldest_undelivered_age_ms: report.oldestUndeliveredAgeMs,
+            dlq_depth: report.dlqDepth,
+            sends_per_minute: report.sendsPerMinute,
+            success_rate: report.successRate,
+            p95_latency_ms: report.p95LatencyMs,
+          },
+        };
+      },
+      (b) =>
+        policy(requires("webhookEndpoints:view"))(b)
+          .withParams(endpointIdParams)
+          .withOutput(z.object({ data: healthDtoSchema }))
+          .withDocs({
+            tags: ["Webhooks"],
+            summary: "Read an endpoint's delivery health",
+            description:
+              "Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour.",
+            responses: { ...canonicalBaseResponses, ...notFoundResponse },
+          }),
+    )
+    .registerRoute(
+      "get",
+      "/event-types",
+      MANAGEMENT_API_VERSION,
+      async () => ({
         data: WEBHOOK_EVENT_TYPES.map((t) => ({
           type: t.type,
           family: t.family,
@@ -929,75 +935,80 @@ export function createWebhookRestApp(options: {
           is_emitting: t.isEmitting,
           description: t.description,
         })),
-      });
-    },
-  );
-
-  secured.access(requires("webhookEndpoints:view")).get(
-    "/events",
-    requireWebhookPlan,
-    describeRoute({
-      tags: ["Webhooks"],
-      summary: "List emitted events",
-      description:
-        "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from` must not be later than `to` — a range that ends before it starts is rejected rather than answered with an empty page. They are required because the log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
-      responses: okResponse(
-        "One page of emitted-event envelopes, newest first",
-        z.object({
-          data: z.array(webhookEventEnvelopeSchema),
-          next_cursor: nextCursorSchema,
-        }),
-      ),
-    }),
-    zValidator("query", eventsQuerySchema),
-    async (c) => {
-      const organization = c.get("organization");
-      const query = c.req.valid("query");
-      // The service maps emitted types to row statuses and serves an empty
-      // page for unknown types, so consumers can probe forward-compatibly
-      // without an error.
-      const page = await webhooks()
-        .requireEvents()
-        .getEmittedEvents({
-          organizationId: organization.id,
-          fromMs: query.from,
-          toMs: query.to,
-          cursor: query.cursor ?? null,
-          limit: query.limit,
-          types: query.type !== undefined ? [query.type] : undefined,
-        });
-      return c.json({ data: page.events, next_cursor: page.nextCursor });
-    },
-  );
-
-  secured.access(requires("webhookEndpoints:view")).get(
-    "/events/:id",
-    requireWebhookPlan,
-    describeRoute({
-      tags: ["Webhooks"],
-      summary: "Get one emitted event",
-      description:
-        "One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids.",
-      responses: {
-        ...okResponse(
-          "The envelope, exactly as it was delivered",
-          z.object({ data: webhookEventEnvelopeSchema }),
-        ),
-        ...notFoundResponse,
+      }),
+      (b) =>
+        policy(requires("webhookEndpoints:view"))(b)
+          .withOutput(z.object({ data: z.array(eventTypeDtoSchema) }))
+          .withDocs({
+            tags: ["Webhooks"],
+            summary: "List subscribable event types",
+            description:
+              "The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet",
+            responses: canonicalBaseResponses,
+          }),
+    )
+    .registerRoute(
+      "get",
+      "/events",
+      MANAGEMENT_API_VERSION,
+      async (c: WebhookContext, query: z.infer<typeof eventsQuerySchema>) => {
+        const organization = organizationOf(c);
+        // The service maps emitted types to row statuses and serves an empty
+        // page for unknown types, so consumers can probe forward-compatibly
+        // without an error.
+        const page = await webhooks()
+          .requireEvents()
+          .getEmittedEvents({
+            organizationId: organization.id,
+            fromMs: query.from,
+            toMs: query.to,
+            cursor: query.cursor ?? null,
+            limit: query.limit,
+            types: query.type !== undefined ? [query.type] : undefined,
+          });
+        return { data: page.events, next_cursor: page.nextCursor };
       },
-    }),
-    async (c) => {
-      const organization = c.get("organization");
-      const event = await webhooks()
-        .requireEvents()
-        .tryGetEmittedEventById({
+      (b) =>
+        policy(requires("webhookEndpoints:view"))(b)
+          .withQuery(eventsQuerySchema)
+          .withOutput(
+            z.object({
+              data: z.array(webhookEventEnvelopeSchema),
+              next_cursor: nextCursorSchema,
+            }),
+          )
+          .withDocs({
+            tags: ["Webhooks"],
+            summary: "List emitted events",
+            description:
+              "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from` must not be later than `to` — a range that ends before it starts is rejected rather than answered with an empty page. They are required because the log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
+            responses: canonicalBaseResponses,
+          }),
+    )
+    .registerRoute(
+      "get",
+      "/events/:id",
+      MANAGEMENT_API_VERSION,
+      async (c: WebhookContext, input: { id: string }) => {
+        const organization = organizationOf(c);
+        const event = await webhooks().requireEvents().tryGetEmittedEventById({
           organizationId: organization.id,
-          id: c.req.param("id"),
+          id: input.id,
         });
-      if (!event) throw new WebhookEventNotFoundError();
-      return c.json({ data: event });
-    },
-  );
-
-  return secured;
+        if (!event) throw new WebhookEventNotFoundError();
+        return { data: event };
+      },
+      (b) =>
+        policy(requires("webhookEndpoints:view"))(b)
+          .withParams(endpointIdParams)
+          .withOutput(z.object({ data: webhookEventEnvelopeSchema }))
+          .withDocs({
+            tags: ["Webhooks"],
+            summary: "Get one emitted event",
+            description:
+              "One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids.",
+            responses: { ...canonicalBaseResponses, ...notFoundResponse },
+          }),
+    )
+    .build();
 }

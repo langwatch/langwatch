@@ -4,7 +4,14 @@
  */
 
 import { handlerManagedAuth } from "@langwatch/api";
-import { bodyLimit, type AppRestSecurity, type MountableRestApp } from "@langwatch/api/rest";
+import {
+  bodyLimit,
+  type AppRestSecurity,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  type ServiceContext,
+} from "@langwatch/api/rest";
 import {
   LangyApiRequestInvalidError,
   LangyConversationNotFoundError,
@@ -91,10 +98,17 @@ export function createLangyUiActionsRestApp(options: {
   ports: LangyUiActionsRestPorts;
 }): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({
+
+  const { service: restService, policy } = security.createServiceVersionedApp({
+    name: "langy-ui",
     basePath: "/api/langy/ui",
+    // `langwatch ui call` posts this exact path; the dispatch surface serves
+    // one generation rather than a dated namespace.
+    staticGeneration: "v1",
     errorEnvelope: "canonical",
   });
+
+  const uiDoor = policy(uiActionAuth);
 
   const service = () => {
     const langy = ports.langy();
@@ -110,45 +124,43 @@ export function createLangyUiActionsRestApp(options: {
     });
   };
 
-  secured
-    .access(uiActionAuth)
-    .post("/actions", bodyLimit({ maxSize: MAX_ACTION_BODY_BYTES }), async (c) => {
-      const caller = await resolveLangyRestCaller({
-        request: c.req.raw,
-        ports,
-        flag: LANGY_UI_ACTIONS_FLAG,
-      });
-      if (caller.dark) return c.notFound();
+  const dispatchHandler = async (c: ServiceContext<EndpointVariables>) => {
+    const caller = await resolveLangyRestCaller({
+      request: c.req.raw,
+      ports,
+      flag: LANGY_UI_ACTIONS_FLAG,
+    });
+    if (caller.dark) return c.notFound();
 
-      const parsed = dispatchBodySchema.safeParse(await c.req.json().catch(() => null));
-      if (!parsed.success) {
-        throw new LangyApiRequestInvalidError(parsed.error.issues);
-      }
-      const { conversationId, kind, payload, experimentSlug } = parsed.data;
+    const parsed = dispatchBodySchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) {
+      throw new LangyApiRequestInvalidError(parsed.error.issues);
+    }
+    const { conversationId, kind, payload, experimentSlug } = parsed.data;
 
-      // The action's own permission is the key's ceiling for this dispatch.
-      // Unknown kinds refuse before the ceiling so the error names the real
-      // problem (the kind), not a permission the caller cannot reason about.
-      const definition = ports.actions().tryFind(kind);
-      if (!definition) throw new LangyUiActionUnknownError(kind);
-      await ports.enforceCeiling({
-        resolved: caller.resolved,
-        permission: definition.requiredPermission,
-      });
-
-      const outcome = await service().dispatch({
-        projectId: caller.projectId,
-        userId: caller.userId,
-        conversationId,
-        kind,
-        payload: payload ?? {},
-        ...(experimentSlug ? { experimentSlug } : {}),
-        notFound: () => new LangyConversationNotFoundError(conversationId),
-      });
-      return c.json(outcome, 200);
+    // The action's own permission is the key's ceiling for this dispatch.
+    // Unknown kinds refuse before the ceiling so the error names the real
+    // problem (the kind), not a permission the caller cannot reason about.
+    const definition = ports.actions().tryFind(kind);
+    if (!definition) throw new LangyUiActionUnknownError(kind);
+    await ports.enforceCeiling({
+      resolved: caller.resolved,
+      permission: definition.requiredPermission,
     });
 
-  secured.access(uiActionAuth).get("/actions", async (c) => {
+    const outcome = await service().dispatch({
+      projectId: caller.projectId,
+      userId: caller.userId,
+      conversationId,
+      kind,
+      payload: payload ?? {},
+      ...(experimentSlug ? { experimentSlug } : {}),
+      notFound: () => new LangyConversationNotFoundError(conversationId),
+    });
+    return c.json(outcome, 200);
+  };
+
+  const listHandler = async (c: ServiceContext<EndpointVariables>) => {
     const caller = await resolveLangyRestCaller({
       request: c.req.raw,
       ports,
@@ -176,7 +188,22 @@ export function createLangyUiActionsRestApp(options: {
       },
       200,
     );
-  });
+  };
 
-  return secured.hono;
+  return restService
+    .registerRoute("post", "/actions", MANAGEMENT_API_VERSION, dispatchHandler, (b) =>
+      uiDoor(b)
+        .withMiddleware(bodyLimit({ maxSize: MAX_ACTION_BODY_BYTES }))
+        .withRawResponse(
+          "the dispatch answers the action service's own outcome, and Hono's own 404 " +
+            "when the rollout is dark for the project",
+        ),
+    )
+    .registerRoute("get", "/actions", MANAGEMENT_API_VERSION, listHandler, (b) =>
+      uiDoor(b).withRawResponse(
+        "the catalogue publishes each action's own draft-07 payload schema, which " +
+          "the CLI reads as it stands",
+      ),
+    )
+    .build();
 }

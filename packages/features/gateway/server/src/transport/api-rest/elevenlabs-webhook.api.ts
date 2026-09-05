@@ -5,7 +5,11 @@
  */
 
 import { publicEndpoint } from "@langwatch/api";
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import {
+  type AppRestSecurity,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+} from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
 import { createHmac, timingSafeEqual } from "crypto";
 import type { Context } from "hono";
@@ -137,12 +141,10 @@ export type ElevenLabsWebhookRestPorts = Readonly<{
 
 async function handleElevenLabsWebhook(
   c: Context,
+  input: { modelProviderId: string; body: string },
   ports: ElevenLabsWebhookRestPorts,
 ): Promise<Response> {
-  // Typed as optional because the generic Context does not know this route's
-  // parameters. An empty id resolves no provider, so it answers 404 with the
-  // rest of them.
-  const modelProviderId = c.req.param("modelProviderId") ?? "";
+  const modelProviderId = input.modelProviderId;
   const configured = await GatewayElevenLabsCredentialService.create(
     ports.credentials,
   ).tryGetWebhookSecret({ modelProviderId });
@@ -152,8 +154,9 @@ async function handleElevenLabsWebhook(
     return c.json({ error: "Webhook not configured" }, { status: 404 });
   }
 
-  // The RAW bytes: the HMAC is over exactly what the vendor sent.
-  const rawBody = await c.req.text();
+  // The RAW bytes: the HMAC is over exactly what the vendor sent, read once
+  // by the framework so nothing can parse them first.
+  const rawBody = input.body;
   if (
     !verifyElevenLabsSignature({
       rawBody,
@@ -262,9 +265,32 @@ export function createElevenLabsWebhookRestApp(options: {
   security: AppRestSecurity;
   ports: ElevenLabsWebhookRestPorts;
 }): MountableRestApp {
-  const secured = options.security.createServiceApp({ basePath: "/api" });
-  secured
-    .access(publicEndpoint(WEBHOOK_PUBLIC_REASON))
-    .post("/elevenlabs/webhook/:modelProviderId", (c) => handleElevenLabsWebhook(c, options.ports));
-  return secured.hono;
+  const { service, policy } = options.security.createServiceVersionedApp({
+    name: "elevenlabs-webhook",
+    basePath: "/api",
+    // Existing ElevenLabs configurations hold this exact URL; the route and
+    // the HMAC are transcribed unchanged, so there is no dated contract here.
+    staticGeneration: "v1",
+    errorEnvelope: "legacy",
+  });
+
+  return service
+    .registerRoute(
+      "post",
+      "/elevenlabs/webhook/:modelProviderId",
+      MANAGEMENT_API_VERSION,
+      (c: Context, input: { modelProviderId: string; body: string }) =>
+        handleElevenLabsWebhook(c, input, options.ports),
+      (b) =>
+        policy(publicEndpoint(WEBHOOK_PUBLIC_REASON))(b)
+          .withParams(z.object({ modelProviderId: z.string() }))
+          // Signed payload is `timestamp . raw bytes`: a JSON round trip
+          // reorders keys and the signature stops matching.
+          .withRawBody("text")
+          .withRawResponse(
+            "the vendor's delivery loop reads the status: 404 for an unconfigured id, " +
+              "401 for a bad signature, 400 for an unparsable payload, { received: true } otherwise",
+          ),
+    )
+    .build();
 }

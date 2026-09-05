@@ -16,15 +16,18 @@ import {
   idempotentReplayHeaders,
   readIdempotencyKey,
   requestTraceIds,
-  type SecuredApp,
-  validator as zValidator,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  type ProjectScopedContext,
+  projectOf,
+  resolver,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import {
   type GatewayBudgetScope,
@@ -520,7 +523,7 @@ const createBudgetSchema = z.object({
     ),
 });
 
-type GatewayContext = Context<{ Variables: AppRestProjectVariables }>;
+type GatewayContext = ProjectScopedContext<EndpointVariables>;
 
 /**
  * Identity this request authorizes as, plus the id audit rows record. Which principal a credential stands for is the process's decision (a scoped API key acts as its owning user; a legacy project key carries none and acts as a synthetic machine principal for its project) — the application answers it, this transport only supplies the two facts it holds.
@@ -530,7 +533,7 @@ function actorForRequest(
   app: GatewayApp,
 ): { actor: GatewayActor; actorUserId: string } {
   return app.actorForCredential({
-    projectId: c.get("project").id,
+    projectId: projectOf(c).id,
     resolvedToken: c.get("resolvedToken"),
   });
 }
@@ -659,1389 +662,1514 @@ function budgetFromWire(
 export function createGatewayPlatformRestApp(options: {
   security: AppRestSecurity;
   gateway: () => GatewayApp;
-}): SecuredApp<{ Variables: AppRestProjectVariables }> {
+}): MountableRestApp {
   const { security, gateway } = options;
 
-  const secured = security.createProjectApp({
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "gateway-platform",
+    // The generation is the contract, not a dated namespace: the routes answer
+    // exactly where they answer today, with no `/api/v1` twin beside them.
     basePath: "/api/gateway/v1",
+    staticGeneration: "v1",
     errorEnvelope: "canonical",
   });
 
+  /** Every answer here is the control plane's own published body. */
+  const GATEWAY_PLATFORM_ANSWER =
+    "the gateway control plane answers its own published bodies, including the " +
+    "replayed create the idempotency ledger serves from its stored bytes";
+
   // ── Virtual keys ────────────────────────────────────────────────────────
 
-  secured.access(apiKeyPermission("virtualKeys:view")).get(
-    "/virtual-keys",
-    describeRoute({
-      summary: "List virtual keys",
-      description:
-        "Returns the virtual keys visible to the caller's project credential: keys scoped to this project, to its team, or to the whole organization. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Visibility is applied to each page after it is read, so a page can hold fewer than `limit` rows without meaning the walk is finished.",
-      tags: ["Virtual Keys"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "Visible virtual keys",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  data: z.array(virtualKeyDtoSchema),
-                  next_cursor: nextCursorSchema,
-                }),
-              ),
-            },
-          },
-        },
+  return service
+    .registerRoute(
+      "get",
+      "/virtual-keys",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: z.infer<typeof virtualKeyListQuerySchema>) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const page = { data: input };
+        const cursor = createdAtIdCursor(page.data.cursor);
+        if (cursor === null) return invalidCursor(c);
+
+        const organizationId = await app.organizationIdForProject(project.id);
+        const service = app.virtualKeys;
+        const rows = await service.getPage({
+          organizationId,
+          limit: page.data.limit,
+          cursor: cursor ?? null,
+          externalId: page.data.external_id,
+        });
+        // Visibility is applied to the page, not to the query, because
+        // `isVisibleToMembership` is the shared implementation the tRPC list uses
+        // and a second copy of it in SQL is exactly the drift this app avoids. The
+        // cursor therefore advances over rows READ, so a page can be shorter than
+        // `limit` without meaning the walk is done.
+        return c.json({
+          data: await app.toVirtualKeySnakeDtos({
+            virtualKeys: app.visibleToProjectCredential({ project, virtualKeys: rows }),
+          }),
+          next_cursor: wirePages.nextPageCursor(rows, page.data.limit, (vk) => [
+            vk.createdAt.getTime(),
+            vk.id,
+          ]),
+        });
       },
-    }),
-    zValidator("query", virtualKeyListQuerySchema),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const page = { data: c.req.valid("query") };
-      const cursor = createdAtIdCursor(page.data.cursor);
-      if (cursor === null) return invalidCursor(c);
-
-      const organizationId = await app.organizationIdForProject(project.id);
-      const service = app.virtualKeys;
-      const rows = await service.getPage({
-        organizationId,
-        limit: page.data.limit,
-        cursor: cursor ?? null,
-        externalId: page.data.external_id,
-      });
-      // Visibility is applied to the page, not to the query, because
-      // `isVisibleToMembership` is the shared implementation the tRPC list uses
-      // and a second copy of it in SQL is exactly the drift this app avoids. The
-      // cursor therefore advances over rows READ, so a page can be shorter than
-      // `limit` without meaning the walk is done.
-      return c.json({
-        data: await app.toVirtualKeySnakeDtos({
-          virtualKeys: app.visibleToProjectCredential({ project, virtualKeys: rows }),
-        }),
-        next_cursor: wirePages.nextPageCursor(rows, page.data.limit, (vk) => [
-          vk.createdAt.getTime(),
-          vk.id,
-        ]),
-      });
-    },
-  );
-
-  secured.access(apiKeyPermission("virtualKeys:create")).post(
-    "/virtual-keys",
-    describeRoute({
-      summary: "Create virtual key",
-      description:
-        "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
-      tags: ["Virtual Keys"],
-      parameters: [idempotencyKeyParameter],
-      responses: {
-        ...canonicalBaseResponses,
-        ...canonicalConflictResponses,
-        201: {
-          description: "Virtual key created",
-          headers: idempotentReplayHeaders,
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  virtual_key: virtualKeyDtoSchema,
-                  secret: z.string(),
-                }),
-              ),
-            },
-          },
-        },
-        400: {
-          description: "Validation error",
-          content: {
-            "application/json": { schema: resolver(apiErrorSchema) },
-          },
-        },
-        403: {
-          description: "Caller lacks virtualKeys:manage at a requested scope",
-          content: {
-            "application/json": { schema: resolver(apiErrorSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("json", createVirtualKeySchema),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const body = { data: c.req.valid("json") };
-      const idempotencyKey = readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER));
-      const organizationId = await app.organizationIdForProject(project.id);
-      const { actor, actorUserId } = actorForRequest(c, app);
-      const scopes = scopesFromWire(body.data.scopes, project.id);
-      const service = app.virtualKeys;
-      try {
-        // The SAME pre-flight the tRPC create runs — it is one operation on the
-        // application, with the actor swapped for the API credential: manage at
-        // every requested scope, scopes inside the caller's organization, the
-        // destination anchored and manageable, guardrail refs project-local.
-        await app.authorizeVirtualKeyCreate({
-          actor,
-          organizationId,
-          scopes,
-          traceProjectId: body.data.trace_project_id,
-          guardrailAttachments: body.data.config?.guardrailAttachments,
-        });
-        const input = {
-          organizationId,
-          name: body.data.name,
-          description: body.data.description ?? null,
-          principalUserId: body.data.principal_user_id ?? null,
-          scopes,
-          traceProjectId: body.data.trace_project_id ?? null,
-          routingPolicyId: body.data.routing_policy_id ?? null,
-          routingMode: body.data.routing_mode && toStoredEnum(body.data.routing_mode),
-          expiresAt: body.data.expires_at ?? null,
-          budget: budgetFromWire(app, body.data.budget),
-          config: body.data.config,
-          externalId: body.data.external_id,
-          metadata: body.data.metadata,
-          actorUserId,
-        };
-        // Only the create is inside the idempotent section. The pre-flight
-        // above is read-only, so leaving it out means a replay still re-checks
-        // the caller's scopes rather than trusting a grant it held yesterday.
-        const outcome = await app.idempotency({
-          operation: "gateway.v1.virtual-keys.create",
-          scopeId: project.id,
-          key: idempotencyKey,
-          validatedBody: body.data,
-          handler: async () => {
-            const { virtualKey, secret } = await service.create(input);
-            logger.info(
-              { projectId: project.id, vkId: virtualKey.id },
-              "Created virtual key via REST",
-            );
-            // Secret is minted once and stored only as a hash, so a caller
-            // losing this response has no second way to read it — the whole
-            // reason this route takes an idempotency key, and the receipt
-            // holding this response is encrypted at rest, since a replay that
-            // withheld the secret would hand back a key nobody can ever use.
-            return {
-              status: 201,
-              body: { virtual_key: await app.toVirtualKeySnakeDto(virtualKey), secret },
-            };
-          },
-        });
-        return idempotentJson({ c, outcome });
-      } catch (error) {
-        return trpcErrorResponse(c, error);
-      }
-    },
-  );
-
-  secured.access(apiKeyPermission("virtualKeys:view")).get(
-    "/virtual-keys/:id",
-    describeRoute({
-      summary: "Get virtual key",
-      tags: ["Virtual Keys"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "Virtual key detail",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
-            },
-          },
-        },
-        404: {
-          description: "Not found",
-          content: {
-            "application/json": { schema: resolver(apiErrorSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const organizationId = await app.organizationIdForProject(project.id);
-      try {
-        const vk = await app.requireVisibleVirtualKeyForProjectCredential({
-          project,
-          id,
-          organizationId,
-        });
-        return c.json({ virtual_key: await app.toVirtualKeySnakeDto(vk) });
-      } catch (error) {
-        return trpcErrorResponse(c, error);
-      }
-    },
-  );
-
-  secured.access(apiKeyPermission("gatewayUsage:view")).get(
-    "/virtual-keys/:id/spend",
-    describeRoute({
-      summary: "Read a virtual key's spend",
-      description:
-        "Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`), the same source the dashboard's key list and Usage tab read, so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.",
-      tags: ["Virtual Keys"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "Spend summary for the key",
-          content: {
-            "application/json": { schema: resolver(spendSummaryDtoSchema) },
-          },
-        },
-        404: {
-          description: "Not found",
-          content: {
-            "application/json": { schema: resolver(apiErrorSchema) },
-          },
-        },
-        412: {
-          description: "No spend source on this deployment",
-          content: {
-            "application/json": { schema: resolver(apiErrorSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("query", vkSpendWindowSchema),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const windowParse = { data: c.req.valid("query") };
-      const now = new Date();
-      const fromDate =
-        windowParse.data.from !== undefined
-          ? new Date(windowParse.data.from)
-          : GatewayWindow.startOfCurrentMonthUTC(now);
-      const toDate = windowParse.data.to !== undefined ? new Date(windowParse.data.to) : now;
-      if (fromDate.getTime() >= toDate.getTime()) {
-        return errorResponse(c, {
-          status: 400,
-          code: "validation_error",
-          message: "`from` must be before `to`",
-        });
-      }
-
-      const organizationId = await app.organizationIdForProject(project.id);
-      let vk;
-      try {
-        vk = await app.requireVisibleVirtualKeyForProjectCredential({
-          project,
-          id,
-          organizationId,
-        });
-      } catch (error) {
-        return trpcErrorResponse(c, error);
-      }
-
-      // Same failure the tRPC spend column raises (spend_source_unavailable):
-      // without the ClickHouse spend source there is no number to report, and
-      // a confident zero would be indistinguishable from a zero-spend key.
-      if (!app.spendSourceAvailable) {
-        return errorResponse(c, {
-          status: 412,
-          code: "spend_source_unavailable",
-          message:
-            "spend_source_unavailable: this deployment has no ClickHouse spend source to read key spend from",
-        });
-      }
-
-      const spend = await app.spendByVirtualKey({
-        organizationId,
-        virtualKeyIds: [vk.id],
-        window: { fromDate, toDate },
-      });
-      const row = spend.get(vk.id);
-      return c.json({
-        virtual_key_id: vk.id,
-        // With the spend source present, a missing row means the key
-        // genuinely spent nothing, so zero is the honest render.
-        spent_usd: row?.spentUsd ?? "0",
-        requests: row?.requests ?? 0,
-        window: { from: fromDate.getTime(), to: toDate.getTime() },
-      });
-    },
-  );
-
-  secured.access(apiKeyPermission("virtualKeys:update")).patch(
-    "/virtual-keys/:id",
-    describeRoute({
-      summary: "Update virtual key",
-      description:
-        "Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and costs land: send `trace_project_id` for that, validated the way create validates it; explicit null re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
-      tags: ["Virtual Keys"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "Updated",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
-            },
-          },
-        },
-        400: {
-          description: "Validation error",
-          content: {
-            "application/json": { schema: resolver(apiErrorSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("json", updateVirtualKeySchema),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const body = { data: c.req.valid("json") };
-      const organizationId = await app.organizationIdForProject(project.id);
-      const { actor, actorUserId } = actorForRequest(c, app);
-      const service = app.virtualKeys;
-      try {
-        // Absent `scopes` means "not re-scoping", which is what the
-        // application's update pre-flight reads to decide whether the stored
-        // guardrail attachments have to be revalidated against a new project.
-        const scopes = body.data.scopes ? scopesFromWire(body.data.scopes, project.id) : undefined;
-        // The SAME pre-flight the tRPC update runs: update on a scope the key
-        // already lives in, manage on every new scope, the destination anchored
-        // and manageable when it moves, attachments judged against the project
-        // the key resolves to.
-        await app.authorizeVirtualKeyUpdate({
-          actor,
-          organizationId,
-          id,
-          scopes,
-          traceProjectId: body.data.trace_project_id,
-          guardrailAttachments: body.data.config?.guardrailAttachments,
-        });
-        const updated = await service.update({
-          id,
-          organizationId,
-          actorUserId,
-          name: body.data.name,
-          description: body.data.description,
-          scopes,
-          traceProjectId: body.data.trace_project_id,
-          routingPolicyId: body.data.routing_policy_id,
-          routingMode: body.data.routing_mode && toStoredEnum(body.data.routing_mode),
-          expiresAt: body.data.expires_at,
-          budget: budgetFromWire(app, body.data.budget),
-          config: body.data.config,
-          externalId: body.data.external_id,
-          metadata: body.data.metadata,
-        });
-        return c.json({ virtual_key: await app.toVirtualKeySnakeDto(updated) });
-      } catch (error) {
-        return trpcErrorResponse(c, error);
-      }
-    },
-  );
-
-  secured.access(apiKeyPermission("virtualKeys:rotate")).post(
-    "/virtual-keys/:id/rotate",
-    describeRoute({
-      summary: "Rotate virtual key secret",
-      description:
-        "Mints a fresh secret for an existing VK. The old secret remains valid for 24h (grace window) so in-flight clients can roll over.",
-      tags: ["Virtual Keys"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "Rotated",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  virtual_key: virtualKeyDtoSchema,
-                  secret: z.string(),
-                }),
-              ),
-            },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const organizationId = await app.organizationIdForProject(project.id);
-      const { actor, actorUserId } = actorForRequest(c, app);
-      const service = app.virtualKeys;
-      try {
-        await app.authorizeVirtualKeyOperation({
-          actor,
-          organizationId,
-          id,
-          permission: "virtualKeys:rotate",
-        });
-        const { virtualKey, secret } = await service.rotate({
-          id,
-          organizationId,
-          actorUserId,
-        });
-        return c.json({ virtual_key: await app.toVirtualKeySnakeDto(virtualKey), secret });
-      } catch (error) {
-        return trpcErrorResponse(c, error);
-      }
-    },
-  );
-
-  secured.access(apiKeyPermission("virtualKeys:update")).post(
-    "/virtual-keys/:id/disable",
-    describeRoute({
-      summary: "Disable virtual key",
-      // Declared by hand rather than through zValidator because the body is
-      // optional here: requiring `{}` to send no operator note would be a worse
-      // contract than documenting the shape directly.
-      requestBody: {
-        required: false,
-        content: {
-          "application/json": {
-            schema: {
-              type: "object",
-              properties: {
-                reason: {
-                  type: "string",
-                  maxLength: 500,
-                  description: "Operator note, audit-logged and shown in the key's detail view.",
+      (b) =>
+        policy(apiKeyPermission("virtualKeys:view"))(b)
+          .withQuery(virtualKeyListQuerySchema)
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "List virtual keys",
+            description:
+              "Returns the virtual keys visible to the caller's project credential: keys scoped to this project, to its team, or to the whole organization. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Visibility is applied to each page after it is read, so a page can hold fewer than `limit` rows without meaning the walk is finished.",
+            tags: ["Virtual Keys"],
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "Visible virtual keys",
+                content: {
+                  "application/json": {
+                    schema: resolver(
+                      z.object({
+                        data: z.array(virtualKeyDtoSchema),
+                        next_cursor: nextCursorSchema,
+                      }),
+                    ),
+                  },
                 },
               },
             },
-          },
-        },
-      },
-      description:
-        "Reversible stop: requests on the key are rejected with the distinct `virtual_key_disabled` error until it is enabled again. Budgets, scopes, key material, and any rotation grace stay intact. The change propagates through the gateway's change-event feed. Idempotent.",
-      tags: ["Virtual Keys"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "Disabled",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
+          }),
+    )
+    .registerRoute(
+      "post",
+      "/virtual-keys",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: z.infer<typeof createVirtualKeySchema>) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const body = { data: input };
+        const idempotencyKey = readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER));
+        const organizationId = await app.organizationIdForProject(project.id);
+        const { actor, actorUserId } = actorForRequest(c, app);
+        const scopes = scopesFromWire(body.data.scopes, project.id);
+        const service = app.virtualKeys;
+        try {
+          // The SAME pre-flight the tRPC create runs — it is one operation on the
+          // application, with the actor swapped for the API credential: manage at
+          // every requested scope, scopes inside the caller's organization, the
+          // destination anchored and manageable, guardrail refs project-local.
+          await app.authorizeVirtualKeyCreate({
+            actor,
+            organizationId,
+            scopes,
+            traceProjectId: body.data.trace_project_id,
+            guardrailAttachments: body.data.config?.guardrailAttachments,
+          });
+          const input = {
+            organizationId,
+            name: body.data.name,
+            description: body.data.description ?? null,
+            principalUserId: body.data.principal_user_id ?? null,
+            scopes,
+            traceProjectId: body.data.trace_project_id ?? null,
+            routingPolicyId: body.data.routing_policy_id ?? null,
+            routingMode: body.data.routing_mode && toStoredEnum(body.data.routing_mode),
+            expiresAt: body.data.expires_at ?? null,
+            budget: budgetFromWire(app, body.data.budget),
+            config: body.data.config,
+            externalId: body.data.external_id,
+            metadata: body.data.metadata,
+            actorUserId,
+          };
+          // Only the create is inside the idempotent section. The pre-flight
+          // above is read-only, so leaving it out means a replay still re-checks
+          // the caller's scopes rather than trusting a grant it held yesterday.
+          const outcome = await app.idempotency({
+            operation: "gateway.v1.virtual-keys.create",
+            scopeId: project.id,
+            key: idempotencyKey,
+            validatedBody: body.data,
+            handler: async () => {
+              const { virtualKey, secret } = await service.create(input);
+              logger.info(
+                { projectId: project.id, vkId: virtualKey.id },
+                "Created virtual key via REST",
+              );
+              // Secret is minted once and stored only as a hash, so a caller
+              // losing this response has no second way to read it — the whole
+              // reason this route takes an idempotency key, and the receipt
+              // holding this response is encrypted at rest, since a replay that
+              // withheld the secret would hand back a key nobody can ever use.
+              return {
+                status: 201,
+                body: { virtual_key: await app.toVirtualKeySnakeDto(virtualKey), secret },
+              };
             },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const body = disableVkSchema.safeParse(await c.req.json().catch(() => ({})));
-      if (!body.success) return validationErrorResponse(c, body.error);
-      const organizationId = await app.organizationIdForProject(project.id);
-      const { actor, actorUserId } = actorForRequest(c, app);
-      const service = app.virtualKeys;
-      try {
-        await app.authorizeVirtualKeyOperation({
-          actor,
-          organizationId,
-          id,
-          permission: "virtualKeys:update",
-        });
-        const updated = await service.disable({
-          id,
-          organizationId,
-          actorUserId,
-          reason: body.data.reason ?? null,
-        });
-        return c.json({ virtual_key: await app.toVirtualKeySnakeDto(updated) });
-      } catch (error) {
-        return trpcErrorResponse(c, error);
-      }
-    },
-  );
-
-  secured.access(apiKeyPermission("virtualKeys:update")).post(
-    "/virtual-keys/:id/enable",
-    describeRoute({
-      summary: "Enable virtual key",
-      description:
-        "Reverses disable: the key returns to `active` exactly as it was, including any rotation grace that was running. Idempotent.",
-      tags: ["Virtual Keys"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "Enabled",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
-            },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const organizationId = await app.organizationIdForProject(project.id);
-      const { actor, actorUserId } = actorForRequest(c, app);
-      const service = app.virtualKeys;
-      try {
-        await app.authorizeVirtualKeyOperation({
-          actor,
-          organizationId,
-          id,
-          permission: "virtualKeys:update",
-        });
-        const updated = await service.enable({
-          id,
-          organizationId,
-          actorUserId,
-        });
-        return c.json({ virtual_key: await app.toVirtualKeySnakeDto(updated) });
-      } catch (error) {
-        return trpcErrorResponse(c, error);
-      }
-    },
-  );
-
-  secured.access(apiKeyPermission("virtualKeys:delete")).post(
-    "/virtual-keys/:id/revoke",
-    describeRoute({
-      summary: "Revoke virtual key",
-      description:
-        "Marks the virtual key as revoked and archives its own budgets. Clients using it start receiving 401 within ~60s (the gateway's change-event long-poll period). Idempotent.",
-      tags: ["Virtual Keys"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "Revoked",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
-            },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const organizationId = await app.organizationIdForProject(project.id);
-      const { actor, actorUserId } = actorForRequest(c, app);
-      const service = app.virtualKeys;
-      try {
-        await app.authorizeVirtualKeyOperation({
-          actor,
-          organizationId,
-          id,
-          permission: "virtualKeys:delete",
-        });
-        const updated = await service.revoke({
-          id,
-          organizationId,
-          actorUserId,
-        });
-        return c.json({ virtual_key: await app.toVirtualKeySnakeDto(updated) });
-      } catch (error) {
-        return trpcErrorResponse(c, error);
-      }
-    },
-  );
-
-  // ── Gateway provider bindings ───────────────────────────────────────────
-
-  secured.access(apiKeyPermission("gatewayProviders:view")).get(
-    "/providers",
-    describeRoute({
-      summary: "List provider bindings",
-      description:
-        "Lists every gateway-bound model-provider credential for the caller's project, including health and rate-limit settings.",
-      tags: ["Providers"],
-      responses: {
-        ...canonicalBaseResponses,
-        410: {
-          description: "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
-          content: {
-            "application/json": { schema: resolver(apiErrorSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      return errorResponse(c, {
-        status: 410,
-        code: "gateway_provider_bindings_gone",
-        message:
-          "Gateway provider bindings folded into ModelProvider in iter 110. Use GET /api/gateway-platform/v1/model-providers or the Advanced (Gateway) tab in the dashboard.",
-      });
-    },
-  );
-
-  secured.access(apiKeyPermission("gatewayProviders:manage")).post(
-    "/providers",
-    describeRoute({
-      summary: "Bind a model provider to the gateway",
-      description:
-        "Creates a GatewayProviderCredential binding. Reuses the ModelProvider API key already configured in project settings; this only adds gateway-specific settings (rate limits, rotation, fallback priority).",
-      tags: ["Providers"],
-      responses: {
-        ...canonicalBaseResponses,
-        410: {
-          description: "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
-          content: {
-            "application/json": { schema: resolver(apiErrorSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      return errorResponse(c, {
-        status: 410,
-        code: "gateway_provider_bindings_gone",
-        message:
-          "Gateway provider bindings folded into ModelProvider in iter 110. Configure rate limits, providerConfig, fallback priority via the Advanced (Gateway) tab on /api/gateway-platform/v1/model-providers/:id.",
-      });
-    },
-  );
-
-  // ── Budgets ─────────────────────────────────────────────────────────────
-
-  secured.access(apiKeyPermission("gatewayBudgets:view")).get(
-    "/budgets",
-    describeRoute({
-      summary: "List budgets",
-      description:
-        "Returns the non-archived budgets in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Filter with `scope_type` (comma-separated), which is applied in the query, so `limit` counts rows returned. `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. A template's own `spent_usd` and `spent_nano_usd` are null because one allowance per person has no single total to report; each person's figure is in `GET /spend-summaries` and the seat buckets. `spend_available: false` means spend could not be totalled at all, and both fields are null for that reason instead, rather than a stale figure a caller could read as real money. Every amount is published twice: `_usd` is the display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a budget and its spend reconcile without parsing decimals.",
-      tags: ["Budgets"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "Budgets for the organization",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  data: z.array(budgetDtoSchema),
-                  spend_available: z.boolean(),
-                  next_cursor: nextCursorSchema,
-                }),
-              ),
-            },
-          },
-        },
-        400: {
-          description: "Invalid scope_type filter",
-          content: {
-            "application/json": { schema: resolver(apiErrorSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("query", budgetListQuerySchema),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const page = { data: c.req.valid("query") };
-      const cursor = createdAtIdCursor(page.data.cursor);
-      if (cursor === null) return invalidCursor(c);
-
-      const rawFilter = page.data.scope_type;
-      let scopeTypes: Set<z.infer<typeof budgetScopeTypeSchema>> | null = null;
-      if (rawFilter !== undefined) {
-        // Strict: the filter takes the same lowercase values the rows carry.
-        // The `.toUpperCase()` that used to sit here was the only dual-casing
-        // tolerance on the surface, and it made `scope_type=Group` work while
-        // the body's `kind` refused the same spelling.
-        const parsed = z
-          .array(budgetScopeTypeSchema)
-          .min(1)
-          .safeParse(rawFilter.split(",").map((s) => s.trim()));
-        if (!parsed.success) {
-          return c.json(
-            {
-              error: {
-                type: "bad_request",
-                code: "validation_error",
-                message: `scope_type must be a comma-separated subset of ${budgetScopeTypeSchema.options.join(", ")}`,
-              },
-            },
-            400,
-          );
+          });
+          return idempotentJson({ c, outcome });
+        } catch (error) {
+          return trpcErrorResponse(c, error);
         }
-        scopeTypes = new Set(parsed.data);
-      }
-      const organizationId = await app.organizationIdForProject(project.id);
-      const service = app.budgetDecisions;
-      const {
-        budgets: rows,
-        spendAvailable,
-        readAt,
-        scopeReach,
-      } = await service.listPageWithHealth({
-        organizationId,
-        limit: page.data.limit,
-        cursor: cursor ?? null,
-        // Pushed into the query, so `limit` counts rows RETURNED. Filtering the
-        // page instead would make a request for 50 group budgets come back with
-        // a handful and no way to tell that from the end of the walk.
-        scopeTypes: scopeTypes ? Array.from(scopeTypes, (t) => toStoredEnum(t)) : undefined,
-        externalId: page.data.external_id,
-      });
-      const memberCounts = await app.groupMemberCounts(rows);
-      return c.json({
-        spend_available: spendAvailable,
-        data: rows.map((b) =>
-          budgetDtos.toBudgetDto({
-            budget: b,
-            memberCount: memberCounts.get(b.scopeId),
-            spendAvailable,
-            readAt,
-            reachable: scopeReach.get(b.id)?.reachable,
-          }),
-        ),
-        next_cursor: wirePages.nextPageCursor(rows, page.data.limit, (b) => [
-          b.createdAt.getTime(),
-          b.id,
-        ]),
-      });
-    },
-  );
-
-  secured.access(apiKeyPermission("gatewayBudgets:view")).get(
-    "/budgets/:id",
-    describeRoute({
-      summary: "Get budget",
-      description:
-        "One budget, in exactly the row shape `GET /budgets` returns, including the live spend enrichment and the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived budgets are not returned. `spend_available: false` means spend could not be totalled, and `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero spend. A per-person template reports null there too, because one allowance per person has no single total; each person's figure is in `GET /spend-summaries` and the seat buckets.",
-      tags: ["Budgets"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "The budget",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  budget: budgetDtoSchema,
-                  spend_available: z.boolean(),
-                }),
-              ),
-            },
-          },
-        },
-        404: {
-          description: "Not found",
-          content: {
-            "application/json": { schema: resolver(apiErrorSchema) },
-          },
-        },
       },
-    }),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const organizationId = await app.organizationIdForProject(project.id);
-      const service = app.budgetDecisions;
-      const found = await service.tryGetWithHealth({ id, organizationId });
-      if (!found) {
-        return errorResponse(c, {
-          status: 404,
-          code: "budget_not_found",
-          message: `budget ${id} not found`,
-        });
-      }
-      const memberCounts = await app.groupMemberCounts([found.budget]);
-      return c.json({
-        spend_available: found.spendAvailable,
-        budget: budgetDtos.toBudgetDto({
-          budget: found.budget,
-          memberCount: memberCounts.get(found.budget.scopeId),
-          spendAvailable: found.spendAvailable,
-          readAt: found.readAt,
-          reachable: !found.unreachableByAnyKey,
-        }),
-      });
-    },
-  );
-
-  secured.access(apiKeyPermission("gatewayBudgets:create")).post(
-    "/budgets",
-    describeRoute({
-      summary: "Create budget",
-      description:
-        "Creates an organization-owned budget. The scope discriminates which resource the budget covers, across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user). `group` budgets are per-member allowances and `attributed_user` budgets are per-end-user templates; both require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date. A `team`, `project` or `group` budget that none of the organization's active keys can produce traffic for is refused with `gateway_budget_scope_unreachable`, since it would never spend and never block; send `allow_unreachable` to keep it anyway, and note that an organization with no active keys is never refused. Send `Idempotency-Key` to make a retry safe.",
-      tags: ["Budgets"],
-      parameters: [idempotencyKeyParameter],
-      responses: {
-        ...canonicalBaseResponses,
-        ...canonicalConflictResponses,
-        201: {
-          description: "Budget created",
-          headers: idempotentReplayHeaders,
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ budget: budgetDtoSchema })),
-            },
-          },
-        },
-        400: {
-          description: "Validation error",
-          content: {
-            "application/json": { schema: resolver(apiErrorSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("json", createBudgetSchema),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const body = { data: c.req.valid("json") };
-      // Read before the try: a malformed key is a request-validation failure and
-      // takes the same route to the wire as one the schema caught, rather than
-      // being reshaped by the service-error mapping below.
-      const idempotencyKey = readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER));
-      const organizationId = await app.organizationIdForProject(project.id);
-      const { actorUserId } = actorForRequest(c, app);
-      const service = app.budgetDecisions;
-      try {
-        await authorizeOrganizationWide(c, app, {
-          organizationId,
-          permission: "gatewayBudgets:create",
-        });
-        const outcome = await app.idempotency({
-          operation: "gateway.v1.budgets.create",
-          scopeId: project.id,
-          key: idempotencyKey,
-          validatedBody: body.data,
-          handler: async () => {
-            const row = await service.create({
-              organizationId,
-              scope: scopeFromWire(body.data.scope),
-              name: body.data.name,
-              description: body.data.description ?? null,
-              window: toStoredEnum(body.data.window),
-              limitUsd: body.data.limit_usd,
-              onBreach: body.data.on_breach && toStoredEnum(body.data.on_breach),
-              timezone: body.data.timezone ?? null,
-              providerKey: body.data.provider_key ?? null,
-              externalId: body.data.external_id,
-              metadata: body.data.metadata,
-              cycleAnchorAt: body.data.cycle_anchor_at ? new Date(body.data.cycle_anchor_at) : null,
-              allowUnreachable: body.data.allow_unreachable,
-              actorUserId,
-            });
-            const [memberCounts, reach] = await Promise.all([
-              app.groupMemberCounts([row]),
-              service.scopeReach({ organizationId, scope: row }),
-            ]);
-            return {
-              status: 201,
-              body: {
-                budget: budgetDtos.toBudgetDto({
-                  budget: row,
-                  memberCount: memberCounts.get(row.scopeId),
-                  reachable: reach.reachable,
-                }),
+      (b) =>
+        policy(apiKeyPermission("virtualKeys:create"))(b)
+          .withInput(createVirtualKeySchema)
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Create virtual key",
+            parameters: [idempotencyKeyParameter],
+            description:
+              "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+            tags: ["Virtual Keys"],
+            responses: {
+              ...canonicalBaseResponses,
+              ...canonicalConflictResponses,
+              201: {
+                description: "Virtual key created",
+                headers: idempotentReplayHeaders,
+                content: {
+                  "application/json": {
+                    schema: resolver(
+                      z.object({
+                        virtual_key: virtualKeyDtoSchema,
+                        secret: z.string(),
+                      }),
+                    ),
+                  },
+                },
               },
-            };
-          },
-        });
-        return idempotentJson({ c, outcome });
-      } catch (error) {
-        return trpcErrorResponse(c, error);
-      }
-    },
-  );
-
-  secured.access(apiKeyPermission("gatewayBudgets:update")).patch(
-    "/budgets/:id",
-    describeRoute({
-      summary: "Update budget",
-      description:
-        "Partial update. Scope, window and cycle_anchor_at are immutable after create. Use explicit null to clear timezone / description.",
-      tags: ["Budgets"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "Updated",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ budget: budgetDtoSchema })),
-            },
-          },
-        },
-      },
-    }),
-    zValidator("json", updateBudgetSchema),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const body = { data: c.req.valid("json") };
-      const organizationId = await app.organizationIdForProject(project.id);
-      const { actorUserId } = actorForRequest(c, app);
-      const service = app.budgetDecisions;
-      try {
-        await authorizeOrganizationWide(c, app, {
-          organizationId,
-          permission: "gatewayBudgets:update",
-        });
-        const row = await service.update({
-          id,
-          organizationId,
-          name: body.data.name,
-          description: body.data.description,
-          limitUsd: body.data.limit_usd,
-          onBreach: body.data.on_breach && toStoredEnum(body.data.on_breach),
-          timezone: body.data.timezone,
-          externalId: body.data.external_id,
-          metadata: body.data.metadata,
-          actorUserId,
-        });
-        const memberCounts = await app.groupMemberCounts([row]);
-        return c.json({
-          budget: budgetDtos.toBudgetDto({
-            budget: row,
-            memberCount: memberCounts.get(row.scopeId),
-          }),
-        });
-      } catch (error) {
-        return trpcErrorResponse(c, error);
-      }
-    },
-  );
-
-  secured.access(apiKeyPermission("gatewayBudgets:delete")).delete(
-    "/budgets/:id",
-    describeRoute({
-      summary: "Archive budget",
-      description:
-        "Soft-delete: the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained.",
-      tags: ["Budgets"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "Archived",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ budget: budgetDtoSchema })),
-            },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const organizationId = await app.organizationIdForProject(project.id);
-      const { actorUserId } = actorForRequest(c, app);
-      const service = app.budgetDecisions;
-      try {
-        await authorizeOrganizationWide(c, app, {
-          organizationId,
-          permission: "gatewayBudgets:delete",
-        });
-        const row = await service.archive({
-          id,
-          organizationId,
-          actorUserId,
-        });
-        return c.json({ budget: budgetDtos.toBudgetDto({ budget: row }) });
-      } catch (error) {
-        return trpcErrorResponse(c, error);
-      }
-    },
-  );
-
-  secured.access(apiKeyPermission("gatewayBudgets:update")).post(
-    "/budgets/:id/reset",
-    describeRoute({
-      summary: "Reset budget period",
-      // Declared by hand rather than through zValidator because the body is
-      // optional here: requiring `{}` to send no operator note would be a worse
-      // contract than documenting the shape directly.
-      requestBody: {
-        required: false,
-        content: {
-          "application/json": {
-            schema: {
-              type: "object",
-              properties: {
-                reason: {
-                  type: "string",
-                  maxLength: 500,
-                  description: "Free-text operator note, audit-logged with the reset.",
+              400: {
+                description: "Validation error",
+                content: {
+                  "application/json": { schema: resolver(apiErrorSchema) },
+                },
+              },
+              403: {
+                description: "Caller lacks virtualKeys:manage at a requested scope",
+                content: {
+                  "application/json": { schema: resolver(apiErrorSchema) },
                 },
               },
             },
-          },
-        },
+          }),
+    )
+    .registerRoute(
+      "get",
+      "/virtual-keys/:id",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: { id: string }) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const id = input.id;
+        const organizationId = await app.organizationIdForProject(project.id);
+        try {
+          const vk = await app.requireVisibleVirtualKeyForProjectCredential({
+            project,
+            id,
+            organizationId,
+          });
+          return c.json({ virtual_key: await app.toVirtualKeySnakeDto(vk) });
+        } catch (error) {
+          return trpcErrorResponse(c, error);
+        }
       },
-      description:
-        "Moves the budget's period boundary to now and recomputes the next reset; recorded spend is NEVER mutated (the ledger and every emitted billing event are immutable, so reconciliation is unaffected). On calendar windows this truncates the running period and the next boundary stays calendar; on `manual` windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets ONE end-user bucket's boundary and leaves the template period untouched.",
-      tags: ["Budgets"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "Reset",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ budget: budgetDtoSchema })),
+      (b) =>
+        policy(apiKeyPermission("virtualKeys:view"))(b)
+          .withParams(z.object({ id: z.string().min(1) }))
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Get virtual key",
+            tags: ["Virtual Keys"],
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "Virtual key detail",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
+                  },
+                },
+              },
+              404: {
+                description: "Not found",
+                content: {
+                  "application/json": { schema: resolver(apiErrorSchema) },
+                },
+              },
             },
-          },
-        },
-      },
-    }),
-    zValidator("query", resetBudgetQuerySchema),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const endUserId = c.req.valid("query").end_user_id ?? null;
-      // The body is OPTIONAL on this route and on /disable: a reset with no
-      // operator note is the common case, and requiring `{}` to send nothing
-      // would be a worse contract than documenting the body by hand. Both keep
-      // manual parsing for that reason, and declare their `requestBody` in
-      // describeRoute so the spec still shows it.
-      const body = resetBudgetSchema.safeParse(await c.req.json().catch(() => ({})));
-      if (!body.success) return validationErrorResponse(c, body.error);
-      const organizationId = await app.organizationIdForProject(project.id);
-      const { actorUserId } = actorForRequest(c, app);
-      const service = app.budgetDecisions;
-      try {
-        await authorizeOrganizationWide(c, app, {
+          }),
+    )
+    .registerRoute(
+      "get",
+      "/virtual-keys/:id/spend",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: { id: string } & z.infer<typeof vkSpendWindowSchema>) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const id = input.id;
+        const windowParse = { data: input };
+        const now = new Date();
+        const fromDate =
+          windowParse.data.from !== undefined
+            ? new Date(windowParse.data.from)
+            : GatewayWindow.startOfCurrentMonthUTC(now);
+        const toDate = windowParse.data.to !== undefined ? new Date(windowParse.data.to) : now;
+        if (fromDate.getTime() >= toDate.getTime()) {
+          return errorResponse(c, {
+            status: 400,
+            code: "validation_error",
+            message: "`from` must be before `to`",
+          });
+        }
+
+        const organizationId = await app.organizationIdForProject(project.id);
+        let vk;
+        try {
+          vk = await app.requireVisibleVirtualKeyForProjectCredential({
+            project,
+            id,
+            organizationId,
+          });
+        } catch (error) {
+          return trpcErrorResponse(c, error);
+        }
+
+        // Same failure the tRPC spend column raises (spend_source_unavailable):
+        // without the ClickHouse spend source there is no number to report, and
+        // a confident zero would be indistinguishable from a zero-spend key.
+        if (!app.spendSourceAvailable) {
+          return errorResponse(c, {
+            status: 412,
+            code: "spend_source_unavailable",
+            message:
+              "spend_source_unavailable: this deployment has no ClickHouse spend source to read key spend from",
+          });
+        }
+
+        const spend = await app.spendByVirtualKey({
           organizationId,
-          permission: "gatewayBudgets:update",
+          virtualKeyIds: [vk.id],
+          window: { fromDate, toDate },
         });
-        const row = await service.reset({
-          id,
-          organizationId,
-          actorUserId,
-          endUserId,
-          reason: body.data.reason ?? null,
-        });
-        const memberCounts = await app.groupMemberCounts([row]);
+        const row = spend.get(vk.id);
         return c.json({
+          virtual_key_id: vk.id,
+          // With the spend source present, a missing row means the key
+          // genuinely spent nothing, so zero is the honest render.
+          spent_usd: row?.spentUsd ?? "0",
+          requests: row?.requests ?? 0,
+          window: { from: fromDate.getTime(), to: toDate.getTime() },
+        });
+      },
+      (b) =>
+        policy(apiKeyPermission("gatewayUsage:view"))(b)
+          .withParams(z.object({ id: z.string().min(1) }))
+          .withQuery(vkSpendWindowSchema)
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Read a virtual key's spend",
+            description:
+              "Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`), the same source the dashboard's key list and Usage tab read, so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.",
+            tags: ["Virtual Keys"],
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "Spend summary for the key",
+                content: {
+                  "application/json": { schema: resolver(spendSummaryDtoSchema) },
+                },
+              },
+              404: {
+                description: "Not found",
+                content: {
+                  "application/json": { schema: resolver(apiErrorSchema) },
+                },
+              },
+              412: {
+                description: "No spend source on this deployment",
+                content: {
+                  "application/json": { schema: resolver(apiErrorSchema) },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "patch",
+      "/virtual-keys/:id",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: { id: string } & z.infer<typeof updateVirtualKeySchema>) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const id = input.id;
+        const body = { data: input };
+        const organizationId = await app.organizationIdForProject(project.id);
+        const { actor, actorUserId } = actorForRequest(c, app);
+        const service = app.virtualKeys;
+        try {
+          // Absent `scopes` means "not re-scoping", which is what the
+          // application's update pre-flight reads to decide whether the stored
+          // guardrail attachments have to be revalidated against a new project.
+          const scopes = body.data.scopes
+            ? scopesFromWire(body.data.scopes, project.id)
+            : undefined;
+          // The SAME pre-flight the tRPC update runs: update on a scope the key
+          // already lives in, manage on every new scope, the destination anchored
+          // and manageable when it moves, attachments judged against the project
+          // the key resolves to.
+          await app.authorizeVirtualKeyUpdate({
+            actor,
+            organizationId,
+            id,
+            scopes,
+            traceProjectId: body.data.trace_project_id,
+            guardrailAttachments: body.data.config?.guardrailAttachments,
+          });
+          const updated = await service.update({
+            id,
+            organizationId,
+            actorUserId,
+            name: body.data.name,
+            description: body.data.description,
+            scopes,
+            traceProjectId: body.data.trace_project_id,
+            routingPolicyId: body.data.routing_policy_id,
+            routingMode: body.data.routing_mode && toStoredEnum(body.data.routing_mode),
+            expiresAt: body.data.expires_at,
+            budget: budgetFromWire(app, body.data.budget),
+            config: body.data.config,
+            externalId: body.data.external_id,
+            metadata: body.data.metadata,
+          });
+          return c.json({ virtual_key: await app.toVirtualKeySnakeDto(updated) });
+        } catch (error) {
+          return trpcErrorResponse(c, error);
+        }
+      },
+      (b) =>
+        policy(apiKeyPermission("virtualKeys:update"))(b)
+          .withParams(z.object({ id: z.string().min(1) }))
+          .withInput(updateVirtualKeySchema)
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Update virtual key",
+            description:
+              "Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and costs land: send `trace_project_id` for that, validated the way create validates it; explicit null re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
+            tags: ["Virtual Keys"],
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "Updated",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
+                  },
+                },
+              },
+              400: {
+                description: "Validation error",
+                content: {
+                  "application/json": { schema: resolver(apiErrorSchema) },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "post",
+      "/virtual-keys/:id/rotate",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: { id: string }) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const id = input.id;
+        const organizationId = await app.organizationIdForProject(project.id);
+        const { actor, actorUserId } = actorForRequest(c, app);
+        const service = app.virtualKeys;
+        try {
+          await app.authorizeVirtualKeyOperation({
+            actor,
+            organizationId,
+            id,
+            permission: "virtualKeys:rotate",
+          });
+          const { virtualKey, secret } = await service.rotate({
+            id,
+            organizationId,
+            actorUserId,
+          });
+          return c.json({ virtual_key: await app.toVirtualKeySnakeDto(virtualKey), secret });
+        } catch (error) {
+          return trpcErrorResponse(c, error);
+        }
+      },
+      (b) =>
+        policy(apiKeyPermission("virtualKeys:rotate"))(b)
+          .withParams(z.object({ id: z.string().min(1) }))
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Rotate virtual key secret",
+            description:
+              "Mints a fresh secret for an existing VK. The old secret remains valid for 24h (grace window) so in-flight clients can roll over.",
+            tags: ["Virtual Keys"],
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "Rotated",
+                content: {
+                  "application/json": {
+                    schema: resolver(
+                      z.object({
+                        virtual_key: virtualKeyDtoSchema,
+                        secret: z.string(),
+                      }),
+                    ),
+                  },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "post",
+      "/virtual-keys/:id/disable",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: { id: string }) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const id = input.id;
+        const body = disableVkSchema.safeParse(await c.req.json().catch(() => ({})));
+        if (!body.success) return validationErrorResponse(c, body.error);
+        const organizationId = await app.organizationIdForProject(project.id);
+        const { actor, actorUserId } = actorForRequest(c, app);
+        const service = app.virtualKeys;
+        try {
+          await app.authorizeVirtualKeyOperation({
+            actor,
+            organizationId,
+            id,
+            permission: "virtualKeys:update",
+          });
+          const updated = await service.disable({
+            id,
+            organizationId,
+            actorUserId,
+            reason: body.data.reason ?? null,
+          });
+          return c.json({ virtual_key: await app.toVirtualKeySnakeDto(updated) });
+        } catch (error) {
+          return trpcErrorResponse(c, error);
+        }
+      },
+      (b) =>
+        policy(apiKeyPermission("virtualKeys:update"))(b)
+          .withParams(z.object({ id: z.string().min(1) }))
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Disable virtual key",
+            requestBody: {
+              required: false,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      reason: {
+                        type: "string",
+                        maxLength: 500,
+                        description:
+                          "Operator note, audit-logged and shown in the key's detail view.",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            // Declared by hand rather than through zValidator because the body is
+            // optional here: requiring `{}` to send no operator note would be a worse
+            // contract than documenting the shape directly.
+            description:
+              "Reversible stop: requests on the key are rejected with the distinct `virtual_key_disabled` error until it is enabled again. Budgets, scopes, key material, and any rotation grace stay intact. The change propagates through the gateway's change-event feed. Idempotent.",
+            tags: ["Virtual Keys"],
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "Disabled",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
+                  },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "post",
+      "/virtual-keys/:id/enable",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: { id: string }) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const id = input.id;
+        const organizationId = await app.organizationIdForProject(project.id);
+        const { actor, actorUserId } = actorForRequest(c, app);
+        const service = app.virtualKeys;
+        try {
+          await app.authorizeVirtualKeyOperation({
+            actor,
+            organizationId,
+            id,
+            permission: "virtualKeys:update",
+          });
+          const updated = await service.enable({
+            id,
+            organizationId,
+            actorUserId,
+          });
+          return c.json({ virtual_key: await app.toVirtualKeySnakeDto(updated) });
+        } catch (error) {
+          return trpcErrorResponse(c, error);
+        }
+      },
+      (b) =>
+        policy(apiKeyPermission("virtualKeys:update"))(b)
+          .withParams(z.object({ id: z.string().min(1) }))
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Enable virtual key",
+            description:
+              "Reverses disable: the key returns to `active` exactly as it was, including any rotation grace that was running. Idempotent.",
+            tags: ["Virtual Keys"],
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "Enabled",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
+                  },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "post",
+      "/virtual-keys/:id/revoke",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: { id: string }) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const id = input.id;
+        const organizationId = await app.organizationIdForProject(project.id);
+        const { actor, actorUserId } = actorForRequest(c, app);
+        const service = app.virtualKeys;
+        try {
+          await app.authorizeVirtualKeyOperation({
+            actor,
+            organizationId,
+            id,
+            permission: "virtualKeys:delete",
+          });
+          const updated = await service.revoke({
+            id,
+            organizationId,
+            actorUserId,
+          });
+          return c.json({ virtual_key: await app.toVirtualKeySnakeDto(updated) });
+        } catch (error) {
+          return trpcErrorResponse(c, error);
+        }
+      },
+      (b) =>
+        policy(apiKeyPermission("virtualKeys:delete"))(b)
+          .withParams(z.object({ id: z.string().min(1) }))
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Revoke virtual key",
+            description:
+              "Marks the virtual key as revoked and archives its own budgets. Clients using it start receiving 401 within ~60s (the gateway's change-event long-poll period). Idempotent.",
+            tags: ["Virtual Keys"],
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "Revoked",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
+                  },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "get",
+      "/providers",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext) => {
+        return errorResponse(c, {
+          status: 410,
+          code: "gateway_provider_bindings_gone",
+          message:
+            "Gateway provider bindings folded into ModelProvider in iter 110. Use GET /api/gateway-platform/v1/model-providers or the Advanced (Gateway) tab in the dashboard.",
+        });
+      },
+      (b) =>
+        policy(apiKeyPermission("gatewayProviders:view"))(b)
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "List provider bindings",
+            description:
+              "Lists every gateway-bound model-provider credential for the caller's project, including health and rate-limit settings.",
+            tags: ["Providers"],
+            responses: {
+              ...canonicalBaseResponses,
+              410: {
+                description:
+                  "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
+                content: {
+                  "application/json": { schema: resolver(apiErrorSchema) },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "post",
+      "/providers",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext) => {
+        return errorResponse(c, {
+          status: 410,
+          code: "gateway_provider_bindings_gone",
+          message:
+            "Gateway provider bindings folded into ModelProvider in iter 110. Configure rate limits, providerConfig, fallback priority via the Advanced (Gateway) tab on /api/gateway-platform/v1/model-providers/:id.",
+        });
+      },
+      (b) =>
+        policy(apiKeyPermission("gatewayProviders:manage"))(b)
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Bind a model provider to the gateway",
+            description:
+              "Creates a GatewayProviderCredential binding. Reuses the ModelProvider API key already configured in project settings; this only adds gateway-specific settings (rate limits, rotation, fallback priority).",
+            tags: ["Providers"],
+            responses: {
+              ...canonicalBaseResponses,
+              410: {
+                description:
+                  "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
+                content: {
+                  "application/json": { schema: resolver(apiErrorSchema) },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "get",
+      "/budgets",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: z.infer<typeof budgetListQuerySchema>) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const page = { data: input };
+        const cursor = createdAtIdCursor(page.data.cursor);
+        if (cursor === null) return invalidCursor(c);
+
+        const rawFilter = page.data.scope_type;
+        let scopeTypes: Set<z.infer<typeof budgetScopeTypeSchema>> | null = null;
+        if (rawFilter !== undefined) {
+          // Strict: the filter takes the same lowercase values the rows carry.
+          // The `.toUpperCase()` that used to sit here was the only dual-casing
+          // tolerance on the surface, and it made `scope_type=Group` work while
+          // the body's `kind` refused the same spelling.
+          const parsed = z
+            .array(budgetScopeTypeSchema)
+            .min(1)
+            .safeParse(rawFilter.split(",").map((s) => s.trim()));
+          if (!parsed.success) {
+            return c.json(
+              {
+                error: {
+                  type: "bad_request",
+                  code: "validation_error",
+                  message: `scope_type must be a comma-separated subset of ${budgetScopeTypeSchema.options.join(", ")}`,
+                },
+              },
+              400,
+            );
+          }
+          scopeTypes = new Set(parsed.data);
+        }
+        const organizationId = await app.organizationIdForProject(project.id);
+        const service = app.budgetDecisions;
+        const {
+          budgets: rows,
+          spendAvailable,
+          readAt,
+          scopeReach,
+        } = await service.listPageWithHealth({
+          organizationId,
+          limit: page.data.limit,
+          cursor: cursor ?? null,
+          // Pushed into the query, so `limit` counts rows RETURNED. Filtering the
+          // page instead would make a request for 50 group budgets come back with
+          // a handful and no way to tell that from the end of the walk.
+          scopeTypes: scopeTypes ? Array.from(scopeTypes, (t) => toStoredEnum(t)) : undefined,
+          externalId: page.data.external_id,
+        });
+        const memberCounts = await app.groupMemberCounts(rows);
+        return c.json({
+          spend_available: spendAvailable,
+          data: rows.map((b) =>
+            budgetDtos.toBudgetDto({
+              budget: b,
+              memberCount: memberCounts.get(b.scopeId),
+              spendAvailable,
+              readAt,
+              reachable: scopeReach.get(b.id)?.reachable,
+            }),
+          ),
+          next_cursor: wirePages.nextPageCursor(rows, page.data.limit, (b) => [
+            b.createdAt.getTime(),
+            b.id,
+          ]),
+        });
+      },
+      (b) =>
+        policy(apiKeyPermission("gatewayBudgets:view"))(b)
+          .withQuery(budgetListQuerySchema)
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "List budgets",
+            description:
+              "Returns the non-archived budgets in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Filter with `scope_type` (comma-separated), which is applied in the query, so `limit` counts rows returned. `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. A template's own `spent_usd` and `spent_nano_usd` are null because one allowance per person has no single total to report; each person's figure is in `GET /spend-summaries` and the seat buckets. `spend_available: false` means spend could not be totalled at all, and both fields are null for that reason instead, rather than a stale figure a caller could read as real money. Every amount is published twice: `_usd` is the display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a budget and its spend reconcile without parsing decimals.",
+            tags: ["Budgets"],
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "Budgets for the organization",
+                content: {
+                  "application/json": {
+                    schema: resolver(
+                      z.object({
+                        data: z.array(budgetDtoSchema),
+                        spend_available: z.boolean(),
+                        next_cursor: nextCursorSchema,
+                      }),
+                    ),
+                  },
+                },
+              },
+              400: {
+                description: "Invalid scope_type filter",
+                content: {
+                  "application/json": { schema: resolver(apiErrorSchema) },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "get",
+      "/budgets/:id",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: { id: string }) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const id = input.id;
+        const organizationId = await app.organizationIdForProject(project.id);
+        const service = app.budgetDecisions;
+        const found = await service.tryGetWithHealth({ id, organizationId });
+        if (!found) {
+          return errorResponse(c, {
+            status: 404,
+            code: "budget_not_found",
+            message: `budget ${id} not found`,
+          });
+        }
+        const memberCounts = await app.groupMemberCounts([found.budget]);
+        return c.json({
+          spend_available: found.spendAvailable,
           budget: budgetDtos.toBudgetDto({
-            budget: row,
-            memberCount: memberCounts.get(row.scopeId),
+            budget: found.budget,
+            memberCount: memberCounts.get(found.budget.scopeId),
+            spendAvailable: found.spendAvailable,
+            readAt: found.readAt,
+            reachable: !found.unreachableByAnyKey,
           }),
         });
-      } catch (error) {
-        return trpcErrorResponse(c, error);
-      }
-    },
-  );
-
-  secured.access(apiKeyPermission("gatewayProviders:update")).patch(
-    "/providers/:id",
-    describeRoute({
-      summary: "Update provider binding",
-      description:
-        "Partial update of gateway-specific settings (rate limits, rotation, slot, extra headers). The underlying ModelProvider credentials are managed in project settings, not here.",
-      tags: ["Providers"],
-      responses: {
-        ...canonicalBaseResponses,
-        410: {
-          description: "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
-          content: {
-            "application/json": { schema: resolver(apiErrorSchema) },
-          },
-        },
       },
-    }),
-    async (c) => {
-      return errorResponse(c, {
-        status: 410,
-        code: "gateway_provider_bindings_gone",
-        message:
-          "Gateway provider bindings folded into ModelProvider in iter 110. PATCH the advanced fields via PATCH /api/gateway-platform/v1/model-providers/:id.",
-      });
-    },
-  );
-
-  secured.access(apiKeyPermission("gatewayProviders:manage")).delete(
-    "/providers/:id",
-    describeRoute({
-      summary: "Disable provider binding",
-      description:
-        "Marks the binding disabled. Requests routing to this slot are skipped (fallback chain continues). Historical ledger rows are retained.",
-      tags: ["Providers"],
-      responses: {
-        ...canonicalBaseResponses,
-        410: {
-          description: "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
-          content: {
-            "application/json": { schema: resolver(apiErrorSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      return errorResponse(c, {
-        status: 410,
-        code: "gateway_provider_bindings_gone",
-        message:
-          "Gateway provider bindings folded into ModelProvider in iter 110. Disable the underlying ModelProvider via DELETE /api/gateway-platform/v1/model-providers/:id (soft-disable).",
-      });
-    },
-  );
-
-  // ── Cache-control rules ────────────────────────────────────────────────
-
-  secured.access(apiKeyPermission("gatewayCacheRules:view")).get(
-    "/cache-rules",
-    describeRoute({
-      summary: "List cache-control rules",
-      description:
-        "Organization-scoped operator-authored rules, sorted priority descending then oldest first, with archived rules excluded. Paged by cursor: follow `next_cursor` until it comes back null. Matchers and action are returned verbatim as JSON.",
-      tags: ["Cache Rules"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "Cache rules for the organisation",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  data: z.array(cacheRuleDtoSchema),
-                  next_cursor: nextCursorSchema,
-                }),
-              ),
+      (b) =>
+        policy(apiKeyPermission("gatewayBudgets:view"))(b)
+          .withParams(z.object({ id: z.string().min(1) }))
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Get budget",
+            description:
+              "One budget, in exactly the row shape `GET /budgets` returns, including the live spend enrichment and the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived budgets are not returned. `spend_available: false` means spend could not be totalled, and `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero spend. A per-person template reports null there too, because one allowance per person has no single total; each person's figure is in `GET /spend-summaries` and the seat buckets.",
+            tags: ["Budgets"],
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "The budget",
+                content: {
+                  "application/json": {
+                    schema: resolver(
+                      z.object({
+                        budget: budgetDtoSchema,
+                        spend_available: z.boolean(),
+                      }),
+                    ),
+                  },
+                },
+              },
+              404: {
+                description: "Not found",
+                content: {
+                  "application/json": { schema: resolver(apiErrorSchema) },
+                },
+              },
             },
-          },
-        },
-      },
-    }),
-    zValidator("query", pageQuerySchema),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const page = { data: c.req.valid("query") };
-      const cursor = cacheRuleCursor(page.data.cursor);
-      if (cursor === null) return invalidCursor(c);
-
-      const organizationId = await app.organizationIdForProject(project.id);
-      const service = app.budgetDecisions;
-      const rows = await service.cacheRuleListPage({
-        organizationId,
-        limit: page.data.limit,
-        cursor: cursor ?? null,
-      });
-      return c.json({
-        data: rows.map(toCacheRuleDto),
-        next_cursor: wirePages.nextPageCursor(rows, page.data.limit, (r) => [
-          r.priority,
-          r.createdAt.getTime(),
-          r.id,
-        ]),
-      });
-    },
-  );
-
-  secured.access(apiKeyPermission("gatewayCacheRules:view")).get(
-    "/cache-rules/:id",
-    describeRoute({
-      summary: "Get a cache rule",
-      description:
-        "Returns the rule if it belongs to the caller's organisation; 404 otherwise. Archived rules are NOT returned (use the audit log to inspect removed rules).",
-      tags: ["Cache Rules"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "The rule",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ cache_rule: cacheRuleDtoSchema })),
+          }),
+    )
+    .registerRoute(
+      "post",
+      "/budgets",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: z.infer<typeof createBudgetSchema>) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const body = { data: input };
+        // Read before the try: a malformed key is a request-validation failure and
+        // takes the same route to the wire as one the schema caught, rather than
+        // being reshaped by the service-error mapping below.
+        const idempotencyKey = readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER));
+        const organizationId = await app.organizationIdForProject(project.id);
+        const { actorUserId } = actorForRequest(c, app);
+        const service = app.budgetDecisions;
+        try {
+          await authorizeOrganizationWide(c, app, {
+            organizationId,
+            permission: "gatewayBudgets:create",
+          });
+          const outcome = await app.idempotency({
+            operation: "gateway.v1.budgets.create",
+            scopeId: project.id,
+            key: idempotencyKey,
+            validatedBody: body.data,
+            handler: async () => {
+              const row = await service.create({
+                organizationId,
+                scope: scopeFromWire(body.data.scope),
+                name: body.data.name,
+                description: body.data.description ?? null,
+                window: toStoredEnum(body.data.window),
+                limitUsd: body.data.limit_usd,
+                onBreach: body.data.on_breach && toStoredEnum(body.data.on_breach),
+                timezone: body.data.timezone ?? null,
+                providerKey: body.data.provider_key ?? null,
+                externalId: body.data.external_id,
+                metadata: body.data.metadata,
+                cycleAnchorAt: body.data.cycle_anchor_at
+                  ? new Date(body.data.cycle_anchor_at)
+                  : null,
+                allowUnreachable: body.data.allow_unreachable,
+                actorUserId,
+              });
+              const [memberCounts, reach] = await Promise.all([
+                app.groupMemberCounts([row]),
+                service.scopeReach({ organizationId, scope: row }),
+              ]);
+              return {
+                status: 201,
+                body: {
+                  budget: budgetDtos.toBudgetDto({
+                    budget: row,
+                    memberCount: memberCounts.get(row.scopeId),
+                    reachable: reach.reachable,
+                  }),
+                },
+              };
             },
-          },
-        },
+          });
+          return idempotentJson({ c, outcome });
+        } catch (error) {
+          return trpcErrorResponse(c, error);
+        }
       },
-    }),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const organizationId = await app.organizationIdForProject(project.id);
-      const service = app.budgetDecisions;
-      const row = await service.tryCacheRuleGet({ id, organizationId });
-      if (!row) {
+      (b) =>
+        policy(apiKeyPermission("gatewayBudgets:create"))(b)
+          .withInput(createBudgetSchema)
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Create budget",
+            parameters: [idempotencyKeyParameter],
+            description:
+              "Creates an organization-owned budget. The scope discriminates which resource the budget covers, across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user). `group` budgets are per-member allowances and `attributed_user` budgets are per-end-user templates; both require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date. A `team`, `project` or `group` budget that none of the organization's active keys can produce traffic for is refused with `gateway_budget_scope_unreachable`, since it would never spend and never block; send `allow_unreachable` to keep it anyway, and note that an organization with no active keys is never refused. Send `Idempotency-Key` to make a retry safe.",
+            tags: ["Budgets"],
+            responses: {
+              ...canonicalBaseResponses,
+              ...canonicalConflictResponses,
+              201: {
+                description: "Budget created",
+                headers: idempotentReplayHeaders,
+                content: {
+                  "application/json": {
+                    schema: resolver(z.object({ budget: budgetDtoSchema })),
+                  },
+                },
+              },
+              400: {
+                description: "Validation error",
+                content: {
+                  "application/json": { schema: resolver(apiErrorSchema) },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "patch",
+      "/budgets/:id",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: { id: string } & z.infer<typeof updateBudgetSchema>) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const id = input.id;
+        const body = { data: input };
+        const organizationId = await app.organizationIdForProject(project.id);
+        const { actorUserId } = actorForRequest(c, app);
+        const service = app.budgetDecisions;
+        try {
+          await authorizeOrganizationWide(c, app, {
+            organizationId,
+            permission: "gatewayBudgets:update",
+          });
+          const row = await service.update({
+            id,
+            organizationId,
+            name: body.data.name,
+            description: body.data.description,
+            limitUsd: body.data.limit_usd,
+            onBreach: body.data.on_breach && toStoredEnum(body.data.on_breach),
+            timezone: body.data.timezone,
+            externalId: body.data.external_id,
+            metadata: body.data.metadata,
+            actorUserId,
+          });
+          const memberCounts = await app.groupMemberCounts([row]);
+          return c.json({
+            budget: budgetDtos.toBudgetDto({
+              budget: row,
+              memberCount: memberCounts.get(row.scopeId),
+            }),
+          });
+        } catch (error) {
+          return trpcErrorResponse(c, error);
+        }
+      },
+      (b) =>
+        policy(apiKeyPermission("gatewayBudgets:update"))(b)
+          .withParams(z.object({ id: z.string().min(1) }))
+          .withInput(updateBudgetSchema)
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Update budget",
+            description:
+              "Partial update. Scope, window and cycle_anchor_at are immutable after create. Use explicit null to clear timezone / description.",
+            tags: ["Budgets"],
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "Updated",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.object({ budget: budgetDtoSchema })),
+                  },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "delete",
+      "/budgets/:id",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: { id: string }) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const id = input.id;
+        const organizationId = await app.organizationIdForProject(project.id);
+        const { actorUserId } = actorForRequest(c, app);
+        const service = app.budgetDecisions;
+        try {
+          await authorizeOrganizationWide(c, app, {
+            organizationId,
+            permission: "gatewayBudgets:delete",
+          });
+          const row = await service.archive({
+            id,
+            organizationId,
+            actorUserId,
+          });
+          return c.json({ budget: budgetDtos.toBudgetDto({ budget: row }) });
+        } catch (error) {
+          return trpcErrorResponse(c, error);
+        }
+      },
+      (b) =>
+        policy(apiKeyPermission("gatewayBudgets:delete"))(b)
+          .withParams(z.object({ id: z.string().min(1) }))
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Archive budget",
+            description:
+              "Soft-delete: the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained.",
+            tags: ["Budgets"],
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "Archived",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.object({ budget: budgetDtoSchema })),
+                  },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "post",
+      "/budgets/:id/reset",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: { id: string } & z.infer<typeof resetBudgetQuerySchema>) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const id = input.id;
+        const endUserId = input.end_user_id ?? null;
+        // The body is OPTIONAL on this route and on /disable: a reset with no
+        // operator note is the common case, and requiring `{}` to send nothing
+        // would be a worse contract than documenting the body by hand. Both keep
+        // manual parsing for that reason, and declare their `requestBody` in
+        // describeRoute so the spec still shows it.
+        const body = resetBudgetSchema.safeParse(await c.req.json().catch(() => ({})));
+        if (!body.success) return validationErrorResponse(c, body.error);
+        const organizationId = await app.organizationIdForProject(project.id);
+        const { actorUserId } = actorForRequest(c, app);
+        const service = app.budgetDecisions;
+        try {
+          await authorizeOrganizationWide(c, app, {
+            organizationId,
+            permission: "gatewayBudgets:update",
+          });
+          const row = await service.reset({
+            id,
+            organizationId,
+            actorUserId,
+            endUserId,
+            reason: body.data.reason ?? null,
+          });
+          const memberCounts = await app.groupMemberCounts([row]);
+          return c.json({
+            budget: budgetDtos.toBudgetDto({
+              budget: row,
+              memberCount: memberCounts.get(row.scopeId),
+            }),
+          });
+        } catch (error) {
+          return trpcErrorResponse(c, error);
+        }
+      },
+      (b) =>
+        policy(apiKeyPermission("gatewayBudgets:update"))(b)
+          .withParams(z.object({ id: z.string().min(1) }))
+          .withQuery(resetBudgetQuerySchema)
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Reset budget period",
+            requestBody: {
+              required: false,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: {
+                      reason: {
+                        type: "string",
+                        maxLength: 500,
+                        description: "Free-text operator note, audit-logged with the reset.",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            // Declared by hand rather than through zValidator because the body is
+            // optional here: requiring `{}` to send no operator note would be a worse
+            // contract than documenting the shape directly.
+            description:
+              "Moves the budget's period boundary to now and recomputes the next reset; recorded spend is NEVER mutated (the ledger and every emitted billing event are immutable, so reconciliation is unaffected). On calendar windows this truncates the running period and the next boundary stays calendar; on `manual` windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets ONE end-user bucket's boundary and leaves the template period untouched.",
+            tags: ["Budgets"],
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "Reset",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.object({ budget: budgetDtoSchema })),
+                  },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "patch",
+      "/providers/:id",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: { id: string }) => {
         return errorResponse(c, {
-          status: 404,
-          code: "cache_rule_not_found",
-          message: `cache rule ${id} not found`,
+          status: 410,
+          code: "gateway_provider_bindings_gone",
+          message:
+            "Gateway provider bindings folded into ModelProvider in iter 110. PATCH the advanced fields via PATCH /api/gateway-platform/v1/model-providers/:id.",
         });
-      }
-      return c.json({ cache_rule: toCacheRuleDto(row) });
-    },
-  );
-
-  secured.access(apiKeyPermission("gatewayCacheRules:create")).post(
-    "/cache-rules",
-    describeRoute({
-      summary: "Create a cache rule",
-      description:
-        "Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll. Send `Idempotency-Key` to make a retry safe.",
-      tags: ["Cache Rules"],
-      parameters: [idempotencyKeyParameter],
-      responses: {
-        ...canonicalBaseResponses,
-        ...canonicalConflictResponses,
-        201: {
-          description: "Created",
-          headers: idempotentReplayHeaders,
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ cache_rule: cacheRuleDtoSchema })),
-            },
-          },
-        },
-        400: {
-          description: "Validation error",
-          content: {
-            "application/json": { schema: resolver(apiErrorSchema) },
-          },
-        },
       },
-    }),
-    zValidator("json", createCacheRuleSchema),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const body = { data: c.req.valid("json") };
-      const idempotencyKey = readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER));
-      const organizationId = await app.organizationIdForProject(project.id);
-      const { actorUserId } = actorForRequest(c, app);
-      const service = app.budgetDecisions;
-      try {
-        await authorizeOrganizationWide(c, app, {
-          organizationId,
-          permission: "gatewayCacheRules:create",
-        });
-        const outcome = await app.idempotency({
-          operation: "gateway.v1.cache-rules.create",
-          scopeId: project.id,
-          key: idempotencyKey,
-          validatedBody: body.data,
-          handler: async () => {
-            const row = await service.cacheRuleCreate({
-              organizationId,
-              name: body.data.name,
-              description: body.data.description ?? null,
-              priority: body.data.priority,
-              enabled: body.data.enabled,
-              matchers: body.data.matchers,
-              action: body.data.action,
-              actorUserId,
-            });
-            return { status: 201, body: { cache_rule: toCacheRuleDto(row) } };
-          },
-        });
-        return idempotentJson({ c, outcome });
-      } catch (error) {
-        return trpcErrorResponse(c, error);
-      }
-    },
-  );
-
-  secured.access(apiKeyPermission("gatewayCacheRules:update")).patch(
-    "/cache-rules/:id",
-    describeRoute({
-      summary: "Update a cache rule",
-      description:
-        "Partial update. `matchers` and `action` REPLACE the stored value when provided (not merged field-by-field). Omitting them leaves the stored value untouched. The rule id + organisation are immutable.",
-      tags: ["Cache Rules"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "Updated",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ cache_rule: cacheRuleDtoSchema })),
+      (b) =>
+        policy(apiKeyPermission("gatewayProviders:update"))(b)
+          .withParams(z.object({ id: z.string().min(1) }))
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Update provider binding",
+            description:
+              "Partial update of gateway-specific settings (rate limits, rotation, slot, extra headers). The underlying ModelProvider credentials are managed in project settings, not here.",
+            tags: ["Providers"],
+            responses: {
+              ...canonicalBaseResponses,
+              410: {
+                description:
+                  "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
+                content: {
+                  "application/json": { schema: resolver(apiErrorSchema) },
+                },
+              },
             },
-          },
-        },
+          }),
+    )
+    .registerRoute(
+      "delete",
+      "/providers/:id",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: { id: string }) => {
+        return errorResponse(c, {
+          status: 410,
+          code: "gateway_provider_bindings_gone",
+          message:
+            "Gateway provider bindings folded into ModelProvider in iter 110. Disable the underlying ModelProvider via DELETE /api/gateway-platform/v1/model-providers/:id (soft-disable).",
+        });
       },
-    }),
-    zValidator("json", updateCacheRuleSchema),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const body = { data: c.req.valid("json") };
-      const organizationId = await app.organizationIdForProject(project.id);
-      const { actorUserId } = actorForRequest(c, app);
-      const service = app.budgetDecisions;
-      try {
-        await authorizeOrganizationWide(c, app, {
+      (b) =>
+        policy(apiKeyPermission("gatewayProviders:manage"))(b)
+          .withParams(z.object({ id: z.string().min(1) }))
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Disable provider binding",
+            description:
+              "Marks the binding disabled. Requests routing to this slot are skipped (fallback chain continues). Historical ledger rows are retained.",
+            tags: ["Providers"],
+            responses: {
+              ...canonicalBaseResponses,
+              410: {
+                description:
+                  "Gone. Gateway provider bindings folded into ModelProvider in iter 110.",
+                content: {
+                  "application/json": { schema: resolver(apiErrorSchema) },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "get",
+      "/cache-rules",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: z.infer<typeof pageQuerySchema>) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const page = { data: input };
+        const cursor = cacheRuleCursor(page.data.cursor);
+        if (cursor === null) return invalidCursor(c);
+
+        const organizationId = await app.organizationIdForProject(project.id);
+        const service = app.budgetDecisions;
+        const rows = await service.cacheRuleListPage({
           organizationId,
-          permission: "gatewayCacheRules:update",
+          limit: page.data.limit,
+          cursor: cursor ?? null,
         });
-        const row = await service.cacheRuleUpdate({
-          id,
-          organizationId,
-          name: body.data.name,
-          description: body.data.description,
-          priority: body.data.priority,
-          enabled: body.data.enabled,
-          matchers: body.data.matchers,
-          action: body.data.action,
-          actorUserId,
+        return c.json({
+          data: rows.map(toCacheRuleDto),
+          next_cursor: wirePages.nextPageCursor(rows, page.data.limit, (r) => [
+            r.priority,
+            r.createdAt.getTime(),
+            r.id,
+          ]),
         });
+      },
+      (b) =>
+        policy(apiKeyPermission("gatewayCacheRules:view"))(b)
+          .withQuery(pageQuerySchema)
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "List cache-control rules",
+            description:
+              "Organization-scoped operator-authored rules, sorted priority descending then oldest first, with archived rules excluded. Paged by cursor: follow `next_cursor` until it comes back null. Matchers and action are returned verbatim as JSON.",
+            tags: ["Cache Rules"],
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "Cache rules for the organisation",
+                content: {
+                  "application/json": {
+                    schema: resolver(
+                      z.object({
+                        data: z.array(cacheRuleDtoSchema),
+                        next_cursor: nextCursorSchema,
+                      }),
+                    ),
+                  },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "get",
+      "/cache-rules/:id",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: { id: string }) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const id = input.id;
+        const organizationId = await app.organizationIdForProject(project.id);
+        const service = app.budgetDecisions;
+        const row = await service.tryCacheRuleGet({ id, organizationId });
+        if (!row) {
+          return errorResponse(c, {
+            status: 404,
+            code: "cache_rule_not_found",
+            message: `cache rule ${id} not found`,
+          });
+        }
         return c.json({ cache_rule: toCacheRuleDto(row) });
-      } catch (error) {
-        return trpcErrorResponse(c, error);
-      }
-    },
-  );
-
-  secured.access(apiKeyPermission("gatewayCacheRules:delete")).delete(
-    "/cache-rules/:id",
-    describeRoute({
-      summary: "Archive a cache rule",
-      description:
-        "Soft-delete: sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.",
-      tags: ["Cache Rules"],
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "Archived",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ cache_rule: cacheRuleDtoSchema })),
-            },
-          },
-        },
       },
-    }),
-    async (c) => {
-      const app = gateway();
-      const project = c.get("project");
-      const id = c.req.param("id");
-      const organizationId = await app.organizationIdForProject(project.id);
-      const { actorUserId } = actorForRequest(c, app);
-      const service = app.budgetDecisions;
-      try {
-        await authorizeOrganizationWide(c, app, {
-          organizationId,
-          permission: "gatewayCacheRules:delete",
-        });
-        const row = await service.cacheRuleArchive({
-          id,
-          organizationId,
-          actorUserId,
-        });
-        return c.json({ cache_rule: toCacheRuleDto(row) });
-      } catch (error) {
-        return trpcErrorResponse(c, error);
-      }
-    },
-  );
-
-  return secured;
+      (b) =>
+        policy(apiKeyPermission("gatewayCacheRules:view"))(b)
+          .withParams(z.object({ id: z.string().min(1) }))
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Get a cache rule",
+            description:
+              "Returns the rule if it belongs to the caller's organisation; 404 otherwise. Archived rules are NOT returned (use the audit log to inspect removed rules).",
+            tags: ["Cache Rules"],
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "The rule",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.object({ cache_rule: cacheRuleDtoSchema })),
+                  },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "post",
+      "/cache-rules",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: z.infer<typeof createCacheRuleSchema>) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const body = { data: input };
+        const idempotencyKey = readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER));
+        const organizationId = await app.organizationIdForProject(project.id);
+        const { actorUserId } = actorForRequest(c, app);
+        const service = app.budgetDecisions;
+        try {
+          await authorizeOrganizationWide(c, app, {
+            organizationId,
+            permission: "gatewayCacheRules:create",
+          });
+          const outcome = await app.idempotency({
+            operation: "gateway.v1.cache-rules.create",
+            scopeId: project.id,
+            key: idempotencyKey,
+            validatedBody: body.data,
+            handler: async () => {
+              const row = await service.cacheRuleCreate({
+                organizationId,
+                name: body.data.name,
+                description: body.data.description ?? null,
+                priority: body.data.priority,
+                enabled: body.data.enabled,
+                matchers: body.data.matchers,
+                action: body.data.action,
+                actorUserId,
+              });
+              return { status: 201, body: { cache_rule: toCacheRuleDto(row) } };
+            },
+          });
+          return idempotentJson({ c, outcome });
+        } catch (error) {
+          return trpcErrorResponse(c, error);
+        }
+      },
+      (b) =>
+        policy(apiKeyPermission("gatewayCacheRules:create"))(b)
+          .withInput(createCacheRuleSchema)
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Create a cache rule",
+            parameters: [idempotencyKeyParameter],
+            description:
+              "Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll. Send `Idempotency-Key` to make a retry safe.",
+            tags: ["Cache Rules"],
+            responses: {
+              ...canonicalBaseResponses,
+              ...canonicalConflictResponses,
+              201: {
+                description: "Created",
+                headers: idempotentReplayHeaders,
+                content: {
+                  "application/json": {
+                    schema: resolver(z.object({ cache_rule: cacheRuleDtoSchema })),
+                  },
+                },
+              },
+              400: {
+                description: "Validation error",
+                content: {
+                  "application/json": { schema: resolver(apiErrorSchema) },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "patch",
+      "/cache-rules/:id",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: { id: string } & z.infer<typeof updateCacheRuleSchema>) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const id = input.id;
+        const body = { data: input };
+        const organizationId = await app.organizationIdForProject(project.id);
+        const { actorUserId } = actorForRequest(c, app);
+        const service = app.budgetDecisions;
+        try {
+          await authorizeOrganizationWide(c, app, {
+            organizationId,
+            permission: "gatewayCacheRules:update",
+          });
+          const row = await service.cacheRuleUpdate({
+            id,
+            organizationId,
+            name: body.data.name,
+            description: body.data.description,
+            priority: body.data.priority,
+            enabled: body.data.enabled,
+            matchers: body.data.matchers,
+            action: body.data.action,
+            actorUserId,
+          });
+          return c.json({ cache_rule: toCacheRuleDto(row) });
+        } catch (error) {
+          return trpcErrorResponse(c, error);
+        }
+      },
+      (b) =>
+        policy(apiKeyPermission("gatewayCacheRules:update"))(b)
+          .withParams(z.object({ id: z.string().min(1) }))
+          .withInput(updateCacheRuleSchema)
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Update a cache rule",
+            description:
+              "Partial update. `matchers` and `action` REPLACE the stored value when provided (not merged field-by-field). Omitting them leaves the stored value untouched. The rule id + organisation are immutable.",
+            tags: ["Cache Rules"],
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "Updated",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.object({ cache_rule: cacheRuleDtoSchema })),
+                  },
+                },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "delete",
+      "/cache-rules/:id",
+      MANAGEMENT_API_VERSION,
+      async (c: GatewayContext, input: { id: string }) => {
+        const app = gateway();
+        const project = projectOf(c);
+        const id = input.id;
+        const organizationId = await app.organizationIdForProject(project.id);
+        const { actorUserId } = actorForRequest(c, app);
+        const service = app.budgetDecisions;
+        try {
+          await authorizeOrganizationWide(c, app, {
+            organizationId,
+            permission: "gatewayCacheRules:delete",
+          });
+          const row = await service.cacheRuleArchive({
+            id,
+            organizationId,
+            actorUserId,
+          });
+          return c.json({ cache_rule: toCacheRuleDto(row) });
+        } catch (error) {
+          return trpcErrorResponse(c, error);
+        }
+      },
+      (b) =>
+        policy(apiKeyPermission("gatewayCacheRules:delete"))(b)
+          .withParams(z.object({ id: z.string().min(1) }))
+          .withRawResponse(GATEWAY_PLATFORM_ANSWER)
+          .withDocs({
+            summary: "Archive a cache rule",
+            description:
+              "Soft-delete: sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.",
+            tags: ["Cache Rules"],
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "Archived",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.object({ cache_rule: cacheRuleDtoSchema })),
+                  },
+                },
+              },
+            },
+          }),
+    )
+    .build();
 }
 
 function toCacheRuleDto(r: GatewayCacheRuleResource) {

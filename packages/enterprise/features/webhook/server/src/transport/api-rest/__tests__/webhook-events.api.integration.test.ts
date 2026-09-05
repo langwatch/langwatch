@@ -220,7 +220,7 @@ function buildApp(rows: WebhookSpendEventRow[]) {
     security: testSecurity(),
     webhooks: () => WebhookApp.create(dependencies),
     canonicalError,
-  }).hono;
+  });
 }
 
 const eventsWindow = () => {

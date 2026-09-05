@@ -142,7 +142,7 @@ export function mountGatewayPlatformRest(): GatewayRestHarness {
   const hono = new Hono();
   hono.route(
     "/",
-    createGatewayPlatformRestApp({ security, gateway: () => gateway.app }).hono as never,
+    createGatewayPlatformRestApp({ security, gateway: () => gateway.app }) as never,
   );
 
   return {

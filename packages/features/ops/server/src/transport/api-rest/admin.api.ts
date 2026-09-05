@@ -23,9 +23,14 @@
  * authorization audit something untrue.
  */
 import { handlerManagedAuth } from "@langwatch/api";
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import {
+  type AppRestSecurity,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+} from "@langwatch/api/rest";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import type { Context } from "hono";
+import { z } from "zod";
 
 import {
   AdminSurfaceHiddenError,
@@ -113,7 +118,22 @@ export function createAdminRestApp(options: {
   ports: AdminRestPorts;
 }): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({ basePath: "/api" });
+
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "admin",
+    basePath: "/api",
+    // React Admin calls these paths verbatim; the back office has no dated
+    // contract to negotiate, so the family serves one generation where it is.
+    staticGeneration: "v1",
+    errorEnvelope: "legacy",
+  });
+
+  const admin = policy(adminAuth);
+
+  /** Every answer here is the back office's own shape, not a published one. */
+  const backOfficeAnswer =
+    "the back office answers React Admin's own envelope, which the client " +
+    "parses as it stands; the refusals are HandledErrors rendered by the boundary";
 
   /**
    * The acting admin, or the refusal.
@@ -168,10 +188,9 @@ export function createAdminRestApp(options: {
     return c.json({ message: "Impersonation started" });
   };
 
-  secured.access(adminAuth).post("/admin/impersonate", (c) => impersonate(c, "POST"));
-  secured.access(adminAuth).delete("/admin/impersonate", (c) => impersonate(c, "DELETE"));
+  const resourceParamsSchema = z.object({ resource: z.string().min(1) });
 
-  secured.access(adminAuth).post("/admin/:resource", async (c) => {
+  const operationHandler = async (c: Context) => {
     const { ops, user } = await requireAdmin(c.req.raw);
 
     const body = await readJsonBody(c);
@@ -206,9 +225,27 @@ export function createAdminRestApp(options: {
       req: auditRequestFrom(c.req.raw),
     });
     return c.json(result);
-  });
+  };
 
-  return secured.hono;
+  return service
+    .registerRoute(
+      "post",
+      "/admin/impersonate",
+      MANAGEMENT_API_VERSION,
+      (c: Context) => impersonate(c, "POST"),
+      (b) => admin(b).withRawResponse(backOfficeAnswer),
+    )
+    .registerRoute(
+      "delete",
+      "/admin/impersonate",
+      MANAGEMENT_API_VERSION,
+      (c: Context) => impersonate(c, "DELETE"),
+      (b) => admin(b).withRawResponse(backOfficeAnswer),
+    )
+    .registerRoute("post", "/admin/:resource", MANAGEMENT_API_VERSION, operationHandler, (b) =>
+      admin(b).withParams(resourceParamsSchema).withRawResponse(backOfficeAnswer),
+    )
+    .build();
 }
 
 /** The plural spellings React Admin sends, mapped onto the model names. */

@@ -5,7 +5,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { GatewaySpendCursorAdapter } from "../../adapters/gateway-spend-cursor.adapter";
@@ -31,12 +30,14 @@ import { USD_DISPLAY_STRING_FORMAT } from "@langwatch/gateway-contract";
 import { requires } from "@langwatch/api";
 import {
   type ApiErrorBody,
-  type AppRestOrganizationVariables,
   type AppRestSecurity,
   BadRequestError,
   canonicalBaseResponses,
-  type SecuredApp,
-  validator as zValidator,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  type OrganizationScopedContext,
+  organizationOf,
 } from "@langwatch/api/rest";
 
 const spendCursors = GatewaySpendCursorAdapter.create();
@@ -328,16 +329,8 @@ const replayResultSchema = z.object({
   window: z.object({ from: z.string(), to: z.string() }),
 });
 
-/** One documented 200, in this family's canonical envelope for errors. */
-function okResponse(description: string, schema: z.ZodTypeAny) {
-  return {
-    ...canonicalBaseResponses,
-    200: {
-      description,
-      content: { "application/json": { schema: resolver(schema) } },
-    },
-  };
-}
+/** The refusals every route here documents; the 200 comes from its output. */
+const spendResponses = canonicalBaseResponses;
 
 /**
  * One or two dimensions, comma separated — two is the ceiling since a third multiplies the group count past what one cursor walk serves usefully, and a caller wanting a third really wants the events read. Validated inside the transform, not piped into an array schema, so a refusal names group_by, not group_by.0 — an index the caller never wrote maps onto nothing a client can point at.
@@ -608,284 +601,303 @@ export function createGatewaySpendRestApp(options: {
     c: Context,
   ) => { status: ContentfulStatusCode; body: ApiErrorBody };
   spend: () => GatewaySpendRestPorts;
-}): SecuredApp<{ Variables: AppRestOrganizationVariables }> {
+}): MountableRestApp {
   const { security, billingPlanGate, canonicalError, spend } = options;
 
-  const secured = security.createOrgApp({
+  const { service, policy } = security.createVersionedApp({
+    name: "gateway-spend",
+    // The generation is the contract, not a dated namespace: the routes answer
+    // exactly where they answer today, with no `/api/v1` twin beside them.
     basePath: "/api/gateway/v1",
+    staticGeneration: "v1",
     errorEnvelope: "canonical",
+    // The family's own handler, layered over the canonical boundary: it logs
+    // what the caller actually received and renders through the application's
+    // own taxonomy.
+    errorHandler: () => handleGatewaySpendApiError(canonicalError),
+    // Every route is gated on the organization's plan, after the door and the
+    // permission check and before the handler — where it ran before.
+    routeMiddleware: [billingPlanGate],
   });
 
-  secured.hono.onError(handleGatewaySpendApiError(canonicalError));
+  type SpendContext = OrganizationScopedContext<EndpointVariables>;
 
-  secured.access(requires("gatewaySpend:view")).get(
-    "/spend-summaries",
-    billingPlanGate,
-    describeRoute({
-      responses: okResponse(
-        "Per-key spend rollups",
-        z.object({
-          data: z.array(spendSummaryRowSchema),
-          next_cursor: nextCursorSchema,
-        }),
-      ),
-      tags: ["Gateway Spend"],
-      summary: "List spend summaries",
-      description: SPEND_SUMMARIES_DESCRIPTION,
-    }),
-    zValidator("query", spendSummariesQuerySchema),
-    async (c) => {
-      const ports = spend();
-      const organization = c.get("organization");
-      const query = c.req.valid("query");
-      // Same contract as /spend-events: a garbled cursor is refused rather
-      // than silently restarting from the first key. A cursor decoding but
-      // naming a different dimension count is refused too — a different walk
-      // shape, and continuing would re-serve page one under a fresh cursor
-      // with nothing saying the walk reset.
-      if (query.cursor !== undefined) {
-        const parts = spendCursors.decodeSpendSummariesCursor(query.cursor);
-        const dimensionCount = query.group_by.length + (query.bucket === "none" ? 0 : 1);
-        if (parts === null) {
-          throw new BadRequestError("Invalid cursor.");
-        }
-        if (parts.length !== dimensionCount) {
-          throw new BadRequestError(
-            "This cursor belongs to a walk over a different grouping. Start a new walk without a cursor.",
-          );
-        }
-      }
-      spendGrouping.assertGroupingIsWalkable({
-        keys: query.group_by,
-        bucket: query.bucket,
-        toMs: query.to,
-        nowMs: Date.now(),
-        allowUnstable: query.allow_unstable,
-        settlementPolicy: ports.settlementPolicy,
-      });
-      const scope = await ports.resolveSpendScope({
-        organizationId: organization.id,
-        projectIds: query.project_id,
-        teamIds: query.team_id,
-        externalIds: query.external_id,
-      });
-      const page = await requireSpendEvents(ports).getSpendSummaries({
-        tenantIds: scope.tenantIds,
-        groupBy: query.group_by,
-        bucket: query.bucket,
-        timezone: query.timezone,
-        fromMs: query.from,
-        toMs: query.to,
-        cursor: query.cursor ?? null,
-        limit: query.limit,
-        filters: spendFilters.spendFiltersFromQuery({
-          query,
-          overrides: { virtualKeyIds: scope.virtualKeyIds },
-        }),
-      });
-      return c.json({
-        data: page.rows.map((r) => ({
-          key: r.key,
-          group: r.group,
-          bucket_start: r.bucketStart,
-          event_count: r.eventCount,
-          settled_count: r.settledCount,
-          usage: {
-            input_tokens: r.tokensInput,
-            output_tokens: r.tokensOutput,
-            cache_read_input_tokens: r.tokensCacheRead,
-            cache_creation_input_tokens: r.tokensCacheWrite,
-            reasoning_tokens: r.tokensReasoning,
-          },
-          cost: { total_usd: r.costUsd, nano_usd: r.costNanoUsd },
-        })),
-        next_cursor: page.nextCursor,
-      });
-    },
-  );
-
-  secured.access(requires("gatewaySpend:view")).get(
-    "/spend-events",
-    billingPlanGate,
-    describeRoute({
-      tags: ["Gateway Spend"],
-      summary: "List spend events",
-      description: SPEND_EVENTS_PULL_DESCRIPTION,
-      responses: okResponse(
-        "One page of billing envelopes",
-        z.object({
-          data: z.array(spendEventEnvelopeSchema),
-          next_cursor: nextCursorSchema,
-        }),
-      ),
-    }),
-    zValidator("query", spendEventsQuerySchema),
-    async (c) => {
-      const ports = spend();
-      const organization = c.get("organization");
-      const query = c.req.valid("query");
-      // A present-but-garbled cursor is a caller bug: refusing beats
-      // silently restarting the walk, which would re-serve the whole range.
-      if (query.cursor !== undefined && !spendCursors.decodeSpendEventsCursor(query.cursor)) {
+  const spendSummariesHandler = async (
+    c: SpendContext,
+    query: z.infer<typeof spendSummariesQuerySchema>,
+  ) => {
+    const ports = spend();
+    const organization = organizationOf(c);
+    // Same contract as /spend-events: a garbled cursor is refused rather
+    // than silently restarting from the first key. A cursor decoding but
+    // naming a different dimension count is refused too — a different walk
+    // shape, and continuing would re-serve page one under a fresh cursor
+    // with nothing saying the walk reset.
+    if (query.cursor !== undefined) {
+      const parts = spendCursors.decodeSpendSummariesCursor(query.cursor);
+      const dimensionCount = query.group_by.length + (query.bucket === "none" ? 0 : 1);
+      if (parts === null) {
         throw new BadRequestError("Invalid cursor.");
       }
-      const scope = await ports.resolveSpendScope({
-        organizationId: organization.id,
-        projectIds: query.project_id,
-        teamIds: query.team_id,
-        externalIds: query.external_id,
-      });
-      const page = await requireSpendEvents(ports).walkSpendEvents({
-        tenantIds: scope.tenantIds,
-        fromMs: query.from,
-        toMs: query.to,
-        cursor: query.cursor ?? null,
-        limit: query.limit,
-        filters: spendFilters.spendFiltersFromQuery({
-          query,
-          overrides: { virtualKeyIds: scope.virtualKeyIds },
+      if (parts.length !== dimensionCount) {
+        throw new BadRequestError(
+          "This cursor belongs to a walk over a different grouping. Start a new walk without a cursor.",
+        );
+      }
+    }
+    spendGrouping.assertGroupingIsWalkable({
+      keys: query.group_by,
+      bucket: query.bucket,
+      toMs: query.to,
+      nowMs: Date.now(),
+      allowUnstable: query.allow_unstable,
+      settlementPolicy: ports.settlementPolicy,
+    });
+    const scope = await ports.resolveSpendScope({
+      organizationId: organization.id,
+      projectIds: query.project_id,
+      teamIds: query.team_id,
+      externalIds: query.external_id,
+    });
+    const page = await requireSpendEvents(ports).getSpendSummaries({
+      tenantIds: scope.tenantIds,
+      groupBy: query.group_by,
+      bucket: query.bucket,
+      timezone: query.timezone,
+      fromMs: query.from,
+      toMs: query.to,
+      cursor: query.cursor ?? null,
+      limit: query.limit,
+      filters: spendFilters.spendFiltersFromQuery({
+        query,
+        overrides: { virtualKeyIds: scope.virtualKeyIds },
+      }),
+    });
+    return {
+      data: page.rows.map((r) => ({
+        key: r.key,
+        group: r.group,
+        bucket_start: r.bucketStart,
+        event_count: r.eventCount,
+        settled_count: r.settledCount,
+        usage: {
+          input_tokens: r.tokensInput,
+          output_tokens: r.tokensOutput,
+          cache_read_input_tokens: r.tokensCacheRead,
+          cache_creation_input_tokens: r.tokensCacheWrite,
+          reasoning_tokens: r.tokensReasoning,
+        },
+        cost: { total_usd: r.costUsd, nano_usd: r.costNanoUsd },
+      })),
+      next_cursor: page.nextCursor,
+    };
+  };
+
+  const spendEventsHandler = async (
+    c: SpendContext,
+    query: z.infer<typeof spendEventsQuerySchema>,
+  ) => {
+    const ports = spend();
+    const organization = organizationOf(c);
+    // A present-but-garbled cursor is a caller bug: refusing beats
+    // silently restarting the walk, which would re-serve the whole range.
+    if (query.cursor !== undefined && !spendCursors.decodeSpendEventsCursor(query.cursor)) {
+      throw new BadRequestError("Invalid cursor.");
+    }
+    const scope = await ports.resolveSpendScope({
+      organizationId: organization.id,
+      projectIds: query.project_id,
+      teamIds: query.team_id,
+      externalIds: query.external_id,
+    });
+    const page = await requireSpendEvents(ports).walkSpendEvents({
+      tenantIds: scope.tenantIds,
+      fromMs: query.from,
+      toMs: query.to,
+      cursor: query.cursor ?? null,
+      limit: query.limit,
+      filters: spendFilters.spendFiltersFromQuery({
+        query,
+        overrides: { virtualKeyIds: scope.virtualKeyIds },
+      }),
+    });
+    return {
+      data: page.rows.map((row) => ports.spendEventEnvelope(row)),
+      next_cursor: page.nextCursor,
+    };
+  };
+
+  const endUserSpendHandler = async (
+    c: SpendContext,
+    input: { id: string } & z.infer<typeof endUserSpendQuerySchema>,
+  ) => {
+    const ports = spend();
+    const organization = organizationOf(c);
+    const endUserId = input.id;
+    const query = input;
+    const now = Date.now();
+    const fromMs = query.from ?? now - END_USER_WINDOWS[query.window];
+    const toMs = query.to ?? now;
+    const { tenantIds } = await ports.resolveSpendScope({
+      organizationId: organization.id,
+    });
+    const rollup = await requireSpendEvents(ports).getEndUserSpend({
+      tenantIds,
+      endUserId,
+      fromMs,
+      toMs,
+      virtualKeyId: query.virtual_key_id,
+    });
+    const budgetRepository = ports.budgetSpend;
+    if (!budgetRepository) {
+      // The ledger is the only store spend accrues in, so without ClickHouse
+      // there are no figures to report against these caps.
+      throw ports.spendStoreUnavailable();
+    }
+    const caps = await ports.endUserCaps({
+      budgetRepository,
+      organizationId: organization.id,
+      endUserId,
+      tenantIds,
+      virtualKeyId: query.virtual_key_id,
+    });
+    return {
+      data: {
+        end_user_id: endUserId,
+        window: query.window,
+        from: new Date(fromMs).toISOString(),
+        to: new Date(toMs).toISOString(),
+        cost: { total_usd: rollup.spendUsd, nano_usd: rollup.spendNanoUsd },
+        request_count: rollup.requestCount,
+        usage: {
+          input_tokens: rollup.tokensInput,
+          output_tokens: rollup.tokensOutput,
+          cache_read_input_tokens: rollup.tokensCacheRead,
+          cache_creation_input_tokens: rollup.tokensCacheWrite,
+          reasoning_tokens: rollup.tokensReasoning,
+        },
+        caps,
+      },
+    };
+  };
+
+  const replayHandler = async (c: SpendContext, body: z.infer<typeof replayBodySchema>) => {
+    const ports = spend();
+    const organization = organizationOf(c);
+
+    const endpoints = ports.webhookEndpoints;
+    const endpoint = await endpoints.tryGetDeliverable({
+      organizationId: organization.id,
+      endpointId: body.endpoint_id,
+    });
+    if (!endpoint) {
+      throw new BadRequestError("unknown or inactive endpoint for this organization");
+    }
+
+    const events = ports.webhookEvents;
+    if (!events) {
+      throw ports.spendStoreUnavailable();
+    }
+    const delivery = ports.webhookDelivery;
+    if (!delivery) throw ports.spendStoreUnavailable();
+
+    // One replay identity per call: it salts batch ids and inbox source
+    // ids so redelivered envelopes cannot collide with their historical
+    // batches; the ENVELOPE ids stay untouched.
+    await assertReplayWindowWithinCap({
+      events,
+      endpoint,
+      accepts: ports.endpointAcceptsEvent,
+      organizationId: organization.id,
+      fromMs: body.from,
+      toMs: body.to,
+    });
+
+    const replayId = nanoid(10);
+    const replayed = await appendWindowToEndpointStream({
+      events,
+      endpoint,
+      delivery,
+      accepts: ports.endpointAcceptsEvent,
+      organizationId: organization.id,
+      fromMs: body.from,
+      toMs: body.to,
+      replayId,
+    });
+
+    return {
+      data: {
+        endpoint_id: endpoint.id,
+        replay_id: replayId,
+        replayed,
+        window: {
+          from: new Date(body.from).toISOString(),
+          to: new Date(body.to).toISOString(),
+        },
+      },
+    };
+  };
+
+  return service
+    .registerRoute("get", "/spend-summaries", MANAGEMENT_API_VERSION, spendSummariesHandler, (b) =>
+      policy(requires("gatewaySpend:view"))(b)
+        .withQuery(spendSummariesQuerySchema)
+        .withOutput(
+          z.object({
+            data: z.array(spendSummaryRowSchema),
+            next_cursor: nextCursorSchema,
+          }),
+        )
+        .withDocs({
+          tags: ["Gateway Spend"],
+          summary: "List spend summaries",
+          description: SPEND_SUMMARIES_DESCRIPTION,
+          responses: spendResponses,
         }),
-      });
-      return c.json({
-        data: page.rows.map((row) => ports.spendEventEnvelope(row)),
-        next_cursor: page.nextCursor,
-      });
-    },
-  );
-
-  secured.access(requires("gatewaySpend:view")).get(
-    "/end-users/:id/spend",
-    billingPlanGate,
-    describeRoute({
-      tags: ["Gateway Spend"],
-      summary: "Read one end user's spend",
-      description: END_USER_SPEND_DESCRIPTION,
-      responses: okResponse(
-        "Spend and standing for one end user",
-        z.object({ data: endUserSpendSchema }),
-      ),
-    }),
-    zValidator("query", endUserSpendQuerySchema),
-    async (c) => {
-      const ports = spend();
-      const organization = c.get("organization");
-      const endUserId = c.req.param("id");
-      const query = c.req.valid("query");
-      const now = Date.now();
-      const fromMs = query.from ?? now - END_USER_WINDOWS[query.window];
-      const toMs = query.to ?? now;
-      const { tenantIds } = await ports.resolveSpendScope({
-        organizationId: organization.id,
-      });
-      const rollup = await requireSpendEvents(ports).getEndUserSpend({
-        tenantIds,
-        endUserId,
-        fromMs,
-        toMs,
-        virtualKeyId: query.virtual_key_id,
-      });
-      const budgetRepository = ports.budgetSpend;
-      if (!budgetRepository) {
-        // The ledger is the only store spend accrues in, so without ClickHouse
-        // there are no figures to report against these caps.
-        throw ports.spendStoreUnavailable();
-      }
-      const caps = await ports.endUserCaps({
-        budgetRepository,
-        organizationId: organization.id,
-        endUserId,
-        tenantIds,
-        virtualKeyId: query.virtual_key_id,
-      });
-      return c.json({
-        data: {
-          end_user_id: endUserId,
-          window: query.window,
-          from: new Date(fromMs).toISOString(),
-          to: new Date(toMs).toISOString(),
-          cost: { total_usd: rollup.spendUsd, nano_usd: rollup.spendNanoUsd },
-          request_count: rollup.requestCount,
-          usage: {
-            input_tokens: rollup.tokensInput,
-            output_tokens: rollup.tokensOutput,
-            cache_read_input_tokens: rollup.tokensCacheRead,
-            cache_creation_input_tokens: rollup.tokensCacheWrite,
-            reasoning_tokens: rollup.tokensReasoning,
-          },
-          caps,
-        },
-      });
-    },
-  );
-
-  secured.access(requires("gatewaySpend:manage")).post(
-    "/spend-events/replay",
-    billingPlanGate,
-    describeRoute({
-      tags: ["Gateway Spend"],
-      summary: "Replay spend events to an endpoint",
-      description: REPLAY_DESCRIPTION,
-      responses: okResponse("Replay accepted", z.object({ data: replayResultSchema })),
-    }),
-    zValidator("json", replayBodySchema),
-    async (c) => {
-      const ports = spend();
-      const organization = c.get("organization");
-      const body = c.req.valid("json");
-
-      const endpoints = ports.webhookEndpoints;
-      const endpoint = await endpoints.tryGetDeliverable({
-        organizationId: organization.id,
-        endpointId: body.endpoint_id,
-      });
-      if (!endpoint) {
-        throw new BadRequestError("unknown or inactive endpoint for this organization");
-      }
-
-      const events = ports.webhookEvents;
-      if (!events) {
-        throw ports.spendStoreUnavailable();
-      }
-      const delivery = ports.webhookDelivery;
-      if (!delivery) throw ports.spendStoreUnavailable();
-
-      // One replay identity per call: it salts batch ids and inbox source
-      // ids so redelivered envelopes cannot collide with their historical
-      // batches; the ENVELOPE ids stay untouched.
-      await assertReplayWindowWithinCap({
-        events,
-        endpoint,
-        accepts: ports.endpointAcceptsEvent,
-        organizationId: organization.id,
-        fromMs: body.from,
-        toMs: body.to,
-      });
-
-      const replayId = nanoid(10);
-      const replayed = await appendWindowToEndpointStream({
-        events,
-        endpoint,
-        delivery,
-        accepts: ports.endpointAcceptsEvent,
-        organizationId: organization.id,
-        fromMs: body.from,
-        toMs: body.to,
-        replayId,
-      });
-
-      return c.json({
-        data: {
-          endpoint_id: endpoint.id,
-          replay_id: replayId,
-          replayed,
-          window: {
-            from: new Date(body.from).toISOString(),
-            to: new Date(body.to).toISOString(),
-          },
-        },
-      });
-    },
-  );
-
-  return secured;
+    )
+    .registerRoute("get", "/spend-events", MANAGEMENT_API_VERSION, spendEventsHandler, (b) =>
+      policy(requires("gatewaySpend:view"))(b)
+        .withQuery(spendEventsQuerySchema)
+        .withOutput(
+          z.object({
+            data: z.array(spendEventEnvelopeSchema),
+            next_cursor: nextCursorSchema,
+          }),
+        )
+        .withDocs({
+          tags: ["Gateway Spend"],
+          summary: "List spend events",
+          description: SPEND_EVENTS_PULL_DESCRIPTION,
+          responses: spendResponses,
+        }),
+    )
+    .registerRoute(
+      "get",
+      "/end-users/:id/spend",
+      MANAGEMENT_API_VERSION,
+      endUserSpendHandler,
+      (b) =>
+        policy(requires("gatewaySpend:view"))(b)
+          .withParams(z.object({ id: z.string().min(1) }))
+          .withQuery(endUserSpendQuerySchema)
+          .withOutput(z.object({ data: endUserSpendSchema }))
+          .withDocs({
+            tags: ["Gateway Spend"],
+            summary: "Read one end user's spend",
+            description: END_USER_SPEND_DESCRIPTION,
+            responses: spendResponses,
+          }),
+    )
+    .registerRoute("post", "/spend-events/replay", MANAGEMENT_API_VERSION, replayHandler, (b) =>
+      policy(requires("gatewaySpend:manage"))(b)
+        .withInput(replayBodySchema)
+        .withOutput(z.object({ data: replayResultSchema }))
+        .withDocs({
+          tags: ["Gateway Spend"],
+          summary: "Replay spend events to an endpoint",
+          description: REPLAY_DESCRIPTION,
+          responses: spendResponses,
+        }),
+    )
+    .build();
 }
