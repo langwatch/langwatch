@@ -104,15 +104,15 @@ export async function emitRunResult({
   // A run that scheduled nothing can never see a completion arrive. Polling
   // would run out the full timeout and report a timeout for a run that is
   // already over.
-  const nothingToWaitFor = wait !== undefined && result.jobCount === 0;
+  const hasNothingToWaitFor = wait !== undefined && result.jobCount === 0;
 
-  if (!wait || nothingToWaitFor) {
+  if (!wait || hasNothingToWaitFor) {
     await printResult(
       { ...result, outcome: "scheduled" satisfies RunCommandOutcome },
       {
         ...options,
         table: () => {
-          if (nothingToWaitFor) {
+          if (hasNothingToWaitFor) {
             console.log();
             console.log(
               chalk.yellow("  No jobs were scheduled: nothing to wait for."),

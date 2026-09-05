@@ -300,7 +300,13 @@ export function parseWait(
   if (value === undefined || value === false) return undefined;
   if (value === true) return { timeoutMs: DEFAULT_WAIT_MINUTES * 60 * 1000 };
   const minutes = Number(value);
-  if (value.trim() === "" || !Number.isFinite(minutes) || minutes <= 0) {
+  const timeoutMs = minutes * 60 * 1000;
+  if (
+    value.trim() === "" ||
+    !Number.isFinite(minutes) ||
+    minutes <= 0 ||
+    !Number.isFinite(timeoutMs)
+  ) {
     console.error(
       chalk.red(
         `Error: --wait takes a number of minutes, such as --wait 90, not "${value}".`,
@@ -308,7 +314,7 @@ export function parseWait(
     );
     process.exit(1);
   }
-  return { timeoutMs: minutes * 60 * 1000 };
+  return { timeoutMs };
 }
 
 /**
