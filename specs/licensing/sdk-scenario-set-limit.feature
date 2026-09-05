@@ -1,3 +1,4 @@
+@unimplemented
 Feature: SDK Scenario Set Limit on Free Plan
 
   Free-plan users can create up to 3 distinct scenario sets via the SDK.

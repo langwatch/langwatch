@@ -1,7 +1,7 @@
 /**
  * The browser entry: what `index.html` loads, the only module that runs on
- * import. Unfilled slots (graphics quality, command bar, footer) are honest
- * pass-throughs — named in `core-application-feature-extraction-plan.md`.
+ * import. Unfilled slots (command bar, footer) are honest pass-throughs —
+ * named in `core-application-feature-extraction-plan.md`.
  */
 
 import type { ReactNode } from "react";
@@ -15,6 +15,7 @@ import { createUiApplication } from "./features/installed-ui-features.compositio
 import { OnboardingAttributionProvider } from "./features/onboarding/ui/sections/onboarding-attribution-provider";
 import type { PublicEnvironment } from "./model/public-environment";
 import { UiErrorToaster } from "./ui/elements/ui-error-toaster";
+import { GraphicsQualityProvider } from "./ui/sections/graphics-quality-provider";
 import { UiApplicationShell } from "./ui/sections/ui-application-shell";
 import type { UiApplication } from "./ui/sections/ui-application";
 
@@ -74,7 +75,7 @@ class BrowserUiShell extends UiShellPort {
           attribution: OnboardingAttributionProvider,
           session: UiPendingProvider,
           transport: UiPendingProvider,
-          graphicsQuality: UiPendingProvider,
+          graphicsQuality: GraphicsQualityProvider,
           commandBar: UiPendingProvider,
           toaster: UiErrorToaster,
           footer: UiNoFooter,

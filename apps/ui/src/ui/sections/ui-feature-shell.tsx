@@ -16,6 +16,7 @@ import {
   type UiCapabilityInstall,
   type UiSessionPort,
 } from "@langwatch/ui-host/capabilities";
+import { UiSlot } from "@langwatch/ui-host/slots";
 import {
   createUiFeatureApiClient,
   type UiFeatureApiBinding,
@@ -95,7 +96,12 @@ export function createUiFeatureShell({
     // session with nothing resolved publishes none and the hook reads unresolved.
     return (
       <UiCapabilityContextProvider value={resolved}>
-        <UiScopeHostProvider value={resolved.session.scopeHost()}>{children}</UiScopeHostProvider>
+        <UiScopeHostProvider value={resolved.session.scopeHost()}>
+          {children}
+          {/* Always mounted, one gate for every routed page — a surface
+              without this reach opened a limit dialog nobody ever saw. */}
+          <UiSlot name="globalUpgradeModal" props={{}} />
+        </UiScopeHostProvider>
       </UiCapabilityContextProvider>
     );
   }

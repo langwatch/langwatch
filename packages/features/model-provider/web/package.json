@@ -59,6 +59,10 @@
     "./surfaces/clamp-max-tokens": {
       "types": "./src/model/clamp-max-tokens.ts",
       "default": "./src/model/clamp-max-tokens.ts"
+    },
+    "./surfaces/missing-model-toast": {
+      "types": "./src/ui/sections/missing-model-toast.ts",
+      "default": "./src/ui/sections/missing-model-toast.ts"
     }
   },
   "scripts": {

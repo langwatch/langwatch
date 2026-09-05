@@ -18,6 +18,8 @@ export type UiSlotProps = {
   resourceLimits: { label: string; current: number; max?: number };
   /** Said above a provider's credentials when the credentials are not the customer's. */
   managedModelProviderAlert: { provider: string; error?: string };
+  /** The store-driven upgrade/limit dialog, mounted once at the app root. */
+  globalUpgradeModal: Record<never, never>;
 };
 
 /** The blocks a screen may ask for. */

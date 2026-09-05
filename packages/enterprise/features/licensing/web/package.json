@@ -20,6 +20,10 @@
     "./surfaces/seat-types": {
       "types": "./src/surfaces/seat-types/index.ts",
       "default": "./src/surfaces/seat-types/index.ts"
+    },
+    "./surfaces/global-upgrade-modal": {
+      "types": "./src/surfaces/global-upgrade-modal/index.ts",
+      "default": "./src/surfaces/global-upgrade-modal/index.ts"
     }
   },
   "scripts": {
@@ -31,6 +35,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
     "lucide-react": "^1.22.0"
   },
   "devDependencies": {
