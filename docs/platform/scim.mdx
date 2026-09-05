@@ -1,185 +1,185 @@
 ---
 title: "SCIM Provisioning"
-description: "Automatically provision and deprovision users in LangWatch using SCIM 2.0 with your identity provider (Okta, Azure AD, etc.)."
+description: "Provision and deprovision LangWatch users from your identity provider (Okta, Entra ID and others) over SCIM 2.0."
 sidebarTitle: SCIM Provisioning
 keywords: scim, provisioning, deprovisioning, okta, azure ad, identity provider, sso, user management
 ---
 
 <Note>
-  **Available on Enterprise plans.** SCIM provisioning needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. The plan is checked on every call, not only when a token is created, so if it lapses, tokens that already exist stop verifying and your identity provider's requests are refused. Minting a token through the [SCIM Tokens API](/api-reference/scim-tokens/overview) without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  **Available on Enterprise plans.** SCIM provisioning needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. The plan is checked on every SCIM call, so when it lapses, existing tokens stop verifying and your identity provider's requests are refused with HTTP 403. The [SCIM Tokens API](/api-reference/scim-tokens/overview) refuses to mint a token without an Enterprise plan with HTTP 402 and the error code `enterprise_plan_required`. To enable it, contact [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
-SCIM (System for Cross-domain Identity Management) 2.0 allows your identity provider to automatically manage user lifecycle in LangWatch, provisioning new users when they join your organization and deprovisioning them when they leave, without any manual intervention.
+SCIM (System for Cross-domain Identity Management) 2.0 lets your identity provider create LangWatch users when people join your organization, deactivate them when they leave, and push groups that you map to roles.
 
 ## Prerequisites
 
-- Organization Admin permissions in LangWatch
-- An identity provider that supports SCIM 2.0 (Okta, Azure AD, Entra ID, etc.)
-- SSO configured for your organization (recommended, see [SSO Setup](/self-hosting/configuration/sso))
+- `organization:manage` in LangWatch (an organization Admin)
+- An identity provider that supports SCIM 2.0: Okta, Entra ID (Azure AD) and others
+- SSO set up for your organization. LangWatch creates an SSO connection for your organization during SSO setup, and every SCIM token belongs to one connection. See [SSO Setup](/self-hosting/configuration/sso)
 
-## Setting Up SCIM
+## Set up SCIM
 
-### Step 1: Get Your SCIM Base URL
+### Step 1: Copy the SCIM base URL
 
-Navigate to **Settings → SCIM** in your LangWatch organization. The SCIM Base URL is displayed at the top of the page:
+Open **Settings > SCIM Provisioning**. The base URL is shown at the top of the page:
 
 ```
 https://app.langwatch.ai/api/scim/v2
 ```
 
-For self-hosted deployments, replace the domain with your own:
+On a self-hosted deployment, replace the domain with your own:
 
 ```
 https://your-langwatch-instance.example.com/api/scim/v2
 ```
 
-### Step 2: Generate a Bearer Token
+### Step 2: Create a bearer token
 
-1. In **Settings → SCIM**, click **Generate Token**
-2. Optionally add a description (e.g., `Okta SCIM integration`)
-3. Click **Generate Token**
-4. **Copy the token immediately**: it will not be shown again
+A token belongs to one SSO connection and is shown once. Create it through the [SCIM Tokens API](/api-reference/scim-tokens/overview) with the connection id LangWatch gave you during SSO setup:
+
+```bash
+curl -X POST https://app.langwatch.ai/api/scim-tokens \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{"connectionId": "YOUR_CONNECTION_ID", "description": "Okta SCIM integration"}'
+```
+
+The response carries the token once. Store it in your identity provider straight away.
 
 <Warning>
-  Store your SCIM bearer token securely. Once you close the dialog, the token
-  value cannot be retrieved. If you lose the token, revoke it and generate a new
-  one.
+  The token cannot be retrieved later. If you lose it, revoke it and create a new one.
 </Warning>
 
-You can generate multiple tokens (e.g., one per integration) and revoke them individually from the token table.
+You can create several tokens, for example one per integration, and revoke each one separately from the table on **Settings > SCIM Provisioning**.
 
-### Step 3: Configure Your Identity Provider
-
-Use the SCIM Base URL and bearer token to configure SCIM in your identity provider:
+### Step 3: Configure your identity provider
 
 | Setting | Value |
 |---------|-------|
 | SCIM Base URL | `https://app.langwatch.ai/api/scim/v2` |
-| Bearer Token | Your generated token |
+| Bearer Token | The token from step 2 |
 
-Refer to your identity provider's own documentation for where to enter these values:
+Where to enter them:
 
 - **Okta**: [Configure SCIM provisioning](https://help.okta.com/en-us/content/topics/apps/apps_app_integration_wizard_scim.htm)
-- **Azure AD, Entra ID**: [Configure automatic user provisioning](https://learn.microsoft.com/en-us/entra/identity/app-provisioning/configure-automatic-user-provisioning-portal)
+- **Entra ID (Azure AD)**: [Configure automatic user provisioning](https://learn.microsoft.com/en-us/entra/identity/app-provisioning/configure-automatic-user-provisioning-portal)
 
 ---
 
-## Supported Operations
+## Supported operations
 
-LangWatch SCIM 2.0 supports the following user operations:
+| Operation | Description |
+|-----------|-------------|
+| **Create User** | Creates the user and adds them to your organization as a Member. An address that is already a member gets `409 Conflict` |
+| **Get User** | Returns one user by id |
+| **List Users** | Lists the users in the organization, with an optional `userName eq` filter |
+| **Update User (PUT)** | Replaces the user's attributes |
+| **Update User (PATCH)** | Changes single attributes, for example `active` |
+| **Delete User** | Removes the membership and deactivates the account. The user's data stays |
 
-| Operation               | Description                                                             |
-| ----------------------- | ----------------------------------------------------------------------- |
-| **Create User**         | Provisions a new user and adds them to your organization as a Member    |
-| **Get User**            | Retrieves a single user by ID                                           |
-| **List Users**          | Lists all users in the organization, with optional `userName` filtering |
-| **Update User (PUT)**   | Replaces user attributes (name, email, active status)                   |
-| **Update User (PATCH)** | Partially updates user attributes (e.g., deactivate only)               |
-| **Delete User**         | Deactivates the user (soft delete, their data is preserved)            |
+### SCIM endpoints
 
-### SCIM Endpoints
+| Endpoint | Methods |
+|----------|---------|
+| `/api/scim/v2/Users` | `GET`, `POST` |
+| `/api/scim/v2/Users/{id}` | `GET`, `PUT`, `PATCH`, `DELETE` |
+| `/api/scim/v2/Groups` | `GET`, `POST` |
+| `/api/scim/v2/Groups/{id}` | `GET`, `PUT`, `PATCH`, `DELETE` |
+| `/api/scim/v2/ServiceProviderConfig` | `GET` |
+| `/api/scim/v2/ResourceTypes` | `GET` |
+| `/api/scim/v2/Schemas` | `GET` |
 
-| Endpoint                             | Methods                         |
-| ------------------------------------ | ------------------------------- |
-| `/api/scim/v2/Users`                 | `GET`, `POST`                   |
-| `/api/scim/v2/Users/{id}`            | `GET`, `PUT`, `PATCH`, `DELETE` |
-| `/api/scim/v2/Groups`                | `GET`, `POST`                   |
-| `/api/scim/v2/Groups/{id}`           | `GET`, `PUT`, `PATCH`, `DELETE` |
-| `/api/scim/v2/ServiceProviderConfig` | `GET`                           |
-| `/api/scim/v2/ResourceTypes`         | `GET`                           |
-| `/api/scim/v2/Schemas`               | `GET`                           |
+`ServiceProviderConfig`, `ResourceTypes` and `Schemas` need no token. List endpoints return at most 100 rows per page; `startIndex` starts at 1. `ServiceProviderConfig` advertises `patch`, `filter` with `maxResults` 100, and no `bulk`, `sort`, `etag` or `changePassword`. `GET /Groups` accepts `excludedAttributes=members`.
 
-### User Attributes
+### User attributes
 
-| SCIM Attribute    | LangWatch Field | Notes                         |
-| ----------------- | --------------- | ----------------------------- |
-| `userName`        | Email address   | Used as the unique identifier |
-| `name.givenName`  | First name      | Combined into display name    |
-| `name.familyName` | Last name       | Combined into display name    |
-| `emails[primary]` | Email address   | Should match `userName`       |
-| `active`          | Account status  | `false` deactivates the user  |
+| SCIM attribute | LangWatch field | Notes |
+|----------------|-----------------|-------|
+| `externalId` | Identity provider id | The primary key. LangWatch matches a user on the connection and `externalId` first, then on the email |
+| `userName` | Email address | Must be an email. It is the account's address |
+| `name.givenName`, `name.familyName` | Name | Joined into the display name |
+| `emails` | | Accepted and ignored on write; the address comes from `userName`. Returned on read |
+| `active` | Account status | `false` deactivates the user |
+| `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User` `costCenter` | Department | Assigns the user to the department with that name, and creates it when it does not exist. An empty value removes the assignment |
 
 ---
 
-## User Lifecycle Behavior
+## User lifecycle
 
 ### Provisioning (Create)
 
-When your identity provider provisions a user:
+- A new address: LangWatch creates the account and adds it to your organization as a Member.
+- An existing account that is not in your organization: LangWatch adds it as a Member. A deactivated account is reactivated first.
+- An existing member: `409 Conflict`.
 
-- If the user **does not exist** in LangWatch, a new account is created and added to your organization
-- If the user **already exists** (same email) but is not in your organization, they are added as a **Member**
-- If the user **already exists** and is deactivated, their account is reactivated
+Set the roles after provisioning in [Access Control (RBAC)](/platform/rbac), or map roles to groups with [SCIM Groups](/platform/scim-groups).
 
-New users provisioned via SCIM are assigned the **Member** role by default. You can adjust roles manually in LangWatch after provisioning using [RBAC](/platform/rbac), or use [SCIM Groups](/platform/scim-groups) to automatically assign roles based on group membership.
+### Deprovisioning (Delete)
 
-### Deprovisioning (Delete/Deactivate)
+A `DELETE` on a user:
 
-When your identity provider sends a **DELETE** for a user:
+- Removes the organization membership and every role binding
+- Deactivates the account. Every session and CLI token is revoked at once
+- Keeps the user's data: traces, annotations and datasets
+- A second `DELETE` returns `404 Not Found`
 
-- Their org membership and all role bindings are **removed**
-- Their account is **deactivated**: they can no longer sign in
-- Their data (traces, annotations, datasets) is **preserved**
-- A second DELETE returns `404 Not Found`, the operation is idempotent
+### Suspending (`PATCH active: false`)
 
-When your identity provider **suspends** a user (`PATCH active: false`):
-
-- Their account is **deactivated**: they can no longer sign in
-- Their org membership and role bindings are **preserved**
-- Re-activating (`active: true`) immediately restores access
+- Deactivates the account. Every session and CLI token is revoked at once
+- Keeps the organization membership and the role bindings
+- `active: true` restores access
 
 <Info>
-  Use `active: false` for temporary suspension and DELETE for permanent offboarding. DELETE removes all memberships and role bindings, re-provisioning the user starts from scratch.
+  Use `active: false` for a temporary suspension and `DELETE` for permanent offboarding. After a `DELETE`, provisioning the user again starts with no bindings.
 </Info>
 
 ---
 
-## Managing Tokens
+## Manage tokens
 
-From **Settings → SCIM**, you can manage all bearer tokens:
+**Settings > SCIM Provisioning** lists the tokens of the organization:
 
-| Column      | Description                                                 |
-| ----------- | ----------------------------------------------------------- |
-| Description | Optional label you provided when creating the token         |
-| Created     | Date the token was generated                                |
-| Last Used   | Date the token was last used to authenticate a SCIM request |
+| Column | Description |
+|--------|-------------|
+| Description | The label given when the token was created |
+| Created | When the token was created |
+| Last Used | The last SCIM request authenticated with the token |
 
-To revoke a token, click the delete icon next to it and confirm. Any identity provider using that token will immediately lose access.
+To revoke a token, click the delete icon on its row and confirm. The identity provider using that token loses access at once. The [SCIM Tokens API](/api-reference/scim-tokens/overview) lists and revokes tokens too, and each token created or revoked through the API is written to the [Audit Log](/platform/audit-log). Provisioning requests themselves are not in the audit log.
 
 ---
 
-## Security Considerations
+## Security
 
-- **Rotate tokens regularly**: generate a new token and update your IdP before revoking the old one to avoid downtime
-- **One token per integration**: use separate tokens for each identity provider or environment so you can revoke them independently
-- **Combine with SSO**: SCIM works best when paired with SSO so that provisioned users sign in via your IdP rather than email/password
-- **Audit token usage**: the "Last Used" column helps identify unused or stale tokens
+- **Rotate tokens**: create the new token and update your identity provider before you revoke the old one
+- **One token per integration**: revoke one without affecting the others
+- **Combine with SSO**: provisioned users then sign in through your identity provider
+- **Watch Last Used**: a token with no recent use can be revoked
 
 ---
 
 ## Troubleshooting
 
-**Test connection fails in my identity provider**
+**The connection test fails in the identity provider**
 
-- Verify the SCIM Base URL ends with `/api/scim/v2` (no trailing slash)
-- Ensure the bearer token is pasted correctly without extra whitespace
-- Confirm the token has not been revoked in LangWatch
+- The base URL ends with `/api/scim/v2`, without a trailing slash
+- The token is pasted without extra whitespace
+- The token is not revoked in LangWatch and the plan is active
 
-**Users are not being provisioned**
+**Users are not provisioned**
 
-- Check that users or groups are assigned to the application in your IdP
-- Verify that **Create Users** is enabled in your IdP's provisioning settings
-- Review provisioning logs in your IdP for detailed error messages
+- The users or groups are assigned to the application in the identity provider
+- **Create Users** is enabled in the provisioning settings
+- The provisioning log of the identity provider shows the error LangWatch returned
 
-**Deactivated users can still sign in**
+**Generate Token on the settings page reports "Failed to generate token"**
 
-- SCIM deactivation prevents future sign-ins but active sessions may persist until they expire
-- For immediate access removal, also revoke the user's active sessions from your IdP
+- The button on **Settings > SCIM Provisioning** sends no SSO connection, and a token needs one. Create the token through the [SCIM Tokens API](/api-reference/scim-tokens/overview) with your `connectionId`, as in step 2. The page still lists and revokes tokens
 
-**User shows "already exists" error**
+**A user shows an "already exists" error**
 
-- A user with the same email may already be a member of the organization, this is expected behavior and can be safely ignored
+- The address is already a member of the organization. LangWatch returns `409 Conflict`, and the identity provider links the existing user on its next sync
 
 ---
 
-For additional help, contact us at [support@langwatch.ai](mailto:support@langwatch.ai).
+For help, contact [support@langwatch.ai](mailto:support@langwatch.ai).

@@ -389,114 +389,101 @@ sidebarTitle: API Keys
 keywords: api keys, authentication, personal keys, service keys, langwatch, security, mcp, ci/cd
 ---
 
-LangWatch uses API keys to authenticate SDK calls, MCP connections, and API requests. All keys are managed from a single place: **Settings → API Keys**.
+## Ingestion keys and API keys
 
-## Ingestion keys vs API keys
-
-LangWatch splits credentials into two concepts, the same way Datadog separates ingest-only API keys from RBAC-scoped application keys. An ingestion key is an `ik-lw-…` string and an API key is an `sk-lw-…` string, so you can tell them apart at a glance. They carry very different power:
+LangWatch has two kinds of credentials. An ingestion key starts with `ik-lw-` and can only write traces. An API key starts with `sk-lw-` and can read and change whatever its scope and permissions allow. Both are managed at **Settings > API Keys**.
 
 | | Ingestion key | API key |
 |---|---|---|
-| **What it does** | Writes traces, and nothing else | Reads and manages everything its scope allows |
-| **Role** | A built-in, write-only ingest-only role granting only `traces:create` | RBAC scopes you pick (personal: your ceiling; service: scope + mode) |
+| **What it does** | Writes traces. It cannot read, update or delete | Reads and manages everything its permissions allow |
+| **Permissions** | `traces:create` only | The permission categories you pick, capped by the owner's permissions on a personal key |
 | **Scope** | Exactly one project | One or more projects, teams, or the whole organization |
-| **Best for** | Spraying into agent environments, CLIs, and OTLP exporters (Claude Code, Cursor, Claude cowork, …) where you only want to push telemetry | SDK setup, MCP, CI/CD, dashboards, automation, anything that reads or changes data |
-| **Blast radius if leaked** | Minimal, it can only create traces in its one project, never read or delete | Whatever its RBAC scope grants, treat it like a password |
+| **Use it for** | Agent environments, CLIs and OTLP exporters that only push telemetry | SDK setup, MCP, CI/CD, dashboards and automation |
+| **If it leaks** | The holder can create traces in one project, and cannot read or delete anything | The holder gets whatever the key grants. Treat it like a password |
 
-Because an ingestion key is genuinely write-only, it's safe to drop into an agent's environment or a managed-settings file. An [ingestion template](/ai-governance/ingestion-templates) mints one for you and wires it into the tool's `OTEL_EXPORTER_OTLP_HEADERS`; the `langwatch <tool>` CLI does the same on your behalf. An ingestion key may also reference an `IngestionTemplate` (its OTTL / catalog metadata) so the receiver shapes the trace into the canonical `gen_ai.*` form. The rest of this page covers the RBAC-scoped **API keys** you create from **Settings → API Keys**.
+An [ingestion template](/ai-governance/ingestion-templates) mints an ingestion key and writes it into the tool's `OTEL_EXPORTER_OTLP_HEADERS`; the `langwatch <tool>` CLI does the same. An ingestion key can reference the template so the receiver shapes the trace into the `gen_ai.*` attributes. The rest of this page covers API keys.
 
-## Key Types
+## Key types
 
-| | Personal Key | Service Key |
+| | Personal key | Service key |
 |---|---|---|
-| **Tied to** | A specific user | No user (org-level) |
-| **Best for** | Local development, AI assistants (MCP), personal workflows | CI/CD pipelines, automation, service-to-service |
-| **Permissions** | Inherits your RBAC permissions (ceiling model) | Scoped to specific projects with ADMIN access |
-| **Survives user removal** | No, disabled when user leaves the org | Yes, independent of any user |
-| **Requires `LANGWATCH_PROJECT_ID`** | Yes | Yes |
+| **Owner** | One user | None; it belongs to the organization |
+| **Use it for** | Local development, AI assistants over MCP, personal scripts | CI/CD pipelines, automation, service-to-service calls |
+| **Permissions** | Never more than the owner holds at the time of the request | The scope and the permission mode you set |
+| **Who can create it** | Any member | Organization admins |
+| **When the owner leaves** | Removing the owner from the organization revokes their bindings, so the key can no longer do anything. A deactivated owner's key is rejected | Keeps working |
 
 <Info>
-  **Legacy project keys** (the `LANGWATCH_API_KEY` shown on the project setup page) still work and will continue to be supported. They have the project context built in, so they don't require `LANGWATCH_PROJECT_ID`. New users should prefer creating keys from **Settings → API Keys** for better security and access control.
+  The **Project API Key** shown on the project setup page, and in the **Legacy** row of **Settings > API Keys**, still works and is not going away. It carries its project, so it does not need `LANGWATCH_PROJECT_ID`. Rotate it from that row. Create keys from **Settings > API Keys** when you need scoped permissions.
 </Info>
 
-## Creating a Personal API Key
-
-Personal keys are ideal for local development, connecting your AI coding assistant via MCP, or any workflow where you want the key tied to your identity.
+## Create a personal key
 
 <Steps>
-  <Step title="Go to Settings → API Keys">
-    Navigate to [Settings → API Keys](https://app.langwatch.ai/settings/api-keys) in your LangWatch dashboard.
+  <Step title="Open Settings > API Keys">
+    Go to [Settings > API Keys](https://app.langwatch.ai/settings/api-keys) and click **Create new secret key**.
   </Step>
 
-  <Step title="Click Create API Key">
-    Click the **Create API Key** button in the top right.
+  <Step title="Fill in the drawer">
+    - **Key type**: shown to organization admins only. Pick **Personal**. Other members always create a personal key.
+    - **Name**: for example `Local dev` or `MCP key`
+    - **Description**: optional
+    - **Scope**: the projects, teams or the organization the key can access
+    - **Permissions**: **All** gives the key your own permissions on each scope. **Restricted** lets you pick read or write per [permission category](#permission-categories)
+    - **Expiration**: **No expiration**, 7, 30, 60 or 90 days, or **Custom**
   </Step>
 
-  <Step title="Configure the key">
-    - **Type**: Select **Personal**
-    - **Name**: Give it a descriptive name (e.g., "My MCP key", "Local dev")
-    - **Scope**: Select which projects, teams, or the whole organization the key can access
-    - **Expiration**: Optionally set an expiration date
-    - **Permissions**: Choose a permission mode:
-      - **All**: inherits your full permissions at each scope
-      - **Restricted**: fine-grained control over individual permission categories (see [Permission Categories](#permission-categories))
-  </Step>
-
-  <Step title="Copy your key">
-    After creation, your key is shown **once**. Copy it and store it securely. You cannot see the full key again.
-
-    The key format is: `sk-lw-<id>_<secret>`
+  <Step title="Copy the key">
+    Click **Create secret key**. The key is shown once, as `sk-lw-<id>_<secret>`, with ready-made `.env`, HTTP header, terminal and MCP snippets whose copy buttons carry the real key. Copy it now; the table never shows it again.
   </Step>
 </Steps>
 
-### Using a Personal Key
+### Use a personal key
 
-Set both `LANGWATCH_API_KEY` and `LANGWATCH_PROJECT_ID` in your environment:
+Set the key and the project id in the environment. The SDKs and the MCP server read both.
 
 ```bash .env
 LANGWATCH_API_KEY="sk-lw-..."
 LANGWATCH_PROJECT_ID="your-project-id"
 ```
 
-You can find your project ID in **Settings → Projects** or in the project URL.
+The project id is in **Settings > Projects** and in the project URL. A key scoped to exactly one project resolves that project on its own; a key that reaches more than one project needs `LANGWATCH_PROJECT_ID`.
 
-## Creating a Service API Key
+Organization admins can also create a personal key for another member: the drawer shows a member picker, and the key is capped by that member's permissions.
 
-Service keys are designed for automated systems: CI/CD pipelines, production services, and multi-project setups. They aren't tied to any user, so they keep working even if team members leave.
+## Create a service key
+
+Service keys are for automated systems: CI/CD pipelines, production services and scripts that span projects. They have no owner, so they keep working when people leave.
 
 <Note>
-  Only organization **admins** can create service keys.
+  Only organization admins create service keys.
 </Note>
 
 <Steps>
-  <Step title="Go to Settings → API Keys">
-    Navigate to [Settings → API Keys](https://app.langwatch.ai/settings/api-keys) in your LangWatch dashboard.
+  <Step title="Open Settings > API Keys">
+    Go to [Settings > API Keys](https://app.langwatch.ai/settings/api-keys) and click **Create new secret key**.
   </Step>
 
-  <Step title="Click Create API Key">
-    Click the **Create API Key** button in the top right.
-  </Step>
-
-  <Step title="Configure the key">
-    - **Type**: Select **Service**
-    - **Name**: Give it a descriptive name (e.g., "CI pipeline", "Production tracing")
-    - **Scope**: Select which projects, teams, or the whole organization the key can access
-    - **Expiration**: Optionally set an expiration date
-    - **Permissions**: Choose **All** for full access, or **Restricted** for fine-grained control
+  <Step title="Fill in the drawer">
+    - **Key type**: **Service**
+    - **Name** and optional **Description**
+    - **Scope**: the projects, teams or the organization the key can access
+    - **Permissions**: **All** gives Admin on every scope you picked. **Restricted** gives only the categories you tick
+    - **Expiration**
 
     <Warning>
-      A service key scoped to the organization with **All** permissions gets **org-wide ADMIN access**. Always scope to specific projects when possible.
+      A service key scoped to the organization with **All** permissions is an organization-wide Admin. Scope service keys to the projects they serve.
     </Warning>
   </Step>
 
-  <Step title="Copy your key">
-    After creation, your key is shown **once**. Copy it and store it securely.
+  <Step title="Copy the key">
+    Click **Create secret key** and store the key. It is shown once.
   </Step>
 </Steps>
 
-### Using a Service Key
+### Use a service key
 
-Service keys require `LANGWATCH_PROJECT_ID` so the SDK knows which project to send traces to:
+Set `LANGWATCH_API_KEY` and `LANGWATCH_PROJECT_ID` as for a personal key. Endpoints that work on the organization, for example the spend events and webhook endpoints of the LangWatch AI Gateway, accept an organization-scoped key without a project id.
 
 
 ### Environment variables
@@ -511,10 +498,8 @@ LANGWATCH_PROJECT_ID="your-project-id"
 ```python
 import langwatch
 
-langwatch.setup(
-    api_key="sk-lw-...",
-    project_id="your-project-id",
-)
+# LANGWATCH_PROJECT_ID comes from the environment
+langwatch.setup(api_key="sk-lw-...")
 ```
 
 ### TypeScript
@@ -522,51 +507,49 @@ langwatch.setup(
 ```typescript
 import { LangWatch } from 'langwatch';
 
-const langwatch = new LangWatch({
-  apiKey: 'sk-lw-...',
-  projectId: 'your-project-id',
-});
+// LANGWATCH_PROJECT_ID comes from the environment
+const langwatch = new LangWatch({ apiKey: 'sk-lw-...' });
 ```
 
-## Permission Categories
+## Permission categories
 
-When using **Restricted** permissions, you can grant read or write access to individual feature areas:
+A **Restricted** key holds read or write access per category. Read grants the `view` action on the resources in the category. Write grants every action on them.
 
 | Category | Read | Write |
 |---|---|---|
-| **Traces** | View traces and spans | Create, update, and share traces |
-| **Cost** | View cost analytics | None |
-| **Scenarios** | View test scenarios | Create and manage scenarios |
+| **Traces** | View traces and spans | Create, update and share traces |
+| **Cost** | View cost analytics | Read only |
+| **Scenarios** | View scenarios and runs | Create and manage scenarios |
 | **Annotations** | View annotations | Create and manage annotations |
 | **Analytics** | View analytics dashboards | Create and manage dashboards |
 | **Evaluations** | View evaluations | Create and manage evaluations |
+| **Langy** | View Langy conversations | Start and manage Langy conversations |
 | **Datasets** | View datasets | Create and manage datasets |
 | **Triggers** | View triggers | Create and manage triggers |
 | **Workflows** | View workflows | Create and manage workflows |
+| **Experiments** | View experiments | Create and manage experiments |
 | **Prompts** | View prompts | Create and manage prompts |
-| **Secrets** | View secrets | Create and manage secrets |
-| **Audit Log** | View audit log | None |
+| **Playground** | View the playground | Run the playground |
+| **Secrets** | List secrets | Create and manage secrets |
+| **Agent Cache** | View the agent cache | Manage the agent cache |
+| **Audit Log** | View the audit log | Read only |
 | **Team** | View team members | Manage team membership |
-| **Project** | View project settings | Create, update, and delete projects |
+| **Project** | View project settings | Create, update and delete projects |
+| **Organization** | View the organization | Manage the organization |
+| **Gateway** | View virtual keys, budgets, providers, routing policies, guardrails, usage, cache rules, spend and webhook endpoints | Manage all of them |
+| **Governance** | View governance, ingestion sources, anomaly rules, compliance exports, the activity monitor and AI tools | Manage all of them |
 
-Categories marked "None" for write are read-only by design.
+**Also check:** [Access Control (RBAC)](/platform/rbac) for the actions each resource accepts.
 
-## Connecting to AI Assistants (MCP)
+## Connect an AI assistant over MCP
 
-Personal API keys work with the [LangWatch MCP Server](/integration/mcp) to give your AI coding assistant access to LangWatch features: tracing, analytics, prompt management, and more.
-
-<Steps>
-  <Step title="Create a personal API key">
-    Follow the [steps above](#creating-a-personal-api-key) to create a personal key.
-  </Step>
-
-  <Step title="Add the MCP server to your editor">
+A personal key gives the [LangWatch MCP Server](/integration/mcp) access to traces, analytics, prompts and the other features your key allows. The MCP server needs both `LANGWATCH_API_KEY` and `LANGWATCH_PROJECT_ID`.
 
 
 ### Claude Code
 
 ```bash
-claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey sk-lw-...
+claude mcp add langwatch --env LANGWATCH_API_KEY=sk-lw-... --env LANGWATCH_PROJECT_ID=your-project-id -- npx -y @langwatch/mcp-server
 ```
 
 ### Cursor / VS Code
@@ -578,45 +561,41 @@ claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey sk-lw-...
       "command": "npx",
       "args": ["-y", "@langwatch/mcp-server"],
       "env": {
-        "LANGWATCH_API_KEY": "sk-lw-..."
+        "LANGWATCH_API_KEY": "sk-lw-...",
+        "LANGWATCH_PROJECT_ID": "your-project-id"
       }
     }
   }
 }
 ```
 
-See the [full MCP setup guide](/integration/mcp) for all supported editors.
-  </Step>
+The dialog that shows a new key prints these commands with the key and the project id filled in. See the [MCP setup guide](/integration/mcp) for the other editors.
 
-  <Step title="Ask your assistant to instrument your code">
-    ```plaintext
-    "Instrument my codebase with LangWatch"
-    ```
-  </Step>
-</Steps>
+## The `langwatch login` key
 
-## Permissions Model
+`langwatch login` in the CLI opens a browser page where you approve the scopes, then creates a personal **Restricted** key named `CLI login - <device>` and stores it in `~/.langwatch/config.json` as `cli_api_key`. The default selection holds every permission category except managing or deleting the organization and managing teams, at organization scope for organization admins and on your teams otherwise.
 
-API key permissions follow a **ceiling model**: a personal key can never exceed the creating user's own permissions.
+One key exists per device: a new login replaces the previous key and `langwatch logout` revokes it. The key appears in **Settings > API Keys** as a personal key with the **Restricted** badge, and you can revoke it there too.
 
-- If you have **ADMIN** access and create a key with **All** permissions, the key gets ADMIN
-- If you have **MEMBER** access and create a key with **All** permissions, the key gets MEMBER (not ADMIN)
-- **Restricted** keys let you manually narrow access to specific permission categories at read or write level
+## How permissions are resolved
 
-Service keys bypass the user ceiling since they have no associated user. Their permissions come directly from their scope and permission mode.
+A personal key never exceeds its owner. On every request LangWatch intersects the key's permissions with what the owner holds at that moment, so a demoted owner's key loses access at the same time.
 
-For more on roles and permissions, see [Access Control (RBAC)](/platform/rbac).
+A service key has no owner. Its permissions come from its scope and permission mode alone.
 
-## Managing Keys
+## Manage keys
 
-From the **Settings → API Keys** page you can:
+**Settings > API Keys** lists every key with **Name**, **Status**, **Secret Key** (the prefix only), **Created**, **Last Used**, **Type** (the owner's email, or **Service**), **Scope** and **Permissions**. A scope filter above the table narrows the list to one project, team or the organization.
 
-- **View all keys**: see name, type, status, scope, permissions, creation date, last used, and creator
-- **Edit a key**: update the name, permission mode, or permission categories
-- **Revoke a key**: immediately disables the key (cannot be undone)
+The key's owner and organization admins can:
+
+- **Edit** the name, description, permission mode, categories and scope
+- **Revoke** the key. A revoked key is refused at once and cannot be restored
+
+The **Ingestion keys** table on the same page lists ingestion keys; organization admins revoke them.
 
 <Tip>
-  Rotate keys regularly and revoke any that are no longer in use. Set expiration dates on keys used for temporary workflows.
+  Set an expiration on keys made for a short task, and revoke keys that show no **Last Used** date for a while.
 </Tip>
 
 ---
@@ -625,117 +604,427 @@ From the **Settings → API Keys** page you can:
 
 ---
 title: "Audit Log"
-description: "Track user actions and changes in LangWatch"
+description: "Every change made through the LangWatch settings, API and AI Gateway, with who did it, from where, and what changed."
 sidebarTitle: Audit Log
-keywords: audit log, langwatch, llm, ai, audit log
+keywords: audit log, compliance, csv export, langwatch
 ---
 
 <Note>
-  **Available on Enterprise plans.** Reading the audit log needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. Without one the audit log is refused, whoever asks for it. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  **Available on Enterprise plans.** Reading the audit log needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. Without one the page shows an upgrade notice and the API refuses the query. To enable it, contact [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
-LangWatch provides an audit log to track user actions and changes in the platform. This allows you to monitor and audit the activities of your users and ensure compliance with your organization's policies.
+## What is logged
 
-## Overview
+The audit log is at **Settings > Audit Log**. It keeps one row per action, for the whole organization, and rows are never deleted.
 
-The audit log is a record of all actions performed in the platform. It is stored in a database and can be queried to find specific actions and changes.
+LangWatch writes a row for:
 
-You can search the audit log by:
-- **Name**: Filter by user name or identifier
-- **Action**: Filter by specific action types
-- **Date**: Filter by date range to find actions within a specific time period
+- Every change made in the settings pages or through the app: creating, updating, archiving or deleting an organization, a team, a project, a member, an invite, a role, a role binding, a group, an API key, a secret, a model provider, a data retention rule or an SSO connection. Both the successful call and the refused one are logged, with the error on the refused one.
+- Every LangWatch AI Gateway change: virtual keys, budgets, cache rules and guardrails, including the state before and after the change.
+- Every call to the management API on members, invites, SCIM tokens and API keys.
+- Support impersonation, with the impersonating operator recorded on the row.
 
-Additionally, you can download the audit log data as a CSV file for further analysis or compliance reporting.
+Sign-ins are not logged. Reads of product data (opening a trace, running a search) are not logged.
+
+## What a row contains
+
+| Column | Content |
+|--------|---------|
+| Timestamp | When the action ran |
+| Source | **Platform** for a settings or API change, **Gateway** for a LangWatch AI Gateway change |
+| User | Name and email of the person who acted |
+| Action | The action name, for example `organization.updateMemberRole`, `role.create` or `gateway.virtual_key.rotated` |
+| Target | The kind and id of the changed object on Gateway rows, for example `virtual_key` |
+| Project | The project the action applied to, when it applied to one |
+| IP Address | The client address of the request |
+| Error | The error message when the action was refused |
+
+The CSV export adds the user agent, the request arguments, and the before and after state of Gateway rows. Secret values in the arguments are replaced by `[redacted]`.
 
 <Frame>
-<img src="/images/audit-log.png" alt="LangWatch Audit Log" />
+<img src="/images/platform/audit-log.png" alt="Settings > Audit Log with the filters and a page of rows" />
 </Frame>
+
+## Filters
+
+| Filter | Behavior |
+|--------|----------|
+| Search by User | Matches one member by name or email |
+| Filter by Action | Case-insensitive substring match on the action name. `virtual_key` matches every virtual key action |
+| Project | One project, or all. Rows with no project are always included |
+| Select Date | A date range or a preset period. The default is the last 30 days |
+
+Every filter is in the page URL, so you can share a filtered view. A virtual key or a budget page links here with its own target already filtered.
+
+## Export
+
+Click **Export CSV** to download every row that matches the current filters as `audit_logs_<date>.csv`. JSON columns (arguments, before, after) are cut at 4096 characters per cell, and a cut cell ends with a marker that gives the number of characters removed.
+
+## Who can see it
+
+Opening **Settings > Audit Log** needs `organization:manage`. Querying the log needs `auditLog:view`, which every built-in team role holds except the Lite Member cap. A custom role can grant `auditLog:view` on its own.
+
+**Also check:** [Access Control (RBAC)](/platform/rbac).
+
+---
+
+# FILE: ./platform/command-bar.mdx
+
+---
+title: "Command Bar"
+description: "Press Cmd+K to open any page, jump to an entity by id, search by name, switch project or theme, and ask Langy."
+sidebarTitle: Command Bar
+keywords: command bar, command palette, cmd+k, search, shortcuts, langwatch
+---
+
+## Open it
+
+Press `Cmd+K` on macOS or `Ctrl+K` elsewhere, or click the **Search** field in the top bar. `Esc` closes it. On the project home page the same shortcut focuses the search field in the page.
+
+<Frame>
+<img src="/images/platform/command-bar.png" alt="The command bar with prompt typed, showing the Navigation and Actions matches" />
+</Frame>
+
+## What you can do
+
+| Type | Result |
+|------|--------|
+| Any text | Pages and settings whose name matches: Trace Explorer, Experiments, Prompts, Datasets, Workflows, Members, Roles, Audit Log and every other page you can open |
+| A name, 2 characters or more | Prompts, agents, datasets, workflows and evaluators with that name. Every search also offers **Search "..." in traces** and **Search "..." in docs** with the same text |
+| An entity id | A **Jump to ID** entry, for example **Open trace**, that opens the entity. See the id list below |
+| A project, team or organization name, or `switch project` | The projects you can switch to. Your own project is excluded |
+| `New` | Create an agent, an evaluation, a prompt, a dataset, an automation or a scenario, or invite a teammate |
+| `Light`, `Dark`, `System` | Switch the theme |
+| An empty bar | Your last 5 opened traces, workflows, datasets, prompts and agents from the last 30 days, grouped by day, and the **Ask Langy** entry. The recent items show only while the bar is empty |
+
+Support entries (Documentation, Discord, Report a Bug, Feature Request, Status Page) are also there.
+
+## Jump to an id
+
+Paste an id and pick the entry under **Jump to ID**.
+
+| Id | Opens |
+|----|-------|
+| `trace_...` or a 32 character hex trace id | The trace in the Trace Explorer |
+| `span_...` or a 16 character hex span id | The Trace Explorer filtered on that span |
+| `prompt_...` | The prompt |
+| `dataset_...` | The dataset |
+| `experiment_...` | The experiment |
+| `workflow_...` | The workflow |
+| `agent_...` | The agent |
+| `evaluator_...` | The evaluator |
+| `scenario_...` or `scen_...` | The scenario |
+| `monitor_...` | The automation |
+
+<Frame>
+<img src="/images/platform/command-bar-jump-id.png" alt="The command bar with a trace id pasted and the Open trace entry under Jump to ID" />
+</Frame>
+
+## Ask Langy
+
+**Ask Langy** is the first entry on an empty bar. When you type, it follows the matches and comes before the search entries. Select it, or press `Tab`, to hand the text to Langy and open the Langy panel. It is available when you can start a Langy turn in the current project.
+
+## Keys
+
+| Key | Action |
+|-----|--------|
+| `↑` `↓` | Move the selection |
+| `Enter` | Open |
+| `Cmd+Enter` / `Ctrl+Enter` | Open in a new tab |
+| `Cmd+L` / `Ctrl+L` | Copy the link of the selected entry |
+| `Tab` | Ask Langy |
+| `Esc` | Close |
+
+---
+
+# FILE: ./platform/data-privacy.mdx
+
+---
+title: "Data Privacy"
+description: "One policy that controls which trace content LangWatch stores, who can read it, and how personal data and secrets are redacted, set at the organization, department, team or project level."
+sidebarTitle: Data Privacy
+keywords: data privacy, pii, redaction, secrets, content drop, langwatch
+---
+
+## What the policy controls
+
+The data privacy policy is at **Settings > Data Privacy**. A rule at a scope decides, for every trace that arrives in that scope, what LangWatch stores and who can read it. It has four controls: content, custom attributes, PII redaction and secrets redaction.
+
+The policy changes what LangWatch stores. It does not change the request your application sends to the model provider.
+
+<Frame>
+<img src="/images/platform/data-privacy.png" alt="The Add privacy rule drawer with the content, audience, PII and secrets controls" />
+</Frame>
+
+## Scopes and inheritance
+
+Write a rule at the organization, a department, a team or a project. Every control in a new rule starts on **Inherit**, so a rule only changes the controls you set. An organization or department rule can be limited to personal projects.
+
+For each control, the most specific rule that sets it wins, in this order: project, department (personal projects), department, team, organization (personal projects), organization. A control no rule sets uses the platform default: content **Captured**, PII **Essential**, secrets **On**.
+
+Two lists add up across scopes instead of overriding: the PII exceptions and the custom secret patterns. The **Effective for** table on the page shows the result of the cascade for the scope you are looking at.
+
+## Content
+
+Content has four categories: **Input**, **Output**, **System instructions** and **Tool calls**. Set each one to:
+
+| Choice | What LangWatch does |
+|--------|---------------------|
+| **Captured** | Stores the content and shows it to everyone with access to the project |
+| **Restricted** | Stores the content and shows it only to the audience you pick. Everyone else sees a placeholder that names who can see it |
+| **Dropped** | Removes the content at ingestion. It is never stored and cannot be recovered |
+
+**Dropped** applies on every ingestion path: OTLP, the REST collector, the LangWatch AI Gateway, ingestion keys and coding agent logs. It removes the input, output, system and tool call attributes from the span and its events, and strips the matching roles from chat message arrays. A dropped span keeps its tokens, cost, model, latency, ids, names and status, and carries the marker `langwatch.privacy.dropped` so the trace view can explain the gap.
+
+**Restricted** is enforced when the content is read, in the Trace Explorer, the trace API, analytics, evaluations and annotations. A public share link shows captured content only.
+
+**Dropped** and both redactions apply to new traces only. A trace stored before the rule keeps its content. **Restricted** applies to stored traces too, because it is checked at read time.
+
+## Audience
+
+When a category or an attribute is **Restricted**, the **Restricted content is visible to** section appears. One audience applies to every restricted item in the rule:
+
+| Option | Who can read the content |
+|--------|--------------------------|
+| **All members** | Everyone with access to the project |
+| **Project owners** | The owner of a personal project, on their own personal projects |
+| **Admins**, **Members**, **Viewers** | Everyone holding that built-in team role |
+| A custom group | The members of that group |
+
+An empty audience means no one can read the restricted content. A department limits where a rule applies. It cannot be picked as an audience.
+
+## Custom attributes
+
+Add a row per span attribute key pattern, with `*` as a wildcard, for example `gen_ai.prompt.*`. Each row is **Restricted** or **Dropped**. A pattern matches the attribute key. It does not match a path inside a JSON value. A rule holds up to 50 rows of up to 256 characters, and a pattern made only of wildcards is refused.
+
+## PII redaction
+
+PII redaction masks personal data in stored content and replaces each value with a typed marker such as `[EMAIL_ADDRESS]`. It runs at ingestion, before the span is stored.
+
+| Level | What is redacted |
+|-------|------------------|
+| **Off** | No personal data |
+| **Essential** | Emails, phone numbers, card numbers, IP addresses and national ids, detected as the data arrives |
+| **Strict** | Essential plus names, locations and more, through deeper detection that can add latency |
+| **Custom** | Exactly the entities you tick, from both lists |
+
+Card numbers and Brazilian CPF are checksum-validated before redaction. Attribute values over 250,000 characters are skipped. When the deep detection service cannot be reached, LangWatch applies the Essential level and marks the span with `langwatch.privacy.pii_incomplete`.
+
+**Exceptions** are regular expressions that must not be redacted, for example an internal id format like `00[0-9]{12}`. A rule holds up to 50. LangWatch refuses a pattern that would also match ordinary data such as a card number, an email or a phone number.
+
+## Secrets redaction
+
+Secrets redaction scrubs API keys, tokens, private keys and database URLs from stored content and replaces them with `[SECRET]`. It is **On** by default and runs at ingestion.
+
+The built-in detection matches known vendor key prefixes, key-shaped strings (a vendor style prefix with a high entropy body) and secrets named in prose. Record ids such as `project_` or `toolu_` prefixes are excluded.
+
+**Custom patterns** add your own regular expressions on top, for example `acme_live_[a-z0-9]+`. LangWatch refuses a pattern that also matches ordinary text, and tells you which sample it matched.
+
+## Who can change the policy
+
+| Rule scope | Permission to write |
+|------------|---------------------|
+| Organization, department | `organization:manage` |
+| Team | `team:manage` |
+| Project | `project:update` |
+
+Anyone with `project:view` can open the page for a project. Organization and department rules are listed only to people with `organization:manage`.
+
+## Boundaries
+
+- The policy governs traces. Content already copied elsewhere, for example into a dataset row or an exported file, is not covered.
+- On a self-hosted deployment, `LANGWATCH_DATA_PRIVACY_ENFORCEMENT=off` turns the ingestion-time drop off. If the drop fails for a span, LangWatch stores the span intact; read-time restrictions still apply to it.
+
+**Also check:** [Data Retention](/platform/data-retention) for how long traces are kept, and [Access Control (RBAC)](/platform/rbac) for the roles named in the audience.
+
 ---
 
 # FILE: ./platform/data-retention.mdx
 
 ---
 title: Data Retention
-description: Control how long LangWatch keeps your event data before it's deleted.
+description: Set how long LangWatch keeps traces, scenario runs and experiment runs per organization, team or project before it deletes them.
 keywords: data retention, retention policy, delete data, ttl, retention period, enterprise, self-hosting
 ---
 
-Data retention sets how long LangWatch keeps your event data before deleting it automatically. Retention applies to the events LangWatch ingests (the spans within your traces and your scenario runs) along with their associated data.
-
-You can tighten or extend retention per scope: the organization, a team, or a single project.
-
 <Note>
-  Configuring data retention requires an **Enterprise plan**. On other plans, every project uses the platform default window. See the [pricing page](/pricing) for how extended retention is billed.
+  **Available on paid plans.** Configuring retention needs a paid plan. On the Free plan every project keeps data for the platform default of 49 days. Enterprise plans and self-hosted deployments with a license also get the longer presets and a custom period. Retained data over the plan volume is billed per extra GB, see the [pricing page](/pricing).
 </Note>
 
-## How it works
+## What retention covers
 
-Retention is configured with **retention policies**. Each policy has two parts:
+A retention policy sets a number of days for one scope. Data older than that is deleted. The policy covers three categories of data, and one policy sets the same period for all three:
 
-- **Scope**: the level the policy applies to. Policies cascade most-specific-first, so a more specific scope overrides a broader one:
-  - **Organization**: the default that applies to every project in the org.
-  - **Team**: overrides the organization default for projects in that team.
-  - **Project**: overrides both the team and organization defaults for that project only.
-- **Retention period**: how long data is kept before deletion.
+| Category | Data |
+|----------|------|
+| Traces & Spans | Spans, log records, metrics, trace summaries, analytics, evaluation runs and Langy analytics events |
+| Scenarios | Scenario runs and suite runs |
+| Experiments | Experiment runs and their items |
 
-Retention periods range from a few weeks up to several years, set in weeks, months, or years. Periods always round to whole weeks, because deletion is partition-aligned (see [How deletion works](#how-deletion-works)).
+Data stored in Postgres is not covered: annotations, datasets, prompts, and the settings pages keep their rows.
 
-<Note>
-  When you retain data longer than your plan's included window, the additional storage is billed at **€3 per extra GB**. You only pay for what you store.
-</Note>
+The [LangWatch AI Gateway spend records](/ai-gateway/billing-events) are outside retention. They keep a fixed 13 month lifetime, so you can reconcile invoices after the traces behind them are gone.
 
-## Configuration
+## Scopes
 
-Organization owners and administrators manage policies under **Settings → Data Retention** at [app.langwatch.ai/settings/data-retention](https://app.langwatch.ai/settings/data-retention).
+Write a policy at the organization, a team or a project. A project uses the most specific policy: its own, then its team's, then the organization's, then the platform default of 49 days.
 
-To add a scoped policy:
+The **Data Retention** panel at the top of the page shows the period that applies to the current project, and **Data Storage** shows how much space the projects you can see use today. The **All you can see** filter narrows the table to one scope.
+
+<Frame>
+<img src="/images/platform/data-retention.png" alt="Settings > Data Retention with the retention and storage panels, one organization policy and the Add retention policy button" />
+</Frame>
+
+## Periods
+
+Periods are whole weeks. The presets round up so that the label is always covered:
+
+| Preset | Days | Plans |
+|--------|------|-------|
+| 1 month | 35 | Paid, Enterprise, self-hosted |
+| 2 months | 63 | Paid, Enterprise, self-hosted |
+| 3 months | 91 | Enterprise, self-hosted |
+| 1 year | 371 | Enterprise, self-hosted |
+| 5 years | 1827 | Enterprise, self-hosted |
+| Custom | 49 days or more, in weeks, months (28 days) or years (364 days), rounded to whole weeks | Enterprise, self-hosted |
+
+The longest period is 65,534 days.
+
+## Add a policy
+
+Open **Settings > Data Retention**. Reading the page needs `project:view`. Writing a policy needs `organization:manage` for the organization, `team:manage` for a team and `project:update` for a project. The scope picker only offers the scopes you can write.
 
 <Steps>
-  <Step title="Open the drawer">
-    Click **Add retention policy**.
+  <Step title="Click Add retention policy">
+    The drawer opens with the **Scope** picker and the **Retention** select.
   </Step>
-  <Step title="Choose a scope">
-    Pick the organization, a team, or a single project. A more specific scope overrides the broader defaults.
+  <Step title="Pick one or more scopes">
+    The picker is multi-select. One **Create** writes the same period to every scope you pick.
   </Step>
-  <Step title="Pick a retention period">
-    Choose one of the preset windows or enter a custom value in weeks, months, or years.
+  <Step title="Pick the retention period">
+    Choose a preset, or **Custom...** on Enterprise and self-hosted, and enter an amount and a unit.
   </Step>
-  <Step title="Create">
-    Click **Create** to save the policy.
+  <Step title="Decide about existing data">
+    **Apply this change to existing data** is off by default. Off: the period applies to data ingested from now on. On: LangWatch also restamps the rows already stored for the current project, and rows older than the new period become eligible for deletion.
+  </Step>
+  <Step title="Click Create">
+    The policy appears in the table. The row menu has **Edit**, which reopens the drawer with the scope locked and saves with **Save changes**, and **Remove**, after which the scope falls back to the next policy in the chain.
   </Step>
 </Steps>
 
-### Applying the change to existing data
-
-When you create or update a policy, you choose whether it applies only going forward or also to data you've already stored:
-
-- **Off**: the new retention applies to newly ingested data only.
-- **On** (*"Apply this change to existing data"*): LangWatch rewrites the scope's existing rows so the new retention takes effect immediately. Data that is already older than the new window is removed on the next cleanup.
-
-## How deletion works
-
-LangWatch periodically removes any events that fall outside the configured retention window. Because retention is partition-aligned, data is cleaned up in whole-week partitions rather than row-by-row at the exact second it expires.
-
-A few things to keep in mind:
-
 <Warning>
-  **Deletion is permanent.** Once data is removed it cannot be recovered. If you need to keep data beyond your retention window, export it before it expires.
+  Deletion is permanent. Export data you need to keep before its period ends.
 </Warning>
 
-- **Retention applies to the underlying data, regardless of references.** If another object, for example a dataset or an evaluation, references an event that has since been deleted, that reference points to data that no longer exists.
-- **More specific scopes override broader ones.** A project with its own policy ignores the team and organization defaults; a team policy overrides the organization default.
+## How deletion runs
 
-## Billing records are exempt
+Every stored row carries its retention period. ClickHouse deletes expired rows during its background merges through a TTL expression, so a row disappears some time after its period ends, not at the exact second.
 
-[Gateway spend records](/ai-gateway/billing-events), the per-request billing events platforms use to rebill their own customers, are deliberately **outside** tenant retention. They keep a **fixed 13-month** lifetime regardless of any policy configured here.
+Shortening a period without **Apply this change to existing data** leaves stored rows on their old period. Lengthening a period never brings back deleted rows.
 
-Retention policies are customer-shrinkable to weeks and can rewrite existing data retroactively; billing records are invoiceable evidence and must survive both. Shortening your trace retention never deletes spend records, and no policy can extend or shorten their 13-month window. The practical effect: your billing reconciliation window is always 13 months, even when operational traces are kept for far less, and a spend event remains queryable after its underlying trace has aged out (only the trace drill-through is gone).
+## Self-hosted deployments
 
-## Self-hosted and hybrid instances
+Retention works the same way on your own ClickHouse. Files that traces reference in object storage, for example images, are not deleted by retention.
 
-Data Retention works the same way on self-hosted deployments, with deletion running against your own storage. Make sure the LangWatch service has permission to delete objects from the storage bucket it manages.
+**Also check:** [Data Privacy](/platform/data-privacy) for what LangWatch stores in the first place, and [self-hosting](/self-hosting/overview) for the storage setup.
 
-If you use versioned object storage, removing an object leaves earlier versions and delete markers in place. Clean these up manually or with a storage lifecycle rule. See the [self-hosting docs](/self-hosting/overview) for setup details.
+---
+
+# FILE: ./platform/members-and-teams.mdx
+
+---
+title: "Members and Teams"
+description: "Invite people to your organization, put them on teams, give them a role per team or per project, and remove their access."
+sidebarTitle: Members and Teams
+keywords: members, teams, projects, invites, lite member, seats, langwatch
+---
+
+## Organizations, teams and projects
+
+An organization is the top level: it holds the members, the seats, the billing plan and the organization-wide settings. A team groups projects and the people who work on them. A project is where your traces, evaluations, prompts, datasets and API keys live.
+
+Every member has one organization role. Access to projects comes from a team role: a person on a team holds that role on every project in the team, and a project-level binding can override it for one project.
+
+Every member also gets a personal workspace on their first visit to the organization: one personal team with one personal project, listed under **My Workspace** and hidden from the team pickers.
+
+**Also check:** [Access Control (RBAC)](/platform/rbac) for what each role can do.
+
+## Members
+
+**Settings > Members** lists every member with their organization role and their access. Opening the page needs `organization:manage`.
+
+<Frame>
+<img src="/images/platform/members.png" alt="Settings > Members with the seat usage, the members table and the Add members button" />
+</Frame>
+
+Each row shows the name, the email, a **Lite Member** badge when the member is on a Lite seat, a **Disabled** badge when access is switched off, and the **Access** column: one badge per role binding, as `role on scope`, with `via <group>` when the binding comes from a group.
+
+Click a row to open the member dialog:
+
+- **Organization role**: Admin, Member or Lite Member. You cannot change your own role.
+- **Access**: the team and project bindings. Add a row with a role, a scope type (organization, team or project) and the team or project. Remove a row to revoke it.
+- **Group access**: the bindings inherited from groups, read only.
+
+The seat panel above the table shows **Team Members** and **Lite Members** in use against the plan limits.
+
+Each member manages their own sign-in methods at **Settings > Authentication**: passkeys and the sign-in method of their account. An administrator cannot change another member's sign-in methods there.
+
+## Invite people
+
+Click **Add members**. Enter one or more email addresses separated by commas, spaces or semicolons. Tick **Lite Member** to invite the whole batch on Lite seats. Under **Team Assignments**, add each team the person joins with the role on that team: Admin, Member, Viewer or a custom role. A Lite Member can only be assigned as Viewer. The drawer warns when a Lite Member invite has no team, because a Lite Member with no team sees no project.
+
+Click **Send invites**. When the deployment has no email provider, the button reads **Create invites** and you copy the invite link from the row menu instead. An invite link has the form `https://app.langwatch.ai/invite/accept?inviteCode=...` and works for 14 days. **Resend invitation** issues a new 14-day link, and **Revoke** cancels it.
+
+Pending invites are listed under the members table with their status: Invited, Expired, Revoked, Accepted or Awaiting payment. An invite for a full seat over the plan limit opens the seat purchase dialog or the upgrade dialog before it is sent.
+
+<Frame>
+<img src="/images/platform/members-invite.png" alt="The Add members drawer with emails, the Lite Member option and team assignments" />
+</Frame>
+
+### Let colleagues join by domain
+
+The **Who can join your organization** section below the members table sets how people with a verified email address on your domain get in:
+
+| Option | Behavior |
+|--------|----------|
+| Nobody | Only invitations work |
+| Anyone who asks, once you approve | Colleagues can request to join. Requests appear on the members page for you to approve or reject |
+| Anyone on a domain you name, straight away | Colleagues on the listed domains join with the default role, and you get an email each time |
+
+## Lite Members
+
+A Lite Member is a read-only seat, counted apart from full seats. On a team or a project a Lite Member can read traces, analytics, evaluations, datasets, prompts, workflows, experiments and scenarios, and can create and update annotations. A Lite Member cannot see costs, the LangWatch AI Gateway pages or the audit log, cannot change anything else, and has the same limits over the API and MCP. In the settings pages a Lite Member can only hold the Viewer role.
+
+## Teams
+
+**Settings > Teams & Projects** shows every team with its projects and members. Click **New team** to create one; you are added as its Admin. The team card shows the members with their team role, which you can change in place, and an **X** to remove the member from the team. Members that come from a group are read only and show `via <group>`.
+
+<Frame>
+<img src="/images/platform/teams.png" alt="Settings > Teams & Projects with two teams, their members and their projects" />
+</Frame>
+
+**Add to team** adds an organization member with a role on this team, and so on every project in it. Under each project, **Add person to this project** gives a role on that project only; for someone already on the team it overrides the team role for that project. A project with overrides is marked, and each override can be reverted to the team role.
+
+<Frame>
+<img src="/images/platform/team-members.png" alt="A team expanded on Settings > Teams & Projects with the per-member role select" />
+</Frame>
+
+Click **Edit** on a team to open its page: rename it (the slug is read only), edit the members, add or archive projects. **Archive this team** hides the team and all its projects; contact support to restore it. A team keeps at least one Admin: removing the last one is refused.
+
+## Remove access
+
+| Action | Where | Effect |
+|--------|-------|--------|
+| Remove from a team | Settings > Teams & Projects, the **X** on the member row, or the member dialog | The person loses the role on that team and its projects. Project overrides stay until removed |
+| Remove a group member | Settings > Groups | The person loses every binding that came from the group |
+| Disable | Settings > Members, row menu | Every request from the person is refused until you enable them again. Their role and bindings stay, and their seat is freed. Enabling them again takes a seat |
+| Delete | Settings > Members, row menu | The membership and its bindings are removed. Not available for yourself or for the last member |
+
+Deleting a member does not delete the traces, prompts or other work they created.
+
+## API
+
+The [Members API](/api-reference/members/overview) lists members and their access, updates and removes a member, and the [Invites API](/api-reference/invites/overview) creates, lists and revokes invites, so you can run on-boarding and off-boarding from your own tooling. Every member and invite change is written to the [Audit Log](/platform/audit-log).
 
 ---
 
@@ -743,145 +1032,106 @@ If you use versioned object storage, removing an object leaves earlier versions 
 
 ---
 title: Model Providers
-description: Configure LLM credentials once at the organisation, team, or project scope, and let every project that needs them inherit.
+description: Store the LLM credentials that LangWatch uses for evaluators, Workflows, the playground, Agent Testing and Langy once, at the organization, team or project scope.
 sidebarTitle: Model Providers
+keywords: model providers, api keys, openai, anthropic, azure, bedrock, vertex, gemini, scope, default models, langwatch
 ---
 
-LangWatch Model Providers are the credentials the platform uses to make real LLM calls on your behalf, from online evaluators, the prompt playground, the Optimization Studio, and the AI Gateway's bound provider credentials.
+## What a model provider is
 
-Historically every project carried its own copy of every provider credential. That's fine for one project but painful at enterprise scale: ten projects in one org meant ten copies of the same OpenAI key, ten rotation chores, and ten places to audit. The **scoped model providers** model replaces that with a single ladder.
+A model provider is a saved credential for one LLM vendor, with the scopes that can use it. LangWatch uses it whenever a feature calls a model on your behalf: online evaluators, Workflows, the prompt playground, Agent Testing, topic clustering, embeddings, trace AI search, Langy and the LangWatch AI Gateway.
 
-<CardGroup cols={3}>
-  <Card title="Organisation scope" icon="building">
-    One credential; every project in the org can use it. The common case for enterprise accounts with a single billing entity.
-  </Card>
-  <Card title="Team scope" icon="users">
-    One credential; every project under a team inherits. For teams with their own model budget or fine-tuning account.
-  </Card>
-  <Card title="Project scope" icon="folder">
-    One credential; only this project uses it. For test projects, per-customer isolation, or narrow experiments.
-  </Card>
-</CardGroup>
+Manage them at **Settings > Model Providers**. The table lists each configuration with its **Scope** chips, broadest scope first. The row menu has **Edit Provider**, **Test Connection** and **Delete Provider**. On a self-hosted deployment, a vendor whose key is set in the server environment shows as a row with a **System** chip and no menu.
 
-## How inheritance works
+<Frame>
+<img src="/images/platform/model-providers-add-menu.png" alt="The Add Model Provider menu with the provider types" />
+</Frame>
 
-A provider configured at a wider scope is automatically available to every narrower scope. A project sees the union of:
+## Supported providers
 
-1. Its own project-scoped providers,
-2. Every team-scoped provider on teams it belongs to,
-3. Every organisation-scoped provider on its parent org.
+**Add Model Provider** opens a menu with one entry per vendor:
 
-When multiple scopes offer "the same kind" of provider (e.g. two OpenAI credentials, one org-wide, one project-specific), the **narrowest scope wins** for that provider's bound features. The org-wide credential stays visible but tagged as "inherited"; the project credential is the effective one.
+| Provider | Credentials |
+|----------|-------------|
+| OpenAI | API key, or a base URL for an endpoint that needs none |
+| Codex (OpenAI account) | Sign in with your OpenAI account. Used by coding features only |
+| Anthropic | API key, or a base URL |
+| Gemini | API key. Add a project and a location to use Gemini through Vertex AI |
+| Azure OpenAI | API key and endpoint, optional API version. **Use API Gateway** switches to an API gateway base URL and version |
+| Bedrock | AWS access key id, secret access key and region |
+| Vertex AI | Service account JSON, project and location |
+| DeepSeek, xAI, Cerebras, Groq, Voyage AI | API key |
+| ElevenLabs | API key, optional webhook secret |
+| Azure Safety | Content Safety endpoint and key, for the Azure safety evaluators |
+| Custom (OpenAI-compatible) | Base URL and optional API key, for a LiteLLM proxy, vLLM or any endpoint that serves `/chat/completions` |
 
-```
-Project "acme-api" sees:
-  ✓ OpenAI (Org: acme)             ← org-wide, inherited
-  ✓ Anthropic (Team: acme-platform) ← team-wide, inherited
-  ✓ OpenAI (Project: acme-api)      ← project-specific, OVERRIDES the org OpenAI
-  ✓ Azure (Project: acme-api)       ← project-specific, no org or team equivalent
-```
+You can save several configurations of the same vendor, for example one OpenAI account per region, and tell them apart by **Name**.
 
-## Creating a provider
+## Add a provider
 
-**Settings → Model Providers → New provider** opens the create drawer with an **Availability** radio group near the bottom of the form, three options: Project, Team, Organization.
+<Steps>
+  <Step title="Pick the vendor">
+    Click **Add Model Provider** and choose the vendor. The drawer opens.
+  </Step>
+  <Step title="Name it">
+    **Name** is required, up to 128 characters. It is how the configuration appears in model pickers and in the LangWatch AI Gateway.
+  </Step>
+  <Step title="Pick the scope">
+    **Scope** is a multi-select of the organization, teams and projects. It starts on the widest scope you can manage. The helper text states who can use the configuration, for example "Only this project can use this provider." You need `organization:manage`, `team:manage` or `project:manage` for each scope you pick.
+  </Step>
+  <Step title="Enter the credentials">
+    Fill in the vendor's fields. Below them: **Extra Headers** sent with every request, the routing handle line ("Requests reach this provider as `openai/<model>`") for the LangWatch AI Gateway, **Custom Models**, and **Advanced (Gateway)** for rate limits and fallback priority.
+  </Step>
+  <Step title="Save and test">
+    Save, then open the row menu and click **Test Connection**. The verdict appears under the provider name in its row: **Connection works**, the vendor's refusal message, or a note that the provider cannot be tested automatically and is checked on first use. The test runs on the server with the saved key; the browser never receives it.
+  </Step>
+</Steps>
 
-| Option | Requires | Available to |
-|---|---|---|
-| **Project** | project-admin on the selected project | that project only |
-| **Team** | team-admin on the selected team | every project under the team |
-| **Organisation** | org-admin | every project in the org |
+<Frame>
+<img src="/images/platform/model-providers-scope.png" alt="The provider drawer with the Scope picker open" />
+</Frame>
 
-Radio options that your role doesn't cover are hidden (not greyed-out), e.g. a user on a personal org with no team sees only Project + Organization; a user who doesn't belong to a team sees the Team option omitted. Default selection is **Project**: least-privilege by default. Helper text under the radio describes each scope's blast radius:
+<Frame>
+<img src="/images/platform/model-providers-test-connection.png" alt="The OpenAI row with Connection works under the provider name after Test Connection" />
+</Frame>
 
-- **Project**: Only this project can use this provider.
-- **Team**: Every project in the team inherits this provider.
-- **Organization**: Every project in the organization inherits this provider.
+Bedrock, Vertex AI, Azure OpenAI, Azure Safety, Voyage AI and Codex cannot be tested automatically. Their settings are checked the first time a feature uses them.
 
-Once you've picked the scope, the rest of the form is the same as before: provider type (OpenAI, Anthropic, Azure, Bedrock, Vertex, Gemini, Custom OpenAI-compatible), credential fields, optional rotation policy.
+Scope is fixed after create. To move a configuration to another scope, delete it and create it again at the new scope.
 
-## Changing a provider's scope
+Keys are encrypted at rest with AES-GCM. After save the drawer shows a masked placeholder instead of the key; type a new value to replace it, or leave the placeholder to keep it.
 
-<Note>**v1 behaviour**: scope is set at create time and is immutable in the edit drawer. To change a provider's scope, create a new row at the desired scope, then delete the original. In-place widen/narrow with automatic binding reconciliation is a v1.1 follow-up. The design for that flow is described below for forward reference.</Note>
+## Custom models
 
-### v1.1 plan: Widening (Project → Team → Organisation)
+Every LLM provider has a **Custom Models** section. Click **Add**, choose a chat model or an embeddings model, and enter the model id. The entry appears in the model pickers next to the vendor's known models, which **See all models** lists. Use it for fine-tuned models, new releases and the models behind a Custom (OpenAI-compatible) endpoint.
 
-Strictly additive. The provider becomes available to more projects; existing bindings continue to work unchanged (they reference the provider by id, not by scope). The edit drawer will surface a warning: "This provider will become available to every project in the org."
+## Who can see and use a configuration
 
-### v1.1 plan: Narrowing (Organisation → Team → Project)
+A project sees every configuration scoped to the project itself, to its team or to its organization. Each one is a separate entry in the model pickers under its own name.
 
-Narrowing can orphan downstream bindings. The edit drawer will show a confirmation modal listing every binding that will be archived before saving. Archival is explicit, each archived binding emits an audit-log entry so you can reconstruct exactly what happened.
+| Scope | Create, edit and delete | See |
+|-------|------------------------|-----|
+| Organization | `organization:manage` | `organization:view` |
+| Team | `team:manage` | `team:view` |
+| Project | `project:manage` | `project:view` |
 
-<Warning>Narrowing scope never silent-revokes. When shipped, the flow will show you exactly which bindings fall outside the new scope before you confirm.</Warning>
+The **All you can see** filter above the table narrows the list and the default models to one scope. Every save and delete is written to the [Audit Log](/platform/audit-log) as `modelProvider.update` or `modelProvider.delete`.
 
-## Overriding an inherited provider at a narrower scope
+## Default models
 
-If a project needs its own OpenAI key, different rate limits, different region, a dedicated billing account, you don't have to remove the inherited one. Create a new provider with the same type at **Project** scope; the narrower row takes precedence and is the effective credential. The inherited row remains visible in the list (so you understand where it came from) but is no longer used for resolution on that project.
+The **Default Models** section on the same page sets the model each feature uses unless the user picks one in the feature itself. A config sets a model per role (**Default**, **Fast**, **Langy**, **Embeddings**) and per feature, for example the model a new prompt or evaluator starts with, the Langy chat model, trace AI search, workflow commit messages, and the topic clustering model and embeddings.
 
-<Note>In v1 the inherited row shows its scope badge (Org, Team) but does not have an **Override at project scope** action in its kebab menu, you create the project-scoped row directly from **New provider**. The inline override affordance is a v1.1 follow-up.</Note>
+Click **Add config**, pick the scopes and the models. A project config beats a team config, which beats an organization config. A feature that no config names inherits from the wider scope.
 
-## AI Gateway provider bindings
+<Frame>
+<img src="/images/platform/model-providers-default-models.png" alt="The Default Models section with one config and the Add config button" />
+</Frame>
 
-Every `GatewayProviderCredential` (the thing a VK is bound to) references a `ModelProvider` by id, independent of the provider's scope. So **scope changes never break bindings**, and binding creation works identically whether the bound provider is org, team, or project.
+## Self-hosted deployments
 
-<Note>**Provider scope ≠ binding scope.** A binding is always **per-project** (it belongs to a project's VK). What an org-scoped provider enables is (a) **visibility**: every project in the org sees the provider in Settings + the Bind drawer, (b) **credential sharing**: the decrypted API key comes from the one org row, so rotation at the org level propagates everywhere. Each project still creates its own binding because gateway-specific knobs (rate limits, slot, fallback priority) are per-project decisions. An org-scoped provider visible across 5 projects that all want gateway routing still needs 5 binding operations, that's intentional, preserves governance and budget attribution.</Note>
+Set vendor keys as environment variables to get **System** configurations available to every project. See [self-hosting](/self-hosting/overview) for the variable names. Configurations added in the settings page work alongside them.
 
-The AI Gateway → Providers → Bind provider drawer groups the Select options by scope origin:
-
-```
-─ Organisation (acme) ─
-  OpenAI-ent
-─ Team (acme-platform) ─
-  OpenAI-plat
-─ This project (acme-api) ─
-  OpenAI-prod-only
-```
-
-Hovering any option shows why it's visible at the current project, the scope-ladder rationale, one line.
-
-## Permissions
-
-The scope ladder reuses the existing RBAC model with three new manage permissions:
-
-| Permission | Who gets it by default | Lets you |
-|---|---|---|
-| `modelProviders:manage:organization` | org-admin | Create, edit, delete org-scoped providers |
-| `modelProviders:manage:team` | team-admin | Create, edit, delete providers scoped to any team you admin |
-| `modelProviders:manage:project` | project-admin | Create, edit, delete project-scoped providers |
-
-See [RBAC](/platform/rbac) for the full permission model.
-
-## Default Model: the same ladder
-
-`DefaultModel` configs mirror the exact same scope ladder. An org admin can pin `openai/gpt-5-mini` as the default for the whole organisation; teams and projects override only when they need to. Resolution walks project → team → org, first-match-wins, narrower overrides win.
-
-## Migration from project-scoped to scoped
-
-If you've been using LangWatch for a while, every existing provider lives at **Project** scope. The scoped-providers migration is **zero-drift**: every existing row gets `scopeType=PROJECT` and `scopeId = current projectId` automatically, with identical behaviour.
-
-You opt into wider scopes on your timeline. A practical migration path for an org with N projects and duplicated credentials:
-
-1. Identify the provider you have N copies of (e.g. OpenAI).
-2. Create one new Org-scoped provider with the canonical credentials.
-3. For each of the N projects, verify the inherited org provider is the one now in use (the project-scoped copy can stay visible; the narrower one wins unless you delete it).
-4. Rotate the N project-scoped keys to the org row over a window you control.
-5. Delete the (now-superseded) project-scoped copies. Existing bindings on any VK still reference specific credential IDs, they follow the VK's `providerCredentialId`, not the name, so be careful when deleting to preserve the binding path.
-
-See [AI Gateway → Provider Bindings](/ai-gateway/provider-bindings#scope--access) for the gateway-side story.
-
-## Trade-offs and guardrails
-
-**Wider isn't always better.** Org-scoped credentials share a rate limit across every project. If one team's traffic spike starves another team's evaluator runs, narrower scopes are the right lever. Scope for the boundary that matches your blast-radius tolerance, not the broadest one that works.
-
-**Rotation at scope.** Rotating an org-scoped credential rotates it for every project that inherits it, on the next bundle refresh (≤ 30 s on the gateway path). Plan your rotation windows accordingly, don't rotate a hot org credential at peak traffic.
-
-**Audit trails.** Every create, edit, scope change, and delete emits an audit-log entry, see [Audit Log](/platform/audit-log). For enterprise compliance, this is the single source of truth for "who changed this credential, when, and from what to what."
-
-## See also
-
-- [RBAC](/platform/rbac): the permission model that gates scope changes.
-- [Audit Log](/platform/audit-log): every scope change shows up here.
-- [AI Gateway → Provider Bindings](/ai-gateway/provider-bindings): how the gateway resolves a VK's bound provider across scopes.
-- [Custom Models](/integration/custom-models): connecting local or OpenAI-compatible endpoints (the same dialog now has a scope picker).
+**Also check:** [Access Control (RBAC)](/platform/rbac) for the permissions above, [Custom Models](/integration/custom-models) for OpenAI-compatible endpoints, and [LangWatch AI Gateway providers](/ai-gateway/provider-bindings) for routing traffic through a saved configuration.
 
 ---
 
@@ -889,238 +1139,217 @@ See [AI Gateway → Provider Bindings](/ai-gateway/provider-bindings#scope--acce
 
 ---
 title: "Access Control (RBAC)"
-description: "Manage user permissions and access levels in LangWatch with RBAC to secure evaluation workflows and agent testing environments."
+description: "Roles, permissions, custom roles and role bindings: who can do what in an organization, a team or a project."
 sidebarTitle: Access Control (RBAC)
-keywords: rbac, langwatch, llm, ai, rbac, role-based access control
+keywords: rbac, roles, permissions, custom roles, role bindings, groups, langwatch
 ---
 
 <Note>
-  **Custom roles are available on Enterprise plans.** The built-in organization, team and project roles below work on every plan. Creating custom roles and assigning them needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. Calls to the [Roles API](/api-reference/roles/overview) without one are refused with HTTP 402 and the error code `enterprise_plan_required`. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  **Custom roles, role bindings and groups are Enterprise features.** The built-in organization and team roles work on every plan. Creating custom roles, listing role bindings and creating groups need an Enterprise plan, and a self-hosted deployment needs an Enterprise license. The [Roles API](/api-reference/roles/overview) refuses calls without one with HTTP 402 and the error code `enterprise_plan_required`. To enable it, contact [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
-LangWatch provides role-based access control (RBAC) to manage user permissions and access levels. This allows you to control who can access your LangWatch workspace and what they can do.
+## How access is structured
 
-# Role-Based Access Control (RBAC) System
+A permission is a `resource:action` pair, for example `traces:view` or `datasets:manage`. A role is a named set of permissions. A role binding gives a role to a person, a group or an API key at one scope: the organization, a team or a project.
 
-LangWatch implements a Role-Based Access Control (RBAC) system that manages permissions across organizations, teams, and projects. Role bindings can be assigned directly to users or to groups, including groups synced from your identity provider via SCIM.
+LangWatch has three scopes:
 
-<Info>
-  For group-based access control and identity provider integration, see [SCIM Groups](/platform/scim-groups).
-</Info>
+| Scope | What it contains |
+|-------|------------------|
+| **Organization** | Billing, members, seats, groups, roles, the audit log and the organization-wide settings |
+| **Team** | A set of projects and the people who work on them |
+| **Project** | Traces, evaluations, prompts, datasets, API keys and everything else you send data to |
 
-## Permission Structure
+Every member of the organization has an organization role. Access to a team or a project comes from a team role, given per team or per project through a role binding.
 
-### Actions
-The system defines six core actions that can be performed on resources:
+## Organization roles
 
-| Action | Description |
-|--------|-------------|
-| `view` | Read-only access to view resources |
-| `create` | Ability to create new resources |
-| `update` | Ability to modify existing resources |
-| `delete` | Ability to remove resources |
-| `manage` | Full CRUD access plus administrative settings |
-| `share` | Ability to share resources with others |
+Set the organization role per member at **Settings > Members**. The role decides what a person can do at the organization level and how their seat is counted.
 
-### Resources
-Permissions are applied to the following resource types:
+| Role | What it grants |
+|------|----------------|
+| **Admin** | Every permission on every team and project in the organization, plus the organization settings: members, teams, roles, groups, billing, the audit log, AI Governance, webhook endpoints and spend data |
+| **Member** | `organization:view` and `aiTools:view`. Access to a team or a project comes only from a team role |
+| **Lite Member** | `organization:view` and `aiTools:view`. On a team or a project a Lite Member is capped at the Viewer permissions below, plus `annotations:create` and `annotations:update`, and never sees costs, the AI Gateway pages or the audit log |
 
-| Resource | Description |
-|----------|-------------|
-| `organization` | Organization-level settings and management |
-| `project` | Individual projects within teams |
-| `team` | Team management and settings |
-| `analytics` | Analytics dashboards and reports |
-| `cost` | Cost tracking and billing information |
-| `traces` | LLM trace data and logs |
-| `scenarios` | Test scenarios and evaluations |
-| `annotations` | Data annotations and labeling |
-| `evaluations` | Creating and managing evaluations |
-| `datasets` | Managing datasets |
-| `automations` | Creating and managing automations |
-| `workflows` | Creating and managing workflows |
-| `prompts` | Creating and managing prompts |
+A Lite Member uses a Lite seat, which is counted separately from full seats. In the settings pages a Lite Member can only be given the Viewer role on a team or a project. A group binding above Viewer applies as Viewer for a Lite Member.
 
+**Also check:** [Members and Teams](/platform/members-and-teams) for seats, invites and how to change a member's role.
 
-## Predefined Roles
+## Team roles
 
-### Team Roles
+A team role applies to one team and, through inheritance, to every project in it. A binding on a single project overrides the team role for that project only. The built-in roles are **Admin**, **Member** and **Viewer**.
 
-#### Admin
-Full administrative access to all team resources and settings.
+| Resource | Viewer | Member | Admin |
+|----------|--------|--------|-------|
+| `project` | view | view, create, update | manage |
+| `team` | view | view | manage |
+| `analytics` | view | manage | manage |
+| `cost` | | view | view |
+| `traces` | view | view, create, update, share | view, create, update, share |
+| `annotations` | view | manage | manage |
+| `evaluations` | view | manage | manage |
+| `datasets` | view | manage | manage |
+| `experiments` | view | manage | manage |
+| `scenarios` | view | manage | manage |
+| `workflows` | view | manage | manage |
+| `prompts` | view | manage | manage |
+| `triggers` | | manage | manage |
+| `secrets` | view | manage | manage |
+| `langy` | | view, create, update, delete | manage |
+| `agentCache` | | manage | manage |
+| `auditLog` | view | view | view |
+| `virtualKeys` | view | view, create, update, rotate | manage, viewOtherPersonal |
+| `gatewayBudgets` | view | view | manage |
+| `gatewayProviders` | view | view | manage |
+| `routingPolicies` | view | view | manage |
+| `gatewayGuardrails` | view | view | manage |
+| `gatewayCacheRules` | view | view | manage |
+| `gatewayUsage` | view | view | view |
 
-| Resource | Permissions |
-|----------|-------------|
-| Projects | `view`, `manage` |
-| Analytics | `view`, `manage` |
-| Cost | `view` |
-| Traces | `view`, `share` |
-| Annotations | `view`, `manage` |
-| Evaluations | `view`, `manage` |
-| Datasets | `view`, `manage` |
-| Automations | `view`, `manage` |
-| Workflows | `view`, `manage` |
-| Prompts | `view`, `manage` |
-| Scenarios | `view`, `manage` |
-| Team | `view`, `manage` |
+In short: a Viewer reads. A Member creates and edits the work in the project, sees costs, and manages its own virtual keys. An Admin also manages the team, deletes projects, and manages the AI Gateway configuration.
 
-#### Member
-Same permissions as Admin but cannot manage team settings.
+## Actions
 
-#### Viewer
-Read-only access to the resources listed below, for observation and reporting.
+| Action | Meaning |
+|--------|---------|
+| `view` | Read the resource |
+| `create` | Create a new one |
+| `update` | Edit an existing one |
+| `delete` | Delete one |
+| `manage` | Implies `view`, `create`, `update`, `delete`, `rotate`, `attach` and `detach` on the same resource |
+| `share` | Create a public share link for a trace |
+| `rotate` | Rotate a virtual key |
+| `attach`, `detach` | Attach a guardrail to a virtual key, or detach it |
+| `viewOtherPersonal` | See the personal virtual keys of other members, for off-boarding |
 
-| Resource | Permissions |
-|----------|-------------|
-| Projects | `view` |
-| Analytics | `view` |
-| Traces | `view` |
-| Annotations | `view` |
-| Evaluations | `view` |
-| Datasets | `view` |
-| Automations | `view` |
-| Workflows | `view` |
-| Prompts | `view` |
-| Scenarios | `view` |
-| Team | `view` |
+`share` and `viewOtherPersonal` are never implied by `manage`. Grant them explicitly.
 
-### Organization Roles
+## Resources
 
-#### Admin
-Complete control over organization settings and all teams.
+Each table lists the actions a resource accepts. Resources marked **organization only** can only be granted by an organization-scoped binding; a team or project binding never grants them, even through a custom role that lists them.
 
-| Resource | Permissions |
-|----------|-------------|
-| Organization | `view`, `manage`, `delete` |
+### Core
 
-#### Member
-Basic organization access for team members.
+| Resource | Actions | Scope |
+|----------|---------|-------|
+| `organization` | view, manage, delete | organization only |
+| `team` | view, manage | any |
+| `project` | view, create, update, delete, manage | any |
 
-| Resource | Permissions |
-|----------|-------------|
-| Organization | `view` |
+### Product
 
-## Permission Hierarchy
+| Resource | Actions |
+|----------|---------|
+| `analytics` | view, create, update, delete, manage |
+| `cost` | view |
+| `traces` | view, create, update, share |
+| `scenarios` | view, create, update, delete, manage |
+| `annotations` | view, create, update, delete, manage |
+| `evaluations` | view, create, update, delete, manage |
+| `experiments` | view, create, update, delete, manage |
+| `datasets` | view, create, update, delete, manage |
+| `triggers` | view, create, update, delete, manage |
+| `workflows` | view, create, update, delete, manage |
+| `prompts` | view, create, update, delete, manage |
+| `secrets` | view, create, update, delete, manage |
+| `langy` | view, create, update, delete, manage |
+| `agentCache` | view, manage |
 
-The system implements a hierarchical permission model where:
+### Platform
 
-- **`manage` permissions automatically include** `view`, `create`, `update`, and `delete` permissions
-- This means if a user has `analytics:manage`, they automatically have `analytics:view`, `analytics:create`, `analytics:update`, and `analytics:delete`
+| Resource | Actions |
+|----------|---------|
+| `auditLog` | view |
 
-## Organization Structure
+### LangWatch AI Gateway
 
-LangWatch uses three layers for access and ownership:
+| Resource | Actions | Scope |
+|----------|---------|-------|
+| `virtualKeys` | view, create, update, delete, rotate, manage, viewOtherPersonal | any |
+| `gatewayBudgets` | view, create, update, delete, manage | any |
+| `gatewayProviders` | view, update, manage | any |
+| `routingPolicies` | view, manage | any |
+| `gatewayGuardrails` | view, attach, detach, manage | any |
+| `gatewayCacheRules` | view, create, update, delete, manage | any |
+| `gatewayUsage` | view | any |
+| `gatewaySpend` | view, manage | organization only |
+| `webhookEndpoints` | view, manage | organization only |
 
-- **Organization**: the top-level container for billing, users, and shared policy.
-- **Team**: the container that groups projects and members together.
-- **Project**: the actual unit where traces, evaluations, prompts, and API keys live.
+### AI Governance
 
-Practical rules:
+| Resource | Actions | Scope |
+|----------|---------|-------|
+| `governance` | view, manage | organization only |
+| `ingestionSources` | view, create, update, delete, manage | organization only |
+| `anomalyRules` | view, create, update, delete, manage | organization only |
+| `complianceExport` | view | organization only |
+| `activityMonitor` | view | organization only |
+| `aiTools` | view, manage | organization only |
 
-- Create teams first when you want a new workspace boundary for a department or product line.
-- Create projects inside a team, or move an existing project to another team when ownership changes.
-- Moving a project between teams changes the inherited RBAC boundary. Team members on the destination team gain access, and source-team inheritance no longer applies.
-- Groups are the scale mechanism on top of this hierarchy. Use them to assign the same role bindings to many users at once.
+## Custom roles
 
-The day-to-day flows live in the UI under **Settings → Teams**, **Settings → Projects**, and **Settings → Groups**. The same operations are available through the Teams, Projects, and Groups APIs.
-
-## Custom Roles
-
-### Overview
-Organizations can create custom roles to provide more granular permission control beyond the predefined roles. Custom roles allow organizations to:
-
-- Define specific permission combinations
-- Create roles tailored to specific job functions
-- Implement least-privilege access principles
-- Maintain compliance with organizational policies
-
-### Creating Custom Roles
-
-Custom roles are created at the organization level and can be assigned to users within any team in that organization. Custom roles can be found under settings.
-
-#### Required Fields
-- **Name**: Unique role name (1-50 characters)
-- **Description**: Optional description of the role's purpose
-- **Permissions**: Array of specific permissions
-
-
-The following screenshot shows the roles interface in LangWatch.
+A custom role is a named permission set you define. Create it at **Settings > Roles & Permissions** with `organization:manage`. Custom roles are Enterprise.
 
 <Frame>
-<img src="/images/rbac/roles.png" alt="LangWatch RBAC Roles Interface" />
+<img src="/images/platform/roles-list.png" alt="Settings > Roles & Permissions with the built-in roles and one custom role" />
 </Frame>
 
-To create a new role, click the "Create Role" button.
+A custom role has:
 
-Add the name and description of the role and click the "Create" button.
+| Field | Rule |
+|-------|------|
+| Name | Required, 1 to 50 characters, unique in the organization |
+| Description | Optional |
+| Permissions | One or more `resource:action` pairs |
+
+The permission selector groups the checkboxes by resource. Ticking `manage` ticks the actions it implies. Ticking `create`, `update` or `delete` also ticks `view`.
 
 <Frame>
-<img src="/images/rbac/roles-create.png" alt="Creating Custom Roles in LangWatch" />
+<img src="/images/platform/roles-create-permissions.png" alt="The Create Role dialog with the permission selector" />
 </Frame>
 
-Once the role is created, you can attach it to a user under the teams page.
+The selector offers these resources: traces, cost, scenarios, annotations, analytics, evaluations, datasets, triggers, workflows, experiments, prompts, secrets, audit log, team, project, governance, ingestion sources, anomaly rules, compliance export, activity monitor and AI tools. The [Roles API](/api-reference/roles/overview) accepts every resource and action in the tables above.
+
+To give a custom role to a person, pick it in the role select at **Settings > Teams & Projects** (a team member row, **Add to team** or **Add access to project**), in the member dialog at **Settings > Members**, in the team assignments of an invite, or bind it to a group. A custom role can be bound at organization, team or project scope. An organization Admin who also holds a custom team role keeps the Admin access.
+
+## Role bindings
+
+A role binding is one row: who, which role, at which scope.
+
+| Part | Options |
+|------|---------|
+| Who | A user, a group, or an API key |
+| Role | Admin, Member, Viewer, or a custom role |
+| Scope | The organization, one team, or one project |
+
+You create bindings for users from **Settings > Members** and **Settings > Teams & Projects**, and for groups from **Settings > Groups**. **Settings > Role Bindings** lists every binding in the organization per user and per group, filtered by organization, team or project scope. The page is read only.
 
 <Frame>
-<img src="/images/rbac/roles-add.png" alt="Adding Roles to Users in LangWatch" />
+<img src="/images/platform/role-bindings.png" alt="Settings > Role Bindings listing bindings per person and group" />
 </Frame>
 
+An API key can hold bindings too. A key with restricted permissions stores its scopes as bindings on the key, and LangWatch intersects them with the permissions of the user who owns the key on every request. A key never grants more than its owner holds at that moment. A service key with no owner has no such ceiling.
 
-### Custom Role Management
+**Also check:** [API Keys](/platform/api-keys) for how to scope a key.
 
-#### Permissions Required
-- **Create/Update/Delete Custom Roles**: `organization:manage` permission
-- **Assign Custom Roles**: `team:manage` permission
+## Groups
 
-#### Best Practices
-- **Naming Convention**: Use descriptive names that clearly indicate the role's purpose
-- **Documentation**: Provide clear descriptions explaining when to use each role
-- **Regular Review**: Periodically review custom roles to ensure they're still needed
-- **Least Privilege**: Grant only the minimum permissions required for the role's function
-- **Testing**: Test custom roles in a development environment before deploying
+A group gives the same bindings to many people at once. Create a group at **Settings > Groups** (Enterprise), add members, and bind roles to the group at any scope. A binding on a group applies to every member of the group, and the members page shows it as "via" the group.
 
-### Custom Role Limitations
+A group synced from your identity provider through SCIM keeps its name and membership under the identity provider's control: you bind roles to it in LangWatch, and the identity provider decides who is in it.
 
-- Custom roles cannot grant permissions that exceed the organization admin's capabilities
-- Custom roles are organization-scoped and cannot be shared across organizations
+<Frame>
+<img src="/images/platform/groups-list.png" alt="Settings > Groups with one manual group, its access and its member count" />
+</Frame>
 
-### Public Sharing
-The system supports public sharing of traces, allowing access without authentication when resources are explicitly shared publicly.
+**Also check:** [SCIM Groups](/platform/scim-groups).
 
----
+## How a request is authorized
 
-## Scoped Role Bindings
+LangWatch first checks that the caller is an active member of the organization; a disabled member is refused, and API keys skip this check. It then collects every binding on the scope chain of the request, the project, its team and the organization, including bindings held through groups.
 
-Roles in LangWatch are assigned via **role bindings**: a binding links a principal (user or group) to a role at a specific scope.
-
-### Scopes
-
-| Scope | What it grants |
-|-------|---------------|
-| **Organization** | Access across the entire organization at the specified role level |
-| **Team** | Access to a specific team and all its projects |
-| **Project** | Access to a single project only |
-
-### Resolution Rules
-
-- **Most specific scope wins**: a project-level binding overrides a team-level binding for that project
-- **Org Admin always wins**: an org-level Admin binding grants full access everywhere regardless of narrower bindings
-- **Multiple bindings at the same scope**: the highest role is used (e.g. Member + Viewer → Member)
-
-Role bindings can be assigned to users directly from **Settings → Members**, or to groups from **Settings → Groups**. Users inherit all bindings assigned to groups they belong to.
-
-<Tip>
-  Use group bindings (especially SCIM groups from your IdP) to manage access at scale, assigning a binding to a group is equivalent to assigning it to every member of that group. See [SCIM Groups](/platform/scim-groups).
-</Tip>
-
----
-
-## Security Considerations
-
-- **Principle of Least Privilege**: Grant only necessary permissions
-- **Regular Audits**: Periodically review role assignments and permissions
-- **Separation of Duties**: Use different roles for different functions
-- **Access Reviews**: Implement regular access reviews for sensitive roles
-- **Monitoring**: Track permission usage and changes for security auditing
+Any binding that grants the permission allows the request; a narrower binding never cancels a wider one. An organization-scoped Admin binding grants every permission. At organization scope, every active member holds the Member organization permissions. Organization-only resources need an organization-scoped binding.
 
 ---
 
@@ -1128,163 +1357,131 @@ Role bindings can be assigned to users directly from **Settings → Members**, o
 
 ---
 title: "SCIM Groups & Role Mapping"
-description: "Automatically assign roles to users in LangWatch based on groups pushed from your identity provider."
+description: "Bind roles to the groups your identity provider pushes over SCIM, so every member of a group holds the same access."
 sidebarTitle: SCIM Groups
 keywords: scim, groups, role mapping, provisioning, okta, azure ad, entra id, identity provider, rbac, access control
 ---
 
-SCIM Groups allow your identity provider to push group memberships into LangWatch. Admins can then map those groups to specific roles at the organization, team, or project level, so users automatically get the right access the moment they are provisioned.
-
-Whether the group is SCIM-synced or created manually in the UI, groups are an **Enterprise** feature in LangWatch.
+A SCIM group is a group that your identity provider pushes into LangWatch. You bind roles to the group at the organization, team or project scope, and every member of the group holds those roles.
 
 <Info>
-  SCIM Groups are an **Enterprise** feature. See [SCIM Provisioning](/platform/scim) for setting up user provisioning first.
+  Groups are an **Enterprise** feature, whether they come from SCIM or are created by hand. Set up [SCIM Provisioning](/platform/scim) for users first.
 </Info>
 
 ---
 
-## How It Works
+## How it works
 
-1. Your identity provider pushes groups to LangWatch via the SCIM `/Groups` endpoint
-2. Groups appear in **Settings → Groups** in LangWatch
-3. Admins assign role bindings to each group (e.g. _MEMBER on Team Engineering_)
-4. When a user is added to the group in the IdP, they inherit all roles assigned to that group
-5. When a user is removed from the group (or deprovisioned), access is revoked automatically
+1. Your identity provider pushes groups to the SCIM `/Groups` endpoint
+2. The groups appear at **Settings > Groups**
+3. You bind roles to each group, for example Member on the Engineering team
+4. A user added to the group in the identity provider holds every binding of the group
+5. A user removed from the group, or deprovisioned, loses them
 
 ---
 
-## Viewing Groups
+## View groups
 
-Navigate to **Settings → Groups** to see all groups pushed from your identity provider. Each row shows:
+**Settings > Groups** lists every group. Each row shows:
 
 | Column | Description |
 |--------|-------------|
-| **Group** | The group name as defined in your IdP |
-| **Source** | `SCIM` for IdP-managed groups, `Manual` for manually created groups |
-| **Access** | The role bindings assigned to this group |
-| **Members** | Number of users currently in the group |
+| **Group** | The group name from the identity provider |
+| **Source** | `SCIM` for a pushed group, `Manual` for a group created in LangWatch |
+| **Access** | The role bindings of the group |
+| **Members** | The number of users in the group |
 
-Click any group row to open the detail panel where you can manage bindings and members.
+Click a row to open the group dialog, where you manage the bindings and, for manual groups, the members.
 
 ---
 
-## Assigning Roles to a Group
+## Bind roles to a group
 
-Open a group and use the **Access granted** section to add role bindings:
+Open a group. In the **Access granted** section:
 
 1. Select a **role** (Admin, Member, Viewer, or a custom role)
 2. Select the **scope**: Organization, Team, or Project
-3. Select the specific team or project (for Team/Project scope)
-4. Click **Add**
+3. Select the team or the project for a Team or Project scope
+4. Click **Add**, then **Save**. The binding is written when you save
 
-<Tip>
-  You can add multiple bindings to a single group, for example, _Member on the whole organization_ plus _Admin on Team Platform_.
-</Tip>
+A group can hold several bindings, for example Member on the organization plus Admin on the Platform team.
 
-### Role Scopes
+### Binding scopes
 
 | Scope | What it grants |
 |-------|---------------|
-| **Organization** | Access across the entire organization at the specified role level |
-| **Team** | Access to a specific team and all its projects |
-| **Project** | Access to a single project only |
+| **Organization** | The role on every team and project in the organization |
+| **Team** | The role on one team and all its projects |
+| **Project** | The role on one project |
 
 ---
 
-## Role Resolution
+## How bindings add up
 
-A user may belong to multiple groups, each with different role assignments. LangWatch resolves the effective role using the **highest privilege wins** rule:
+A user in several groups holds every binding of every group, plus the bindings set on the user directly at **Settings > Members**. Permissions add up: a request is allowed when any binding on the project, its team or the organization grants it, and no binding removes what another one grants.
 
-**Hierarchy:** `ADMIN > MEMBER > VIEWER`
+For example, a user in Group A (Member on the Engineering team) and Group B (Admin on the Engineering team) holds both, and can do everything an Admin can on that team.
 
-If a user is in:
-- Group A → Member on Team Engineering
-- Group B → Admin on Team Engineering
-
-They receive **Admin** on Team Engineering.
-
-For custom roles: if a user only has custom role assignments (no built-in roles), the custom role is used. If they have both built-in and custom roles, the built-in hierarchy takes precedence.
-
-The most specific scope always applies, a project-level binding overrides a team-level binding for that project.
+**Also check:** [Access Control (RBAC)](/platform/rbac) for how a request is authorized.
 
 ---
 
-## User Lifecycle with Groups
+## User lifecycle with groups
 
-### When a User is Added to a Group
+### When a user is added to a group
 
-The user immediately inherits all role bindings assigned to that group. If they were not yet a member of your LangWatch organization, they are provisioned as a **Member** first (see [User Provisioning](/platform/scim#provisioning-create)).
+The user holds every binding of the group at once. Group membership never creates a user: a member id that is not yet in your organization is skipped, so provision the user through `/Users` first (see [User Provisioning](/platform/scim#provisioning-create)).
 
-### When a User is Removed from a Group
+### When a user is removed from a group
 
-Their group-inherited roles are removed. If they have no other active bindings, they will have no project or team access but remain in the organization.
+The group's bindings no longer apply to the user. With no other binding, the user stays in the organization and sees no team or project.
 
-### When a User is Deprovisioned (DELETE)
+### When a group is deleted
 
-When your IdP sends a SCIM DELETE for a user:
+LangWatch removes the group, its memberships and its role bindings.
 
-- Their org membership and all role bindings are **removed**
-- Their account is **deactivated**: they can no longer sign in
-- Their data (traces, annotations, datasets) is **preserved**
+### When a user is deprovisioned (DELETE)
 
-A second DELETE for the same user returns `404 Not Found`, the operation is idempotent.
-
-### When a User is Suspended (PATCH active=false)
-
-When your IdP suspends a user (sets `active: false`):
-
-- Their account is **deactivated**: they can no longer sign in
-- Their org membership and role bindings are **preserved**
-- Re-activating (`active: true`) immediately restores access
-
-<Info>
-  Use `PATCH active=false` for temporary suspension (e.g. leave of absence). Use DELETE for permanent offboarding. The distinction matters because DELETE removes all role bindings and group memberships, re-provisioning the user starts from scratch.
-</Info>
+A `DELETE` on a user removes the organization membership and every role binding, deactivates the account and keeps the user's data. A `PATCH` with `active: false` deactivates the account and keeps the membership and the bindings. Both are described in [SCIM Provisioning](/platform/scim#user-lifecycle).
 
 ---
 
-## Manual Groups
+## Manual groups
 
 You can also create groups manually without an identity provider:
 
-1. In **Settings → Groups**, click **Add manual group** at the bottom of the table
+1. At **Settings > Groups**, click **Add manual group** at the bottom of the table
 2. Enter a group name
-3. Optionally add role bindings and members in the creation dialog
+3. Add role bindings and members in the dialog if you want
 4. Click **Create group**
 
-Manual groups behave identically to SCIM groups for role assignment. Members must already be in your organization to be added.
-
-<Note>
-  Manual groups are not synced with any identity provider. Membership must be managed from within LangWatch.
-</Note>
+Bindings work the same way on manual and SCIM groups. Members must already be in your organization. A manual group is not synced with an identity provider, and the `/Groups` endpoint does not list it.
 
 ---
 
-## SCIM Group Endpoints
-
-LangWatch supports the following SCIM group operations:
+## SCIM group endpoints
 
 | Endpoint | Methods |
 |----------|---------|
 | `/api/scim/v2/Groups` | `GET`, `POST` |
 | `/api/scim/v2/Groups/{id}` | `GET`, `PUT`, `PATCH`, `DELETE` |
 
-### Supported PATCH Operations
+`POST` with the `displayName` of an existing group returns `409 Conflict`. `GET /Groups` returns SCIM groups only, at most 100 per page.
+
+### Supported PATCH operations
 
 | Operation | Example | Effect |
 |-----------|---------|--------|
-| `add members` | Add users to group | Users inherit group's roles |
-| `remove members` | Remove users from group | Roles revoked for removed users |
-| `replace displayName` | Rename the group | Group name updated in LangWatch |
-| `replace members` | Full member replacement | Adds new, removes old members |
+| `add members` | Add users to the group | The users hold the group's bindings |
+| `remove members` | Remove users from the group | The group's bindings no longer apply to them |
+| `replace displayName` | Rename the group | The name changes in LangWatch |
+| `replace members` | Replace the member list | Adds the new members and removes the old ones |
 
-A `replace` that carries no member list leaves the group's membership alone — replacing an unrelated attribute never removes anyone. Sending `members` as an empty list is a member list, and does clear the group, as does an explicit `null`.
+A `replace` clears the membership only when `members` is an empty list or an explicit `null`. A `replace` with no `members` value, a `members` value that is not a list, or a list with entries that have no usable string `value` leaves the membership unchanged, so a malformed payload cannot revoke access. The other attributes in the same operation, such as `displayName`, still apply, and the unapplied part is written to the server log.
 
-To clear a group you have to say so, either with an empty list or with an explicit `null`. A missing `members` value, a non-`null` value that is not a list, or a list holding entries without a usable id — no string `value`, or a blank one — says nothing we can act on and is treated as saying nothing about membership rather than as saying "no members" — a malformed payload should not revoke anyone's access. Only the member replacement is left unapplied: any other recognized attribute in the same operation, such as `displayName`, still takes effect. The unapplied part is recorded in the server logs.
+### Supported filter
 
-### Supported Filter
-
-Groups can be filtered by `displayName` using a case-insensitive `eq` filter:
+`GET /Groups` filters by `displayName` with a case-insensitive `eq`:
 
 ```
 GET /api/scim/v2/Groups?filter=displayName eq "Engineering"
@@ -1294,47 +1491,40 @@ GET /api/scim/v2/Groups?filter=displayName eq "Engineering"
 
 ## Troubleshooting
 
-**Groups are not appearing in LangWatch**
+**Groups do not appear in LangWatch**
 
-- Confirm that group push (SCIM provisioning of groups) is enabled in your IdP's application settings
-- Check your IdP's provisioning logs for errors on the Groups endpoint
-- Verify your bearer token has not been revoked
+- Group push is enabled in the identity provider's application settings
+- The provisioning log of the identity provider shows no error on the Groups endpoint
+- The bearer token is not revoked
 
 **Users in a group have no access**
 
-- Open the group in **Settings → Groups** and check the **Access granted** section
-- If empty, add at least one role binding to the group
-- Confirm the user appears in the group's **Members** list
+- Open the group at **Settings > Groups**. The **Access granted** section needs at least one binding
+- The user is in the group's **Members** list. A user who was not in the organization when the identity provider pushed the group was skipped; push the group again after the user is provisioned
 
-**User has more access than expected**
+**A user has more access than expected**
 
-- The user may be in multiple groups, check all group memberships in your IdP
-- Direct role bindings on the user (from **Settings → Members**) also apply and are combined with group bindings
+- The user is in several groups. Bindings add up across groups
+- Bindings set on the user at **Settings > Members** add up with the group bindings
 
-**Removing a user from a group in the IdP has no effect**
+**Removing a user from a group in the identity provider has no effect**
 
-- Ensure your IdP is configured to push group membership changes (not just user changes)
-- Check provisioning logs for any errors on the PATCH groups endpoint
+- The identity provider pushes group membership changes, not only user changes
+- The provisioning log shows no error on the group `PATCH`
 
 ---
 
-## Managing Groups via REST API
+## Manage groups through the REST API
 
-In addition to the UI and SCIM provisioning, groups can be managed programmatically via the [Groups REST API](/api-reference/groups/overview). This is useful for:
-
-- Automating group creation and membership management
-- Scripting role binding assignments
-- Integrating with custom provisioning workflows
-
-See the [Groups API Reference](/api-reference/groups/overview) for full endpoint documentation.
+The [Groups REST API](/api-reference/groups/overview) creates groups, sets their bindings and members, and deletes them, so you can script provisioning outside SCIM.
 
 <Info>
-SCIM-managed groups cannot have their members or names modified via the REST API. Those operations are reserved for the identity provider.
+  The name and the members of a SCIM group belong to the identity provider. The REST API and the settings page refuse to change them.
 </Info>
 
 ---
 
-For additional help, contact us at [support@langwatch.ai](mailto:support@langwatch.ai).
+For help, contact [support@langwatch.ai](mailto:support@langwatch.ai).
 
 ---
 
@@ -1342,189 +1532,241 @@ For additional help, contact us at [support@langwatch.ai](mailto:support@langwat
 
 ---
 title: "SCIM Provisioning"
-description: "Automatically provision and deprovision users in LangWatch using SCIM 2.0 with your identity provider (Okta, Azure AD, etc.)."
+description: "Provision and deprovision LangWatch users from your identity provider (Okta, Entra ID and others) over SCIM 2.0."
 sidebarTitle: SCIM Provisioning
 keywords: scim, provisioning, deprovisioning, okta, azure ad, identity provider, sso, user management
 ---
 
 <Note>
-  **Available on Enterprise plans.** SCIM provisioning needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. The plan is checked on every call, not only when a token is created, so if it lapses, tokens that already exist stop verifying and your identity provider's requests are refused. Minting a token through the [SCIM Tokens API](/api-reference/scim-tokens/overview) without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  **Available on Enterprise plans.** SCIM provisioning needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. The plan is checked on every SCIM call, so when it lapses, existing tokens stop verifying and your identity provider's requests are refused with HTTP 403. The [SCIM Tokens API](/api-reference/scim-tokens/overview) refuses to mint a token without an Enterprise plan with HTTP 402 and the error code `enterprise_plan_required`. To enable it, contact [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
-SCIM (System for Cross-domain Identity Management) 2.0 allows your identity provider to automatically manage user lifecycle in LangWatch, provisioning new users when they join your organization and deprovisioning them when they leave, without any manual intervention.
+SCIM (System for Cross-domain Identity Management) 2.0 lets your identity provider create LangWatch users when people join your organization, deactivate them when they leave, and push groups that you map to roles.
 
 ## Prerequisites
 
-- Organization Admin permissions in LangWatch
-- An identity provider that supports SCIM 2.0 (Okta, Azure AD, Entra ID, etc.)
-- SSO configured for your organization (recommended, see [SSO Setup](/self-hosting/configuration/sso))
+- `organization:manage` in LangWatch (an organization Admin)
+- An identity provider that supports SCIM 2.0: Okta, Entra ID (Azure AD) and others
+- SSO set up for your organization. LangWatch creates an SSO connection for your organization during SSO setup, and every SCIM token belongs to one connection. See [SSO Setup](/self-hosting/configuration/sso)
 
-## Setting Up SCIM
+## Set up SCIM
 
-### Step 1: Get Your SCIM Base URL
+### Step 1: Copy the SCIM base URL
 
-Navigate to **Settings → SCIM** in your LangWatch organization. The SCIM Base URL is displayed at the top of the page:
+Open **Settings > SCIM Provisioning**. The base URL is shown at the top of the page:
 
 ```
 https://app.langwatch.ai/api/scim/v2
 ```
 
-For self-hosted deployments, replace the domain with your own:
+On a self-hosted deployment, replace the domain with your own:
 
 ```
 https://your-langwatch-instance.example.com/api/scim/v2
 ```
 
-### Step 2: Generate a Bearer Token
+### Step 2: Create a bearer token
 
-1. In **Settings → SCIM**, click **Generate Token**
-2. Optionally add a description (e.g., `Okta SCIM integration`)
-3. Click **Generate Token**
-4. **Copy the token immediately**: it will not be shown again
+A token belongs to one SSO connection and is shown once. Create it through the [SCIM Tokens API](/api-reference/scim-tokens/overview) with the connection id LangWatch gave you during SSO setup:
+
+```bash
+curl -X POST https://app.langwatch.ai/api/scim-tokens \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{"connectionId": "YOUR_CONNECTION_ID", "description": "Okta SCIM integration"}'
+```
+
+The response carries the token once. Store it in your identity provider straight away.
 
 <Warning>
-  Store your SCIM bearer token securely. Once you close the dialog, the token
-  value cannot be retrieved. If you lose the token, revoke it and generate a new
-  one.
+  The token cannot be retrieved later. If you lose it, revoke it and create a new one.
 </Warning>
 
-You can generate multiple tokens (e.g., one per integration) and revoke them individually from the token table.
+You can create several tokens, for example one per integration, and revoke each one separately from the table on **Settings > SCIM Provisioning**.
 
-### Step 3: Configure Your Identity Provider
-
-Use the SCIM Base URL and bearer token to configure SCIM in your identity provider:
+### Step 3: Configure your identity provider
 
 | Setting | Value |
 |---------|-------|
 | SCIM Base URL | `https://app.langwatch.ai/api/scim/v2` |
-| Bearer Token | Your generated token |
+| Bearer Token | The token from step 2 |
 
-Refer to your identity provider's own documentation for where to enter these values:
+Where to enter them:
 
 - **Okta**: [Configure SCIM provisioning](https://help.okta.com/en-us/content/topics/apps/apps_app_integration_wizard_scim.htm)
-- **Azure AD, Entra ID**: [Configure automatic user provisioning](https://learn.microsoft.com/en-us/entra/identity/app-provisioning/configure-automatic-user-provisioning-portal)
+- **Entra ID (Azure AD)**: [Configure automatic user provisioning](https://learn.microsoft.com/en-us/entra/identity/app-provisioning/configure-automatic-user-provisioning-portal)
 
 ---
 
-## Supported Operations
+## Supported operations
 
-LangWatch SCIM 2.0 supports the following user operations:
+| Operation | Description |
+|-----------|-------------|
+| **Create User** | Creates the user and adds them to your organization as a Member. An address that is already a member gets `409 Conflict` |
+| **Get User** | Returns one user by id |
+| **List Users** | Lists the users in the organization, with an optional `userName eq` filter |
+| **Update User (PUT)** | Replaces the user's attributes |
+| **Update User (PATCH)** | Changes single attributes, for example `active` |
+| **Delete User** | Removes the membership and deactivates the account. The user's data stays |
 
-| Operation               | Description                                                             |
-| ----------------------- | ----------------------------------------------------------------------- |
-| **Create User**         | Provisions a new user and adds them to your organization as a Member    |
-| **Get User**            | Retrieves a single user by ID                                           |
-| **List Users**          | Lists all users in the organization, with optional `userName` filtering |
-| **Update User (PUT)**   | Replaces user attributes (name, email, active status)                   |
-| **Update User (PATCH)** | Partially updates user attributes (e.g., deactivate only)               |
-| **Delete User**         | Deactivates the user (soft delete, their data is preserved)            |
+### SCIM endpoints
 
-### SCIM Endpoints
+| Endpoint | Methods |
+|----------|---------|
+| `/api/scim/v2/Users` | `GET`, `POST` |
+| `/api/scim/v2/Users/{id}` | `GET`, `PUT`, `PATCH`, `DELETE` |
+| `/api/scim/v2/Groups` | `GET`, `POST` |
+| `/api/scim/v2/Groups/{id}` | `GET`, `PUT`, `PATCH`, `DELETE` |
+| `/api/scim/v2/ServiceProviderConfig` | `GET` |
+| `/api/scim/v2/ResourceTypes` | `GET` |
+| `/api/scim/v2/Schemas` | `GET` |
 
-| Endpoint                             | Methods                         |
-| ------------------------------------ | ------------------------------- |
-| `/api/scim/v2/Users`                 | `GET`, `POST`                   |
-| `/api/scim/v2/Users/{id}`            | `GET`, `PUT`, `PATCH`, `DELETE` |
-| `/api/scim/v2/Groups`                | `GET`, `POST`                   |
-| `/api/scim/v2/Groups/{id}`           | `GET`, `PUT`, `PATCH`, `DELETE` |
-| `/api/scim/v2/ServiceProviderConfig` | `GET`                           |
-| `/api/scim/v2/ResourceTypes`         | `GET`                           |
-| `/api/scim/v2/Schemas`               | `GET`                           |
+`ServiceProviderConfig`, `ResourceTypes` and `Schemas` need no token. List endpoints return at most 100 rows per page; `startIndex` starts at 1. `ServiceProviderConfig` advertises `patch`, `filter` with `maxResults` 100, and no `bulk`, `sort`, `etag` or `changePassword`. `GET /Groups` accepts `excludedAttributes=members`.
 
-### User Attributes
+### User attributes
 
-| SCIM Attribute    | LangWatch Field | Notes                         |
-| ----------------- | --------------- | ----------------------------- |
-| `userName`        | Email address   | Used as the unique identifier |
-| `name.givenName`  | First name      | Combined into display name    |
-| `name.familyName` | Last name       | Combined into display name    |
-| `emails[primary]` | Email address   | Should match `userName`       |
-| `active`          | Account status  | `false` deactivates the user  |
+| SCIM attribute | LangWatch field | Notes |
+|----------------|-----------------|-------|
+| `externalId` | Identity provider id | The primary key. LangWatch matches a user on the connection and `externalId` first, then on the email |
+| `userName` | Email address | Must be an email. It is the account's address |
+| `name.givenName`, `name.familyName` | Name | Joined into the display name |
+| `emails` | | Accepted and ignored on write; the address comes from `userName`. Returned on read |
+| `active` | Account status | `false` deactivates the user |
+| `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User` `costCenter` | Department | Assigns the user to the department with that name, and creates it when it does not exist. An empty value removes the assignment |
 
 ---
 
-## User Lifecycle Behavior
+## User lifecycle
 
 ### Provisioning (Create)
 
-When your identity provider provisions a user:
+- A new address: LangWatch creates the account and adds it to your organization as a Member.
+- An existing account that is not in your organization: LangWatch adds it as a Member. A deactivated account is reactivated first.
+- An existing member: `409 Conflict`.
 
-- If the user **does not exist** in LangWatch, a new account is created and added to your organization
-- If the user **already exists** (same email) but is not in your organization, they are added as a **Member**
-- If the user **already exists** and is deactivated, their account is reactivated
+Set the roles after provisioning in [Access Control (RBAC)](/platform/rbac), or map roles to groups with [SCIM Groups](/platform/scim-groups).
 
-New users provisioned via SCIM are assigned the **Member** role by default. You can adjust roles manually in LangWatch after provisioning using [RBAC](/platform/rbac), or use [SCIM Groups](/platform/scim-groups) to automatically assign roles based on group membership.
+### Deprovisioning (Delete)
 
-### Deprovisioning (Delete/Deactivate)
+A `DELETE` on a user:
 
-When your identity provider sends a **DELETE** for a user:
+- Removes the organization membership and every role binding
+- Deactivates the account. Every session and CLI token is revoked at once
+- Keeps the user's data: traces, annotations and datasets
+- A second `DELETE` returns `404 Not Found`
 
-- Their org membership and all role bindings are **removed**
-- Their account is **deactivated**: they can no longer sign in
-- Their data (traces, annotations, datasets) is **preserved**
-- A second DELETE returns `404 Not Found`, the operation is idempotent
+### Suspending (`PATCH active: false`)
 
-When your identity provider **suspends** a user (`PATCH active: false`):
-
-- Their account is **deactivated**: they can no longer sign in
-- Their org membership and role bindings are **preserved**
-- Re-activating (`active: true`) immediately restores access
+- Deactivates the account. Every session and CLI token is revoked at once
+- Keeps the organization membership and the role bindings
+- `active: true` restores access
 
 <Info>
-  Use `active: false` for temporary suspension and DELETE for permanent offboarding. DELETE removes all memberships and role bindings, re-provisioning the user starts from scratch.
+  Use `active: false` for a temporary suspension and `DELETE` for permanent offboarding. After a `DELETE`, provisioning the user again starts with no bindings.
 </Info>
 
 ---
 
-## Managing Tokens
+## Manage tokens
 
-From **Settings → SCIM**, you can manage all bearer tokens:
+**Settings > SCIM Provisioning** lists the tokens of the organization:
 
-| Column      | Description                                                 |
-| ----------- | ----------------------------------------------------------- |
-| Description | Optional label you provided when creating the token         |
-| Created     | Date the token was generated                                |
-| Last Used   | Date the token was last used to authenticate a SCIM request |
+| Column | Description |
+|--------|-------------|
+| Description | The label given when the token was created |
+| Created | When the token was created |
+| Last Used | The last SCIM request authenticated with the token |
 
-To revoke a token, click the delete icon next to it and confirm. Any identity provider using that token will immediately lose access.
+To revoke a token, click the delete icon on its row and confirm. The identity provider using that token loses access at once. The [SCIM Tokens API](/api-reference/scim-tokens/overview) lists and revokes tokens too, and each token created or revoked through the API is written to the [Audit Log](/platform/audit-log). Provisioning requests themselves are not in the audit log.
 
 ---
 
-## Security Considerations
+## Security
 
-- **Rotate tokens regularly**: generate a new token and update your IdP before revoking the old one to avoid downtime
-- **One token per integration**: use separate tokens for each identity provider or environment so you can revoke them independently
-- **Combine with SSO**: SCIM works best when paired with SSO so that provisioned users sign in via your IdP rather than email/password
-- **Audit token usage**: the "Last Used" column helps identify unused or stale tokens
+- **Rotate tokens**: create the new token and update your identity provider before you revoke the old one
+- **One token per integration**: revoke one without affecting the others
+- **Combine with SSO**: provisioned users then sign in through your identity provider
+- **Watch Last Used**: a token with no recent use can be revoked
 
 ---
 
 ## Troubleshooting
 
-**Test connection fails in my identity provider**
+**The connection test fails in the identity provider**
 
-- Verify the SCIM Base URL ends with `/api/scim/v2` (no trailing slash)
-- Ensure the bearer token is pasted correctly without extra whitespace
-- Confirm the token has not been revoked in LangWatch
+- The base URL ends with `/api/scim/v2`, without a trailing slash
+- The token is pasted without extra whitespace
+- The token is not revoked in LangWatch and the plan is active
 
-**Users are not being provisioned**
+**Users are not provisioned**
 
-- Check that users or groups are assigned to the application in your IdP
-- Verify that **Create Users** is enabled in your IdP's provisioning settings
-- Review provisioning logs in your IdP for detailed error messages
+- The users or groups are assigned to the application in the identity provider
+- **Create Users** is enabled in the provisioning settings
+- The provisioning log of the identity provider shows the error LangWatch returned
 
-**Deactivated users can still sign in**
+**Generate Token on the settings page reports "Failed to generate token"**
 
-- SCIM deactivation prevents future sign-ins but active sessions may persist until they expire
-- For immediate access removal, also revoke the user's active sessions from your IdP
+- The button on **Settings > SCIM Provisioning** sends no SSO connection, and a token needs one. Create the token through the [SCIM Tokens API](/api-reference/scim-tokens/overview) with your `connectionId`, as in step 2. The page still lists and revokes tokens
 
-**User shows "already exists" error**
+**A user shows an "already exists" error**
 
-- A user with the same email may already be a member of the organization, this is expected behavior and can be safely ignored
+- The address is already a member of the organization. LangWatch returns `409 Conflict`, and the identity provider links the existing user on its next sync
 
 ---
 
-For additional help, contact us at [support@langwatch.ai](mailto:support@langwatch.ai).
+For help, contact [support@langwatch.ai](mailto:support@langwatch.ai).
+
+---
+
+# FILE: ./platform/secrets.mdx
+
+---
+title: "Secrets"
+description: "Encrypted, write-only credentials stored per project and referenced by name from workflow code blocks and HTTP agents."
+sidebarTitle: Secrets
+keywords: secrets, credentials, encryption, workflows, http agent, langwatch
+---
+
+## What a secret is
+
+A secret is a named value that LangWatch stores encrypted for one project and never shows again. You reference it by name from the places that need it, so the credential is not written into the workflow or the agent definition.
+
+Manage secrets at **Settings > Secrets**. Listing needs `secrets:view`; creating, updating and deleting need `secrets:manage`, which the Member and Admin team roles hold.
+
+## Rules
+
+| Rule | Value |
+|------|-------|
+| Name | Uppercase letters, digits and underscores, starting with a letter: `^[A-Z][A-Z0-9_]*$` |
+| Value | 1 to 10,000 characters |
+| Limit | 50 secrets per project |
+| Storage | AES-256-GCM, encrypted at rest |
+| Read back | Never. You can replace the value or delete the secret |
+
+Creating a secret with an existing name is refused. To change a value, open the row menu and pick **Update value**.
+
+## Where a secret is used
+
+**Workflow code blocks.** Every secret of the project is available in the Python code block as `secrets.NAME`. The code editor lists the names in its **Secrets** popover and inserts a reference on click.
+
+```python
+import requests
+
+response = requests.get(
+    "https://api.acme.example/v1/items",
+    headers={"Authorization": f"Bearer {secrets.ACME_API_KEY}"},
+)
+```
+
+**HTTP agents in Agent Testing.** Write `{{ secrets.NAME }}` in the URL, a header value or an auth field of an HTTP agent. LangWatch resolves it when it builds the request, leaves an unknown name as written, and scrubs the resolved value from errors and spans. The request body is never substituted.
+
+```text
+Authorization: Bearer {{ secrets.ACME_API_KEY }}
+```
+
+## API
+
+The [Secrets API](/api-reference/secrets/overview) lists, creates, updates and deletes secrets with a project API key. The list response never includes values.
 
 ---
 
@@ -2186,7 +2428,9 @@ Authorization: Bearer vk-lw-<ULID>
 Content-Type: multipart/form-data
 ```
 
-Form matches OpenAI's [image edit schema](https://developers.openai.com/api/reference/resources/images/methods/edit/): one or more `image[]` parts, a `prompt` part, and `model`. A single file may also be sent under `image`. Use one field name or the other: a form carrying files under both gets a `400`, because the parts state an order inside each field and none across them. The optional parts are `mask`, `n`, `size`, `quality`, `background`, `input_fidelity`, `output_format`, `output_compression`, `response_format` and `user`. A part this list does not name is dropped rather than sent to the provider; `stream` and `partial_images` are the exception, and get the same `400` the generation route gives them. `response_format` reaches the provider as sent, and the gpt-image models reject it on this route as well.
+Form matches OpenAI's [image edit schema](https://developers.openai.com/api/reference/resources/images/methods/edit/): one or more `image[]` parts, a `prompt` part, and `model`. A single file may also be sent under `image`. Use one field name or the other. A form that sends files under both answers `400`, because each field orders its own parts and there is no order between the two fields.
+
+The optional parts are `mask`, `n`, `size`, `quality`, `background`, `input_fidelity`, `output_format`, `output_compression`, `response_format` and `user`. A part this list does not name is dropped rather than sent to the provider; `stream` and `partial_images` are the exception, and get the same `400` the generation route gives them. `response_format` reaches the provider as sent, and the gpt-image models reject it on this route as well.
 
 ```bash
 curl https://gateway.langwatch.ai/v1/images/edits \
@@ -14964,87 +15208,6 @@ Use these files as the authoritative reference when implementing a CLI command o
 
 ---
 
-# FILE: ./ai-governance/audit-log.mdx
-
----
-title: Audit log
-description: Every governance and gateway mutation in one append-only log. Timestamp, actor, action, target kind + ID, project context, IP, and error, searchable by user, action, project, and date range. Lives at /settings/audit-log.
-sidebarTitle: Audit log
----
-
-The audit log is the immutable record of every state-changing action in your LangWatch organization, who did what to which resource, when, from where. It lives at `/settings/audit-log` and shows up in the **Settings → Teams & Access** sidebar group.
-
-<Info>**Pairs with:** [Compliance architecture](/ai-governance/compliance-architecture) (the OCSF v1.1 export consumes the same event stream), [CLI debug](/ai-governance/cli-debug) (`langwatch governance status` mirrors the same setup-state signals the audit log records on first activation), and [Ingestion sources](/ai-governance/ingestion-sources) (S3 audit log feeds from external SaaS platforms, Workato, Copilot Studio, Anthropic Compliance, land here as OTel-shaped events through the same pipeline, so a single audit log query covers in-platform mutations *and* third-party-tool activity in one place).</Info>
-
-<Note>**Permission required**: the audit log surface is gated to `organization:manage` (admins). Members on the org see an "Access Restricted" panel when they navigate here directly. The underlying tRPC procedure is also gated server-side, so direct API calls return UNAUTHORIZED for non-admins.</Note>
-
-## What lands in the log
-
-Two streams write into the same `AuditLog` table, the audit log lists them interleaved by timestamp.
-
-| Stream | Source | Examples |
-|---|---|---|
-| **Platform** (control plane) | tRPC mutations on the Next.js app | `organization.createInvites`, `gatewayBudgets.create`, `ingestionSources.rotate`, `team.update`, `roleBinding.assignToUser`, `virtualKeys.create` |
-| **Gateway** (data plane) | Domain events emitted by the Go AI Gateway | `gateway.budget.created`, `gateway.virtualKey.minted`, `gateway.routingPolicy.applied` |
-
-A single user action often produces both: creating a Gateway Budget through the admin UI writes a `gatewayBudgets.create` Platform row *and* a `gateway.budget.created` Gateway row, both stamped with the same `targetId` so you can correlate them in the same view.
-
-## Columns
-
-Each row shows:
-
-| Column | Source | Notes |
-|---|---|---|
-| **Timestamp** | wall-clock at the time of the mutation | rendered with relative-age helper (`3 minutes ago`) plus the full local timestamp |
-| **Source** | Either `Platform` or `Gateway` chip | discriminator across the two streams |
-| **User** | Display name + email of the caller | empty for system-emitted gateway events with no human actor |
-| **Action** | Dotted action path (`organization.createInvites`) | exactly the tRPC procedure name or the Gateway domain event name |
-| **Target** | Two-line cell, kind on top, ID below | e.g. `budget`, `_pE3XIGR7XOoUwH8G3mcB` |
-| **Project** | Project name when the action was project-scoped | empty for org-level mutations |
-| **IP address** | Caller IP when present | omitted for server-side, scheduled jobs |
-| **Error** | Exception class + message when the action failed | empty for successful mutations |
-
-The Target column is populated by a recursive walker that handles every shape a tRPC mutation might return: a direct `{id}`, a wrapped `{source: {id}}`, an array of created entities (`[{invite: {id}}, ...]` for bulk-create like `organization.createInvites`), or a wrapped array. Walking depth is capped to surface the entity ID without leaking nested unrelated IDs.
-
-## Filtering
-
-Four filters across the top of the table:
-
-- **Search by User**: name or email substring match.
-- **Filter by Action**: substring match against the action path. Type `createInvites` to pin every invite-creation row across the org's history. The URL updates to `/settings/audit-log?actionFilter=<value>&pageOffset=0` so any filtered view is bookmarkable.
-- **Project**: dropdown of every project in the org plus an "All Projects" option. When two projects share the same display name (e.g. two users' "Personal Workspace"), the dropdown automatically appends a parent-team suffix (`Personal Workspace · Alice's Workspace`, `Personal Workspace · Bob's Workspace`) so they're disambiguated visually.
-- **Select Date**: preset windows (`Last 30 days`, `Last 7 days`, custom range).
-
-The four filters compose with AND. Pagination is below the table; **Items per page** can be set to 10, 25, 50, 100, 250.
-
-## Export
-
-**Export CSV** at the top right downloads the currently filtered view as a CSV. The CSV preserves every column shown in the table (plus a few rarely-rendered ones, `requestId`, `domainErrorCode`) so it round-trips into spreadsheets, BI tools, or your SIEM if you'd rather not wire the [OCSF API](/ai-governance/compliance-architecture) just to dump a quick incident timeline.
-
-## Retention
-
-Audit log retention follows your organization's [retention policy](/platform/data-retention), scoped per organization, team, and project. Configuring it requires an Enterprise plan; other plans use the platform default window. Organizations under SOC 2, ISO 27001, or HIPAA obligations usually set a multi-year period here.
-
-Retention applies to the underlying ClickHouse partition; the Postgres `AuditLog` mirror table is kept for fast UI lookups against the most recent year. The full model is described in [Compliance architecture](/ai-governance/compliance-architecture).
-
-## Common admin questions
-
-| Question | Where to look |
-|---|---|
-| Who invited the new contractor account? | Filter `Action: organization.createInvites`, scan **Target** for the invite ID, click into **Members → Invites** for the email. |
-| When did the budget for project Foo get raised? | Filter `Action: gatewayBudgets.update` + Project = Foo. The diff between two rows is the change. |
-| Why did the gateway start blocking requests? | Filter `Source: Gateway` + `Action: gateway.budget.breached`. Each breach event carries the budget ID. |
-| Did anyone touch SSO config last weekend? | Filter `Action: organization.update` + date range. SSO provider field changes appear in the diff payload. |
-| Was the rotation of the `lw_is_*` ingest secret recorded? | Filter `Action: ingestionSources.rotate`. The Target ID is the IngestionSource ID. |
-
-## Where to next
-
-- **Forward to your SIEM**: every row is OCSF v1.1 mapped and replayable via the cron-pull API. See [Compliance architecture](/ai-governance/compliance-architecture).
-- **Detect patterns automatically**: [Anomaly Rules](/ai-governance/anomaly-rules) operate on the same event stream and fire `AnomalyAlert` rows when thresholds are crossed.
-- **Programmatic reads**: the underlying tRPC procedure is `organization.getAuditLogs` (admin-only). The CSV export uses the same procedure with no pagination.
-
----
-
 # FILE: ./ai-governance/cli-debug.mdx
 
 ---
@@ -15983,388 +16146,6 @@ Governance sits behind a single fence on each surface:
   tail`): [CLI ingest debug](/ai-governance/cli-debug).
 - For the architecture deep-dive once published:
   `architecture.md` (in flight on this branch).
-
----
-
-# FILE: ./ai-governance/data-privacy.mdx
-
----
-title: Data privacy policy
-description: One scoped, cascading policy that controls which trace content is stored, who can read it, and how PII and secrets are redacted, written once at the organization, department, team, or project level.
-sidebarTitle: Data Privacy
----
-
-Traces carry the most sensitive material in your stack: user prompts,
-model responses, system instructions, tool arguments, and whatever
-credentials or personal data leaked into any of them. The **data
-privacy policy** is the single place to decide what happens to that
-content. One set of rules covers four concerns:
-
-1. **Content disposition**: whether each content category is stored
-   at all.
-2. **Audience visibility**: who can read the content that is stored.
-3. **PII redaction**: scrubbing personal data out of stored content.
-4. **Secrets redaction**: scrubbing credentials out of stored
-   content.
-
-Rules live under **Settings > Privacy** in your organization
-settings. A rule is written once at the scope it should govern, and
-every project underneath resolves it automatically.
-
-<Info>**Pairs with:** [No-spy mode](/ai-governance/no-spy-mode), the
-organization-wide posture built from this policy for enterprises that
-must not store employee conversational content, and
-[Compliance architecture](/ai-governance/compliance-architecture) for
-how privacy fits the broader audit story.</Info>
-
-## Content categories
-
-Four categories of trace content are governed independently:
-
-| Category | What it covers |
-|---|---|
-| **Input** | User prompts and request bodies |
-| **Output** | Model responses and completions |
-| **System instructions** | System prompts and instruction blocks |
-| **Tool calls** | Tool-call arguments and tool results |
-
-Each category is set to one of three dispositions: **Capture**,
-**Restrict**, or **Drop**.
-
-## The three dispositions
-
-| Disposition | Stored? | Who can read it |
-|---|---|---|
-| **Capture** (default) | Yes | The whole team |
-| **Restrict** | Yes | Only the audience chosen on the rule |
-| **Drop** | Never | No one, the content is stripped at ingestion |
-
-### Restrict or drop?
-
-**Restrict** keeps the data. Debugging stays possible for the chosen
-audience, the audience can be widened or narrowed at any time, and
-because the check runs at read time, an audience change applies
-immediately to every trace, including traces stored before the rule
-existed.
-
-**Drop** is the hard guarantee. The content is stripped in the
-ingestion pipeline and never written, so no later permission change,
-export, or breach can surface it. The cost is that no one can debug
-with it, and it cannot be undone for data that already arrived
-dropped.
-
-Choose Restrict when the question is *who may read this*. Choose Drop
-when the requirement is *this must not exist in storage*.
-
-### Drop covers every ingestion path
-
-A drop rule applies wherever the trace comes from:
-
-- the OpenTelemetry endpoint
-- the REST collector
-- AI gateway traffic
-- ingestion keys
-- coding-agent logs (for example Claude Code request bodies)
-
-### Observability metadata always survives
-
-Whatever is dropped or restricted, the trace skeleton stays useful:
-token counts, cost, model name, latency and timings, span structure,
-and status are always stored and always visible. You can answer "what
-did this run cost?" and "where did it fail?" without anyone reading
-the conversation.
-
-### Retroactivity
-
-| Setting | Acts at | Applies to |
-|---|---|---|
-| Drop | Ingestion | New traces only |
-| PII redaction | Ingestion | New traces only |
-| Secrets redaction | Ingestion | New traces only |
-| Restrict audience | Read time | All traces, existing ones included, immediately |
-
-Adding a drop rule does not scrub traces that are already stored. To
-age out content that landed before the rule existed, pair the rule
-with your retention setup (see
-[Compliance architecture](/ai-governance/compliance-architecture)).
-
-## Scopes and the cascade
-
-A rule is written at one of four scopes:
-
-| Scope | Governs |
-|---|---|
-| **Organization** | Every project in the organization |
-| **Department** | Every project assigned to that department |
-| **Team** | Every project under that team |
-| **Project** | That project only |
-
-Organization and Department rules can be narrowed to **personal
-projects only**: every user's personal CLI workspace, where
-coding-agent traffic lands. A personal project's department follows
-its owner, so a department rule narrowed this way covers the personal
-workspaces of that department's people.
-
-When a project resolves its policy, the cascade walks **Project, then
-Department, then Team, then Organization**, and for each setting the
-most specific tier that sets it wins. A department rule beats a team
-rule. Settings a rule
-leaves unset inherit from the next tier up, so a project can drop its
-input while inheriting the organization's PII level. Two fields
-accumulate across tiers instead of overriding: **custom drop keys**
-and **custom secret patterns** are unioned, so every tier's additions
-apply.
-
-### Worked example
-
-Acme writes two rules:
-
-1. An **Organization** rule narrowed to personal projects only:
-   **Input is dropped**. Prompts from every employee's personal
-   coding-agent workspace are never stored.
-2. A **Department** rule on the HR department: **Output is
-   restricted** to the organization's `HR` group. HR's assistants
-   handle sensitive employee conversations, so only HR staff may read
-   them.
-
-How three projects resolve:
-
-| Project | Input | Output | Why |
-|---|---|---|---|
-| `billing-api`, a team project | Captured | Captured | The organization rule is narrowed to personal projects, so neither rule applies; platform defaults. |
-| `hr-helpdesk`, assigned to the HR department | Captured | Restricted to the `HR` group | The department rule sets output; no rule sets input. |
-| Dana's personal workspace (Dana is in HR) | Dropped | Restricted to the `HR` group | The organization rule drops personal-project input, and a personal project follows its owner's department, so HR's output rule applies too. |
-
-All three projects also resolve **Essential** PII redaction and
-secrets redaction **on**: no rule sets those fields, so the platform
-defaults apply. If `hr-helpdesk` later adds a Project rule setting
-output back to Capture, that wins, because Project is the most
-specific tier.
-
-## Audiences
-
-A restricted category is readable by the audience picked on the rule:
-
-- **Admins**, the built-in administrator audience
-- **All members**, everyone with access to the project
-- any of the organization's **groups**
-- any of the organization's **departments**
-
-An empty audience means **no one** can read the content, admins
-included.
-
-Viewers outside the audience see a `[REDACTED]` placeholder in place
-of the content, together with the reason: which privacy policy hid it
-and which audience can see it. Metadata (cost, tokens, latency,
-status) stays visible to everyone with project access.
-
-## Secrets redaction
-
-Secrets redaction is **on by default for every project**.
-Coding-agent traces are full of live credentials, so the safe default
-is to scrub them. It runs natively in the ingestion pipeline and
-replaces each detected secret with a redaction placeholder, leaving
-the surrounding text intact. How detection decides what is a
-credential is covered on
-[Secrets redaction](/coding-agents/secrets-redaction).
-
-The built-in catalog covers:
-
-- cloud and provider API keys: AWS, GitHub, OpenAI, Anthropic, Slack,
-  Google, Stripe
-- JWTs
-- private key blocks
-- database connection-string passwords
-- bearer tokens
-- values under obviously-sensitive attribute names (for example
-  `authorization`)
-
-### Custom patterns
-
-Add your own regular expressions for company-specific secrets, for
-example tokens shaped like `acme_live_...`. Patterns are validated
-when the rule is saved: a pattern that risks catastrophic
-backtracking is rejected. Custom patterns accumulate down the
-cascade, so a team's patterns apply on top of the organization's.
-
-### Turning it off
-
-A rule can disable secrets redaction for its scope.
-
-<Warning>With secrets redaction off, any credential pasted into a
-prompt or returned by a tool is stored in the clear. Turn it off only
-when you are certain no real credentials transit the projects in
-scope.</Warning>
-
-## PII redaction
-
-| Level | What it redacts | How it runs |
-|---|---|---|
-| **Disabled** | None | No scanning at all |
-| **Essential** (default) | Emails, phone numbers, credit cards, IP addresses, IBANs, national IDs | Natively in the ingestion pipeline, fast, no external call |
-| **Strict** | Everything in Essential, plus person names and locations | Uses the deeper analysis service |
-
-Like secrets, detected PII is replaced with a redaction placeholder.
-
-<Note>Credit card numbers are validated before redaction, so a random
-16-digit order id in your traces is left intact.</Note>
-
-## Custom drop keys
-
-A rule can list extra span attribute keys to strip at ingestion, on
-top of the built-in catalog, for example `http.request.body`. Like
-custom secret patterns, drop keys accumulate across tiers: keys added
-at the organization, department, team, and project levels all apply.
-
-## Defaults
-
-With no rule anywhere in the cascade, a project resolves to:
-
-| Setting | Default |
-|---|---|
-| Input | Captured, visible to the whole team |
-| Output | Captured, visible to the whole team |
-| System instructions | Captured, visible to the whole team |
-| Tool calls | Captured, visible to the whole team |
-| PII redaction | Essential |
-| Secrets redaction | On |
-| Custom drop keys | None |
-| Custom secret patterns | None |
-
-Privacy is default-on: secrets and essential PII are scrubbed before
-you write a single rule.
-
-## Permissions
-
-Rules are managed under **Settings > Privacy**. Writing a rule
-requires the permission matching its scope:
-
-| Rule scope | Required permission |
-|---|---|
-| Organization | Organization manage |
-| Department | Organization manage |
-| Team | Team manage |
-| Project | Project update |
-
-## Where to next
-
-- [No-spy mode](/ai-governance/no-spy-mode): the organization-wide
-  drop posture for employee coding assistants, built from this
-  policy.
-- [Compliance architecture](/ai-governance/compliance-architecture):
-  retention classes, OCSF export, and the audit substrate around the
-  trace store.
-- [Roles and permissions](/ai-governance/roles-and-permissions): how
-  the manage and update permissions are granted.
-
----
-
-# FILE: ./ai-governance/departments.mdx
-
----
-title: Departments
-description: A single-valued accounting dimension for attributing AI spend across people, teams, and projects, including personal AI use. Separate from RBAC; pure accounting.
-sidebarTitle: Departments
----
-
-A **department** is an accounting label for spend. You name departments (Engineering, Marketing, ...) once, assign people, teams, and projects to them, and spend rolls up by department across the whole org, including each person's personal AI use.
-
-Departments answer a question the team and per-user views cannot: *"are Marketing people spending more than Engineering people, including their personal AI use?"*. Teams are a many-to-many access construct (a person can be in several), so they are a poor single attribution key, and RBAC roles answer authorization, not accounting. A department is single-valued per person per org, so every dollar lands in exactly one bucket.
-
-<Info>**Pairs with:** [Governance dashboard](/ai-governance/governance-dashboard) for the **Spend by department** card, [Members & invites](/ai-governance/members-and-invites) and [Workspaces & access](/ai-governance/workspaces) for where you assign them, and [Roles & permissions](/ai-governance/roles-and-permissions) for why departments are *not* access control.</Info>
-
-<Note>**Departments are pure accounting.** They never grant or restrict access. Assigning someone to "Engineering" changes how their spend is attributed, nothing else.</Note>
-
-## How spend is attributed
-
-Every trace that hits the gateway resolves to exactly one department, picked by this precedence:
-
-1. **The principal user's department.** If the trace has a principal user and that user is assigned to a department, it wins.
-2. **The user's team department (inherited).** If the principal user has no own department, the department of their team is used.
-3. **The project's department.** A trace with no principal user (an autonomous agent) attributes to the department of the project it ran in.
-4. **Unassigned.** If none of the above resolve, the trace rolls up under **Unassigned**.
-
-The principal user's department always wins over the project's, and a trace is counted once. So a developer's personal AI use and the autonomous agents their team builds can land in the same department.
-
-## Where you assign departments
-
-An org can have tens of thousands of members, so assignment lives on the pages that already paginate the org chart, not as one flat list:
-
-| Surface | What you assign | Where |
-|---|---|---|
-| **People** | A member's department. Their spend, including personal AI use, rolls up to it. | [Members page](/ai-governance/members-and-invites), per row |
-| **Teams** | A team's department. The default its members and projects inherit when they have none of their own. | Teams page, per row |
-| **Projects** | A project's department. Agent spend with no human principal rolls up here. | Project settings |
-
-The **departments page** itself only creates, renames, and archives departments, and links out to those surfaces. It never renders a per-person assignment list, so it stays usable in a large org.
-
-<Frame caption="On the members page each person carries a Department column. The picker assigns that member's spend, including their personal AI use, to a department.">
-  ![Members department assignment](/images/ai-governance/departments/members-assignment.png)
-</Frame>
-
-<Frame caption="On the teams page each team row carries the same picker. A team's department is the default its members and projects inherit when they have none of their own.">
-  ![Teams department assignment](/images/ai-governance/departments/teams-assignment.png)
-</Frame>
-
-### Managing departments
-
-Open the departments page under **Governance → People** (`/governance/people`) to:
-
-- **Create** a department by name (Engineering, Marketing, ...).
-- **Edit** a department's name.
-- **Archive** a department you no longer use.
-
-It belongs to your organization; a member of another org never sees it.
-
-<Frame caption="The departments page lists each department with a kebab menu for Edit and Archive. The page only creates, renames, and archives; it never renders a per-person assignment list.">
-  ![Departments page](/images/ai-governance/departments/departments-page.png)
-</Frame>
-
-<Frame caption="Edit opens a drawer with a single Name field. Saving renames the department and the list updates in place.">
-  ![Edit department drawer](/images/ai-governance/departments/department-edit-drawer.png)
-</Frame>
-
-## SCIM auto-assignment
-
-For organizations that provision identities through SCIM, assignment is automatic. The SCIM 2.0 Enterprise User extension carries a standard `costCenter` attribute, so an IdP (Okta, Entra ID, ...) can drive department membership the same way it drives department or division. Manual per-row assignment is the fallback for orgs without SCIM.
-
-| IdP action | Result in LangWatch |
-|---|---|
-| Provisions a user whose `costCenter` is `Engineering` | The user's membership carries department "Engineering" |
-| Provisions a user whose `costCenter` is a name that does not exist yet | The department is **created on first use** and the user is assigned to it |
-| Updates a user's `costCenter` from `Engineering` to `Marketing` | The assignment is **replaced**, not added; the user carries "Marketing" |
-| Removes a user's `costCenter` attribute | The user is unassigned; their spend rolls up under **Unassigned** |
-
-## Archiving
-
-Archiving a department is non-destructive:
-
-- It no longer appears in the assignment picker on the members, teams, and project surfaces.
-- Spend previously attributed to it rolls up under **Unassigned** rather than disappearing.
-
-Assignments are never nulled on archive. The rollup maps a stored department back to a name through the active departments only, so an archived department's spend resolves as Unassigned without any backfill. Reusing an archived department's name for a new active one is allowed.
-
-## Spend by department on the dashboard
-
-The [governance dashboard](/ai-governance/governance-dashboard) renders a **Spend by department** card. Each department's total includes spend from personal projects, team projects, and agent projects attributed to it, aggregated across **every project in the org**.
-
-This is the cross-org view: the card is not limited to a single governance ingestion project, so a fully active org with no dedicated ingestion source still sees real numbers. The Marketing-versus-Engineering comparison reads from departments, not from RBAC roles or team-membership counts.
-
-Every underlying query is tenant-isolated: a department rollup for your org contains zero spend from any other org.
-
-## Permissions
-
-- Reading the department list requires `governance:view`, which is also what opens the page.
-- Creating, renaming, and archiving departments requires `governance:manage` (granted to ADMIN by default). Without it, the page shows the list and hides the write controls.
-- Assigning people, teams, and projects to a department happens on the respective surfaces under the same `governance:manage` permission.
-- Departments never appear in any access-control decision. They are an accounting dimension only.
-
-## Where to next
-
-- **See the rollup:** [Governance dashboard](/ai-governance/governance-dashboard).
-- **Assign people:** [Members & invites](/ai-governance/members-and-invites).
-- **Understand access vs accounting:** [Roles & permissions](/ai-governance/roles-and-permissions).
-- **Provision via SCIM:** [Workspaces & access](/ai-governance/workspaces).
 
 ---
 
@@ -18098,123 +17879,6 @@ If every step succeeds and step 5 returns the matching audit rows, an agent can 
 
 ---
 
-# FILE: ./ai-governance/members-and-invites.mdx
-
----
-title: Members & invites
-description: Add people to your organization, assign organization roles, scope team memberships, manage invite requests, and self-service per-user sign-in methods. Lives at /settings/members + /settings/authentication.
-sidebarTitle: Members & invites
----
-
-The members surface at `/settings/members` is the admin entry point for everything **about who is in your org**: existing members and their roles, pending invites, invite requests waiting for admin approval, and removal flows. Per-user account self-service (change password, sign-in method status, optional add-method when allowed) lives at `/settings/authentication`, the same URL used by the legacy non-governance LLMOps shell, so existing bookmarks and muscle memory keep working.
-
-<Info>**Pairs with:** [Roles & permissions](/ai-governance/roles-and-permissions) (the role catalog and what each org-level role can do) and [Audit log](/ai-governance/audit-log) (every invite, role change, and removal records a row).</Info>
-
-<Note>**Permissions**: `/settings/members` requires `organization:manage` (admins). Members navigating here directly see an "Access Restricted" panel. The underlying tRPC procedures (`organization.getAllOrganizationMembers`, `organization.createInvites`, `organization.deleteMember`, `organization.updateMemberRole`) are also gated server-side.</Note>
-
-## What admins see at `/settings/members`
-
-Three sections, top to bottom.
-
-### Organization Members
-
-A table of every active member. Columns:
-
-| Column | What it shows |
-|---|---|
-| **Name** | Display name + avatar |
-| **Email** | The address they sign in with |
-| **Access** | Per-team role chips, `ADMIN on Marketing`, `MEMBER on Engineering`, etc. Stacks vertically when a user is on multiple teams. |
-| (overflow menu) | Per-row actions: Change role, Remove from org, View access breakdown. |
-
-The table reflects every `OrganizationUser` row plus their `TeamUser` rows. Personal-workspace teams owned by other users are hidden from non-admin viewers (a privacy boundary documented in [Workspaces](/ai-governance/workspaces#personal-workspace-privacy)).
-
-### Invites
-
-Pending invitations the admin sent that haven't been accepted yet. Columns: Email, Status, Role, Teams, (revoke action).
-
-`Status` is one of:
-
-- `INVITED`, invite link sent, not yet accepted.
-- `WAITING_APPROVAL`, invite request created by a member (not an admin) via the [self-service request flow](#self-service-invite-requests-non-admin-flow); waiting for an admin to approve.
-- `EXPIRED`, invite token timed out (24h default).
-
-Click a row to copy the invite link or revoke it.
-
-### Invite Requests (when applicable)
-
-When a non-admin member proposes a new invite via `createInviteRequest`, the row lands in this section instead of **Invites**. Admins see who requested the invite, for whom, with what proposed role + team(s), and can **Approve** (issues the actual invite) or **Reject** (deletes the request).
-
-## Adding a single member
-
-The fast path:
-
-1. Click **+ Add members** at the top right of the table.
-2. In the upsert drawer, type one or more emails (comma-separated).
-3. Pick the **Organization role**: `Admin` or `Member`. See [Roles & permissions](/ai-governance/roles-and-permissions) for what each grants.
-4. Tick **Lite Member** for anyone who should only read what the team produces rather than change it. This is the same choice as the `External` org role, and it is what decides whether they occupy a full or a lite seat. The (i) next to it lists exactly what they can see; [Seats](/ai-governance/roles-and-permissions#seats) has the full breakdown.
-5. Under **Team Assignments**, pick which teams + which team-level role per team (`Admin`, `Member`, `Viewer` per team). One row per team; click **+ Add team** to scope to multiple teams.
-6. Click **Send invites**.
-
-What happens next:
-
-- Each email gets a one-click accept link (token TTL 24h, configurable per-org).
-- A row appears under **Invites** with status `INVITED`.
-- The audit log records `organization.createInvites` with the invite's ID as the target, see [Audit log](/ai-governance/audit-log) for how to read this back.
-
-When the invitee clicks the link they land on `/auth/signin`, sign in via your company SSO (or email + password if your deployment runs the open-core flow), and end up on `/me` with their assigned org role + team memberships pre-applied. From there, point them at the [developer walkthrough](/ai-governance/getting-started-developer).
-
-## Bulk invites
-
-The same drawer accepts comma-separated emails. Each email gets its own invite row + audit log entry. Bulk creates respect the org's [seat limit](/ai-governance/control-plane#seat-limits): once the limit hits, the bulk action returns `LimitExceededError` and emits a `usageLimits.notify` event.
-
-## Self-service invite requests (non-admin flow)
-
-Some orgs let members propose invites without granting them `organization:manage`. This is the `createInviteRequest` flow, different from the admin `createInvites`:
-
-- **Permission**: `organization:view` (which all members have by default).
-- **Role**: restricted to `MEMBER` or `EXTERNAL` only, never `ADMIN`. Self-service can't escalate privilege.
-- **Status**: lands as `WAITING_APPROVAL` until an admin approves it via `approveInvite`.
-
-If your org doesn't want this surface, omit the **Request invite** UI element, there's no separate gate to disable. The procedure is always reachable but produces a request, not an invite.
-
-## Changing a member's role
-
-From the **Organization Members** table, click the overflow menu next to a row → **Change role**. Pick a new org role, optionally adjust team-level roles. Click **Save**.
-
-The change is immediate. The audit log records `organization.updateMemberRole` and `team.updateMemberRole` (one row per affected team) so you can reconstruct the timeline of who held what role on what date.
-
-Caveats:
-
-- You can't demote yourself if you're the last admin, the form returns `LAST_ADMIN_PROTECTED`.
-- You can't elevate an `EXTERNAL` user past `MEMBER` without first removing the External lite-member flag.
-- Role changes don't break existing sessions; they take effect on the next request the user makes (the permission resolver is per-request, not session-cached beyond the JWT TTL).
-
-## Removing a member
-
-Overflow menu → **Remove from org**. The user loses every team membership, every role binding, and every Personal Virtual Key they minted (revoked on the gateway via the same RBAC chain). Their existing audit log rows stay, removal doesn't rewrite history.
-
-## Per-user sign-in methods at `/settings/authentication`
-
-What the user controls about their own account lives at `/settings/authentication`, the same URL used by both the governance/Personal-Workspace shell and the legacy non-governance LLMOps shell. The page renders one of three shapes depending on how your org is configured:
-
-- **Email + password**: single Change Password row. The default shape for self-hosted Apache 2.0 deployments + dev orgs without an SSO enforced.
-- **SSO enforced**: *"You sign in via your company's SSO provider"* status row, no add-method affordance. This is the shape for any org that enforces a single SSO provider.
-- **Auth0 + no enforced SSO (rare)**: linked OAuth providers list (Google, GitHub, Microsoft) with an optional Link-another button. Only relevant when the deployment is on Auth0 *and* the admin hasn't enforced one provider.
-
-The page is per-user. There's no admin gate, every member of the org can manage their own credentials here. Admins don't manage other users' sign-in methods from this page; user-account-management is by-design self-service.
-
-Org-level SSO configuration (IdP metadata, SAML cert, SCIM provisioning) is **separate** from this page, it lives at `/settings/scim` (admin-only) and the SSO-provider env config in your deployment's helm values, `.env`.
-
-## Where to next
-
-- **Self-service for me**: [/settings/authentication](#per-user-sign-in-methods-at-settingsauthentication) (this page) and [Devices](/ai-governance/personal-portal/sessions).
-- **Org SSO + SCIM auto-provisioning**: `/settings/scim` (admin-only).
-- **Role catalog**: [Roles & permissions](/ai-governance/roles-and-permissions).
-- **Audit who did what when**: [Audit log](/ai-governance/audit-log).
-
----
-
 # FILE: ./ai-governance/no-spy-mode.mdx
 
 ---
@@ -18381,107 +18045,164 @@ Turning on the Enterprise feature surface takes a real signed license key. There
 # FILE: ./ai-governance/overview.mdx
 
 ---
-title: AI Governance Overview
-description: A personal tool home for developers and a governance home for admins.
+title: AI Governance
+description: An inventory of every AI tool and source in the company, the people who use them, anomaly rules on their activity, and a personal home page for each developer.
 sidebarTitle: Overview
+keywords: ai governance, ai inventory, ingestion sources, tool catalog, anomaly rules, departments, langwatch
 ---
 
-LangWatch gives every developer a personal home for Claude Code, Codex, Cursor, Gemini, opencode, and every other AI tool the company approves. Admins get a governance home for spend, sources, routing, anomalies, and audit trails.
+AI Governance is the part of LangWatch where you administer the AI tools your company uses. It is for the platform or IT team that approves those tools and watches their use, and it gives every developer one page with the tools they may use and their own usage.
 
-## How it feels day to day
+The section is in the sidebar under **AI Governance**, with four pages: **Overview**, **Inventory**, **Anomaly Rules** and **People**. Opening them needs the `governance:view` permission, which an organization Admin holds. Each developer also has a personal home page at `/me`.
 
-### For a developer
+## The overview page
 
-`langwatch login` opens a device-flow approval in the browser, comes back to the CLI ready to wrap any supported tool.
+The overview at `/governance` shows the last 30 days: spend over time, the spend share across teams, the top teams and users by spend, spend by department, the recent anomalies and the status of each ingestion source. The panels roll up the events of your ingestion sources. LangWatch AI Gateway traffic is under **Gateway > Usage**.
 
-<Frame caption="`langwatch login` opens a device-flow approval in the browser. SSO already linked through the org's identity provider, pre-filled user code, single Approve button.">
-  ![Device flow approval](/images/ai-governance/cli-flow/02-device-flow-approval.png)
+Until the first ingestion source reports an event, the page shows a setup checklist instead: add tools to the catalog, define a routing policy, connect an ingestion source and define anomaly rules.
+
+<Frame caption="The overview before the first ingestion source reports an event: the setup checklist with all four steps complete.">
+  ![The AI Governance overview with the setup checklist](/images/ai-governance/governance-overview.png)
 </Frame>
 
-<Frame caption="Back in the terminal: 'Logged in as you@org.com'. The session is persisted to ~/.langwatch/config.json. From this point every wrapper call is attributed to the user.">
-  ![CLI login success](/images/ai-governance/cli-flow/03-cli-login-success.png)
+## Inventory
+
+The inventory has two tabs. **Sources** lists the systems that report AI activity, in two groups: real-time streams that push events as they happen, and sources synced on a schedule. A new source reads **Awaiting first event** until its first event arrives, then **Active**.
+
+<Frame caption="The Sources tab with two real-time sources, a Claude Code source and a generic OpenTelemetry source, both awaiting their first event.">
+  ![The Sources tab of the inventory](/images/ai-governance/governance-inventory-sources.png)
 </Frame>
 
-<Frame caption="`langwatch claude` (or codex, cursor, gemini, opencode) just works. The wrapper pre-injects gateway env vars, the underlying tool is unchanged, every request is gateway-routed and cost-attributed.">
-  ![CLI wrapped tool](/images/ai-governance/cli-flow/04-cli-wrapped-tool.png)
+**Catalog** holds the tool tiles that developers see on their personal home page, in three groups: coding assistants, model providers and internal tools. Each tile carries its scope.
+
+<Frame caption="The Catalog tab after the starter pack import: four coding assistants and four model providers, each scoped to the organization.">
+  ![The Catalog tab of the inventory](/images/ai-governance/governance-inventory-catalog.png)
 </Frame>
 
-The Personal AI Tools Portal at `/me` is the dashboard for everything they have access to.
+## Anomaly Rules
 
-<Frame caption="The Personal AI Tools Portal at /me. Tiles for Claude Code, Codex, Cursor, Gemini, opencode wrappers, per-provider Virtual Key issuance, admin-curated internal tools. Click a tile, follow the install drawer, copy one command.">
-  ![Personal portal populated](/images/ai-governance/post-bypass/01-me-portal.png)
+Rules are grouped by severity: Critical, Warning and Info. Each rule has a type, a description and a scope.
+
+<Frame caption="One Warning rule of type spend_spike, scoped to the organization.">
+  ![The Anomaly Rules page with one rule](/images/ai-governance/governance-anomaly-rule.png)
 </Frame>
 
-Below the tools, the live usage panel shows this month's spend against the personal budget, request count, the daily-bucket cost chart, and the model breakdown.
+## Personal home page
 
-<Frame caption="The /me usage panel below the tile fold. SPENT-of-budget gauge, request count, MOST-USED model with share, Spending-over-time daily bar chart, By-tool breakdown.">
-  ![My usage populated](/images/ai-governance/post-bypass/37-me-usage-scrolled.png)
+`/me` shows each developer the tools published in the catalog, the budgets that apply to them, and their usage this month.
+
+<Frame caption="The personal home page: the tool tiles, the personal and organization budgets, and the Spent, Requests and Most-used model cards.">
+  ![The personal home page](/images/ai-governance/me-home.png)
 </Frame>
 
-Every span the wrapper produces lands in the developer's own Trace Explorer, with cost, tokens, duration, and model attributed to them.
+## Pages
 
-<Frame caption="Trace Explorer at /[personal-project]/traces. Real populated traces with tokens, cost, duration columns. The same explorer admins use, scoped to the developer's own workspace.">
-  ![Trace explorer populated](/images/ai-governance/post-bypass/12-traces-populated.png)
+<CardGroup cols={2}>
+  <Card title="Inventory: sources" icon="plug" href="/ai-governance/ingestion-sources/index">
+    The systems that report AI activity to LangWatch: Claude Code, generic OpenTelemetry, Workato, Microsoft Copilot Studio, the OpenAI and Anthropic compliance and admin APIs, Databricks Genie, and custom S3 or HTTP audit logs. Each source shows whether it is active, awaiting its first event or disabled.
+  </Card>
+  <Card title="Inventory: tool catalog" icon="grid-2" href="/ai-governance/personal-portal/admin-catalog">
+    The coding assistants, model providers and internal tools that developers see on their personal home page. Import the starter pack, then scope each tile to the whole organization or to departments.
+  </Card>
+  <Card title="Anomaly Rules" icon="triangle-exclamation" href="/ai-governance/anomaly-rules">
+    Rules with a severity (Critical, Warning or Info) and a scope (the organization, one source type or one source) that raise an alert when activity crosses a threshold. Available on Enterprise plans.
+  </Card>
+  <Card title="People" icon="users" href="/ai-governance/people">
+    Departments: the accounting label that spend rolls up by. Assign people, teams and projects to a department, and personal AI use follows the person.
+  </Card>
+  <Card title="Personal home page" icon="house-user" href="/ai-governance/personal-portal/overview">
+    `/me` shows each developer the tools they may use, the budgets that apply to them, and their spend, requests and most-used model this month.
+  </Card>
+  <Card title="Roles and permissions" icon="user-shield" href="/platform/rbac">
+    Who can open the governance pages and who can change them: `governance:view` and `governance:manage`, plus the permissions for ingestion sources, anomaly rules and the tool catalog.
+  </Card>
+  <Card title="Audit log" icon="scroll" href="/platform/audit-log">
+    Every change made in the settings, the API and the LangWatch AI Gateway, with who made it and from where.
+  </Card>
+</CardGroup>
+
+**Also check:** [Coding Agents](/coding-agents/overview) for the cost and activity of each coding agent session, and [LangWatch AI Gateway](/ai-gateway/overview) for virtual keys and budgets.
+
+---
+
+# FILE: ./ai-governance/people.mdx
+
+---
+title: People
+description: Departments group the people, teams and projects of your organization for spend accounting, so every request rolls up to exactly one department, including personal AI use.
+sidebarTitle: People
+keywords: departments, people, spend attribution, cost center, scim, langwatch
+---
+
+A department is an accounting label for AI spend. You create departments on the **People** page, assign people, teams and projects to them on the members and teams pages, and the governance overview shows spend by department for the whole organization.
+
+A department never grants or restricts access. Assigning a person to Engineering changes only where their spend is counted. For access, see [Access Control (RBAC)](/platform/rbac).
+
+## Manage departments
+
+Open **AI Governance > People** (`/governance/people`). The page has:
+
+- **Create a department**: type a name and click **Create**.
+- The department list, with **Edit** to rename and **Archive** in the row menu.
+- **Assigning departments**: links to the members and teams pages, where you assign each person, team and project.
+
+<Frame caption="The People page with two departments and the assignment guide below the list.">
+  ![The People page](/images/ai-governance/governance-people.png)
 </Frame>
 
-> Subscription-based tools that authenticate client-side (a personal Anthropic 20x plan, an OpenAI Enterprise plan, a Cursor with a custom endpoint) skip the Virtual Key proxy path entirely. The direct-OTLP route is documented in [Ingestion templates](/ai-governance/ingestion-templates).
+Reading the list needs `governance:view`. Creating, renaming, archiving and assigning need `governance:manage`. Without it the page shows the list only.
 
-### For an admin
+## Assign people, teams and projects
 
-The bird-eye view at `/governance` is the daily home for admin oversight: org-wide spend, top spenders, open anomaly count, ingestion-source health, recent activity. Below it, `/governance/*` is the authoring surface where routing policies, ingestion sources, anomaly rules, the AI Tools Portal catalog, and the audit log all live.
+The People page does not list assignments per person, so it stays usable in a large organization. Assign on the pages that already list the people and teams:
 
-<Frame caption="The /governance dashboard. KPI summary (org-wide spend, active users, open anomalies), 30-day spend-over-time chart bucketed per team, spend-share-across-teams bar, ingestion-source health, recent activity. Read-mostly oversight, the place admins check before standup.">
-  ![Governance bird-eye](/images/ai-governance/post-bypass/06-governance-birdeye.png)
+| What | Where | Effect |
+|------|-------|--------|
+| A person | **Settings > Members**, the **Department** column | The person's spend, including their personal AI use, rolls up to this department |
+| A team | **Settings > Teams & Projects**, the picker on the team row | The default for the team's members and projects that have no department of their own |
+| A project | **Settings > Teams & Projects**, the picker on the project row | Spend of agents that run in the project with no person behind the request |
+
+The Department column and the pickers appear once the organization has at least one department, for a viewer with `organization:manage`.
+
+<Frame caption="The Department column on Settings > Members, with each person assigned to Engineering or Marketing.">
+  ![The Department column on Settings > Members](/images/ai-governance/governance-people-member-assignment.png)
 </Frame>
 
-The Tool Catalog at `/governance/inventory?tab=catalog` stocks the developer-facing `/me` portal. Pick a fixed roster of coding assistants and model providers, scope to the org or to specific teams, publish.
-
-<Frame caption="Tool Catalog editor. Three tile classes, preset picker, custom icon upload, scope binding, publish lifecycle.">
-  ![Tool catalog editor](/images/ai-governance/post-bypass/07-tool-catalog.png)
+<Frame caption="The Department picker on each team row and on the project row under the expanded team at Settings > Teams & Projects.">
+  ![The department pickers on Settings > Teams & Projects](/images/ai-governance/governance-people-team-assignment.png)
 </Frame>
 
-Every governance mutation lands in the audit log, with filterable URL state and CSV export.
+## How spend is attributed
 
-<Frame caption="The audit log table shows real entries, target, user, project, and outcome.">
-  ![Audit log](/images/ai-governance/post-bypass/08-audit-log.png)
-</Frame>
+Each request counts once, in exactly one department.
 
-## What it covers
+For a request made by a person, LangWatch uses the first of these that is set: the person's own department, the department of their team, the department of the project the request ran in. For a request with no person behind it, for example an autonomous agent, LangWatch uses the department of the project. A project's department is its own, or the one inherited from its team.
 
-- **Coding assistants**: Claude Code, Codex, Cursor, Gemini CLI, opencode. The wrapper CLI signs the user in, mints a Personal Virtual Key, and routes every request through the gateway.
-- **Provider Virtual Keys**: per-user keys for Anthropic, OpenAI, Bedrock, Gemini. Drop them into your app config, same gateway, same budget, no provider secret in dotfiles.
-- **Direct OTLP ingestion**: see [Ingestion templates](/ai-governance/ingestion-templates).
-- **External AI platforms**: Workato, Microsoft Copilot Studio, OpenAI Enterprise Compliance, Anthropic Compliance API, generic S3 audit-log drops. They land in the same trace store as everything else.
-- **Anomaly detection**: admin-defined rules for spend spikes, geo mismatch, and off-hours activity, all folded from the same event stream.
-- **Compliance and SIEM export**: every event is OCSF v1.1 mapped, replayable to Splunk, Datadog Security, Sentinel, and Elastic Security via cron pull.
+A request that matches none of these is counted under **Unassigned**.
 
-## Two personas
+The person always wins over the project, so a developer's personal AI use and the agents their team runs can land in the same department. The **Spend by department** card on the [overview](/ai-governance/overview) shows the result for the last 30 days, across every project in the organization.
 
-LangWatch governance is shaped around two people who never need the same screen:
+## Archive a department
 
-- **End user**: a developer or analyst who needs a Personal Virtual Key, wants to see their own usage and budget at `/me`, and sometimes switches between Personal, Team, and Project workspaces. They never see the admin surface.
-- **Admin**: an org-level operator who configures ingestion sources, publishes routing policies, defines anomaly rules, and signs off on OCSF and SIEM export. They never see the end-user `/me` chrome.
+Archive removes the department from the pickers. Spend already attributed to it is counted under **Unassigned** from then on. The assignments stay stored; archive deletes no data. You can create a new department with the same name as an archived one.
 
-The persona-aware chrome (single-chip header on `/me`, full sidebar on `/governance/*`) keeps both surfaces clean, so neither has to navigate around the other.
+## Assign departments through SCIM
 
-## Get started
+When your identity provider provisions users through SCIM, LangWatch reads the `costCenter` attribute of the SCIM Enterprise User extension:
 
-- **Developer**: [First 5 minutes](/ai-governance/getting-started-developer). Install the CLI, sign in via SSO, run your first request, read your spend back.
-- **Admin**: [First 30 minutes](/ai-governance/getting-started-admin). Publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, write your first spend-spike anomaly rule.
-- **Drive governance from an agent**: every governance feature has a [REST API](/ai-governance/api), [CLI](/ai-governance/cli), and [MCP server](/ai-governance/mcp). Customers can fully set up governance via Claude Code or any MCP-capable agent.
+| The identity provider sends | LangWatch |
+|-----------------------------|-----------|
+| A `costCenter` that matches an active department | Assigns the user to it |
+| A `costCenter` that matches no active department | Creates the department and assigns the user |
+| A new `costCenter` value on an update | Replaces the assignment |
+| An empty `costCenter`, or removes the attribute | Clears the assignment; the user's spend counts under Unassigned |
+| No `costCenter` in the request | Leaves the assignment as it is |
 
-## Reference
+## Where else a department applies
 
-- [Personas](/ai-governance/personas): who sees what
-- [Workspaces, members, roles](/ai-governance/workspaces): Personal, Team, Project scopes
-- [`/governance` dashboard](/ai-governance/governance-dashboard): daily admin home
-- [Ingestion templates](/ai-governance/ingestion-templates): admin-curated catalog for direct-OTLP ingestion
-- [Ingestion sources](/ai-governance/ingestion-sources/index): Workato, Copilot Studio, Compliance APIs, S3
-- [Anomaly rules](/ai-governance/anomaly-rules)
-- [Audit log](/ai-governance/audit-log)
-- [Compliance architecture](/ai-governance/compliance-architecture): OCSF, retention, SIEM
-- [No-spy mode](/ai-governance/no-spy-mode): content-stripping for privacy-locked enterprises
-- [Open-core licensing](/ai-governance/open-core-licensing): what's Apache 2.0 vs Enterprise
+A [data privacy](/platform/data-privacy) rule can be written at department scope, and a tile in the [tool catalog](/ai-governance/personal-portal/admin-catalog) can be scoped to departments.
+
+**Also check:** [SCIM](/platform/scim) for provisioning setup, and [Members and Teams](/platform/members-and-teams) for the pages where you assign departments.
 
 ---
 
@@ -19353,167 +19074,6 @@ The same one-click pattern applies for `openai_compliance` and
   for live inspection of pulled events
 - [Compliance architecture](/ai-governance/compliance-architecture):
   how pulled events flow through the unified observability substrate
-
----
-
-# FILE: ./ai-governance/roles-and-permissions.mdx
-
----
-title: Roles & permissions
-description: The org-role, team-role, permission catalog and how role bindings stitch them together. Pre-built ADMIN, MEMBER, EXTERNAL, VIEWER roles plus custom roles via the CustomRolePermissions JSON column. Lives at /settings/roles + /settings/role-bindings.
-sidebarTitle: Roles & permissions
----
-
-LangWatch RBAC has two layers, two surfaces, and one stitching mechanism:
-
-- **Two layers**: *organization roles* (org-wide capabilities, e.g. `ADMIN`, `MEMBER`, `EXTERNAL`) and *team roles* (per-team capabilities, e.g. `ADMIN`, `MEMBER`, `VIEWER`).
-- **Two surfaces**: `/settings/roles` (the role catalog: pre-built + custom) and `/settings/role-bindings` (who is bound to what role at what scope).
-- **One stitching mechanism**: a `RoleBinding` row glues a *user* to a *role* at a *scope* (organization, team, project, or governance subscope).
-
-The pre-built roles cover the common cases. You only land here when you need to delegate `aiTools:manage` without granting full `organization:manage`, or when an audit asks "who can read the audit log" and you want a screen instead of a Slack thread.
-
-<Info>**Pairs with:** [Members & invites](/ai-governance/members-and-invites) (assigning roles when inviting), [Audit log](/ai-governance/audit-log) (every role binding mutation records a row), and [AI Gateway → RBAC](/ai-gateway/rbac) (the gateway-side enforcement of permissions).</Info>
-
-## Organization roles
-
-The three pre-built org roles. Each user in the org has exactly one.
-
-| Org role | Defaults | What it grants by default |
-|---|---|---|
-| **ADMIN** | First user to sign in becomes admin | `organization:view`, `organization:manage`, `organization:delete`; the full governance surface (`governance:view`, `governance:manage`, `ingestionSources:*`, `anomalyRules:*`, `complianceExport:view`, `activityMonitor:view`); `aiTools:view` + `aiTools:manage`. |
-| **MEMBER** | Default for invitees | `organization:view`, `aiTools:view`. **No** governance permissions, **no** member-list reads, **no** audit log access by default. The team-role (below) is what gives them anything beyond `/me`. |
-| **EXTERNAL** | Lite-member shape, opt-in via the invite drawer | Same as MEMBER. EXTERNAL also has stricter team-level defaults: even when on a team they default to view-only, apart from annotations (see [Seats](#seats)). |
-
-The minimum-privilege default is intentional: an `ORGANIZATION` role binding for a MEMBER does **not** grant team-level access. Team-level permissions come from team-role bindings (next).
-
-## Seats
-
-Paid plans meter seats, and there are two kinds. Which one a person occupies follows from what they can do, not from a separate billing switch:
-
-- A **full seat** is someone who can change things.
-- A **lite seat** is someone who can only look at what the team produces.
-
-ADMIN and MEMBER are always full seats. EXTERNAL is a lite seat on its built-in permissions.
-
-Assign a **custom role** to an EXTERNAL member and that role decides the seat instead: if it grants anything beyond viewing, they can change things and count as a full seat from then on. The rule reads the custom role, not the built-in defaults, which is why annotations below stay part of a lite seat while a custom role granting only `annotations:create` would make the same person a full one. If you want a reviewer who annotates, leave them on the built-in lite role rather than building a custom role for it.
-
-### What a lite member can do
-
-They can open the projects they are invited to and read what the team produces there:
-
-| They can see | They cannot |
-|---|---|
-| Traces, including the detail view | See costs |
-| Analytics | Create, edit or delete projects, datasets, prompts, evaluations, workflows or experiments |
-| Evaluations and their results | Invite anyone or change roles |
-| Scenario runs | Manage the gateway, virtual keys or budgets |
-| Datasets, prompts, workflows and experiments | Reach any project they were not invited to |
-| Their own team | |
-| The names of the project's secrets, never their values | |
-
-Annotations are the exception: on the built-in lite role a member can leave and edit them, so reviewers can mark up what they read without needing a full seat.
-
-These are permissions, not screens, so they hold wherever the data is reached. A lite member using the [MCP server](/integration/mcp) with their own account, or the API with their own credentials, sees exactly what they see in the app.
-
-<Note>
-Trace **viewing** is included in a lite seat. If you want someone who cannot open a trace at all, build a custom role that withholds `traces:view` and bind it to them.
-</Note>
-
-### Choosing between them
-
-The question to ask about a person is whether they need to change anything. Someone who reviews output, watches dashboards and comments on what they find is a lite seat. Someone who builds prompts, runs experiments, edits datasets, or configures the gateway is a full seat.
-
-## Team roles
-
-The four pre-built team roles. A user can have **different** team roles on different teams (`ADMIN` on Engineering, `VIEWER` on Marketing).
-
-| Team role | What it grants by default |
-|---|---|
-| **ADMIN** | The full team-scoped permission set: `project:create/update`, `analytics:manage`, `traces:create`, `virtualKeys:create/update/rotate/manage`, `gatewayBudgets:view/manage`, `gatewayProviders:view/update/manage`, `routingPolicies:view/manage`, `gatewayGuardrails:view/attach/detach/manage`, `gatewayLogs:view`, `auditLog:view`, `gatewayUsage:view`, `gatewayCacheRules:*`. |
-| **MEMBER** | The team-scoped working set: `project:view/create/update`, `analytics:manage`, `traces:create/update/share`, and `*:manage` on annotations, evaluations, workflows, experiments, datasets, triggers, prompts, scenarios and secrets. On the gateway it runs its own keys (`virtualKeys:view/create/update/rotate`) and reads the rest (`gatewayBudgets:view`, `gatewayProviders:view`, `routingPolicies:view`, `gatewayGuardrails:view`, `gatewayLogs:view`, `auditLog:view`, `gatewayUsage:view`, `gatewayCacheRules:view`), so it can't delete or reconfigure providers and policies. |
-| **VIEWER** | View-only across the team. No create, update, delete on anything. The right shape for stakeholders who need read access to a team's traces but should never reconfigure anything. |
-| **CUSTOM** | Empty by default. Permissions come from the `CustomRolePermissions` JSON column on the `RoleBinding` row, see [Custom roles](#custom-roles) below. |
-
-A user's effective permissions on a resource are the **union** of every binding that applies, org-level baseline + team-level baseline + any custom-role overrides.
-
-## Permission catalog
-
-Every gate in the codebase is a string of the shape `<resource>:<verb>`. The full catalog (abridged):
-
-- **Organization**: `organization:view`, `organization:manage`, `organization:delete`.
-- **Governance**: `governance:view`, `governance:manage`, `ingestionSources:*`, `anomalyRules:*`, `complianceExport:view`, `activityMonitor:view`.
-- **AI Tools Portal**: `aiTools:view` (everyone), `aiTools:manage` (admin).
-- **Audit log**: `auditLog:view` (team-level by default; **note** the audit log UI page is gated to `organization:manage`, the underlying procedure is on `auditLog:view`).
-- **Per-team resources**: `project:*`, `analytics:*`, `traces:*`, `virtualKeys:*`, `gatewayBudgets:*`, `gatewayProviders:*`, `routingPolicies:*`, `gatewayGuardrails:*`, `gatewayLogs:*`, `gatewayUsage:*`, `gatewayCacheRules:*`, `evaluations:*`, `datasets:*`, `workflows:*`, `prompts:*`, `scenarios:*`, `secrets:*`.
-
-## What `organization:manage` gates today
-
-The legacy `/settings/{audit-log, teams, members, roles, groups}` pages all require `organization:manage` (admins only). Underlying tRPC procedures match, `role.getAll`, `organization.getAllOrganizationMembers`, `organization.getOrganizationPendingInvites`, `team.getTeamsWithRoleBindings`, `organization.getMemberById`, `group.getById`, `group.listForMember`, `group.listAll`, `limits.checkAndSendUsageLimitNotification` are all gated to `organization:manage` server-side.
-
-Picker procedures (`team.getTeamsWithMembers`, `team.getTeamWithMembers`, `organization.getOrganizationWithMembersAndTheirTeams`) intentionally stay on `organization:view` so non-admin pickers (the AddAutomationDrawer, GroupBindingInputRow, project pickers, onboarding flows) continue working, but they redact other members' email addresses to `null` for non-admin callers and strip other users' [Personal Workspaces](/ai-governance/workspaces#personal-workspace-privacy) from the result entirely.
-
-## The role catalog at `/settings/roles`
-
-The catalog page lists every role available in the org:
-
-- 4 pre-built org roles (ADMIN, MEMBER, EXTERNAL, VIEWER).
-- 4 pre-built team roles (ADMIN, MEMBER, VIEWER, CUSTOM).
-- Any custom roles your admin has authored (see below).
-
-Pre-built rows are **read-only**: you can't change what `MEMBER` does, because the gateway and the control plane both encode those defaults. Custom rows are editable.
-
-## Custom roles
-
-Custom roles are how you say "let `bob@acme.test` manage the AI Tools Portal but not the rest of the org." They're a `RoleBinding` row whose `role = "CUSTOM"` and whose `customRoleId` references a `CustomRole` row whose `permissions` JSON column lists exactly the gates that role grants.
-
-To create one:
-
-1. Open `/settings/roles` → **+ New custom role**.
-2. Name the role (e.g. `aitools-curator`).
-3. Tick the permissions to grant. Permissions are scope-aware, granting `aiTools:manage` at organization scope is different from granting it at team scope.
-4. Save.
-
-To **bind** the role to a user:
-
-1. Open `/settings/role-bindings` → **+ New binding**.
-2. Pick the user, pick the role (`aitools-curator` from the catalog), pick the scope (`Organization`, a specific team, a specific project, a governance subscope).
-3. Save.
-
-The binding is now active. The user's effective permissions are the union of:
-
-- Their org-role defaults (e.g. MEMBER → `organization:view` + `aiTools:view`).
-- Their team-role defaults for every team they're on.
-- The new custom binding (`aiTools:manage` at org scope).
-
-## Role bindings at `/settings/role-bindings`
-
-The bindings page is a **deep table**: every active `RoleBinding` row in the org. Filter by user, role, scope, or scope target. The most common admin questions:
-
-| Question | Filter |
-|---|---|
-| Who can manage the AI Tools Portal? | Role = `aiTools-curator` (or any custom role granting `aiTools:manage`). |
-| Who has admin on the Marketing team? | Role = `ADMIN`, Scope = `Team`, Scope target = Marketing. |
-| What does `bob@acme.test` actually have access to? | User = bob. Cross-reference with the [permission catalog](#permission-catalog) for what each role grants. |
-| Has anyone been bound at `Organization` scope to `MEMBER`? | Role = `MEMBER`, Scope = `Organization`. (Note: org-scoped MEMBER bindings do NOT imply team- or project-level access, the resolver is hierarchical.) |
-
-The page is the answer to "who can do what in this org." Every change records an audit log row.
-
-## How permissions resolve at request time
-
-A request hitting any `*:manage`-gated procedure flows through `checkOrganizationPermission` (or `checkTeamPermission` for team-scoped procs), which:
-
-1. Walks the user's role bindings.
-2. Builds the effective permission set as the union of: org-role defaults + every team-role default the user has + every custom-role permission via active bindings.
-3. Returns `true` if the requested permission is in the set.
-
-The resolver is **per-request**. Permission changes take effect on the next request from the user, there's no session-level cache. JWT TTL (1h) is the upper bound on how long a stale grant can leak via existing tokens.
-
-## Where to next
-
-- **Invite someone with a specific role**: [Members & invites](/ai-governance/members-and-invites).
-- **Audit who did what**: [Audit log](/ai-governance/audit-log).
-- **Gateway-side enforcement**: [AI Gateway → RBAC](/ai-gateway/rbac).
-- **Workspace scoping**: [Workspaces](/ai-governance/workspaces) (where org, team, project sit relative to each other).
 
 ---
 
