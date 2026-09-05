@@ -4,6 +4,8 @@
  * @see specs/agents/agents-rest-api.feature
  */
 import { beforeEach, describe, expect, it } from "vitest";
+
+import { AGENTS_ALIAS_SUCCESSOR } from "../agent-legacy.api";
 import { buildAgentApps } from "./agent-rest.test-harness";
 
 describe("given a project with a valid API key", () => {
@@ -275,6 +277,30 @@ describe("given the deprecated /api/agents alias", () => {
 
       const afterArchive = await api.v1(`/api/v1/agents/${created.id}`);
       expect(afterArchive.status).toBe(404);
+    });
+  });
+
+  describe("when any of its endpoints answers", () => {
+    /** @scenario "Every alias response carries the deprecation headers" */
+    it("names the successor on the response", async () => {
+      const response = await api.legacy("/api/agents");
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Deprecation")).toBe("true");
+      expect(response.headers.get("Link")).toBe(
+        `<${AGENTS_ALIAS_SUCCESSOR}>; rel="successor-version"`,
+      );
+    });
+
+    /** @scenario "A refused alias request still carries the deprecation headers" */
+    it("keeps naming it on a refusal", async () => {
+      const response = await api.legacy("/api/agents/agent_nope");
+
+      expect(response.status).toBe(404);
+      expect(response.headers.get("Deprecation")).toBe("true");
+      expect(response.headers.get("Link")).toBe(
+        `<${AGENTS_ALIAS_SUCCESSOR}>; rel="successor-version"`,
+      );
     });
   });
 

@@ -17,6 +17,11 @@ vi.mock("@langwatch/observability", () => ({
     error: vi.fn(),
     debug: vi.fn(),
   }),
+  // The framework's own request logger reaches for these two as well, so the
+  // stub has to answer them or every route in the family fails before its
+  // handler runs.
+  getStatusCodeFromError: () => 500,
+  logHttpRequest: vi.fn(),
 }));
 
 import { createScenarioEventsRestApp, type InlineMediaExtraction } from "../scenario-event.api";
@@ -131,7 +136,7 @@ function mount(options: { extract: InlineMediaExtraction; dispatch?: ReturnType<
     platformUrl: ({ path }) => `https://app.langwatch.test${path}`,
   });
 
-  const hono = new Hono().route("/", events.hono as never);
+  const hono = new Hono().route("/", events as never);
 
   return {
     post: (body: string) =>

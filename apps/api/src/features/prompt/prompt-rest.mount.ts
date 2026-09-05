@@ -48,5 +48,5 @@ export function mountPromptsRest(options: {
         ),
       uniqueConstraintTargets,
     },
-  }).hono;
+  });
 }

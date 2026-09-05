@@ -1,11 +1,10 @@
 import type { ScenarioService } from "@langwatch/scenario-contract";
 import {
-  type AppRestProjectVariables,
   type AppRestSecurity,
+  type MountableRestApp,
   type PlatformUrlBuilder,
-  type SecuredApp,
 } from "@langwatch/api/rest";
-import { registerScenarioRoutes } from "./scenario-v1.api";
+import { registerScenarioRoutes, scenarioRestErrorHandler } from "./scenario-v1.api";
 
 /**
  * REST for the scenarios (test cases) a project defines, and their version
@@ -19,13 +18,18 @@ export function createScenariosRestApp(options: {
   security: AppRestSecurity;
   scenarios: () => ScenarioService;
   platformUrl: PlatformUrlBuilder;
-}): SecuredApp<{ Variables: AppRestProjectVariables }> {
-  const secured = options.security.createProjectApp({ basePath: "/api/scenarios" });
+}): MountableRestApp {
+  const family = options.security.createProjectVersionedApp({
+    name: "scenarios",
+    basePath: "/api/scenarios",
+    errorEnvelope: "legacy",
+    errorHandler: scenarioRestErrorHandler,
+  });
 
-  registerScenarioRoutes(secured, {
+  registerScenarioRoutes(family, {
     scenarios: options.scenarios,
     platformUrl: options.platformUrl,
   });
 
-  return secured;
+  return family.service.build();
 }

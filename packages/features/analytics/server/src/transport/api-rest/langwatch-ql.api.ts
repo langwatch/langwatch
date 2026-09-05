@@ -11,8 +11,8 @@
  *
  * Project-scoped rather than service-scoped: these endpoints authenticate with
  * a customer's API key and must resolve a project and its RBAC, which is what
- * `createProjectApp` wires. A service app here would authenticate with a
- * shared internal secret and reach no project at all.
+ * `createProjectVersionedApp` wires. A service app here would authenticate with
+ * a shared internal secret and reach no project at all.
  *
  * Every collaborator arrives on {@link LangWatchQLRestPorts} rather than being
  * read off a process-wide application container, which is what lets this
@@ -33,15 +33,17 @@ export function createLangWatchQLRestApp(options: {
   security: AppRestSecurity;
   ports: LangWatchQLRestPorts;
 }): MountableRestApp {
-  const secured = options.security.createProjectApp({
+  const family = options.security.createProjectVersionedApp({
+    name: "saved-workbench-charts",
     basePath: "/api/v1/projects",
     // A new route family, so it publishes the canonical error envelope from
     // the start rather than joining the legacy families a consumer already
     // parses.
     errorEnvelope: "canonical",
+    staticGeneration: "v1",
   });
 
-  registerSavedWorkbenchChartRoutes(secured, options.ports);
+  registerSavedWorkbenchChartRoutes(family, options.ports);
 
-  return secured.hono;
+  return family.service.build();
 }

@@ -25,7 +25,7 @@ function mount(getRunIdsForSet = vi.fn()) {
     platformUrl: ({ path }) => `https://app.langwatch.test${path}`,
   });
 
-  const hono = new Hono().route("/", events.hono as never);
+  const hono = new Hono().route("/", events as never);
 
   return {
     delete: (query: string) =>

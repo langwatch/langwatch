@@ -632,9 +632,9 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
     `https://app.langwatch.test/${projectSlug}${path}`;
   // The three families register absolute paths, so the first one's router
   // serves as the root the other two are routed into.
-  const hono = createRunPlansV1RestApp({ security, suites: () => app, platformUrl }).hono;
-  hono.route("/", createTestSuitesV1RestApp({ security, suites: () => app, platformUrl }).hono);
-  hono.route("/", createSuiteRestApp({ security, suites: () => app, platformUrl }).hono);
+  const hono = createRunPlansV1RestApp({ security, suites: () => app, platformUrl });
+  hono.route("/", createTestSuitesV1RestApp({ security, suites: () => app, platformUrl }));
+  hono.route("/", createSuiteRestApp({ security, suites: () => app, platformUrl }));
 
   const send = (
     method: string,
@@ -658,7 +658,7 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
       send("PATCH", path, body ?? {}, headers),
     delete: (path: string, headers?: Record<string, string>) =>
       send("DELETE", path, undefined, headers),
-    routes: () => hono.routes.map((route) => route.path),
+    routes: () => hono.routes.map((route: { path: string }) => route.path),
   };
 
   return { api, world, commands, app };

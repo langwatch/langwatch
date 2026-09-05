@@ -5,16 +5,23 @@
  */
 import { requires } from "@langwatch/api";
 import {
+  type AppRestOrganizationVariables,
   type AppRestProjectVariables,
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
   conflictResponses,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
   type PlatformUrlBuilder,
+  organizationOf,
+  projectOf,
+  type ProjectScopedContext,
+  resolver,
+  type RestApiVersionedFamily,
   type RouteResponse,
-  type SecuredApp,
   successSchema,
-  validator as zValidator,
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -41,7 +48,6 @@ import {
 } from "@langwatch/prompt-contract";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { describeRoute, resolver } from "hono-openapi";
 import { z, type ZodSchema } from "zod";
 
 import type { PromptApp } from "#app/prompt.app";
@@ -257,60 +263,115 @@ export type PromptOrganizationVariables = { organization: Readonly<{ id: string 
  */
 export type PromptAppVariables = AppRestProjectVariables & PromptOrganizationVariables;
 
+/** What a tag assignment answers with. */
+const assignTagResponseSchema = z.object({
+  configId: z.string(),
+  versionId: z.string(),
+  tag: z.string(),
+  updatedAt: z.date(),
+});
+
+/** One organization-level tag definition, as the tag doors publish it. */
+const tagDefinitionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  createdAt: z.coerce.date(),
+});
+
+/** What a sync sends: the local content, and the version it was taken from. */
+const syncInputSchema = z.object({
+  configData: getLatestConfigVersionSchema().shape.configData,
+  parameters: z.record(z.string(), z.unknown()).optional(),
+  localVersion: versionSchema.optional(),
+  commitMessage: commitMessageSchema.optional(),
+});
+
+/** What a sync answers with: what it did, and the conflict when it did nothing. */
+const syncResultSchema = z.object({
+  action: z.enum(["created", "updated", "conflict", "up_to_date"]),
+  prompt: apiResponsePromptWithVersionDataSchema.optional(),
+  conflictInfo: z
+    .object({
+      localVersion: z.number(),
+      remoteVersion: z.number(),
+      differences: z.array(z.string()),
+      remoteConfigData: getLatestConfigVersionSchema().shape.configData,
+      remoteParameters: z.record(z.string(), z.unknown()).optional(),
+    })
+    .optional(),
+});
+
+/** The handler context this family reads: the project door's, plus the organization. */
+type PromptContext = ProjectScopedContext<
+  EndpointVariables & Partial<AppRestOrganizationVariables>
+>;
+
+/**
+ * Why every route declares its answer in prose rather than a schema: these
+ * doors answer their own statuses (201 on a created tag, a bare 204 on a
+ * deleted one, a sync that answers `created`/`updated`/`conflict`), and the
+ * bodies below are already parsed through the family's own response schemas
+ * before they are written. The documented `responses` on each route are the
+ * published shapes and are unchanged.
+ */
+const PROMPT_ANSWER_REASON =
+  "the prompt doors choose their status per outcome (201 on a created tag, 204 on a deleted one, a sync result that names its own action) and answer with the bodies these routes already parse through their own response schemas";
+
+const idParamsSchema = z.object({ id: z.string() });
+const idTagParamsSchema = z.object({ id: z.string(), tag: z.string() });
+const tagParamsSchema = z.object({ tag: z.string() });
+const idVersionParamsSchema = z.object({ id: z.string(), versionId: z.string() });
+
 /**
  * REST for a project's prompts, built against one process's security.
+ *
+ * `bareMount`: `/api/prompts/...` is the whole published contract, and its
+ * `/:id{.+}` doors would be shadowed by a version guard claiming the same
+ * shape.
  */
 export function createPromptsRestApp(options: {
   security: AppRestSecurity;
   /**
-   * Resolved per request, as reading it off the Hono context used to be:
+   * Resolved per request, as reading it off the request context used to be:
    * mounting a family must not force its services to be constructed, which is
    * what lets the OpenAPI spec generator build this app with none.
    */
   prompts: () => PromptRestService;
   ports: PromptRestPorts;
-}): SecuredApp<{ Variables: PromptAppVariables }> {
-  const secured = options.security.createProjectApp<PromptOrganizationVariables>({
+}): MountableRestApp {
+  // Organization resolution runs after the access chain, which authenticates
+  // and sets `project` — the same order the per-route middleware gave it.
+  const family = options.security.createProjectVersionedApp({
+    name: "prompts",
     basePath: "/api/prompts",
+    errorEnvelope: "legacy",
+    bareMount: true,
+    routeMiddleware: [options.ports.organizationMiddleware],
   });
-  registerPromptRoutes(secured, options.prompts, options.ports);
-  return secured;
+  registerPromptRoutes(family, options.prompts, options.ports);
+  return family.service.build();
 }
 
 export function registerPromptRoutes(
-  secured: SecuredApp<{ Variables: PromptAppVariables }>,
+  family: RestApiVersionedFamily,
   prompts: () => PromptRestService,
   ports: PromptRestPorts,
 ): void {
-  // Organization resolution runs after the access chain, which authenticates
-  // and sets `project`. The Prompt service is already process-owned on App.
+  const { service, policy } = family;
 
   // Get all prompts
-  secured.access(requires("prompts:view")).get(
+  service.registerRoute(
+    "get",
     "/",
-    ports.organizationMiddleware,
-    describeRoute({
-      description: "Get all prompts for a project",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(z.array(apiResponsePromptWithVersionDataSchema)),
-            },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const service = prompts();
-      const project = c.get("project");
-      const organization = c.get("organization");
+    MANAGEMENT_API_VERSION,
+    async (c: PromptContext) => {
+      const promptService = prompts();
+      const project = projectOf(c);
+      const organization = organizationOf(c);
 
       logger.info({ projectId: project.id }, "Getting all prompts for project");
 
-      const configs: ApiResponsePrompt[] = await service.getAllPrompts({
+      const configs: ApiResponsePrompt[] = await promptService.getAllPrompts({
         projectId: project.id,
         organizationId: organization.id,
         version: "latest",
@@ -329,59 +390,39 @@ export function registerPromptRoutes(
           })),
       );
     },
+    (b) =>
+      policy(requires("prompts:view"))(b)
+        .withRawResponse(PROMPT_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "Get all prompts for a project",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Success",
+              content: {
+                "application/json": {
+                  schema: resolver(z.array(apiResponsePromptWithVersionDataSchema)),
+                },
+              },
+            },
+          },
+        }),
   );
-
-  // Assign tag to a prompt version
-  const assignTagResponseSchema = z.object({
-    configId: z.string(),
-    versionId: z.string(),
-    tag: z.string(),
-    updatedAt: z.date(),
-  });
 
   // Assigning a tag changes an existing prompt; it creates nothing the caller
   // `:manage`. Moving a tag is not editing a prompt — it repoints the release
   // pointer, and so decides which version the customer's live traffic resolves
   // to. That is a deployment, and it belongs with the grain that administers
   // the prompt rather than with the one that edits its text.
-  secured.access(requires("prompts:manage")).put(
+  service.registerRoute(
+    "put",
     "/:id{.+?}/tags/:tag",
-    ports.organizationMiddleware,
-    describeRoute({
-      description: 'Assign a tag (e.g. "production", "staging") to a specific prompt version',
-      parameters: [
-        {
-          name: "tag",
-          in: "path",
-          description: 'The tag to assign (e.g., "production", "staging", or a custom tag)',
-          required: true,
-          schema: { type: "string" },
-        },
-      ],
-      responses: {
-        ...baseResponses,
-        200: buildStandardSuccessResponse(assignTagResponseSchema),
-        404: {
-          description: "Prompt not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-        422: {
-          description: "Invalid tag or version",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("json", z.object({ versionId: z.string() })),
-    async (c) => {
-      const service = prompts();
-      const project = c.get("project");
-      const organization = c.get("organization");
-      const { id, tag } = c.req.param();
-      const { versionId } = c.req.valid("json");
+    MANAGEMENT_API_VERSION,
+    async (c: PromptContext, input: z.infer<typeof idTagParamsSchema> & { versionId: string }) => {
+      const promptService = prompts();
+      const project = projectOf(c);
+      const organization = organizationOf(c);
+      const { id, tag, versionId } = input;
 
       logger.info(
         { projectId: project.id, promptId: id, tag, versionId },
@@ -389,7 +430,7 @@ export function registerPromptRoutes(
       );
 
       try {
-        const config = await service.tryGetPromptByIdOrHandle({
+        const config = await promptService.tryGetPromptByIdOrHandle({
           idOrHandle: id,
           projectId: project.id,
           organizationId: organization.id,
@@ -404,7 +445,7 @@ export function registerPromptRoutes(
         // The lookup above also matches org-scoped prompts a SIBLING project
         // owns, so the row's own projectId is not the one the credential was
         // authorized on. The write goes to the authorized project.
-        const result = await service.assignTag({
+        const result = await promptService.assignTag({
           configId: config.id,
           versionId,
           tag,
@@ -434,38 +475,50 @@ export function registerPromptRoutes(
         throw error;
       }
     },
+    (b) =>
+      policy(requires("prompts:manage"))(b)
+        .withParams(idTagParamsSchema)
+        .withInput(z.object({ versionId: z.string() }))
+        .withRawResponse(PROMPT_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: 'Assign a tag (e.g. "production", "staging") to a specific prompt version',
+          parameters: [
+            {
+              name: "tag",
+              in: "path",
+              description: 'The tag to assign (e.g., "production", "staging", or a custom tag)',
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            ...baseResponses,
+            200: buildStandardSuccessResponse(assignTagResponseSchema),
+            404: {
+              description: "Prompt not found",
+              content: {
+                "application/json": { schema: resolver(badRequestSchema) },
+              },
+            },
+            422: {
+              description: "Invalid tag or version",
+              content: {
+                "application/json": { schema: resolver(badRequestSchema) },
+              },
+            },
+          },
+        }),
   );
 
   // --- Tag definition CRUD (org-level) ---
 
   // List all tag definitions for the org
-  secured.access(requires("prompts:view")).get(
+  service.registerRoute(
+    "get",
     "/tags",
-    ports.organizationMiddleware,
-    describeRoute({
-      description: "List all prompt tag definitions for the organization",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.array(
-                  z.object({
-                    id: z.string(),
-                    name: z.string(),
-                    createdAt: z.coerce.date(),
-                  }),
-                ),
-              ),
-            },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const organization = c.get("organization");
+    MANAGEMENT_API_VERSION,
+    async (c: PromptContext) => {
+      const organization = organizationOf(c);
       const tags = await prompts().listTags({ organizationId: organization.id });
 
       return c.json(
@@ -476,36 +529,31 @@ export function registerPromptRoutes(
         })),
       );
     },
+    (b) =>
+      policy(requires("prompts:view"))(b)
+        .withRawResponse(PROMPT_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "List all prompt tag definitions for the organization",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Success",
+              content: {
+                "application/json": { schema: resolver(z.array(tagDefinitionSchema)) },
+              },
+            },
+          },
+        }),
   );
 
   // Create a tag definition
-  secured.access(requires("prompts:manage")).post(
+  service.registerRoute(
+    "post",
     "/tags",
-    ports.organizationMiddleware,
-    describeRoute({
-      description: "Create a custom prompt tag definition for the organization",
-      responses: {
-        ...baseResponses,
-        201: {
-          description: "Tag created",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  id: z.string(),
-                  name: z.string(),
-                  createdAt: z.coerce.date(),
-                }),
-              ),
-            },
-          },
-        },
-      },
-    }),
-    zValidator("json", z.object({ name: z.string() })),
-    async (c) => {
-      const organization = c.get("organization");
-      const { name } = c.req.valid("json");
+    MANAGEMENT_API_VERSION,
+    async (c: PromptContext, input: { name: string }) => {
+      const organization = organizationOf(c);
+      const { name } = input;
       try {
         const tag = await prompts().createTag({
           organizationId: organization.id,
@@ -528,37 +576,32 @@ export function registerPromptRoutes(
         throw error;
       }
     },
+    (b) =>
+      policy(requires("prompts:manage"))(b)
+        .withInput(z.object({ name: z.string() }))
+        .withRawResponse(PROMPT_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "Create a custom prompt tag definition for the organization",
+          responses: {
+            ...baseResponses,
+            201: {
+              description: "Tag created",
+              content: {
+                "application/json": { schema: resolver(tagDefinitionSchema) },
+              },
+            },
+          },
+        }),
   );
 
   // Rename a tag definition
-  secured.access(requires("prompts:manage")).put(
+  service.registerRoute(
+    "put",
     "/tags/:tag",
-    ports.organizationMiddleware,
-    describeRoute({
-      description: "Rename a prompt tag definition",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Tag renamed",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  id: z.string(),
-                  name: z.string(),
-                  createdAt: z.coerce.date(),
-                }),
-              ),
-            },
-          },
-        },
-      },
-    }),
-    zValidator("json", z.object({ name: z.string() })),
-    async (c) => {
-      const organization = c.get("organization");
-      const { tag: oldName } = c.req.param();
-      const { name: newName } = c.req.valid("json");
+    MANAGEMENT_API_VERSION,
+    async (c: PromptContext, input: z.infer<typeof tagParamsSchema> & { name: string }) => {
+      const organization = organizationOf(c);
+      const { tag: oldName, name: newName } = input;
       try {
         const tag = await prompts().renameTag({
           organizationId: organization.id,
@@ -588,22 +631,33 @@ export function registerPromptRoutes(
         throw error;
       }
     },
+    (b) =>
+      policy(requires("prompts:manage"))(b)
+        .withParams(tagParamsSchema)
+        .withInput(z.object({ name: z.string() }))
+        .withRawResponse(PROMPT_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "Rename a prompt tag definition",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Tag renamed",
+              content: {
+                "application/json": { schema: resolver(tagDefinitionSchema) },
+              },
+            },
+          },
+        }),
   );
 
   // Delete a tag definition
-  secured.access(requires("prompts:manage")).delete(
+  service.registerRoute(
+    "delete",
     "/tags/:tag",
-    ports.organizationMiddleware,
-    describeRoute({
-      description: "Delete a prompt tag definition and cascade to assignments",
-      responses: {
-        ...baseResponses,
-        204: { description: "Tag deleted" },
-      },
-    }),
-    async (c) => {
-      const organization = c.get("organization");
-      const { tag: tagName } = c.req.param();
+    MANAGEMENT_API_VERSION,
+    async (c: PromptContext, input: z.infer<typeof tagParamsSchema>) => {
+      const organization = organizationOf(c);
+      const { tag: tagName } = input;
       try {
         const tag = await prompts().tryDeleteTagByName({
           organizationId: organization.id,
@@ -629,35 +683,33 @@ export function registerPromptRoutes(
         throw error;
       }
     },
+    (b) =>
+      policy(requires("prompts:manage"))(b)
+        .withParams(tagParamsSchema)
+        .withRawResponse(PROMPT_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "Delete a prompt tag definition and cascade to assignments",
+          responses: {
+            ...baseResponses,
+            204: { description: "Tag deleted" },
+          },
+        }),
   );
 
   // Get versions
-  secured.access(requires("prompts:view")).get(
+  service.registerRoute(
+    "get",
     "/:id{.+?}/versions",
-    ports.organizationMiddleware,
-    describeRoute({
-      description:
-        "Get all versions for a prompt. Does not include base prompt data, only versioned data.",
-      responses: {
-        ...baseResponses,
-        200: buildStandardSuccessResponse(z.array(apiResponsePromptWithVersionDataSchema)),
-        404: {
-          description: "Prompt not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const service = prompts();
-      const project = c.get("project");
-      const organization = c.get("organization");
-      const { id } = c.req.param();
+    MANAGEMENT_API_VERSION,
+    async (c: PromptContext, input: z.infer<typeof idParamsSchema>) => {
+      const promptService = prompts();
+      const project = projectOf(c);
+      const organization = organizationOf(c);
+      const { id } = input;
 
       logger.info({ projectId: project.id, promptId: id }, "Getting versions for prompt");
 
-      const versions: ApiResponsePrompt[] = await service.getAllVersions({
+      const versions: ApiResponsePrompt[] = await promptService.getAllVersions({
         idOrHandle: id,
         projectId: project.id,
         organizationId: organization.id,
@@ -681,32 +733,37 @@ export function registerPromptRoutes(
           })),
       );
     },
+    (b) =>
+      policy(requires("prompts:view"))(b)
+        .withParams(idParamsSchema)
+        .withRawResponse(PROMPT_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description:
+            "Get all versions for a prompt. Does not include base prompt data, only versioned data.",
+          responses: {
+            ...baseResponses,
+            200: buildStandardSuccessResponse(z.array(apiResponsePromptWithVersionDataSchema)),
+            404: {
+              description: "Prompt not found",
+              content: {
+                "application/json": { schema: resolver(badRequestSchema) },
+              },
+            },
+          },
+        }),
   );
 
   // Restore (rollback to) a specific version — a new version of a prompt that
   // already exists, i.e. an update of that prompt.
-  secured.access(requires("prompts:update")).post(
+  service.registerRoute(
+    "post",
     "/:id{.+?}/versions/:versionId/restore",
-    ports.organizationMiddleware,
-    describeRoute({
-      description:
-        "Restore a prompt to a previous version. Creates a new version with the same config data as the specified version.",
-      responses: {
-        ...baseResponses,
-        200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
-        404: {
-          description: "Prompt or version not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const service = prompts();
-      const project = c.get("project");
-      const organization = c.get("organization");
-      const { id, versionId } = c.req.param();
+    MANAGEMENT_API_VERSION,
+    async (c: PromptContext, input: z.infer<typeof idVersionParamsSchema>) => {
+      const promptService = prompts();
+      const project = projectOf(c);
+      const organization = organizationOf(c);
+      const { id, versionId } = input;
 
       logger.info({ projectId: project.id, promptId: id, versionId }, "Restoring prompt version");
 
@@ -715,7 +772,7 @@ export function registerPromptRoutes(
       // body (code `prompt_not_found`, 404, trace ids). Hand-rolling
       // `c.json({ error: message }, 404)` here shipped untyped prose instead,
       // which nothing downstream could branch on.
-      const restored = await service.restoreVersion({
+      const restored = await promptService.restoreVersion({
         versionId,
         projectId: project.id,
         organizationId: organization.id,
@@ -734,72 +791,44 @@ export function registerPromptRoutes(
         }),
       });
     },
+    (b) =>
+      policy(requires("prompts:update"))(b)
+        .withParams(idVersionParamsSchema)
+        .withRawResponse(PROMPT_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description:
+            "Restore a prompt to a previous version. Creates a new version with the same config data as the specified version.",
+          responses: {
+            ...baseResponses,
+            200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
+            404: {
+              description: "Prompt or version not found",
+              content: {
+                "application/json": { schema: resolver(badRequestSchema) },
+              },
+            },
+          },
+        }),
   );
 
   // Get prompt by ID
-  secured.access(requires("prompts:view")).get(
+  service.registerRoute(
+    "get",
     "/:id{.+}",
-    ports.organizationMiddleware,
-    describeRoute({
-      description:
-        "Get a specific prompt by slug, with optional shorthand syntax for tags and versions. " +
-        'Pass a bare slug like "pizza-prompt" to get the latest version, ' +
-        '"pizza-prompt:production" to resolve a tagged version, or ' +
-        '"pizza-prompt:2" to fetch version 2. ' +
-        "Alternatively, use the tag or version query parameters with a bare slug.",
-      parameters: [
-        {
-          name: "id",
-          in: "path",
-          description:
-            "Prompt slug or shorthand. Supports three formats: " +
-            '(1) bare slug — "pizza-prompt" returns the latest version; ' +
-            '(2) slug:tag — "pizza-prompt:production" returns the version pointed to by that tag; ' +
-            '(3) slug:version — "pizza-prompt:2" returns that specific version number. ' +
-            '"slug:latest" is equivalent to the bare slug. ' +
-            "Cannot be combined with the tag or version query parameters.",
-          required: true,
-          schema: { type: "string" },
-        },
-        {
-          name: "version",
-          in: "query",
-          description:
-            "Specific version number to retrieve. Cannot be used when the id path already contains a shorthand suffix.",
-          required: false,
-          schema: { type: "integer", minimum: 0 },
-        },
-        {
-          name: "tag",
-          in: "query",
-          description:
-            'Fetch the version pointed to by this tag (e.g., "production", "staging"). ' +
-            "Cannot be used when the id path already contains a shorthand suffix.",
-          required: false,
-          schema: { type: "string" },
-        },
-      ],
-      responses: {
-        ...baseResponses,
-        200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
-        404: {
-          description: "Prompt not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const service = prompts();
-      const project = c.get("project");
-      const organization = c.get("organization");
-      const { id } = c.req.param();
+    MANAGEMENT_API_VERSION,
+    async (c: PromptContext, input: z.infer<typeof idParamsSchema>) => {
+      const promptService = prompts();
+      const project = projectOf(c);
+      const organization = organizationOf(c);
+      const { id } = input;
 
       try {
         // Parse shorthand syntax (e.g., "pizza-prompt:production" or "pizza-prompt:2")
         const shorthand = parsePromptShorthand(id);
 
+        // The two window parameters stay read off the request rather than
+        // declared: a caller that sends `version=abc` is answered by the
+        // conflict/shorthand rules below, not refused by a schema.
         const queryVersion = c.req.query("version")
           ? parseInt(c.req.query("version") ?? "")
           : undefined;
@@ -819,7 +848,7 @@ export function registerPromptRoutes(
 
         logger.info({ projectId: project.id, id: shorthand.slug, version, tag }, "Getting prompt");
 
-        const config = await service.tryGetPromptByIdOrHandle({
+        const config = await promptService.tryGetPromptByIdOrHandle({
           idOrHandle: shorthand.slug,
           projectId: project.id,
           organizationId: organization.id,
@@ -861,28 +890,74 @@ export function registerPromptRoutes(
         throw error;
       }
     },
+    (b) =>
+      policy(requires("prompts:view"))(b)
+        .withParams(idParamsSchema)
+        .withRawResponse(PROMPT_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description:
+            "Get a specific prompt by slug, with optional shorthand syntax for tags and versions. " +
+            'Pass a bare slug like "pizza-prompt" to get the latest version, ' +
+            '"pizza-prompt:production" to resolve a tagged version, or ' +
+            '"pizza-prompt:2" to fetch version 2. ' +
+            "Alternatively, use the tag or version query parameters with a bare slug.",
+          parameters: [
+            {
+              name: "id",
+              in: "path",
+              description:
+                "Prompt slug or shorthand. Supports three formats: " +
+                '(1) bare slug — "pizza-prompt" returns the latest version; ' +
+                '(2) slug:tag — "pizza-prompt:production" returns the version pointed to by that tag; ' +
+                '(3) slug:version — "pizza-prompt:2" returns that specific version number. ' +
+                '"slug:latest" is equivalent to the bare slug. ' +
+                "Cannot be combined with the tag or version query parameters.",
+              required: true,
+              schema: { type: "string" },
+            },
+            {
+              name: "version",
+              in: "query",
+              description:
+                "Specific version number to retrieve. Cannot be used when the id path already contains a shorthand suffix.",
+              required: false,
+              schema: { type: "integer", minimum: 0 },
+            },
+            {
+              name: "tag",
+              in: "query",
+              description:
+                'Fetch the version pointed to by this tag (e.g., "production", "staging"). ' +
+                "Cannot be used when the id path already contains a shorthand suffix.",
+              required: false,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            ...baseResponses,
+            200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
+            404: {
+              description: "Prompt not found",
+              content: {
+                "application/json": { schema: resolver(badRequestSchema) },
+              },
+            },
+          },
+        }),
   );
 
   // Create prompt with initial version. Asks for `prompts:create`; `:manage`
   // still implies it, so no existing caller changes, and a viewer holding only
   // `prompts:view` is declined exactly as before.
-  secured.access(requires("prompts:create")).post(
+  service.registerRoute(
+    "post",
     "/",
-    ports.organizationMiddleware,
-    describeRoute({
-      description: "Create a new prompt with default initial version",
-      responses: {
-        ...baseResponses,
-        200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
-        409: conflictResponses[409],
-      },
-    }),
-    zValidator("json", createPromptInputSchema),
-    async (c) => {
-      const service = prompts();
-      const project = c.get("project");
-      const organization = c.get("organization");
-      const { tags, ...data } = c.req.valid("json");
+    MANAGEMENT_API_VERSION,
+    async (c: PromptContext, input: z.infer<typeof createPromptInputSchema>) => {
+      const promptService = prompts();
+      const project = projectOf(c);
+      const organization = organizationOf(c);
+      const { tags, ...data } = input;
 
       logger.info(
         {
@@ -896,7 +971,7 @@ export function registerPromptRoutes(
       );
 
       try {
-        const newConfig: ApiResponsePrompt = await service.createPrompt({
+        const newConfig: ApiResponsePrompt = await promptService.createPrompt({
           projectId: project.id,
           organizationId: organization.id,
           ...data,
@@ -909,7 +984,7 @@ export function registerPromptRoutes(
         if (tags && tags.length > 0) {
           await Promise.all(
             tags.map((tag) =>
-              service.assignTag({
+              promptService.assignTag({
                 configId: newConfig.id,
                 versionId: newConfig.versionId,
                 tag,
@@ -921,7 +996,7 @@ export function registerPromptRoutes(
 
           logger.info({ promptId: newConfig.id, tags }, "Assigned tags to initial version");
 
-          const refetched = await service.tryGetPromptByIdOrHandle({
+          const refetched = await promptService.tryGetPromptByIdOrHandle({
             idOrHandle: newConfig.id,
             projectId: project.id,
             organizationId: organization.id,
@@ -940,7 +1015,7 @@ export function registerPromptRoutes(
             path: `/prompts`,
           }),
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error({ projectId: project.id, error }, "Error creating prompt");
         if (error instanceof PromptTagValidationError) {
           throw new HTTPException(422, {
@@ -953,60 +1028,38 @@ export function registerPromptRoutes(
         throw error;
       }
     },
+    (b) =>
+      policy(requires("prompts:create"))(b)
+        .withInput(createPromptInputSchema)
+        .withRawResponse(PROMPT_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "Create a new prompt with default initial version",
+          responses: {
+            ...baseResponses,
+            200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
+            409: conflictResponses[409],
+          },
+        }),
   );
 
   // Sync endpoint for upsert operations
-  secured.access(requires("prompts:manage")).post(
+  service.registerRoute(
+    "post",
     "/:id{.+?}/sync",
-    ports.organizationMiddleware,
-    describeRoute({
-      description: "Sync/upsert a prompt with local content",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Sync result",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  action: z.enum(["created", "updated", "conflict", "up_to_date"]),
-                  prompt: apiResponsePromptWithVersionDataSchema.optional(),
-                  conflictInfo: z
-                    .object({
-                      localVersion: z.number(),
-                      remoteVersion: z.number(),
-                      differences: z.array(z.string()),
-                      remoteConfigData: getLatestConfigVersionSchema().shape.configData,
-                      remoteParameters: z.record(z.string(), z.unknown()).optional(),
-                    })
-                    .optional(),
-                }),
-              ),
-            },
-          },
-        },
-      },
-    }),
-    zValidator(
-      "json",
-      z.object({
-        configData: getLatestConfigVersionSchema().shape.configData,
-        parameters: z.record(z.string(), z.unknown()).optional(),
-        localVersion: versionSchema.optional(),
-        commitMessage: commitMessageSchema.optional(),
-      }),
-    ),
-    async (c) => {
-      const service = prompts();
-      const project = c.get("project");
-      const organization = c.get("organization");
-      const { id } = c.req.param();
-      const data = c.req.valid("json");
+    MANAGEMENT_API_VERSION,
+    async (
+      c: PromptContext,
+      input: z.infer<typeof idParamsSchema> & z.infer<typeof syncInputSchema>,
+    ) => {
+      const promptService = prompts();
+      const project = projectOf(c);
+      const organization = organizationOf(c);
+      const { id, ...data } = input;
 
       logger.info({ projectId: project.id, promptId: id }, "Syncing prompt with local content");
 
       try {
-        const syncResult = await service.syncPrompt({
+        const syncResult = await promptService.syncPrompt({
           idOrHandle: id,
           localConfigData: data.configData,
           localVersion: data.localVersion,
@@ -1016,7 +1069,7 @@ export function registerPromptRoutes(
           parameters: data.parameters,
         });
 
-        const response: any = {
+        const response: Record<string, unknown> = {
           action: syncResult.action,
         };
 
@@ -1042,10 +1095,10 @@ export function registerPromptRoutes(
         }
 
         return c.json(response);
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error({ projectId: project.id, promptId: id, error }, "Error syncing prompt");
 
-        if (error.message.includes("No permission")) {
+        if (error instanceof Error && error.message.includes("No permission")) {
           throw new HTTPException(403, {
             message: error.message,
           });
@@ -1065,39 +1118,38 @@ export function registerPromptRoutes(
         throw error;
       }
     },
+    (b) =>
+      policy(requires("prompts:manage"))(b)
+        .withParams(idParamsSchema)
+        .withInput(syncInputSchema)
+        .withRawResponse(PROMPT_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "Sync/upsert a prompt with local content",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Sync result",
+              content: {
+                "application/json": { schema: resolver(syncResultSchema) },
+              },
+            },
+          },
+        }),
   );
 
   // Update prompt
-  secured.access(requires("prompts:update")).put(
+  service.registerRoute(
+    "put",
     "/:id{.+}",
-    ports.organizationMiddleware,
-    describeRoute({
-      description: "Update a prompt",
-      responses: {
-        ...baseResponses,
-        200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
-        404: {
-          description: "Prompt not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-        409: conflictResponses[409],
-        422: {
-          description: "Invalid input",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("json", updatePromptInputSchema),
-    async (c) => {
-      const service = prompts();
-      const project = c.get("project");
-      const organization = c.get("organization");
-      const { id } = c.req.param();
-      const { tags, ...data } = c.req.valid("json");
+    MANAGEMENT_API_VERSION,
+    async (
+      c: PromptContext,
+      input: z.infer<typeof idParamsSchema> & z.infer<typeof updatePromptInputSchema>,
+    ) => {
+      const promptService = prompts();
+      const project = projectOf(c);
+      const organization = organizationOf(c);
+      const { id, tags, ...data } = input;
       const projectId = project.id;
 
       if (Object.keys(data).length === 0) {
@@ -1117,7 +1169,7 @@ export function registerPromptRoutes(
       );
 
       try {
-        const updatedConfig: ApiResponsePrompt = await service.updatePrompt({
+        const updatedConfig: ApiResponsePrompt = await promptService.updatePrompt({
           idOrHandle: id,
           projectId,
           data,
@@ -1134,7 +1186,7 @@ export function registerPromptRoutes(
         if (tags && tags.length > 0) {
           await Promise.all(
             tags.map((tag) =>
-              service.assignTag({
+              promptService.assignTag({
                 configId: updatedConfig.id,
                 versionId: updatedConfig.versionId,
                 tag,
@@ -1154,7 +1206,7 @@ export function registerPromptRoutes(
             "Assigned tags to updated version",
           );
 
-          const refetched = await service.tryGetPromptByIdOrHandle({
+          const refetched = await promptService.tryGetPromptByIdOrHandle({
             idOrHandle: updatedConfig.id,
             projectId,
             organizationId: organization.id,
@@ -1181,7 +1233,7 @@ export function registerPromptRoutes(
             path: `/prompts`,
           }),
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error({ projectId, promptId: id, error }, "Error updating prompt");
         if (error instanceof PromptTagValidationError) {
           throw new HTTPException(422, {
@@ -1195,33 +1247,47 @@ export function registerPromptRoutes(
         throw error;
       }
     },
-  );
-  // Delete prompt
-  secured.access(requires("prompts:manage")).delete(
-    "/:id{.+}",
-    ports.organizationMiddleware,
-    describeRoute({
-      description: "Delete a prompt",
-      responses: {
-        ...baseResponses,
-        200: buildStandardSuccessResponse(successSchema),
-        404: {
-          description: "Prompt not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
+    (b) =>
+      policy(requires("prompts:update"))(b)
+        .withParams(idParamsSchema)
+        .withInput(updatePromptInputSchema)
+        .withRawResponse(PROMPT_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "Update a prompt",
+          responses: {
+            ...baseResponses,
+            200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
+            404: {
+              description: "Prompt not found",
+              content: {
+                "application/json": { schema: resolver(badRequestSchema) },
+              },
+            },
+            409: conflictResponses[409],
+            422: {
+              description: "Invalid input",
+              content: {
+                "application/json": { schema: resolver(badRequestSchema) },
+              },
+            },
           },
-        },
-      },
-    }),
-    async (c) => {
-      const service = prompts();
-      const project = c.get("project");
-      const organization = c.get("organization");
-      const { id } = c.req.param();
+        }),
+  );
+
+  // Delete prompt
+  service.registerRoute(
+    "delete",
+    "/:id{.+}",
+    MANAGEMENT_API_VERSION,
+    async (c: PromptContext, input: z.infer<typeof idParamsSchema>) => {
+      const promptService = prompts();
+      const project = projectOf(c);
+      const organization = organizationOf(c);
+      const { id } = input;
 
       logger.info({ projectId: project.id, promptId: id }, "Deleting prompt");
 
-      const result = await service.deletePrompt({
+      const result = await promptService.deletePrompt({
         idOrHandle: id,
         projectId: project.id,
         organizationId: organization.id,
@@ -1234,5 +1300,22 @@ export function registerPromptRoutes(
 
       return c.json(successSchema.parse(result));
     },
+    (b) =>
+      policy(requires("prompts:manage"))(b)
+        .withParams(idParamsSchema)
+        .withRawResponse(PROMPT_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "Delete a prompt",
+          responses: {
+            ...baseResponses,
+            200: buildStandardSuccessResponse(successSchema),
+            404: {
+              description: "Prompt not found",
+              content: {
+                "application/json": { schema: resolver(badRequestSchema) },
+              },
+            },
+          },
+        }),
   );
 }

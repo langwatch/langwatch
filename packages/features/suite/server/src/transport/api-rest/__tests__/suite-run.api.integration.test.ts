@@ -82,7 +82,7 @@ function buildApi(run: (...args: never[]) => unknown) {
 
   return {
     fetch: (path: string, body: unknown) =>
-      app.hono.fetch(
+      app.fetch(
         new Request(`http://api.test${path}`, {
           method: "POST",
           headers: { "content-type": "application/json" },

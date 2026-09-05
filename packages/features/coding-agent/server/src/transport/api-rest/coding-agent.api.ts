@@ -6,20 +6,22 @@ import {
   MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE,
 } from "@langwatch/coding-agent-contract";
 import { ValidationError } from "@langwatch/handled-error";
-import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 
 import { requires } from "@langwatch/api";
 import {
-  type AppRestProjectVariables,
   type AppRestSecurity,
   baseResponses,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  projectOf,
+  type ProjectScopedContext,
   resolvePersonalCaller,
-  type SecuredApp,
+  resolver,
 } from "@langwatch/api/rest";
 import type { CodingAgentApp } from "#app/coding-agent.app";
 import {
-  pullRequestUsageParameters,
   pullRequestUsageQuerySchema,
   pullRequestUsageResponseSchema,
 } from "../../rules/pull-request-usage-wire.rules";
@@ -110,6 +112,7 @@ const eventsQuerySchema = z.object({
   kinds: z
     .string()
     .optional()
+    .describe(`Comma-separated event kinds to include. Known kinds: ${EVENT_KINDS.join(", ")}.`)
     .transform((raw) =>
       raw
         ? raw
@@ -118,11 +121,18 @@ const eventsQuerySchema = z.object({
             .filter((kind) => kind.length > 0)
         : undefined,
     ),
-  from: z.coerce.number().finite().optional(),
-  to: z.coerce.number().finite().optional(),
+  from: z.coerce
+    .number()
+    .finite()
+    .optional()
+    .describe(
+      "Epoch ms lower bound on event time; with `to`, prunes storage partitions for faster reads.",
+    ),
+  to: z.coerce.number().finite().optional().describe("Epoch ms upper bound on event time."),
   cursor: z
     .string()
     .optional()
+    .describe("Opaque keyset cursor from the previous response's nextCursor.")
     .transform((raw, ctx) => {
       if (raw === undefined) return undefined;
       const decoded = decodeCursor(raw);
@@ -158,7 +168,23 @@ function decodeCursor(raw: string): CodingAgentSessionCursor | null {
   }
 }
 
-/** REST for the coding-agent reads, `/api/coding-agent`. */
+const sessionParamsSchema = z.object({
+  sessionId: z.string().min(1).describe("The agent's own session id (session.id / conversation id)."),
+});
+
+const sessionEventsResponseSchema = z.object({
+  events: z.array(sessionEventSchema),
+  nextCursor: z.string().nullable(),
+});
+
+/**
+ * REST for the coding-agent reads, `/api/coding-agent`.
+ *
+ * Two families over one base path. The rollup alone gets no `/api/v1` twin:
+ * that address is declared by the organization-scoped v1 family
+ * (coding-agent-v1.api.ts), which answers the same question for a different
+ * credential.
+ */
 export function createCodingAgentRestApp(options: {
   security: AppRestSecurity;
   /**
@@ -169,219 +195,171 @@ export function createCodingAgentRestApp(options: {
   app: () => CodingAgentApp;
   /** Records who read an answer that names people. */
   audit: () => CodingAgentRestAuditPort;
-}): SecuredApp<{ Variables: AppRestProjectVariables }> {
+}): MountableRestApp[] {
   const { security, app, audit } = options;
 
-  const secured = security.createProjectApp({ basePath: "/api/coding-agent" });
-
-  // The rollup alone gets no `/api/v1` twin: that address is declared by the
-  // organization-scoped v1 family (coding-agent-v1.api.ts), which answers the
-  // same question for a different credential. Its own app, so the rest of the
-  // family keeps the twin every REST family answers on.
-  const rollup = security.createProjectApp({
+  const sessions = security.createProjectVersionedApp({
+    name: "coding-agent",
     basePath: "/api/coding-agent",
-    v1Alias: false,
+    errorEnvelope: "legacy",
   });
 
-  // GET /sessions/:sessionId/events: one session's event sequence, in time
-  // order: every model call with its context and cost, every compaction with
-  // its before/after tokens, rate limits, tool runs, prompts. The raw material
-  // for per-call context and cost analytics; scalar facts only, content stays
-  // on the trace/log reads.
-  secured.access(requires("traces:view")).get(
-    "/sessions/:sessionId/events",
-    describeRoute({
-      summary: "List coding agent session events",
-      description:
-        "List a coding-agent session's events (model calls, compactions, rate limits, " +
-        "tool runs, prompts) in time order, keyset-paginated. Pass the previous " +
-        "response's nextCursor to continue; filter with kinds (comma-separated).",
-      parameters: [
-        {
-          name: "sessionId",
-          in: "path",
-          required: true,
-          schema: { type: "string" },
-          description: "The agent's own session id (session.id / conversation id).",
-        },
-        {
-          name: "kinds",
-          in: "query",
-          required: false,
-          schema: { type: "string" },
-          description: `Comma-separated event kinds to include. Known kinds: ${EVENT_KINDS.join(", ")}.`,
-        },
-        {
-          name: "cursor",
-          in: "query",
-          required: false,
-          schema: { type: "string" },
-          description: "Opaque keyset cursor from the previous response's nextCursor.",
-        },
-        {
-          name: "limit",
-          in: "query",
-          required: false,
-          schema: { type: "integer", maximum: MAX_PAGE, default: DEFAULT_PAGE },
-        },
-        {
-          name: "from",
-          in: "query",
-          required: false,
-          schema: { type: "integer" },
-          description:
-            "Epoch ms lower bound on event time; with `to`, prunes storage partitions for faster reads.",
-        },
-        {
-          name: "to",
-          in: "query",
-          required: false,
-          schema: { type: "integer" },
-          description: "Epoch ms upper bound on event time.",
-        },
-      ],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "One page of session events plus the cursor for the next page",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  events: z.array(sessionEventSchema),
-                  nextCursor: z.string().nullable(),
-                }),
-              ),
-            },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const sessionId = c.req.param("sessionId");
+  const rollup = security.createProjectVersionedApp({
+    name: "coding-agent-rollup",
+    basePath: "/api/coding-agent",
+    errorEnvelope: "legacy",
+    // The bare path alone: `/api/v1/coding-agent/pull-request-usage` is
+    // declared by the organization-scoped v1 family, which answers the same
+    // question for a different credential.
+    bareMount: true,
+  });
 
-      const query = eventsQuerySchema.safeParse({
-        limit: c.req.query("limit"),
-        kinds: c.req.query("kinds"),
-        from: c.req.query("from"),
-        to: c.req.query("to"),
-        cursor: c.req.query("cursor"),
-      });
-      if (!query.success) {
-        throw ValidationError.fromZodError(query.error);
-      }
-      const { limit, kinds, from, to, cursor } = query.data;
-      // Both bounds or neither: half a window would silently widen the read
-      // past what the caller asked for.
-      if ((from === undefined) !== (to === undefined)) {
-        throw new ValidationError("from and to must be supplied together");
-      }
+  type CodingAgentContext = ProjectScopedContext<EndpointVariables>;
 
-      const { events, nextCursor } = await app().getSessionEvents({
+  // One session's event sequence, in time order: every model call with its
+  // context and cost, every compaction with its before/after tokens, rate
+  // limits, tool runs, prompts. Scalar facts only; content stays on the
+  // trace/log reads.
+  const eventsHandler = async (
+    c: CodingAgentContext,
+    input: z.infer<typeof sessionParamsSchema> & z.infer<typeof eventsQuerySchema>,
+  ) => {
+    const { limit, kinds, from, to, cursor } = input;
+    // Both bounds or neither: half a window would silently widen the read
+    // past what the caller asked for.
+    if ((from === undefined) !== (to === undefined)) {
+      throw new ValidationError("from and to must be supplied together");
+    }
+
+    const { events, nextCursor } = await app().getSessionEvents({
+      projectId: projectOf(c).id,
+      sessionId: input.sessionId,
+      kinds,
+      occurredAt: from !== undefined && to !== undefined ? { fromMs: from, toMs: to } : undefined,
+      cursor,
+      limit,
+    });
+
+    return { events, nextCursor: nextCursor ? encodeCursor(nextCursor) : null };
+  };
+
+  // What one pull request cost in assistant usage, across every project of the
+  // organization the CALLER may read. Numbers and names only: no session
+  // title, no prompt, no file list.
+  const usageHandler = async (
+    c: CodingAgentContext,
+    input: z.infer<typeof pullRequestUsageQuerySchema>,
+  ) => {
+    const project = projectOf(c);
+    const application = app();
+    // The rollup answers with whatever the CALLER may read across the whole
+    // organization, so it needs a person rather than just a project.
+    const callerUserId = resolvePersonalCaller({
+      project,
+      apiKeyUserId: c.get("apiKeyUserId"),
+    });
+    const host = input.host ?? new URL(application.githubWebBase()).hostname;
+
+    // The application resolves the organization behind the project, refuses
+    // an orphan as "not mapped", and applies the same permission cut the
+    // in-app surfaces resolve — names included: a caller reading this rollup
+    // is building something that has to say WHO the usage belongs to, and
+    // the agent-reported id it used to get instead resolved to nobody.
+    const { usage, organizationId } = await application.getPullRequestUsage(
+      {
         projectId: project.id,
-        sessionId,
-        kinds,
-        occurredAt: from !== undefined && to !== undefined ? { fromMs: from, toMs: to } : undefined,
-        cursor,
-        limit,
-      });
+        repositoryHost: host,
+        repositoryFullName: input.repository,
+        prNumber: input.pullRequest,
+      },
+      { id: callerUserId },
+    );
 
-      return c.json({
-        events,
-        nextCursor: nextCursor ? encodeCursor(nextCursor) : null,
-      });
-    },
-  );
+    // This answer names people, so who read it stays attributable. Awaited
+    // before the answer leaves, so a read is never served unrecorded. Never
+    // the contributors themselves: how many projects fed the rollup says how
+    // wide the read reached without copying the names into a second store
+    // that outlives it.
+    await audit().auditLog({
+      userId: callerUserId,
+      organizationId,
+      action: "codingAgents.pullRequestUsage",
+      targetKind: "pullRequest",
+      targetId: `${host}/${input.repository}#${input.pullRequest}`,
+      args: {
+        repository: input.repository,
+        host,
+        pullRequest: input.pullRequest,
+        contributingProjectCount: new Set(usage.rows.map((row) => row.projectId)).size,
+      },
+    });
 
-  // GET /pull-request-usage: what one pull request cost in assistant usage,
-  // across every project of the organization the CALLER may read. Numbers and
-  // names only: no session title, no prompt, no file list.
-  rollup.access(requires("traces:view")).get(
-    "/pull-request-usage",
-    describeRoute({
-      summary: "Get pull request coding agent usage",
-      description:
-        "Assistant usage for one pull request: sessions, tokens and cost, " +
-        "grouped by contributor and agent, plus per-model totals, " +
-        "over the pull request's whole lifetime rather than a time window. " +
-        "Every row and the totals split cost three ways: the part priced per " +
-        "token, the part a bundled subscription already covers, and the " +
-        "list-price total of both. Per-model totals carry the list price only. " +
-        "Cost is calculated from the tokens the agent reported and LangWatch's " +
-        "model prices, so it estimates spend rather than restating a provider " +
-        "invoice. " +
-        "Requires a personal-project API key; rows appear only for projects the " +
-        "calling user may view, and cost only for those they may price.",
-      parameters: [...pullRequestUsageParameters],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "The pull request's usage rollup",
-          content: {
-            "application/json": {
-              schema: resolver(pullRequestUsageResponseSchema),
+    return usage;
+  };
+
+  const sessionsApp = sessions.service
+    .registerRoute(
+      "get",
+      "/sessions/:sessionId/events",
+      MANAGEMENT_API_VERSION,
+      eventsHandler,
+      (b) =>
+        sessions
+          .policy(requires("traces:view"))(b)
+          .withParams(sessionParamsSchema)
+          .withQuery(eventsQuerySchema)
+          .withOutput(sessionEventsResponseSchema)
+          .withDocs({
+            summary: "List coding agent session events",
+            description:
+              "List a coding-agent session's events (model calls, compactions, rate limits, " +
+              "tool runs, prompts) in time order, keyset-paginated. Pass the previous " +
+              "response's nextCursor to continue; filter with kinds (comma-separated).",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "One page of session events plus the cursor for the next page",
+                content: {
+                  "application/json": { schema: resolver(sessionEventsResponseSchema) },
+                },
+              },
+            },
+          }),
+    )
+    .build();
+
+  const rollupApp = rollup.service
+    .registerRoute("get", "/pull-request-usage", MANAGEMENT_API_VERSION, usageHandler, (b) =>
+      rollup
+        .policy(requires("traces:view"))(b)
+        .withQuery(pullRequestUsageQuerySchema)
+        .withOutput(pullRequestUsageResponseSchema)
+        .withDocs({
+          summary: "Get pull request coding agent usage",
+          description:
+            "Assistant usage for one pull request: sessions, tokens and cost, " +
+            "grouped by contributor and agent, plus per-model totals, " +
+            "over the pull request's whole lifetime rather than a time window. " +
+            "Every row and the totals split cost three ways: the part priced per " +
+            "token, the part a bundled subscription already covers, and the " +
+            "list-price total of both. Per-model totals carry the list price only. " +
+            "Cost is calculated from the tokens the agent reported and LangWatch's " +
+            "model prices, so it estimates spend rather than restating a provider " +
+            "invoice. " +
+            "Requires a personal-project API key; rows appear only for projects the " +
+            "calling user may view, and cost only for those they may price.",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "The pull request's usage rollup",
+              content: {
+                "application/json": { schema: resolver(pullRequestUsageResponseSchema) },
+              },
             },
           },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const application = app();
-      // The rollup answers with whatever the CALLER may read across the whole
-      // organization, so it needs a person rather than just a project.
-      const callerUserId = resolvePersonalCaller({
-        project,
-        apiKeyUserId: c.get("apiKeyUserId"),
-      });
+        }),
+    )
+    .build();
 
-      const query = pullRequestUsageQuerySchema.safeParse({
-        repository: c.req.query("repository"),
-        pullRequest: c.req.query("pullRequest"),
-        host: c.req.query("host") ?? new URL(application.githubWebBase()).hostname,
-      });
-      if (!query.success) throw ValidationError.fromZodError(query.error);
-
-      // The application resolves the organization behind the project, refuses
-      // an orphan as "not mapped", and applies the same permission cut the
-      // in-app surfaces resolve — names included: a caller reading this rollup
-      // is building something that has to say WHO the usage belongs to, and
-      // the agent-reported id it used to get instead resolved to nobody.
-      const { usage, organizationId } = await application.getPullRequestUsage(
-        {
-          projectId: project.id,
-          repositoryHost: query.data.host,
-          repositoryFullName: query.data.repository,
-          prNumber: query.data.pullRequest,
-        },
-        { id: callerUserId },
-      );
-
-      // This answer names people, so who read it stays attributable. Awaited
-      // before the answer leaves, so a read is never served unrecorded. Never
-      // the contributors themselves: how many projects fed the rollup says how
-      // wide the read reached without copying the names into a second store
-      // that outlives it.
-      await audit().auditLog({
-        userId: callerUserId,
-        organizationId,
-        action: "codingAgents.pullRequestUsage",
-        targetKind: "pullRequest",
-        targetId: `${query.data.host}/${query.data.repository}#${query.data.pullRequest}`,
-        args: {
-          repository: query.data.repository,
-          host: query.data.host,
-          pullRequest: query.data.pullRequest,
-          contributingProjectCount: new Set(usage.rows.map((row) => row.projectId)).size,
-        },
-      });
-
-      return c.json(usage);
-    },
-  );
-
-  secured.hono.route("/", rollup.hono);
-
-  return secured;
+  return [sessionsApp, rollupApp];
 }

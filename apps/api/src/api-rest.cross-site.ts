@@ -1,14 +1,15 @@
 /**
  * The process's ONE answer to "did this request come from our own origin?".
  */
-import type { Context } from "hono";
 
 /**
  * `Sec-Fetch-Site` is the primary signal — set by every modern browser based on the real
  * request initiator and unaffected by reverse proxies; `cross-site` is exactly the CSRF
  * vector, while `same-origin`/`same-site`/`none` (direct nav) are legitimate.
  */
-export function isCrossSiteRequest(c: Context): boolean {
+export function isCrossSiteRequest(c: {
+  req: { header(name: string): string | undefined };
+}): boolean {
   const secFetchSite = c.req.header("sec-fetch-site");
   if (secFetchSite) {
     return secFetchSite === "cross-site";

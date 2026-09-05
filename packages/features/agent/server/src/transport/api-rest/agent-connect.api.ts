@@ -19,9 +19,14 @@ import {
   resultFrameSchema,
 } from "@langwatch/agent-contract";
 import { handlerManagedAuth } from "@langwatch/api";
-import { bodyLimit, type AppRestProjectVariables, type SecuredApp } from "@langwatch/api/rest";
-import type { Context } from "hono";
-import { describeRoute, type DescribeRouteOptions, resolver } from "hono-openapi";
+import {
+  bodyLimit,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type ProjectScopedContext,
+  type RestApiVersionedFamily,
+  resolver,
+} from "@langwatch/api/rest";
 import { z } from "zod";
 
 import {
@@ -29,20 +34,6 @@ import {
   type LongPollTransportService,
 } from "../../services/connected-agent-long-poll.service";
 import type { ConnectCredentials } from "../../services/connected-agent-session.service";
-
-/** The schema slot of a `describeRoute` request body, on hono-openapi's terms. */
-type RequestBodySchema = NonNullable<
-  Extract<
-    NonNullable<DescribeRouteOptions["requestBody"]>,
-    { content: unknown }
-  >["content"][string]["schema"]
->;
-
-/**
- * A zod schema as a `requestBody` schema object.
- */
-const requestBodySchema = (schema: z.ZodType): RequestBodySchema =>
-  z.toJSONSchema(schema, { target: "openapi-3.0", reused: "inline" }) as RequestBodySchema;
 
 /** The frames a process may post; a register goes to its own endpoint. */
 export const postedFramesSchema = z.object({
@@ -98,23 +89,39 @@ const connectAccess = handlerManagedAuth({
   permissions: ["scenarios:manage"],
 });
 
-function credentialsOf(c: Context): ConnectCredentials {
+/** The handler context the three endpoints run on. */
+type ConnectContext = ProjectScopedContext<EndpointVariables>;
+
+/**
+ * The protocol answers a refusal as a FRAME carrying its own status — 401,
+ * 403, 410, 422, 503 — so the endpoint has no single success status to
+ * declare and writes the transport's answer through unchanged.
+ */
+const FRAME_ANSWER_REASON =
+  "the connect protocol answers with a frame whose status is the frame's, not the endpoint's";
+
+function credentialsOf(c: ConnectContext): ConnectCredentials {
   return {
     authorization: c.req.header("authorization"),
     projectId: c.req.header("x-project-id"),
   };
 }
 
-async function jsonBodyOf(c: Context): Promise<unknown> {
+/** The posted bytes as JSON, or null when they are not JSON at all. */
+function jsonBodyOf(body: string): unknown {
   try {
-    return await c.req.json();
+    return JSON.parse(body) as unknown;
   } catch {
     return null;
   }
 }
 
 /** A credential refusal is a refused frame; anything else stays an error. */
-function refusedOrThrow(c: Context, error: unknown, transport: LongPollTransportService): Response {
+function refusedOrThrow(
+  c: ConnectContext,
+  error: unknown,
+  transport: LongPollTransportService,
+): Response {
   if (error instanceof AgentRegisterRefusedError) {
     const answer = transport.refusedAnswer(error);
     return c.json(answer.body, answer.status as 200);
@@ -136,7 +143,7 @@ const payloadGuard = (relayMaxPayloadMb: number | undefined) =>
   });
 
 export interface ConnectEndpointDeps {
-  secured: SecuredApp<{ Variables: AppRestProjectVariables }>;
+  family: RestApiVersionedFamily;
   transport: () => LongPollTransportService;
   /** `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB`; the default cap when absent. */
   relayMaxPayloadMb?: number;
@@ -144,148 +151,161 @@ export interface ConnectEndpointDeps {
 
 /** The register endpoint: one process announces the agents it serves. */
 function registerRegisterEndpoint({
-  secured,
+  family,
   transport,
   relayMaxPayloadMb,
 }: ConnectEndpointDeps): void {
-  secured.access(connectAccess).post(
+  const registerHandler = async (c: ConnectContext, input: { body: string }) => {
+    const answer = await transport().register({
+      credentials: credentialsOf(c),
+      body: jsonBodyOf(input.body),
+    });
+    return c.json(answer.body, answer.status as 200);
+  };
+
+  family.service.registerRoute(
+    "post",
     "/connect/register",
-    describeRoute({
-      operationId: "registerConnectedAgentInstance",
-      tags: ["Agents"],
-      description:
-        "Register the connected agents of a process over HTTP, for a network that blocks WebSockets. The body is the register frame of the connect protocol. Answers with the registered frame and the instance token the poll and frames endpoints are addressed with, or with a refused frame.",
-      requestBody: {
-        content: {
-          "application/json": { schema: requestBodySchema(registerFrameSchema) },
-        },
-      },
-      responses: {
-        200: {
-          description: "The instance is registered",
-          content: {
-            "application/json": { schema: resolver(registerAnswerSchema) },
-          },
-        },
-        401: { description: "The API key is not valid: a refused frame" },
-        403: {
-          description: "The key type or its permissions cannot connect an agent: a refused frame",
-        },
-        422: {
+    MANAGEMENT_API_VERSION,
+    registerHandler,
+    (b) =>
+      family
+        .policy(connectAccess)(b)
+        .withRawBody("text", { contentType: "application/json" })
+        .withRawResponse(FRAME_ANSWER_REASON, { contentType: "application/json" })
+        .withMiddleware(payloadGuard(relayMaxPayloadMb))
+        .withDocs({
+          operationId: "registerConnectedAgentInstance",
+          tags: ["Agents"],
           description:
-            "The body is not a register frame, or an agent of it is not valid: a refused frame",
-        },
-        503: {
-          description: "The deployment runs several replicas without Redis: a refused frame",
-        },
-      },
-    }),
-    payloadGuard(relayMaxPayloadMb),
-    async (c) => {
-      const answer = await transport().register({
-        credentials: credentialsOf(c),
-        body: await jsonBodyOf(c),
-      });
-      return c.json(answer.body, answer.status as 200);
-    },
+            "Register the connected agents of a process over HTTP, for a network that blocks WebSockets. The body is the register frame of the connect protocol. Answers with the registered frame and the instance token the poll and frames endpoints are addressed with, or with a refused frame.",
+          responses: {
+            200: {
+              description: "The instance is registered",
+              content: {
+                "application/json": { schema: resolver(registerAnswerSchema) },
+              },
+            },
+            401: { description: "The API key is not valid: a refused frame" },
+            403: {
+              description:
+                "The key type or its permissions cannot connect an agent: a refused frame",
+            },
+            422: {
+              description:
+                "The body is not a register frame, or an agent of it is not valid: a refused frame",
+            },
+            503: {
+              description: "The deployment runs several replicas without Redis: a refused frame",
+            },
+          },
+        }),
   );
 }
 
 /** The poll endpoint: the instance waits for its next frames. */
-function registerPollEndpoint({ secured, transport }: ConnectEndpointDeps): void {
-  secured.access(connectAccess).get(
-    "/connect/poll",
-    describeRoute({
-      operationId: "pollConnectedAgentInstance",
-      tags: ["Agents"],
-      description: `Wait for the next call and cancel frames of a registered instance, up to ${POLL_WAIT_MS / 1000} seconds, then answer with what is waiting or with an empty list. Each poll refreshes the instance presence, so a process that polls reads Online. Addressed with the instance token in the X-Agent-Instance-Token header.`,
-      responses: {
-        200: {
-          description: "The frames waiting for the instance, possibly none",
-          content: {
-            "application/json": { schema: resolver(pollAnswerSchema) },
+function registerPollEndpoint({ family, transport }: ConnectEndpointDeps): void {
+  // The in-flight list is read rather than declared: a list too long to parse
+  // has always been treated as none in flight, and declaring it would turn
+  // that into a rejected request.
+  const pollHandler = async (c: ConnectContext) => {
+    const query = pollQuerySchema.safeParse({ inFlight: c.req.query("inFlight") });
+    const inFlightCallIds = query.success
+      ? (query.data.inFlight ?? "").split(",").filter(Boolean)
+      : [];
+    try {
+      const answer = await transport().poll({
+        credentials: credentialsOf(c),
+        token: c.req.header(INSTANCE_TOKEN_HEADER),
+        inFlightCallIds,
+        signal: c.req.raw.signal,
+      });
+      return c.json(answer);
+    } catch (error) {
+      return refusedOrThrow(c, error, transport());
+    }
+  };
+
+  family.service.registerRoute("get", "/connect/poll", MANAGEMENT_API_VERSION, pollHandler, (b) =>
+    family
+      .policy(connectAccess)(b)
+      .withRawResponse(FRAME_ANSWER_REASON, { contentType: "application/json" })
+      .withDocs({
+        operationId: "pollConnectedAgentInstance",
+        tags: ["Agents"],
+        description: `Wait for the next call and cancel frames of a registered instance, up to ${POLL_WAIT_MS / 1000} seconds, then answer with what is waiting or with an empty list. Each poll refreshes the instance presence, so a process that polls reads Online. Addressed with the instance token in the X-Agent-Instance-Token header.`,
+        responses: {
+          200: {
+            description: "The frames waiting for the instance, possibly none",
+            content: {
+              "application/json": { schema: resolver(pollAnswerSchema) },
+            },
+          },
+          401: { description: "The API key is not valid: a refused frame" },
+          410: {
+            description: "The instance token is not known; register the instance again",
           },
         },
-        401: { description: "The API key is not valid: a refused frame" },
-        410: {
-          description: "The instance token is not known; register the instance again",
-        },
-      },
-    }),
-    async (c) => {
-      const query = pollQuerySchema.safeParse({
-        inFlight: c.req.query("inFlight"),
-      });
-      const inFlightCallIds = query.success
-        ? (query.data.inFlight ?? "").split(",").filter(Boolean)
-        : [];
-      try {
-        const answer = await transport().poll({
-          credentials: credentialsOf(c),
-          token: c.req.header(INSTANCE_TOKEN_HEADER),
-          inFlightCallIds,
-          signal: c.req.raw.signal,
-        });
-        return c.json(answer);
-      } catch (error) {
-        return refusedOrThrow(c, error, transport());
-      }
-    },
+      }),
   );
 }
 
 /** The frames endpoint: the instance posts its answers back. */
 function registerFramesEndpoint({
-  secured,
+  family,
   transport,
   relayMaxPayloadMb,
 }: ConnectEndpointDeps): void {
-  secured.access(connectAccess).post(
-    "/connect/frames",
-    describeRoute({
-      operationId: "postConnectedAgentFrames",
-      tags: ["Agents"],
-      description:
-        "Post the ack, result and deregister frames of a registered instance. Addressed with the instance token in the X-Agent-Instance-Token header.",
-      requestBody: {
-        content: {
-          "application/json": { schema: requestBodySchema(postedFramesSchema) },
-        },
-      },
-      responses: {
-        200: {
-          description: "The frames were taken",
-          content: {
-            "application/json": { schema: resolver(framesAnswerSchema) },
-          },
-        },
-        401: { description: "The API key is not valid: a refused frame" },
-        410: {
-          description: "The instance token is not known; register the instance again",
-        },
-        422: { description: "A frame is not one the endpoint takes" },
-      },
-    }),
-    payloadGuard(relayMaxPayloadMb),
-    async (c) => {
-      try {
-        const parsed = postedFramesSchema.safeParse(await jsonBodyOf(c));
-        if (!parsed.success) {
-          throw new AgentRegisterRefusedError({
-            reason: "protocol_invalid",
-            message: "The body must carry ack, result and deregister frames under frames.",
-          });
-        }
-        const answer = await transport().frames({
-          credentials: credentialsOf(c),
-          token: c.req.header(INSTANCE_TOKEN_HEADER),
-          frames: parsed.data.frames,
+  const framesHandler = async (c: ConnectContext, input: { body: string }) => {
+    try {
+      const parsed = postedFramesSchema.safeParse(jsonBodyOf(input.body));
+      if (!parsed.success) {
+        throw new AgentRegisterRefusedError({
+          reason: "protocol_invalid",
+          message: "The body must carry ack, result and deregister frames under frames.",
         });
-        return c.json(answer);
-      } catch (error) {
-        return refusedOrThrow(c, error, transport());
       }
-    },
+      const answer = await transport().frames({
+        credentials: credentialsOf(c),
+        token: c.req.header(INSTANCE_TOKEN_HEADER),
+        frames: parsed.data.frames,
+      });
+      return c.json(answer);
+    } catch (error) {
+      return refusedOrThrow(c, error, transport());
+    }
+  };
+
+  family.service.registerRoute(
+    "post",
+    "/connect/frames",
+    MANAGEMENT_API_VERSION,
+    framesHandler,
+    (b) =>
+      family
+        .policy(connectAccess)(b)
+        .withRawBody("text", { contentType: "application/json" })
+        .withRawResponse(FRAME_ANSWER_REASON, { contentType: "application/json" })
+        .withMiddleware(payloadGuard(relayMaxPayloadMb))
+        .withDocs({
+          operationId: "postConnectedAgentFrames",
+          tags: ["Agents"],
+          description:
+            "Post the ack, result and deregister frames of a registered instance. Addressed with the instance token in the X-Agent-Instance-Token header.",
+          responses: {
+            200: {
+              description: "The frames were taken",
+              content: {
+                "application/json": { schema: resolver(framesAnswerSchema) },
+              },
+            },
+            401: { description: "The API key is not valid: a refused frame" },
+            410: {
+              description: "The instance token is not known; register the instance again",
+            },
+            422: { description: "A frame is not one the endpoint takes" },
+          },
+        }),
   );
 }
 

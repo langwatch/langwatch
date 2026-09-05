@@ -43,7 +43,7 @@ function mount(options: {
     platformUrl: ({ projectSlug, path }) => `https://app.langwatch.test/${projectSlug}${path}`,
   });
 
-  const hono = new Hono().route("/", events.hono as never);
+  const hono = new Hono().route("/", events as never);
 
   return {
     setPendingNavigate,

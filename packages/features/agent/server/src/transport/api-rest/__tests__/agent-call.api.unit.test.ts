@@ -118,7 +118,12 @@ function buildApi(
   } = {} as never,
 ) {
   const { security, chain } = testSecurity({ projectId, apiKeyUserId, authorizeRefuses });
-  const secured = security.createProjectApp({ basePath: "/api/v1/agents" });
+  const family = security.createProjectVersionedApp({
+    name: "agents-v1",
+    basePath: "/api/v1/agents",
+    errorEnvelope: "legacy",
+    staticGeneration: "v1",
+  });
   const getById = vi.fn(async () => agent);
   const app = { getById } as unknown as AgentApp;
   const runtime = {
@@ -129,8 +134,8 @@ function buildApi(
     runtime: () => runtime,
     assertRunnable,
   };
-  registerCallEndpoint({ secured, deps });
-  return { hono: secured.hono, chain, getById, dispatch, assertRunnable };
+  registerCallEndpoint({ family, deps });
+  return { hono: family.service.build(), chain, getById, dispatch, assertRunnable };
 }
 
 const body = JSON.stringify({ messages: [{ role: "user", content: "hi" }] });

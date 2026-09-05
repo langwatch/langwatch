@@ -5,9 +5,9 @@
 import type {
   DatasetDirectUploadAuthorization,
   DatasetDirectUploadAuthorizer,
+  DatasetDirectUploadRequestReader,
 } from "@langwatch/dataset-server";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { Context } from "hono";
 
 import { isCrossSiteRequest } from "../../api-rest.cross-site";
 
@@ -28,7 +28,7 @@ export function createDatasetDirectUploadAuthorizer(options: {
   const { session, credentials, projects } = options;
 
   return async function authorizeDirectUpload(
-    c: Context,
+    c: DatasetDirectUploadRequestReader,
     projectId: string,
   ): Promise<DatasetDirectUploadAuthorization> {
     // 1. The browser session (the upload UI).

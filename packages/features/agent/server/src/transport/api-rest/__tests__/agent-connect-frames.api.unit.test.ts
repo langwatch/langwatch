@@ -56,7 +56,12 @@ function testSecurity(): AppRestSecurity {
 
 function buildApi(relayMaxPayloadMb?: number) {
   const security = testSecurity();
-  const secured = security.createProjectApp({ basePath: "/api/v1/agents" });
+  const family = security.createProjectVersionedApp({
+    name: "agents-v1",
+    basePath: "/api/v1/agents",
+    errorEnvelope: "legacy",
+    staticGeneration: "v1",
+  });
   const framesSpy = vi.fn();
   const fakeTransport = {
     frames: framesSpy,
@@ -68,11 +73,11 @@ function buildApi(relayMaxPayloadMb?: number) {
     }),
   } as unknown as LongPollTransportService;
   registerConnectEndpoints({
-    secured,
+    family,
     transport: () => fakeTransport,
     relayMaxPayloadMb,
   });
-  return { hono: secured.hono, framesSpy };
+  return { hono: family.service.build(), framesSpy };
 }
 
 const headers = { "content-type": "application/json", authorization: "Bearer sk-lw-anything" };

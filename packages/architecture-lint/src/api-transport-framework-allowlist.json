@@ -1,37 +1,18 @@
 {
   "files": [
     "packages/enterprise/features/billing/server/src/transport/api-trpc/subscription.api.ts",
-    "packages/enterprise/features/governance/server/src/transport/api-trpc/activity-monitor.api.ts",
-    "packages/enterprise/features/governance/server/src/transport/api-trpc/ai-tools.api.ts",
-    "packages/enterprise/features/governance/server/src/transport/api-trpc/anomaly-rules.api.ts",
-    "packages/enterprise/features/governance/server/src/transport/api-trpc/governance.api.ts",
-    "packages/enterprise/features/governance/server/src/transport/api-trpc/ingestion-sources.api.ts",
-    "packages/enterprise/features/governance/server/src/transport/api-trpc/ingestion-templates.api.ts",
-    "packages/enterprise/features/governance/server/src/transport/api-trpc/routing-policy.api.ts",
-    "packages/enterprise/features/licensing/server/src/transport/api-trpc/license-enforcement.api.ts",
-    "packages/enterprise/features/licensing/server/src/transport/api-trpc/license.api.ts",
-    "packages/enterprise/features/scim/server/src/transport/api-trpc/scim-token.api.ts",
     "packages/enterprise/features/sso/server/src/transport/api-trpc/sso-connection.api.ts",
     "packages/enterprise/features/webhook/server/src/transport/api-trpc/webhook-endpoint.api.ts",
-    "packages/features/agent/server/src/transport/api-trpc/agent.api.ts",
-    "packages/features/agent/server/src/transport/api-trpc/http-proxy.api.ts",
-    "packages/features/annotation/server/src/transport/api-trpc/annotation.api.ts",
     "packages/features/auth/server/src/transport/api-trpc/public-env.api.ts",
-    "packages/features/evaluator/server/src/transport/api-trpc/evaluator.api.ts",
     "packages/features/experiment/server/src/transport/api-trpc/experiment.api.ts",
-    "packages/features/feature-flag/server/src/transport/api-trpc/feature-flag.api.ts",
     "packages/features/langy/server/src/transport/api-trpc/langy.api.ts",
-    "packages/features/monitor/server/src/transport/api-trpc/monitor.api.ts",
     "packages/features/ops/server/src/transport/api-trpc/bug-report.api.ts",
     "packages/features/ops/server/src/transport/api-trpc/ops.api.ts",
-    "packages/features/prompt/server/src/transport/api-rest/prompt.api.ts",
     "packages/features/scenario/server/src/transport/api-trpc/scenario-events.api.ts",
     "packages/features/suite/server/src/transport/api-trpc/suite.api.ts",
     "packages/features/trace/server/src/transport/api-rest/otlp-path-alias.api.ts",
     "packages/features/trace/server/src/transport/api-trpc/traces-v2.api.ts",
     "packages/features/trace/server/src/transport/api-trpc/traces.api.ts",
-    "packages/features/user/server/src/transport/api-trpc/user.api.ts",
-    "packages/features/workflow/server/src/transport/api-trpc/workflow-optimization.api.ts",
-    "packages/features/workflow/server/src/transport/api-trpc/workflow.api.ts"
+    "packages/features/user/server/src/transport/api-trpc/user.api.ts"
   ]
 }

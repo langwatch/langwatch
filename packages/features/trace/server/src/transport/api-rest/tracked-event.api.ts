@@ -17,15 +17,19 @@ import {
   type TrackEventRESTParamsValidator,
   trackEventRESTParamsValidatorSchema,
 } from "@langwatch/trace-contract";
-import { describeRoute, resolver } from "hono-openapi";
+import type { ErrorHandler } from "hono";
 import { z } from "zod";
 import { requires } from "@langwatch/api";
 import {
-  type AppRestProjectVariables,
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
-  type SecuredApp,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  projectOf,
+  type ProjectScopedContext,
+  resolver,
 } from "@langwatch/api/rest";
 
 const logger = createLogger("langwatch:api:events");
@@ -33,6 +37,24 @@ const logger = createLogger("langwatch:api:events");
 const trackEventResponseSchema = z.object({
   message: z.literal("Event tracked"),
 });
+
+/**
+ * A payload this family refused, carrying the prose the caller reads.
+ *
+ * The body has always been the bare `{ error }` the family writes itself, so
+ * the refusal is raised as the family's own error and rendered by the family's
+ * own handler rather than collapsing into the boundary's generic 500.
+ */
+class TrackedEventRejectedError extends Error {}
+
+const trackedEventErrorHandler =
+  (boundary: ErrorHandler): ErrorHandler =>
+  (error, c) => {
+    if (error instanceof TrackedEventRejectedError) {
+      return c.json({ error: error.message }, 400);
+    }
+    return boundary(error, c);
+  };
 
 /**
  * What recording a tracked event needs from the process.
@@ -69,72 +91,85 @@ export interface TrackedEventPorts {
 export function createEventsRestApp(options: {
   security: AppRestSecurity;
   ports: TrackedEventPorts;
-}): SecuredApp<{ Variables: AppRestProjectVariables }> {
+}): MountableRestApp {
   const { security, ports } = options;
 
-  const secured = security.createProjectApp({ basePath: "/api/events" });
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "events",
+    basePath: "/api/events",
+    errorEnvelope: "legacy",
+    errorHandler: trackedEventErrorHandler,
+  });
 
-  secured.access(requires("traces:create")).post(
-    "/track",
-    describeRoute({
-      description:
-        "Record a user event (e.g. thumbs up/down, selected text) attached to a trace. " +
-        "Predefined event types validate against their schemas; custom event types pass " +
-        "through `trackEventRESTParamsValidatorSchema`.",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Event tracked",
-          content: {
-            "application/json": { schema: resolver(trackEventResponseSchema) },
+  type EventsContext = ProjectScopedContext<EndpointVariables>;
+
+  // The body is read unparsed and parsed here rather than through `withInput`:
+  // a rejection answers 400 with this family's own prose, which is what every
+  // SDK release older than the canonical URL already reads.
+  const trackHandler = async (c: EventsContext, input: { body: string }) => {
+    const project = projectOf(c);
+
+    let rawBody: Record<string, unknown>;
+    try {
+      rawBody = JSON.parse(input.body) as Record<string, unknown>;
+    } catch {
+      throw new TrackedEventRejectedError("Bad request");
+    }
+
+    let body: TrackEventRESTParamsValidator;
+    try {
+      body = trackEventRESTParamsValidatorSchema.parse(rawBody);
+    } catch (error) {
+      logger.error({ error, body: rawBody, projectId: project.id }, "invalid event received");
+      ports.reportError(error);
+      throw new TrackedEventRejectedError(ports.describeValidationError(error));
+    }
+
+    try {
+      ports.assertPredefinedEventPayload(rawBody);
+    } catch (error) {
+      logger.error({ error, body: rawBody, projectId: project.id }, "invalid event received");
+      ports.reportError(error);
+      throw new TrackedEventRejectedError(ports.describeValidationError(error));
+    }
+
+    const eventId = body.event_id ?? ports.generateEventId();
+
+    try {
+      await ports.recordTrackedEvent({ project, body, eventId });
+    } catch (error) {
+      logger.error({ error }, "unable to dispatch tracked event span");
+    }
+
+    return { message: "Event tracked" as const };
+  };
+
+  return service
+    .registerRoute("post", "/track", MANAGEMENT_API_VERSION, trackHandler, (b) =>
+      policy(requires("traces:create"))(b)
+        .withRawBody("text", { contentType: "application/json" })
+        .withOutput(trackEventResponseSchema)
+        .withDocs({
+          description:
+            "Record a user event (e.g. thumbs up/down, selected text) attached to a trace. " +
+            "Predefined event types validate against their schemas; custom event types pass " +
+            "through `trackEventRESTParamsValidatorSchema`.",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Event tracked",
+              content: {
+                "application/json": { schema: resolver(trackEventResponseSchema) },
+              },
+            },
+            400: {
+              description: "Invalid event payload",
+              content: {
+                "application/json": { schema: resolver(badRequestSchema) },
+              },
+            },
           },
-        },
-        400: {
-          description: "Invalid event payload",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-
-      let rawBody: Record<string, unknown>;
-      try {
-        rawBody = (await c.req.json()) as Record<string, unknown>;
-      } catch {
-        return c.json({ error: "Bad request" }, 400);
-      }
-
-      let body: TrackEventRESTParamsValidator;
-      try {
-        body = trackEventRESTParamsValidatorSchema.parse(rawBody);
-      } catch (error) {
-        logger.error({ error, body: rawBody, projectId: project.id }, "invalid event received");
-        ports.reportError(error);
-        return c.json({ error: ports.describeValidationError(error) }, 400);
-      }
-
-      try {
-        ports.assertPredefinedEventPayload(rawBody);
-      } catch (error) {
-        logger.error({ error, body: rawBody, projectId: project.id }, "invalid event received");
-        ports.reportError(error);
-        return c.json({ error: ports.describeValidationError(error) }, 400);
-      }
-
-      const eventId = body.event_id ?? ports.generateEventId();
-
-      try {
-        await ports.recordTrackedEvent({ project, body, eventId });
-      } catch (error) {
-        logger.error({ error }, "unable to dispatch tracked event span");
-      }
-
-      return c.json({ message: "Event tracked" as const });
-    },
-  );
-
-  return secured;
+        }),
+    )
+    .build();
 }

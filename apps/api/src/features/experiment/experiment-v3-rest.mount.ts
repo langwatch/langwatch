@@ -95,5 +95,5 @@ export function mountExperimentV3Rest(options: {
     },
   });
 
-  return [canonical, createExperimentV3LegacyAliasRestApp({ canonical })];
+  return [canonical, createExperimentV3LegacyAliasRestApp({ security, canonical })];
 }

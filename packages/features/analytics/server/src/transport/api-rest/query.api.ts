@@ -6,16 +6,17 @@
 
 import { apiKeyPermission } from "@langwatch/api";
 import {
-  type AppRestProjectVariables,
   type AppRestSecurity,
   canonicalBaseResponses,
   canonicalUnprocessableResponses,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
   type MountableRestApp,
-  type SecuredApp,
-  validator as zValidator,
+  projectOf,
+  type ProjectScopedContext,
+  resolver,
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
-import { describeRoute, resolver } from "hono-openapi";
 
 import { LWQL_CLEAN_DIAGNOSTICS_MEANING } from "../../rules/langwatch-ql-diagnostics-shape.rules";
 import type { LangWatchQLRestPorts } from "../../services/langwatch-ql-route-guards.service";
@@ -27,9 +28,6 @@ import {
   lwqlGranularityStepSchema,
   lwqlTimeWindowSchema,
 } from "../../services/langwatch-ql-time-window.service";
-
-/** The app every route in this family is registered on. */
-type QueryApp = SecuredApp<{ Variables: AppRestProjectVariables }>;
 
 const logger = createLogger("langwatch:api:query");
 
@@ -47,9 +45,7 @@ const QUERY_PERMISSION = "analytics:view" as const;
  * `requires`, because this is a public API-key surface — the ceiling is what makes a scoped key
  * answer `effective = ApiKey ∩ user` instead of inheriting the whole of its owner's access.
  */
-function queryAccess() {
-  return apiKeyPermission(QUERY_PERMISSION);
-}
+const queryAccess = apiKeyPermission(QUERY_PERMISSION);
 
 const RUN_DESCRIPTION =
   "Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project.\n\n" +
@@ -62,95 +58,6 @@ const SCHEMA_DESCRIPTION =
   "Scoped to the credential's own project and its permissions: a column this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.";
 
 /**
- * `POST /api/v1/query` — execute one statement. The body IS the query.
- */
-function registerRun(secured: QueryApp, ports: LangWatchQLRestPorts): void {
-  secured.access(queryAccess()).post(
-    "/",
-    describeRoute({
-      summary: "Run a LangWatchQL query",
-      description: RUN_DESCRIPTION,
-      tags: QUERY_TAGS,
-      responses: {
-        ...canonicalBaseResponses,
-        // A scan-ceiling refusal: the statement is well formed, the volume it
-        // would read is not allowed. QueryScanLimitExceededError carries 422.
-        ...canonicalUnprocessableResponses,
-        200: {
-          description:
-            "The query ran. Columns, rows, execution statistics, truncation state and diagnostics, scoped to the caller's project.",
-          content: {
-            "application/json": { schema: resolver(lwqlResultSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("json", lwqlQuerySchema),
-    async (c) => {
-      const project = c.get("project");
-      const { sql, parameters, timeWindow, granularitySeconds } = c.req.valid("json");
-
-      logger.info({ projectId: project.id, sqlLength: sql.length }, "Running LangWatchQL query");
-
-      // The restricted tenant capability is hashed from the project's own
-      // LangWatchQL secret, which the request's identity deliberately does not
-      // carry. Read it here, and hand the service only the two fields it names.
-      const { lwqlKey } = await ports.projects().getById(project.id);
-
-      const result = await ports.langWatchQL().execute({
-        project: { id: project.id, lwqlKey },
-        protections: await ports.protectionsFor({ projectId: project.id }),
-        sql,
-        ...(parameters ? { parameters } : {}),
-        ...(timeWindow ? { timeWindow } : {}),
-        ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
-      });
-      return c.json(result);
-    },
-  );
-}
-
-/**
- * `GET /api/v1/query/schema` — describe what may be queried. A GET, because it reads a catalog
- * and takes no arguments: the credential is the whole of its input.
- */
-function registerSchema(secured: QueryApp, ports: LangWatchQLRestPorts): void {
-  secured.access(queryAccess()).get(
-    "/schema",
-    describeRoute({
-      summary: "Discover the queryable LangWatchQL schema",
-      description: SCHEMA_DESCRIPTION,
-      tags: QUERY_TAGS,
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description:
-            "The datasets and columns this key may query, with the permissions that unlock each one.",
-          content: {
-            "application/json": { schema: resolver(lwqlSchemaSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-
-      return c.json(
-        ports.langWatchQL().describeSchema({
-          protections: await ports.protectionsFor({ projectId: project.id }),
-        }),
-      );
-    },
-  );
-}
-
-/** Registers the query-domain routes. */
-export function registerQueryRoutes(secured: QueryApp, ports: LangWatchQLRestPorts): void {
-  registerRun(secured, ports);
-  registerSchema(secured, ports);
-}
-
-/**
  * `/api/v1/query`, bound to one process's graph. Version-first, unlike the families that
  * predate it: a consumer holding a base URL does not learn two rules for where `v1` lives.
  */
@@ -158,14 +65,94 @@ export function createQueryRestApp(options: {
   security: AppRestSecurity;
   ports: LangWatchQLRestPorts;
 }): MountableRestApp {
-  const secured = options.security.createProjectApp({
+  const { security, ports } = options;
+
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "query",
     basePath: "/api/v1/query",
     errorEnvelope: "canonical",
+    staticGeneration: "v1",
   });
 
-  registerQueryRoutes(secured, options.ports);
+  type QueryContext = ProjectScopedContext<EndpointVariables>;
 
-  return secured.hono;
+  const projectId = (c: QueryContext): string => projectOf(c).id;
+
+  /** `POST /api/v1/query` — execute one statement. The body IS the query. */
+  const runHandler = async (c: QueryContext, input: z.infer<typeof lwqlQuerySchema>) => {
+    const { sql, parameters, timeWindow, granularitySeconds } = input;
+    const id = projectId(c);
+
+    logger.info({ projectId: id, sqlLength: sql.length }, "Running LangWatchQL query");
+
+    // The restricted tenant capability is hashed from the project's own
+    // LangWatchQL secret, which the request's identity deliberately does not
+    // carry. Read it here, and hand the service only the two fields it names.
+    const { lwqlKey } = await ports.projects().getById(id);
+
+    return await ports.langWatchQL().execute({
+      project: { id, lwqlKey },
+      protections: await ports.protectionsFor({ projectId: id }),
+      sql,
+      ...(parameters ? { parameters } : {}),
+      ...(timeWindow ? { timeWindow } : {}),
+      ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
+    });
+  };
+
+  /**
+   * `GET /api/v1/query/schema` — describe what may be queried. A GET, because it reads a catalog
+   * and takes no arguments: the credential is the whole of its input.
+   */
+  const schemaHandler = async (c: QueryContext) =>
+    ports.langWatchQL().describeSchema({
+      protections: await ports.protectionsFor({ projectId: projectId(c) }),
+    });
+
+  return service
+    .registerRoute("post", "/", MANAGEMENT_API_VERSION, runHandler, (b) =>
+      policy(queryAccess)(b)
+        .withInput(lwqlQuerySchema)
+        .withOutput(lwqlResultSchema)
+        .withDocs({
+          summary: "Run a LangWatchQL query",
+          description: RUN_DESCRIPTION,
+          tags: QUERY_TAGS,
+          responses: {
+            ...canonicalBaseResponses,
+            // A scan-ceiling refusal: the statement is well formed, the volume
+            // it would read is not allowed. QueryScanLimitExceededError carries 422.
+            ...canonicalUnprocessableResponses,
+            200: {
+              description:
+                "The query ran. Columns, rows, execution statistics, truncation state and diagnostics, scoped to the caller's project.",
+              content: {
+                "application/json": { schema: resolver(lwqlResultSchema) },
+              },
+            },
+          },
+        }),
+    )
+    .registerRoute("get", "/schema", MANAGEMENT_API_VERSION, schemaHandler, (b) =>
+      policy(queryAccess)(b)
+        .withOutput(lwqlSchemaSchema)
+        .withDocs({
+          summary: "Discover the queryable LangWatchQL schema",
+          description: SCHEMA_DESCRIPTION,
+          tags: QUERY_TAGS,
+          responses: {
+            ...canonicalBaseResponses,
+            200: {
+              description:
+                "The datasets and columns this key may query, with the permissions that unlock each one.",
+              content: {
+                "application/json": { schema: resolver(lwqlSchemaSchema) },
+              },
+            },
+          },
+        }),
+    )
+    .build();
 }
 
 /**

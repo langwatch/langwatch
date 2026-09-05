@@ -125,7 +125,7 @@ describe("given the prompt transports mounted on the process's own roots", () =>
         } as never,
       });
 
-      const paths = [...new Set(app.hono.routes.map((route) => route.path))];
+      const paths = [...new Set(app.routes.map((route) => route.path))];
 
       // The family is twinned onto /api/v1 by the door; the /api addresses its
       // callers already hold are what must not move.

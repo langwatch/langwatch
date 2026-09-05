@@ -13,29 +13,28 @@ import {
   type ScenarioTabRegistry,
   type SimulationService,
 } from "@langwatch/scenario-contract";
-import { describeRoute, resolver } from "hono-openapi";
-import type { MiddlewareHandler } from "hono";
+import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { z } from "zod";
 import { requires } from "@langwatch/api";
 import {
   type AppRestBroadcast,
-  type AppRestProjectVariables,
   type AppRestSecurity,
   baseResponses,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
   type PlatformUrlBuilder,
-  type SecuredApp,
-  validator as zValidator,
+  projectOf,
+  type ProjectScopedContext,
+  resolver,
 } from "@langwatch/api/rest";
 
 const logger = createLogger("langwatch:api:scenario-events");
 
 /**
- * Externalises the inline media a reported event carries, rewriting the event
- * to reference the stored bytes by URL.
- *
- * The walk itself is the stored-objects vertical's, and it needs that
- * vertical's content-addressed store, so it arrives already bound to one. Only
- * the ids of what it stored are read back here, for the log line.
+ * Externalises the inline media a reported event carries, rewriting the
+ * event to reference the stored bytes by URL. The walk is the
+ * stored-objects vertical's, arriving already bound to its store.
  */
 export type InlineMediaExtraction = (input: {
   event: unknown;
@@ -46,13 +45,40 @@ export type InlineMediaExtraction = (input: {
 }) => Promise<{ rewrittenEvent: unknown; refs: readonly { id: string }[] }>;
 
 /**
- * REST for the events an SDK reports while a scenario runs.
- *
- * Everything the family needs from the process arrives as an argument: the
- * simulation and tab services it dispatches to, the tenant broadcast the live
- * simulations page reads, the media externalisation the stored-objects
- * vertical owns, and the two middlewares whose implementations depend on this
- * process's plan store and Node bridge.
+ * A run this project does not hold. The family answers it in the bare
+ * `{ error }` body it has always had.
+ */
+class ScenarioRunNotThereError extends Error {}
+
+const scenarioEventErrorHandler =
+  (boundary: ErrorHandler): ErrorHandler =>
+  (error, c) => {
+    if (error instanceof ScenarioRunNotThereError) {
+      return c.json({ error: error.message }, 404);
+    }
+    return boundary(error, c);
+  };
+
+const browserTabBodySchema = z.object({
+  tabKey: z.string().min(1).max(200),
+  batchRunId: z.string().min(1).max(200),
+  scenarioSetId: z.string().min(1).max(200).optional(),
+});
+
+const archiveQuerySchema = z
+  .object({
+    scenarioSetId: z.string().min(1).optional(),
+    scenarioRunId: z.string().min(1).optional(),
+  })
+  .refine(
+    (query) => (query.scenarioSetId === undefined) !== (query.scenarioRunId === undefined),
+    { message: "Pass exactly one of scenarioSetId or scenarioRunId as a query parameter" },
+  );
+
+/**
+ * REST for the events an SDK reports while a scenario runs. Everything
+ * needed from the process arrives as an argument: services, tenant
+ * broadcast, media externalisation, and the two dependent middlewares.
  */
 export function createScenarioEventsRestApp(options: {
   security: AppRestSecurity;
@@ -68,7 +94,7 @@ export function createScenarioEventsRestApp(options: {
    *  environment here: a feature receives typed configuration, and the
    *  composition root is the one place that parses it. */
   platformUrl: PlatformUrlBuilder;
-}): SecuredApp<{ Variables: AppRestProjectVariables }> {
+}): MountableRestApp {
   const {
     security,
     simulations,
@@ -80,266 +106,253 @@ export function createScenarioEventsRestApp(options: {
     platformUrl,
   } = options;
 
-  const secured = security.createProjectApp({ basePath: "/api/scenario-events" });
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "scenario-events",
+    basePath: "/api/scenario-events",
+    errorEnvelope: "legacy",
+    errorHandler: scenarioEventErrorHandler,
+  });
 
-  // POST /api/scenario-events - Create a new scenario event
-  //
-  // Reporting a scenario event creates run data; it never touches a scenario
-  // definition, so it asks for `scenarios:create` rather than the administration
-  // grain. `:manage` still implies `:create` through the RBAC hierarchy, so every
-  // SDK key and role that could report events yesterday still can; a viewer holds
-  // only `scenarios:view` and is declined exactly as before.
-  secured.access(requires("scenarios:create")).post(
-    "/",
-    traceUsageGuard,
-    bodyLimit({ maxSize: 50 * 1024 * 1024 }), // 50MB — accommodates inline media payloads
-    describeRoute({
-      description: "Create a new scenario event",
-      responses: {
-        ...baseResponses,
-        201: {
-          description: "Event created successfully",
-          content: {
-            "application/json": { schema: resolver(responseSchemas.success) },
-          },
-        },
-        400: {
-          description: "Invalid event data",
-          content: {
-            "application/json": { schema: resolver(responseSchemas.error) },
-          },
-        },
+  type ScenarioEventContext = ProjectScopedContext<EndpointVariables>;
+
+  const reportHandler = async (
+    c: ScenarioEventContext,
+    validatedEvent: z.infer<typeof scenarioEventSchema>,
+  ) => {
+    const project = projectOf(c);
+
+    logger.info(
+      {
+        projectId: project.id,
+        eventType: validatedEvent.type,
+        scenarioId: validatedEvent.scenarioId,
+        scenarioRunId: validatedEvent.scenarioRunId,
+        scenarioSetId: validatedEvent.scenarioSetId,
       },
-    }),
-    zValidator("json", scenarioEventSchema),
-    async (c) => {
-      const { project } = c.var;
-      const validatedEvent = c.req.valid("json");
+      "Received scenario event",
+    );
 
+    // Extract inline media bytes, externalize to stored objects, and rewrite
+    // the event payload to reference them by URL before dispatch.
+    const { rewrittenEvent: rawRewritten, refs } = await extractInlineMedia({
+      event: validatedEvent,
+      projectId: project.id,
+      ownerKind: "scenario_run",
+      ownerId: validatedEvent.scenarioRunId,
+      purpose: "scenario_event",
+    });
+
+    // Cast back to the typed ScenarioEvent — the rewrite only touches content
+    // arrays inside message objects; all discriminant fields are preserved.
+    const event = rawRewritten as ScenarioEvent;
+
+    if (refs.length > 0) {
       logger.info(
         {
+          stored_object_ids: refs.map((r) => r.id),
           projectId: project.id,
-          eventType: validatedEvent.type,
-          scenarioId: validatedEvent.scenarioId,
           scenarioRunId: validatedEvent.scenarioRunId,
-          scenarioSetId: validatedEvent.scenarioSetId,
+          count: refs.length,
         },
-        "Received scenario event",
+        `scenario event extracted ${refs.length} stored object(s)`,
       );
+    }
 
-      // Extract inline media bytes, externalize to stored objects, and rewrite
-      // the event payload to reference them by URL before dispatch.
-      const { rewrittenEvent: rawRewritten, refs } = await extractInlineMedia({
-        event: validatedEvent,
-        projectId: project.id,
-        ownerKind: "scenario_run",
-        ownerId: validatedEvent.scenarioRunId,
-        purpose: "scenario_event",
-      });
+    await dispatchSimulationEvent(simulations(), project.id, event);
 
-      // Cast back to the typed ScenarioEvent — the rewrite only touches content
-      // arrays inside message objects; all discriminant fields are preserved.
-      const event = rawRewritten as ScenarioEvent;
+    // Streaming events: broadcast only, no persistence
+    if (isStreamingEvent(event.type)) {
+      await broadcastStreamingEvent(broadcast(), project.id, event);
+      return { success: true };
+    }
 
-      if (refs.length > 0) {
-        logger.info(
-          {
-            stored_object_ids: refs.map((r) => r.id),
-            projectId: project.id,
-            scenarioRunId: validatedEvent.scenarioRunId,
-            count: refs.length,
-          },
-          `scenario event extracted ${refs.length} stored object(s)`,
-        );
-      }
+    // Broadcast START/END directly so the frontend gets them immediately
+    // (the subscriber's debounced broadcast is too slow and causes CONTENT
+    // deltas to be dropped). Works regardless of event-sourcing flag.
+    if (
+      event.type === ScenarioEventType.TEXT_MESSAGE_START ||
+      event.type === ScenarioEventType.TEXT_MESSAGE_END
+    ) {
+      await broadcastStreamingEvent(broadcast(), project.id, event);
+    }
 
-      await dispatchSimulationEvent(simulations(), project.id, event);
+    const url = platformUrl({
+      projectSlug: project.slug,
+      path: `/simulations/${event.scenarioSetId || DEFAULT_SET_ID}`,
+    });
 
-      // Streaming events: broadcast only, no persistence
-      if (isStreamingEvent(event.type)) {
-        await broadcastStreamingEvent(broadcast(), project.id, event);
-        return c.json({ success: true }, 201);
-      }
+    return { success: true, url };
+  };
 
-      // Broadcast START/END directly so the frontend gets them immediately
-      // (the subscriber's debounced broadcast is too slow and causes CONTENT
-      // deltas to be dropped). Works regardless of event-sourcing flag.
-      if (
-        event.type === ScenarioEventType.TEXT_MESSAGE_START ||
-        event.type === ScenarioEventType.TEXT_MESSAGE_END
-      ) {
-        await broadcastStreamingEvent(broadcast(), project.id, event);
-      }
+  const browserTabHandler = async (
+    c: ScenarioEventContext,
+    input: z.infer<typeof browserTabBodySchema>,
+  ) => {
+    const project = projectOf(c);
+    const { tabKey, batchRunId, scenarioSetId } = input;
 
-      const url = platformUrl({
-        projectSlug: project.slug,
-        path: `/simulations/${event.scenarioSetId || DEFAULT_SET_ID}`,
-      });
+    // Built server-side from ids rather than accepted as a URL: a handoff can
+    // only ever point a browser at this instance's own simulations page. The
+    // ids are caller-supplied and only length-bounded, so they are encoded — a
+    // `#` or `?` in one would otherwise truncate the rest of the path.
+    const url = platformUrl({
+      projectSlug: project.slug,
+      path: `/simulations/${encodeURIComponent(
+        scenarioSetId || DEFAULT_SET_ID,
+      )}/${encodeURIComponent(batchRunId)}`,
+    });
 
-      return c.json({ success: true, url }, 201);
-    },
-  );
+    const hasLiveTab = await scenarioTabs().hasLiveTab({ projectId: project.id, tabKey });
 
-  // POST /api/scenario-events/browser-tab - Offer a batch run to a simulations
-  // tab that is already open on the caller's machine.
-  //
-  // The SDK sends the scenario tab key it stamped on the tab it opened earlier.
-  // When a tab holding that key still has a live SSE subscription, the run is
-  // broadcast to it and the SDK skips opening a browser; otherwise the SDK falls
-  // back to opening one. Reporting a run is `scenarios:create` work, and so is
-  // steering where that run is displayed.
-  secured.access(requires("scenarios:create")).post(
-    "/browser-tab",
-    describeRoute({
-      description:
-        "Offer a batch run to an already-open simulations tab on the caller's machine. Returns whether a live tab took it.",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Handoff evaluated",
-          content: {
-            "application/json": {
-              schema: resolver(responseSchemas.browserTabHandoff),
-            },
-          },
-        },
-      },
-    }),
-    zValidator(
-      "json",
-      z.object({
-        tabKey: z.string().min(1).max(200),
-        batchRunId: z.string().min(1).max(200),
-        scenarioSetId: z.string().min(1).max(200).optional(),
-      }),
-    ),
-    async (c) => {
-      const { project } = c.var;
-      const { tabKey, batchRunId, scenarioSetId } = c.req.valid("json");
+    if (!hasLiveTab) {
+      return { delivered: false, url };
+    }
 
-      // Built server-side from ids rather than accepted as a URL: a handoff can
-      // only ever point a browser at this instance's own simulations page. The
-      // ids are caller-supplied and only length-bounded, so they are encoded — a
-      // `#` or `?` in one would otherwise truncate the rest of the path.
-      const url = platformUrl({
-        projectSlug: project.slug,
-        path: `/simulations/${encodeURIComponent(
-          scenarioSetId || DEFAULT_SET_ID,
-        )}/${encodeURIComponent(batchRunId)}`,
-      });
+    const payload: ScenarioTabNavigatePayload = {
+      event: SCENARIO_TAB_NAVIGATE_EVENT,
+      tabKey,
+      url,
+    };
 
-      const hasLiveTab = await scenarioTabs().hasLiveTab({
-        projectId: project.id,
-        tabKey,
-      });
+    // Parked before the broadcast so a tab reconnecting right now cannot slip
+    // between the two and miss a run we already reported as delivered.
+    await scenarioTabs().setPendingNavigate({ projectId: project.id, tabKey, url });
 
-      if (!hasLiveTab) {
-        return c.json({ delivered: false, url }, 200);
-      }
+    await broadcast().broadcastToTenant(
+      project.id,
+      JSON.stringify(payload),
+      "simulation_updated",
+    );
 
-      const payload: ScenarioTabNavigatePayload = {
-        event: SCENARIO_TAB_NAVIGATE_EVENT,
-        tabKey,
-        url,
-      };
+    logger.info(
+      { projectId: project.id, batchRunId },
+      "Handed scenario batch to an open simulations tab",
+    );
 
-      // Parked before the broadcast so a tab reconnecting right now cannot slip
-      // between the two and miss a run we already reported as delivered.
-      await scenarioTabs().setPendingNavigate({
-        projectId: project.id,
-        tabKey,
-        url,
-      });
+    return { delivered: true, url };
+  };
 
-      await broadcast().broadcastToTenant(
-        project.id,
-        JSON.stringify(payload),
-        "simulation_updated",
-      );
+  const archiveHandler = async (
+    c: ScenarioEventContext,
+    input: z.infer<typeof archiveQuerySchema>,
+  ) => {
+    const project = projectOf(c);
+    const { scenarioSetId, scenarioRunId } = input;
 
-      logger.info(
-        { projectId: project.id, batchRunId },
-        "Handed scenario batch to an open simulations tab",
-      );
-
-      return c.json({ delivered: true, url }, 200);
-    },
-  );
-
-  // DELETE /api/scenario-events - Archive simulation runs. Exactly ONE scope is
-  // MANDATORY: a scenarioSetId (archive every run in the set) or a
-  // scenarioRunId (archive one run). An unqualified request is rejected so a
-  // single call can never archive every run in the project. Stays at `:manage`:
-  // it is destruction, and only the administration grain should carry it.
-  secured.access(requires("scenarios:manage")).delete(
-    "/",
-    traceUsageGuard,
-    describeRoute({
-      description:
-        "Archive simulation runs. Pass exactly one of `scenarioSetId` (archives every run in the set; `scenarioSetId=default` targets the implicit default set) or `scenarioRunId` (archives that one run).",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Runs archived successfully",
-          content: {
-            "application/json": { schema: resolver(responseSchemas.archive) },
-          },
-        },
-        400: {
-          description: "Missing or invalid scope parameter",
-          content: {
-            "application/json": { schema: resolver(responseSchemas.error) },
-          },
-        },
-        404: {
-          description: "Scenario run not found in this project",
-          content: {
-            "application/json": { schema: resolver(responseSchemas.error) },
-          },
-        },
-      },
-    }),
-    zValidator(
-      "query",
-      z
-        .object({
-          scenarioSetId: z.string().min(1).optional(),
-          scenarioRunId: z.string().min(1).optional(),
-        })
-        .refine(
-          (query) => (query.scenarioSetId === undefined) !== (query.scenarioRunId === undefined),
-          { message: "Pass exactly one of scenarioSetId or scenarioRunId as a query parameter" },
-        ),
-    ),
-    async (c) => {
-      const { project } = c.var;
-      const { scenarioSetId, scenarioRunId } = c.req.valid("query");
-
-      if (scenarioRunId !== undefined) {
-        const archivedRun = await archiveScenarioRun({
-          simulations: simulations(),
-          projectId: project.id,
-          scenarioRunId,
-        });
-        if (archivedRun === null) {
-          return c.json({ error: "Scenario run not found" }, 404);
-        }
-        return c.json(archivedRun, 200);
-      }
-
-      const result = await archiveScenarioSetRuns({
+    if (scenarioRunId !== undefined) {
+      const archivedRun = await archiveScenarioRun({
         simulations: simulations(),
         projectId: project.id,
-        // The refine above guarantees exactly one scope, so setId is present.
-        scenarioSetId: scenarioSetId!,
+        scenarioRunId,
       });
+      if (archivedRun === null) throw new ScenarioRunNotThereError("Scenario run not found");
+      return archivedRun;
+    }
 
-      return c.json(result, 200);
-    },
+    return await archiveScenarioSetRuns({
+      simulations: simulations(),
+      projectId: project.id,
+      // The refine above guarantees exactly one scope, so setId is present.
+      scenarioSetId: scenarioSetId!,
+    });
+  };
+
+  return (
+    service
+      // Reporting an event creates run data, not a scenario definition, so it
+      // asks for `scenarios:create`, not `:manage`. `:manage` still implies
+      // `:create`, so every prior key/role still works; a viewer is declined as
+      // before.
+      .registerRoute("post", "/", MANAGEMENT_API_VERSION, reportHandler, (b) =>
+        policy(requires("scenarios:create"))(b)
+          .withInput(scenarioEventSchema)
+          .withOutput(responseSchemas.success)
+          .withStatus(201)
+          // 50MB — accommodates inline media payloads
+          .withMiddleware(traceUsageGuard, bodyLimit({ maxSize: 50 * 1024 * 1024 }))
+          .withDocs({
+            description: "Create a new scenario event",
+            responses: {
+              ...baseResponses,
+              201: {
+                description: "Event created successfully",
+                content: {
+                  "application/json": { schema: resolver(responseSchemas.success) },
+                },
+              },
+              400: {
+                description: "Invalid event data",
+                content: {
+                  "application/json": { schema: resolver(responseSchemas.error) },
+                },
+              },
+            },
+          }),
+      )
+      // Offer a batch run to a tab already open on the caller's machine. If the
+      // SDK's stamped tab key still has a live SSE subscription, the run
+      // broadcasts there and the SDK skips opening a browser; otherwise it
+      // falls back to opening one.
+      .registerRoute("post", "/browser-tab", MANAGEMENT_API_VERSION, browserTabHandler, (b) =>
+        policy(requires("scenarios:create"))(b)
+          .withInput(browserTabBodySchema)
+          .withOutput(responseSchemas.browserTabHandoff)
+          .withDocs({
+            description:
+              "Offer a batch run to an already-open simulations tab on the caller's machine. Returns whether a live tab took it.",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Handoff evaluated",
+                content: {
+                  "application/json": {
+                    schema: resolver(responseSchemas.browserTabHandoff),
+                  },
+                },
+              },
+            },
+          }),
+      )
+      // Archive simulation runs. Exactly ONE scope is MANDATORY: a
+      // scenarioSetId (archive every run in the set) or a scenarioRunId
+      // (archive one run). An unqualified request is rejected so a single call
+      // can never archive every run in the project. Stays at `:manage`: it is
+      // destruction, and only the administration grain should carry it.
+      .registerRoute("delete", "/", MANAGEMENT_API_VERSION, archiveHandler, (b) =>
+        policy(requires("scenarios:manage"))(b)
+          .withQuery(archiveQuerySchema)
+          .withOutput(responseSchemas.archive)
+          .withMiddleware(traceUsageGuard)
+          .withDocs({
+            description:
+              "Archive simulation runs. Pass exactly one of `scenarioSetId` (archives every run in the set; `scenarioSetId=default` targets the implicit default set) or `scenarioRunId` (archives that one run).",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Runs archived successfully",
+                content: {
+                  "application/json": { schema: resolver(responseSchemas.archive) },
+                },
+              },
+              400: {
+                description: "Missing or invalid scope parameter",
+                content: {
+                  "application/json": { schema: resolver(responseSchemas.error) },
+                },
+              },
+              404: {
+                description: "Scenario run not found in this project",
+                content: {
+                  "application/json": { schema: resolver(responseSchemas.error) },
+                },
+              },
+            },
+          }),
+      )
+      .build()
   );
-
-  return secured;
 }
+
 
 async function dispatchSimulationEvent(
   simulations: SimulationService,
@@ -445,13 +458,9 @@ export async function archiveScenarioRun({
 }
 
 /**
- * Archives every active run in a scenario set by dispatching a deleteRun
- * command per run id. Exported as a test seam.
- *
- * Dispatch is bounded-concurrency (not an unbounded `Promise.all`) and
- * failure-collecting: one rejected deleteRun never short-circuits the rest;
- * the failure is counted and logged. The returned `hasMore` reflects whether
- * the run-id lookup hit its cap, i.e. more runs may remain to archive.
+ * Archives every active run in a set via one deleteRun command per run id
+ * (test seam). Bounded-concurrency and failure-collecting: one rejection
+ * never short-circuits the rest. `hasMore` reflects whether the lookup hit its cap.
  */
 export async function archiveScenarioSetRuns({
   simulations,

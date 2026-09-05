@@ -3,7 +3,7 @@ import { toCanonicalCustomModelList } from "../../rules/custom-model-list.rules"
 import { createLogger } from "@langwatch/observability";
 import { type OrganizationService, TeamNotFoundError } from "@langwatch/organization-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
-import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
+import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { z } from "zod";
 import {
   type AppRestProjectVariables,
@@ -122,7 +122,7 @@ export function createModelProvidersRestApp(options: {
     c: ServiceContext<EndpointVariables>,
     input: z.infer<typeof providerParamsSchema> & z.infer<typeof updateModelProviderInputSchema>,
   ) => {
-    const service = modelProviders();
+    const modelProviderService = modelProviders();
     const project = projectOf(c);
     const { provider, ...data } = input;
 
@@ -140,7 +140,7 @@ export function createModelProvidersRestApp(options: {
     // through the id-based path. Nothing is caught here on purpose. Every failure `upsert` raises is a
     // HandledError carrying its own status and code, and the framework boundary renders it; catching them
     // to rethrow one 400 replaced every status with 400 and every code with `http_error`.
-    await service.upsert({
+    await modelProviderService.upsert({
       projectId: project.id,
       provider,
       enabled: data.enabled,
@@ -152,7 +152,7 @@ export function createModelProvidersRestApp(options: {
     });
 
     // Return updated providers list with masked keys
-    const providers = await service.getForProject({ projectId: project.id });
+    const providers = await modelProviderService.getForProject({ projectId: project.id });
 
     logger.info({ projectId: project.id, provider }, "Successfully upserted model provider");
 

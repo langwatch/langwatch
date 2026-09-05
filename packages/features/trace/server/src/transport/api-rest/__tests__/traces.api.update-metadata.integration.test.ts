@@ -96,7 +96,7 @@ function buildApi() {
 
   return {
     fetch: (urlPath: string, init?: RequestInit) =>
-      app.hono.fetch(new Request(`http://api.test${urlPath}`, init)),
+      app.fetch(new Request(`http://api.test${urlPath}`, init)),
   };
 }
 

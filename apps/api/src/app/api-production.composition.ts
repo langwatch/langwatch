@@ -1461,6 +1461,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const restSecurity: AppRestSecurity = ApiRestSecurity.create({
       ...credentials,
       observability: ApiRestObservabilityComposition.create(),
+      // The one ledger every keyed create on this process dispatches through,
+      // supplied here so a family declares `withIdempotency(...)` and wires
+      // nothing. Absent on a process with no database or no cipher.
+      ...(this.composedIdempotency ? { idempotency: this.composedIdempotency.run } : {}),
     });
     const projectRestPolicy: ApiRestProjectPolicy = ApiRestSecurity.projectPolicy(credentials);
     // The process-owned families FIRST, and specifically before anything that

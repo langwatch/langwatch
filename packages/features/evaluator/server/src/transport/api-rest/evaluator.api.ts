@@ -16,14 +16,17 @@ import {
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
   type PlatformUrlBuilder,
-  type SecuredApp,
-  validator as zValidator,
+  projectOf,
+  type ProjectScopedContext,
+  resolver,
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import type { EvaluatorApp } from "#app/evaluator.app";
 import {
@@ -49,6 +52,10 @@ export type EvaluatorOrganizationVariables = {
 
 export type EvaluatorAppVariables = AppRestProjectVariables & EvaluatorOrganizationVariables;
 
+const idParamsSchema = z.object({ id: z.string().min(1) });
+const idOrSlugParamsSchema = z.object({ idOrSlug: z.string().min(1) });
+const archivedSchema = z.object({ success: z.boolean() });
+
 /** The evaluators REST family, built against one process's security. */
 export function createEvaluatorsRestApp(options: {
   security: AppRestSecurity;
@@ -61,324 +68,264 @@ export function createEvaluatorsRestApp(options: {
   platformUrl: PlatformUrlBuilder;
   /** Sets `organization` on the request context, after authentication. */
   organizationMiddleware: MiddlewareHandler;
-}): SecuredApp<{ Variables: EvaluatorAppVariables }> {
+}): MountableRestApp {
   const { security, app, platformUrl, organizationMiddleware } = options;
 
-  const secured = security.createProjectApp<EvaluatorOrganizationVariables>({
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "evaluators",
     basePath: "/api/evaluators",
+    errorEnvelope: "legacy",
+    // Runs after the access chain authenticates and sets `project`, which is
+    // what it reads the team graph from.
+    routeMiddleware: [organizationMiddleware],
   });
 
-  // organizationMiddleware runs after the access chain authenticates and sets
-  // `project`, so it is applied per route rather than app-wide.
+  type EvaluatorContext = ProjectScopedContext<EndpointVariables>;
 
-  // Get all evaluators
-  secured.access(requires("evaluations:view")).get(
-    "/",
-    organizationMiddleware,
-    describeRoute({
-      description: "Get all evaluators for a project",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(z.array(apiResponseEvaluatorWithPlatformUrlSchema)),
-            },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
+  /** One evaluator as the wire publishes it, with its editor address. */
+  const withPlatformUrl = (evaluator: unknown, projectSlug: string) => {
+    const parsed = apiResponseEvaluatorSchema.parse(evaluator);
+    return {
+      ...parsed,
+      platformUrl: platformUrl({
+        projectSlug,
+        path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsed.id}`,
+      }),
+    };
+  };
 
-      logger.info({ projectId: project.id }, "Getting all evaluators for project");
+  const listHandler = async (c: EvaluatorContext) => {
+    const project = projectOf(c);
+    logger.info({ projectId: project.id }, "Getting all evaluators for project");
 
-      const rows = await app().getAllWithFields({
-        projectId: project.id,
-      });
-
-      return c.json(
-        apiResponseEvaluatorSchema
-          .array()
-          .parse(rows)
-          .map((e) => ({
-            ...e,
-            platformUrl: platformUrl({
-              projectSlug: project.slug,
-              path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${e.id}`,
-            }),
-          })),
-      );
-    },
-  );
-
-  // Get evaluator by ID or slug
-  secured.access(requires("evaluations:view")).get(
-    "/:idOrSlug{.+}",
-    organizationMiddleware,
-    describeRoute({
-      description: "Get a specific evaluator by ID or slug",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
-            },
-          },
-        },
-        404: {
-          description: "Evaluator not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { idOrSlug } = c.req.param();
-
-      logger.info({ projectId: project.id, idOrSlug }, "Getting evaluator");
-
-      const evaluator = await app().tryGetByIdOrSlugWithFields({
-        idOrSlug,
-        projectId: project.id,
-      });
-
-      if (!evaluator) {
-        throw new HTTPException(404, {
-          message: "Evaluator not found",
-        });
-      }
-
-      const parsed = apiResponseEvaluatorSchema.parse(evaluator);
-      return c.json({
-        ...parsed,
+    const rows = await app().getAllWithFields({ projectId: project.id });
+    return apiResponseEvaluatorSchema
+      .array()
+      .parse(rows)
+      .map((e) => ({
+        ...e,
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsed.id}`,
+          path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${e.id}`,
         }),
-      });
-    },
-  );
+      }));
+  };
 
-  // Create evaluator
-  // Creating asks for `evaluations:create`; `:manage` still implies it, so no
-  // existing caller changes and a viewer is declined as before.
-  secured.access(requires("evaluations:create")).post(
-    "/",
-    organizationMiddleware,
-    describeRoute({
-      description: "Create a new evaluator",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
-            },
-          },
-        },
-      },
-    }),
-    zValidator("json", createEvaluatorInputSchema),
-    async (c) => {
-      const application = app();
-      const project = c.get("project");
-      const data = c.req.valid("json");
+  const getHandler = async (
+    c: EvaluatorContext,
+    input: z.infer<typeof idOrSlugParamsSchema>,
+  ) => {
+    const project = projectOf(c);
+    logger.info({ projectId: project.id, idOrSlug: input.idOrSlug }, "Getting evaluator");
 
-      logger.info({ projectId: project.id, name: data.name }, "Creating evaluator");
+    const evaluator = await app().tryGetByIdOrSlugWithFields({
+      idOrSlug: input.idOrSlug,
+      projectId: project.id,
+    });
+    if (!evaluator) {
+      throw new HTTPException(404, { message: "Evaluator not found" });
+    }
+    return withPlatformUrl(evaluator, project.slug);
+  };
 
-      const evaluator = await application.createWithResolvedDefaults({
-        projectId: project.id,
-        name: data.name,
-        config: data.config,
-      });
+  const createHandler = async (
+    c: EvaluatorContext,
+    input: z.infer<typeof createEvaluatorInputSchema>,
+  ) => {
+    const application = app();
+    const project = projectOf(c);
+    logger.info({ projectId: project.id, name: input.name }, "Creating evaluator");
 
-      const enriched = await application.getByIdWithFields({
-        id: evaluator.id,
-        projectId: project.id,
-      });
+    const evaluator = await application.createWithResolvedDefaults({
+      projectId: project.id,
+      name: input.name,
+      config: input.config,
+    });
+    const enriched = await application.getByIdWithFields({
+      id: evaluator.id,
+      projectId: project.id,
+    });
+    logger.info(
+      { projectId: project.id, evaluatorId: enriched.id },
+      "Successfully created evaluator",
+    );
+    return withPlatformUrl(enriched, project.slug);
+  };
 
-      logger.info(
-        { projectId: project.id, evaluatorId: enriched.id },
-        "Successfully created evaluator",
-      );
+  const updateHandler = async (
+    c: EvaluatorContext,
+    input: z.infer<typeof idParamsSchema> & z.infer<typeof updateEvaluatorInputSchema>,
+  ) => {
+    const application = app();
+    const project = projectOf(c);
+    const { id } = input;
+    logger.info({ projectId: project.id, evaluatorId: id }, "Updating evaluator");
 
-      const parsedCreated = apiResponseEvaluatorSchema.parse(enriched);
-      return c.json({
-        ...parsedCreated,
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsedCreated.id}`,
-        }),
-      });
-    },
-  );
+    const existing = await application.tryGetById({ id, projectId: project.id });
+    if (!existing) {
+      throw new HTTPException(404, { message: "Evaluator not found" });
+    }
 
-  // Update evaluator
-  secured.access(requires("evaluations:update")).put(
-    "/:id",
-    organizationMiddleware,
-    describeRoute({
-      description: "Update an existing evaluator",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
-            },
-          },
-        },
-        400: {
-          description: "Bad request (e.g. attempting to change evaluatorType)",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-        404: {
-          description: "Evaluator not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("json", updateEvaluatorInputSchema),
-    async (c) => {
-      const application = app();
-      const project = c.get("project");
-      const { id } = c.req.param();
-      const data = c.req.valid("json");
-
-      logger.info({ projectId: project.id, evaluatorId: id }, "Updating evaluator");
-
-      // Verify evaluator exists
-      const existing = await application.tryGetById({
-        id,
-        projectId: project.id,
-      });
-
-      if (!existing) {
-        throw new HTTPException(404, {
-          message: "Evaluator not found",
+    // The evaluator type is fixed at creation: changing it would make every
+    // stored result mean something else.
+    if (input.config?.evaluatorType !== undefined) {
+      const existingConfig = existing.config as { evaluatorType?: string } | null;
+      const existingType = existingConfig?.evaluatorType;
+      if (existingType !== undefined && input.config.evaluatorType !== existingType) {
+        throw new HTTPException(400, {
+          message: `evaluatorType cannot be changed after creation. Current type: "${existingType}"`,
         });
       }
+    }
 
-      // Enforce evaluatorType immutability
-      if (data.config?.evaluatorType !== undefined) {
-        const existingConfig = existing.config as {
-          evaluatorType?: string;
-        } | null;
-        const existingType = existingConfig?.evaluatorType;
-        if (existingType !== undefined && data.config.evaluatorType !== existingType) {
-          throw new HTTPException(400, {
-            message: `evaluatorType cannot be changed after creation. Current type: "${existingType}"`,
-          });
-        }
-      }
+    const updateData: Record<string, unknown> = {};
+    if (input.name !== undefined) {
+      updateData.name = input.name;
+    }
+    if (input.config !== undefined) {
+      // Merge config: keep existing config values, override with provided ones
+      const existingConfig = (existing.config as Record<string, unknown>) ?? {};
+      updateData.config = { ...existingConfig, ...input.config };
+    }
 
-      // Build update data
-      const updateData: Record<string, unknown> = {};
-      if (data.name !== undefined) {
-        updateData.name = data.name;
-      }
-      if (data.config !== undefined) {
-        // Merge config: keep existing config values, override with provided ones
-        const existingConfig = (existing.config as Record<string, unknown>) ?? {};
-        updateData.config = {
-          ...existingConfig,
-          ...data.config,
-        };
-      }
+    const updated = await application.update({ id, projectId: project.id, data: updateData });
+    const enriched = await application.getByIdWithFields({
+      id: updated.id,
+      projectId: project.id,
+    });
+    logger.info(
+      { projectId: project.id, evaluatorId: enriched.id },
+      "Successfully updated evaluator",
+    );
+    return withPlatformUrl(enriched, project.slug);
+  };
 
-      const updated = await application.update({
-        id,
-        projectId: project.id,
-        data: updateData,
-      });
+  const archiveHandler = async (c: EvaluatorContext, input: z.infer<typeof idParamsSchema>) => {
+    const application = app();
+    const project = projectOf(c);
+    const { id } = input;
+    logger.info({ projectId: project.id, evaluatorId: id }, "Archiving evaluator");
 
-      const enriched = await application.getByIdWithFields({
-        id: updated.id,
-        projectId: project.id,
-      });
+    const existing = await application.tryGetById({ id, projectId: project.id });
+    if (!existing) {
+      throw new HTTPException(404, { message: "Evaluator not found" });
+    }
 
-      logger.info(
-        { projectId: project.id, evaluatorId: enriched.id },
-        "Successfully updated evaluator",
-      );
+    await application.archive({ id, projectId: project.id });
+    logger.info({ projectId: project.id, evaluatorId: id }, "Successfully archived evaluator");
+    return { success: true };
+  };
 
-      const parsedUpdated = apiResponseEvaluatorSchema.parse(enriched);
-      return c.json({
-        ...parsedUpdated,
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsedUpdated.id}`,
-        }),
-      });
+  const notFoundResponse = {
+    404: {
+      description: "Evaluator not found",
+      content: { "application/json": { schema: resolver(badRequestSchema) } },
     },
-  );
+  };
 
-  // Delete (archive) evaluator
-  // Archiving deliberately stays at `:manage`.
-  secured.access(requires("evaluations:manage")).delete(
-    "/:id",
-    organizationMiddleware,
-    describeRoute({
-      description: "Archive (soft-delete) an evaluator",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ success: z.boolean() })),
+  return (
+    service
+      .registerRoute("get", "/", MANAGEMENT_API_VERSION, listHandler, (b) =>
+        policy(requires("evaluations:view"))(b)
+          .withOutput(z.array(apiResponseEvaluatorWithPlatformUrlSchema))
+          .withDocs({
+            description: "Get all evaluators for a project",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.array(apiResponseEvaluatorWithPlatformUrlSchema)),
+                  },
+                },
+              },
             },
-          },
-        },
-        404: {
-          description: "Evaluator not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const application = app();
-      const project = c.get("project");
-      const { id } = c.req.param();
-
-      logger.info({ projectId: project.id, evaluatorId: id }, "Archiving evaluator");
-
-      // Verify evaluator exists
-      const existing = await application.tryGetById({
-        id,
-        projectId: project.id,
-      });
-
-      if (!existing) {
-        throw new HTTPException(404, {
-          message: "Evaluator not found",
-        });
-      }
-
-      await application.archive({
-        id,
-        projectId: project.id,
-      });
-
-      logger.info({ projectId: project.id, evaluatorId: id }, "Successfully archived evaluator");
-
-      return c.json({ success: true });
-    },
+          }),
+      )
+      .registerRoute("get", "/:idOrSlug{.+}", MANAGEMENT_API_VERSION, getHandler, (b) =>
+        policy(requires("evaluations:view"))(b)
+          .withParams(idOrSlugParamsSchema)
+          .withOutput(apiResponseEvaluatorWithPlatformUrlSchema)
+          .withDocs({
+            description: "Get a specific evaluator by ID or slug",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": {
+                    schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
+                  },
+                },
+              },
+              ...notFoundResponse,
+            },
+          }),
+      )
+      // Creating asks for `evaluations:create`; `:manage` still implies it, so
+      // no existing caller changes and a viewer is declined as before.
+      .registerRoute("post", "/", MANAGEMENT_API_VERSION, createHandler, (b) =>
+        policy(requires("evaluations:create"))(b)
+          .withInput(createEvaluatorInputSchema)
+          .withOutput(apiResponseEvaluatorWithPlatformUrlSchema)
+          .withDocs({
+            description: "Create a new evaluator",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": {
+                    schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
+                  },
+                },
+              },
+            },
+          }),
+      )
+      .registerRoute("put", "/:id", MANAGEMENT_API_VERSION, updateHandler, (b) =>
+        policy(requires("evaluations:update"))(b)
+          .withParams(idParamsSchema)
+          .withInput(updateEvaluatorInputSchema)
+          .withOutput(apiResponseEvaluatorWithPlatformUrlSchema)
+          .withDocs({
+            description: "Update an existing evaluator",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": {
+                    schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
+                  },
+                },
+              },
+              400: {
+                description: "Bad request (e.g. attempting to change evaluatorType)",
+                content: { "application/json": { schema: resolver(badRequestSchema) } },
+              },
+              ...notFoundResponse,
+            },
+          }),
+      )
+      // Archiving deliberately stays at `:manage`.
+      .registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, archiveHandler, (b) =>
+        policy(requires("evaluations:manage"))(b)
+          .withParams(idParamsSchema)
+          .withOutput(archivedSchema)
+          .withDocs({
+            description: "Archive (soft-delete) an evaluator",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Success",
+                content: { "application/json": { schema: resolver(archivedSchema) } },
+              },
+              ...notFoundResponse,
+            },
+          }),
+      )
+      .build()
   );
-
-  return secured;
 }

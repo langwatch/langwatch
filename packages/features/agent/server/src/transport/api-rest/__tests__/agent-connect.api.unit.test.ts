@@ -62,9 +62,14 @@ function buildApi({ relayMaxPayloadMb }: { relayMaxPayloadMb?: number } = {}) {
     replicaCount: 1,
   });
   const framesSpy = vi.spyOn(transport, "frames");
-  const secured = testSecurity().createProjectApp({ basePath: "/api/v1/agents" });
-  registerConnectEndpoints({ secured, transport: () => transport, relayMaxPayloadMb });
-  return { hono: secured.hono, framesSpy };
+  const family = testSecurity().createProjectVersionedApp({
+    name: "agents-v1",
+    basePath: "/api/v1/agents",
+    errorEnvelope: "legacy",
+    staticGeneration: "v1",
+  });
+  registerConnectEndpoints({ family, transport: () => transport, relayMaxPayloadMb });
+  return { hono: family.service.build(), framesSpy };
 }
 
 const headers = {

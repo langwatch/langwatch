@@ -164,18 +164,17 @@ function buildApi() {
   return {
     repository,
     listTagNames: async (): Promise<string[]> => {
-      const response = await app.hono.request("/api/prompts/tags");
+      const response = await app.request("/api/prompts/tags");
       const body = (await response.json()) as { name: string }[];
       return body.map((tag) => tag.name);
     },
     createTag: (name: string) =>
-      app.hono.request("/api/prompts/tags", {
+      app.request("/api/prompts/tags", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       }),
-    deleteTag: (name: string) =>
-      app.hono.request(`/api/prompts/tags/${name}`, { method: "DELETE" }),
+    deleteTag: (name: string) => app.request(`/api/prompts/tags/${name}`, { method: "DELETE" }),
   };
 }
 

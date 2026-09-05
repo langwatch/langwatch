@@ -67,7 +67,7 @@ const projectOf = (c: Context): { id: string } => c.get("project") as { id: stri
  * buckets, each an open record. Looser than the contract's
  * `analyticsTimeseriesResultSchema`, which this door never enforced outbound.
  */
-const timeseriesResponseSchema = z.object({
+export const timeseriesResponseSchema = z.object({
   currentPeriod: z.array(z.record(z.string(), z.any())),
   previousPeriod: z.array(z.record(z.string(), z.any())),
 });

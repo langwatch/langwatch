@@ -23,11 +23,7 @@
  * missing from the route registry is indistinguishable from one that bypassed
  * the builder, and the endpoint-authorization audit reads that registry.
  */
-import {
-  getRoutePolicy,
-  registerRoutePolicy,
-  type MountableRestApp,
-} from "@langwatch/api/rest";
+import { getRoutePolicy, registerRoutePolicy, type MountableRestApp } from "@langwatch/api/rest";
 import { Hono } from "hono";
 
 /** The URL every pre-rename SDK release posts a tracked event to. */

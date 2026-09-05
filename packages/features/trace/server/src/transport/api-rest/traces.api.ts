@@ -6,19 +6,21 @@ import { TraceReadableSpanService } from "#services/trace-readable-span.service"
 import { TraceFormattingService } from "#services/trace-formatting.service";
 import { requires } from "@langwatch/api";
 import {
-  type AppRestProjectVariables,
   type AppRestSecurity,
   baseResponses,
   coerceToEpoch,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
   type PlatformUrlBuilder,
+  projectOf,
+  type ProjectScopedContext,
   RequestValidationError,
-  type SecuredApp,
-  validator as zValidator,
+  resolver,
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
 import type { Evaluation, Trace, TracesForProjectResult } from "@langwatch/trace-contract";
 import { HTTPException } from "hono/http-exception";
-import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 
 import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
@@ -151,469 +153,321 @@ export interface TracesRestPorts<TBody extends TraceSearchBody, TBodyRaw> {
     | undefined;
 }
 
+/** The handler context every route in this family runs on. */
+type TraceContext = ProjectScopedContext<EndpointVariables>;
+
+const traceIdParamsSchema = z.object({
+  traceId: z
+    .string()
+    .min(1)
+    .describe(
+      "The trace ID — either the full 32-char ID or a unique prefix (≥ 8 chars). Prefix lookup is scoped to the authenticated project.",
+    ),
+});
+
+const traceFormatQuerySchema = z.object({
+  format: z
+    .string()
+    .optional()
+    .describe("Output format: 'digest' (AI-readable) or 'json' (full raw data, default)"),
+  llmMode: z.string().optional().describe("Deprecated: use format=digest instead"),
+});
+
+const traceMetadataBodySchema = z.object({ metadata: traceMetadataUpdateSchema });
+const traceMetadataResponseSchema = z.object({ traceId: z.string() });
+
+const transcriptResponseSchema = z.object({
+  agent: z.string(),
+  sessionId: z.string().nullable(),
+  entries: z.array(z.object({}).passthrough()),
+  totals: z.object({
+    modelCalls: z.number(),
+    toolCalls: z.number(),
+    tokens: z.number(),
+    costUsd: z.number(),
+  }),
+  subAgents: z.array(z.object({}).passthrough()),
+});
+
+const traceNotFoundResponse = {
+  404: {
+    description: "Trace not found",
+    content: { "application/json": { schema: resolver(z.object({ message: z.string() })) } },
+  },
+};
+
+const ambiguousPrefixResponse = {
+  409: {
+    description: "Ambiguous trace ID prefix — the prefix matches more than one trace",
+    content: {
+      "application/json": {
+        schema: resolver(
+          z.object({ message: z.string(), candidateTraceIds: z.array(z.string()) }),
+        ),
+      },
+    },
+  },
+};
+
+/**
+ * A read that answers outside one success schema: `/search` streams its own
+ * JSON so a large page is never buffered, and the two trace reads answer an
+ * ambiguous-prefix 409 with the candidate ids beside the message.
+ */
+const TRACE_ANSWER_REASON =
+  "the search streams its envelope and the reads answer an ambiguous-prefix 409 of their own";
+
 /**
  * The v1 trace family, built against one process's security. ORDERING inside the family is load-bearing: `/:traceId/transcript` and `/:traceId/metadata` are registered before the bare `/:traceId`, so the literal sub-resources are not swallowed by the parameter.
  */
 export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(options: {
   security: AppRestSecurity;
   ports: TracesRestPorts<TBody, TBodyRaw>;
-}): SecuredApp<{ Variables: AppRestProjectVariables }> {
+}): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createProjectApp({ basePath: "/api/traces" });
+
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "traces",
+    basePath: "/api/traces",
+    errorEnvelope: "legacy",
+  });
 
   // POST /search - Search traces for a project
-  secured.access(requires("traces:view")).post(
-    "/search",
-    describeRoute({
-      description: "Search traces for a project",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Matching traces with pagination",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  traces: z.array(z.any()),
-                  pagination: z.object({
-                    totalHits: z.number(),
-                    scrollId: z.string().optional(),
-                    skipped: z
-                      .number()
-                      .optional()
-                      .describe(
-                        "Number of traces dropped from this page because they failed to serialize. Present only when non-zero, so a caller can tell that traces.length is below the page size for a reason other than reaching the end of the result set.",
-                      ),
-                    updatedThrough: z
-                      .number()
-                      .optional()
-                      .describe(
-                        "Only when dateField is 'updated'. Epoch milliseconds: the upper bound this scroll actually covered, which is at or before the endDate you asked for. The scroll reads every trace as of the moment it started, so anything written after that instant belongs to the next pull. Start your next incremental pull from this value — resuming from the endDate you requested would step over the difference and lose those traces. The bound is inclusive on both sides, so a trace last written at exactly this millisecond arrives in this pull and again in the next one: pulls are at-least-once, and applying them idempotently is what keeps that from becoming a duplicate.",
-                      ),
-                  }),
-                  schema: z
-                    .object({
-                      from: z.string(),
-                      columns: z.array(
-                        z.object({
-                          path: z.string(),
-                          type: z.string(),
-                          collection: z.boolean(),
-                        }),
-                      ),
-                    })
-                    .optional()
-                    .describe(
-                      "Present only when 'select' is provided. Describes the resolved columns — " +
-                        "the dotted path, its value type, and whether it belongs to a nested child " +
-                        "collection — so callers can pre-allocate a typed reader.",
-                    ),
-                }),
-              ),
-            },
-          },
-        },
-      },
-    }),
-    zValidator("json", ports.searchBodySchema),
-    async (c) => {
-      const project = c.get("project");
-      const params = c.req.valid("json") as TraceSearchBody & Record<string, unknown>;
-      const {
-        from,
-        select,
-        dateField,
-        format: formatParam,
-        includeSpans,
-        llmMode,
-        scrollId,
-        ...searchFields
-      } = params;
-      const format = formatParam ?? (llmMode ? "digest" : "json");
+  const searchHandler = async (c: TraceContext, input: TraceSearchBody) => {
+    const project = projectOf(c);
+    const params = input as TraceSearchBody & Record<string, unknown>;
+    const {
+      from,
+      select,
+      dateField,
+      format: formatParam,
+      includeSpans,
+      llmMode,
+      scrollId,
+      ...searchFields
+    } = params;
+    const format = formatParam ?? (llmMode ? "digest" : "json");
 
-      logger.info({ projectId: project.id }, "Searching traces for project");
+    logger.info({ projectId: project.id }, "Searching traces for project");
 
-      const pageSize = Math.min(params.pageSize ?? 1000, 1000);
-      const protections = await ports.getProtections({ projectId: project.id });
+    const pageSize = Math.min(params.pageSize ?? 1000, 1000);
+    const protections = await ports.getProtections({ projectId: project.id });
 
-      // When `select` is present, compile the projection up front: the compiled plan
-      // drives column pruning + child-collection joins in the ENGINE, the resolved
-      // schema goes into the response envelope, and the projector replaces formatTrace
-      // per row. An unknown select path is a validation failure like any other — the
-      // body parsed, so it travels the same 422 channel as a schema failure, not 400.
-      let projection: CompiledProjection | undefined;
-      if (select && select.length > 0) {
-        try {
-          projection = TraceProjectionCompileService.compileProjection({
-            from,
-            select,
-            protections: protections as Parameters<
-              typeof TraceProjectionCompileService.compileProjection
-            >[0]["protections"],
+    // When `select` is present, compile the projection up front: the compiled plan
+    // drives column pruning + child-collection joins in the ENGINE, the resolved
+    // schema goes into the response envelope, and the projector replaces formatTrace
+    // per row. An unknown select path is a validation failure like any other — the
+    // body parsed, so it travels the same 422 channel as a schema failure, not 400.
+    let projection: CompiledProjection | undefined;
+    if (select && select.length > 0) {
+      try {
+        projection = TraceProjectionCompileService.compileProjection({
+          from,
+          select,
+          protections: protections as Parameters<
+            typeof TraceProjectionCompileService.compileProjection
+          >[0]["protections"],
+        });
+      } catch (err) {
+        if (err instanceof ProjectionValidationError) {
+          throw new RequestValidationError({
+            target: "json",
+            violations: err.invalidPaths.map((path) => ({
+              field: "select",
+              type: "unknown_path",
+              message: `Unknown or unsupported select path: ${path}`,
+              received: path,
+            })),
           });
-        } catch (err) {
-          if (err instanceof ProjectionValidationError) {
-            throw new RequestValidationError({
-              target: "json",
-              violations: err.invalidPaths.map((path) => ({
-                field: "select",
-                type: "unknown_path",
-                message: `Unknown or unsupported select path: ${path}`,
-                received: path,
-              })),
-            });
-          }
-          throw err;
         }
+        throw err;
       }
+    }
 
-      const results = await ports.traces().getAllTracesForProject(
-        {
-          ...searchFields,
-          projectId: project.id,
-          startDate: coerceToEpoch(params.startDate),
-          endDate: coerceToEpoch(params.endDate),
-          pageSize,
-        },
-        protections,
-        {
-          downloadMode: true,
-          includeSpans: includeSpans ?? false,
-          scrollId: scrollId ?? undefined,
-          dateField,
-          ...(projection ? { projection: projection.plan } : {}),
-        },
-      );
+    const results = await ports.traces().getAllTracesForProject(
+      {
+        ...searchFields,
+        projectId: project.id,
+        startDate: coerceToEpoch(params.startDate),
+        endDate: coerceToEpoch(params.endDate),
+        pageSize,
+      },
+      protections,
+      {
+        downloadMode: true,
+        includeSpans: includeSpans ?? false,
+        scrollId: scrollId ?? undefined,
+        dateField,
+        ...(projection ? { projection: projection.plan } : {}),
+      },
+    );
 
-      const rawTraces = results.groups.flat() as Trace[];
-      const enrichedTraces = enrichTracesWithEvaluations({
-        traces: rawTraces,
-        traceChecks: results.traceChecks,
-      });
+    const rawTraces = results.groups.flat() as Trace[];
+    const enrichedTraces = enrichTracesWithEvaluations({
+      traces: rawTraces,
+      traceChecks: results.traceChecks,
+    });
 
-      const formatTrace = (trace: Trace) => {
-        if (format === "digest") {
-          return {
-            trace_id: trace.trace_id,
-            formatted_trace: TraceFormattingService.formatTraceSummaryDigest(trace),
-            input: trace.input,
-            output: trace.output,
-            timestamps: trace.timestamps,
-            metadata: trace.metadata,
-            error: trace.error,
-            evaluations: trace.evaluations,
-            platformUrl: ports.platformUrl({
-              projectSlug: project.slug,
-              path: `/traces/${trace.trace_id}`,
-            }),
-          };
-        }
+    const formatTrace = (trace: Trace) => {
+      if (format === "digest") {
         return {
-          ...trace,
+          trace_id: trace.trace_id,
+          formatted_trace: TraceFormattingService.formatTraceSummaryDigest(trace),
+          input: trace.input,
+          output: trace.output,
+          timestamps: trace.timestamps,
+          metadata: trace.metadata,
+          error: trace.error,
+          evaluations: trace.evaluations,
           platformUrl: ports.platformUrl({
             projectSlug: project.slug,
             path: `/traces/${trace.trace_id}`,
           }),
         };
-      };
-
-      // A projection (when active) replaces the default formatTrace, shaping each
-      // row to mirror the caller's `select`. The ENGINE has already attached the
-      // Postgres-sourced annotations the projector reads.
-      const serializeTrace = projection
-        ? (trace: Trace) => projection.project(trace as unknown as ProjectableTrace)
-        : formatTrace;
-
-      const serializedTraces: string[] = [];
-      let skippedCount = 0;
-      for (const trace of enrichedTraces) {
-        try {
-          serializedTraces.push(JSON.stringify(serializeTrace(trace)));
-        } catch (err) {
-          skippedCount++;
-          logger.error(
-            {
-              traceId: trace.trace_id,
-              error: err instanceof Error ? err.message : err,
-            },
-            "Failed to serialize trace, skipping",
-          );
-        }
       }
+      return {
+        ...trace,
+        platformUrl: ports.platformUrl({
+          projectSlug: project.slug,
+          path: `/traces/${trace.trace_id}`,
+        }),
+      };
+    };
 
-      // Surface dropped traces so a caller never silently sees fewer rows than
-      // totalHits with no signal. Emitted only when non-zero, so the common-case
-      // envelope stays byte-identical to before.
-      const pagination = JSON.stringify({
-        totalHits: results.totalHits,
-        scrollId: results.scrollId,
-        ...(skippedCount > 0 ? { skipped: skippedCount } : {}),
-        // Updated axis only, and the value a CDC client should resume from.
-        ...(results.updatedThrough !== undefined ? { updatedThrough: results.updatedThrough } : {}),
-      });
+    // A projection (when active) replaces the default formatTrace, shaping each
+    // row to mirror the caller's `select`. The ENGINE has already attached the
+    // Postgres-sourced annotations the projector reads.
+    const serializeTrace = projection
+      ? (trace: Trace) => projection.project(trace as unknown as ProjectableTrace)
+      : formatTrace;
 
-      // When a projection is active the envelope gains a `schema` field describing
-      // the resolved columns so callers can pre-allocate a typed reader.
-      const schemaSuffix = projection ? `,"schema":${JSON.stringify(projection.schema)}` : "";
+    const serializedTraces: string[] = [];
+    let skippedCount = 0;
+    for (const trace of enrichedTraces) {
+      try {
+        serializedTraces.push(JSON.stringify(serializeTrace(trace)));
+      } catch (err) {
+        skippedCount++;
+        logger.error(
+          {
+            traceId: trace.trace_id,
+            error: err instanceof Error ? err.message : err,
+          },
+          "Failed to serialize trace, skipping",
+        );
+      }
+    }
 
-      const encoder = new TextEncoder();
-      const stream = new ReadableStream({
-        start(controller) {
-          controller.enqueue(encoder.encode('{"traces":['));
+    // Surface dropped traces so a caller never silently sees fewer rows than
+    // totalHits with no signal. Emitted only when non-zero, so the common-case
+    // envelope stays byte-identical to before.
+    const pagination = JSON.stringify({
+      totalHits: results.totalHits,
+      scrollId: results.scrollId,
+      ...(skippedCount > 0 ? { skipped: skippedCount } : {}),
+      // Updated axis only, and the value a CDC client should resume from.
+      ...(results.updatedThrough !== undefined ? { updatedThrough: results.updatedThrough } : {}),
+    });
 
-          for (let i = 0; i < serializedTraces.length; i++) {
-            const prefix = i > 0 ? "," : "";
-            controller.enqueue(encoder.encode(prefix + serializedTraces[i]!));
-          }
+    // When a projection is active the envelope gains a `schema` field describing
+    // the resolved columns so callers can pre-allocate a typed reader.
+    const schemaSuffix = projection ? `,"schema":${JSON.stringify(projection.schema)}` : "";
 
-          controller.enqueue(encoder.encode(`],"pagination":${pagination}${schemaSuffix}}`));
-          controller.close();
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('{"traces":['));
+
+        for (let i = 0; i < serializedTraces.length; i++) {
+          const prefix = i > 0 ? "," : "";
+          controller.enqueue(encoder.encode(prefix + serializedTraces[i]!));
+        }
+
+        controller.enqueue(encoder.encode(`],"pagination":${pagination}${schemaSuffix}}`));
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+
+  service.registerRoute("post", "/search", MANAGEMENT_API_VERSION, searchHandler, (b) =>
+    policy(requires("traces:view"))(b)
+      .withInput(ports.searchBodySchema)
+      .withRawResponse(TRACE_ANSWER_REASON, { contentType: "application/json" })
+      .withDocs({
+        description: "Search traces for a project",
+        responses: {
+          ...baseResponses,
+          200: {
+            description: "Matching traces with pagination",
+            content: {
+              "application/json": {
+                schema: resolver(
+                  z.object({
+                    traces: z.array(z.any()),
+                    pagination: z.object({
+                      totalHits: z.number(),
+                      scrollId: z.string().optional(),
+                      skipped: z
+                        .number()
+                        .optional()
+                        .describe(
+                          "Number of traces dropped from this page because they failed to serialize. Present only when non-zero, so a caller can tell that traces.length is below the page size for a reason other than reaching the end of the result set.",
+                        ),
+                      updatedThrough: z
+                        .number()
+                        .optional()
+                        .describe(
+                          "Only when dateField is 'updated'. Epoch milliseconds: the upper bound this scroll actually covered, which is at or before the endDate you asked for. The scroll reads every trace as of the moment it started, so anything written after that instant belongs to the next pull. Start your next incremental pull from this value — resuming from the endDate you requested would step over the difference and lose those traces. The bound is inclusive on both sides, so a trace last written at exactly this millisecond arrives in this pull and again in the next one: pulls are at-least-once, and applying them idempotently is what keeps that from becoming a duplicate.",
+                        ),
+                    }),
+                    schema: z
+                      .object({
+                        from: z.string(),
+                        columns: z.array(
+                          z.object({
+                            path: z.string(),
+                            type: z.string(),
+                            collection: z.boolean(),
+                          }),
+                        ),
+                      })
+                      .optional()
+                      .describe(
+                        "Present only when 'select' is provided. Describes the resolved columns — " +
+                          "the dotted path, its value type, and whether it belongs to a nested child " +
+                          "collection — so callers can pre-allocate a typed reader.",
+                      ),
+                  }),
+                ),
+              },
+            },
+          },
         },
-      });
-
-      return new Response(stream, {
-        headers: { "Content-Type": "application/json" },
-      });
-    },
+      }),
   );
 
   // GET /:traceId/transcript - the coding-agent transcript for one trace.
   // Registered only where the process composed the join it reads; see the port.
   const readCodingAgentTranscript = ports.readCodingAgentTranscript;
   if (readCodingAgentTranscript) {
-    secured.access(requires("traces:view")).get(
-      "/:traceId/transcript",
-      describeRoute({
-        description:
-          "Derived coding-agent transcript for a trace: what the agent did, in order, " +
-          "with per-call token and cost economics. Empty entries for traces without " +
-          "coding-agent content.",
-        parameters: [
-          {
-            name: "traceId",
-            in: "path",
-            description:
-              "The trace ID — either the full 32-char ID or a unique prefix (≥ 8 chars). Prefix lookup is scoped to the authenticated project.",
-            required: true,
-            schema: { type: "string" },
-          },
-        ],
-        responses: {
-          ...baseResponses,
-          200: {
-            description:
-              "The transcript: ordered entries plus per-session totals and sub-agent tool counts",
-            content: {
-              "application/json": {
-                schema: resolver(
-                  z.object({
-                    agent: z.string(),
-                    sessionId: z.string().nullable(),
-                    entries: z.array(z.object({}).passthrough()),
-                    totals: z.object({
-                      modelCalls: z.number(),
-                      toolCalls: z.number(),
-                      tokens: z.number(),
-                      costUsd: z.number(),
-                    }),
-                    subAgents: z.array(z.object({}).passthrough()),
-                  }),
-                ),
-              },
-            },
-          },
-          404: {
-            description: "Trace not found",
-            content: {
-              "application/json": {
-                schema: resolver(z.object({ message: z.string() })),
-              },
-            },
-          },
-          409: {
-            description: "Ambiguous trace ID prefix — the prefix matches more than one trace",
-            content: {
-              "application/json": {
-                schema: resolver(
-                  z.object({
-                    message: z.string(),
-                    candidateTraceIds: z.array(z.string()),
-                  }),
-                ),
-              },
-            },
-          },
-        },
-      }),
-      async (c) => {
-        const project = c.get("project");
-        const { traceId } = c.req.param();
+    const transcriptHandler = async (
+      c: TraceContext,
+      input: z.infer<typeof traceIdParamsSchema>,
+    ) => {
+      const project = projectOf(c);
+      const { traceId } = input;
 
-        logger.info({ projectId: project.id, traceId }, "Getting trace transcript");
-
-        const protections = await ports.getProtections({ projectId: project.id });
-
-        let trace: Trace | undefined;
-        try {
-          trace = await ports.traces().tryGetById(project.id, traceId, protections);
-        } catch (err) {
-          if (err instanceof AmbiguousTraceIdPrefixError) {
-            return c.json(
-              {
-                message: err.message,
-                candidateTraceIds: err.candidateTraceIds,
-              },
-              409,
-            );
-          }
-          throw err;
-        }
-
-        if (!trace) {
-          throw new HTTPException(404, {
-            message: "Trace not found.",
-          });
-        }
-
-        const transcript = await readCodingAgentTranscript({
-          projectId: project.id,
-          traceId: trace.trace_id,
-          occurredAtMs: trace.timestamps.started_at,
-          protections,
-        });
-
-        return c.json(transcript as Record<string, unknown>);
-      },
-    );
-  }
-
-  // PATCH /:traceId/metadata - Update trace metadata via synthetic span.
-  // Registered only where the process composed the ingestion the amendment
-  // rides on; see the port.
-  const updateTraceMetadata = ports.updateTraceMetadata;
-  if (updateTraceMetadata) {
-    secured.access(requires("traces:update")).patch(
-      "/:traceId/metadata",
-      describeRoute({
-        tags: ["Traces"],
-        summary: "Update trace metadata",
-        description:
-          "Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.",
-        responses: {
-          200: {
-            description: "Metadata updated successfully",
-            content: {
-              "application/json": {
-                schema: resolver(z.object({ traceId: z.string() })),
-              },
-            },
-          },
-          ...baseResponses,
-        },
-      }),
-      zValidator(
-        "json",
-        z.object({
-          metadata: traceMetadataUpdateSchema,
-        }),
-      ),
-      async (c) => {
-        const project = c.get("project");
-        const traceId = c.req.param("traceId");
-        const body = c.req.valid("json");
-
-        await updateTraceMetadata({
-          projectId: project.id,
-          traceId,
-          metadata: body.metadata,
-        });
-
-        return c.json({ traceId });
-      },
-    );
-  }
-
-  // GET /:traceId - Get a single trace by ID. LAST of the three, so the two
-  // literal sub-resources above are not swallowed by the parameter.
-  secured.access(requires("traces:view")).get(
-    "/:traceId",
-    describeRoute({
-      description: "Get a single trace by ID.",
-      parameters: [
-        {
-          name: "traceId",
-          in: "path",
-          description:
-            "The trace ID — either the full 32-char ID or a unique prefix (≥ 8 chars). Prefix lookup is scoped to the authenticated project.",
-          required: true,
-          schema: { type: "string" },
-        },
-        {
-          name: "format",
-          in: "query",
-          description: "Output format: 'digest' (AI-readable) or 'json' (full raw data, default)",
-          required: false,
-          schema: { type: "string", enum: ["digest", "json"] },
-        },
-        {
-          name: "llmMode",
-          in: "query",
-          description: "Deprecated: use format=digest instead",
-          required: false,
-          schema: { type: "string", enum: ["true", "false", "1", "0"] },
-        },
-      ],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Trace detail with spans, evaluations, and ASCII tree",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({}).passthrough()),
-            },
-          },
-        },
-        404: {
-          description: "Trace not found",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ message: z.string() })),
-            },
-          },
-        },
-        409: {
-          description: "Ambiguous trace ID prefix — the prefix matches more than one trace",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  message: z.string(),
-                  candidateTraceIds: z.array(z.string()),
-                }),
-              ),
-            },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { traceId } = c.req.param();
-      const formatParam = c.req.query("format");
-      const llmModeParam = c.req.query("llmMode");
-      const format =
-        formatParam ?? (llmModeParam === "true" || llmModeParam === "1" ? "digest" : "json");
-
-      logger.info({ projectId: project.id, traceId }, "Getting trace by ID");
+      logger.info({ projectId: project.id, traceId }, "Getting trace transcript");
 
       const protections = await ports.getProtections({ projectId: project.id });
-      const traceService = ports.traces();
 
       let trace: Trace | undefined;
       try {
-        trace = await traceService.tryGetById(project.id, traceId, protections, {
-          full: true,
-        });
+        trace = await ports.traces().tryGetById(project.id, traceId, protections);
       } catch (err) {
         if (err instanceof AmbiguousTraceIdPrefixError) {
           return c.json(
@@ -633,44 +487,196 @@ export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(opt
         });
       }
 
-      // If the caller passed a prefix, the resolved trace has the full ID.
-      // Use that everywhere downstream so the response, links, and evaluation
-      // lookup all key off the real trace ID.
-      const resolvedTraceId = trace.trace_id;
-
-      const evaluationsMap = await traceService.getEvaluationsMultiple(
-        project.id,
-        [resolvedTraceId],
+      const transcript = await readCodingAgentTranscript({
+        projectId: project.id,
+        traceId: trace.trace_id,
+        occurredAtMs: trace.timestamps.started_at,
         protections,
-      );
-      const evaluations = evaluationsMap[resolvedTraceId] ?? [];
+      });
 
-      if (format === "digest") {
-        return c.json({
-          trace_id: resolvedTraceId,
-          formatted_trace: await TraceReadableSpanService.formatSpansDigest(trace.spans ?? []),
-          timestamps: trace.timestamps,
-          metadata: trace.metadata,
-          evaluations,
-          platformUrl: ports.platformUrl({
-            projectSlug: project.slug,
-            path: `/traces/${resolvedTraceId}`,
+      return c.json(transcript as Record<string, unknown>);
+    };
+
+    service.registerRoute(
+      "get",
+      "/:traceId/transcript",
+      MANAGEMENT_API_VERSION,
+      transcriptHandler,
+      (b) =>
+        policy(requires("traces:view"))(b)
+          .withParams(traceIdParamsSchema)
+          .withRawResponse(TRACE_ANSWER_REASON, { contentType: "application/json" })
+          .withDocs({
+            description:
+              "Derived coding-agent transcript for a trace: what the agent did, in order, " +
+              "with per-call token and cost economics. Empty entries for traces without " +
+              "coding-agent content.",
+            responses: {
+              ...baseResponses,
+              200: {
+                description:
+                  "The transcript: ordered entries plus per-session totals and sub-agent tool counts",
+                content: {
+                  "application/json": { schema: resolver(transcriptResponseSchema) },
+                },
+              },
+              ...traceNotFoundResponse,
+              ...ambiguousPrefixResponse,
+            },
           }),
-        });
-      }
+    );
+  }
 
-      const asciiTree = TraceFormattingService.generateAsciiTree(trace.spans);
+  // PATCH /:traceId/metadata - Update trace metadata via synthetic span.
+  // Registered only where the process composed the ingestion the amendment
+  // rides on; see the port.
+  const updateTraceMetadata = ports.updateTraceMetadata;
+  if (updateTraceMetadata) {
+    const metadataHandler = async (
+      c: TraceContext,
+      input: z.infer<typeof traceIdParamsSchema> & z.infer<typeof traceMetadataBodySchema>,
+    ) => {
+      const project = projectOf(c);
+      const { traceId } = input;
+
+
+      await updateTraceMetadata({
+        projectId: project.id,
+        traceId,
+        metadata: input.metadata,
+      });
+
+      return { traceId };
+    };
+
+    service.registerRoute(
+      "patch",
+      "/:traceId/metadata",
+      MANAGEMENT_API_VERSION,
+      metadataHandler,
+      (b) =>
+        policy(requires("traces:update"))(b)
+          .withParams(traceIdParamsSchema)
+          .withInput(traceMetadataBodySchema)
+          .withOutput(traceMetadataResponseSchema)
+          .withDocs({
+            tags: ["Traces"],
+            summary: "Update trace metadata",
+            description:
+              "Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.",
+            responses: {
+              200: {
+                description: "Metadata updated successfully",
+                content: {
+                  "application/json": { schema: resolver(traceMetadataResponseSchema) },
+                },
+              },
+              ...baseResponses,
+            },
+          }),
+    );
+  }
+
+  // GET /:traceId - Get a single trace by ID. LAST of the three, so the two
+  // literal sub-resources above are not swallowed by the parameter.
+  const traceHandler = async (
+    c: TraceContext,
+    input: z.infer<typeof traceIdParamsSchema> & z.infer<typeof traceFormatQuerySchema>,
+  ) => {
+    const project = projectOf(c);
+    const { traceId } = input;
+    const formatParam = input.format;
+    const llmModeParam = input.llmMode;
+    const format =
+      formatParam ?? (llmModeParam === "true" || llmModeParam === "1" ? "digest" : "json");
+
+    logger.info({ projectId: project.id, traceId }, "Getting trace by ID");
+
+    const protections = await ports.getProtections({ projectId: project.id });
+    const traceService = ports.traces();
+
+    let trace: Trace | undefined;
+    try {
+      trace = await traceService.tryGetById(project.id, traceId, protections, {
+        full: true,
+      });
+    } catch (err) {
+      if (err instanceof AmbiguousTraceIdPrefixError) {
+        return c.json(
+          {
+            message: err.message,
+            candidateTraceIds: err.candidateTraceIds,
+          },
+          409,
+        );
+      }
+      throw err;
+    }
+
+    if (!trace) {
+      throw new HTTPException(404, {
+        message: "Trace not found.",
+      });
+    }
+
+    // If the caller passed a prefix, the resolved trace has the full ID.
+    // Use that everywhere downstream so the response, links, and evaluation
+    // lookup all key off the real trace ID.
+    const resolvedTraceId = trace.trace_id;
+
+    const evaluationsMap = await traceService.getEvaluationsMultiple(
+      project.id,
+      [resolvedTraceId],
+      protections,
+    );
+    const evaluations = evaluationsMap[resolvedTraceId] ?? [];
+
+    if (format === "digest") {
       return c.json({
-        ...trace,
+        trace_id: resolvedTraceId,
+        formatted_trace: await TraceReadableSpanService.formatSpansDigest(trace.spans ?? []),
+        timestamps: trace.timestamps,
+        metadata: trace.metadata,
         evaluations,
-        ascii_tree: asciiTree,
         platformUrl: ports.platformUrl({
           projectSlug: project.slug,
           path: `/traces/${resolvedTraceId}`,
         }),
       });
-    },
+    }
+
+    const asciiTree = TraceFormattingService.generateAsciiTree(trace.spans);
+    return c.json({
+      ...trace,
+      evaluations,
+      ascii_tree: asciiTree,
+      platformUrl: ports.platformUrl({
+        projectSlug: project.slug,
+        path: `/traces/${resolvedTraceId}`,
+      }),
+    });
+  };
+
+  service.registerRoute("get", "/:traceId", MANAGEMENT_API_VERSION, traceHandler, (b) =>
+    policy(requires("traces:view"))(b)
+      .withParams(traceIdParamsSchema)
+      .withQuery(traceFormatQuerySchema)
+      .withRawResponse(TRACE_ANSWER_REASON, { contentType: "application/json" })
+      .withDocs({
+        description: "Get a single trace by ID.",
+        responses: {
+          ...baseResponses,
+          200: {
+            description: "Trace detail with spans, evaluations, and ASCII tree",
+            content: {
+              "application/json": { schema: resolver(z.object({}).passthrough()) },
+            },
+          },
+          ...traceNotFoundResponse,
+          ...ambiguousPrefixResponse,
+        },
+      }),
   );
 
-  return secured;
+  return service.build();
 }

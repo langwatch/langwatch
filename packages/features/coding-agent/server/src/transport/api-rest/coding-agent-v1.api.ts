@@ -29,19 +29,21 @@
  */
 import { anyAuthenticated } from "@langwatch/api";
 import {
-  type AppRestOrganizationVariables,
   type AppRestSecurity,
   baseResponses,
+  type EndpointVariables,
   managementActor,
-  type SecuredApp,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  organizationOf,
+  type OrganizationScopedContext,
+  resolver,
 } from "@langwatch/api/rest";
-import { ValidationError } from "@langwatch/handled-error";
-import { describeRoute, resolver } from "hono-openapi";
+import { z } from "zod";
 
 import type { CodingAgentApp } from "#app/coding-agent.app";
 import type { CodingAgentRestAuditPort } from "./coding-agent.api";
 import {
-  pullRequestUsageParameters,
   pullRequestUsageQuerySchema,
   pullRequestUsageResponseSchema,
 } from "../../rules/pull-request-usage-wire.rules";
@@ -57,105 +59,113 @@ export function createCodingAgentV1RestApp(options: {
   app: () => CodingAgentApp;
   /** Records who read an answer that names people. */
   audit: () => CodingAgentRestAuditPort;
-}): SecuredApp<{ Variables: AppRestOrganizationVariables }> {
+}): MountableRestApp {
   const { security, app, audit } = options;
 
-  const secured = security.createOrgApp({ basePath: "/api/v1/coding-agent" });
+  const { service, policy } = security.createVersionedApp({
+    name: "coding-agent-v1",
+    basePath: "/api/v1/coding-agent",
+    errorEnvelope: "legacy",
+    staticGeneration: "v1",
+  });
 
-  secured
-    // Authentication is the organization key; the AUTHORIZATION is the
-    // caller's per-project cut, resolved in the handler with the key as the
-    // principal. No `requires(...)` fits: no single organization-scope
-    // permission describes "the projects this credential may read", and a
-    // member whose only grant is their own personal workspace must still get
-    // their own rollup.
-    .access(anyAuthenticated())
-    .get(
-      "/pull-request-usage",
-      describeRoute({
-        summary: "Get pull request coding agent usage",
-        description:
-          "Assistant usage for one pull request: sessions, tokens and cost, " +
-          "grouped by contributor and agent, plus per-model totals, " +
-          "over the pull request's whole lifetime rather than a time window. " +
-          "Every row and the totals split cost three ways: the part priced per " +
-          "token, the part a bundled subscription already covers, and the " +
-          "list-price total of both. Per-model totals carry the list price " +
-          "only. Cost is calculated from the tokens the agent reported and " +
-          "LangWatch's model prices, so it estimates spend rather than " +
-          "restating a provider invoice. " +
-          "Authenticate with an organization API key and nothing else: no " +
-          "project id is sent anywhere. A key created for you reads with your " +
-          "own access; an organization service key, such as one a continuous " +
-          "integration job holds, reads with the access its bindings grant. " +
-          "Rows appear only for projects the key may view, and cost only for " +
-          "those it may price.",
-        parameters: [...pullRequestUsageParameters],
-        responses: {
-          ...baseResponses,
-          200: {
-            description: "The pull request's usage rollup",
-            content: {
-              "application/json": {
-                schema: resolver(pullRequestUsageResponseSchema),
-              },
-            },
-          },
-        },
-      }),
-      async (c) => {
-        const organization = c.get("organization");
-        const application = app();
+  type CodingAgentV1Context = OrganizationScopedContext<EndpointVariables>;
 
-        const query = pullRequestUsageQuerySchema.safeParse({
-          repository: c.req.query("repository"),
-          pullRequest: c.req.query("pullRequest"),
-          host: c.req.query("host") ?? new URL(application.githubWebBase()).hostname,
-        });
-        if (!query.success) throw ValidationError.fromZodError(query.error);
+  const usageHandler = async (
+    c: CodingAgentV1Context,
+    input: z.infer<typeof pullRequestUsageQuerySchema>,
+  ) => {
+    const organization = organizationOf(c);
+    const apiKeyId = c.get("apiKeyId");
+    if (apiKeyId === undefined) {
+      // The organization door always resolves a key. Refusing here rather than
+      // reading a blank principal, which would widen the cut instead of failing.
+      throw new Error("No organization API key on the request context");
+    }
+    const application = app();
+    const host = input.host ?? new URL(application.githubWebBase()).hostname;
 
-        // The credential is the principal, not its holder: a deliberately
-        // narrowed key must read with its own scope rather than the full reach
-        // of whoever created it, and a service key — which acts as nobody —
-        // reads with its bindings alone.
-        const usage = await application.getOrganizationPullRequestUsage(
-          {
-            organizationId: organization.id,
-            repositoryHost: query.data.host,
-            repositoryFullName: query.data.repository,
-            prNumber: query.data.pullRequest,
-          },
-          {
-            kind: "apiKey",
-            apiKeyId: c.get("apiKeyId"),
-            userId: c.get("apiKeyUserId"),
-          },
-        );
-
-        // This answer names people, so who read it stays attributable. Awaited
-        // before the answer leaves, so a read is never served unrecorded.
-        // Never the contributors themselves: how many projects fed the rollup
-        // says how wide the read reached without copying the names into a
-        // second store that outlives it. A service key acts as nobody, so it
-        // is recorded as `apikey:<id>` — the same stable actor string the
-        // management audits use.
-        await audit().auditLog({
-          userId: managementActor(c),
-          organizationId: organization.id,
-          action: "codingAgents.pullRequestUsage",
-          targetKind: "pullRequest",
-          targetId: `${query.data.host}/${query.data.repository}#${query.data.pullRequest}`,
-          args: {
-            repository: query.data.repository,
-            host: query.data.host,
-            pullRequest: query.data.pullRequest,
-            contributingProjectCount: new Set(usage.rows.map((row) => row.projectId)).size,
-          },
-        });
-
-        return c.json(usage);
+    // The credential is the principal, not its holder: a deliberately
+    // narrowed key must read with its own scope rather than the full reach
+    // of whoever created it, and a service key — which acts as nobody —
+    // reads with its bindings alone.
+    const usage = await application.getOrganizationPullRequestUsage(
+      {
+        organizationId: organization.id,
+        repositoryHost: host,
+        repositoryFullName: input.repository,
+        prNumber: input.pullRequest,
+      },
+      {
+        kind: "apiKey",
+        apiKeyId,
+        userId: c.get("apiKeyUserId") ?? null,
       },
     );
 
-  return secured;
+    // This answer names people, so who read it stays attributable. Awaited
+    // before the answer leaves, so a read is never served unrecorded.
+    // Never the contributors themselves: how many projects fed the rollup
+    // says how wide the read reached without copying the names into a
+    // second store that outlives it. A service key acts as nobody, so it
+    // is recorded as `apikey:<id>` — the same stable actor string the
+    // management audits use.
+    await audit().auditLog({
+      userId: managementActor(c),
+      organizationId: organization.id,
+      action: "codingAgents.pullRequestUsage",
+      targetKind: "pullRequest",
+      targetId: `${host}/${input.repository}#${input.pullRequest}`,
+      args: {
+        repository: input.repository,
+        host,
+        pullRequest: input.pullRequest,
+        contributingProjectCount: new Set(usage.rows.map((row) => row.projectId)).size,
+      },
+    });
+
+    return usage;
+  };
+
+  return service
+    .registerRoute("get", "/pull-request-usage", MANAGEMENT_API_VERSION, usageHandler, (b) =>
+      // Authentication is the organization key; the AUTHORIZATION is the
+      // caller's per-project cut, resolved in the handler with the key as the
+      // principal. No `requires(...)` fits: no single organization-scope
+      // permission describes "the projects this credential may read", and a
+      // member whose only grant is their own personal workspace must still get
+      // their own rollup.
+      policy(anyAuthenticated())(b)
+        .withQuery(pullRequestUsageQuerySchema)
+        .withOutput(pullRequestUsageResponseSchema)
+        .withDocs({
+          summary: "Get pull request coding agent usage",
+          description:
+            "Assistant usage for one pull request: sessions, tokens and cost, " +
+            "grouped by contributor and agent, plus per-model totals, " +
+            "over the pull request's whole lifetime rather than a time window. " +
+            "Every row and the totals split cost three ways: the part priced per " +
+            "token, the part a bundled subscription already covers, and the " +
+            "list-price total of both. Per-model totals carry the list price " +
+            "only. Cost is calculated from the tokens the agent reported and " +
+            "LangWatch's model prices, so it estimates spend rather than " +
+            "restating a provider invoice. " +
+            "Authenticate with an organization API key and nothing else: no " +
+            "project id is sent anywhere. A key created for you reads with your " +
+            "own access; an organization service key, such as one a continuous " +
+            "integration job holds, reads with the access its bindings grant. " +
+            "Rows appear only for projects the key may view, and cost only for " +
+            "those it may price.",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "The pull request's usage rollup",
+              content: {
+                "application/json": { schema: resolver(pullRequestUsageResponseSchema) },
+              },
+            },
+          },
+        }),
+    )
+    .build();
 }

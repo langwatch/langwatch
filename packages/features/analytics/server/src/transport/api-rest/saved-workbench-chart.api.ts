@@ -6,15 +6,17 @@
 import { requires } from "@langwatch/api";
 import {
   apiErrorSchema,
-  type AppRestProjectVariables,
   canonicalBaseResponses,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  projectOf,
+  type ProjectScopedContext,
+  resolver,
+  type RestApiVersionedFamily,
   type RouteResponse,
-  type SecuredApp,
-  validator as zValidator,
 } from "@langwatch/api/rest";
 import type { SavedWorkbenchChart } from "@langwatch/dashboard-contract";
 import type { ProjectIdentity } from "@langwatch/project-contract";
-import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 
 import {
@@ -24,8 +26,8 @@ import {
 
 const routeGuards = LangWatchQLRouteGuardsService.create();
 
-/** The app every route in this family is registered on. */
-type LangWatchQLApp = SecuredApp<{ Variables: AppRestProjectVariables }>;
+/** The handler context every route in this family runs on. */
+type ChartContext = ProjectScopedContext<EndpointVariables>;
 
 /**
  * The Vega-Lite specification ceiling this route derives its own from. STATED here rather than
@@ -188,16 +190,6 @@ function chartResource({
   };
 }
 
-/**
- * The chart id the path matched. @throws {Error} when a chart route matched without one.
- */
-function chartIdOf(chartId: string | undefined): string {
-  if (!chartId) {
-    throw new Error("chart route matched without a chartId path parameter");
-  }
-  return chartId;
-}
-
 async function dashboardSavedChartCall<T>(
   ports: LangWatchQLRestPorts,
   run: () => Promise<T>,
@@ -209,274 +201,280 @@ async function dashboardSavedChartCall<T>(
   }
 }
 
-function registerList(secured: LangWatchQLApp, ports: LangWatchQLRestPorts): void {
-  secured.access(requires("analytics:view")).get(
-    "/:projectId/analytics/charts",
-    describeRoute({
-      summary: "List saved workbench charts",
-      description:
-        "Lists every saved LangWatchQL chart in this project, each with the statement it runs, the parameter values it was saved with and the Vega-Lite specification that draws it. Charts built with the chart builder are a different kind and are not listed here.",
-      tags: CHART_TAGS,
-      responses: {
-        ...canonicalBaseResponses,
-        200: {
-          description: "The project's saved workbench charts",
-          content: {
-            "application/json": { schema: resolver(chartListSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = await routeGuards.project({
-        featureFlags: ports.featureFlags(),
-        project: c.get("project"),
-        projects: ports.projects(),
-        requestedProjectId: c.req.param("projectId"),
-      });
-      const charts = await dashboardSavedChartCall(ports, () =>
-        ports.charts().listSavedWorkbenchCharts({ projectId: project.id }),
-      );
-      return c.json({
-        data: charts.map((chart) => chartResource({ chart, project, ports })),
-      });
-    },
-  );
-}
-
-function registerCreate(secured: LangWatchQLApp, ports: LangWatchQLRestPorts): void {
-  secured.access(requires("analytics:create")).post(
-    "/:projectId/analytics/charts",
-    describeRoute({
-      summary: "Save a workbench chart",
-      description:
-        "Saves a LangWatchQL statement, its bound parameter values and an optional Vega-Lite specification as one chart. The statement is validated by the LangWatchQL analytics SQL validator against this key's own permissions, and the specification by the visualization policy, before anything is written — a chart that could not be run or drawn is refused rather than stored.",
-      tags: CHART_TAGS,
-      responses: {
-        ...canonicalBaseResponses,
-        201: {
-          description: "The chart was saved",
-          content: { "application/json": { schema: resolver(chartSchema) } },
-        },
-      },
-    }),
-    zValidator("json", createChartSchema),
-    async (c) => {
-      const project = await routeGuards.project({
-        featureFlags: ports.featureFlags(),
-        project: c.get("project"),
-        projects: ports.projects(),
-        requestedProjectId: c.req.param("projectId"),
-      });
-      const { name, definition } = c.req.valid("json");
-      const protections = await ports.protectionsFor({ projectId: project.id });
-      const chart = await dashboardSavedChartCall(ports, () =>
-        ports.charts().createSavedWorkbenchChart({
-          projectId: project.id,
-          protections,
-          name,
-          definition,
-        }),
-      );
-      return c.json(chartResource({ chart, project, ports }), 201);
-    },
-  );
-}
-
-function registerRead(secured: LangWatchQLApp, ports: LangWatchQLRestPorts): void {
-  secured.access(requires("analytics:view")).get(
-    "/:projectId/analytics/charts/:chartId",
-    describeRoute({
-      summary: "Get a saved workbench chart",
-      description:
-        "Returns one saved LangWatchQL chart with its statement, parameter values and specification. A chart saved in another project is reported as not found.",
-      tags: CHART_TAGS,
-      responses: {
-        ...canonicalBaseResponses,
-        ...chartNotFoundResponse,
-        200: {
-          description: "The saved chart",
-          content: { "application/json": { schema: resolver(chartSchema) } },
-        },
-      },
-    }),
-    async (c) => {
-      const project = await routeGuards.project({
-        featureFlags: ports.featureFlags(),
-        project: c.get("project"),
-        projects: ports.projects(),
-        requestedProjectId: c.req.param("projectId"),
-      });
-      const chart = await dashboardSavedChartCall(ports, () =>
-        ports.charts().getSavedWorkbenchChart({
-          chartId: chartIdOf(c.req.param("chartId")),
-          projectId: project.id,
-        }),
-      );
-      return c.json(chartResource({ chart, project, ports }));
-    },
-  );
-}
-
-function registerUpdate(secured: LangWatchQLApp, ports: LangWatchQLRestPorts): void {
-  secured.access(requires("analytics:update")).patch(
-    "/:projectId/analytics/charts/:chartId",
-    describeRoute({
-      summary: "Update a saved workbench chart",
-      description:
-        "Replaces a saved chart's name, its definition, or both. A definition offered here passes exactly the validators a save passes, resolved against this key's current permissions — so a chart cannot be edited into naming a column the caller may no longer read. A request carrying neither field is refused.",
-      tags: CHART_TAGS,
-      responses: {
-        ...canonicalBaseResponses,
-        ...chartNotFoundResponse,
-        200: {
-          description: "The updated chart",
-          content: { "application/json": { schema: resolver(chartSchema) } },
-        },
-      },
-    }),
-    zValidator("json", updateChartSchema),
-    async (c) => {
-      const project = await routeGuards.project({
-        featureFlags: ports.featureFlags(),
-        project: c.get("project"),
-        projects: ports.projects(),
-        requestedProjectId: c.req.param("projectId"),
-      });
-      const { name, definition } = c.req.valid("json");
-      const definitionUpdate =
-        definition === undefined
-          ? undefined
-          : {
-              definition,
-              protections: await ports.protectionsFor({ projectId: project.id }),
-            };
-      const chart = await dashboardSavedChartCall(ports, () =>
-        ports.charts().updateSavedWorkbenchChart({
-          chartId: chartIdOf(c.req.param("chartId")),
-          projectId: project.id,
-          ...(name === undefined ? {} : { name }),
-          ...(definitionUpdate === undefined ? {} : { definitionUpdate }),
-        }),
-      );
-      return c.json(chartResource({ chart, project, ports }));
-    },
-  );
-}
-
-function registerDelete(secured: LangWatchQLApp, ports: LangWatchQLRestPorts): void {
-  secured.access(requires("analytics:delete")).delete(
-    "/:projectId/analytics/charts/:chartId",
-    describeRoute({
-      summary: "Delete a saved workbench chart",
-      description:
-        "Deletes one saved LangWatchQL chart. Answers 204 with no body; deleting a chart that is not in this project is reported as not found.",
-      tags: CHART_TAGS,
-      responses: {
-        ...canonicalBaseResponses,
-        ...chartNotFoundResponse,
-        204: { description: "The chart was deleted" },
-      },
-    }),
-    async (c) => {
-      const project = await routeGuards.project({
-        featureFlags: ports.featureFlags(),
-        project: c.get("project"),
-        projects: ports.projects(),
-        requestedProjectId: c.req.param("projectId"),
-      });
-      await dashboardSavedChartCall(ports, () =>
-        ports.charts().deleteSavedWorkbenchChart({
-          chartId: chartIdOf(c.req.param("chartId")),
-          projectId: project.id,
-        }),
-      );
-      return c.body(null, 204);
-    },
-  );
-}
-
-function registerPlace(secured: LangWatchQLApp, ports: LangWatchQLRestPorts): void {
-  secured.access(requires("analytics:update")).put(
-    "/:projectId/analytics/charts/:chartId/placement",
-    describeRoute({
-      summary: "Place a saved workbench chart on a dashboard",
-      description:
-        "Places one saved LangWatchQL chart on a dashboard in the same project, at the grid position supplied — or, when no grid row is given, at the next row free on that dashboard, counting charts of every kind. A dashboard that is not in this project is reported as not found, exactly like a chart that is not, and nothing is written.",
-      tags: CHART_TAGS,
-      responses: {
-        ...canonicalBaseResponses,
-        ...chartNotFoundResponse,
-        200: {
-          description: "The chart, now placed",
-          content: { "application/json": { schema: resolver(chartSchema) } },
-        },
-      },
-    }),
-    zValidator("json", placeChartSchema),
-    async (c) => {
-      const project = await routeGuards.project({
-        featureFlags: ports.featureFlags(),
-        project: c.get("project"),
-        projects: ports.projects(),
-        requestedProjectId: c.req.param("projectId"),
-      });
-      const chart = await dashboardSavedChartCall(ports, () =>
-        ports.charts().placeSavedWorkbenchChart({
-          projectId: project.id,
-          chartId: chartIdOf(c.req.param("chartId")),
-          ...c.req.valid("json"),
-        }),
-      );
-      return c.json(chartResource({ chart, project, ports }));
-    },
-  );
-}
-
-function registerUnplace(secured: LangWatchQLApp, ports: LangWatchQLRestPorts): void {
-  secured.access(requires("analytics:update")).delete(
-    "/:projectId/analytics/charts/:chartId/placement",
-    describeRoute({
-      summary: "Remove a saved workbench chart from its dashboard",
-      description:
-        "Removes one saved LangWatchQL chart from whatever dashboard it is on, clearing its grid position along with the dashboard id. Idempotent: unplacing a chart that is not placed answers 204 all the same. The chart itself — its statement, parameter values and specification — is untouched.",
-      tags: CHART_TAGS,
-      responses: {
-        ...canonicalBaseResponses,
-        ...chartNotFoundResponse,
-        204: { description: "The chart is no longer on any dashboard" },
-      },
-    }),
-    async (c) => {
-      const project = await routeGuards.project({
-        featureFlags: ports.featureFlags(),
-        project: c.get("project"),
-        projects: ports.projects(),
-        requestedProjectId: c.req.param("projectId"),
-      });
-      await dashboardSavedChartCall(ports, () =>
-        ports.charts().unplaceSavedWorkbenchChart({
-          chartId: chartIdOf(c.req.param("chartId")),
-          projectId: project.id,
-        }),
-      );
-      return c.body(null, 204);
-    },
-  );
-}
+const projectParamsSchema = z.object({ projectId: z.string().min(1) });
+const chartParamsSchema = projectParamsSchema.extend({ chartId: z.string().min(1) });
 
 /**
- * Registers the saved workbench chart routes on the LangWatchQL analytics SQL app.
+ * Registers the saved workbench chart routes on the LangWatchQL analytics family.
  */
 export function registerSavedWorkbenchChartRoutes(
-  secured: LangWatchQLApp,
+  family: RestApiVersionedFamily,
   ports: LangWatchQLRestPorts,
 ): void {
-  registerList(secured, ports);
-  registerCreate(secured, ports);
-  registerRead(secured, ports);
-  registerUpdate(secured, ports);
-  registerDelete(secured, ports);
-  registerPlace(secured, ports);
-  registerUnplace(secured, ports);
+  const { service, policy } = family;
+
+  /**
+   * The project the path names, once the guards have decided the caller may
+   * address it. Every route in the family starts here.
+   */
+  const projectFor = async (c: ChartContext, requestedProjectId: string) =>
+    await routeGuards.project({
+      featureFlags: ports.featureFlags(),
+      project: projectOf(c),
+      projects: ports.projects(),
+      requestedProjectId,
+    });
+
+  const listHandler = async (c: ChartContext, input: z.infer<typeof projectParamsSchema>) => {
+    const project = await projectFor(c, input.projectId);
+    const charts = await dashboardSavedChartCall(ports, () =>
+      ports.charts().listSavedWorkbenchCharts({ projectId: project.id }),
+    );
+    return { data: charts.map((chart) => chartResource({ chart, project, ports })) };
+  };
+
+  const createHandler = async (
+    c: ChartContext,
+    input: z.infer<typeof projectParamsSchema> & z.infer<typeof createChartSchema>,
+  ) => {
+    const project = await projectFor(c, input.projectId);
+    const protections = await ports.protectionsFor({ projectId: project.id });
+    const chart = await dashboardSavedChartCall(ports, () =>
+      ports.charts().createSavedWorkbenchChart({
+        projectId: project.id,
+        protections,
+        name: input.name,
+        definition: input.definition,
+      }),
+    );
+    return chartResource({ chart, project, ports });
+  };
+
+  const readHandler = async (c: ChartContext, input: z.infer<typeof chartParamsSchema>) => {
+    const project = await projectFor(c, input.projectId);
+    const chart = await dashboardSavedChartCall(ports, () =>
+      ports.charts().getSavedWorkbenchChart({ chartId: input.chartId, projectId: project.id }),
+    );
+    return chartResource({ chart, project, ports });
+  };
+
+  const updateHandler = async (
+    c: ChartContext,
+    input: z.infer<typeof chartParamsSchema> & z.infer<typeof updateChartSchema>,
+  ) => {
+    const project = await projectFor(c, input.projectId);
+    const { name, definition } = input;
+    const definitionUpdate =
+      definition === undefined
+        ? undefined
+        : {
+            definition,
+            protections: await ports.protectionsFor({ projectId: project.id }),
+          };
+    const chart = await dashboardSavedChartCall(ports, () =>
+      ports.charts().updateSavedWorkbenchChart({
+        chartId: input.chartId,
+        projectId: project.id,
+        ...(name === undefined ? {} : { name }),
+        ...(definitionUpdate === undefined ? {} : { definitionUpdate }),
+      }),
+    );
+    return chartResource({ chart, project, ports });
+  };
+
+  const deleteHandler = async (c: ChartContext, input: z.infer<typeof chartParamsSchema>) => {
+    const project = await projectFor(c, input.projectId);
+    await dashboardSavedChartCall(ports, () =>
+      ports.charts().deleteSavedWorkbenchChart({ chartId: input.chartId, projectId: project.id }),
+    );
+  };
+
+  const placeHandler = async (
+    c: ChartContext,
+    input: z.infer<typeof chartParamsSchema> & z.infer<typeof placeChartSchema>,
+  ) => {
+    const project = await projectFor(c, input.projectId);
+    const { projectId: _requested, chartId, ...placement } = input;
+    const chart = await dashboardSavedChartCall(ports, () =>
+      ports.charts().placeSavedWorkbenchChart({
+        projectId: project.id,
+        chartId,
+        ...placement,
+      }),
+    );
+    return chartResource({ chart, project, ports });
+  };
+
+  const unplaceHandler = async (c: ChartContext, input: z.infer<typeof chartParamsSchema>) => {
+    const project = await projectFor(c, input.projectId);
+    await dashboardSavedChartCall(ports, () =>
+      ports.charts().unplaceSavedWorkbenchChart({ chartId: input.chartId, projectId: project.id }),
+    );
+  };
+
+  service
+    .registerRoute(
+      "get",
+      "/:projectId/analytics/charts",
+      MANAGEMENT_API_VERSION,
+      listHandler,
+      (b) =>
+        policy(requires("analytics:view"))(b)
+          .withParams(projectParamsSchema)
+          .withOutput(chartListSchema)
+          .withDocs({
+            summary: "List saved workbench charts",
+            description:
+              "Lists every saved LangWatchQL chart in this project, each with the statement it runs, the parameter values it was saved with and the Vega-Lite specification that draws it. Charts built with the chart builder are a different kind and are not listed here.",
+            tags: CHART_TAGS,
+            responses: {
+              ...canonicalBaseResponses,
+              200: {
+                description: "The project's saved workbench charts",
+                content: { "application/json": { schema: resolver(chartListSchema) } },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "post",
+      "/:projectId/analytics/charts",
+      MANAGEMENT_API_VERSION,
+      createHandler,
+      (b) =>
+        policy(requires("analytics:create"))(b)
+          .withParams(projectParamsSchema)
+          .withInput(createChartSchema)
+          .withOutput(chartSchema)
+          .withStatus(201)
+          .withDocs({
+            summary: "Save a workbench chart",
+            description:
+              "Saves a LangWatchQL statement, its bound parameter values and an optional Vega-Lite specification as one chart. The statement is validated by the LangWatchQL analytics SQL validator against this key's own permissions, and the specification by the visualization policy, before anything is written — a chart that could not be run or drawn is refused rather than stored.",
+            tags: CHART_TAGS,
+            responses: {
+              ...canonicalBaseResponses,
+              201: {
+                description: "The chart was saved",
+                content: { "application/json": { schema: resolver(chartSchema) } },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "get",
+      "/:projectId/analytics/charts/:chartId",
+      MANAGEMENT_API_VERSION,
+      readHandler,
+      (b) =>
+        policy(requires("analytics:view"))(b)
+          .withParams(chartParamsSchema)
+          .withOutput(chartSchema)
+          .withDocs({
+            summary: "Get a saved workbench chart",
+            description:
+              "Returns one saved LangWatchQL chart with its statement, parameter values and specification. A chart saved in another project is reported as not found.",
+            tags: CHART_TAGS,
+            responses: {
+              ...canonicalBaseResponses,
+              ...chartNotFoundResponse,
+              200: {
+                description: "The saved chart",
+                content: { "application/json": { schema: resolver(chartSchema) } },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "patch",
+      "/:projectId/analytics/charts/:chartId",
+      MANAGEMENT_API_VERSION,
+      updateHandler,
+      (b) =>
+        policy(requires("analytics:update"))(b)
+          .withParams(chartParamsSchema)
+          .withInput(updateChartSchema)
+          .withOutput(chartSchema)
+          .withDocs({
+            summary: "Update a saved workbench chart",
+            description:
+              "Replaces a saved chart's name, its definition, or both. A definition offered here passes exactly the validators a save passes, resolved against this key's current permissions — so a chart cannot be edited into naming a column the caller may no longer read. A request carrying neither field is refused.",
+            tags: CHART_TAGS,
+            responses: {
+              ...canonicalBaseResponses,
+              ...chartNotFoundResponse,
+              200: {
+                description: "The updated chart",
+                content: { "application/json": { schema: resolver(chartSchema) } },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "delete",
+      "/:projectId/analytics/charts/:chartId",
+      MANAGEMENT_API_VERSION,
+      deleteHandler,
+      (b) =>
+        policy(requires("analytics:delete"))(b)
+          .withParams(chartParamsSchema)
+          .withOutput(z.void())
+          .withDocs({
+            summary: "Delete a saved workbench chart",
+            description:
+              "Deletes one saved LangWatchQL chart. Answers 204 with no body; deleting a chart that is not in this project is reported as not found.",
+            tags: CHART_TAGS,
+            responses: {
+              ...canonicalBaseResponses,
+              ...chartNotFoundResponse,
+              204: { description: "The chart was deleted" },
+            },
+          }),
+    )
+    .registerRoute(
+      "put",
+      "/:projectId/analytics/charts/:chartId/placement",
+      MANAGEMENT_API_VERSION,
+      placeHandler,
+      (b) =>
+        policy(requires("analytics:update"))(b)
+          .withParams(chartParamsSchema)
+          .withInput(placeChartSchema)
+          .withOutput(chartSchema)
+          .withDocs({
+            summary: "Place a saved workbench chart on a dashboard",
+            description:
+              "Places one saved LangWatchQL chart on a dashboard in the same project, at the grid position supplied — or, when no grid row is given, at the next row free on that dashboard, counting charts of every kind. A dashboard that is not in this project is reported as not found, exactly like a chart that is not, and nothing is written.",
+            tags: CHART_TAGS,
+            responses: {
+              ...canonicalBaseResponses,
+              ...chartNotFoundResponse,
+              200: {
+                description: "The chart, now placed",
+                content: { "application/json": { schema: resolver(chartSchema) } },
+              },
+            },
+          }),
+    )
+    .registerRoute(
+      "delete",
+      "/:projectId/analytics/charts/:chartId/placement",
+      MANAGEMENT_API_VERSION,
+      unplaceHandler,
+      (b) =>
+        policy(requires("analytics:update"))(b)
+          .withParams(chartParamsSchema)
+          .withOutput(z.void())
+          .withDocs({
+            summary: "Remove a saved workbench chart from its dashboard",
+            description:
+              "Removes one saved LangWatchQL chart from whatever dashboard it is on, clearing its grid position along with the dashboard id. Idempotent: unplacing a chart that is not placed answers 204 all the same. The chart itself — its statement, parameter values and specification — is untouched.",
+            tags: CHART_TAGS,
+            responses: {
+              ...canonicalBaseResponses,
+              ...chartNotFoundResponse,
+              204: { description: "The chart is no longer on any dashboard" },
+            },
+          }),
+    );
 }

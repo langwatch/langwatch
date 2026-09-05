@@ -102,7 +102,7 @@ describe("model overrides and turn limits over REST", () => {
     it("carries the values back on create and on read", async () => {
       const { app } = harness();
 
-      const createRes = await app.hono!.request("/api/scenarios", {
+      const createRes = await app!.request("/api/scenarios", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -124,7 +124,7 @@ describe("model overrides and turn limits over REST", () => {
         minTurns: 2,
       });
 
-      const readRes = await app.hono!.request(`/api/scenarios/${created.id}`);
+      const readRes = await app!.request(`/api/scenarios/${created.id}`);
       expect(readRes.status).toBe(200);
       const read = await readRes.json();
       expect(read).toMatchObject({
@@ -141,7 +141,7 @@ describe("model overrides and turn limits over REST", () => {
     it("clears the stored override", async () => {
       const { app } = harness();
 
-      const createRes = await app.hono!.request("/api/scenarios", {
+      const createRes = await app!.request("/api/scenarios", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -152,7 +152,7 @@ describe("model overrides and turn limits over REST", () => {
       });
       const created = (await createRes.json()) as { id: string };
 
-      const updateRes = await app.hono!.request(`/api/scenarios/${created.id}`, {
+      const updateRes = await app!.request(`/api/scenarios/${created.id}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ simulatorModel: null }),
@@ -161,7 +161,7 @@ describe("model overrides and turn limits over REST", () => {
       const updated = (await updateRes.json()) as { simulatorModel: string | null };
       expect(updated.simulatorModel).toBeNull();
 
-      const readRes = await app.hono!.request(`/api/scenarios/${created.id}`);
+      const readRes = await app!.request(`/api/scenarios/${created.id}`);
       const read = (await readRes.json()) as { simulatorModel: string | null };
       expect(read.simulatorModel).toBeNull();
     });
@@ -172,7 +172,7 @@ describe("model overrides and turn limits over REST", () => {
     it("rejects the create with a validation error", async () => {
       const { app } = harness();
 
-      const res = await app.hono!.request("/api/scenarios", {
+      const res = await app!.request("/api/scenarios", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -193,7 +193,7 @@ describe("PATCH /api/scenarios/:id", () => {
     it("updates the scenario like PUT does", async () => {
       const { app } = harness();
 
-      const createRes = await app.hono!.request("/api/scenarios", {
+      const createRes = await app!.request("/api/scenarios", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -203,7 +203,7 @@ describe("PATCH /api/scenarios/:id", () => {
       });
       const created = (await createRes.json()) as { id: string };
 
-      const res = await app.hono!.request(`/api/scenarios/${created.id}`, {
+      const res = await app!.request(`/api/scenarios/${created.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: "Patched Name" }),

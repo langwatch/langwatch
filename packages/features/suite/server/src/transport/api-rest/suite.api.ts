@@ -1,13 +1,16 @@
 import { requires } from "@langwatch/api";
 import {
-  type AppRestProjectVariables,
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
   deprecatedAlias,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
   type PlatformUrlBuilder,
-  type SecuredApp,
-  validator as zValidator,
+  projectOf,
+  type ProjectScopedContext,
+  resolver,
 } from "@langwatch/api/rest";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
@@ -27,7 +30,7 @@ import {
   type SuiteScope,
   suiteTargetSchema,
 } from "@langwatch/suite-contract";
-import { describeRoute, resolver } from "hono-openapi";
+import type { ErrorHandler } from "hono";
 import { z } from "zod";
 import { OrganizationNotFoundForProjectError, type SuiteApp } from "#app/suite.app";
 
@@ -35,6 +38,9 @@ const logger = createLogger("langwatch:api:suites");
 
 /** The one sentence every operation of this family opens with. */
 const DEPRECATION_NOTE = "Deprecated: use /api/v1/run-plans and /api/v1/test-suites.";
+
+/** The successors, as the deprecation warning names them. */
+const DEPRECATION_SUCCESSORS = "use /api/v1/run-plans and /api/v1/test-suites";
 
 /**
  * A refused run, at the status this family publishes one with.
@@ -50,6 +56,23 @@ class SuiteAliasRunRefusedError extends HandledError {
     this.name = "SuiteAliasRunRefusedError";
   }
 }
+
+/**
+ * A row this family could not address, carrying the sentence it answers with.
+ * The body has always been the bare `{ error }` the family writes itself, and
+ * the wording differs by route, so the message travels with the refusal.
+ */
+class SuiteAliasNotFoundError extends Error {}
+
+/** The family's 404s, in the bare `{ error }` body they have always had. */
+const suiteErrorHandler =
+  (boundary: ErrorHandler): ErrorHandler =>
+  (error, c) => {
+    if (error instanceof SuiteAliasNotFoundError) {
+      return c.json({ error: error.message }, 404);
+    }
+    return boundary(error, c);
+  };
 
 /**
  * The refusal for a body that names targets the addressed row does not take.
@@ -303,6 +326,9 @@ function toTestSuiteResponse(testSuite: ScenarioTestSuite) {
   };
 }
 
+const idParamsSchema = z.object({ id: z.string().min(1) });
+const archivedSuiteSchema = z.object({ id: z.string(), archived: z.boolean() });
+
 /**
  * REST for suites — the run plans a project assembles by hand, and the test suites
  * scenarios are filed into.
@@ -311,432 +337,390 @@ export function createSuiteRestApp(options: {
   security: AppRestSecurity;
   suites: () => SuiteApp;
   platformUrl: PlatformUrlBuilder;
-}): SecuredApp<{ Variables: AppRestProjectVariables }> {
+}): MountableRestApp {
   const { security, suites, platformUrl } = options;
 
-  const secured = security.createProjectApp({ basePath: "/api/suites" });
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "suites",
+    basePath: "/api/suites",
+    errorEnvelope: "legacy",
+    errorHandler: suiteErrorHandler,
+    // Every answer of the family names its successor.
+    routeMiddleware: [deprecatedAlias({ successor: "/api/v1/run-plans" })],
+  });
 
-  // Every response of the family names its successor, refusals included.
-  secured.use(deprecatedAlias({ successor: "/api/v1/run-plans" }));
+  type SuiteContext = ProjectScopedContext<EndpointVariables>;
 
-  // ── List Suites ────────────────────────────────────────────
-  secured.access(requires("scenarios:view")).get(
-    "/",
-    describeRoute({
-      deprecated: true,
-      description: `${DEPRECATION_NOTE} List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suites.`,
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(z.array(suiteResponseWithPlatformUrlSchema)),
-            },
-          },
-        },
-      },
-    }),
-    zValidator("query", listSuitesQuerySchema),
-    async (c) => {
-      const project = c.get("project");
-      const { kind } = c.req.valid("query");
-      logger.info({ projectId: project.id, kind }, "Listing suites");
+  const planPath = (slug: string) => `/simulations/run-plans/${slug}`;
+  const withPlatformUrl = <T extends { slug: string }>(row: T, projectSlug: string) => ({
+    ...row,
+    platformUrl: platformUrl({ projectSlug, path: planPath(row.slug) }),
+  });
 
-      const listed =
-        kind === "folder"
-          ? (await suites().listTestSuites({ projectId: project.id })).map(toTestSuiteResponse)
-          : (await suites().list({ projectId: project.id })).map(toSuiteResponse);
+  const listHandler = async (c: SuiteContext, input: z.infer<typeof listSuitesQuerySchema>) => {
+    const project = projectOf(c);
+    const { kind } = input;
+    logger.info({ projectId: project.id, kind }, "Listing suites");
 
-      return c.json(
-        listed.map((s) => ({
-          ...s,
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/simulations/run-plans/${s.slug}`,
-          }),
-        })),
-      );
-    },
-  );
+    const listed =
+      kind === "folder"
+        ? (await suites().listTestSuites({ projectId: project.id })).map(toTestSuiteResponse)
+        : (await suites().list({ projectId: project.id })).map(toSuiteResponse);
 
-  // ── Get Suite ──────────────────────────────────────────────
-  secured.access(requires("scenarios:view")).get(
-    "/:id",
-    describeRoute({
-      deprecated: true,
-      description: `${DEPRECATION_NOTE} Get a suite (run plan) by its ID.`,
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(suiteResponseWithPlatformUrlSchema),
-            },
-          },
-        },
-        404: {
-          description: "Suite not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      logger.info({ projectId: project.id, suiteId: id }, "Getting suite");
+    return listed.map((s) => withPlatformUrl(s, project.slug));
+  };
 
-      // The "try the run plan, fall back to the test suite" order is the
-      // application's; this door only decides how it words the miss.
-      let found;
-      try {
-        found = await suites().getByIdOrTestSuite({ id, projectId: project.id });
-      } catch (error) {
-        if (!(error instanceof SuiteNotFoundError)) throw error;
-        return c.json({ error: "Suite not found" }, 404);
-      }
+  const getHandler = async (c: SuiteContext, input: z.infer<typeof idParamsSchema>) => {
+    const project = projectOf(c);
+    const { id } = input;
+    logger.info({ projectId: project.id, suiteId: id }, "Getting suite");
 
-      const body =
-        found.kind === "test_suite"
-          ? toTestSuiteResponse(found.testSuite)
-          : toSuiteResponse(found.suite);
+    // The "try the run plan, fall back to the test suite" order is the
+    // application's; this door only decides how it words the miss.
+    let found;
+    try {
+      found = await suites().getByIdOrTestSuite({ id, projectId: project.id });
+    } catch (error) {
+      if (!(error instanceof SuiteNotFoundError)) throw error;
+      throw new SuiteAliasNotFoundError("Suite not found");
+    }
 
-      return c.json({
-        ...body,
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/simulations/run-plans/${body.slug}`,
-        }),
-      });
-    },
-  );
+    const row =
+      found.kind === "test_suite"
+        ? toTestSuiteResponse(found.testSuite)
+        : toSuiteResponse(found.suite);
+    return withPlatformUrl(row, project.slug);
+  };
 
-  // ── Create Suite ─────────────────────────────────────────── Creating a run plan asks for
-  // `scenarios:create`, not `scenarios:manage`. `:manage` still implies `:create` through
-  // the RBAC hierarchy, so every role and key that could create a suite yesterday still can;
-  // what changes is that a credential issued at the CREATE grain — which the product does
-  // issue — is now honoured instead of refused at the door.
-  secured.access(requires("scenarios:create")).post(
-    "/",
-    describeRoute({
-      deprecated: true,
-      description: `${DEPRECATION_NOTE} Create a new suite (run plan).`,
-      responses: {
-        ...baseResponses,
-        201: {
-          description: "Suite created",
-          content: {
-            "application/json": {
-              schema: resolver(suiteResponseWithPlatformUrlSchema),
-            },
-          },
-        },
-      },
-    }),
-    zValidator("json", createSuiteInputSchema),
-    async (c) => {
-      const project = c.get("project");
-      const body = c.req.valid("json");
-      logger.info({ projectId: project.id, kind: body.kind }, "Creating suite");
+  const createHandler = async (
+    c: SuiteContext,
+    input: z.infer<typeof createSuiteInputSchema>,
+  ) => {
+    const project = projectOf(c);
+    logger.info({ projectId: project.id, kind: input.kind }, "Creating suite");
 
-      const { kind, scope, ...definition } = body;
-      const suite =
-        kind === "folder"
-          ? toTestSuiteResponse(
-              await suites().createTestSuite({
-                projectId: project.id,
-                name: definition.name,
-              }),
-            )
-          : toSuiteResponse(
-              await suites().create({
-                ...definition,
-                ...(scope ? { scope: toDomainScope(scope) } : {}),
-                projectId: project.id,
-              }),
-            );
-      return c.json(
-        {
-          ...suite,
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/simulations/run-plans/${suite.slug}`,
-          }),
-        },
-        201,
-      );
-    },
-  );
-
-  // ── Update Suite ───────────────────────────────────────────
-  // `:update` for the same reason as `:create` above.
-  secured.access(requires("scenarios:update")).patch(
-    "/:id",
-    describeRoute({
-      deprecated: true,
-      description: `${DEPRECATION_NOTE} Update a suite (run plan).`,
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Suite updated",
-          content: {
-            "application/json": {
-              schema: resolver(suiteResponseWithPlatformUrlSchema),
-            },
-          },
-        },
-        404: {
-          description: "Suite not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("json", updateSuiteInputSchema),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      const body = c.req.valid("json");
-      logger.info({ projectId: project.id, suiteId: id }, "Updating suite");
-
-      // Whether this id names a test suite, and what a test suite refuses, is the
-      // application's decision — the same one the tRPC surface makes.
-      let updated;
-      try {
-        if (body.targets !== undefined) {
-          const found = await suites().getByIdOrTestSuite({ id, projectId: project.id });
-          if (found.kind === "test_suite") throw storedTargetsRefusal("update");
-        }
-        const { scope, ...fields } = body;
-        updated = await suites().update({
-          id,
-          projectId: project.id,
-          ...fields,
-          ...(scope ? { scope: toDomainScope(scope) } : {}),
-        });
-      } catch (error) {
-        if (!(error instanceof SuiteNotFoundError)) throw error;
-        return c.json({ error: "Suite not found" }, 404);
-      }
-
-      const response =
-        updated.kind === "test_suite"
-          ? toTestSuiteResponse(updated.testSuite)
-          : toSuiteResponse(updated.suite);
-
-      return c.json({
-        ...response,
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/simulations/run-plans/${response.slug}`,
-        }),
-      });
-    },
-  );
-
-  // ── Duplicate Suite ────────────────────────────────────────
-  // A duplicate is a create: it leaves the source suite untouched and produces a
-  // new one, so it asks for `scenarios:create`.
-  secured.access(requires("scenarios:create")).post(
-    "/:id/duplicate",
-    describeRoute({
-      deprecated: true,
-      description: `${DEPRECATION_NOTE} Duplicate a suite (run plan).`,
-      responses: {
-        ...baseResponses,
-        201: {
-          description: "Suite duplicated",
-          content: {
-            "application/json": {
-              schema: resolver(suiteResponseWithPlatformUrlSchema),
-            },
-          },
-        },
-        404: {
-          description: "Suite not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      logger.info({ projectId: project.id, suiteId: id }, "Duplicating suite");
-
-      try {
-        const suite = await suites().duplicate({ id, projectId: project.id });
-        return c.json(
-          {
-            ...toSuiteResponse(suite),
-            platformUrl: platformUrl({
-              projectSlug: project.slug,
-              path: `/simulations/run-plans/${suite.slug}`,
+    const { kind, scope, ...definition } = input;
+    const suite =
+      kind === "folder"
+        ? toTestSuiteResponse(
+            await suites().createTestSuite({ projectId: project.id, name: definition.name }),
+          )
+        : toSuiteResponse(
+            await suites().create({
+              ...definition,
+              ...(scope ? { scope: toDomainScope(scope) } : {}),
+              projectId: project.id,
             }),
-          },
-          201,
-        );
-      } catch (error) {
-        if (error instanceof SuiteNotFoundError) {
-          return c.json({ error: error.message }, 404);
-        }
-        throw error;
+          );
+    return withPlatformUrl(suite, project.slug);
+  };
+
+  const updateHandler = async (
+    c: SuiteContext,
+    input: z.infer<typeof idParamsSchema> & z.infer<typeof updateSuiteInputSchema>,
+  ) => {
+    const project = projectOf(c);
+    const { id, ...body } = input;
+    logger.info({ projectId: project.id, suiteId: id }, "Updating suite");
+
+    // Whether this id names a test suite, and what a test suite refuses, is the
+    // application's decision — the same one the tRPC surface makes.
+    let updated;
+    try {
+      if (body.targets !== undefined) {
+        const found = await suites().getByIdOrTestSuite({ id, projectId: project.id });
+        if (found.kind === "test_suite") throw storedTargetsRefusal("update");
       }
-    },
-  );
-
-  // ── Run Suite ────────────────────────────────────────────── RUNNING A SUITE IS NOT
-  // ADMINISTERING IT. The run creates scenario runs; the suite definition, its scenarios and
-  // its targets are left exactly as they were. `scenarios:manage` is the grain that also
-  // carries delete, so gating a run on it meant "you may only execute this if you may also
-  // destroy it" — and it refused every credential the product issues at the write grain.
-  secured.access(requires("scenarios:create")).post(
-    "/:id/run",
-    describeRoute({
-      deprecated: true,
-      description: `${DEPRECATION_NOTE} Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount. When the id names a test suite, the targets are read from the body.`,
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Suite run scheduled",
-          content: {
-            "application/json": {
-              schema: resolver(suiteRunResultSchema),
-            },
-          },
-        },
-        404: {
-          description: "Suite not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("json", runSuiteInputSchema),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      const body = c.req.valid("json");
-      logger.info({ projectId: project.id, suiteId: id }, "Running suite");
-
-      const app = suites();
-      const actor = runActorFromRequest({
-        // A project key belongs to no person, so it records no actor. A
-        // user-bound key records the person it belongs to, through the
-        // surface the request declared.
-        userId: c.get("apiKeyUserId"),
-        surfaceHeader: c.req.header("X-LangWatch-Surface"),
+      const { scope, ...fields } = body;
+      updated = await suites().update({
+        id,
+        projectId: project.id,
+        ...fields,
+        ...(scope ? { scope: toDomainScope(scope) } : {}),
       });
-      const idempotencyKey =
-        body.idempotencyKey ?? `api-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    } catch (error) {
+      if (!(error instanceof SuiteNotFoundError)) throw error;
+      throw new SuiteAliasNotFoundError("Suite not found");
+    }
 
-      try {
-        const found = await app.getByIdOrTestSuite({ id, projectId: project.id });
-        // A test suite stores no target, so the run takes them from the body
-        // and is filed under the run plan its scope resolves. A run plan
-        // stores its own, so a body naming any is a malformed request.
-        if (found.kind !== "test_suite" && body.targets !== undefined) {
-          throw storedTargetsRefusal("run");
-        }
+    const response =
+      updated.kind === "test_suite"
+        ? toTestSuiteResponse(updated.testSuite)
+        : toSuiteResponse(updated.suite);
+    return withPlatformUrl(response, project.slug);
+  };
 
-        const result =
-          found.kind === "test_suite"
-            ? await app.runPlan({
-                projectId: project.id,
-                config: {
-                  scope: { mode: "test_suites", testSuiteIds: [id] },
-                  targets: body.targets ?? [],
+  const duplicateHandler = async (c: SuiteContext, input: z.infer<typeof idParamsSchema>) => {
+    const project = projectOf(c);
+    const { id } = input;
+    logger.info({ projectId: project.id, suiteId: id }, "Duplicating suite");
+
+    try {
+      const suite = await suites().duplicate({ id, projectId: project.id });
+      return withPlatformUrl(toSuiteResponse(suite), project.slug);
+    } catch (error) {
+      if (error instanceof SuiteNotFoundError) {
+        throw new SuiteAliasNotFoundError(error.message);
+      }
+      throw error;
+    }
+  };
+
+  const runHandler = async (
+    c: SuiteContext,
+    input: z.infer<typeof idParamsSchema> & z.infer<typeof runSuiteInputSchema>,
+  ) => {
+    const project = projectOf(c);
+    const { id } = input;
+    logger.info({ projectId: project.id, suiteId: id }, "Running suite");
+
+    const app = suites();
+    const actor = runActorFromRequest({
+      // A project key belongs to no person, so it records no actor. A
+      // user-bound key records the person it belongs to, through the
+      // surface the request declared.
+      userId: c.get("apiKeyUserId"),
+      surfaceHeader: c.req.header("X-LangWatch-Surface"),
+    });
+    const idempotencyKey =
+      input.idempotencyKey ?? `api-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    try {
+      const found = await app.getByIdOrTestSuite({ id, projectId: project.id });
+      // A test suite stores no target, so the run takes them from the body
+      // and is filed under the run plan its scope resolves. A run plan
+      // stores its own, so a body naming any is a malformed request.
+      if (found.kind !== "test_suite" && input.targets !== undefined) {
+        throw storedTargetsRefusal("run");
+      }
+
+      const result =
+        found.kind === "test_suite"
+          ? await app.runPlan({
+              projectId: project.id,
+              config: {
+                scope: { mode: "test_suites", testSuiteIds: [id] },
+                targets: input.targets ?? [],
+              },
+              idempotencyKey,
+              ...(input.parameters !== undefined && { parameters: input.parameters }),
+              ...(input.note !== undefined && { note: input.note }),
+              ...(actor !== undefined && { actor }),
+            })
+          : await app.run({
+              id,
+              projectId: project.id,
+              idempotencyKey,
+              parameters: input.parameters,
+              note: input.note,
+              actor,
+            });
+
+      return { scheduled: true, ...result };
+    } catch (error) {
+      if (error instanceof OrganizationNotFoundForProjectError) {
+        throw new SuiteAliasNotFoundError("Organization not found for project");
+      }
+      if (error instanceof SuiteNotFoundError) {
+        throw new SuiteAliasNotFoundError(error.message);
+      }
+      // The domain's own refusal, at the status this family publishes: the
+      // code, the fault and the remediation are the boundary's to render.
+      if (error instanceof SuiteExecutionError) throw new SuiteAliasRunRefusedError(error);
+      throw error;
+    }
+  };
+
+  const archiveHandler = async (c: SuiteContext, input: z.infer<typeof idParamsSchema>) => {
+    const project = projectOf(c);
+    const { id } = input;
+    logger.info({ projectId: project.id, suiteId: id }, "Archiving suite");
+
+    try {
+      await suites().archiveTestSuite({ testSuiteId: id, projectId: project.id });
+      return { id, archived: true };
+    } catch (error) {
+      if (!(error instanceof ScenarioTestSuiteNotFoundError)) throw error;
+    }
+
+    try {
+      await suites().archive({ id, projectId: project.id });
+    } catch (error) {
+      if (!(error instanceof SuiteNotFoundError)) throw error;
+      throw new SuiteAliasNotFoundError("Suite not found");
+    }
+
+    return { id, archived: true };
+  };
+
+  const notFoundResponse = {
+    404: {
+      description: "Suite not found",
+      content: { "application/json": { schema: resolver(badRequestSchema) } },
+    },
+  };
+
+  return (
+    service
+      // ── List Suites ────────────────────────────────────────────
+      .registerRoute("get", "/", MANAGEMENT_API_VERSION, listHandler, (b) =>
+        policy(requires("scenarios:view"))(b)
+          .withQuery(listSuitesQuerySchema)
+          .withOutput(z.array(suiteResponseWithPlatformUrlSchema))
+          .withDeprecated(DEPRECATION_SUCCESSORS)
+          .withDocs({
+            description: `${DEPRECATION_NOTE} List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suites.`,
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.array(suiteResponseWithPlatformUrlSchema)),
+                  },
                 },
-                idempotencyKey,
-                ...(body.parameters !== undefined && { parameters: body.parameters }),
-                ...(body.note !== undefined && { note: body.note }),
-                ...(actor !== undefined && { actor }),
-              })
-            : await app.run({
-                id,
-                projectId: project.id,
-                idempotencyKey,
-                parameters: body.parameters,
-                note: body.note,
-                actor,
-              });
-
-        return c.json({
-          scheduled: true,
-          ...result,
-        });
-      } catch (error) {
-        if (error instanceof OrganizationNotFoundForProjectError) {
-          return c.json({ error: "Organization not found for project" }, 404);
-        }
-        if (error instanceof SuiteNotFoundError) {
-          return c.json({ error: error.message }, 404);
-        }
-        // The domain's own refusal, at the status this family publishes: the
-        // code, the fault and the remediation are the boundary's to render.
-        if (error instanceof SuiteExecutionError) throw new SuiteAliasRunRefusedError(error);
-        throw error;
-      }
-    },
-  );
-
-  // ── Delete (Archive) Suite ─────────────────────────────────
-  // Archiving deliberately stays at `:manage` — it is the only grain that carries
-  // destruction, and a credential scoped to read-and-write must not inherit it.
-  secured.access(requires("scenarios:manage")).delete(
-    "/:id",
-    describeRoute({
-      deprecated: true,
-      description: `${DEPRECATION_NOTE} Archive (soft-delete) a suite. Archiving a test suite also archives every scenario filed in it, in one transaction.`,
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Suite archived",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ id: z.string(), archived: z.boolean() })),
+              },
             },
-          },
-        },
-        404: {
-          description: "Suite not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      logger.info({ projectId: project.id, suiteId: id }, "Archiving suite");
-
-      try {
-        await suites().archiveTestSuite({
-          testSuiteId: id,
-          projectId: project.id,
-        });
-        return c.json({ id, archived: true });
-      } catch (error) {
-        if (!(error instanceof ScenarioTestSuiteNotFoundError)) throw error;
-      }
-
-      try {
-        await suites().archive({ id, projectId: project.id });
-      } catch (error) {
-        if (!(error instanceof SuiteNotFoundError)) throw error;
-        return c.json({ error: "Suite not found" }, 404);
-      }
-
-      return c.json({ id, archived: true });
-    },
+          }),
+      )
+      // ── Get Suite ──────────────────────────────────────────────
+      .registerRoute("get", "/:id", MANAGEMENT_API_VERSION, getHandler, (b) =>
+        policy(requires("scenarios:view"))(b)
+          .withParams(idParamsSchema)
+          .withOutput(suiteResponseWithPlatformUrlSchema)
+          .withDeprecated(DEPRECATION_SUCCESSORS)
+          .withDocs({
+            description: `${DEPRECATION_NOTE} Get a suite (run plan) by its ID.`,
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": {
+                    schema: resolver(suiteResponseWithPlatformUrlSchema),
+                  },
+                },
+              },
+              ...notFoundResponse,
+            },
+          }),
+      )
+      // ── Create Suite ─────────────────────────────────────────── Creating a run plan asks
+      // for `scenarios:create`, not `scenarios:manage`. `:manage` still implies `:create`,
+      // so every role and key that could create a suite yesterday still can; what changes is
+      // that a credential issued at the CREATE grain is honoured instead of refused.
+      .registerRoute("post", "/", MANAGEMENT_API_VERSION, createHandler, (b) =>
+        policy(requires("scenarios:create"))(b)
+          .withInput(createSuiteInputSchema)
+          .withOutput(suiteResponseWithPlatformUrlSchema)
+          .withStatus(201)
+          .withDeprecated(DEPRECATION_SUCCESSORS)
+          .withDocs({
+            description: `${DEPRECATION_NOTE} Create a new suite (run plan).`,
+            responses: {
+              ...baseResponses,
+              201: {
+                description: "Suite created",
+                content: {
+                  "application/json": {
+                    schema: resolver(suiteResponseWithPlatformUrlSchema),
+                  },
+                },
+              },
+            },
+          }),
+      )
+      // ── Update Suite ───────────────────────────────────────────
+      // `:update` for the same reason as `:create` above.
+      .registerRoute("patch", "/:id", MANAGEMENT_API_VERSION, updateHandler, (b) =>
+        policy(requires("scenarios:update"))(b)
+          .withParams(idParamsSchema)
+          .withInput(updateSuiteInputSchema)
+          .withOutput(suiteResponseWithPlatformUrlSchema)
+          .withDeprecated(DEPRECATION_SUCCESSORS)
+          .withDocs({
+            description: `${DEPRECATION_NOTE} Update a suite (run plan).`,
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Suite updated",
+                content: {
+                  "application/json": {
+                    schema: resolver(suiteResponseWithPlatformUrlSchema),
+                  },
+                },
+              },
+              ...notFoundResponse,
+            },
+          }),
+      )
+      // ── Duplicate Suite ────────────────────────────────────────
+      // A duplicate is a create: it leaves the source suite untouched and
+      // produces a new one, so it asks for `scenarios:create`.
+      .registerRoute("post", "/:id/duplicate", MANAGEMENT_API_VERSION, duplicateHandler, (b) =>
+        policy(requires("scenarios:create"))(b)
+          .withParams(idParamsSchema)
+          .withOutput(suiteResponseWithPlatformUrlSchema)
+          .withStatus(201)
+          .withDeprecated(DEPRECATION_SUCCESSORS)
+          .withDocs({
+            description: `${DEPRECATION_NOTE} Duplicate a suite (run plan).`,
+            responses: {
+              ...baseResponses,
+              201: {
+                description: "Suite duplicated",
+                content: {
+                  "application/json": {
+                    schema: resolver(suiteResponseWithPlatformUrlSchema),
+                  },
+                },
+              },
+              ...notFoundResponse,
+            },
+          }),
+      )
+      // ── Run Suite ────────────────────────────────────────────── RUNNING A SUITE IS NOT
+      // ADMINISTERING IT. The run creates scenario runs; the suite definition, its scenarios
+      // and its targets are left exactly as they were.
+      .registerRoute("post", "/:id/run", MANAGEMENT_API_VERSION, runHandler, (b) =>
+        policy(requires("scenarios:create"))(b)
+          .withParams(idParamsSchema)
+          .withInput(runSuiteInputSchema)
+          .withOutput(suiteRunResultSchema)
+          .withDeprecated(DEPRECATION_SUCCESSORS)
+          .withDocs({
+            description: `${DEPRECATION_NOTE} Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount. When the id names a test suite, the targets are read from the body.`,
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Suite run scheduled",
+                content: { "application/json": { schema: resolver(suiteRunResultSchema) } },
+              },
+              ...notFoundResponse,
+            },
+          }),
+      )
+      // ── Delete (Archive) Suite ─────────────────────────────────
+      // Archiving deliberately stays at `:manage` — it is the only grain that
+      // carries destruction, and a credential scoped to read-and-write must not
+      // inherit it.
+      .registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, archiveHandler, (b) =>
+        policy(requires("scenarios:manage"))(b)
+          .withParams(idParamsSchema)
+          .withOutput(archivedSuiteSchema)
+          .withDeprecated(DEPRECATION_SUCCESSORS)
+          .withDocs({
+            description: `${DEPRECATION_NOTE} Archive (soft-delete) a suite. Archiving a test suite also archives every scenario filed in it, in one transaction.`,
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Suite archived",
+                content: { "application/json": { schema: resolver(archivedSuiteSchema) } },
+              },
+              ...notFoundResponse,
+            },
+          }),
+      )
+      .build()
   );
-
-  return secured;
 }

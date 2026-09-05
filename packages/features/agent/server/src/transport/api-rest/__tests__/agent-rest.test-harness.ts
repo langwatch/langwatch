@@ -177,10 +177,10 @@ export function buildAgentApps() {
   return {
     app,
     agentService,
-    v1: (path: string, init?: RequestInit) => v1.hono.request(path, init),
-    legacy: (path: string, init?: RequestInit) => legacy.hono.request(path, init),
+    v1: (path: string, init?: RequestInit) => v1.request(path, init),
+    legacy: (path: string, init?: RequestInit) => legacy.request(path, init),
     createAgent: async (overrides: { name?: string; type?: AgentType; config?: unknown } = {}) => {
-      const response = await v1.hono.request("/api/v1/agents", {
+      const response = await v1.request("/api/v1/agents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -47,9 +47,9 @@ function testSecurity(): AppRestSecurity {
   const passthrough = (): MiddlewareHandler => async (_c, next) => next();
 
   const ports: RestApiServicePorts = {
-    appContext: async (_c, next) => next(),
-    requestLogger: () => async (_c, next) => next(),
-    requestTracer: () => async (_c, next) => next(),
+    appContext: passthrough(),
+    requestLogger: () => passthrough(),
+    requestTracer: () => passthrough(),
     legacyErrorHandler: boundaryErrorHandler,
     canonicalErrorHandler: boundaryErrorHandler,
     authenticateProject: () => authenticateProject,
@@ -76,7 +76,7 @@ function buildApi(triggerEvaluation: WorkflowRestPorts["triggerEvaluation"]) {
   };
 
   const family = createWorkflowsRestApp({ security, workflows: () => workflows, ports });
-  return family.hono;
+  return family;
 }
 
 const post = (hono: ReturnType<typeof buildApi>, id: string, body: Record<string, unknown> = {}) =>
@@ -104,7 +104,7 @@ describe("POST /api/workflows/:id/evaluate", () => {
       const res = await post(hono, "workflow_1");
 
       expect(res.status).toBe(200);
-      const body = await res.json();
+      const body = (await res.json()) as Record<string, unknown>;
       expect(body.run_id).toBe("run_1");
       expect(body.run_url).toContain("/experiments/");
       expect(triggerEvaluation).toHaveBeenCalledWith(
@@ -118,7 +118,7 @@ describe("POST /api/workflows/:id/evaluate", () => {
 
       const res = await post(hono, "workflow_1");
 
-      const body = await res.json();
+      const body = (await res.json()) as Record<string, unknown>;
       expect(body.workflow_version_id).toBe("version_1");
       expect(body.version).toBe("1");
     });
@@ -196,7 +196,11 @@ describe("POST /api/workflows/:id/evaluate", () => {
     /** @scenario Unknown workflow returns not found */
     it("returns 404", async () => {
       const hono = buildApi(
-        vi.fn(async () => ({ ok: false, status: 404, error: "Workflow not found" })),
+        vi.fn(async (): Promise<WorkflowEvaluationOutcome> => ({
+          ok: false,
+          status: 404,
+          error: "Workflow not found",
+        })),
       );
 
       const res = await post(hono, "workflow_elsewhere");
@@ -209,7 +213,7 @@ describe("POST /api/workflows/:id/evaluate", () => {
     /** @scenario A workflow with no committed version cannot be evaluated */
     it("returns 400 explaining a version must be committed first", async () => {
       const hono = buildApi(
-        vi.fn(async () => ({
+        vi.fn(async (): Promise<WorkflowEvaluationOutcome> => ({
           ok: false,
           status: 400,
           error: "A version must be committed before it can be evaluated",
@@ -219,7 +223,7 @@ describe("POST /api/workflows/:id/evaluate", () => {
       const res = await post(hono, "workflow_1");
 
       expect(res.status).toBe(400);
-      const body = await res.json();
+      const body = (await res.json()) as Record<string, unknown>;
       expect(body.error).toMatch(/version/i);
     });
   });

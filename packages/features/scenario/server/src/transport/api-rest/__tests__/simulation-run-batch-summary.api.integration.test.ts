@@ -81,7 +81,7 @@ function mount(tryGetBatchSummary: ReturnType<typeof vi.fn>) {
 
   return {
     tryGetBatchSummary,
-    fetch: (path: string) => app.hono.fetch(new Request(`http://api.test${path}`)),
+    fetch: (path: string) => app.fetch(new Request(`http://api.test${path}`)),
   };
 }
 

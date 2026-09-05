@@ -450,7 +450,7 @@ export function mountApiPackagedRestFamilies(options: {
             app: datasets,
             platformUrl: ports.platformUrl,
             authorizeDirectUpload,
-          }).hono
+          })
       : null,
   );
 
@@ -680,9 +680,7 @@ export function mountApiPackagedRestFamilies(options: {
   const suites = services.suites;
   mount(
     "suites",
-    suites
-      ? () => createSuiteRestApp({ security, suites, platformUrl: ports.platformUrl })
-      : null,
+    suites ? () => createSuiteRestApp({ security, suites, platformUrl: ports.platformUrl }) : null,
   );
   // The published families a run plan and a test suite each own — `suites`
   // above is the deprecated `/api/suites` alias that predates the split, and

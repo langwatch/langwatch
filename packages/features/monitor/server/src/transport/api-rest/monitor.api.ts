@@ -1,17 +1,40 @@
 import { requires } from "@langwatch/api";
 import {
-  type AppRestProjectVariables,
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
   type PlatformUrlBuilder,
-  type SecuredApp,
-  validator as zValidator,
+  projectOf,
+  type ProjectScopedContext,
+  resolver,
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
-import { describeRoute, resolver } from "hono-openapi";
+import type { ErrorHandler } from "hono";
 import { z } from "zod";
 import type { MonitorApp } from "#app/monitor.app";
+
+/**
+ * A monitor this project does not hold. The family answers it in the bare
+ * `{ error }` body it has always had, so it is raised as the family's own
+ * error and rendered by the family's own handler.
+ */
+class MonitorNotFoundError extends Error {
+  constructor() {
+    super("Monitor not found");
+  }
+}
+
+const monitorErrorHandler =
+  (boundary: ErrorHandler): ErrorHandler =>
+  (error, c) => {
+    if (error instanceof MonitorNotFoundError) {
+      return c.json({ error: error.message }, 404);
+    }
+    return boundary(error, c);
+  };
 
 const logger = createLogger("langwatch:api:monitors");
 
@@ -106,7 +129,7 @@ export function createMonitorRestApp(options: {
   app: () => MonitorApp;
   platformUrl: PlatformUrlBuilder;
   mappingsSchema: z.ZodType;
-}): SecuredApp<{ Variables: AppRestProjectVariables }> {
+}): MountableRestApp {
   const { security, app, platformUrl, mappingsSchema } = options;
 
   const createMonitorSchema = z.object({
@@ -136,276 +159,242 @@ export function createMonitorRestApp(options: {
     threadIdleTimeout: z.number().int().positive().nullable().optional(),
   });
 
-  const secured = security.createProjectApp({ basePath: "/api/monitors" });
+  const idParamsSchema = z.object({ id: z.string().min(1) });
+  const toggleSchema = z.object({ enabled: z.boolean() });
+  const toggledSchema = z.object({ id: z.string(), enabled: z.boolean() });
+  const deletedSchema = z.object({ id: z.string(), deleted: z.boolean() });
+
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "monitors",
+    basePath: "/api/monitors",
+    errorEnvelope: "legacy",
+    errorHandler: monitorErrorHandler,
+  });
+
+  type MonitorContext = ProjectScopedContext<EndpointVariables>;
 
   const monitorDrawerPath = (monitorId: string) =>
     `/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=${monitorId}`;
 
-  // ── List Monitors ───────────────────────────────────────────
-  secured.access(requires("evaluations:view")).get(
-    "/",
-    describeRoute({
-      description: "List all online evaluation monitors for the project",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(z.array(monitorResponseWithPlatformUrlSchema)),
+  const withPlatformUrl = (
+    monitor: Parameters<typeof toMonitorResponse>[0],
+    projectSlug: string,
+  ) => ({
+    ...toMonitorResponse(monitor),
+    platformUrl: platformUrl({ projectSlug, path: monitorDrawerPath(monitor.id) }),
+  });
+
+  const listHandler = async (c: MonitorContext) => {
+    const project = projectOf(c);
+    logger.info({ projectId: project.id }, "Listing monitors");
+
+    const list = await app().list({ projectId: project.id });
+    return list.map((m) => withPlatformUrl(m, project.slug));
+  };
+
+  const getHandler = async (c: MonitorContext, input: z.infer<typeof idParamsSchema>) => {
+    const project = projectOf(c);
+    logger.info({ projectId: project.id, monitorId: input.id }, "Getting monitor");
+
+    const monitor = await app().tryGetById({ id: input.id, projectId: project.id });
+    if (!monitor) throw new MonitorNotFoundError();
+    return withPlatformUrl(monitor, project.slug);
+  };
+
+  const createHandler = async (
+    c: MonitorContext,
+    input: z.infer<typeof createMonitorSchema>,
+  ) => {
+    const project = projectOf(c);
+    logger.info({ projectId: project.id }, "Creating monitor");
+
+    const monitor = await app().create({
+      projectId: project.id,
+      name: input.name,
+      checkType: input.checkType,
+      executionMode: input.executionMode,
+      preconditions: input.preconditions,
+      parameters: input.parameters,
+      mappings: input.mappings,
+      sample: input.sample,
+      evaluatorId: input.evaluatorId,
+      level: input.level,
+      threadIdleTimeout: input.threadIdleTimeout,
+    });
+    return withPlatformUrl(monitor, project.slug);
+  };
+
+  const updateHandler = async (
+    c: MonitorContext,
+    input: z.infer<typeof idParamsSchema> & z.infer<typeof updateMonitorSchema>,
+  ) => {
+    const project = projectOf(c);
+    const { id, ...changes } = input;
+    logger.info({ projectId: project.id, monitorId: id }, "Updating monitor");
+
+    // What an unmentioned field means on a partial update is the
+    // application's answer, not this family's. It was spelled out here as
+    // well, and the two copies had already begun to disagree.
+    const monitor = await app().patch({ id, projectId: project.id, changes });
+    if (!monitor) throw new MonitorNotFoundError();
+    return withPlatformUrl(monitor, project.slug);
+  };
+
+  const toggleHandler = async (
+    c: MonitorContext,
+    input: z.infer<typeof idParamsSchema> & z.infer<typeof toggleSchema>,
+  ) => {
+    const project = projectOf(c);
+    const { id, enabled } = input;
+    logger.info({ projectId: project.id, monitorId: id, enabled }, "Toggling monitor");
+
+    const toggled = await app().toggleExisting({ id, projectId: project.id, enabled });
+    if (!toggled) throw new MonitorNotFoundError();
+    return { id, enabled };
+  };
+
+  const deleteHandler = async (c: MonitorContext, input: z.infer<typeof idParamsSchema>) => {
+    const project = projectOf(c);
+    logger.info({ projectId: project.id, monitorId: input.id }, "Deleting monitor");
+
+    const deleted = await app().deleteExisting({ id: input.id, projectId: project.id });
+    if (!deleted) throw new MonitorNotFoundError();
+    return { id: input.id, deleted: true };
+  };
+
+  const notFoundResponse = {
+    404: {
+      description: "Monitor not found",
+      content: { "application/json": { schema: resolver(badRequestSchema) } },
+    },
+  };
+
+  return (
+    service
+      // ── List Monitors ───────────────────────────────────────────
+      .registerRoute("get", "/", MANAGEMENT_API_VERSION, listHandler, (b) =>
+        policy(requires("evaluations:view"))(b)
+          .withOutput(z.array(monitorResponseWithPlatformUrlSchema))
+          .withDocs({
+            description: "List all online evaluation monitors for the project",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.array(monitorResponseWithPlatformUrlSchema)),
+                  },
+                },
+              },
             },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      logger.info({ projectId: project.id }, "Listing monitors");
-
-      const list = await app().list({ projectId: project.id });
-
-      return c.json(
-        list.map((m) => ({
-          ...toMonitorResponse(m),
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: monitorDrawerPath(m.id),
           }),
-        })),
-      );
-    },
-  );
-
-  // ── Get Monitor ─────────────────────────────────────────────
-  secured.access(requires("evaluations:view")).get(
-    "/:id",
-    describeRoute({
-      description: "Get a monitor by its ID",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(monitorResponseWithPlatformUrlSchema),
+      )
+      // ── Get Monitor ─────────────────────────────────────────────
+      .registerRoute("get", "/:id", MANAGEMENT_API_VERSION, getHandler, (b) =>
+        policy(requires("evaluations:view"))(b)
+          .withParams(idParamsSchema)
+          .withOutput(monitorResponseWithPlatformUrlSchema)
+          .withDocs({
+            description: "Get a monitor by its ID",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": {
+                    schema: resolver(monitorResponseWithPlatformUrlSchema),
+                  },
+                },
+              },
+              ...notFoundResponse,
             },
-          },
-        },
-        404: {
-          description: "Monitor not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      logger.info({ projectId: project.id, monitorId: id }, "Getting monitor");
-
-      const monitor = await app().tryGetById({ id, projectId: project.id });
-
-      if (!monitor) {
-        return c.json({ error: "Monitor not found" }, 404);
-      }
-
-      return c.json({
-        ...toMonitorResponse(monitor),
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: monitorDrawerPath(monitor.id),
-        }),
-      });
-    },
-  );
-
-  // ── Create Monitor ──────────────────────────────────────────
-  // `:create`, matching the tRPC twin in `@langwatch/monitor-server` that the
-  // UI's own "create monitor" button calls. That path already writes `enabled:
-  // true` with the caller's `executionMode` while asking only for `:create`, so
-  // demanding `:manage` here made the identical action cost more over REST than it
-  // does in the product — it did not hold a line, it just picked off the callers
-  // holding a least-privilege key. `:manage` still satisfies this via the rbac
-  // hierarchy (`hasPermissionWithHierarchy`), so no existing caller loses access.
-  // Deletion stays on `:manage` below, which is where the destructive line sits.
-  secured.access(requires("evaluations:create")).post(
-    "/",
-    describeRoute({
-      description: "Create a new online evaluation monitor",
-      responses: {
-        ...baseResponses,
-        201: {
-          description: "Monitor created",
-          content: {
-            "application/json": {
-              schema: resolver(monitorResponseWithPlatformUrlSchema),
-            },
-          },
-        },
-      },
-    }),
-    zValidator("json", createMonitorSchema),
-    async (c) => {
-      const project = c.get("project");
-      const body = c.req.valid("json");
-      logger.info({ projectId: project.id }, "Creating monitor");
-
-      const monitor = await app().create({
-        projectId: project.id,
-        name: body.name,
-        checkType: body.checkType,
-        executionMode: body.executionMode,
-        preconditions: body.preconditions,
-        parameters: body.parameters,
-        mappings: body.mappings,
-        sample: body.sample,
-        evaluatorId: body.evaluatorId,
-        level: body.level,
-        threadIdleTimeout: body.threadIdleTimeout,
-      });
-
-      return c.json(
-        {
-          ...toMonitorResponse(monitor),
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: monitorDrawerPath(monitor.id),
           }),
-        },
-        201,
-      );
-    },
-  );
-
-  // ── Update Monitor ──────────────────────────────────────────
-  secured.access(requires("evaluations:update")).patch(
-    "/:id",
-    describeRoute({
-      description: "Update a monitor (name, enabled state, settings, etc.)",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Monitor updated",
-          content: {
-            "application/json": {
-              schema: resolver(monitorResponseWithPlatformUrlSchema),
+      )
+      // ── Create Monitor ──────────────────────────────────────────
+      // `:create`, matching the tRPC twin in `@langwatch/monitor-server` that
+      // the UI's own "create monitor" button calls. `:manage` still satisfies
+      // this via the permission hierarchy, so no existing caller loses access.
+      // Deletion stays on `:manage` below, where the destructive line sits.
+      .registerRoute("post", "/", MANAGEMENT_API_VERSION, createHandler, (b) =>
+        policy(requires("evaluations:create"))(b)
+          .withInput(createMonitorSchema)
+          .withOutput(monitorResponseWithPlatformUrlSchema)
+          .withStatus(201)
+          .withDocs({
+            description: "Create a new online evaluation monitor",
+            responses: {
+              ...baseResponses,
+              201: {
+                description: "Monitor created",
+                content: {
+                  "application/json": {
+                    schema: resolver(monitorResponseWithPlatformUrlSchema),
+                  },
+                },
+              },
             },
-          },
-        },
-        404: {
-          description: "Monitor not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("json", updateMonitorSchema),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      const body = c.req.valid("json");
-      logger.info({ projectId: project.id, monitorId: id }, "Updating monitor");
-
-      // What an unmentioned field means on a partial update is the
-      // application's answer, not this family's. It was spelled out here as
-      // well, and the two copies had already begun to disagree.
-      const monitor = await app().patch({ id, projectId: project.id, changes: body });
-
-      if (!monitor) {
-        return c.json({ error: "Monitor not found" }, 404);
-      }
-
-      return c.json({
-        ...toMonitorResponse(monitor),
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: monitorDrawerPath(monitor.id),
-        }),
-      });
-    },
-  );
-
-  // ── Toggle Monitor ──────────────────────────────────────────
-  // Enabling/disabling changes the monitor that already exists — an `:update`.
-  secured.access(requires("evaluations:update")).post(
-    "/:id/toggle",
-    describeRoute({
-      description: "Enable or disable a monitor",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Monitor toggled",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ id: z.string(), enabled: z.boolean() })),
+          }),
+      )
+      // ── Update Monitor ──────────────────────────────────────────
+      .registerRoute("patch", "/:id", MANAGEMENT_API_VERSION, updateHandler, (b) =>
+        policy(requires("evaluations:update"))(b)
+          .withParams(idParamsSchema)
+          .withInput(updateMonitorSchema)
+          .withOutput(monitorResponseWithPlatformUrlSchema)
+          .withDocs({
+            description: "Update a monitor (name, enabled state, settings, etc.)",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Monitor updated",
+                content: {
+                  "application/json": {
+                    schema: resolver(monitorResponseWithPlatformUrlSchema),
+                  },
+                },
+              },
+              ...notFoundResponse,
             },
-          },
-        },
-        404: {
-          description: "Monitor not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("json", z.object({ enabled: z.boolean() })),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      const { enabled } = c.req.valid("json");
-      logger.info({ projectId: project.id, monitorId: id, enabled }, "Toggling monitor");
-
-      const toggled = await app().toggleExisting({ id, projectId: project.id, enabled });
-
-      if (!toggled) {
-        return c.json({ error: "Monitor not found" }, 404);
-      }
-
-      return c.json({ id, enabled });
-    },
-  );
-
-  // ── Delete Monitor ──────────────────────────────────────────
-  // Destruction deliberately stays at `:manage`.
-  secured.access(requires("evaluations:manage")).delete(
-    "/:id",
-    describeRoute({
-      description: "Delete a monitor",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Monitor deleted",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ id: z.string(), deleted: z.boolean() })),
+          }),
+      )
+      // ── Toggle Monitor ──────────────────────────────────────────
+      // Enabling/disabling changes the monitor that already exists — an `:update`.
+      .registerRoute("post", "/:id/toggle", MANAGEMENT_API_VERSION, toggleHandler, (b) =>
+        policy(requires("evaluations:update"))(b)
+          .withParams(idParamsSchema)
+          .withInput(toggleSchema)
+          .withOutput(toggledSchema)
+          .withDocs({
+            description: "Enable or disable a monitor",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Monitor toggled",
+                content: { "application/json": { schema: resolver(toggledSchema) } },
+              },
+              ...notFoundResponse,
             },
-          },
-        },
-        404: {
-          description: "Monitor not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      logger.info({ projectId: project.id, monitorId: id }, "Deleting monitor");
-
-      const deleted = await app().deleteExisting({ id, projectId: project.id });
-
-      if (!deleted) {
-        return c.json({ error: "Monitor not found" }, 404);
-      }
-
-      return c.json({ id, deleted: true });
-    },
+          }),
+      )
+      // ── Delete Monitor ──────────────────────────────────────────
+      // Destruction deliberately stays at `:manage`.
+      .registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, deleteHandler, (b) =>
+        policy(requires("evaluations:manage"))(b)
+          .withParams(idParamsSchema)
+          .withOutput(deletedSchema)
+          .withDocs({
+            description: "Delete a monitor",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Monitor deleted",
+                content: { "application/json": { schema: resolver(deletedSchema) } },
+              },
+              ...notFoundResponse,
+            },
+          }),
+      )
+      .build()
   );
-
-  return secured;
 }

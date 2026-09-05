@@ -1,7 +1,5 @@
 /**
- * Ported from
- * platform/app/src/app/api/scenario-events/__tests__/delete-scenario-events.unit.test.ts,
- * the run-scoped half: the DELETE family archives exactly one run when the
+ * The run-scoped half: the DELETE family archives exactly one run when the
  * caller names it, and answers not-found for a run the project does not hold.
  */
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";

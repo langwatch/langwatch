@@ -82,7 +82,7 @@ function buildApi() {
   return {
     assignTag,
     assign: (handle: string, versionId: string) =>
-      app.hono.request(`/api/prompts/${handle}/tags/production`, {
+      app.request(`/api/prompts/${handle}/tags/production`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ versionId }),

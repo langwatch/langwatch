@@ -13,18 +13,21 @@ import {
 } from "@langwatch/agent-contract";
 import { requires } from "@langwatch/api";
 import {
-  type AppRestProjectVariables,
   type AppRestSecurity,
   createFamilyErrorHandler,
+  type EndpointVariables,
   managementActor,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
   NotFoundError,
-  type SecuredApp,
+  projectOf,
+  type ProjectScopedContext,
+  type RestApiVersionedFamily,
+  resolver,
   UnprocessableEntityError,
-  validator as zValidator,
 } from "@langwatch/api/rest";
 import { scenarioParameterDefinitionSchema } from "@langwatch/scenario-contract";
 import type { ErrorHandler } from "hono";
-import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 
 import { AgentApp } from "#app/agent.app";
@@ -35,7 +38,8 @@ import {
   NO_PRESENCE,
   type AgentPresence,
 } from "../../services/connected-agent-presence.service";
-import { AgentService, type AgentListRow } from "../../services/agent.service";
+import { AgentService } from "../../services/agent.service";
+import { agentListRowOf, type AgentListRow } from "../../rules/agent-view.rules";
 import { registerCallEndpoint, type AgentCallDeps } from "./agent-call.api";
 import { registerConnectEndpoints } from "./agent-connect.api";
 import type { AgentPlatformUrlBuilder } from "./agent-legacy.api";
@@ -225,195 +229,219 @@ async function agentWire({
   deps: AgentsV1Deps;
   projectId: string;
   projectSlug: string;
-  agent: Parameters<typeof AgentService.toAgentListRow>[0];
+  agent: Parameters<typeof agentListRowOf>[0];
 }): Promise<AgentWire> {
   const [wire] = await rowsWire({
     deps,
     projectId,
     projectSlug,
-    rows: [AgentService.toAgentListRow(agent)],
+    rows: [agentListRowOf(agent)],
   });
   return wire!;
 }
 
 // ── the family ───────────────────────────────────────────────────────────────
 
+/** The handler context every route in this family runs on. */
+type AgentsV1Context = ProjectScopedContext<EndpointVariables>;
+
 /** Builds the `/api/v1/agents` collection, item and archive endpoints. */
-export function createAgentV1RestApp(
-  deps: AgentsV1Deps,
-): SecuredApp<{ Variables: AppRestProjectVariables }> {
+export function createAgentV1RestApp(deps: AgentsV1Deps): MountableRestApp {
   const { security } = deps;
-  const secured = security.createProjectApp({ basePath: "/api/v1/agents" });
 
-  const boundary = createFamilyErrorHandler({
-    loggerName: "langwatch:api:v1:agents:errors",
-    label: "Agent API Error",
-    boundary: security.legacyErrorHandler,
-  });
-
-  const handleAgentError: ErrorHandler = (error, c) => {
-    if (error instanceof AgentNotFoundError) {
-      return boundary(new NotFoundError(error.message), c);
-    }
-    if (error instanceof InvalidAgentConfigError) {
-      return boundary(new UnprocessableEntityError(error.message), c);
-    }
-    return boundary(error, c);
+  const agentErrorHandler = (spine: ErrorHandler): ErrorHandler => {
+    const boundary = createFamilyErrorHandler({
+      loggerName: "langwatch:api:v1:agents:errors",
+      label: "Agent API Error",
+      boundary: spine,
+    });
+    return (error, c) => {
+      if (error instanceof AgentNotFoundError) {
+        return boundary(new NotFoundError(error.message), c);
+      }
+      if (error instanceof InvalidAgentConfigError) {
+        return boundary(new UnprocessableEntityError(error.message), c);
+      }
+      return boundary(error, c);
+    };
   };
-  secured.hono.onError(handleAgentError);
+
+  const family = security.createProjectVersionedApp({
+    name: "agents-v1",
+    basePath: "/api/v1/agents",
+    errorEnvelope: "legacy",
+    errorHandler: agentErrorHandler,
+    staticGeneration: "v1",
+  });
 
   // The static `/connect/*` paths are registered first, or `/:id` would
   // answer for the segment "connect".
   if (deps.connect) {
     registerConnectEndpoints({
-      secured,
+      family,
       transport: deps.connect.transport,
-      relayMaxPayloadMb: deps.connect.relayMaxPayloadMb,
+      ...(deps.connect.relayMaxPayloadMb === undefined
+        ? {}
+        : { relayMaxPayloadMb: deps.connect.relayMaxPayloadMb }),
     });
   }
-  registerCollectionEndpoints({ secured, deps });
-  registerItemEndpoints({ secured, deps });
-  registerArchiveEndpoint({ secured, deps });
-  registerTestEndpoint({ secured, deps });
+  registerCollectionEndpoints({ family, deps });
+  registerItemEndpoints({ family, deps });
+  registerArchiveEndpoint({ family, deps });
+  registerTestEndpoint({ family, deps });
   if (deps.call) {
     registerCallEndpoint({
-      secured,
+      family,
       deps: { agents: deps.agents, ...deps.call },
     });
   }
 
-  return secured;
+  return family.service.build();
 }
 
 function registerCollectionEndpoints({
-  secured,
+  family,
   deps,
 }: {
-  secured: SecuredApp<{ Variables: AppRestProjectVariables }>;
+  family: RestApiVersionedFamily;
   deps: AgentsV1Deps;
 }): void {
-  secured.access(requires("project:view")).get(
-    "/",
-    describeRoute({
-      operationId: "listAgents",
-      tags: ["Agents"],
-      description:
-        "List the project's agents, paginated, with the presence and owner of each connected agent. Archived agents are left out.",
-      responses: {
-        200: {
-          description: "Success",
-          content: {
-            "application/json": { schema: resolver(agentListResponseSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("query", paginationQuerySchema),
-    async (c) => {
-      const project = c.get("project");
-      const { page, limit } = c.req.valid("query");
+  const listHandler = async (
+    c: AgentsV1Context,
+    input: z.infer<typeof paginationQuerySchema>,
+  ) => {
+    const project = projectOf(c);
+    const result = await deps.agents().list({
+      projectId: project.id,
+      page: input.page,
+      limit: input.limit,
+    });
 
-      const result = await deps.agents().list({
+    return {
+      pagination: result.pagination,
+      data: await rowsWire({
+        deps,
         projectId: project.id,
-        page,
-        limit,
-      });
+        projectSlug: project.slug,
+        rows: result.data.map(agentListRowOf),
+      }),
+    };
+  };
 
-      return c.json({
-        pagination: result.pagination,
-        data: await rowsWire({
-          deps,
-          projectId: project.id,
-          projectSlug: project.slug,
-          rows: result.data.map(AgentService.toAgentListRow),
-        }),
-      });
-    },
-  );
+  const createHandler = async (
+    c: AgentsV1Context,
+    input: z.infer<typeof createAgentRequestSchema>,
+  ) => {
+    const project = projectOf(c);
 
-  secured.access(requires("project:update")).post(
-    "/",
-    describeRoute({
-      operationId: "createAgent",
-      tags: ["Agents"],
-      description:
-        "Create an agent from a name, a type and the configuration of that type. A connected agent is registered from code by the SDK and answers 422 agent_register_only here.",
-      responses: {
-        201: {
-          description: "Agent created",
-          content: {
-            "application/json": { schema: resolver(agentResponseSchema) },
+    // A connected agent is registered by the SDK from the process that runs
+    // it; a request body cannot stand in for that process.
+    if (input.type === "connected") throw new AgentRegisterOnlyError();
+
+    const agent = await deps.agents().create({
+      ...input,
+      id: AgentApp.nextAgentId(),
+      projectId: project.id,
+    });
+
+    return await agentWire({
+      deps,
+      projectId: project.id,
+      projectSlug: project.slug,
+      agent,
+    });
+  };
+
+  family.service
+    .registerRoute("get", "/", MANAGEMENT_API_VERSION, listHandler, (b) =>
+      family
+        .policy(requires("project:view"))(b)
+        .withQuery(paginationQuerySchema)
+        .withOutput(agentListResponseSchema)
+        .withDocs({
+          operationId: "listAgents",
+          tags: ["Agents"],
+          description:
+            "List the project's agents, paginated, with the presence and owner of each connected agent. Archived agents are left out.",
+          responses: {
+            200: {
+              description: "Success",
+              content: { "application/json": { schema: resolver(agentListResponseSchema) } },
+            },
           },
-        },
-      },
-    }),
-    zValidator("json", createAgentRequestSchema),
-    async (c) => {
-      const project = c.get("project");
-      const body = c.req.valid("json");
-
-      // A connected agent is registered by the SDK from the process that runs
-      // it; a request body cannot stand in for that process.
-      if (body.type === "connected") throw new AgentRegisterOnlyError();
-
-      const agent = await deps.agents().create({
-        ...body,
-        id: AgentApp.nextAgentId(),
-        projectId: project.id,
-      });
-
-      return c.json(
-        await agentWire({
-          deps,
-          projectId: project.id,
-          projectSlug: project.slug,
-          agent,
         }),
-        201,
-      );
-    },
-  );
+    )
+    .registerRoute("post", "/", MANAGEMENT_API_VERSION, createHandler, (b) =>
+      family
+        .policy(requires("project:update"))(b)
+        .withInput(createAgentRequestSchema)
+        .withOutput(agentResponseSchema)
+        .withStatus(201)
+        .withDocs({
+          operationId: "createAgent",
+          tags: ["Agents"],
+          description:
+            "Create an agent from a name, a type and the configuration of that type. A connected agent is registered from code by the SDK and answers 422 agent_register_only here.",
+          responses: {
+            201: {
+              description: "Agent created",
+              content: { "application/json": { schema: resolver(agentResponseSchema) } },
+            },
+          },
+        }),
+    );
 }
 
 function registerItemEndpoints({
-  secured,
+  family,
   deps,
 }: {
-  secured: SecuredApp<{ Variables: AppRestProjectVariables }>;
+  family: RestApiVersionedFamily;
   deps: AgentsV1Deps;
 }): void {
-  secured.access(requires("project:view")).get(
-    "/:id",
-    describeRoute({
-      operationId: "getAgent",
-      tags: ["Agents"],
-      description:
-        "Read one agent with its presence, its owner and the run parameters it declares. An id the project does not hold answers 404 agent_not_found.",
-      responses: {
-        200: {
-          description: "Success",
-          content: {
-            "application/json": { schema: resolver(agentResponseSchema) },
+  const getHandler = async (c: AgentsV1Context, input: z.infer<typeof idParamsSchema>) => {
+    const project = projectOf(c);
+    const agent = await deps.agents().getById({ id: input.id, projectId: project.id });
+    return await agentWire({
+      deps,
+      projectId: project.id,
+      projectSlug: project.slug,
+      agent,
+    });
+  };
+
+  const updateHandler = async (
+    c: AgentsV1Context,
+    input: z.infer<typeof idParamsSchema> & z.infer<typeof updateAgentRequestSchema>,
+  ) => {
+    const project = projectOf(c);
+    const { id, ...body } = input;
+    const agent = await deps.agents().update({ ...body, id, projectId: project.id });
+    return await agentWire({
+      deps,
+      projectId: project.id,
+      projectSlug: project.slug,
+      agent,
+    });
+  };
+
+  family.service.registerRoute("get", "/:id", MANAGEMENT_API_VERSION, getHandler, (b) =>
+    family
+      .policy(requires("project:view"))(b)
+      .withParams(idParamsSchema)
+      .withOutput(agentResponseSchema)
+      .withDocs({
+        operationId: "getAgent",
+        tags: ["Agents"],
+        description:
+          "Read one agent with its presence, its owner and the run parameters it declares. An id the project does not hold answers 404 agent_not_found.",
+        responses: {
+          200: {
+            description: "Success",
+            content: { "application/json": { schema: resolver(agentResponseSchema) } },
           },
         },
-      },
-    }),
-    zValidator("param", idParamsSchema),
-    async (c) => {
-      const { id } = c.req.valid("param");
-      const project = c.get("project");
-
-      const agent = await deps.agents().getById({ id, projectId: project.id });
-
-      return c.json(
-        await agentWire({
-          deps,
-          projectId: project.id,
-          projectSlug: project.slug,
-          agent,
-        }),
-      );
-    },
+      }),
   );
 
   // Registered under both verbs. The update is partial either way, so a
@@ -422,129 +450,101 @@ function registerItemEndpoints({
     ["patch", "updateAgent"],
     ["put", "replaceAgent"],
   ] as const) {
-    secured.access(requires("project:update"))[verb](
-      "/:id",
-      describeRoute({
-        operationId,
-        tags: ["Agents"],
-        description:
-          "Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes no edit and answers 422 agent_register_only.",
-        responses: {
-          200: {
-            description: "Success",
-            content: {
-              "application/json": { schema: resolver(agentResponseSchema) },
+    family.service.registerRoute(verb, "/:id", MANAGEMENT_API_VERSION, updateHandler, (b) =>
+      family
+        .policy(requires("project:update"))(b)
+        .withParams(idParamsSchema)
+        .withInput(updateAgentRequestSchema)
+        .withOutput(agentResponseSchema)
+        .withDocs({
+          operationId,
+          tags: ["Agents"],
+          description:
+            "Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes no edit and answers 422 agent_register_only.",
+          responses: {
+            200: {
+              description: "Success",
+              content: { "application/json": { schema: resolver(agentResponseSchema) } },
             },
           },
-        },
-      }),
-      zValidator("param", idParamsSchema),
-      zValidator("json", updateAgentRequestSchema),
-      async (c) => {
-        const { id } = c.req.valid("param");
-        const project = c.get("project");
-        const body = c.req.valid("json");
-
-        const agent = await deps.agents().update({
-          ...body,
-          id,
-          projectId: project.id,
-        });
-
-        return c.json(
-          await agentWire({
-            deps,
-            projectId: project.id,
-            projectSlug: project.slug,
-            agent,
-          }),
-        );
-      },
+        }),
     );
   }
 }
 
 function registerArchiveEndpoint({
-  secured,
+  family,
   deps,
 }: {
-  secured: SecuredApp<{ Variables: AppRestProjectVariables }>;
+  family: RestApiVersionedFamily;
   deps: AgentsV1Deps;
 }): void {
-  secured.access(requires("project:delete")).delete(
-    "/:id",
-    describeRoute({
-      operationId: "archiveAgent",
-      tags: ["Agents"],
-      description:
-        "Archive an agent. It leaves the list and its runs stay. A connected agent that registers again restores its row.",
-      responses: {
-        200: {
-          description: "Success",
-          content: {
-            "application/json": { schema: resolver(archiveResultSchema) },
+  const archiveHandler = async (c: AgentsV1Context, input: z.infer<typeof idParamsSchema>) => {
+    const agent = await deps.agents().archive({ id: input.id, projectId: projectOf(c).id });
+    return {
+      id: agent.id,
+      name: agent.name,
+      type: agentTypeSchema.parse(agent.type),
+      archivedAt: agent.archivedAt,
+    };
+  };
+
+  family.service.registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, archiveHandler, (b) =>
+    family
+      .policy(requires("project:delete"))(b)
+      .withParams(idParamsSchema)
+      .withOutput(archiveResultSchema)
+      .withDocs({
+        operationId: "archiveAgent",
+        tags: ["Agents"],
+        description:
+          "Archive an agent. It leaves the list and its runs stay. A connected agent that registers again restores its row.",
+        responses: {
+          200: {
+            description: "Success",
+            content: { "application/json": { schema: resolver(archiveResultSchema) } },
           },
         },
-      },
-    }),
-    zValidator("param", idParamsSchema),
-    async (c) => {
-      const { id } = c.req.valid("param");
-      const project = c.get("project");
-
-      const agent = await deps.agents().archive({ id, projectId: project.id });
-      return c.json({
-        id: agent.id,
-        name: agent.name,
-        type: agentTypeSchema.parse(agent.type),
-        archivedAt: agent.archivedAt,
-      });
-    },
+      }),
   );
 }
 
 /** `POST /:id/test`, the one-off scripted run. */
 function registerTestEndpoint({
-  secured,
+  family,
   deps,
 }: {
-  secured: SecuredApp<{ Variables: AppRestProjectVariables }>;
+  family: RestApiVersionedFamily;
   deps: AgentsV1Deps;
 }): void {
-  secured.access(requires("scenarios:create")).post(
-    "/:id/test",
-    describeRoute({
-      operationId: "testAgent",
-      tags: ["Agents"],
-      description:
-        'Run one scripted scenario against an agent: the user sends "ping", the agent answers, and the run succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added to the project. Answers at once with the run ids; the run itself is asynchronous.',
-      responses: {
-        200: {
-          description: "The run's ids",
-          content: {
-            "application/json": {
-              schema: resolver(agentTestRunResponseSchema),
-            },
-          },
-        },
-        403: {
-          description: "The agent is a personal development agent of someone else",
-        },
-        404: { description: "No agent with that id in this project" },
-        422: { description: "The agent cannot be tested as it is set up" },
-      },
-    }),
-    zValidator("param", idParamsSchema),
-    async (c) => {
-      const { id } = c.req.valid("param");
-      const project = c.get("project");
-
-      const run = await deps.agents().testRun({
-        agentId: id,
-        projectId: project.id,
+  const testHandler = async (c: AgentsV1Context, input: z.infer<typeof idParamsSchema>) =>
+    agentTestRunResponseSchema.parse(
+      await deps.agents().testRun({
+        agentId: input.id,
+        projectId: projectOf(c).id,
         actorId: managementActor(c),
-      });
-      return c.json(agentTestRunResponseSchema.parse(run));
-    },
+      }),
+    );
+
+  family.service.registerRoute("post", "/:id/test", MANAGEMENT_API_VERSION, testHandler, (b) =>
+    family
+      .policy(requires("scenarios:create"))(b)
+      .withParams(idParamsSchema)
+      .withOutput(agentTestRunResponseSchema)
+      .withDocs({
+        operationId: "testAgent",
+        tags: ["Agents"],
+        description:
+          'Run one scripted scenario against an agent: the user sends "ping", the agent answers, and the run succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added to the project. Answers at once with the run ids; the run itself is asynchronous.',
+        responses: {
+          200: {
+            description: "The run's ids",
+            content: { "application/json": { schema: resolver(agentTestRunResponseSchema) } },
+          },
+          403: { description: "The agent is a personal development agent of someone else" },
+          404: { description: "No agent with that id in this project" },
+          422: { description: "The agent cannot be tested as it is set up" },
+        },
+      }),
   );
 }

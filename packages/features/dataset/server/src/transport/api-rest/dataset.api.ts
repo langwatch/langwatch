@@ -1,5 +1,5 @@
 /**
- * Public Hono REST API for datasets.
+ * Public REST API for datasets.
  *
  * Mounted at `/api/dataset`. Every verb dispatches through `DatasetApp`, the
  * same application the tRPC doors call; this file owns the wire contract —
@@ -16,18 +16,22 @@
 import { Readable } from "node:stream";
 import { handlerManagedAuth, requires } from "@langwatch/api";
 import {
-  type AppRestProjectVariables,
   type AppRestSecurity,
   BadRequestError,
   baseResponses,
   buildStandardSuccessResponse,
+  type EndpointVariables,
   errorSchema,
   InternalServerError,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
   NotFoundError,
   type PlatformUrlBuilder,
-  type SecuredApp,
+  projectOf,
+  type ProjectScopedContext,
+  resolver,
+  type RestErrorHandler,
   UnprocessableEntityError,
-  validator as zValidator,
 } from "@langwatch/api/rest";
 import {
   datasetColumnsSchema,
@@ -40,12 +44,7 @@ import {
 // throws this one, and `instanceof` against the contract's is always false —
 // which sent every column-mismatch and over-size upload to the customer as a
 // 500 instead of the 400 the branches below build.
-import {
-  type DatasetNotReadyError,
-  UploadValidationError,
-} from "@langwatch/dataset-contract";
-import type { Context } from "hono";
-import { describeRoute, resolver } from "hono-openapi";
+import { type DatasetNotReadyError, UploadValidationError } from "@langwatch/dataset-contract";
 import { z } from "zod";
 import type { DatasetApp } from "#app/dataset.app";
 import { createDatasetErrorHandler } from "./dataset-error-handler.api";
@@ -56,6 +55,17 @@ import { datasetOutputSchema } from "../../rules/dataset-schemas.rules";
  * whole dataset inline. A dataset above it is refused rather than truncated.
  */
 const MAX_LIMIT_MB = 25;
+
+/**
+ * Why every route on this family declares its answer in prose rather than a
+ * schema: the doors below choose their status per outcome (201 or 200 on an
+ * upsert, 409 on a slug collision, 425 with the lifecycle state while a
+ * dataset is still preparing) and one of them streams the request body
+ * straight to storage. A single declared output schema could not describe
+ * those answers, and validating one would rewrite bytes an integrator parses.
+ */
+const DATASET_ANSWER_REASON =
+  "the dataset doors choose their status per outcome (201/200, 409 Conflict, 425 DatasetNotReady) and answer with the body their callers already parse";
 
 /**
  * What the direct-upload routes get back when they ask whether this caller may
@@ -78,9 +88,19 @@ export type DatasetDirectUploadAuthorization =
  * application's database, which is why it arrives here as a port.
  */
 export type DatasetDirectUploadAuthorizer = (
-  c: Context,
+  c: DatasetDirectUploadRequestReader,
   projectId: string,
 ) => Promise<DatasetDirectUploadAuthorization>;
+
+/**
+ * The whole of the request an authorizer reads: the raw `Request` it resolves a
+ * session or an API key from, and the headers it reads the same-site signal
+ * from. Named structurally rather than as Hono's `Context`, which is invariant
+ * in its variables map and would refuse the handler context this family builds.
+ */
+export type DatasetDirectUploadRequestReader = {
+  req: { raw: Request; header(name: string): string | undefined };
+};
 
 // -- Validation schemas for new endpoints --
 
@@ -121,6 +141,25 @@ const batchCreateRecordsSchema = z.object({
     .min(1, "entries is required")
     .max(1000, "Maximum batch size is 1000 entries"),
 });
+
+const legacyEntriesSchema = z
+  .object({
+    entries: z.array(z.record(z.string(), z.any())).meta({
+      example: [
+        {
+          input: "hi",
+          output: "Hello, how can I help you today?",
+        },
+      ],
+    }),
+  })
+  .meta({ id: "DatasetPostEntries" });
+
+const slugOrIdParamsSchema = z.object({ slugOrId: z.string() });
+const slugParamsSchema = z.object({ slug: z.string() });
+const recordParamsSchema = z.object({ slugOrId: z.string(), recordId: z.string() });
+const uploadIdParamsSchema = z.object({ uploadId: z.string() });
+const datasetIdParamsSchema = z.object({ datasetId: z.string() });
 
 /**
  * Maps DatasetNotFoundError from the service layer to the HTTP NotFoundError.
@@ -176,17 +215,26 @@ export function createDatasetRestApp(options: {
   app: () => DatasetApp;
   platformUrl: PlatformUrlBuilder;
   authorizeDirectUpload: DatasetDirectUploadAuthorizer;
-}): SecuredApp<{ Variables: AppRestProjectVariables }> {
+}): MountableRestApp {
   const { security, app, platformUrl, authorizeDirectUpload } = options;
 
-  const secured = security.createProjectApp({
+  // `bareMount`: `/api/dataset/...` is the whole published contract. A dated
+  // namespace beside it would add a second address for every door, and its
+  // version guard would claim `/api/dataset/:apiVersion{…}/*` — the same shape
+  // as `/api/dataset/:slugOrId`.
+  //
+  // The family's own error mapping (domain errors → HTTP codes) is layered
+  // over the legacy boundary, exactly as the raw-Hono `onError` did.
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "dataset",
     basePath: "/api/dataset",
+    errorEnvelope: "legacy",
+    bareMount: true,
+    errorHandler: (boundary: RestErrorHandler) =>
+      createDatasetErrorHandler({ boundaryErrorHandler: boundary }),
   });
 
-  // Preserve the dataset-specific error mapping (domain errors → HTTP codes).
-  secured.hono.onError(
-    createDatasetErrorHandler({ boundaryErrorHandler: security.legacyErrorHandler }),
-  );
+  type DatasetContext = ProjectScopedContext<EndpointVariables>;
 
   // The browser→S3 direct-upload routes authenticate the in-app upload UI by
   // NextAuth session cookie (or API key), resolved in-handler — the rest of the
@@ -206,15 +254,13 @@ export function createDatasetRestApp(options: {
   // route with none.
 
   // ── List Datasets (paginated) ──────────────────────────────────
-  secured.access(requires("datasets:view")).get(
+  service.registerRoute(
+    "get",
     "/",
-    describeRoute({
-      description: "List all non-archived datasets for the project (paginated)",
-    }),
-    zValidator("query", paginationQuerySchema),
-    async (c) => {
-      const project = c.get("project");
-      const { page, limit } = c.req.valid("query");
+    MANAGEMENT_API_VERSION,
+    async (c: DatasetContext, input: z.infer<typeof paginationQuerySchema>) => {
+      const project = projectOf(c);
+      const { page, limit } = input;
       const application = app();
 
       const result = await application.listDatasets({
@@ -234,6 +280,13 @@ export function createDatasetRestApp(options: {
         })),
       });
     },
+    (b) =>
+      policy(requires("datasets:view"))(b)
+        .withQuery(paginationQuerySchema)
+        .withRawResponse(DATASET_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "List all non-archived datasets for the project (paginated)",
+        }),
   );
 
   // ── Create Dataset ─────────────────────────────────────────────
@@ -242,15 +295,13 @@ export function createDatasetRestApp(options: {
   // could create a dataset yesterday still can — what changes is that a
   // credential the product issues at the CREATE grain is honoured instead of
   // refused. A viewer holds only `datasets:view` and is declined as before.
-  secured.access(requires("datasets:create")).post(
+  service.registerRoute(
+    "post",
     "/",
-    describeRoute({
-      description: "Create a new dataset",
-    }),
-    zValidator("json", createDatasetSchema),
-    async (c) => {
-      const project = c.get("project");
-      const { name, columnTypes } = c.req.valid("json");
+    MANAGEMENT_API_VERSION,
+    async (c: DatasetContext, input: z.infer<typeof createDatasetSchema>) => {
+      const project = projectOf(c);
+      const { name, columnTypes } = input;
       const application = app();
 
       try {
@@ -288,19 +339,26 @@ export function createDatasetRestApp(options: {
         throw error;
       }
     },
+    (b) =>
+      policy(requires("datasets:create"))(b)
+        .withInput(createDatasetSchema)
+        .withRawResponse(DATASET_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({ description: "Create a new dataset" }),
   );
 
   // ── Create + Upload Dataset from File ─────────────────────────
   // IMPORTANT: This route MUST be registered BEFORE /:slugOrId routes
-  // so Hono doesn't match "upload" as a slugOrId parameter.
+  // so the router doesn't match "upload" as a slugOrId parameter.
   // Also a create: the file becomes a brand-new dataset.
-  secured.access(requires("datasets:create")).post(
+  //
+  // The body is multipart and read by the handler: declaring an input would
+  // have the framework read it as JSON, and the file would be gone.
+  service.registerRoute(
+    "post",
     "/upload",
-    describeRoute({
-      description: "Create a new dataset from an uploaded file (CSV, JSON, JSONL)",
-    }),
-    async (c) => {
-      const project = c.get("project");
+    MANAGEMENT_API_VERSION,
+    async (c: DatasetContext) => {
+      const project = projectOf(c);
       const application = app();
 
       const body = await c.req.parseBody();
@@ -350,17 +408,22 @@ export function createDatasetRestApp(options: {
         throw error;
       }
     },
+    (b) =>
+      policy(requires("datasets:create"))(b)
+        .withRawResponse(DATASET_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "Create a new dataset from an uploaded file (CSV, JSON, JSONL)",
+        }),
   );
 
   // ── Direct (browser→S3) upload: request a presigned PUT ─────────
   // Registered before /:slugOrId so "direct-upload" isn't matched as a slug.
   // Session-cookie (or API-key) authenticated in-handler — see directUploadSessionAuth.
-  secured.access(directUploadSessionAuth).post(
+  service.registerRoute(
+    "post",
     "/direct-upload",
-    describeRoute({
-      description: "Start a direct browser→S3 dataset upload (returns a presigned PUT)",
-    }),
-    async (c) => {
+    MANAGEMENT_API_VERSION,
+    async (c: DatasetContext) => {
       const application = app();
 
       const body = await c.req.parseBody();
@@ -444,6 +507,12 @@ export function createDatasetRestApp(options: {
       });
       return c.json(result, 201);
     },
+    (b) =>
+      policy(directUploadSessionAuth)(b)
+        .withRawResponse(DATASET_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "Start a direct browser→S3 dataset upload (returns a presigned PUT)",
+        }),
   );
 
   // ── Direct upload: stream the file into staging (no browser-reachable S3) ──
@@ -451,13 +520,15 @@ export function createDatasetRestApp(options: {
   // the bytes through the app, via the same-origin URL minted by
   // createPresignedUpload. Registered before the `/:datasetId` routes so "staging"
   // isn't matched as a datasetId. Session-cookie (or API-key) authed in-handler.
-  secured.access(directUploadSessionAuth).put(
+  //
+  // The body is taken as a stream rather than through `withRawBody`, which
+  // would buffer a heavy upload whole before the handler ever saw it.
+  service.registerRoute(
+    "put",
     "/direct-upload/staging/:uploadId",
-    describeRoute({
-      description: "Stream a heavy upload into staging when there is no browser-reachable S3",
-    }),
-    async (c) => {
-      const { uploadId } = c.req.param();
+    MANAGEMENT_API_VERSION,
+    async (c: DatasetContext, input: z.infer<typeof uploadIdParamsSchema>) => {
+      const { uploadId } = input;
       const projectId = c.req.query("projectId");
       if (!projectId || projectId.trim() === "") {
         throw new UnprocessableEntityError("projectId query param is required");
@@ -489,26 +560,29 @@ export function createDatasetRestApp(options: {
       });
       return c.json({ ok: true }, 200);
     },
+    (b) =>
+      policy(directUploadSessionAuth)(b)
+        .withParams(uploadIdParamsSchema)
+        .withRawResponse(DATASET_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "Stream a heavy upload into staging when there is no browser-reachable S3",
+        }),
   );
 
   // ── Direct upload: finalize after the browser has PUT the file ───
   // Session-cookie (or API-key) authenticated in-handler — see directUploadSessionAuth.
-  secured.access(directUploadSessionAuth).post(
+  service.registerRoute(
+    "post",
     "/direct-upload/:datasetId/finalize",
-    describeRoute({
-      description: "Finalize a direct upload: size-check and start processing",
-    }),
-    async (c) => {
-      const { datasetId } = c.req.param();
+    MANAGEMENT_API_VERSION,
+    async (c: DatasetContext, input: z.infer<typeof datasetIdParamsSchema>) => {
+      const { datasetId } = input;
       const projectId = c.req.query("projectId");
       if (!projectId || projectId.trim() === "") {
         throw new UnprocessableEntityError("projectId query param is required");
       }
       const auth = await authorizeDirectUpload(c, projectId.trim());
       if (!auth.ok) {
-        // `auth.body` is the full handled payload (code, meta, tips). Falling
-        // back to `{ error }` keeps the shape for the failures that have no
-        // handled error behind them.
         return c.json(auth.body ?? { error: auth.error }, auth.status);
       }
       const application = app();
@@ -522,26 +596,29 @@ export function createDatasetRestApp(options: {
       });
       return c.json(result, 200);
     },
+    (b) =>
+      policy(directUploadSessionAuth)(b)
+        .withParams(datasetIdParamsSchema)
+        .withRawResponse(DATASET_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "Finalize a direct upload: size-check and start processing",
+        }),
   );
 
   // ── Direct upload: manually retry a failed/stuck normalize (I-RECOVER) ──
   // Session-cookie (or API-key) authenticated in-handler — see directUploadSessionAuth.
-  secured.access(directUploadSessionAuth).post(
+  service.registerRoute(
+    "post",
     "/direct-upload/:datasetId/retry",
-    describeRoute({
-      description: "Retry normalization of a failed or stuck dataset",
-    }),
-    async (c) => {
-      const { datasetId } = c.req.param();
+    MANAGEMENT_API_VERSION,
+    async (c: DatasetContext, input: z.infer<typeof datasetIdParamsSchema>) => {
+      const { datasetId } = input;
       const projectId = c.req.query("projectId");
       if (!projectId || projectId.trim() === "") {
         throw new UnprocessableEntityError("projectId query param is required");
       }
       const auth = await authorizeDirectUpload(c, projectId.trim());
       if (!auth.ok) {
-        // `auth.body` is the full handled payload (code, meta, tips). Falling
-        // back to `{ error }` keeps the shape for the failures that have no
-        // handled error behind them.
         return c.json(auth.body ?? { error: auth.error }, auth.status);
       }
       const application = app();
@@ -553,28 +630,31 @@ export function createDatasetRestApp(options: {
       });
       return c.json(result, 200);
     },
+    (b) =>
+      policy(directUploadSessionAuth)(b)
+        .withParams(datasetIdParamsSchema)
+        .withRawResponse(DATASET_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "Retry normalization of a failed or stuck dataset",
+        }),
   );
 
   // ── Direct upload: abort a still-pending upload (CORS/network PUT failure) ──
   // Session-cookie (or API-key) authenticated in-handler — see directUploadSessionAuth.
   // Cleans up the orphaned `uploading` row so a failed presigned PUT isn't a dead
   // end before the browser falls back to the backend upload path.
-  secured.access(directUploadSessionAuth).delete(
+  service.registerRoute(
+    "delete",
     "/direct-upload/:datasetId",
-    describeRoute({
-      description: "Abort a still-pending direct upload and clean up its row",
-    }),
-    async (c) => {
-      const { datasetId } = c.req.param();
+    MANAGEMENT_API_VERSION,
+    async (c: DatasetContext, input: z.infer<typeof datasetIdParamsSchema>) => {
+      const { datasetId } = input;
       const projectId = c.req.query("projectId");
       if (!projectId || projectId.trim() === "") {
         throw new UnprocessableEntityError("projectId query param is required");
       }
       const auth = await authorizeDirectUpload(c, projectId.trim());
       if (!auth.ok) {
-        // `auth.body` is the full handled payload (code, meta, tips). Falling
-        // back to `{ error }` keeps the shape for the failures that have no
-        // handled error behind them.
         return c.json(auth.body ?? { error: auth.error }, auth.status);
       }
       const application = app();
@@ -586,19 +666,25 @@ export function createDatasetRestApp(options: {
       });
       return c.json(result, 200);
     },
+    (b) =>
+      policy(directUploadSessionAuth)(b)
+        .withParams(datasetIdParamsSchema)
+        .withRawResponse(DATASET_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "Abort a still-pending direct upload and clean up its row",
+        }),
   );
 
   // ── Upload File to Existing Dataset ─────────────────────────────
   // Appending rows to a dataset that already exists changes that dataset, so it
   // is an `:update`, not a create of anything the caller can name.
-  secured.access(requires("datasets:update")).post(
+  service.registerRoute(
+    "post",
     "/:slugOrId/upload",
-    describeRoute({
-      description: "Upload a file (CSV, JSON, JSONL) to an existing dataset",
-    }),
-    async (c) => {
-      const { slugOrId } = c.req.param();
-      const project = c.get("project");
+    MANAGEMENT_API_VERSION,
+    async (c: DatasetContext, input: z.infer<typeof slugOrIdParamsSchema>) => {
+      const { slugOrId } = input;
+      const project = projectOf(c);
       const application = app();
 
       const body = await c.req.parseBody();
@@ -644,20 +730,27 @@ export function createDatasetRestApp(options: {
         throw error;
       }
     },
+    (b) =>
+      policy(requires("datasets:update"))(b)
+        .withParams(slugOrIdParamsSchema)
+        .withRawResponse(DATASET_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "Upload a file (CSV, JSON, JSONL) to an existing dataset",
+        }),
   );
 
   // ── Batch Create Records ──────────────────────────────────────
   // Rows live inside a dataset; adding them mutates that dataset — `:update`.
-  secured.access(requires("datasets:update")).post(
+  service.registerRoute(
+    "post",
     "/:slugOrId/records",
-    describeRoute({
-      description: "Create records in a dataset in batch",
-    }),
-    zValidator("json", batchCreateRecordsSchema),
-    async (c) => {
-      const { slugOrId } = c.req.param();
-      const project = c.get("project");
-      const { entries } = c.req.valid("json");
+    MANAGEMENT_API_VERSION,
+    async (
+      c: DatasetContext,
+      input: z.infer<typeof slugOrIdParamsSchema> & z.infer<typeof batchCreateRecordsSchema>,
+    ) => {
+      const { slugOrId, entries } = input;
+      const project = projectOf(c);
       const application = app();
 
       try {
@@ -678,34 +771,26 @@ export function createDatasetRestApp(options: {
         return mapDatasetNotFoundError(error);
       }
     },
+    (b) =>
+      policy(requires("datasets:update"))(b)
+        .withParams(slugOrIdParamsSchema)
+        .withInput(batchCreateRecordsSchema)
+        .withRawResponse(DATASET_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({ description: "Create records in a dataset in batch" }),
   );
 
   // ── Legacy: Add Entries ────────────────────────────────────────
   // The legacy spelling of the batch-records route above; same grain.
-  secured.access(requires("datasets:update")).post(
+  service.registerRoute(
+    "post",
     "/:slug/entries",
-    describeRoute({
-      description: "Add entries to a dataset",
-    }),
-    zValidator(
-      "json",
-      z
-        .object({
-          entries: z.array(z.record(z.string(), z.any())).meta({
-            example: [
-              {
-                input: "hi",
-                output: "Hello, how can I help you today?",
-              },
-            ],
-          }),
-        })
-        .meta({ id: "DatasetPostEntries" }),
-    ),
-    async (c) => {
-      const { slug } = c.req.param();
-      const project = c.get("project");
-      const { entries } = c.req.valid("json");
+    MANAGEMENT_API_VERSION,
+    async (
+      c: DatasetContext,
+      input: z.infer<typeof slugParamsSchema> & z.infer<typeof legacyEntriesSchema>,
+    ) => {
+      const { slug, entries } = input;
+      const project = projectOf(c);
       const application = app();
 
       // Route through the service (parity with `/:slugOrId/records`) instead of
@@ -733,31 +818,26 @@ export function createDatasetRestApp(options: {
         return mapDatasetNotFoundError(error);
       }
     },
+    (b) =>
+      policy(requires("datasets:update"))(b)
+        .withParams(slugParamsSchema)
+        .withInput(legacyEntriesSchema)
+        .withRawResponse(DATASET_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({ description: "Add entries to a dataset" }),
   );
 
   // ── Get Single Dataset ─────────────────────────────────────────
-  secured.access(requires("datasets:view")).get(
+  service.registerRoute(
+    "get",
     "/:slugOrId",
-    describeRoute({
-      description: "Get a dataset by its slug or id.",
-      responses: {
-        ...baseResponses,
-        200: buildStandardSuccessResponse(datasetOutputSchema),
-        404: {
-          description: "Dataset not found",
-          content: {
-            "application/json": { schema: resolver(errorSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const { slugOrId } = c.req.param();
+    MANAGEMENT_API_VERSION,
+    async (c: DatasetContext, input: z.infer<typeof slugOrIdParamsSchema>) => {
+      const { slugOrId } = input;
       if (!slugOrId) {
         throw new UnprocessableEntityError("Dataset slug or id is required");
       }
 
-      const project = c.get("project");
+      const project = projectOf(c);
       const application = app();
 
       let result;
@@ -792,6 +872,23 @@ export function createDatasetRestApp(options: {
         data: records,
       });
     },
+    (b) =>
+      policy(requires("datasets:view"))(b)
+        .withParams(slugOrIdParamsSchema)
+        .withRawResponse(DATASET_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({
+          description: "Get a dataset by its slug or id.",
+          responses: {
+            ...baseResponses,
+            200: buildStandardSuccessResponse(datasetOutputSchema),
+            404: {
+              description: "Dataset not found",
+              content: {
+                "application/json": { schema: resolver(errorSchema) },
+              },
+            },
+          },
+        }),
   );
 
   // ── Update Dataset ─────────────────────────────────────────────
@@ -803,16 +900,16 @@ export function createDatasetRestApp(options: {
   // calls the same application operation and asks for the same grain; the two
   // surfaces describing one operation differently is what this sweep set out to
   // remove.
-  secured.access(requires("datasets:manage")).patch(
+  service.registerRoute(
+    "patch",
     "/:slugOrId",
-    describeRoute({
-      description: "Update a dataset by its slug or id",
-    }),
-    zValidator("json", updateDatasetSchema),
-    async (c) => {
-      const { slugOrId } = c.req.param();
-      const project = c.get("project");
-      const body = c.req.valid("json");
+    MANAGEMENT_API_VERSION,
+    async (
+      c: DatasetContext,
+      input: z.infer<typeof slugOrIdParamsSchema> & z.infer<typeof updateDatasetSchema>,
+    ) => {
+      const { slugOrId, name, columnTypes } = input;
+      const project = projectOf(c);
       const application = app();
 
       try {
@@ -824,8 +921,8 @@ export function createDatasetRestApp(options: {
         const updated = await application.upsertDataset({
           projectId: project.id,
           slugOrId,
-          name: body.name,
-          columnTypes: body.columnTypes as DatasetColumns | undefined,
+          name,
+          columnTypes: columnTypes as DatasetColumns | undefined,
         });
 
         return c.json({
@@ -856,19 +953,24 @@ export function createDatasetRestApp(options: {
         throw error;
       }
     },
+    (b) =>
+      policy(requires("datasets:manage"))(b)
+        .withParams(slugOrIdParamsSchema)
+        .withInput(updateDatasetSchema)
+        .withRawResponse(DATASET_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({ description: "Update a dataset by its slug or id" }),
   );
 
   // ── Delete (Archive) Dataset ───────────────────────────────────
   // Destruction deliberately stays at `:manage` — it is the only grain that
   // carries it, and a read-and-write credential must not inherit it.
-  secured.access(requires("datasets:manage")).delete(
+  service.registerRoute(
+    "delete",
     "/:slugOrId",
-    describeRoute({
-      description: "Archive a dataset (soft-delete)",
-    }),
-    async (c) => {
-      const { slugOrId } = c.req.param();
-      const project = c.get("project");
+    MANAGEMENT_API_VERSION,
+    async (c: DatasetContext, input: z.infer<typeof slugOrIdParamsSchema>) => {
+      const { slugOrId } = input;
+      const project = projectOf(c);
       const application = app();
 
       try {
@@ -881,19 +983,24 @@ export function createDatasetRestApp(options: {
         return mapDatasetNotFoundError(error);
       }
     },
+    (b) =>
+      policy(requires("datasets:manage"))(b)
+        .withParams(slugOrIdParamsSchema)
+        .withRawResponse(DATASET_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({ description: "Archive a dataset (soft-delete)" }),
   );
 
   // ── List Records (paginated) ───────────────────────────────────
-  secured.access(requires("datasets:view")).get(
+  service.registerRoute(
+    "get",
     "/:slugOrId/records",
-    describeRoute({
-      description: "List records for a dataset (paginated)",
-    }),
-    zValidator("query", paginationQuerySchema),
-    async (c) => {
-      const { slugOrId } = c.req.param();
-      const project = c.get("project");
-      const { page, limit } = c.req.valid("query");
+    MANAGEMENT_API_VERSION,
+    async (
+      c: DatasetContext,
+      input: z.infer<typeof slugOrIdParamsSchema> & z.infer<typeof paginationQuerySchema>,
+    ) => {
+      const { slugOrId, page, limit } = input;
+      const project = projectOf(c);
       const application = app();
 
       try {
@@ -910,19 +1017,25 @@ export function createDatasetRestApp(options: {
         return mapDatasetNotFoundError(error);
       }
     },
+    (b) =>
+      policy(requires("datasets:view"))(b)
+        .withParams(slugOrIdParamsSchema)
+        .withQuery(paginationQuerySchema)
+        .withRawResponse(DATASET_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({ description: "List records for a dataset (paginated)" }),
   );
 
   // ── Update / Upsert Record ─────────────────────────────────────
-  secured.access(requires("datasets:update")).patch(
+  service.registerRoute(
+    "patch",
     "/:slugOrId/records/:recordId",
-    describeRoute({
-      description: "Update or create a record in a dataset",
-    }),
-    zValidator("json", updateRecordSchema),
-    async (c) => {
-      const { slugOrId, recordId } = c.req.param();
-      const project = c.get("project");
-      const { entry } = c.req.valid("json");
+    MANAGEMENT_API_VERSION,
+    async (
+      c: DatasetContext,
+      input: z.infer<typeof recordParamsSchema> & z.infer<typeof updateRecordSchema>,
+    ) => {
+      const { slugOrId, recordId, entry } = input;
+      const project = projectOf(c);
       const application = app();
 
       try {
@@ -941,20 +1054,26 @@ export function createDatasetRestApp(options: {
         return mapDatasetNotFoundError(error);
       }
     },
+    (b) =>
+      policy(requires("datasets:update"))(b)
+        .withParams(recordParamsSchema)
+        .withInput(updateRecordSchema)
+        .withRawResponse(DATASET_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({ description: "Update or create a record in a dataset" }),
   );
 
   // ── Batch Delete Records ───────────────────────────────────────
   // Destructive — stays at `:manage`, like the dataset archive above.
-  secured.access(requires("datasets:manage")).delete(
+  service.registerRoute(
+    "delete",
     "/:slugOrId/records",
-    describeRoute({
-      description: "Delete records from a dataset by IDs",
-    }),
-    zValidator("json", deleteRecordsSchema),
-    async (c) => {
-      const { slugOrId } = c.req.param();
-      const project = c.get("project");
-      const { recordIds } = c.req.valid("json");
+    MANAGEMENT_API_VERSION,
+    async (
+      c: DatasetContext,
+      input: z.infer<typeof slugOrIdParamsSchema> & z.infer<typeof deleteRecordsSchema>,
+    ) => {
+      const { slugOrId, recordIds } = input;
+      const project = projectOf(c);
       const application = app();
 
       let result;
@@ -977,7 +1096,13 @@ export function createDatasetRestApp(options: {
 
       return c.json({ deletedCount: result.count });
     },
+    (b) =>
+      policy(requires("datasets:manage"))(b)
+        .withParams(slugOrIdParamsSchema)
+        .withInput(deleteRecordsSchema)
+        .withRawResponse(DATASET_ANSWER_REASON, { contentType: "application/json" })
+        .withDocs({ description: "Delete records from a dataset by IDs" }),
   );
 
-  return secured;
+  return service.build();
 }

@@ -22,11 +22,13 @@ import {
 import { requires } from "@langwatch/api";
 import {
   bodyLimit,
-  type AppRestProjectVariables,
-  type SecuredApp,
-  validator as zValidator,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  projectOf,
+  type ProjectScopedContext,
+  type RestApiVersionedFamily,
+  resolver,
 } from "@langwatch/api/rest";
-import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 
 import { AgentApp } from "#app/agent.app";
@@ -188,87 +190,89 @@ async function connectedAgentOf({
 }
 
 export function registerCallEndpoint({
-  secured,
+  family,
   deps,
 }: {
-  secured: SecuredApp<{ Variables: AppRestProjectVariables }>;
+  family: RestApiVersionedFamily;
   deps: AgentCallDeps;
 }): void {
-  secured.access(requires("scenarios:create")).post(
-    "/:id/call",
-    describeRoute({
-      operationId: "callConnectedAgent",
-      tags: ["Agents"],
-      description:
-        "Send one conversation turn to a connected agent and get its answer. The agent must be online: a process running the decorated function must be connected.",
-      responses: {
-        200: {
-          description: "The function's answer",
-          content: {
-            "application/json": { schema: resolver(relayCallResponseSchema) },
-          },
-        },
-        404: {
-          description: "No connected agent with that id in this project",
-        },
-        429: {
-          description: "Every instance is busy; Retry-After says when to try again",
-        },
-        503: { description: "No instance of the agent is connected" },
-      },
-    }),
-    bodyLimit({
-      maxSize: relayPayloadCaps(deps.relayMaxPayloadMb).envelopeBytes,
-      onError: () => {
-        // The cap stopped the read, so no size was measured; the message
-        // names the limit alone rather than a number nothing weighed.
-        throw new AgentPayloadTooLargeError({
-          what: "envelope",
-          limitBytes: relayPayloadCaps(deps.relayMaxPayloadMb).envelopeBytes,
-        });
-      },
-    }),
-    zValidator("param", idParamsSchema),
-    zValidator("json", relayCallBodySchema),
-    async (c) => {
-      const { id } = c.req.valid("param");
-      const project = c.get("project");
-      const input = c.req.valid("json");
+  type CallContext = ProjectScopedContext<EndpointVariables>;
 
-      const agent = await connectedAgentOf({ deps, projectId: project.id, id });
-      await deps.assertRunnable({
-        agent,
-        apiKeyUserId: c.get("apiKeyUserId"),
-      });
+  const callHandler = async (
+    c: CallContext,
+    input: z.infer<typeof idParamsSchema> & z.infer<typeof relayCallBodySchema>,
+  ) => {
+    const { id, ...body } = input;
+    const project = projectOf(c);
 
-      const call = dispatchCallOf({
-        body: input,
-        traceparentHeader: c.req.header("traceparent") ?? null,
+    const agent = await connectedAgentOf({ deps, projectId: project.id, id });
+    await deps.assertRunnable({ agent, apiKeyUserId: c.get("apiKeyUserId") });
+
+    const call = dispatchCallOf({
+      body,
+      traceparentHeader: c.req.header("traceparent") ?? null,
+    });
+    try {
+      return await dispatchTurn({
+        runtime: deps.runtime(),
+        projectId: project.id,
+        // `agent` is the full discriminated union `AgentApp.getById`
+        // answers; `dispatchTurn` only ever reads these four fields, so
+        // it declares the narrow contract view rather than the union.
+        agent: {
+          id: agent.id,
+          name: agent.name,
+          environment: agent.environment ?? null,
+          config: agent.config,
+        },
+        call,
+        signal: c.req.raw.signal,
       });
-      try {
-        return c.json(
-          await dispatchTurn({
-            runtime: deps.runtime(),
-            projectId: project.id,
-            // `agent` is the full discriminated union `AgentApp.getById`
-            // answers; `dispatchTurn` only ever reads these four fields, so
-            // it declares the narrow contract view rather than the union.
-            agent: {
-              id: agent.id,
-              name: agent.name,
-              environment: agent.environment ?? null,
-              config: agent.config,
-            },
-            call,
-            signal: c.req.raw.signal,
-          }),
-        );
-      } catch (error) {
-        if (error instanceof AgentBusyError) {
-          c.header("Retry-After", String(Math.ceil((error.meta.retryAfterMs as number) / 1000)));
-        }
-        throw error;
+    } catch (error) {
+      if (error instanceof AgentBusyError) {
+        // Set on the context the framework serialises through, so the header
+        // reaches the caller with the refusal the boundary renders.
+        c.header("Retry-After", String(Math.ceil((error.meta.retryAfterMs as number) / 1000)));
       }
-    },
+      throw error;
+    }
+  };
+
+  family.service.registerRoute("post", "/:id/call", MANAGEMENT_API_VERSION, callHandler, (b) =>
+    family
+      .policy(requires("scenarios:create"))(b)
+      .withParams(idParamsSchema)
+      .withInput(relayCallBodySchema)
+      .withOutput(relayCallResponseSchema)
+      .withMiddleware(
+        bodyLimit({
+          maxSize: relayPayloadCaps(deps.relayMaxPayloadMb).envelopeBytes,
+          onError: () => {
+            // The cap stopped the read, so no size was measured; the message
+            // names the limit alone rather than a number nothing weighed.
+            throw new AgentPayloadTooLargeError({
+              what: "envelope",
+              limitBytes: relayPayloadCaps(deps.relayMaxPayloadMb).envelopeBytes,
+            });
+          },
+        }),
+      )
+      .withDocs({
+        operationId: "callConnectedAgent",
+        tags: ["Agents"],
+        description:
+          "Send one conversation turn to a connected agent and get its answer. The agent must be online: a process running the decorated function must be connected.",
+        responses: {
+          200: {
+            description: "The function's answer",
+            content: {
+              "application/json": { schema: resolver(relayCallResponseSchema) },
+            },
+          },
+          404: { description: "No connected agent with that id in this project" },
+          429: { description: "Every instance is busy; Retry-After says when to try again" },
+          503: { description: "No instance of the agent is connected" },
+        },
+      }),
   );
 }

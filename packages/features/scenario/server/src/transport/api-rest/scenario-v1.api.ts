@@ -9,22 +9,42 @@ import {
   type ScenarioActor,
   type ScenarioService,
 } from "@langwatch/scenario-contract";
-import { describeRoute, resolver } from "hono-openapi";
+import type { ErrorHandler } from "hono";
 import { z } from "zod";
 import { requires } from "@langwatch/api";
 import {
-  type AppRestProjectVariables,
   badRequestSchema,
   baseResponses,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
   type PlatformUrlBuilder,
-  type SecuredApp,
-  validator as zValidator,
+  projectOf,
+  type ProjectScopedContext,
+  resolver,
+  type RestApiVersionedFamily,
 } from "@langwatch/api/rest";
 
 const logger = createLogger("langwatch:api:scenarios");
 
-/** The secured app every route below registers on. */
-type ScenarioRestApp = SecuredApp<{ Variables: AppRestProjectVariables }>;
+/** The handler context every route below runs on. */
+type ScenarioContext = ProjectScopedContext<EndpointVariables>;
+
+/**
+ * A scenario or version this project does not hold. The family answers it in
+ * the bare `{ error }` body it has always had, so the miss is raised as the
+ * family's own error and rendered by the family's own handler.
+ */
+export class ScenarioRestNotThereError extends Error {}
+
+/** The family's 404s, in the body they have always had. */
+export const scenarioRestErrorHandler =
+  (boundary: ErrorHandler): ErrorHandler =>
+  (error, c) => {
+    if (error instanceof ScenarioRestNotThereError) {
+      return c.json({ error: error.message }, 404);
+    }
+    return boundary(error, c);
+  };
 
 /** What each route needs from the process it was mounted into. */
 type ScenarioRestPorts = {
@@ -242,448 +262,364 @@ function scenarioEditorPath(scenarioId: string): string {
   return `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${scenarioId}`;
 }
 
-export function registerScenarioRoutes(secured: ScenarioRestApp, ports: ScenarioRestPorts): void {
-  registerListScenariosRoute(secured, ports);
-  registerGetScenarioRoute(secured, ports);
-  registerCreateScenarioRoute(secured, ports);
-  registerUpdateScenarioRoute(secured, ports);
-  registerDeleteScenarioRoute(secured, ports);
-  registerListScenarioVersionsRoute(secured, ports);
-  registerGetScenarioVersionRoute(secured, ports);
-}
+const idParamsSchema = z.object({ id: z.string().min(1) });
+const idVersionParamsSchema = idParamsSchema.extend({
+  version: z.coerce.number().int().min(1),
+});
+const archivedScenarioSchema = z.object({ id: z.string(), archived: z.boolean() });
 
-/** List every scenario in the project. */
-function registerListScenariosRoute(
-  secured: ScenarioRestApp,
+const scenarioNotFoundResponse = {
+  404: {
+    description: "Scenario not found",
+    content: { "application/json": { schema: resolver(badRequestSchema) } },
+  },
+};
+
+export function registerScenarioRoutes(
+  family: RestApiVersionedFamily,
   { scenarios, platformUrl }: ScenarioRestPorts,
 ): void {
-  secured.access(requires("scenarios:view")).get(
-    "/",
-    describeRoute({
-      description: "Get all scenarios for a project",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(z.array(scenarioResponseWithPlatformUrlSchema)),
-            },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      logger.info({ projectId: project.id }, "Listing scenarios");
+  const { service, policy } = family;
 
-      const listed = await scenarios().list({ projectId: project.id });
+  const withPlatformUrl = (scenario: Scenario, projectSlug: string) => ({
+    ...toScenarioResponse(scenario),
+    platformUrl: platformUrl({ projectSlug, path: scenarioEditorPath(scenario.id) }),
+  });
 
-      return c.json(
-        listed.map((s) => ({
-          ...toScenarioResponse(s),
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: scenarioEditorPath(s.id),
-          }),
-        })),
-      );
-    },
-  );
-}
+  /** List every scenario in the project. */
+  const listHandler = async (c: ScenarioContext) => {
+    const project = projectOf(c);
+    logger.info({ projectId: project.id }, "Listing scenarios");
 
-/** Read one scenario by id. */
-function registerGetScenarioRoute(
-  secured: ScenarioRestApp,
-  { scenarios, platformUrl }: ScenarioRestPorts,
-): void {
-  secured.access(requires("scenarios:view")).get(
-    "/:id",
-    describeRoute({
-      description: "Get a specific scenario by ID",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(scenarioResponseWithPlatformUrlSchema),
-            },
-          },
-        },
-        404: {
-          description: "Scenario not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      logger.info({ projectId: project.id, scenarioId: id }, "Getting scenario");
+    const listed = await scenarios().list({ projectId: project.id });
+    return listed.map((s) => withPlatformUrl(s, project.slug));
+  };
 
-      const scenario = await scenarios().tryGetById({
-        id,
-        projectId: project.id,
-      });
+  /** Read one scenario by id. */
+  const getHandler = async (c: ScenarioContext, input: z.infer<typeof idParamsSchema>) => {
+    const project = projectOf(c);
+    logger.info({ projectId: project.id, scenarioId: input.id }, "Getting scenario");
 
-      if (!scenario) {
-        return c.json({ error: "Scenario not found" }, 404);
+    const scenario = await scenarios().tryGetById({ id: input.id, projectId: project.id });
+    if (!scenario) throw new ScenarioRestNotThereError("Scenario not found");
+
+    return withPlatformUrl(scenario, project.slug);
+  };
+
+  /** Create a scenario. */
+  const createHandler = async (
+    c: ScenarioContext,
+    body: z.infer<typeof createScenarioSchema>,
+  ) => {
+    const project = projectOf(c);
+    logger.info({ projectId: project.id }, "Creating scenario");
+
+    const scenario = await scenarios().create({
+      projectId: project.id,
+      name: body.name,
+      situation: body.situation,
+      criteria: body.criteria,
+      labels: body.labels,
+      ...(body.parameters !== undefined && { parameters: body.parameters }),
+      ...(body.simulatorModel !== undefined && { simulatorModel: body.simulatorModel }),
+      ...(body.judgeModel !== undefined && { judgeModel: body.judgeModel }),
+      ...(body.maxTurns !== undefined && { maxTurns: body.maxTurns }),
+      ...(body.minTurns !== undefined && { minTurns: body.minTurns }),
+      ...(body.testSuiteId !== undefined && { testSuiteId: body.testSuiteId }),
+      actor: actorFromRequest(c),
+    });
+
+    return withPlatformUrl(scenario, project.slug);
+  };
+
+  /**
+   * Update a scenario in place. PUT and PATCH register the same handler:
+   * both apply a partial update, so a client using either verb gets the
+   * same behavior instead of a 404 on one of them.
+   */
+  const updateHandler = async (
+    c: ScenarioContext,
+    input: z.infer<typeof idParamsSchema> & z.infer<typeof updateScenarioSchema>,
+  ) => {
+    const project = projectOf(c);
+    const { id, ...body } = input;
+    logger.info({ projectId: project.id, scenarioId: id }, "Updating scenario");
+
+    const existing = await scenarios().tryGetById({ id, projectId: project.id });
+    if (!existing) throw new ScenarioRestNotThereError("Scenario not found");
+
+    const scenario = await scenarios().update({
+      id,
+      projectId: project.id,
+      ...scenarioUpdateData(body),
+      actor: actorFromRequest(c),
+    });
+
+    return withPlatformUrl(scenario, project.slug);
+  };
+
+  /** Archive a scenario. */
+  const archiveHandler = async (c: ScenarioContext, input: z.infer<typeof idParamsSchema>) => {
+    const project = projectOf(c);
+    const { id } = input;
+    logger.info({ projectId: project.id, scenarioId: id }, "Archiving scenario");
+
+    try {
+      await scenarios().archive({ id, projectId: project.id });
+      return { id, archived: true };
+    } catch (error) {
+      if (error instanceof ScenarioNotFoundError) {
+        throw new ScenarioRestNotThereError("Scenario not found");
       }
+      throw error;
+    }
+  };
 
-      return c.json({
-        ...toScenarioResponse(scenario),
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: scenarioEditorPath(scenario.id),
-        }),
+  /** The version history of a scenario, newest first. */
+  const listVersionsHandler = async (
+    c: ScenarioContext,
+    input: z.infer<typeof idParamsSchema> & z.infer<typeof listScenarioVersionsQuerySchema>,
+  ) => {
+    const project = projectOf(c);
+    const { id, limit, cursor } = input;
+    logger.info({ projectId: project.id, scenarioId: id }, "Listing scenario versions");
+
+    try {
+      const page = await scenarios().listVersions({
+        projectId: project.id,
+        scenarioId: id,
+        ...(limit !== undefined && { limit }),
+        ...(cursor !== undefined && { cursor }),
       });
-    },
-  );
+      return {
+        versions: page.versions.map((version) => ({
+          version: version.version,
+          authorLabel: version.authorLabel,
+          authorId: version.authorId,
+          changeDescription: version.changeDescription,
+          changedFields: version.changedFields,
+          createdAt: version.createdAt.toISOString(),
+          isSynthesized: version.isSynthesized,
+        })),
+        nextCursor: page.nextCursor,
+      };
+    } catch (error) {
+      if (error instanceof ScenarioNotFoundError) {
+        throw new ScenarioRestNotThereError("Scenario not found");
+      }
+      throw error;
+    }
+  };
 
-  // Creating asks for `scenarios:create`, not `scenarios:manage`.
-  //
-  // Nobody loses access: `:manage` implies `:create` through the RBAC
-  // hierarchy, so every role and key that could create a scenario yesterday
-  // still can. What changes is that access granted at the CREATE grain now
-  // works — it used to be a permission the product would issue and then refuse
-  // to honour, which is how an assistant scoped to exactly "read and create"
-  // ended up unable to create anything. A viewer is unaffected: they keep the
-  // read routes and are declined the write, as before.
-}
+  /**
+   * One version of a scenario with the content it saved.
+   *
+   * A version number that names nothing refuses with the
+   * `scenario_version_not_found` code, which the synthesized Created entry
+   * also answers: it has no stored snapshot to serve.
+   */
+  const getVersionHandler = async (
+    c: ScenarioContext,
+    input: z.infer<typeof idVersionParamsSchema>,
+  ) => {
+    const project = projectOf(c);
+    const { id, version } = input;
+    logger.info({ projectId: project.id, scenarioId: id, version }, "Getting scenario version");
 
-/** Create a scenario. */
-function registerCreateScenarioRoute(
-  secured: ScenarioRestApp,
-  { scenarios, platformUrl }: ScenarioRestPorts,
-): void {
-  secured.access(requires("scenarios:create")).post(
-    "/",
-    describeRoute({
-      description: "Create a new scenario",
-      responses: {
-        ...baseResponses,
-        201: {
-          description: "Scenario created",
-          content: {
-            "application/json": {
-              schema: resolver(scenarioResponseWithPlatformUrlSchema),
+    try {
+      const detail = await scenarios().getVersion({
+        projectId: project.id,
+        scenarioId: id,
+        version,
+      });
+      return {
+        version: detail.version,
+        authorLabel: detail.authorLabel,
+        authorId: detail.authorId,
+        changeDescription: detail.changeDescription,
+        changedFields: detail.changedFields,
+        createdAt: detail.createdAt.toISOString(),
+        isSynthesized: detail.isSynthesized,
+        schemaVersion: detail.schemaVersion,
+        snapshot: {
+          name: detail.fields.name,
+          situation: detail.fields.situation,
+          criteria: detail.fields.criteria,
+          labels: detail.fields.labels,
+          parameters: parseScenarioParameterDefinitions(detail.fields.parameters),
+          simulatorModel: detail.fields.simulatorModel,
+          judgeModel: detail.fields.judgeModel,
+          maxTurns: detail.fields.maxTurns,
+          minTurns: detail.fields.minTurns,
+        },
+      };
+    } catch (error) {
+      if (error instanceof ScenarioNotFoundError) {
+        throw new ScenarioRestNotThereError("Scenario not found");
+      }
+      throw error;
+    }
+  };
+
+  service
+    .registerRoute("get", "/", MANAGEMENT_API_VERSION, listHandler, (b) =>
+      policy(requires("scenarios:view"))(b)
+        .withOutput(z.array(scenarioResponseWithPlatformUrlSchema))
+        .withDocs({
+          description: "Get all scenarios for a project",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Success",
+              content: {
+                "application/json": {
+                  schema: resolver(z.array(scenarioResponseWithPlatformUrlSchema)),
+                },
+              },
             },
           },
-        },
-      },
-    }),
-    zValidator("json", createScenarioSchema),
-    async (c) => {
-      const project = c.get("project");
-      const body = c.req.valid("json");
-
-      logger.info({ projectId: project.id }, "Creating scenario");
-
-      const scenario = await scenarios().create({
-        projectId: project.id,
-        name: body.name,
-        situation: body.situation,
-        criteria: body.criteria,
-        labels: body.labels,
-        ...(body.parameters !== undefined && { parameters: body.parameters }),
-        ...(body.simulatorModel !== undefined && {
-          simulatorModel: body.simulatorModel,
         }),
-        ...(body.judgeModel !== undefined && { judgeModel: body.judgeModel }),
-        ...(body.maxTurns !== undefined && { maxTurns: body.maxTurns }),
-        ...(body.minTurns !== undefined && { minTurns: body.minTurns }),
-        ...(body.testSuiteId !== undefined && { testSuiteId: body.testSuiteId }),
-        actor: actorFromRequest(c),
-      });
-
-      return c.json(
-        {
-          ...toScenarioResponse(scenario),
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: scenarioEditorPath(scenario.id),
-          }),
-        },
-        201,
-      );
-    },
-  );
+    )
+    .registerRoute("get", "/:id", MANAGEMENT_API_VERSION, getHandler, (b) =>
+      policy(requires("scenarios:view"))(b)
+        .withParams(idParamsSchema)
+        .withOutput(scenarioResponseWithPlatformUrlSchema)
+        .withDocs({
+          description: "Get a specific scenario by ID",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Success",
+              content: {
+                "application/json": {
+                  schema: resolver(scenarioResponseWithPlatformUrlSchema),
+                },
+              },
+            },
+            ...scenarioNotFoundResponse,
+          },
+        }),
+    )
+    // Creating asks for `scenarios:create`, not `scenarios:manage`. Nobody
+    // loses access: `:manage` implies `:create`, so every role and key that
+    // could create a scenario yesterday still can. What changes is that access
+    // granted at the CREATE grain now works.
+    .registerRoute("post", "/", MANAGEMENT_API_VERSION, createHandler, (b) =>
+      policy(requires("scenarios:create"))(b)
+        .withInput(createScenarioSchema)
+        .withOutput(scenarioResponseWithPlatformUrlSchema)
+        .withStatus(201)
+        .withDocs({
+          description: "Create a new scenario",
+          responses: {
+            ...baseResponses,
+            201: {
+              description: "Scenario created",
+              content: {
+                "application/json": {
+                  schema: resolver(scenarioResponseWithPlatformUrlSchema),
+                },
+              },
+            },
+          },
+        }),
+    );
 
   // `:update` for the same reason as `:create` above — `:manage` still implies
   // it, so no existing caller changes.
-}
-
-/**
- * Update a scenario in place. PUT and PATCH register the same handler:
- * both apply a partial update, so a client using either verb gets the
- * same behavior instead of a 404 on one of them.
- */
-function registerUpdateScenarioRoute(secured: ScenarioRestApp, ports: ScenarioRestPorts): void {
   for (const verb of ["put", "patch"] as const) {
-    registerUpdateScenarioVerb({ secured, verb, ports });
-  }
-}
-
-function registerUpdateScenarioVerb({
-  secured,
-  verb,
-  ports,
-}: {
-  secured: ScenarioRestApp;
-  verb: "put" | "patch";
-  ports: ScenarioRestPorts;
-}): void {
-  const { scenarios, platformUrl } = ports;
-  secured.access(requires("scenarios:update"))[verb](
-    "/:id",
-    describeRoute({
-      description: "Update an existing scenario",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Scenario updated",
-          content: {
-            "application/json": {
-              schema: resolver(scenarioResponseWithPlatformUrlSchema),
+    service.registerRoute(verb, "/:id", MANAGEMENT_API_VERSION, updateHandler, (b) =>
+      policy(requires("scenarios:update"))(b)
+        .withParams(idParamsSchema)
+        .withInput(updateScenarioSchema)
+        .withOutput(scenarioResponseWithPlatformUrlSchema)
+        .withDocs({
+          description: "Update an existing scenario",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Scenario updated",
+              content: {
+                "application/json": {
+                  schema: resolver(scenarioResponseWithPlatformUrlSchema),
+                },
+              },
             },
+            ...scenarioNotFoundResponse,
           },
-        },
-        404: {
-          description: "Scenario not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("json", updateScenarioSchema),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      const body = c.req.valid("json");
-
-      logger.info({ projectId: project.id, scenarioId: id }, "Updating scenario");
-
-      const existing = await scenarios().tryGetById({
-        id,
-        projectId: project.id,
-      });
-      if (!existing) {
-        return c.json({ error: "Scenario not found" }, 404);
-      }
-
-      const scenario = await scenarios().update({
-        id,
-        projectId: project.id,
-        ...scenarioUpdateData(body),
-        actor: actorFromRequest(c),
-      });
-
-      return c.json({
-        ...toScenarioResponse(scenario),
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: scenarioEditorPath(scenario.id),
         }),
-      });
-    },
-  );
+    );
+  }
 
-  // Archiving deliberately still asks for `:manage`. Create and update were
-  // refined because access issued at that grain was being refused; nothing is
-  // asking to destroy scenarios at a finer grain, and the destructive verb is
-  // the wrong place to widen who qualifies.
-}
-
-/** Archive a scenario. */
-function registerDeleteScenarioRoute(
-  secured: ScenarioRestApp,
-  { scenarios }: ScenarioRestPorts,
-): void {
-  secured.access(requires("scenarios:manage")).delete(
-    "/:id",
-    describeRoute({
-      description: "Archive (soft-delete) a scenario",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Scenario archived",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ id: z.string(), archived: z.boolean() })),
+  service
+    // Archiving deliberately still asks for `:manage`. Create and update were
+    // refined because access issued at that grain was being refused; nothing
+    // is asking to destroy scenarios at a finer grain.
+    .registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, archiveHandler, (b) =>
+      policy(requires("scenarios:manage"))(b)
+        .withParams(idParamsSchema)
+        .withOutput(archivedScenarioSchema)
+        .withDocs({
+          description: "Archive (soft-delete) a scenario",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Scenario archived",
+              content: {
+                "application/json": { schema: resolver(archivedScenarioSchema) },
+              },
             },
+            ...scenarioNotFoundResponse,
           },
-        },
-        404: {
-          description: "Scenario not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-
-      logger.info({ projectId: project.id, scenarioId: id }, "Archiving scenario");
-
-      try {
-        await scenarios().archive({ id, projectId: project.id });
-        return c.json({ id, archived: true });
-      } catch (error) {
-        if (error instanceof ScenarioNotFoundError) {
-          return c.json({ error: "Scenario not found" }, 404);
-        }
-        throw error;
-      }
-    },
-  );
-}
-
-/** The version history of a scenario, newest first. */
-function registerListScenarioVersionsRoute(
-  secured: ScenarioRestApp,
-  { scenarios }: ScenarioRestPorts,
-): void {
-  secured.access(requires("scenarios:view")).get(
-    "/:id/versions",
-    describeRoute({
-      description:
-        "List the saved versions of a scenario, newest first. A scenario saved before versions were recorded closes its history with a synthesized Created entry.",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(scenarioVersionListResponseSchema),
+        }),
+    )
+    .registerRoute("get", "/:id/versions", MANAGEMENT_API_VERSION, listVersionsHandler, (b) =>
+      policy(requires("scenarios:view"))(b)
+        .withParams(idParamsSchema)
+        .withQuery(listScenarioVersionsQuerySchema)
+        .withOutput(scenarioVersionListResponseSchema)
+        .withDocs({
+          description:
+            "List the saved versions of a scenario, newest first. A scenario saved before versions were recorded closes its history with a synthesized Created entry.",
+          responses: {
+            ...baseResponses,
+            200: {
+              description: "Success",
+              content: {
+                "application/json": { schema: resolver(scenarioVersionListResponseSchema) },
+              },
             },
+            ...scenarioNotFoundResponse,
           },
-        },
-        404: {
-          description: "Scenario not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("query", listScenarioVersionsQuerySchema),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      const { limit, cursor } = c.req.valid("query");
-
-      logger.info({ projectId: project.id, scenarioId: id }, "Listing scenario versions");
-
-      try {
-        const page = await scenarios().listVersions({
-          projectId: project.id,
-          scenarioId: id,
-          ...(limit !== undefined && { limit }),
-          ...(cursor !== undefined && { cursor }),
-        });
-        return c.json({
-          versions: page.versions.map((version) => ({
-            version: version.version,
-            authorLabel: version.authorLabel,
-            authorId: version.authorId,
-            changeDescription: version.changeDescription,
-            changedFields: version.changedFields,
-            createdAt: version.createdAt.toISOString(),
-            isSynthesized: version.isSynthesized,
-          })),
-          nextCursor: page.nextCursor,
-        });
-      } catch (error) {
-        if (error instanceof ScenarioNotFoundError) {
-          return c.json({ error: "Scenario not found" }, 404);
-        }
-        throw error;
-      }
-    },
-  );
-}
-
-/**
- * One version of a scenario with the content it saved.
- *
- * A version number that names nothing refuses with the
- * `scenario_version_not_found` code, which the synthesized Created entry also
- * answers: it has no stored snapshot to serve.
- */
-function registerGetScenarioVersionRoute(
-  secured: ScenarioRestApp,
-  { scenarios }: ScenarioRestPorts,
-): void {
-  secured.access(requires("scenarios:view")).get(
-    "/:id/versions/:version",
-    describeRoute({
-      description:
-        "Get one saved version of a scenario, with the name, situation, criteria, labels and parameters as that version saved them.",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(scenarioVersionDetailResponseSchema),
+        }),
+    )
+    .registerRoute(
+      "get",
+      "/:id/versions/:version",
+      MANAGEMENT_API_VERSION,
+      getVersionHandler,
+      (b) =>
+        policy(requires("scenarios:view"))(b)
+          .withParams(idVersionParamsSchema)
+          .withOutput(scenarioVersionDetailResponseSchema)
+          .withDocs({
+            description:
+              "Get one saved version of a scenario, with the name, situation, criteria, labels and parameters as that version saved them.",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": {
+                    schema: resolver(scenarioVersionDetailResponseSchema),
+                  },
+                },
+              },
+              404: {
+                description: "Scenario or version not found",
+                content: { "application/json": { schema: resolver(badRequestSchema) } },
+              },
             },
-          },
-        },
-        404: {
-          description: "Scenario or version not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("param", versionPathSchema),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      const { version } = c.req.valid("param");
-
-      logger.info({ projectId: project.id, scenarioId: id, version }, "Getting scenario version");
-
-      try {
-        const detail = await scenarios().getVersion({
-          projectId: project.id,
-          scenarioId: id,
-          version,
-        });
-        return c.json({
-          version: detail.version,
-          authorLabel: detail.authorLabel,
-          authorId: detail.authorId,
-          changeDescription: detail.changeDescription,
-          changedFields: detail.changedFields,
-          createdAt: detail.createdAt.toISOString(),
-          isSynthesized: detail.isSynthesized,
-          schemaVersion: detail.schemaVersion,
-          snapshot: {
-            name: detail.fields.name,
-            situation: detail.fields.situation,
-            criteria: detail.fields.criteria,
-            labels: detail.fields.labels,
-            parameters: parseScenarioParameterDefinitions(detail.fields.parameters),
-            simulatorModel: detail.fields.simulatorModel,
-            judgeModel: detail.fields.judgeModel,
-            maxTurns: detail.fields.maxTurns,
-            minTurns: detail.fields.minTurns,
-          },
-        });
-      } catch (error) {
-        if (error instanceof ScenarioNotFoundError) {
-          return c.json({ error: "Scenario not found" }, 404);
-        }
-        throw error;
-      }
-    },
-  );
+          }),
+    );
 }

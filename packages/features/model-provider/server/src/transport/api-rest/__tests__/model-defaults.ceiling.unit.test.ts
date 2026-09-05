@@ -87,7 +87,7 @@ function mount() {
     modelProviders: () => modelProviders,
   });
 
-  return { hono: family.hono, saveDefaultConfig, deleteDefaultConfig, asked };
+  return { hono: family, saveDefaultConfig, deleteDefaultConfig, asked };
 }
 
 const WRITE_BODY = JSON.stringify({

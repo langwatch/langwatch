@@ -15,6 +15,7 @@ import type { EventSourcing } from "@langwatch/eventing";
 import {
   ExperimentApp,
   ExperimentDspyRetentionPort,
+  ExperimentWorkbenchUpdatesPort,
   PostgresExperimentAdapter,
   workbenchStateSchema,
   type ExperimentBroadcast,
@@ -142,6 +143,10 @@ export function composeExperimentFeature(options: {
     modelProvider: options.peers.modelProviders,
   }).build();
 
+  // ONE channel for both directions: the emitter the workbench publishes a
+  // save on is the emitter the SSE subscription reads it from.
+  const broadcast = options.broadcast ?? NO_BROADCAST;
+
   const experiments = PostgresExperimentAdapter.create({
     database: prisma,
     // The adapter's own contract: `null` is a deployment without ClickHouse,
@@ -167,9 +172,11 @@ export function composeExperimentFeature(options: {
     // name — which is what stops a run at its first cell rather than letting
     // it produce a history with a hole at the front.
     ...(experimentRunCommands ? { execution: experimentRunCommands } : {}),
-    // Still no `updates`: this process broadcasts no cell, so a workbench cell
-    // lands on the next read rather than as it happens. That is the packaged
-    // no-op's documented shape, not a gap this composition is papering over.
+    // A save lands on the tenant's channel as it happens: an open experiments
+    // list and an open workbench both read the same emitter this publishes on,
+    // through the `onExperimentUpdate` subscription. Without it a create over
+    // REST showed up only after a reload.
+    updates: EmitterExperimentWorkbenchUpdates.create(broadcast),
   });
 
   const app = ExperimentApp.create({
@@ -177,7 +184,7 @@ export function composeExperimentFeature(options: {
     workflows: options.peers.workflows,
     dataset: options.peers.datasets,
     monitors: options.peers.monitors,
-    broadcast: options.broadcast ?? NO_BROADCAST,
+    broadcast,
   });
 
   // The run loop, over the SAME services the namespace answers from. A second
@@ -329,6 +336,38 @@ const NO_BROADCAST: ExperimentBroadcast = (() => {
     },
   };
 })();
+
+/**
+ * The workbench's live-update publisher, over this process's tenant channel.
+ * The frame is the one the browser already reads: the signal as JSON under
+ * `event`, beside the timestamp, as the broadcast fabric puts it on the wire.
+ */
+class EmitterExperimentWorkbenchUpdates extends ExperimentWorkbenchUpdatesPort {
+  static create(broadcast: ExperimentBroadcast): EmitterExperimentWorkbenchUpdates {
+    return new EmitterExperimentWorkbenchUpdates(broadcast);
+  }
+
+  private constructor(private readonly broadcast: ExperimentBroadcast) {
+    super();
+  }
+
+  publish(input: {
+    projectId: string;
+    experimentId: string;
+    slug: string;
+    version: number;
+    actorLabel: string;
+    runId?: string;
+  }): Promise<void> {
+    const { projectId, ...signal } = input;
+    this.broadcast.getTenantEmitter(projectId).emit("experiment_updated", {
+      event: JSON.stringify({ event: "experiment_updated", ...signal }),
+      timestamp: Date.now(),
+    });
+
+    return Promise.resolve();
+  }
+}
 
 /**
  * The DSPy retention floor, fixed for this process.

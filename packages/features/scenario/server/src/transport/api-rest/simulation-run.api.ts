@@ -4,16 +4,19 @@ import type {
   ScenarioRunData,
   SimulationService,
 } from "@langwatch/scenario-contract";
-import { describeRoute, resolver } from "hono-openapi";
+import type { ErrorHandler } from "hono";
 import { z } from "zod";
 import { requires } from "@langwatch/api";
 import {
-  type AppRestProjectVariables,
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
-  type SecuredApp,
-  validator as zValidator,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  projectOf,
+  type ProjectScopedContext,
+  resolver,
 } from "@langwatch/api/rest";
 
 const logger = createLogger("langwatch:api:simulation-runs");
@@ -157,6 +160,37 @@ const batchQuerySchema = z.object({
 });
 
 /**
+ * A run or a batch this project does not hold. The family answers it in the
+ * bare `{ error }` body it has always had, so the miss is raised as the
+ * family's own error and rendered by the family's own handler.
+ */
+class SimulationRunNotThereError extends Error {}
+
+const simulationRunErrorHandler =
+  (boundary: ErrorHandler): ErrorHandler =>
+  (error, c) => {
+    if (error instanceof SimulationRunNotThereError) {
+      return c.json({ error: error.message }, 404);
+    }
+    return boundary(error, c);
+  };
+
+const scenarioRunIdParamsSchema = z.object({ scenarioRunId: z.string().min(1) });
+const batchRunIdParamsSchema = z.object({ batchRunId: z.string().min(1) });
+
+const runListResponseSchema = z.object({
+  runs: z.array(scenarioRunResponseWithPlatformUrlSchema),
+  hasMore: z.boolean().optional(),
+  nextCursor: z.string().optional(),
+});
+
+const batchListResponseSchema = z.object({
+  batches: z.array(batchSummarySchema),
+  hasMore: z.boolean().optional(),
+  nextCursor: z.string().optional(),
+});
+
+/**
  * REST for the runs a simulation produced — the individual runs, and the batch
  * summaries that aggregate them.
  *
@@ -168,245 +202,240 @@ export function createSimulationRunsRestApp(options: {
   security: AppRestSecurity;
   simulations: () => SimulationService;
   scenarioRunPlatformUrl: ScenarioRunPlatformUrlBuilder;
-}): SecuredApp<{ Variables: AppRestProjectVariables }> {
+}): MountableRestApp {
   const { security, simulations, scenarioRunPlatformUrl } = options;
 
-  const secured = security.createProjectApp({ basePath: "/api/simulation-runs" });
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "simulation-runs",
+    basePath: "/api/simulation-runs",
+    errorEnvelope: "legacy",
+    errorHandler: simulationRunErrorHandler,
+  });
+
+  type SimulationRunContext = ProjectScopedContext<EndpointVariables>;
+
+  const withPlatformUrl = (run: ScenarioRunData, projectSlug: string) => ({
+    ...toRunResponse(run),
+    platformUrl: scenarioRunPlatformUrl({ projectSlug, scenarioRunId: run.scenarioRunId }),
+  });
 
   // ── List Runs ──────────────────────────────────────────────
-  secured.access(requires("scenarios:view")).get(
-    "/",
-    describeRoute({
-      description: "List simulation runs, optionally filtered by scenarioSetId or batchRunId",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  runs: z.array(scenarioRunResponseWithPlatformUrlSchema),
-                  hasMore: z.boolean().optional(),
-                  nextCursor: z.string().optional(),
-                }),
-              ),
-            },
-          },
-        },
-      },
-    }),
-    zValidator("query", listQuerySchema),
-    async (c) => {
-      const project = c.get("project");
-      const { scenarioSetId, batchRunId, limit, cursor } = c.req.valid("query");
-      logger.info({ projectId: project.id, scenarioSetId, batchRunId }, "Listing simulation runs");
+  const listRunsHandler = async (
+    c: SimulationRunContext,
+    input: z.infer<typeof listQuerySchema>,
+  ) => {
+    const project = projectOf(c);
+    const { scenarioSetId, batchRunId, limit, cursor } = input;
+    logger.info({ projectId: project.id, scenarioSetId, batchRunId }, "Listing simulation runs");
 
-      const simulationRuns = simulations();
+    const simulationRuns = simulations();
 
-      if (batchRunId) {
-        // Get runs for a specific batch. The scenario set id narrows the query
-        // when given, but the batch id alone is enough: the CLI's --wait polls
-        // with just the batch id it was handed at scheduling time.
-        const result = await simulationRuns.getRunDataForBatchRun({
-          projectId: project.id,
-          scenarioSetId,
-          batchRunId,
-        });
-
-        if ("changed" in result && result.changed === false) {
-          return c.json({ runs: [], hasMore: false });
-        }
-
-        const runs = "runs" in result ? result.runs : [];
-        return c.json({
-          runs: runs.map((r) => ({
-            ...toRunResponse(r),
-            platformUrl: scenarioRunPlatformUrl({
-              projectSlug: project.slug,
-              scenarioRunId: r.scenarioRunId,
-            }),
-          })),
-          hasMore: false,
-        });
-      }
-
-      if (scenarioSetId) {
-        // Get runs for a scenario set
-        const result = await simulationRuns.getRunDataForScenarioSet({
-          projectId: project.id,
-          scenarioSetId,
-          limit,
-          cursor,
-        });
-
-        return c.json({
-          runs: result.runs.map((r) => ({
-            ...toRunResponse(r),
-            platformUrl: scenarioRunPlatformUrl({
-              projectSlug: project.slug,
-              scenarioRunId: r.scenarioRunId,
-            }),
-          })),
-          hasMore: result.hasMore,
-          nextCursor: result.nextCursor,
-        });
-      }
-
-      // No filter - get all suite runs
-      const result = await simulationRuns.getRunDataForAllSuites({
+    if (batchRunId) {
+      // Get runs for a specific batch. The scenario set id narrows the query
+      // when given, but the batch id alone is enough: the CLI's --wait polls
+      // with just the batch id it was handed at scheduling time.
+      const result = await simulationRuns.getRunDataForBatchRun({
         projectId: project.id,
-        limit,
-        cursor,
+        scenarioSetId,
+        batchRunId,
       });
 
-      if (!result.changed) {
-        return c.json({ runs: [], hasMore: false });
+      if ("changed" in result && result.changed === false) {
+        return { runs: [], hasMore: false };
       }
 
-      return c.json({
-        runs: result.runs.map((r) => ({
-          ...toRunResponse(r),
-          platformUrl: scenarioRunPlatformUrl({
-            projectSlug: project.slug,
-            scenarioRunId: r.scenarioRunId,
-          }),
-        })),
-        hasMore: result.hasMore,
-        nextCursor: result.nextCursor,
-      });
-    },
-  );
+      const runs = "runs" in result ? result.runs : [];
+      return {
+        runs: runs.map((r) => withPlatformUrl(r, project.slug)),
+        hasMore: false,
+      };
+    }
 
-  // ── Get Single Run ────────────────────────────────────────
-  secured.access(requires("scenarios:view")).get(
-    "/:scenarioRunId",
-    describeRoute({
-      description: "Get a single simulation run by its ID",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(scenarioRunResponseWithPlatformUrlSchema),
-            },
-          },
-        },
-        404: {
-          description: "Run not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { scenarioRunId } = c.req.param();
-      logger.info({ projectId: project.id, scenarioRunId }, "Getting simulation run");
-
-      const run = await simulations().tryGetScenarioRunData({
-        projectId: project.id,
-        scenarioRunId,
-      });
-
-      if (!run) {
-        return c.json({ error: "Simulation run not found" }, 404);
-      }
-
-      return c.json({
-        ...toRunResponse(run),
-        platformUrl: scenarioRunPlatformUrl({
-          projectSlug: project.slug,
-          scenarioRunId: run.scenarioRunId,
-        }),
-      });
-    },
-  );
-
-  // ── List Batches ──────────────────────────────────────────
-  secured.access(requires("scenarios:view")).get(
-    "/batches/list",
-    describeRoute({
-      description: "List batch summaries for a scenario set (pass/fail counts per batch)",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  batches: z.array(batchSummarySchema),
-                  hasMore: z.boolean().optional(),
-                  nextCursor: z.string().optional(),
-                }),
-              ),
-            },
-          },
-        },
-      },
-    }),
-    zValidator("query", batchQuerySchema),
-    async (c) => {
-      const project = c.get("project");
-      const { scenarioSetId, limit, cursor } = c.req.valid("query");
-      logger.info({ projectId: project.id, scenarioSetId }, "Listing batch history");
-
-      const result = await simulations().getBatchHistoryForScenarioSet({
+    if (scenarioSetId) {
+      // Get runs for a scenario set
+      const result = await simulationRuns.getRunDataForScenarioSet({
         projectId: project.id,
         scenarioSetId,
         limit,
         cursor,
       });
 
-      return c.json({
-        batches: result.batches.map(toBatchSummaryResponse),
+      return {
+        runs: result.runs.map((r) => withPlatformUrl(r, project.slug)),
         hasMore: result.hasMore,
         nextCursor: result.nextCursor,
-      });
-    },
-  );
+      };
+    }
+
+    // No filter - get all suite runs
+    const result = await simulationRuns.getRunDataForAllSuites({
+      projectId: project.id,
+      limit,
+      cursor,
+    });
+
+    if (!result.changed) {
+      return { runs: [], hasMore: false };
+    }
+
+    return {
+      runs: result.runs.map((r) => withPlatformUrl(r, project.slug)),
+      hasMore: result.hasMore,
+      nextCursor: result.nextCursor,
+    };
+  };
+
+  // ── Get Single Run ────────────────────────────────────────
+  const getRunHandler = async (
+    c: SimulationRunContext,
+    input: z.infer<typeof scenarioRunIdParamsSchema>,
+  ) => {
+    const project = projectOf(c);
+    logger.info(
+      { projectId: project.id, scenarioRunId: input.scenarioRunId },
+      "Getting simulation run",
+    );
+
+    const run = await simulations().tryGetScenarioRunData({
+      projectId: project.id,
+      scenarioRunId: input.scenarioRunId,
+    });
+
+    if (!run) throw new SimulationRunNotThereError("Simulation run not found");
+
+    return withPlatformUrl(run, project.slug);
+  };
+
+  // ── List Batches ──────────────────────────────────────────
+  const listBatchesHandler = async (
+    c: SimulationRunContext,
+    input: z.infer<typeof batchQuerySchema>,
+  ) => {
+    const project = projectOf(c);
+    const { scenarioSetId, limit, cursor } = input;
+    logger.info({ projectId: project.id, scenarioSetId }, "Listing batch history");
+
+    const result = await simulations().getBatchHistoryForScenarioSet({
+      projectId: project.id,
+      scenarioSetId,
+      limit,
+      cursor,
+    });
+
+    return {
+      batches: result.batches.map(toBatchSummaryResponse),
+      hasMore: result.hasMore,
+      nextCursor: result.nextCursor,
+    };
+  };
 
   // ── Get Single Batch ──────────────────────────────────────
-  secured.access(requires("scenarios:view")).get(
-    "/batches/:batchRunId",
-    describeRoute({
-      description: "Get the summary of a single batch run, including its completion flag",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": { schema: resolver(batchSummarySchema) },
-          },
-        },
-        404: {
-          description: "Batch run not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { batchRunId } = c.req.param();
-      logger.info({ projectId: project.id, batchRunId }, "Getting batch summary");
+  const getBatchHandler = async (
+    c: SimulationRunContext,
+    input: z.infer<typeof batchRunIdParamsSchema>,
+  ) => {
+    const project = projectOf(c);
+    logger.info(
+      { projectId: project.id, batchRunId: input.batchRunId },
+      "Getting batch summary",
+    );
 
-      const batch = await simulations().tryGetBatchSummary({
-        projectId: project.id,
-        batchRunId,
-      });
+    const batch = await simulations().tryGetBatchSummary({
+      projectId: project.id,
+      batchRunId: input.batchRunId,
+    });
 
-      if (!batch) {
-        return c.json({ error: "Batch run not found" }, 404);
-      }
+    if (!batch) throw new SimulationRunNotThereError("Batch run not found");
 
-      return c.json(toBatchSummaryResponse(batch));
-    },
+    return toBatchSummaryResponse(batch);
+  };
+
+  return (
+    service
+      .registerRoute("get", "/", MANAGEMENT_API_VERSION, listRunsHandler, (b) =>
+        policy(requires("scenarios:view"))(b)
+          .withQuery(listQuerySchema)
+          .withOutput(runListResponseSchema)
+          .withDocs({
+            description:
+              "List simulation runs, optionally filtered by scenarioSetId or batchRunId",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": { schema: resolver(runListResponseSchema) },
+                },
+              },
+            },
+          }),
+      )
+      .registerRoute("get", "/:scenarioRunId", MANAGEMENT_API_VERSION, getRunHandler, (b) =>
+        policy(requires("scenarios:view"))(b)
+          .withParams(scenarioRunIdParamsSchema)
+          .withOutput(scenarioRunResponseWithPlatformUrlSchema)
+          .withDocs({
+            description: "Get a single simulation run by its ID",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": {
+                    schema: resolver(scenarioRunResponseWithPlatformUrlSchema),
+                  },
+                },
+              },
+              404: {
+                description: "Run not found",
+                content: { "application/json": { schema: resolver(badRequestSchema) } },
+              },
+            },
+          }),
+      )
+      .registerRoute("get", "/batches/list", MANAGEMENT_API_VERSION, listBatchesHandler, (b) =>
+        policy(requires("scenarios:view"))(b)
+          .withQuery(batchQuerySchema)
+          .withOutput(batchListResponseSchema)
+          .withDocs({
+            description:
+              "List batch summaries for a scenario set (pass/fail counts per batch)",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": { schema: resolver(batchListResponseSchema) },
+                },
+              },
+            },
+          }),
+      )
+      .registerRoute(
+        "get",
+        "/batches/:batchRunId",
+        MANAGEMENT_API_VERSION,
+        getBatchHandler,
+        (b) =>
+          policy(requires("scenarios:view"))(b)
+            .withParams(batchRunIdParamsSchema)
+            .withOutput(batchSummarySchema)
+            .withDocs({
+              description:
+                "Get the summary of a single batch run, including its completion flag",
+              responses: {
+                ...baseResponses,
+                200: {
+                  description: "Success",
+                  content: { "application/json": { schema: resolver(batchSummarySchema) } },
+                },
+                404: {
+                  description: "Batch run not found",
+                  content: { "application/json": { schema: resolver(badRequestSchema) } },
+                },
+              },
+            }),
+      )
+      .build()
   );
-
-  return secured;
 }

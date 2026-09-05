@@ -5,18 +5,20 @@ import {
   type Workflow,
   type WorkflowService,
 } from "@langwatch/workflow-contract";
-import type { MiddlewareHandler } from "hono";
-import { describeRoute, resolver } from "hono-openapi";
+import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { z } from "zod";
 import { requires } from "@langwatch/api";
 import {
-  type AppRestProjectVariables,
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
   type PlatformUrlBuilder,
-  type SecuredApp,
-  validator as zValidator,
+  projectOf,
+  type ProjectScopedContext,
+  resolver,
 } from "@langwatch/api/rest";
 
 const logger = createLogger("langwatch:api:workflows");
@@ -131,6 +133,53 @@ export interface WorkflowRestPorts {
 }
 
 /**
+ * A trigger the application refused, carrying the status and the sentence it
+ * named. The three refusals are the application's own taxonomy, which this
+ * package cannot see, so the value it answers becomes this error and the
+ * family's handler writes the body it has always written.
+ */
+class WorkflowEvaluationRefusedError extends Error {
+  constructor(
+    readonly status: 400 | 404,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * The family's refusals, in the bare `{ error }` body they have always had.
+ */
+const workflowErrorHandler =
+  (boundary: ErrorHandler): ErrorHandler =>
+  (error, c) => {
+    if (error instanceof WorkflowEvaluationRefusedError) {
+      return c.json({ error: error.message }, error.status);
+    }
+    if (error instanceof WorkflowNotFoundError) {
+      return c.json({ error: "Workflow not found" }, 404);
+    }
+    return boundary(error, c);
+  };
+
+const idParamsSchema = z.object({ id: z.string().min(1) });
+
+const updateWorkflowSchema = z.object({
+  name: z.string().min(1).optional(),
+  icon: z.string().optional(),
+  description: z.string().optional(),
+});
+
+const archivedWorkflowSchema = z.object({ id: z.string(), archived: z.boolean() });
+
+const evaluationStartedSchema = z.object({
+  run_id: z.string(),
+  run_url: z.string(),
+  workflow_version_id: z.string(),
+  version: z.string(),
+});
+
+/**
  * The `/api/workflows` CRUD family, built against one process's security.
  *
  * `workflows` is resolved per request, as reading it off the Hono context used
@@ -147,279 +196,230 @@ export function createWorkflowsRestApp(options: {
   security: AppRestSecurity;
   workflows: () => WorkflowService;
   ports: WorkflowRestPorts;
-}): SecuredApp<{ Variables: AppRestProjectVariables }> {
+}): MountableRestApp {
   const { security, workflows, ports } = options;
 
-  const secured = security.createProjectApp({ basePath: "/api/workflows" });
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "workflows",
+    basePath: "/api/workflows",
+    errorEnvelope: "legacy",
+    errorHandler: workflowErrorHandler,
+  });
 
-  secured.access(requires("workflows:view")).get(
-    "/",
-    describeRoute({
-      description: "List all non-archived workflows for the project",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(z.array(workflowResponseWithPlatformUrlSchema)),
+  type WorkflowContext = ProjectScopedContext<EndpointVariables>;
+
+  const studioUrl = (projectSlug: string, workflowId: string) =>
+    ports.platformUrl({ projectSlug, path: `/studio/${workflowId}` });
+
+  const listHandler = async (c: WorkflowContext) => {
+    const project = projectOf(c);
+    logger.info({ projectId: project.id }, "Listing workflows");
+
+    const listed = await workflows().list({ projectId: project.id });
+    return listed.map((w) => ({
+      ...toWorkflowResponse(w),
+      platformUrl: studioUrl(project.slug, w.id),
+    }));
+  };
+
+  const getHandler = async (c: WorkflowContext, input: z.infer<typeof idParamsSchema>) => {
+    const project = projectOf(c);
+    logger.info({ projectId: project.id, workflowId: input.id }, "Getting workflow");
+
+    const workflow = await workflows().getById({ id: input.id, projectId: project.id });
+    return {
+      ...toWorkflowResponse(workflow),
+      platformUrl: studioUrl(project.slug, workflow.id),
+    };
+  };
+
+  const updateHandler = async (
+    c: WorkflowContext,
+    input: z.infer<typeof idParamsSchema> & z.infer<typeof updateWorkflowSchema>,
+  ) => {
+    const project = projectOf(c);
+    const { id, ...body } = input;
+    logger.info({ projectId: project.id, workflowId: id }, "Updating workflow");
+
+    const service_ = workflows();
+    await service_.assertInProject({ workflowId: id, projectId: project.id });
+    const updated = await service_.update({ id, projectId: project.id, ...body });
+
+    return {
+      ...toWorkflowResponse(updated),
+      platformUrl: studioUrl(project.slug, updated.id),
+    };
+  };
+
+  const archiveHandler = async (c: WorkflowContext, input: z.infer<typeof idParamsSchema>) => {
+    const project = projectOf(c);
+    logger.info({ projectId: project.id, workflowId: input.id }, "Archiving workflow");
+
+    await workflows().archive({ id: input.id, projectId: project.id });
+    return { id: input.id, archived: true };
+  };
+
+  const evaluateHandler = async (
+    c: WorkflowContext,
+    input: z.infer<typeof idParamsSchema> & z.infer<typeof evaluateBodySchema>,
+  ) => {
+    const project = projectOf(c);
+    const { id } = input;
+    logger.info(
+      { projectId: project.id, workflowId: id },
+      "Triggering workflow evaluation via API",
+    );
+
+    const outcome = await ports.triggerEvaluation({
+      projectId: project.id,
+      projectSlug: project.slug,
+      workflowId: id,
+      versionId: input.version_id,
+      data: input.data,
+      datasetId: input.dataset_id,
+      parameters: input.parameters,
+      rowIndices: input.row_indices,
+    });
+
+    if (!outcome.ok) {
+      throw new WorkflowEvaluationRefusedError(outcome.status, outcome.error);
+    }
+
+    return {
+      run_id: outcome.runId,
+      run_url: outcome.runUrl,
+      workflow_version_id: outcome.workflowVersionId,
+      version: outcome.version,
+    };
+  };
+
+  const notFoundResponse = {
+    404: {
+      description: "Workflow not found",
+      content: { "application/json": { schema: resolver(badRequestSchema) } },
+    },
+  };
+
+  return (
+    service
+      .registerRoute("get", "/", MANAGEMENT_API_VERSION, listHandler, (b) =>
+        policy(requires("workflows:view"))(b)
+          .withOutput(z.array(workflowResponseWithPlatformUrlSchema))
+          .withDocs({
+            description: "List all non-archived workflows for the project",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": {
+                    schema: resolver(z.array(workflowResponseWithPlatformUrlSchema)),
+                  },
+                },
+              },
             },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      logger.info({ projectId: project.id }, "Listing workflows");
-
-      const listed = await workflows().list({ projectId: project.id });
-
-      return c.json(
-        listed.map((w) => ({
-          ...toWorkflowResponse(w),
-          platformUrl: ports.platformUrl({
-            projectSlug: project.slug,
-            path: `/studio/${w.id}`,
           }),
-        })),
-      );
-    },
-  );
-
-  secured.access(requires("workflows:view")).get(
-    "/:id",
-    describeRoute({
-      description: "Get a workflow by its ID",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(workflowResponseWithPlatformUrlSchema),
+      )
+      .registerRoute("get", "/:id", MANAGEMENT_API_VERSION, getHandler, (b) =>
+        policy(requires("workflows:view"))(b)
+          .withParams(idParamsSchema)
+          .withOutput(workflowResponseWithPlatformUrlSchema)
+          .withDocs({
+            description: "Get a workflow by its ID",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Success",
+                content: {
+                  "application/json": {
+                    schema: resolver(workflowResponseWithPlatformUrlSchema),
+                  },
+                },
+              },
+              ...notFoundResponse,
             },
-          },
-        },
-        404: {
-          description: "Workflow not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      logger.info({ projectId: project.id, workflowId: id }, "Getting workflow");
-
-      let workflow;
-      try {
-        workflow = await workflows().getById({
-          id,
-          projectId: project.id,
-        });
-      } catch (error) {
-        if (!(error instanceof WorkflowNotFoundError)) throw error;
-        return c.json({ error: "Workflow not found" }, 404);
-      }
-
-      return c.json({
-        ...toWorkflowResponse(workflow),
-        platformUrl: ports.platformUrl({
-          projectSlug: project.slug,
-          path: `/studio/${workflow.id}`,
-        }),
-      });
-    },
-  );
-
-  // Editing metadata on a workflow that already exists is an `:update`.
-  // `:manage` still implies it, so no existing caller changes.
-  secured.access(requires("workflows:update")).patch(
-    "/:id",
-    describeRoute({
-      description: "Update a workflow's metadata (name, icon, description)",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Workflow updated",
-          content: {
-            "application/json": {
-              schema: resolver(workflowResponseWithPlatformUrlSchema),
+          }),
+      )
+      // Editing metadata on a workflow that already exists is an `:update`.
+      // `:manage` still implies it, so no existing caller changes.
+      .registerRoute("patch", "/:id", MANAGEMENT_API_VERSION, updateHandler, (b) =>
+        policy(requires("workflows:update"))(b)
+          .withParams(idParamsSchema)
+          .withInput(updateWorkflowSchema)
+          .withOutput(workflowResponseWithPlatformUrlSchema)
+          .withDocs({
+            description: "Update a workflow's metadata (name, icon, description)",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Workflow updated",
+                content: {
+                  "application/json": {
+                    schema: resolver(workflowResponseWithPlatformUrlSchema),
+                  },
+                },
+              },
+              ...notFoundResponse,
             },
-          },
-        },
-        404: {
-          description: "Workflow not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    zValidator(
-      "json",
-      z.object({
-        name: z.string().min(1).optional(),
-        icon: z.string().optional(),
-        description: z.string().optional(),
-      }),
-    ),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      const body = c.req.valid("json");
-      logger.info({ projectId: project.id, workflowId: id }, "Updating workflow");
-
-      const service = workflows();
-      try {
-        await service.assertInProject({ workflowId: id, projectId: project.id });
-      } catch (error) {
-        if (!(error instanceof WorkflowNotFoundError)) throw error;
-        return c.json({ error: "Workflow not found" }, 404);
-      }
-      const updated = await service.update({
-        id,
-        projectId: project.id,
-        ...body,
-      });
-
-      return c.json({
-        ...toWorkflowResponse(updated),
-        platformUrl: ports.platformUrl({
-          projectSlug: project.slug,
-          path: `/studio/${updated.id}`,
-        }),
-      });
-    },
-  );
-
-  // Archiving deliberately stays at `:manage`.
-  secured.access(requires("workflows:manage")).delete(
-    "/:id",
-    describeRoute({
-      description: "Archive (soft-delete) a workflow",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Workflow archived",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ id: z.string(), archived: z.boolean() })),
+          }),
+      )
+      // Archiving deliberately stays at `:manage`.
+      .registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, archiveHandler, (b) =>
+        policy(requires("workflows:manage"))(b)
+          .withParams(idParamsSchema)
+          .withOutput(archivedWorkflowSchema)
+          .withDocs({
+            description: "Archive (soft-delete) a workflow",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Workflow archived",
+                content: {
+                  "application/json": { schema: resolver(archivedWorkflowSchema) },
+                },
+              },
+              ...notFoundResponse,
             },
-          },
-        },
-        404: {
-          description: "Workflow not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      logger.info({ projectId: project.id, workflowId: id }, "Archiving workflow");
-
-      try {
-        await workflows().archive({
-          id,
-          projectId: project.id,
-        });
-      } catch (error) {
-        if (!(error instanceof WorkflowNotFoundError)) throw error;
-        return c.json({ error: "Workflow not found" }, 404);
-      }
-
-      return c.json({ id, archived: true });
-    },
-  );
-
-  // Running a workflow is not administering it: the committed version, its nodes
-  // and its dataset are untouched — the call produces a RUN. So it asks for
-  // `workflows:create`, the same grain as the suite run. `:manage` still implies
-  // it, so nobody who could trigger an evaluation yesterday loses that, and a
-  // viewer holding only `workflows:view` is declined exactly as before. The
-  // second gate below is unchanged: the caller must also be able to READ the run.
-  secured.access(requires("workflows:create")).post(
-    "/:id/evaluate",
-    describeRoute({
-      description:
-        "Trigger an evaluation run of a workflow's committed version through " +
-        "the evaluations pipeline. Evaluate the workflow's attached dataset, " +
-        "inline data, or a platform dataset id; parameters bind as constant " +
-        "entry inputs on every row. Returns a run id and a results URL to poll " +
-        "or open in the browser.",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Evaluation started",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  run_id: z.string(),
-                  run_url: z.string(),
-                  workflow_version_id: z.string(),
-                  version: z.string(),
-                }),
-              ),
+          }),
+      )
+      // Running a workflow is not administering it: the committed version, its
+      // nodes and its dataset are untouched — the call produces a RUN. So it
+      // asks for `workflows:create`, the same grain as the suite run. The
+      // second gate below is unchanged: the caller must also be able to READ
+      // the run.
+      .registerRoute("post", "/:id/evaluate", MANAGEMENT_API_VERSION, evaluateHandler, (b) =>
+        policy(requires("workflows:create"))(b)
+          .withParams(idParamsSchema)
+          .withInput(evaluateBodySchema)
+          .withOutput(evaluationStartedSchema)
+          // The caller polls the run + reads results on
+          // /api/experiments/runs/:runId(/results), which require
+          // evaluations:view. Enforced here too so a workflows-only key cannot
+          // start a run it would then get 403 trying to read.
+          .withMiddleware(ports.requireApiKeyPermission("evaluations:view"))
+          .withDocs({
+            description:
+              "Trigger an evaluation run of a workflow's committed version through " +
+              "the evaluations pipeline. Evaluate the workflow's attached dataset, " +
+              "inline data, or a platform dataset id; parameters bind as constant " +
+              "entry inputs on every row. Returns a run id and a results URL to poll " +
+              "or open in the browser.",
+            responses: {
+              ...baseResponses,
+              200: {
+                description: "Evaluation started",
+                content: {
+                  "application/json": { schema: resolver(evaluationStartedSchema) },
+                },
+              },
+              400: {
+                description: "No committed version to evaluate",
+                content: { "application/json": { schema: resolver(badRequestSchema) } },
+              },
+              ...notFoundResponse,
             },
-          },
-        },
-        400: {
-          description: "No committed version to evaluate",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-        404: {
-          description: "Workflow not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    // The caller polls the run + reads results on /api/experiments/runs/:runId(/results),
-    // which require evaluations:view. Enforce it here too so a workflows-only key
-    // cannot start a run it would then get 403 trying to read.
-    ports.requireApiKeyPermission("evaluations:view"),
-    zValidator("json", evaluateBodySchema),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      const body = c.req.valid("json");
-      logger.info(
-        { projectId: project.id, workflowId: id },
-        "Triggering workflow evaluation via API",
-      );
-
-      const outcome = await ports.triggerEvaluation({
-        projectId: project.id,
-        projectSlug: project.slug,
-        workflowId: id,
-        versionId: body.version_id,
-        data: body.data,
-        datasetId: body.dataset_id,
-        parameters: body.parameters,
-        rowIndices: body.row_indices,
-      });
-
-      if (!outcome.ok) {
-        return c.json({ error: outcome.error }, outcome.status);
-      }
-
-      return c.json({
-        run_id: outcome.runId,
-        run_url: outcome.runUrl,
-        workflow_version_id: outcome.workflowVersionId,
-        version: outcome.version,
-      });
-    },
+          }),
+      )
+      .build()
   );
-
-  return secured;
 }

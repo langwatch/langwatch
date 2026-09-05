@@ -120,7 +120,7 @@ function buildApi() {
 
   return {
     fetch: (path: string, init?: RequestInit) =>
-      app.hono.fetch(new Request(`http://api.test${path}`, init)),
+      app.fetch(new Request(`http://api.test${path}`, init)),
   };
 }
 

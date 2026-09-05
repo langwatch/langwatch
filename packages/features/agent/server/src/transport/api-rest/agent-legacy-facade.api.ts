@@ -1,12 +1,5 @@
 import type { AgentApp } from "#app/agent.app";
 
-export const legacyAgentsApiDocumentation = {
-  deprecated: true,
-  tags: ["Legacy"],
-  description:
-    "Legacy Agents REST compatibility API. New LangWatch product clients use the Agents RPC interface.",
-} as const;
-
 /**
  * The legacy REST vocabulary over the feature's application.
  *
