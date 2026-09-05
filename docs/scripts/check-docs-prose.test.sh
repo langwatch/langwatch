@@ -161,7 +161,11 @@ fi
 
 # A table written without its outer pipes ends the paragraph that ran into it.
 # Without that, the prose before the table and the prose after it count as one
-# paragraph and a page under the limit on both sides reports a violation.
+# paragraph and a page under the limit on both sides reports a violation. The
+# long page goes first so the only page left is under the limit throughout, and
+# the run has to come back clean rather than merely quiet about this page: a
+# checker that died early would report no violation here either.
+rm -f "$LONG_PAGE"
 TABLE_PAGE="$WORK/docs/table.mdx"
 {
   printf -- '---\ntitle: Table\n---\n\n'
@@ -173,11 +177,14 @@ TABLE_PAGE="$WORK/docs/table.mdx"
 } > "$TABLE_PAGE"
 
 TABLE_OUTPUT="$(DOCS_PROSE_MAX_PARAGRAPH_WORDS=10 bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
-if printf '%s\n' "$TABLE_OUTPUT" | grep -q 'table.mdx,line='; then
-  check "prose either side of a table without outer pipes is two paragraphs" no
-  echo "Output: $TABLE_OUTPUT"
-else
+TABLE_STATUS=$?
+
+if [[ $TABLE_STATUS -eq 0 ]] && ! printf '%s\n' "$TABLE_OUTPUT" | grep -q 'table.mdx,line='; then
   check "prose either side of a table without outer pipes is two paragraphs" yes
+else
+  check "prose either side of a table without outer pipes is two paragraphs" no
+  echo "Status: $TABLE_STATUS"
+  echo "Output: $TABLE_OUTPUT"
 fi
 
 if [[ $FAILURES -gt 0 ]]; then
