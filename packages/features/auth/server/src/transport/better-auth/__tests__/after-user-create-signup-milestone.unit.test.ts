@@ -1,10 +1,7 @@
 /**
- * The `signed_up` PostHog milestone fires for every new user, unconditionally,
- * before the SSO domain auto-join even looks at the email — the two
- * user-creation choke points (BetterAuth's adapter hook and the email
- * register route) each own the event for the users they create, and neither
- * a domain match, a missing domain, nor a downstream join failure may
- * suppress it.
+ * The `signed_up` PostHog milestone fires for every new user, unconditionally, before the
+ * SSO domain auto-join even looks at the email — the two user-creation choke points
+ * (BetterAuth's adapter hook and the email register route) each own the event for the
  */
 import {
   type AuthzAttachBindingsInput,

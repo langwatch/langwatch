@@ -42,7 +42,7 @@ import {
   pendingKey,
 } from "../rules/connected-agent-keys.rules";
 import type { Unsubscribe } from "../ports/agent-state-store.port";
-import type { ConnectedAgentRuntime, InstanceMeta } from "../ports/connected-agent-runtime.port";
+import type { InstanceMeta } from "../ports/connected-agent-runtime.port";
 import {
   AgentSessionService,
   type ConnectCredentials,

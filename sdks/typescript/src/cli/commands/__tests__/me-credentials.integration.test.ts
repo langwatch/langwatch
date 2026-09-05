@@ -1,15 +1,7 @@
 /**
- * The /me credentials story, end to end against the REAL built CLI and a real
- * HTTP server: a device session alone (no env vars anywhere) powers data
- * commands via the personal project's API key, the lazy exchange happens
- * exactly once and rewrites the session file, the identity notice rides
- * stderr while `-o json` stdout stays parseable, and headless project login
- * fails fast instead of blocking on a browser.
- *
- * Requires `pnpm build` (like the other CLI integration tests in this package).
- *
- * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
- * Feature: specs/ai-governance/cli-onboarding/login-unified.feature
+ * The /me credentials story, end to end against the REAL built CLI and a real HTTP server:
+ * a device session alone (no env vars anywhere) powers data commands via the personal
+ * project's API key, the lazy exchange happens exactly once and rewrites the session file,
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { spawn } from "node:child_process";
@@ -68,12 +60,11 @@ const run = (
   cwd: string = workDir,
 ): Promise<RunResult> =>
   new Promise((resolve) => {
-    // The runner's own shell (and the repo .env vitest loads) may carry a
-    // real LANGWATCH_API_KEY; the whole point here is a CLI with NO key in
-    // its environment, so scrub it before overlaying the test's env. The
-    // agent-mode markers (CLAUDECODE etc.) are scrubbed too: an agent
-    // running this suite would otherwise flip the CLI into agents format
-    // and change which rendering the assertions see.
+    // The runner's own shell (and the repo .env vitest loads) may carry a real
+    // LANGWATCH_API_KEY; the whole point here is a CLI with NO key in its environment, so
+    // scrub it before overlaying the test's env. The agent-mode markers (CLAUDECODE etc.) are
+    // scrubbed too: an agent running this suite would otherwise flip the CLI into agents
+    // format and change which rendering the assertions see.
     const baseEnv: Record<string, string | undefined> = { ...process.env };
     delete baseEnv.LANGWATCH_API_KEY;
     for (const marker of [

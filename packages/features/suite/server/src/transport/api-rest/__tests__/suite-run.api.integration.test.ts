@@ -1,11 +1,5 @@
 /**
  * @vitest-environment node
- *
- * `POST /api/suites/:id/run`, driven through the real Hono app: it schedules
- * jobs through SuiteApp.run and answers with the batch id, and it lets a
- * parameter-validation refusal (an unknown run-time key, a secret override)
- * surface as the boundary error it is rather than a bare 500.
- *
  * @see specs/scenarios/scenario-run-parameters.feature
  */
 import {

@@ -1,10 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Evaluator End node: the results are a fixed four-field vocabulary
- * (details, passed, score, label), all optional - normalized on open and
- * explained field by field (not editable rows). Non-evaluator end nodes keep
- * their free-form results, rendered through the injected variables renderer.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

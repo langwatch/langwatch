@@ -1,11 +1,5 @@
 /**
  * @vitest-environment node
- *
- * `SuiteService.runPlan`'s orchestration: validate first, write the plan row
- * only once the run holds up, then queue it. The name-matching and locking
- * behaviour itself is a repository concern with its own database — see
- * `specs/suites/run-plan-identity-by-name.feature`'s `@integration` scenarios,
- * not covered here.
  */
 import { describe, expect, it, vi } from "vitest";
 import type { AgentService } from "@langwatch/agent-contract";
@@ -254,7 +248,14 @@ describe("SuiteService.runPlan", () => {
       }));
       const { service, findOrCreatePlanByName } = buildService({
         repository: {
-          findOrCreatePlanByName: async ({ id, projectId: pid, name, scope, targets, config: cfg }) => ({
+          findOrCreatePlanByName: async ({
+            id,
+            projectId: pid,
+            name,
+            scope,
+            targets,
+            config: cfg,
+          }) => ({
             suite: baseSuite({
               id,
               projectId: pid,

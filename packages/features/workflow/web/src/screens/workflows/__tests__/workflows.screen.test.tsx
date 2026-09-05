@@ -1,20 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The workflows library: what a reader sees, where a card takes them, and what
- * deleting one would take with it.
- *
- * THE PLATFORM PAGE HAD NO RENDER SUITE AT ALL. `pages/[project]/workflows.tsx`
- * and the card underneath it carried an empty state, a create dialog, a
- * two-branch delete and three overlays, and nothing mounted any of it. These
- * are those behaviours, stated for the first time.
- *
- * WHAT THIS FILE IS REALLY FOR is the delete. A workflow's cascade ARCHIVES the
- * evaluators and agents bound to it and DELETES every online evaluation those
- * evaluators back, in production, with no undo on this screen — so the two
- * things worth pinning are that the reader is told before they confirm, and
- * that the branch is chosen by what the related-entities read actually answered
- * rather than by which button was pressed.
  */
 
 import { cleanup, screen, waitFor } from "@testing-library/react";

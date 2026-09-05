@@ -1,9 +1,6 @@
 /**
- * `run()` used to take the idempotency key positionally, which left no room
- * for the values a run supplies for the parameters its scenarios declare. It
- * takes an options object now and still accepts the old positional string, so
- * both call forms are exercised here against the bytes that leave the process.
- *
+ * `run()` used to take the idempotency key positionally, which left no room for the values
+ * a run supplies for the parameters its scenarios declare.
  * Spec: specs/scenarios/scenario-run-parameters.feature
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";

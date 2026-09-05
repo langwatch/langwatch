@@ -1,10 +1,6 @@
 /**
- * The connected-agent runtime as everything above the infrastructure sees it
+ * The connected-agent runtime as everything above the infrastructure sees it dispatcher.
  * (ADR-128): one pod id, one state store, one presence registry and one call
- * dispatcher.
- *
- * The services and the gateway are written against these ports; the Redis and
- * memory adapters that satisfy them are chosen by the composing process.
  */
 
 import type { CallOutcome, DispatchAgent, DispatchCall } from "@langwatch/agent-contract";

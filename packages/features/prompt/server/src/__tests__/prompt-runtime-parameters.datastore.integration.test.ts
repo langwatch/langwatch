@@ -1,16 +1,5 @@
 /**
  * @vitest-environment node
- *
- * Runtime parameters (search_iterations, confidence_threshold, and anything
- * else a prompt author wants echoed back to the caller) travel with a prompt
- * version the same way its content does: stored on create, versioned on
- * update, carried through fetch/list/restore/sync.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL (or DATABASE_URL). Skips cleanly
- * without one.
- *
- * Ported from platform/app/src/server/prompt-config/__tests__/runtimeParameters.integration.test.ts.
- *
  * @see specs/prompts/prompt-runtime-parameters.feature
  */
 import {
@@ -208,7 +197,11 @@ describe.skipIf(!DB_URL)("Feature: Prompt runtime parameters", () => {
         data: { commitMessage: "Schema v2", parameters: { schema: "v2" } },
       });
 
-      const versions = await service.getAllVersions({ idOrHandle: handle, projectId, organizationId });
+      const versions = await service.getAllVersions({
+        idOrHandle: handle,
+        projectId,
+        organizationId,
+      });
 
       const v1 = versions.find((v) => v.version === 1);
       const v2 = versions.find((v) => v.version === 2);

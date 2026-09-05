@@ -58,15 +58,8 @@ export interface SyncResult {
 }
 
 /**
- * Service for managing prompt resources via the Langwatch API.
- * Constructor creates a proxy that wraps the service and traces all methods.
- *
- * Responsibilities:
- * - CRUD operations for prompts
- * - Creating prompt versions
- * - Error handling with contextual information
- *
- * All methods return raw PromptResponse data from the API.
+ * Service for managing prompt resources via the Langwatch API. Constructor creates a proxy
+ * that wraps the service and traces all methods.
  */
 export class PromptsApiService {
   private readonly apiClient: LangwatchApiClient;
@@ -81,10 +74,9 @@ export class PromptsApiService {
   }
 
   /**
-   * Handles API errors by throwing a PromptsApiError with operation context.
+   * Handles API errors by throwing a PromptsApiError with operation context. @throws
    * @param operation Description of the operation being performed.
    * @param error The error object returned from the API client.
-   * @throws {PromptsApiError}
    */
   private handleApiError(operation: string, error: unknown, response?: Response): never {
     const resolvedStatus = response?.status ?? extractStatusFromResponse(error);
@@ -118,11 +110,7 @@ export class PromptsApiService {
   /**
    * Fetches a single prompt by its ID.
    * @param id The prompt's unique identifier.
-   * @param options Optional parameters for the request.
-   * @param options.version Specific version to fetch (numeric string or "latest").
-   * @param options.tag Tag to fetch (e.g., "production", "staging", or a custom tag).
-   * @returns Raw PromptResponse data.
-   * @throws {PromptsApiError} If the API call fails.
+   * @param options Optional version or tag to fetch.
    */
   get = async (
     id: string,
@@ -152,10 +140,9 @@ export class PromptsApiService {
   };
 
   /**
-   * Validates if a prompt exists.
+   * Validates if a prompt exists. @throws {PromptsApiError} If the API call fails (not 404).
    * @param id The prompt's unique identifier.
    * @returns True if prompt exists, false otherwise.
-   * @throws {PromptsApiError} If the API call fails (not 404).
    */
   async exists(id: string): Promise<boolean> {
     try {
@@ -185,10 +172,9 @@ export class PromptsApiService {
   }
 
   /**
-   * Creates a new prompt.
+   * Creates a new prompt. @throws {PromptsApiError} If the API call fails.
    * @param params The prompt creation payload, matching the OpenAPI schema.
    * @returns Raw PromptResponse data of the created prompt.
-   * @throws {PromptsApiError} If the API call fails.
    */
   async create(params: CreatePromptBody): Promise<PromptResponse> {
     const { data, error, response } = await this.apiClient.POST("/api/v1/prompts", {
@@ -204,11 +190,9 @@ export class PromptsApiService {
   }
 
   /**
-   * Updates an existing prompt.
    * @param id The prompt's unique identifier.
    * @param params The update payload, matching the OpenAPI schema.
    * @returns Raw PromptResponse data of the updated prompt.
-   * @throws {PromptsApiError} If the API call fails.
    */
   async update(id: string, params: UpdatePromptBody): Promise<PromptResponse> {
     const { error, data, response } = await this.apiClient.PUT("/api/v1/prompts/{id}", {
@@ -241,10 +225,9 @@ export class PromptsApiService {
   }
 
   /**
-   * Creates a custom prompt tag for the organization.
+   * Creates a custom prompt tag for the organization. @throws {PromptsApiError} If the API
    * @param params.name The tag name (must match /^[a-z][a-z0-9_-]*$/).
    * @returns The created tag.
-   * @throws {PromptsApiError} If the API call fails.
    */
   async createTag({ name }: { name: string }): Promise<CreatedTag> {
     const { data, error, response } = await this.apiClient.POST("/api/v1/prompts/tags", {
@@ -280,10 +263,9 @@ export class PromptsApiService {
   }
 
   /**
-   * Renames an existing prompt tag.
+   * Renames an existing prompt tag. @throws {PromptsApiError} If the API call fails.
    * @param tag The current tag name.
    * @param name The new tag name.
-   * @throws {PromptsApiError} If the API call fails.
    */
   async renameTag({ tag, name }: { tag: string; name: string }): Promise<void> {
     const { data, error, response } = await this.apiClient.PUT("/api/v1/prompts/tags/{tag}", {
@@ -341,10 +323,9 @@ export class PromptsApiService {
   }
 
   /**
-   * Fetches all versions for a given prompt.
+   * Fetches all versions for a given prompt. @throws {PromptsApiError} If the API call
    * @param id The prompt's unique identifier.
    * @returns Array of raw PromptResponse data for each version.
-   * @throws {PromptsApiError} If the API call fails.
    */
   async getVersions(id: string): Promise<PromptResponse[]> {
     const { data, error, response } = await this.apiClient.GET("/api/v1/prompts/{id}/versions", {
@@ -360,11 +341,9 @@ export class PromptsApiService {
   }
 
   /**
-   * Upserts a prompt with local configuration - creates if doesn't exist, updates version if exists.
    * @param handle The prompt's handle/identifier.
    * @param config Local prompt configuration.
    * @returns Object with created flag and raw PromptResponse data.
-   * @throws {PromptsApiError} If the API call fails.
    */
   async upsert(
     handle: string,

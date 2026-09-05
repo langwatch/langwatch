@@ -1,10 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The last gate a deactivated account meets. Sign-in ends at a Session row,
- * so whatever route brought the person here — password, OAuth, passkey — the
- * refusal has to live where that row is written, or a revoked account gets a
- * live session through whichever route the check forgot.
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";

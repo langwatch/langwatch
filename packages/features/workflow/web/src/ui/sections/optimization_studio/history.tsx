@@ -136,10 +136,8 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
         if (!confirm("Autosaved changes might be lost. Continue?")) {
           return;
         }
-      } else if (hasChanges) {
-        if (!confirm("Unsaved changes will be lost. Continue?")) {
-          return;
-        }
+      } else if (hasChanges && !confirm("Unsaved changes will be lost. Continue?")) {
+        return;
       }
 
       const version = await restoreVersion.mutateAsync({

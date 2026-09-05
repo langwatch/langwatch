@@ -1,12 +1,7 @@
 /**
- * How the CLI journey spawns the built CLI: one temporary working directory,
- * one temporary config path, and credentials that come only from the two
- * environment variables an integrator would set.
- *
- * The agent-mode variables are stripped deliberately. The CLI reads
- * CLAUDECODE and its siblings as "answer machine-readably", so a suite run
- * from an agent's terminal would assert against different output than the same
- * suite run from a person's.
+ * How the CLI journey spawns the built CLI: one temporary working directory, one temporary
+ * config path, and credentials that come only from the two environment variables an
+ * integrator would set.
  */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

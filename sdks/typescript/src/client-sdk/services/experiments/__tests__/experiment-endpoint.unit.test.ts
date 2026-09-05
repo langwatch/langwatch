@@ -19,10 +19,8 @@ const fetchedUrl = (): string => {
 };
 
 /**
- * A trailing slash on the endpoint used to append onto paths that already carry
- * their own leading slash, producing `//api/v1/experiment/init`. The router does
- * not match that, so the SDK surfaced the server's opaque `{"error":"Not
- * Found"}` with nothing pointing at the endpoint as the cause.
+ * A trailing slash on the endpoint used to append onto paths that already carry their own
+ * leading slash, producing `//api/v1/experiment/init`.
  */
 describe("Experiment.init endpoint handling", () => {
   const previousApiKey = process.env.LANGWATCH_API_KEY;

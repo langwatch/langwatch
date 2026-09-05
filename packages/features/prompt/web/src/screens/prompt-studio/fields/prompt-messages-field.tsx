@@ -194,10 +194,6 @@ function MessageRow({
 
 /**
  * Single Responsibility: Render and manage the configurable prompt message list.
- *
- * Supports two editing modes:
- * - "prompt": Simple view showing only the system prompt (default)
- * - "messages": Full view showing all messages with role labels and controls
  */
 export function PromptMessagesField({
   messageFields,

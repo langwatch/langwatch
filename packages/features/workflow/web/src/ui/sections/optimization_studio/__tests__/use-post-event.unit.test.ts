@@ -276,10 +276,7 @@ describe("alertOnError", () => {
   describe("given an uncoded failure", () => {
     /**
      * ADR-045 §3: an unhandled failure's raw detail is logged with the trace
-     * id, never presented. The engine's message is arbitrary text — it can
-     * name a URL, a temp path or a Go net error — so the toast says what we
-     * were doing and nothing we cannot vouch for. The message is still in the
-     * node properties panel for whoever is debugging.
+     * id, never presented.
      */
     it("names the action instead of quoting the engine", () => {
       const toast = handleErroredExecution({
@@ -300,10 +297,8 @@ describe("alertOnError", () => {
     });
 
     /**
-     * The trace id is the one thing on an uncoded frame that may be shown, and
-     * it is the whole of what a customer can hand support. It has to survive
-     * the trip to the host, which now writes the words: a report that arrives
-     * with no trace leaves the reader with nothing to quote.
+     * The trace id is the one thing on an uncoded frame that may be shown, and it is the whole
+     * of what a customer can hand support.
      */
     it("carries the trace id over, and nothing else off the frame", () => {
       const traced = handleErroredExecution({
@@ -320,10 +315,8 @@ describe("alertOnError", () => {
 
   describe("when two uncoded failures arrive", () => {
     /**
-     * The dedupe id is keyed on what the toast SAYS, and two failures we could
-     * not name say the same thing — so they are one toast, not two identical
-     * ones stacked. A failure the registry HAS copy for still keys on its own
-     * code, so it never collapses onto an unrelated one.
+     * The dedupe id is keyed on what the toast SAYS, and two failures we could not name say
+     * the same thing — so they are one toast, not two identical ones stacked.
      */
     it("shows one toast, not two identical ones", () => {
       handleErroredExecution({ error: "Timeout" });

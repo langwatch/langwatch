@@ -7,14 +7,8 @@ import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
 /**
- * Returns the provider map rather than printing it: the output port renders it
- * in whatever format the caller asked for (utils/output.ts).
- *
- * `customKeys` reaches us already masked — `GET /api/v1/model-providers` answers
- * from `getProjectModelProvidersForFrontend`, which runs `maskApiKeys` before
- * serialising — so the raw response carries no key material and needs no
- * further redaction here. The human table only says whether keys EXIST, and
- * that stays true of the machine payload.
+ * Returns the provider map rather than printing it: the output port renders it in whatever
+ * format the caller asked for (utils/output.ts).
  */
 export const listModelProvidersCommand = async (): Promise<CommandResult | void> => {
   await resolveCredentials();

@@ -328,10 +328,7 @@ describe("getSimulationRunCommand()", () => {
 });
 
 /**
- * The note belongs to the batch and the version is the scenario version the
- * run used. Both read as named fields: the run's raw metadata is internal and
- * never part of what the CLI shows or returns.
- *
+ * The note belongs to the batch and the version is the scenario version the run used.
  * Spec: specs/features/simulation-runs-cli.feature
  */
 describe("the note and the scenario version", () => {

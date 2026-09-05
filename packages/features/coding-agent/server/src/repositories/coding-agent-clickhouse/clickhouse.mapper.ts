@@ -1,9 +1,6 @@
 /**
- * The row coercions every coding-agent ClickHouse repository decodes with, and
- * the fan-out that groups a set of tenants by the client each resolves to.
- *
- * Shared rather than repeated: a repository that parsed `DateTime64(3)` its own
- * way would read the same column as a different instant.
+ * The row coercions every coding-agent ClickHouse repository decodes with, and the fan-out
+ * that groups a set of tenants by the client each resolves to.
  */
 import type {
   CodingAgentClickHouseClient,

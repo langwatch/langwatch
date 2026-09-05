@@ -1,7 +1,6 @@
 /**
- * The inline Sessions-destination stamp on the fold store's commit seam:
- * one throttled, error-swallowing project touch per window.
- *
+ * The inline Sessions-destination stamp on the fold store's commit seam: one throttled,
+ * error-swallowing project touch per window.
  * @see specs/coding-agent/project-menu-links.feature
  */
 import { describe, expect, it, vi } from "vitest";

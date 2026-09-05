@@ -1,9 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The If/Else node emits both branch handles (true/false) for routing, but
- * the results panel must surface a single condition result, not two boxes
- * that read as a contradiction ("FALSE: true").
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -38,7 +34,10 @@ describe("ExecutionOutputPanel - if/else outputs", () => {
     /** @scenario The if/else result shows a single condition value */
     it("shows one Condition box of false, not both branch handles", () => {
       const { container } = render(
-        <ExecutionOutputPanel executionState={successState({ true: false, false: true })} nodeType="if_else" />,
+        <ExecutionOutputPanel
+          executionState={successState({ true: false, false: true })}
+          nodeType="if_else"
+        />,
         { wrapper: Wrapper },
       );
 
@@ -54,7 +53,10 @@ describe("ExecutionOutputPanel - if/else outputs", () => {
     /** @scenario The if/else result shows a single condition value */
     it("shows one Condition box of true", () => {
       const { container } = render(
-        <ExecutionOutputPanel executionState={successState({ true: true, false: false })} nodeType="if_else" />,
+        <ExecutionOutputPanel
+          executionState={successState({ true: true, false: false })}
+          nodeType="if_else"
+        />,
         { wrapper: Wrapper },
       );
 

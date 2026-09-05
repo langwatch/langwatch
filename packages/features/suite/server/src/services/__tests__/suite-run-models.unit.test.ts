@@ -1,10 +1,5 @@
 /**
  * @vitest-environment node
- *
- * `SuiteRunModelsService.resolve` reads each scenario's own model choice
- * once for the whole batch, not once per scenario. See suite-restore-review
- * fix 7.
- *
  * @see specs/scenarios/resolved-run-models-on-runs.feature
  */
 import { describe, expect, it, vi } from "vitest";

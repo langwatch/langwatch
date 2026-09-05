@@ -15,28 +15,12 @@ export interface SuiteRunProcessingPipelineDeps {
 }
 
 /**
- * How long a suite command's job id stays claimed. One minute, matching the
- * simulation pipeline's `computeRunMetrics`, and long enough to cover the
- * queue's own retry window — the redelivery this guards against arrives when a
- * dispatch throws and the GroupQueue re-runs the subscriber, not hours later.
- *
- * This is a queue-level guard, and the rule that asks for redelivery proof says
- * plainly that queue deduplication is not sufficient on its own. It is not
- * sufficient here either: the durable fix is for the fold executor to drop a
- * replay on `idempotencyKey ?? id` rather than `id` alone, which would make the
- * accumulating fold safe by construction. Until then this closes the window
- * that is actually reachable.
+ * How long a suite command's job id stays claimed.
  */
 const SUITE_COMMAND_DEDUP_TTL_MS = 60_000;
 
 /**
  * The command's own job id, required at this seam rather than optional.
- *
- * `defineCommand` types `makeJobId` as optional because not every command needs
- * one. A command registered WITH deduplication does, and reading it as
- * `undefined` would quietly restore the accumulating double-count the
- * registration exists to prevent. Failing when the pipeline is composed is the
- * loud version of that, and it happens at boot rather than under load.
  */
 function requireJobId<TPayload>(
   commandName: string,
@@ -52,21 +36,6 @@ function requireJobId<TPayload>(
 
 /**
  * Creates the suite run processing pipeline definition.
- *
- * This pipeline uses suite_run aggregates (aggregateId = batchRunId).
- * It tracks the lifecycle of suite runs:
- * - started -> items started/completed
- *
- * Fold Projection: suiteRunState
- * - Computes summary statistics (progress, pass rate, status)
- * - Stored in suite_runs ClickHouse table
- *
- * Commands:
- * - startSuiteRun: Emits SuiteRunStartedEvent when suite run begins
- * - recordSuiteRunItemStarted: Emits SuiteRunItemStartedEvent per item
- * - completeSuiteRunItem: Emits SuiteRunItemCompletedEvent when item finishes
- *
- * No subscriber on this pipeline — cross-pipeline subscribers live on the simulation pipeline.
  */
 export class SuiteRunProcessingPipelineAdapter {
   static create(deps: SuiteRunProcessingPipelineDeps) {

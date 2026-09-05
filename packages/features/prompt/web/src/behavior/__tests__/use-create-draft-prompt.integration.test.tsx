@@ -1,13 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * `useCreateDraftPrompt` used to select `{ addTab }` as a fresh object built
- * inside the selector, which `useSyncExternalStore` reads as a change on
- * every store read and re-renders the caller forever (the render loop fixed
- * for `PublishedPromptsList`, see
- * `screens/prompt-studio/sidebar/__tests__/published-prompts-list.integration.test.tsx`).
- * This renders the hook against the real tab store so the loop would fail
- * here rather than in an error boundary in the browser.
  */
 
 import { act, render } from "@testing-library/react";

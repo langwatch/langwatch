@@ -1,9 +1,6 @@
 /**
  * @vitest-environment node
- *
- * `POST /api/v1/agents/connect/frames`: the two ways a body is refused
- * before it ever reaches the transport (ADR-128, "Transport").
- *
+ * `POST /api/v1/agents/connect/frames`: refused before the transport (ADR-128).
  * @see specs/agents/connected-agents.feature
  */
 import {

@@ -1,12 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Covers specs/prompts/prompt-tab-switcher.feature.
- *
- * The only boundary mocked is `usePromptTabSummary`, the hook each row uses to
- * read its prompt's title / unsaved state / version. Everything else — the Ark
- * menu, the trigger, the rows, keyboard and pointer interaction — is the real
- * thing, so these tests fail if the switcher stops rendering what it promises.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

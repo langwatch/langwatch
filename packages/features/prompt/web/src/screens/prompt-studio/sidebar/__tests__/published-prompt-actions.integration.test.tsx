@@ -89,10 +89,6 @@ import { PublishedPromptActions } from "../published-prompt-actions";
 
 /**
  * A fresh host per render, because the assertions read what the screen told it.
- *
- * `platform/app` reached the toaster singleton and these cases spied on it; the
- * package hands every notice to the host, so the host IS the observation point
- * — and it is the one the real adapter answers, rather than a module double.
  */
 let currentHost: FakePromptHost;
 

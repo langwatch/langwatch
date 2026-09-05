@@ -1,9 +1,5 @@
 /**
  * @vitest-environment node
- *
- * What one HTTP agent test records. The builder decides the span's contents;
- * the gate that decides whether anything is recorded at all lives in the
- * transport and is covered by `http-proxy-trace-gate.unit.test.ts`.
  */
 import { describe, expect, it } from "vitest";
 import {

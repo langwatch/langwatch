@@ -1,9 +1,5 @@
 /**
  * ExperimentsFacade - Entry point for the experiments API
- *
- * Provides:
- * - `init()` method to create experiment sessions (SDK-defined experiments)
- * - `run()` method to execute platform-configured experiments (Experiments Workbench)
  */
 
 import type { LangwatchApiClient } from "@/internal/api/client";
@@ -54,21 +50,9 @@ export class ExperimentsFacade {
   }
 
   /**
-   * Initialize a new experiment session (SDK-defined)
-   *
+   * Initialize a new experiment session (SDK-defined).
    * @param name - Name of the experiment (used as slug)
    * @param options - Optional configuration
-   * @returns An initialized Experiment instance
-   *
-   * @example
-   * ```typescript
-   * const experiment = await langwatch.experiments.init('my-experiment');
-   *
-   * await experiment.run(dataset, async ({ item, index }) => {
-   *   const response = await myAgent(item.question);
-   *   experiment.log('accuracy', { index, score: 0.95 });
-   * });
-   * ```
    */
   async init(name: string, options?: ExperimentInitOptions): Promise<Experiment> {
     return Experiment.init(name, {
@@ -81,25 +65,9 @@ export class ExperimentsFacade {
   }
 
   /**
-   * Run a platform-configured experiment (Experiments Workbench)
-   *
-   * This runs an experiment that was configured in the LangWatch platform.
-   * The method automatically prints a summary and exits with code 1 on failure
-   * (unless `exitOnFailure: false` is passed).
-   *
+   * Run a platform-configured experiment (Experiments Workbench). Prints a
+   * summary and exits with code 1 on failure, unless `exitOnFailure: false`.
    * @param slug - The slug of the experiment (found in the experiment URL)
-   * @param options - Optional configuration
-   * @returns The experiment results including pass rate and summary
-   *
-   * @example
-   * ```typescript
-   * import { LangWatch } from "langwatch";
-   *
-   * const langwatch = new LangWatch();
-   *
-   * const result = await langwatch.experiments.run("my-experiment-slug");
-   * result.printSummary();
-   * ```
    */
   async run(slug: string, options?: RunExperimentOptions): Promise<ExperimentRunResult> {
     this.config.logger.info(`Running platform experiment: ${slug}`);
@@ -109,27 +77,8 @@ export class ExperimentsFacade {
 
   /**
    * Run a platform experiment and return per-row structured results.
-   *
-   * Starts the run through the unified evaluations-v3 backend (optionally
-   * overriding the configured inputs via `data` / `datasetId` / `parameters` /
-   * `rowIndices`), polls to completion, fetches the per-row results, and maps
-   * them to the same row structure as the python SDK's results DataFrame.
-   *
    * @param slug - The slug of the experiment (found in the experiment URL)
    * @param options - Optional inputs and polling configuration
-   * @returns The run id, results URL, status, summary, and per-row results
-   *
-   * @example
-   * ```typescript
-   * const langwatch = new LangWatch();
-   * const { rows, runUrl } = await langwatch.experiments.runWithResults(
-   *   "my-experiment-slug",
-   *   { data: [{ question: "What is 2 + 2?" }] },
-   * );
-   * for (const row of rows) {
-   *   console.log(row.output, row.evaluations);
-   * }
-   * ```
    */
   async runWithResults(
     slug: string,

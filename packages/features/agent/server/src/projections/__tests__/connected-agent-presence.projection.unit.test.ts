@@ -1,7 +1,6 @@
 /**
  * The `lastSeenAt` write throttle: at most once a minute per agent, so a
  * busy instance never turns presence into a write storm (ADR-128).
- *
  * @see specs/agents/connected-agents.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";

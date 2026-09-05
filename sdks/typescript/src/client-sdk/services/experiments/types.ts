@@ -1,8 +1,5 @@
 /**
  * Types for the Experiments API
- *
- * These types define the structure for batch experiments, including
- * logging metrics, running evaluators, and managing targets.
  */
 
 import { z } from "zod";
@@ -265,26 +262,11 @@ export type EvaluateOptions = {
 
 /**
  * Per-candidate metric the judge can be asked to weigh alongside quality
- *
- * Duration is the one the SDK measures itself. Cost is not on offer: the
- * platform works a target's cost out from its traces after the run, so there
- * is nothing to show the judge at the moment a verdict is asked for.
  */
 export type ComparisonMetric = "duration";
 
 /**
  * Outcome of a comparison
- *
- * - `decided`: the judge picked a winner
- * - `tie`: the judge judged the candidates and found none clearly better
- * - `inconclusive`: the judge judged the candidates and established no winner,
- *   which under swap-and-reconcile means its two passes disagreed. A finding
- *   about the candidates, and not a tie: a tie is a measurement, this is the
- *   absence of one
- * - `skipped`: fewer than two targets had an output, so no judge ran
- * - `error`: the judge could not be reached or failed, so nothing was measured
- *   about the candidates at all. Never conflated with `inconclusive`, which
- *   says something about them
  */
 export type ComparisonStatus = "decided" | "tie" | "inconclusive" | "skipped" | "error";
 
@@ -307,20 +289,10 @@ export type ComparisonVerdict = {
 
 /**
  * Options for the compare() method
- *
- * Every option below is optional because the judge already has a default for
- * it. An option left unset is absent from the request, so the judge's own
- * default applies and there is exactly one place where each default is
- * written down. The defaults are documented here for reference only, and are
- * deliberately not restated in code.
  */
 export type ComparisonOptions = {
   /**
-   * Row index in the dataset. Also seeds the judge's deterministic candidate
-   * shuffle.
-   *
-   * compare() takes the row the way log() does: inside a run() callback it is
-   * inferred from the row being processed, and outside one it is required.
+   * Row index in the dataset. Also seeds the judge's deterministic candidate shuffle.
    */
   index?: number;
   /** Name the verdict is recorded under (default: "comparison") */

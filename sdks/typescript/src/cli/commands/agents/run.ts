@@ -33,10 +33,9 @@ const isMessageList = (value: unknown): value is AgentCallMessage[] =>
   );
 
 /**
- * The relay body for a connected agent: `--message` is one user turn,
- * `--input` is the body itself (it must carry `messages`), `--param` gives
- * the run parameters and `--thread-id` continues a conversation. A `--param`
- * value is read as the type the agent declares for it.
+ * The relay body for a connected agent: `--message` is one user turn, `--input` is the
+ * body itself (it must carry `messages`), `--param` gives the run parameters and
+ * `--thread-id` continues a conversation.
  */
 export function buildRelayBody({
   input,
@@ -76,11 +75,8 @@ export function buildRelayBody({
 }
 
 /**
- * Returns the run's response rather than printing it: the output port renders
- * it in whatever format the caller asked for (utils/output.ts). Three paths
- * return their own result: the relay for a connected agent, the URL for an
- * HTTP agent, the workflow engine for a workflow-linked one.
- *
+ * Returns the run's response rather than printing it: the output port renders it in
+ * whatever format the caller asked for (utils/output.ts).
  * @see specs/typescript-sdk/cli-agents.feature
  */
 export const runAgentCommand = async (

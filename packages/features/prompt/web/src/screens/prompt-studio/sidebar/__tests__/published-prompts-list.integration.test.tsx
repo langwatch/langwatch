@@ -1,14 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The published prompts list, rendered against the real tab store.
- *
- * The store is read through `useSyncExternalStore`, which compares snapshots
- * by reference: a selector that builds a fresh object makes every read look
- * like a change and the studio re-renders until React gives up. This suite
- * renders the list against the store rather than a double, so the loop is a
- * failure here rather than an error boundary in the browser.
- *
  * @see specs/prompts/prompt-studio-page.feature
  */
 

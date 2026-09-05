@@ -1,9 +1,7 @@
 /**
  * The session logic both transports share (ADR-128, "Transport"): the
- * credential check, the register frame, presence, call delivery, ack, result
- * and retirement. The WebSocket gateway and the HTTP long-poll transport own
- * their wire and their clocks; everything an instance means to the platform
- * is decided here, once.
+ * credential check, the register frame, presence, call delivery, ack, result and
+ * retirement.
  */
 
 import {

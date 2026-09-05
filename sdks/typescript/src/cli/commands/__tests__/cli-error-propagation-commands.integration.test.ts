@@ -1,10 +1,6 @@
 /**
- * Integration tests that spawn the real CLI binary and verify every
- * non-prompt command surfaces meaningful server-side error messages.
- *
- * This suite focuses on common failure modes (404/409/422/500 with
- * various payload shapes) so regressions in error propagation are caught
- * at the boundary the user actually experiences.
+ * Integration tests that spawn the real CLI binary and verify every non-prompt command
+ * surfaces meaningful server-side error messages.
  */
 import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";

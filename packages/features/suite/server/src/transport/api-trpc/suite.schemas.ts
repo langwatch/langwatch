@@ -20,14 +20,6 @@ export const projectSchema = z.object({
 
 /**
  * A run plan is created with the rule it covers, the scenarios it names, or both.
- *
- * `scenarioIds` is required only for a plan that runs a hand-picked list,
- * which is what a plan with no scope also means. A dynamic scope resolves its
- * own list at run time, so a list given with it is only the cache.
- *
- * Targets are no longer asked for here: the run dialog is where an agent or a
- * prompt is chosen, and a run with none is refused with
- * `suite_targets_required`.
  */
 export const createSuiteSchema = projectSchema
   .extend({
@@ -68,10 +60,9 @@ export const updateSuiteSchema = projectSchema.extend({
 });
 
 /**
- * The contract's run plan config, tightened at the door: `simulatorModel` and
- * `judgeModel` take the same catalog-checked shape the rest of the model
- * surface uses rather than a bare string. Extends rather than re-declares, so
- * `repeatCount`'s cap can never drift from `MAX_REPEAT_COUNT`.
+ * The contract's run plan config, tightened at the door: `simulatorModel` and `judgeModel`
+ * take the same catalog-checked shape the rest of the model surface uses rather than a
+ * bare string.
  */
 export const runPlanConfigSchema = suiteRunPlanConfigSchema.extend({
   simulatorModel: modelOverrideSchema.nullish(),
@@ -79,9 +70,8 @@ export const runPlanConfigSchema = suiteRunPlanConfigSchema.extend({
 });
 
 /**
- * Starts a run under a name: the run either joins the plan of that name and
- * replaces its config, or creates one.
- *
+ * Starts a run under a name: the run either joins the plan of that name and replaces its
+ * config, or creates one.
  * @see specs/suites/run-plan-identity-by-name.feature
  */
 export const runPlanSchema = projectSchema.extend({

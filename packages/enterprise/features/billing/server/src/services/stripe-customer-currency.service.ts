@@ -12,19 +12,6 @@ const logger = createLogger("langwatch:billing:stripeCustomerCurrency");
 
 /**
  * What we were able to establish about the currency a checkout must use.
- *
- * The four cases are kept apart on purpose. Collapsing them into "a currency,
- * or else the one the caller asked for" is what the original bug looked like:
- * Stripe fixes a customer's currency once they have an invoice and rejects
- * sessions in any other one, so guessing wrong is not a degraded result, it is
- * a failed checkout — and by the time the session is created the caller has
- * already written a pending subscription and its invites.
- *
- * - `resolved`  — use this currency. Either the customer's fixed one, or the
- *                 requested one when the customer genuinely has none yet.
- * - `unsupported` — the customer is fixed to a currency we sell no prices in.
- * - `deleted`   — the billing customer no longer exists. Terminal: no
- *                 subscription can be attached to it in any currency.
  */
 export type CheckoutCurrencyResolution =
   | { status: "resolved"; currency: CurrencyType }
@@ -33,11 +20,6 @@ export type CheckoutCurrencyResolution =
 
 /**
  * Establish the currency a checkout session must be created in.
- *
- * Callers must handle `unsupported` and `deleted` before performing any writes —
- * neither can be turned into a working checkout, so proceeding only trades one
- * failure for the same failure plus orphaned pending records. A provider
- * failure throws straight out of here, for the same reason.
  */
 export class StripeCustomerCurrencyService {
   private constructor(private readonly stripeErrors: StripeErrorTranslatorPort) {}
@@ -104,13 +86,8 @@ export class StripeCustomerCurrencyService {
   }
 
   /**
-   * The currency to build the checkout in, or the handled error explaining why
-   * there isn't one.
-   *
-   * Exhaustive over the resolution so a status added later cannot quietly fall
-   * through to "carry on and let Checkout reject it" — which is the shape of the
-   * bug this whole preflight exists to prevent. Callers must invoke this before
-   * any write: every failure here is one no database change can help.
+   * The currency to build the checkout in, or the handled error explaining why there isn't
+   * one.
    */
   getCurrency(resolution: CheckoutCurrencyResolution): CurrencyType {
     switch (resolution.status) {

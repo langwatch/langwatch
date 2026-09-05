@@ -1,14 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The copy counts on the prompt list are computed from the listed prompts
- * only. They count the copies that still exist.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL (or DATABASE_URL). Skips cleanly
- * without one.
- *
- * Ported from platform/app/src/server/prompt-config/__tests__/prompt-list-copy-counts.integration.test.ts.
- *
  * @see specs/prompts/prompt-list-copy-counts.feature
  */
 import {

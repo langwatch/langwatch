@@ -1,19 +1,5 @@
 /**
  * Warning an organization that it is approaching its monthly usage limit.
- *
- * Separate from `UsageLimitService`, which answers a different question: that
- * one reports a limit the customer has ALREADY hit, and reports it to our own
- * internal channels. This one emails the customer's own admins on the way up,
- * at 50, 70, 90, 95 and 100 percent of their allowance.
- *
- * Only the highest threshold crossed is warned about, and only once per
- * calendar month, so a customer who goes from 45 to 96 percent in one
- * afternoon gets a single email about 95 rather than three about 50, 70 and
- * 90.
- *
- * The email is the point of the whole path, so nothing is recorded until at
- * least one has been delivered: a notification row written after a total
- * delivery failure would suppress the retry that could still reach somebody.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -70,10 +56,6 @@ export class UsageWarningService {
 
   /**
    * Sends a usage-limit warning email if one is due, and records that it went.
-   *
-   * Returns the notification record, or null when nothing was sent — which is
-   * the common case: below every threshold, already warned this month, no
-   * organization, no admin with an email.
    */
   async checkAndSendWarning(data: UsageLimitData): Promise<Notification | null> {
     const { organizationId, currentMonthMessagesCount, maxMonthlyUsageLimit } = data;
@@ -150,14 +132,7 @@ export class UsageWarningService {
   }
 
   /**
-   * Whether this threshold was already warned about in the current calendar
-   * month.
-   *
-   * Check-then-insert, so two workers could in principle both pass and send a
-   * duplicate. Accepted: this runs from one cron worker and a user-initiated
-   * mutation that are unlikely to fire together, and a repeated email in the
-   * same month is benign. A unique constraint on
-   * (organizationId, threshold, yearMonth) is the fix if that stops being true.
+   * Whether this threshold was already warned about in the current calendar month.
    */
   private async alreadyWarnedThisMonth({
     organizationId,
@@ -205,12 +180,6 @@ export class UsageWarningService {
 
   /**
    * Per-project message counts, or null when they cannot be read.
-   *
-   * The breakdown is the substance of this email. Sending it with every project
-   * reading 0 — which is what an unknown count used to become — tells an admin
-   * their usage collapsed, in a message whose entire premise is that their
-   * usage is high. Better to send nothing: the threshold is still crossed on
-   * the next run, when the numbers are real.
    */
   private async projectUsage({
     organizationId,
@@ -245,10 +214,6 @@ export class UsageWarningService {
 
   /**
    * Sends to every deliverable admin and records that it happened.
-   *
-   * Throws when not one email got through, so the caller's retry can have
-   * another go — recording a notification nobody received would suppress the
-   * warning for the rest of the month.
    */
   private async sendAndRecord({
     organizationId,

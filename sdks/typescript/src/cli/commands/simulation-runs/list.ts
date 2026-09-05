@@ -34,10 +34,8 @@ type SimulationRunListPage = {
 };
 
 /**
- * The listing pages by batch, so one page can hold no run that matches a
- * status or name filter while later pages do. The scan keeps following the
- * cursor until it finds matches, up to this many runs, so `--status FAILED`
- * answers with the failed runs it can reach instead of an empty first page.
+ * The listing pages by batch, so one page can hold no run that matches a status or name
+ * filter while later pages do.
  */
 const FILTER_SCAN_RUN_CEILING = 500;
 

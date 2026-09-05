@@ -168,10 +168,9 @@ describe("given a sign-up address to confirm", () => {
 
   describe("when a link minted before the doors converged comes back", () => {
     /**
-     * Nothing writes a credential onto a link any more, but links that were
-     * issued with one are still in inboxes with an hour to live, and each was
-     * promised an account. Seeded directly, because the method that used to
-     * write them is gone.
+     * Nothing writes a credential onto a link any more, but links that were issued with one
+     * are still in inboxes with an hour to live, and each was promised an account. Seeded
+     * directly, because the method that used to write them is gone.
      */
     function seedLinkCarryingCredential(harnessed: typeof harness) {
       harnessed.issued.push({

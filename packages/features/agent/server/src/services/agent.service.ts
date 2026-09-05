@@ -405,15 +405,7 @@ export class AgentService extends AgentServiceContract {
   }
 
   /**
-   * Creates or re-registers a connected agent on the row its identity key
-   * names. The re-register writes `lastSeenAt`, so a row unseen for too long
-   * is listed again, and it clears `archivedAt`, so a row deleted by hand
-   * comes back when the process connects again.
-   *
-   * Several instances of one agent normally start together, so two of them
-   * can read no row and both go on to create one. `(projectId, identityKey)`
-   * is unique, so the loser of that race is answered with the row the winner
-   * wrote rather than with a constraint violation.
+   * Creates or re-registers a connected agent on the row its identity key names.
    */
   async registerConnected(input: {
     id: string;

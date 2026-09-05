@@ -1,10 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for the if/else properties panel: the Liquid/Code
- * condition modes and the toggle between them. Monaco-based editors are
- * stubbed (they don't mount in jsdom); the shared field editor is the real
- * component since the editable inputs ARE the behavior under test.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

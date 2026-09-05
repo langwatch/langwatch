@@ -73,9 +73,6 @@ const convertToLocalPromptConfig = (tabData: TabData): LocalPromptConfig | undef
 };
 
 /**
- * Check if a tab has unsaved changes compared to its saved version.
- * Uses the same comparison logic as the prompt playground (areFormValuesEqual).
- *
  * @param tabData - The current tab data
  * @param savedPrompt - The saved prompt from the database (if available)
  * @returns true if there are unsaved changes, false if form matches saved version
@@ -110,17 +107,9 @@ const hasUnsavedChanges = (
 };
 
 /**
- * Converts a playground tab to a TargetConfig for the experiment.
- *
- * Logic for localPromptConfig:
- * - If prompt is NEW (no configId): always include localPromptConfig
- * - If prompt is SAVED but HAS LOCAL CHANGES: include localPromptConfig with current values
- * - If prompt is SAVED with NO CHANGES: reference by ID only (no localPromptConfig)
- *
- * @param tabData - The current tab data
- * @param index - Index for generating unique target ID
- * @param datasets - Datasets for auto-mapping
- * @param savedPrompt - The saved prompt from database (for comparison)
+ * Converts a playground tab to a TargetConfig for the experiment. A new or
+ * locally-changed prompt carries its full local config; an unchanged saved
+ * prompt is referenced by id only.
  */
 const convertTabToTarget = (
   tabData: TabData,
@@ -178,10 +167,8 @@ interface ExperimentFromPlaygroundButtonProps {
 }
 
 /**
- * Button to create an experiment from the current prompt playground tabs.
- * Opens a confirmation dialog and creates the experiment with all open prompts as targets.
- *
- * Single Responsibility: Handles the "Create Experiment from Playground" flow.
+ * Button to create an experiment from the current prompt playground tabs. Opens a
+ * confirmation dialog and creates the experiment with all open prompts as targets.
  */
 export function ExperimentFromPlaygroundButton({ iconOnly }: ExperimentFromPlaygroundButtonProps) {
   const { project, hasPermission } = usePromptProject();
@@ -194,9 +181,7 @@ export function ExperimentFromPlaygroundButton({ iconOnly }: ExperimentFromPlayg
   // store's own references, so selecting them directly is stable; the
   // derived values below are recomputed only when those references change.
   const windows = useDraggableTabsBrowserStore((state) => state.windows);
-  const activeWindowId = useDraggableTabsBrowserStore(
-    (state) => state.activeWindowId,
-  );
+  const activeWindowId = useDraggableTabsBrowserStore((state) => state.activeWindowId);
   const isComparing = windows.length > 1;
   const allTabs = useMemo(() => windows.flatMap((w) => w.tabs), [windows]);
   const activeTab = useMemo(() => {

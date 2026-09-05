@@ -1,11 +1,6 @@
 /**
  * `POST /api/v1/agents/:id/call`: one turn to a connected agent, answered
  * with the function's output (ADR-128, "Transport").
- *
- * The scenario child calls it with the project key, and so do the Test
- * panel, `langwatch agent run` and MCP. The endpoint needs `scenarios:create`
- * and the agent's own project; it dispatches to a live instance and answers,
- * or refuses with one of the handled errors the contract names.
  */
 
 import {
@@ -86,11 +81,6 @@ const idParamsSchema = z.object({
 
 /**
  * Refuses a personal development agent of someone other than the caller.
- *
- * A port because the check reaches the Suite feature's own
- * `assertConnectedAgentsRunnable`, which `@langwatch/agent-server` may not
- * import (strict feature layout); the process composes it from
- * `@langwatch/suite-server` in `apps/api`.
  */
 export type AssertConnectedAgentsRunnablePort = (input: {
   agent: { id: string; name: string; type: string; ownerUserId?: string | null };

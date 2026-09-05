@@ -1,21 +1,11 @@
 /**
  * `connectAgent`: the function that runs an agent becomes a simulation target.
- *
- * The wrapper resolves the environment and the parameter schema at definition,
- * registers the agent with the process-wide client, and returns a function
- * that is directly callable (for unit tests and local runs) and exposes
- * `disconnect()`.
- *
  * @see specs/typescript-sdk/agent-wrapper.feature
  */
 
 import { ConsoleLogger, type Logger } from "../logger";
 import { getSharedClient, warnOnce, type AgentRuntime } from "./client";
-import {
-  resolveEnabled,
-  resolveEnvironment,
-  resolveInstanceLabel,
-} from "./identity";
+import { resolveEnabled, resolveEnvironment, resolveInstanceLabel } from "./identity";
 import type { AgentMessage, AgentParameterValue, JsonSchemaObject } from "./protocol";
 import type { AgentTransport } from "./transport";
 import {
@@ -82,11 +72,8 @@ export interface ConnectAgentOptions<P extends ParameterInput = ParameterDefinit
   /** A definition map, a Standard JSON Schema object, or a JSON Schema object. */
   parameters?: P;
   /**
-   * Whether this process connects. Takes any boolean, so one expression can
-   * gate the deployments that connect. Without it the default is true, except
-   * when CI is truthy; a value given here replaces that rule rather than adding
-   * to it, so keep the CI half: `process.env.APP_ENV !== "production" && !process.env.CI`.
-   * LANGWATCH_AGENT_CONNECT=0 always disables.
+   * Whether this process connects. Takes any boolean, so one expression can gate the
+   * deployments that connect.
    */
   enabled?: boolean;
   /** Names this instance in the platform. Also LANGWATCH_AGENT_INSTANCE_LABEL. */

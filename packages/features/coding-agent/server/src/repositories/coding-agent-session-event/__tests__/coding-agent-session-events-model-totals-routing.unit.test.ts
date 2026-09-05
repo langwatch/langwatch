@@ -1,10 +1,5 @@
 /**
  * How the per-call fact table's cross-tenant read reaches ClickHouse.
- *
- * The write and read contracts against real ClickHouse live in the sibling
- * integration suite; what is pinned here is the routing, which no single
- * endpoint can observe.
- *
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";

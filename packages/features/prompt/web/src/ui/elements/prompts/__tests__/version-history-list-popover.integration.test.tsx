@@ -1,10 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The version history popover's author row: an avatar and a display label
- * that falls back name -> email -> "Unknown author", with a tooltip that
- * always names who (or what) created the version.
- *
  * @see specs/prompts/prompt-version-history-author.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -1,34 +1,5 @@
 /**
  * The prompt library's application: what its doors call.
- *
- * It holds every service the feature's api files reach — the prompt library
- * itself and the project lookup a tag's organization is resolved through — and
- * it is the one typed thing a transport is given. Before it, both doors shared
- * a `PromptApplication` bag declared beside the tRPC context, which described
- * the composition but owned none of the rules that acted on it.
- *
- * What lives here as a rule of its own is what a door would otherwise have to
- * decide for itself:
- *
- *   - attributing a write to its caller, which nine handlers stamped
- *     separately;
- *   - that a tag name is an ORGANIZATION-level name, so a project-scoped
- *     request resolves the organization first — four tag procedures each
- *     resolved it for themselves;
- *   - what a source prompt hands to one of its copies, which `syncFromSource`
- *     and `pushToCopies` each spelled out in full;
- *   - that the tag service's plain domain errors are handled failures with
- *     stable codes, which two doors translated with two different tables.
- *
- * The copy rule is the reason the class exists rather than an argument for it.
- * The two spellings had ALREADY diverged: push carried the source's
- * `responseFormat` onto the copy and sync silently dropped it, so a prompt
- * updated by a push and a prompt updated by a sync did not end up the same. One
- * implementation ends that, and the sync path now carries `responseFormat` too.
- *
- * A caller arrives as an argument, never read from a session or a request.
- * That is what lets one operation serve a browser session, an API key and a
- * background job without knowing which it is serving.
  */
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import {
@@ -145,13 +116,6 @@ export class PromptNoCopiesSelectedError extends HandledError {
 
 /**
  * Re-raises the tag service's plain domain errors on the handled channel.
- *
- * The service's classes carry the right `code` already but extend `Error`, so
- * they reach a boundary as unknown failures. Both doors translated them by
- * hand — one with a four-branch `mapServiceError`, the other with two inline
- * `instanceof` checks that covered only validation — which is how a conflict
- * on one door and a conflict on the other stopped answering the same. The
- * statuses here are exactly the ones those tables produced.
  */
 function asHandledTagError(error: unknown): never {
   if (error instanceof PromptTagValidationError) throw new PromptTagInvalidError(error.message);
@@ -172,19 +136,6 @@ export class PromptApp {
 
   /**
    * The prompt service in full, raw, for the credential-authenticated door.
-   *
-   * Every write above takes a `PromptCaller` and stamps `by.id` as the
-   * version's `authorId`, which is a real foreign key to `User`. The public
-   * REST family at `/api/prompts` authenticates an API key, and an API key
-   * need not act for a person — `apiKeyUserId` is optional, and a legacy
-   * project credential carries none at all. There is no id it could pass that
-   * would be both true and valid, and a synthetic one would break the key. It
-   * also calls `syncPrompt`, the CLI's push-with-conflict-detection, which
-   * this application does not model at all.
-   *
-   * So that door reads the service here rather than the application quietly
-   * growing a caller that is allowed to be nobody — the same seam
-   * `ApiKeyApp.apiKeyService` and `ProjectApp.projectService` keep.
    */
   get promptService(): PromptService {
     return this.dependencies.prompts;
@@ -214,10 +165,6 @@ export class PromptApp {
 
   /**
    * One prompt, refusing when the project has none by that id or handle.
-   *
-   * Three procedures looked a prompt up and raised their own not-found when it
-   * was missing; `prompt_not_found` is the code the client already reads its
-   * copy from, so the refusal belongs with the lookup rather than beside it.
    */
   async getByIdOrHandle(
     input: PromptReference & { organizationId?: string },
@@ -274,9 +221,6 @@ export class PromptApp {
 
   /**
    * Changes only the handle and the scope.
-   *
-   * Deliberately not a new version: neither field is part of what a version
-   * records, so neither takes a commit message.
    */
   updateHandle(input: UpdatePromptHandleCommand): Promise<VersionedPrompt> {
     return this.dependencies.prompts.updateHandle(input);
@@ -308,9 +252,6 @@ export class PromptApp {
 
   /**
    * Where this prompt was copied from, refusing when it was not copied at all.
-   *
-   * A prompt with no source has nothing to sync, which is a refusal the caller
-   * can act on rather than a null the handler has to interpret.
    */
   async getCopySource(input: { promptId: string }): Promise<PromptCopySource> {
     const source = await this.dependencies.prompts.tryGetCopySource(input);
@@ -336,16 +277,6 @@ export class PromptApp {
 
   /**
    * Writes the source prompt's content onto one of its copies.
-   *
-   * The single description of what a copy receives from its source. Both the
-   * pull (`syncFromSource`) and the push (`pushToCopies`) spelled this out in
-   * full, and they had already stopped agreeing: only the push carried
-   * `responseFormat`. Every optional field is forwarded only when the source
-   * actually set one, so a source that never chose a value does not overwrite
-   * a copy's with an explicit undefined.
-   *
-   * The system message is hoisted first so a source whose prompt and messages
-   * both carry one does not write a conflicting pair onto the copy.
    */
   applySourceToCopy(
     input: {
@@ -413,12 +344,7 @@ export class PromptApp {
   // -- tags ------------------------------------------------------------------
 
   /**
-   * The organization's tag catalog, reached through the project the caller
-   * named.
-   *
-   * A tag is an organization-level name, so every tag operation has to resolve
-   * the project's organization first. Four procedures did that themselves,
-   * which is four places for the wrong id to be passed on.
+   * The organization's tag catalog, reached through the project the caller named.
    */
   async listTagsForProject(input: { projectId: string }): Promise<PromptTag[]> {
     return this.dependencies.prompts.listTags({

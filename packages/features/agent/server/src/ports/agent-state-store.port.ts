@@ -1,11 +1,6 @@
 /**
  * The small key, sorted-set, hash and pub/sub surface connected agents need
  * (ADR-128).
- *
- * One port, two adapters, so the registry and the dispatcher are written
- * once. The memory adapter stands in when Redis is not configured; it is
- * correct only with one replica, and the gateway refuses connections
- * otherwise.
  */
 
 export type Unsubscribe = () => Promise<void>;

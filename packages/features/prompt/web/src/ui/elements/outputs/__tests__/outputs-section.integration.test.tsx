@@ -1,9 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The Outputs section lets a user add, rename and retype an output directly
- * from the prompt editor without opening the model-selector popover.
- *
  * @see specs/prompts/prompt-editor-outputs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -71,9 +71,7 @@ export function PromptTabbedSection({
   const storedVariableValues = useDraggableTabsBrowserStore(
     (state) => state.getByTabId(tabId)?.variableValues ?? EMPTY_VARIABLE_VALUES,
   );
-  const updateTabData = useDraggableTabsBrowserStore(
-    (state) => state.updateTabData,
-  );
+  const updateTabData = useDraggableTabsBrowserStore((state) => state.updateTabData);
 
   const formValues = form.watch();
   const hasInputs = inputs.length > 0;
@@ -86,10 +84,6 @@ export function PromptTabbedSection({
 
   /**
    * Whether this deployment has a chat runtime to talk to.
-   *
-   * Asked of the host rather than assumed, because it is a property of the
-   * process that served the page. Where the answer is no, the tab explains
-   * itself instead of mounting a chat whose every send is a 404.
    */
   const playgroundChat = usePromptHost().playgroundChat();
 
@@ -168,10 +162,9 @@ export function PromptTabbedSection({
       size="sm"
       minHeight={0}
       paddingTop={1}
-      // lazyMount (no unmountOnExit): a sub-tab isn't rendered until first
-      // opened, but once mounted it stays. Critically, this keeps the chat
-      // (inside the Conversation panel) alive when the user switches to
-      // Variables/Parameters — unmounting it would abort an in-flight
+      // lazyMount (no unmountOnExit): a sub-tab isn't rendered until first opened, but once
+      // mounted it stays. Critically, this keeps the chat (inside the Conversation panel) alive
+      // when the user switches to Variables/Parameters — unmounting it would abort an in-flight
       // generation. Inactive *prompt* tabs still fully unmount via the outer
       // DraggableTabsBrowser, which is where the memory win comes from.
       lazyMount

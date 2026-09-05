@@ -52,10 +52,9 @@ const projectionRepositories = new WeakMap<
 const projectionClocks = new WeakMap<CodingAgentProjectionPersistence, CodingAgentClockPort>();
 
 /**
- * The process-owned persistence adapter installed into Coding Agent's event
- * projections. It is not a second domain service: projection registration is
- * an application lifecycle boundary, while ordinary callers use only
- * CodingAgentService.
+ * The process-owned persistence adapter installed into Coding Agent's event projections.
+ * It is not a second domain service: projection registration is an application lifecycle
+ * boundary, while ordinary callers use only CodingAgentService.
  */
 export class CodingAgentProjectionPersistenceAdapter extends CodingAgentProjectionPersistence {
   private constructor(private readonly repositories: CodingAgentRepositories) {

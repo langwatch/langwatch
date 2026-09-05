@@ -1,11 +1,5 @@
 /**
  * @vitest-environment node
- * @unit
- *
- * The tenure rule, exhaustively: a session attaches to the first pull request
- * on its branch whose life had not ended when the session started, and a
- * session that drove several branches is asked once per branch.
- *
  * @see specs/coding-agent/pull-request-linkage.feature
  * @see packages/features/coding-agent/specs/session-git-context.feature
  */

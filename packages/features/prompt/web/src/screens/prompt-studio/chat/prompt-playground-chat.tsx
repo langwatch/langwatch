@@ -23,12 +23,7 @@ interface PromptPlaygroundChatProps extends BoxProps {
 }
 
 /**
- * Stable dedup key over the messages-to-persist projection. Encodes
- * each entry's id, role, and content length so streaming content
- * deltas trigger a re-persist (only ID-based dedup short-circuited
- * the latest assistant's chunks and left it stuck at empty content
- * across refreshes — see the effect comment in PromptPlaygroundChatInner).
- * Exported for unit testing.
+ * Stable dedup key over the messages-to-persist projection.
  */
 export function persistedMessagesKey(
   persisted: { id: string; role: ChatMessage["role"]; content: string }[],
@@ -118,21 +113,8 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
     }, [setMessages, tabId, getTabById]);
 
     /**
-     * Sync the visible messages to the tab data so a browser refresh
-     * restores the running conversation. Deduping by message ID alone
-     * dropped the latest assistant reply: the assistant message gets a
-     * stable ID the moment streaming starts (when content is still
-     * empty), the ID-set never changes again for that turn, so the
-     * effect skipped every content delta. The persisted snapshot ended
-     * up with the most recent assistant message stuck at empty content
-     * — which `convertScenarioMessagesToCopilotKit` then dropped on
-     * reload via its `if (message.content && message.content !== "None")`
-     * guard. Keying on a content snapshot too means each streaming
-     * chunk re-persists the latest message; the per-turn writes are a
-     * few dozen small Web Storage updates which is fine. (Named that way
-     * rather than by the global's own name: the screen-closure check reads
-     * this file as text and a docblock that spells the global reads as a use
-     * of it.)
+     * Sync the visible messages to the tab data so a browser refresh restores the running
+     * conversation.
      */
     const prevMessagesKeyRef = useRef("");
     useEffect(() => {
@@ -179,12 +161,10 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
           if (isError) {
             try {
               const parsed = JSON.parse(content.replace("[ERROR]", ""));
-              // Validate parsed error has expected shape. `type` must be one
-              // of OUR failure classes, not merely a string: this payload can
-              // carry the provider's own discriminant (`api_error`), and
-              // ErrorMessage picks the customer's sentence off this field.
-              // Anything unrecognised is `unknown`, which routes to the
-              // registry's generic copy.
+              // Validate parsed error has expected shape. `type` must be one of OUR failure classes, not
+              // merely a string: this payload can carry the provider's own discriminant (`api_error`),
+              // and ErrorMessage picks the customer's sentence off this field. Anything unrecognised is
+              // `unknown`, which routes to the registry's generic copy.
               if (
                 typeof parsed === "object" &&
                 parsed !== null &&

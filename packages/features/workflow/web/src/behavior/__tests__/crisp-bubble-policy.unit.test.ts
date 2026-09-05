@@ -1,15 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The Crisp bubble policy manipulates the real DOM (html attribute, window
- * and document listeners, MutationObserver), so it needs a browser-like
- * environment. Crisp itself is faked: a recording queue whose "on" pushes
- * register callbacks the same way Crisp's real boot drains them.
- *
- * Lifted from
- * `platform/app/src/utils/__tests__/crispBubblePolicy.unit.test.ts`
- * (deleted with `platform/app`); the policy lives in this package now.
- *
  * Spec: specs/support/crisp-bubble-suppression.feature
  */
 import { afterEach, describe, expect, it, vi } from "vitest";

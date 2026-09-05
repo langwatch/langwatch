@@ -1,24 +1,7 @@
 /**
- * EvaluationsFacade - Entry point for the Evaluations API (Online Evaluations / Guardrails)
- *
- * Provides an API for running evaluators and guardrails in real-time against LLM inputs/outputs.
- *
+ * EvaluationsFacade - Entry point for the Evaluations API (Online Evaluations /
+ * Guardrails)
  * @example
- * ```typescript
- * const langwatch = new LangWatch({ apiKey: "your-api-key" });
- *
- * // Run a guardrail
- * const guardrail = await langwatch.evaluations.evaluate("presidio/pii_detection", {
- *   data: { input: userInput, output: generatedResponse },
- *   name: "PII Detection",
- *   asGuardrail: true,
- *   settings: {},
- * });
- *
- * if (!guardrail.passed) {
- *   return "I'm sorry, I can't do that.";
- * }
- * ```
  */
 
 import { trace, SpanStatusCode, context as otelContext } from "@opentelemetry/api";
@@ -46,42 +29,9 @@ export class EvaluationsFacade {
   }
 
   /**
-   * Run an evaluator or guardrail against provided data
-   *
-   * Creates an OpenTelemetry span attached to the current trace context,
-   * calls the LangWatch evaluation API, and returns the result.
-   *
+   * Run an evaluator or guardrail against provided data.
    * @param slug - The evaluator slug (e.g., "presidio/pii_detection", "langevals/llm_boolean")
    * @param options - Evaluation options including data, name, settings, and asGuardrail flag
-   * @returns The evaluation result with status, passed, score, details, label, and cost
-   *
-   * @example
-   * ```typescript
-   * // Run as a guardrail (synchronous evaluation that can block responses)
-   * const guardrail = await langwatch.evaluations.evaluate("presidio/pii_detection", {
-   *   data: { input: userInput, output: generatedResponse },
-   *   name: "PII Detection Guardrail",
-   *   asGuardrail: true,
-   * });
-   *
-   * if (!guardrail.passed) {
-   *   console.log("PII detected:", guardrail.details);
-   *   return "Sorry, I cannot process that request.";
-   * }
-   * ```
-   *
-   * @example
-   * ```typescript
-   * // Run as an online evaluation (async scoring for monitoring)
-   * const result = await langwatch.evaluations.evaluate("langevals/llm_boolean", {
-   *   data: { input: question, output: response },
-   *   name: "Quality Check",
-   *   settings: { prompt: "Check if the response answers the question." },
-   * });
-   *
-   * console.log("Score:", result.score);
-   * console.log("Details:", result.details);
-   * ```
    */
   evaluate = async (slug: string, options: EvaluateOptions): Promise<EvaluationResult> => {
     const { data, name, settings, asGuardrail } = options;

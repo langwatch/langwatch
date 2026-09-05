@@ -46,10 +46,9 @@ function resolveNestedDefaultValue(
 }
 
 /**
- * Salvages one nested object field: recurses through `salvageValidData` when
- * there is a record of defaults to fall back to, otherwise tries a direct
- * parse and leaves the field undefined (so the caller's merge falls back to
- * `schemaDefaults`) when that also fails.
+ * Salvages one nested object field: recurses through `salvageValidData` when there is a
+ * record of defaults to fall back to, otherwise tries a direct parse and leaves the field
+ * undefined (so the caller's merge falls back to `schemaDefaults`) when that also fails.
  */
 function salvageNestedField(
   objectSchema: z.ZodObject<any>,
@@ -64,24 +63,9 @@ function salvageNestedField(
 }
 
 /**
- * Attempts to salvage valid parts of data that fails complete schema validation.
- *
- * Strategy:
- * 1. Try full parse - if successful, return as-is
- * 2. If failed, start with provided defaults or attempt schema.safeParse({})
- * 3. For each top-level key in input data, attempt to parse with that field's schema
- * 4. Keep fields that pass individual validation
- * 5. Recursively salvage nested objects
- * 6. Merge salvaged fields with defaults
- *
- * This is more intelligent than discarding all data on validation failure,
- * as it preserves any valid portions while falling back to defaults only
- * for truly invalid fields.
- *
- * @param schema - Zod schema to validate against (must be z.object())
- * @param data - Potentially corrupted data to salvage
- * @param defaults - Optional pre-computed defaults to use if schema parsing fails
- * @returns Fully valid data with salvaged parts merged with defaults
+ * Attempts to salvage valid parts of data that fails complete schema
+ * validation, keeping any field that parses on its own and falling back to
+ * defaults only for the fields that don't.
  */
 export function salvageValidData<T extends z.ZodObject<any>>(
   schema: T,

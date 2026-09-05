@@ -88,10 +88,8 @@ export type PromptEditorDrawerProps = {
    */
   initialLocalConfig?: LocalPromptConfig;
   /**
-   * Fallback config used ONLY when `promptId` is set but the prompt is not
-   * found in the project (e.g. a workflow imported from another project).
-   * Unlike `initialLocalConfig` it is never merged over a prompt that loads
-   * successfully, so a saved prompt always shows its own library content.
+   * Fallback config used ONLY when `promptId` is set but the prompt is not found in the
+   * project (e.g. a workflow imported from another project).
    */
   inlineConfigFallback?: LocalPromptConfig;
   /**
@@ -156,13 +154,7 @@ const extractLocalConfig = (formValues: PromptConfigFormValues): LocalPromptConf
 });
 
 /**
- * Drawer for creating/editing prompts.
- * Features:
- * - Header with model selector, version history, and Save/Saved button (matches prompt playground)
- * - Message editor (system + user messages)
- * - Inputs and outputs configuration
- * - Integrates with the Prompts versioning system
- * - Supports local tinkering in evaluations context (close without save persists locally)
+ * Drawer for creating/editing prompts. Features:
  */
 export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const { project, hasPermission } = useOrganizationTeamProject();
@@ -211,18 +203,8 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       : (props.availableSources ??
         (complexProps.availableSources as PromptEditorDrawerProps["availableSources"]));
 
-  // ============================================================================
-  // INPUT MAPPINGS - Single Source of Truth Pattern
-  // ============================================================================
-  //
-  // ARCHITECTURE: `inputMappings` (local state) is THE source of truth inside this drawer.
-  // - Initialized from props/store when drawer opens
-  // - ALL reads inside this drawer use `inputMappings`
-  // - Changes update local state immediately (responsive UI)
-  // - Changes also flow OUT to store via callback (persistence)
-  // - External changes (e.g., dataset switch) sync back via useEffect
-  //
-  // DO NOT use `_mappingsFromProps` directly - it's only for initialization/sync.
+  // ============================================================================ INPUT
+  // MAPPINGS - Single Source of Truth Pattern
   // ============================================================================
 
   // External source (only for initialization and sync)
@@ -509,15 +491,11 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     resolvedDefaultModel,
   ]);
 
-  // Backfill the model once resolvedDefaultModel arrives AFTER the init
-  // effect above already ran with an empty model — e.g. this drawer first
-  // opened on a project with zero providers (getResolvedDefault had
-  // nothing to resolve), and a provider was added in another tab since
-  // (#5827: the cache now refreshes cross-tab, but the init effect is a
-  // one-shot gated by isFormInitialized and never re-fires). Scoped to
-  // brand-new/not-found prompts only, and only while the model field is
-  // still the unresolved empty placeholder, so it can never clobber a
-  // real user edit or server value.
+  // Backfill the model once resolvedDefaultModel arrives AFTER the init effect above already
+  // ran with an empty model — e.g. this drawer first opened on a project with zero providers
+  // (getResolvedDefault had nothing to resolve), and a provider was added in another tab
+  // since (#5827: the cache now refreshes cross-tab, but the init effect is a one-shot gated
+  // by isFormInitialized and never re-fires).
   const isNewOrNotFoundPrompt = !promptId || (!promptQuery.data && !promptQuery.isLoading);
   useEffect(() => {
     if (!isFormInitialized) return;
@@ -602,15 +580,11 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         return isUnsaved;
       });
 
-      // Update local config for evaluations context.
-      // IMPORTANT: Don't push form values to the node until the form is initialized.
-      // Before initialization, the form contains defaults ("You are a helpful assistant.")
-      // which would overwrite the node's localPromptConfig (real user data) via the bridge.
-      // IMPORTANT: Only call the callback if the current targetId matches what we
-      // initialized with. This prevents race conditions when switching targets:
-      // the callback ref is updated during render (before effects), so without this
-      // guard, switching from target-A to target-B would call onLocalConfigChangeB
-      // with target-A's stale form values before the form reinitializes.
+      // Update local config for evaluations context. IMPORTANT: Don't push form values to the
+      // node until the form is initialized. Before initialization, the form contains defaults
+      // ("You are a helpful assistant.") which would overwrite the node's localPromptConfig
+      // (real user data) via the bridge. IMPORTANT: Only call the callback if the current
+      // targetId matches what we initialized with.
       if (
         onLocalConfigChangeRef.current &&
         isFormInitializedRef.current &&
@@ -666,13 +640,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       onClose();
     },
     onError: (error) => {
-      // No form bridge here on purpose. The only top-level (claimable) values on
-      // this form are `handle`, `scope` and `configId`, and none of them is
-      // rendered as an input by this drawer — the handle/scope are collected by
-      // the separate Save/Change-handle dialog. `applyHandledErrorToForm` would
-      // therefore claim a `handle` field error, set it on a field nobody paints,
-      // and suppress this toast — the user would click Save and see nothing at
-      // all. Toast until there is a field to put the message on.
+      // No form bridge here on purpose. The only top-level (claimable) values on this form are
+      // `handle`, `scope` and `configId`, and none of them is rendered as an input by this
+      // drawer — the handle/scope are collected by the separate Save/Change-handle dialog.
       showErrorToast({ error, fallbackTitle: "Couldn't create prompt" });
     },
   });
@@ -718,13 +688,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // Don't close - let user continue editing or close manually
     },
     onError: (error) => {
-      // No form bridge here on purpose. The only top-level (claimable) values on
-      // this form are `handle`, `scope` and `configId`, and none of them is
-      // rendered as an input by this drawer — the handle/scope are collected by
-      // the separate Save/Change-handle dialog. `applyHandledErrorToForm` would
-      // therefore claim a `handle` field error, set it on a field nobody paints,
-      // and suppress this toast — the user would click Save and see nothing at
-      // all. Toast until there is a field to put the message on.
+      // No form bridge here on purpose. The only top-level (claimable) values on this form are
+      // `handle`, `scope` and `configId`, and none of them is rendered as an input by this
+      // drawer — the handle/scope are collected by the separate Save/Change-handle dialog.
       showErrorToast({ error, fallbackTitle: "Couldn't save prompt" });
     },
   });
@@ -748,11 +714,8 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
   /**
-   * Reactive validity of the system-prompt-required rule (#3196).
-   * Watch the messages array so the Save button (and inline error) react
-   * as the user types. Shares the predicate with the Zod refinement in
-   * `formSchemaForSave` so client and server stay in sync — a non-empty
-   * trimmed system message must exist.
+   * Reactive validity of the system-prompt-required rule (#3196). Watch the messages array
+   * so the Save button (and inline error) react as the user types.
    */
   const messages = useWatch({
     control: methods.control,

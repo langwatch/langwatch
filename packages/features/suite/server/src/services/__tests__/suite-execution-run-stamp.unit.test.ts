@@ -1,10 +1,5 @@
 /**
  * @vitest-environment node
- *
- * What a queued run's reserved metadata records about the scenario version
- * and the target it ran against — read once at queue time, not re-read
- * later.
- *
  * @see specs/scenarios/scenario-version-on-runs.feature
  */
 import { describe, expect, it } from "vitest";

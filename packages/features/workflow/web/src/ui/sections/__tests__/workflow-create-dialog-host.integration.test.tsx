@@ -1,8 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The create form of the workflow dialog, and what its submit button reads.
- *
  * @see specs/workflows/workflow-management.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

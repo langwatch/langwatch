@@ -1,9 +1,6 @@
 /**
- * Registration by identity: one row per name and environment, a second
- * register on the same identity updates it in place, a race between two
- * instances settles on one row, and a reconnect restores a row unseen or
- * archived (ADR-128, "Register and identity").
- *
+ * Registration by identity: one row per name and environment, and a
+ * reconnect restores a row unseen or archived (ADR-128, "Register and identity").
  * @see specs/agents/connected-agents.feature
  */
 import type {
@@ -38,10 +35,9 @@ function identity(overrides: Partial<ConnectedAgentIdentity> = {}): ConnectedAge
 }
 
 /**
- * A repository that upserts by identity key the way Postgres's unique index
- * does: `create` throws a unique-constraint error when a row of that
- * identity key already exists, exactly what `registerConnected`'s race
- * fallback reads.
+ * A repository that upserts by identity key the way Postgres's unique index does: `create`
+ * throws a unique-constraint error when a row of that identity key already exists, exactly
+ * what `registerConnected`'s race fallback reads.
  */
 class MemoryIdentityRepository extends AgentRepository {
   readonly rows: Agent[] = [];

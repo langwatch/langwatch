@@ -66,10 +66,9 @@ export {
 } from "./app/suite.app";
 
 /**
- * The app-process REST family this feature owns. The process supplies the
- * bound REST security service, a resolver for the application and its own
- * platform-URL builder; the base path, access declarations, schemas and
- * delegation are the feature's.
+ * The app-process REST family this feature owns. The process supplies the bound REST
+ * security service, a resolver for the application and its own platform-URL builder; the
+ * base path, access declarations, schemas and delegation are the feature's.
  */
 export { createSuiteRestApp } from "./transport/api-rest/suite.api";
 /**

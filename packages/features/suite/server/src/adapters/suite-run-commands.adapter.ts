@@ -7,10 +7,6 @@ import {
 
 /**
  * All suite-run-processing commands defined from event data schemas.
- *
- * Event data schemas (in events.ts) are the single source of truth.
- * Command data = envelope (tenantId, occurredAt, idempotencyKey?) + event data.
- * The handle() method strips envelope fields and creates an event.
  */
 
 export const StartSuiteRunCommand = defineCommand({

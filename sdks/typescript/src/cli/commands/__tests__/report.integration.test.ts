@@ -7,10 +7,9 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { reportCommand } from "../report";
 
 /**
- * Integration tests for `langwatch report` against a REAL local HTTP server:
- * the command runs end-to-end (redaction included) and the assertions read
- * what actually arrived on the wire. Corresponds to
- * specs/typescript-sdk/cli-report.feature.
+ * Integration tests for `langwatch report` against a REAL local HTTP server: the command
+ * runs end-to-end (redaction included) and the assertions read what actually arrived on
+ * the wire. Corresponds to specs/typescript-sdk/cli-report.feature.
  */
 describe("langwatch report", () => {
   let server: Server;

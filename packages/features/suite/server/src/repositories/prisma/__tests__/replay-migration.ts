@@ -1,22 +1,6 @@
 /**
- * Reads a shipped migration back, so a test runs the SQL that shipped instead
- * of a copy of it.
- *
- * A migration keeps its number only until `main` merges a higher one, and then
- * it is renumbered so it still runs. The directory is therefore found by the
- * name that follows the number, never by the number.
- *
- * Ported from platform/app/src/server/suites/__tests__/replay-migration.ts
- * (origin/main), pointed at the shared migrations directory
- * (`packages/prisma-client/prisma/migrations`) rather than a per-app copy.
- *
- * A migration is written against the schema of its own day. `20260828120001`
- * renamed `"Scenario"."folderId"` to `"testSuiteId"` and the suite kinds
- * `'folder'` / `'custom'` to `'test_suite'` / `'run_plan'`, so an OLDER
- * migration (like `20260827120002_folder_rows_hold_no_execution_settings`)
- * replayed against the database of today names columns and values that are
- * gone. {@link VOCABULARY_RENAMES} carries each older statement forward. The
- * rule under test is unchanged: only the names it uses are.
+ * Reads a shipped migration back, so a test runs the SQL that shipped instead of a copy of
+ * it.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -32,8 +16,7 @@ const MIGRATIONS_DIR = join(
  * exist, and it works on every project at once. The guard on raw queries has
  * to be told that, and this is the comment it reads.
  */
-const TENANCY_OPTOUT =
-  "-- @tenancy: a data migration, which runs over every project by design\n";
+const TENANCY_OPTOUT = "-- @tenancy: a data migration, which runs over every project by design\n";
 
 /** Names a pre-`20260828120001` statement uses, and their names today. */
 const VOCABULARY_RENAMES: [RegExp, string][] = [
@@ -53,12 +36,8 @@ function migrationPath(nameSuffix: string): string {
 }
 
 /**
- * The statements of one migration, comments stripped, the vocabulary carried
- * forward and the tenancy opt-out added.
- *
- * `$executeRawUnsafe` takes one statement at a time, and no migration file
- * holds a semicolon outside a statement terminator, so splitting on `;` is
- * exact.
+ * The statements of one migration, comments stripped, the vocabulary carried forward and
+ * the tenancy opt-out added.
  */
 export function migrationStatements({
   nameSuffix,

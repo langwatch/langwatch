@@ -1,10 +1,6 @@
 /**
- * The rest of the HTTP long-poll transport's lifecycle: a call answered
- * through the frames endpoint, a cancel delivered on the next poll, a
- * deregister that retires the instance at once, an unknown token, an
- * instance that stopped polling, and the two ways a frames body is refused
+ * The rest of the HTTP long-poll transport's lifecycle: a call answered through the frames
  * (ADR-128, "Transport").
- *
  * @see specs/agents/connected-agents.feature
  */
 import {

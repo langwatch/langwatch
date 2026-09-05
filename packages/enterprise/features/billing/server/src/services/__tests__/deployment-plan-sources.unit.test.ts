@@ -13,9 +13,6 @@ import { DeploymentPlanSourcesService } from "../deployment-plan-sources.service
 
 /**
  * Spec: packages/enterprise/features/billing/specs/deployment-plan-sources.feature
- *
- * The policy both processes resolve through, asserted where it is written
- * rather than twice over in two composition roots.
  */
 
 const subscription = (
@@ -167,10 +164,9 @@ describe("given the plan sources a deployment resolves through", () => {
 });
 
 /**
- * The licence leg arrives built, because verification lives in the Licensing
- * feature and a feature package may not import another feature's
- * implementation. What is decided HERE is whether the deployment resolves
- * through one at all, and what travels with it.
+ * The licence leg arrives built, because verification lives in the Licensing feature and a
+ * feature package may not import another feature's implementation. What is decided HERE is
+ * whether the deployment resolves through one at all, and what travels with it.
  */
 const licensedEnterprise: Plan = {
   ...UNLIMITED_PLAN,

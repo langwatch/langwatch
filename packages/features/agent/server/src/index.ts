@@ -67,13 +67,9 @@ export {
 } from "./transport/api-rest/agent-connect.api";
 
 /**
- * The connected-agent runtime of this process: the state store, the presence
- * registry and the call dispatcher, composed once and built on first use
+ * The connected-agent runtime of this process: the state store, the presence registry and
+ * the call dispatcher, composed once and built on first use
  * (ADR-128).
- *
- * `installConnectedAgentRedis` is the composition root's, and is what makes
- * the runtime shared between replicas; without it the process runs on a
- * memory store and is correct only alone.
  */
 export { ConnectedAgentRuntimeAdapter } from "./adapters/connected-agent-runtime.adapter";
 export {

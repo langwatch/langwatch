@@ -1,11 +1,5 @@
 /**
  * `scenario run` is a run plan scoped to one scenario.
- *
- * It sends ONE request. No suite is created for it and none is deleted
- * afterwards, which is what the first assertions here pin: the old command
- * minted an ephemeral suite, ran it and cleaned it up, so a failure between
- * those steps left rubbish in the project.
- *
  * Spec: specs/features/scenario-cli.feature
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";

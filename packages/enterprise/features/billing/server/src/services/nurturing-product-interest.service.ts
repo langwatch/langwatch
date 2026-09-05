@@ -3,10 +3,6 @@ import type { CioPersonTraits } from "@langwatch/enterprise-billing-contract";
 
 /**
  * Valid integration method trait values sent to Customer.io.
- *
- * These are the canonical CIO trait values. The onboarding product-selection
- * screen ("Pick your flavour") uses different UI keys; the mapping below
- * translates from those UI keys to these trait values.
  */
 export type IntegrationMethodValue = "coding_agent" | "platform" | "mcp" | "manual_sdk";
 
@@ -17,14 +13,6 @@ export class NurturingProductInterestService {
 
   /**
    * Maps the UI product selection key to the Customer.io integration_method trait value.
-   *
-   * The onboarding "Pick your flavour" screen asks HOW the user wants to
-   * integrate. We map the integration method UI key to the CIO trait:
-   *
-   * - "via-claude-code"    -> "coding_agent"
-   * - "via-platform"       -> "platform"
-   * - "via-claude-desktop" -> "mcp"
-   * - "manually"           -> "manual_sdk"
    */
   static integrationMethodFor(selection: string): IntegrationMethodValue {
     const mapping: Record<string, IntegrationMethodValue> = {
@@ -43,10 +31,6 @@ export class NurturingProductInterestService {
 
   /**
    * Fires a separate identifyUser call to set the integration_method trait.
-   *
-   * Called from the "Pick your flavour" onboarding screen AFTER the initial
-   * signup identification (initializeOrganization fires before flavour selection).
-   * Fire-and-forget -- does not block navigation.
    */
   static fireIntegrationMethod({
     userId,

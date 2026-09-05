@@ -119,10 +119,9 @@ export type VersionedPrompt = {
     copiedPrompts: number;
   };
   /**
-   * Tags currently pointing at the version returned in this response.
-   * For list/get responses, these are the tags that resolve to the
-   * latest/requested version specifically — not the entire prompt's tag set.
-   * For versions endpoint, these are the tags pointing at the row's version.
+   * Tags currently pointing at the version returned in this response. For list/get
+   * responses, these are the tags that resolve to the latest/requested version specifically
+   * — not the entire prompt's tag set.
    */
   tags: Array<{ name: string; versionId: string }>;
   parameters: Record<string, unknown>;
@@ -205,13 +204,8 @@ export class PromptService extends PromptServiceContract {
   }
 
   /**
-   * Gets a prompt by ID or handle.
-   * If a handle is provided, it will be formatted with the organization and project context.
-   *
-   * @param params - The parameters object
-   * @param params.idOrHandle - The ID or handle of the prompt
-   * @param params.projectId - The project ID for authorization and context
-   * @returns The prompt configuration
+   * Gets a prompt by ID or handle. If a handle is provided, it is formatted
+   * with the organization and project context.
    */
   async tryGetPromptByIdOrHandle(params: {
     idOrHandle: string;
@@ -384,19 +378,8 @@ export class PromptService extends PromptServiceContract {
   }
 
   /**
-   * Creates a new prompt configuration with an initial version.
-   * Will create a default version if no version data is provided.
-   *
-   * @param params - The parameters object
-   * @param params.name - The name of the prompt (do not use this, use handle instead)
-   * @param params.projectId - The project ID for authorization and context
-   * @param params.organizationId - The organization ID for authorization and context
-   * @param params.handle - The handle of the prompt (also used as name)
-   * @param params.scope - The scope of the prompt (defaults to "PROJECT")
-   * @param params.authorId - Optional author ID for the initial version
-   * @param params.configData - Optional initial configuration data
-   * @param params.schemaVersion - Optional schema version (defaults to latest)
-   * @returns The created prompt configuration with its initial version
+   * Creates a new prompt configuration with an initial version, defaulting
+   * the version data when none is provided.
    */
   async createPrompt(params: {
     // Config data
@@ -527,17 +510,8 @@ export class PromptService extends PromptServiceContract {
   }
 
   /**
-   * Duplicates a prompt inside the project it already belongs to.
-   * Single Responsibility: Recreate a prompt's configuration under a free handle.
-   *
-   * Duplicates are numbered from one: `support-bot-1`, `support-bot-2`, ...
-   * The hyphen is not cosmetic — `handleSchema` allows only lowercase letters,
-   * digits, hyphens, underscores and one slash, and a handle that fails it is
-   * silently forced into draft mode when the prompt is reopened (see
-   * `isHandleValid` in `versioned-prompt-form-values.ts`).
-   *
-   * @throws NotFoundError when the source prompt does not exist in the project
-   * @throws HandleGenerationError when every candidate handle is taken
+   * Duplicates a prompt inside the project it already belongs to. Single Responsibility:
+   * Recreate a prompt's configuration under a free handle.
    */
   async duplicatePrompt(params: {
     idOrHandle: string;
@@ -569,14 +543,8 @@ export class PromptService extends PromptServiceContract {
   }
 
   /**
-   * Copies a prompt into another project, recording the source it came from.
-   * Single Responsibility: Recreate a prompt's configuration in a target project.
-   *
-   * Permission on the source project is the caller's concern; this method
-   * assumes it has already been established.
-   *
-   * @throws NotFoundError when the source prompt does not exist
-   * @throws HandleGenerationError when every candidate handle is taken
+   * Copies a prompt into another project, recording the source it came from. Single
+   * Responsibility: Recreate a prompt's configuration in a target project.
    */
   async copyPrompt(params: {
     idOrHandle: string;
@@ -621,10 +589,8 @@ export class PromptService extends PromptServiceContract {
   }
 
   /**
-   * Finds the first handle no other prompt in the project has taken.
-   * `candidateFor(0)` is the first handle tried.
-   *
-   * @throws HandleGenerationError once `maxAttempts` candidates are exhausted
+   * Finds the first handle no other prompt in the project has taken. `candidateFor(0)` is
+   * the first handle tried.
    */
   private async generateUniqueHandle(params: {
     candidateFor: (attempt: number) => string;
@@ -656,12 +622,6 @@ export class PromptService extends PromptServiceContract {
 
   /**
    * The handle a duplicate or copy numbers from.
-   *
-   * A prompt is not guaranteed to have a handle — draft and legacy configs
-   * carry `handle: null` — and a display name is free-form text the handle
-   * format rejects. Slugify anything that would not survive `handleSchema`,
-   * because an invalid handle silently forces the prompt into draft mode when
-   * it is reopened (see `isHandleValid` in `versioned-prompt-form-values.ts`).
    */
   private deriveBaseHandle(source: VersionedPrompt): string {
     const candidate = source.handle ?? source.name;
@@ -778,20 +738,9 @@ export class PromptService extends PromptServiceContract {
   }
 
   /**
-   * Updates a prompt configuration with the provided data.
-   * Creates a new version with a commit message tracking the changes.
-   *
-   * Supports partial updates:
-   * - Metadata updates (handle, scope) are applied to the config
-   * - ConfigData updates (prompt, model, etc.) create a new version
-   * - Only provided fields are updated; others preserve existing values
-   * - A commit message is always required to track changes
-   *
-   * @param params - The parameters object
-   * @param params.idOrHandle - The prompt configuration ID or handle
-   * @param params.projectId - The project ID for authorization and context
-   * @param params.data - The update data (must include commitMessage)
-   * @returns The updated prompt configuration with new version
+   * Updates a prompt configuration with the provided data, creating a new
+   * version with a commit message tracking the changes. Only provided
+   * fields are updated; a commit message is always required.
    */
   async updatePrompt(params: PromptUpdateInput): Promise<VersionedPrompt> {
     const { idOrHandle, projectId, data } = params;
@@ -871,15 +820,7 @@ export class PromptService extends PromptServiceContract {
     return newPrompt;
   }
 
-  /**
-   * Checks if a handle is unique for a project.
-   * @param params - The parameters object
-   * @param params.handle - The handle to check
-   * @param params.projectId - The project ID to check
-   * @param params.organizationId - The organization ID to check
-   * @param params.excludeId - The ID of the config to exclude from the check
-   * @returns True if the handle is unique, false otherwise
-   */
+  /** Checks if a handle is unique for a project. */
   async checkHandleUniqueness(params: {
     handle: string;
     projectId: string;
@@ -901,18 +842,8 @@ export class PromptService extends PromptServiceContract {
   }
 
   /**
-   * Syncs a prompt from local source.
-   * If the local version is the same as the remote version, it will be skipped.
-   * If the local version is newer than the remote version, it will be updated.
-   * If the local version is older than the remote version, it will be conflict.
-   *
-   * @param params - The parameters object
-   * @param params.idOrHandle - The ID or handle of the prompt
-   * @param params.localConfigData - The local config data
-   * @param params.localVersion - The local version number
-   * @param params.projectId - The project ID
-   * @param params.organizationId - The organization ID
-   * @param params.authorId - The author ID
+   * Syncs a prompt from a local source: skipped when versions match, updated
+   * when local is newer, and reported as a conflict when local is older.
    */
   async syncPrompt(params: {
     idOrHandle: string;
@@ -1148,9 +1079,6 @@ export class PromptService extends PromptServiceContract {
 
   /**
    * Delete a prompt
-   *
-   * NOTE: This will only delete the config if the provided projectId matches the config's projectId
-   * otherwise it will throw with a permission error.
    */
   async deletePrompt(params: {
     idOrHandle: string;
@@ -1253,18 +1181,8 @@ export class PromptService extends PromptServiceContract {
   }
 
   /**
-   * Transforms camelCase service params to snake_case for repository/database
-   * Single Responsibility: Handle naming convention conversion at data boundary
-   *
-   * Uses transformCamelToSnake utility which derives mappings from PARAM_NAME_MAPPING
-   * (single source of truth) plus prompt-specific mappings.
-   *
-   * The 'reasoning' field passes through unchanged as the canonical field.
-   * Provider-specific mapping happens at the boundary layer (reasoningBoundary.ts)
-   * when making actual LLM API calls, not when saving to the database.
-   *
-   * TODO: Move to repository layer - the repository should handle this transformation
-   * to properly isolate database schema concerns from service business logic.
+   * Transforms camelCase service params to snake_case for repository/database Single
+   * Responsibility: Handle naming convention conversion at data boundary
    */
   private transformToDbFormat(data: Record<string, unknown>): Record<string, unknown> {
     return transformCamelToSnake(data);
@@ -1411,10 +1329,8 @@ export class PromptService extends PromptServiceContract {
   }
 
   /**
-   * Fetches the tag assignments pointing at exactly the given versionIds,
-   * grouped by versionId. Delegates to the repository so the service keeps
-   * no raw Prisma access. Callers should pass only the versionIds they
-   * actually need (not the full history of a config) to keep this bounded.
+   * Fetches the tag assignments pointing at exactly the given versionIds, grouped by
+   * versionId. Delegates to the repository so the service keeps no raw Prisma access.
    */
   private async getTagsByVersionIds(params: {
     versionIds: string[];
@@ -1444,10 +1360,8 @@ export class PromptService extends PromptServiceContract {
   }
 
   /**
-   * Returns the id of the latest (by createdAt desc) version for a config,
-   * or an empty string when no version exists. Delegates to the versions
-   * repository's non-throwing finder so real DB errors surface as
-   * exceptions instead of being silently swallowed into "".
+   * Returns the id of the latest (by createdAt desc) version for a config, or an empty
+   * string when no version exists.
    */
   private async getLatestVersionIdForConfig(params: {
     configId: string;
@@ -1462,10 +1376,8 @@ export class PromptService extends PromptServiceContract {
   }
 
   /**
-   * Prepends the built-in "latest" tag when the current version is the latest
-   * for its prompt. "latest" is a first-class, protected tag (see PromptTagService)
-   * that always resolves to the newest version, so it belongs in the response
-   * alongside any custom tags that happen to point at this version.
+   * Prepends the built-in "latest" tag when the current version is the latest for its
+   * prompt.
    */
   private withLatestTag(params: {
     tags: Array<{ name: string; versionId: string }>;

@@ -117,7 +117,9 @@ function asDispatched(payload: SpanReferencedPayload): TraceProcessingEvent {
 }
 
 /** The same normalization the platform runs — builds expected store rows. */
-const normalization = new SpanNormalizationPipelineService(TraceCanonicalisationService.create());
+const normalization = SpanNormalizationPipelineService.create(
+  TraceCanonicalisationService.create(),
+);
 
 function normalizedFrom(event: SpanReceivedEvent): NormalizedSpan {
   return normalization.normalizeSpanReceived(

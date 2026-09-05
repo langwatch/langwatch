@@ -736,12 +736,7 @@ export class TestProjectService extends ProjectService {
   }
 
   /**
-   * The contract's shape, not a convenient subset. The one service that calls
-   * this reads `.data[].id` and nothing else, so the rows stay id-only — but
-   * the envelope around them is real, because a consumer that starts reading
-   * `pagination` should fail here rather than against an object that never
-   * had it. The narrowing is at this single boundary instead of spread across
-   * the tests that assign `projects`.
+   * The contract's shape, not a convenient subset.
    */
   async listByOrganization(): Promise<PaginatedProjects> {
     return {

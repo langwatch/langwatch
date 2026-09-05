@@ -1,11 +1,5 @@
 /**
  * How the global setup tells the test workers which stack it resolved.
- *
- * The vitest config's `env` block is a snapshot taken before the global setup
- * runs, so a stack discovered at setup time (haven, or one this run booted)
- * cannot be published through it. The setup writes the resolved address and
- * key here, and a setup file loaded in every worker puts them in the
- * environment before any test module is imported.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

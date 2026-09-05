@@ -1,23 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The migration that carries the stored vocabulary forward, run against real
- * data.
- *
- * It has two halves. The schema half renames `"Scenario"."folderId"` to
- * `"testSuiteId"`, renames the index over it and changes the `kind` default;
- * those statements run once and cannot be replayed, so they are read back off
- * the live database instead. The data half rewrites the suite kinds and the
- * plan scope modes; those statements are replayed here, over rows seeded with
- * the values they had before, inside a transaction that is rolled back.
- *
- * Ported from
- * platform/app/src/server/suites/__tests__/test-suite-vocabulary-migration.integration.test.ts
- * (origin/main), adapted to the split feature-package architecture: this
- * package has no dedicated `test:integration` lane, so — following the
- * precedent set by `plan-identity.integration.test.ts` in this same
- * package — the suite skips itself when `DATABASE_URL` is absent.
- *
  * @see specs/suites/test-suites.feature
  */
 import { randomUUID } from "node:crypto";
@@ -159,7 +141,8 @@ describe.skipIf(!databaseUrl)("The stored test suite vocabulary", () => {
         await database().project.deleteMany({ where: { id: projectId } });
       }
       if (teamId) await database().team.deleteMany({ where: { id: teamId } });
-      if (organizationId) await database().organization.deleteMany({ where: { id: organizationId } });
+      if (organizationId)
+        await database().organization.deleteMany({ where: { id: organizationId } });
     } finally {
       await connection?.closeOnce();
     }

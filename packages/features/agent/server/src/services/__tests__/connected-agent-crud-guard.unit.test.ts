@@ -1,8 +1,6 @@
 /**
- * A connected agent's identity, config and type are the SDK's to write, not
- * a caller's: create and edit refuse it, and only archive is allowed through
+ * A connected agent's identity, config and type are the SDK's to write, not a caller's:
  * (ADR-128, "A connected agent cannot be edited by hand").
- *
  * @see specs/agents/connected-agents.feature
  */
 import type {

@@ -15,10 +15,6 @@ const logger = createLogger("langwatch:prompt-version-tags");
 
 /**
  * The client slice tag assignments bind to.
- *
- * An assignment row plus the version row it is checked against — nothing
- * else. Declared here so the adapter above, and every layer above that, name
- * no generated client at all.
  */
 export type PromptTagAssignmentDatabase = Pick<
   PrismaClient,
@@ -144,10 +140,9 @@ export class PrismaPromptTagAssignmentRepository extends PromptTagAssignmentRepo
   }
 
   /**
-   * Returns every tag assignment (with its PromptTag) that points at any of
-   * the given versionIds within the project. Used by read paths that need
-   * to surface tags alongside the returned version(s) without loading the
-   * entire tag history for the config.
+   * Returns every tag assignment (with its PromptTag) that points at any of the given
+   * versionIds within the project. Used by read paths that need to surface tags alongside
+   * the returned version(s) without loading the entire tag history for the config.
    */
   async findByVersionIds(params: {
     versionIds: string[];

@@ -50,17 +50,6 @@ type LLMConfigPopoverProps = {
 
 /**
  * LLM Config Popover Content
- *
- * Renders the popover content for LLM configuration with dynamic parameters
- * based on the selected model's capabilities.
- *
- * Features:
- * - Model selector with provider icons
- * - Dynamic parameter display based on model's supportedParameters
- * - Max tokens slider with model-specific limits
- * - Reasoning parameters (reasoning, verbosity) for reasoning models
- * - Traditional parameters (temperature, top_p, penalties) for other models
- * - Structured outputs toggle and configuration
  */
 export function LLMConfigPopover({
   values,

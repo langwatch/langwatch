@@ -1,15 +1,7 @@
 /**
- * The wire shapes the `/api/v1/run-plans` and `/api/v1/test-suites` REST
- * families publish. Speaks the domain's own scope vocabulary
- * (all/test_suites/labels/scenarios) — unlike the deprecated `/api/suites`
- * alias, which remaps to folders/cases.
- *
- *   - a RUN PLAN is what you run. It is identified by its NAME: a run started
- *     under a name joins the plan of that name and replaces its
- *     configuration, or creates the plan when nothing answers.
- *   - a TEST SUITE is a group of scenarios. It holds what it collects and
- *     nothing about how a run of it is executed, so the targets, the repeat
- *     count and the models arrive with the run request.
+ * The wire shapes the `/api/v1/run-plans` and `/api/v1/test-suites` REST families publish.
+ * Speaks the domain's own scope vocabulary (all/test_suites/labels/scenarios) — unlike the
+ * deprecated `/api/suites` alias, which remaps to folders/cases.
  */
 import { modelOverrideSchema } from "@langwatch/model-provider-contract";
 import { runNoteSchema, runParameterValuesSchema } from "@langwatch/scenario-contract";
@@ -28,11 +20,6 @@ const QUERY_BOOLEAN_FALSE = ["false", "0", "no", ""];
 
 /**
  * A boolean spelled in a query string.
- *
- * `z.coerce.boolean()` is JavaScript `Boolean()`, so every non-empty string is
- * true and `includeArchived=false` would turn the filter off. The most
- * obvious way to spell "off" must not mean "on", and a spelling this does not
- * know is refused by name rather than guessed at.
  */
 export const queryBoolean = z
   .string()
@@ -278,11 +265,6 @@ export type RunPlanRunResultWire = z.infer<typeof runPlanRunResultSchema>;
 
 /**
  * The runs a call queued, as the wire shape.
- *
- * A scenario the project no longer names carries no name at all in the domain
- * result. On the wire that is `null`: JSON has no undefined, and an absent key
- * would make the field optional for every consumer rather than nullable for
- * the few rows that need it.
  */
 export function toRunItemsWire(
   items: readonly {

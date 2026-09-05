@@ -427,13 +427,9 @@ export class CodingAgentPullRequestReadService {
   }
 
   /**
-   * Every session that may have worked on one repository's branches, found two
-   * ways and merged: sessions whose own row matches (the legacy read), plus
-   * sessions whose STAMPED fact rows name the repository even though their row
-   * has since moved to another one — a resumed agent cycling between
-   * repositories is one session, and only its stamps remember everywhere it
-   * has been. The returned key set marks the row-matched ones, which are the
-   * only candidates the unstamped bucket may be priced under here.
+   * Every session that may have worked on one repository's branches, found two ways and
+   * merged: sessions whose own row matches (the legacy read), plus sessions whose STAMPED
+   * fact rows name the repository even though their row has since moved to another one — a
    */
   private async candidateSessionsFor({
     tenantIds,

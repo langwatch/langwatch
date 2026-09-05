@@ -1,11 +1,5 @@
 /**
  * @vitest-environment node
- *
- * `POST /api/v1/agents/:id/call`, the relay route the scenario child and the
- * Test panel post a turn to: the permission it declares, how it treats an
- * agent that belongs to another project, and the personal-agent ownership
- * gate around the dispatcher.
- *
  * @see specs/agents/connected-agents.feature
  */
 import {

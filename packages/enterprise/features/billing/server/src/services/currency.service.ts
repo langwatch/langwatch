@@ -121,11 +121,6 @@ export class CurrencyService {
 
   /**
    * Detect currency from a request using: CDN headers → geoip lookup → fallback.
-   *
-   * Resolution order:
-   * 1. CDN-injected country headers (x-vercel-ip-country, cf-ipcountry)
-   * 2. geoip-country lookup from client IP
-   * 3. DEFAULT_CURRENCY fallback
    */
   private static detectCurrencyFromRequest(req: CurrencyRequest | undefined): {
     currency: CurrencyType;

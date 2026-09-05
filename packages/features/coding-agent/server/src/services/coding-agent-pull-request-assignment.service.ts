@@ -55,12 +55,8 @@ export class CodingAgentPullRequestAssignmentService {
   }
 
   /**
-   * The tenure rule answered PER BRANCH: for each branch the session drove, the
-   * pull request its work on that branch belongs to. This is what stamped fact
-   * rows attribute through — tokens stamped with branch B go to B's winner — so
-   * one session's cost lands on every pull request it drove, each by the work it
-   * did there. A branch with no pull request alive in the session's era is
-   * simply absent from the map.
+   * The tenure rule answered PER BRANCH: for each branch the session drove, the pull request
+   * its work on that branch belongs to.
    */
   assignDrivingSessionsPerBranch(input: {
     sessions: readonly AssignableDrivingSession[];

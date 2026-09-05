@@ -1,12 +1,6 @@
 /**
  * Dispatches one call to one live instance and waits for its answer (ADR-128,
  * "Transport", "Concurrency", "Timeouts").
- *
- * Durable and at most once: the envelope is written to Redis and to the
- * instance's pending set before the instance channel is nudged, the SDK
- * acknowledges when the function starts, and a call is retried on another
- * instance only before that acknowledgement. The result lands in a key and a
- * nudge on this pod's reply channel; the key is polled as the fallback.
  */
 
 import {
@@ -137,13 +131,6 @@ export class CallDispatcherAdapter extends ConnectedAgentDispatchPort {
 
   /**
    * Sends one turn to one live instance and returns its answer.
-   *
-   * @throws {AgentOfflineError} no instance inside the first-turn grace
-   * @throws {AgentBusyError} every instance at its concurrency
-   * @throws {AgentInstanceLostError} a sticky thread's instance is gone
-   * @throws {AgentDisconnectedError} the instance went away after it started
-   * @throws {AgentCallTimeoutError} the deadline passed
-   * @throws {AgentCallFailedError} the function raised
    */
   async dispatch(params: DispatchParams): Promise<CallOutcome> {
     await this.start();
@@ -560,12 +547,6 @@ export class CallDispatcherAdapter extends ConnectedAgentDispatchPort {
 
 /**
  * The error a result carries, as the handled error the caller reads.
- *
- * A gateway refusing an oversized payload writes what it measured, and that
- * keeps its own class. An instance that already runs its declared number of
- * calls answers `agent_busy`, which is the same refusal the dispatcher raises
- * when every instance is full, so it keeps that class too and the caller can
- * wait and send the turn again. Anything else is the function's own error.
  */
 function remoteError(error: StoredResultError): Error {
   if (error.payload) {

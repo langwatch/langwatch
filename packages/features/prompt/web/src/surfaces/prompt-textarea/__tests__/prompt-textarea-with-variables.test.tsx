@@ -684,15 +684,11 @@ describe("PromptTextAreaWithVariables", () => {
 
     /** @scenario An undefined variable is flagged without crashing the page */
     it("does not re-measure the banner on every parent re-render when the invalid-variable set is unchanged", () => {
-      // Regression: the banner useLayoutEffect depended on the `invalidVariables`
-      // array identity. The prompt editor rebuilds the variables array on every
-      // render, so the effect re-ran and called setState on every render, which
-      // churned the commit phase into React's "Maximum update depth exceeded"
-      // crash (it threw the page to the top-level error boundary). The fix keys
-      // the effect on a stable primitive signature of the invalid names, so it
-      // only re-measures when the set of undefined variables actually changes.
-      // Each re-measure here stands in for one of the per-render setStates that
-      // fed the crash, so a non-zero count on stable input is the regression.
+      // Regression: the banner useLayoutEffect depended on the `invalidVariables` array
+      // identity. The prompt editor rebuilds the variables array on every render, so the effect
+      // re-ran and called setState on every render, which churned the commit phase into React's
+      // "Maximum update depth exceeded" crash (it threw the page to the top-level error
+      // boundary).
       function Harness() {
         const [, forceRerender] = useReducer((n: number) => n + 1, 0);
         // Mirrors PromptMessagesEditor: a brand-new array (and objects) each render.

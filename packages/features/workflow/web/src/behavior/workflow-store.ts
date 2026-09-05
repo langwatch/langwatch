@@ -104,9 +104,7 @@ export type WorkflowStore = State & {
   setEdges: (edges: Edge[]) => void;
   edgeConnectToNewHandle: (source: string, sourceHandle: string, target: string) => string;
   /**
-   * Update a node in the workflow.
-   * This will find the node by id and update it.
-   * If the id is not found, nothing will be updated.
+   * Update a node in the workflow. This will find the node by id and update it.
    * @param node - The new node data
    * @param newId - Optional new id for the node once it updated
    */
@@ -134,12 +132,9 @@ export type WorkflowStore = State & {
   ) => void;
   setHoveredNodeId: (nodeId: string | undefined) => void;
   /**
-   * Attach (or replace) the dataset on an entry node, merging its
-   * columns into the node's fields instead of overwriting them.
-   * User-defined inputs survive a dataset attach; columns already
-   * present (by identifier) are not duplicated. The user can then
-   * remove dataset-derived fields they don't care about - the dataset
-   * stays attached either way.
+   * Attach (or replace) the dataset on an entry node, merging its columns into the node's
+   * fields instead of overwriting them. User-defined inputs survive a dataset attach;
+   * columns already present (by identifier) are not duplicated.
    */
   attachEntryDataset: (nodeId: string, dataset: Entry["dataset"], columns: Field[]) => void;
   setSelectedNode: (nodeId: string) => void;
@@ -1010,12 +1005,6 @@ export const store = (
   },
   /**
    * Fails the run and every node still running, with the SAME failure.
-   *
-   * Takes the coded failure, not just its message: the nodes it marks failed
-   * are casualties of one cause, so they inherit its `error_type` and
-   * `upstream_status` too. Passing only the string left them uncoded, and an
-   * uncoded state has no registry copy to render — so a failure we had named
-   * came out as raw engine text on every sibling node.
    */
   stopWorkflowIfRunning: (failure: CodedExecutionFailure | undefined) => {
     const cause = {

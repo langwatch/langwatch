@@ -5,16 +5,9 @@ import type { CreateEvaluatorBody } from "../types";
 import type { LangwatchApiClient } from "@/internal/api/client";
 
 /**
- * D12: openapi-fetch's own empty-body short-circuit answers a non-2xx (or an
- * empty-but-ok) response with neither `data` nor a parsed `error` when the
- * body is unreadable — a proxy's empty 502 page, a truncated response. Left
- * unguarded, `if (error) …; return data;` resolves the promise with
- * `undefined`, and the caller fails three lines later with something like
- * "Cannot read properties of undefined" instead of at the call site.
- *
- * `specs/typescript-sdk/non-json-platform-errors.feature` names the contract
- * this binds: an unreadable body still raises the same typed API error a
- * named failure would, carrying the operation and the HTTP status.
+ * D12: openapi-fetch's own empty-body short-circuit answers a non-2xx (or an empty-but-ok)
+ * response with neither `data` nor a parsed `error` when the body is unreadable — a
+ * proxy's empty 502 page, a truncated response.
  */
 const clientWith = (result: {
   data?: unknown;

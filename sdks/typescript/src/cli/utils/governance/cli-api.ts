@@ -1,16 +1,6 @@
 /**
- * Thin REST client for governance endpoints used by the
- * `langwatch governance ...` CLI namespace.
- *
- * Two transports live in this file:
- *
- *   1. `/api/auth/cli/governance/*` — CLI-specific read proxies for
- *      activity monitor + status that pre-date the public REST
- *      surface. Read-only.
- *   2. `/api/v1/governance/*` — the public REST contract for
- *      IngestionTemplate CRUD plus the device-session ingestion-key
- *      mint route. The CLI sends `X-LangWatch-Surface: cli` so audit
- *      rows land with `metadata.surface = 'cli'` per @audit-uniform.
+ * Thin REST client for governance endpoints used by the `langwatch governance ...` CLI
+ * namespace.
  */
 
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
@@ -68,21 +58,9 @@ export interface GovernanceSetupState {
 }
 
 /**
- * The CLI's fallback governance error — thrown for a failure the platform did
- * NOT name (a bare status, an OAuth `error_description`, a proxy's text) and for
- * the CLI's own client-side preconditions (no session, a disabled tool policy).
- *
+ * The CLI's fallback governance error — thrown for a failure the platform did NOT name (a
+ * bare status, an OAuth `error_description`, a proxy's text) and for the CLI's own
  * It carries the ADR-045 handled-error surface — the `isLangWatchHandledError`
- * brand plus `code` / `httpStatus` / `meta` — so `handledErrorFromThrown`
- * (behind `reportCommandError`) reads it straight into the domain structure and
- * the render pipeline treats it exactly like a server-named `HandledError`.
- * `status` is kept as an alias of `httpStatus` so the existing
- * `err.status === 404` / `err.code === "tool_disabled"` / `instanceof`
- * control-flow keeps working unchanged.
- *
- * A failure the platform DID name never reaches here: the transports below run
- * the parsed body through `throwIfHandledError` first, which raises a typed
- * `LangWatchHandledError` carrying the server's real code / meta / trace id.
  */
 export class GovernanceCliError extends Error {
   /** Brands this for `handledErrorFromThrown` — see the SDK's LangWatchHandledError. */
@@ -109,16 +87,8 @@ export class GovernanceCliError extends Error {
 
 /**
  * The ADR-045 error path for a non-2xx governance response. Before throwing the
- * CLI's own {@link GovernanceCliError}, hand the parsed body to
- * `throwIfHandledError`: when the platform NAMED the failure (a domain-error
- * envelope) that raises a typed `LangWatchHandledError` with the server's real
- * `code` / `meta` / `traceId`, and the render pipeline surfaces it as such.
- * When it did not — a bare status, an OAuth `error_description`, a proxy's text —
- * this falls through to the GovernanceCliError the CLI has always thrown, so the
- * existing `code` / `status` / `instanceof` control-flow keeps working. The
- * `message` composed here is reused verbatim in both throws so nothing regresses.
- *
- * Mirrors `ApiKeysApiService.request()`.
+ * CLI's own {@link GovernanceCliError}, hand the parsed body to `throwIfHandledError`:
+ * when the platform NAMED the failure (a domain-error envelope) that raises a typed
  */
 function throwGovernanceHttpError({
   operation,
@@ -142,10 +112,9 @@ export interface CliApiOptions {
   /** Seams for the automatic session refresh. Tests only. */
   refreshDeps?: SessionRefreshDeps;
   /**
-   * Abort the request after this many milliseconds. Set it on any call
-   * a user is waiting behind: without it a connection that opens and
-   * never answers holds the CLI forever, since fetch has no default
-   * timeout of its own.
+   * Abort the request after this many milliseconds. Set it on any call a user is waiting
+   * behind: without it a connection that opens and never answers holds the CLI forever,
+   * since fetch has no default timeout of its own.
    */
   timeoutMs?: number;
 }
@@ -154,15 +123,7 @@ export interface CliApiOptions {
 export const SESSION_EXPIRED_MESSAGE = "Session expired, run `langwatch login --device` again";
 
 /**
- * Send an authenticated control-plane request, keeping the device
- * session alive around it.
- *
- * The access token is short-lived and the refresh token is not, so a
- * spent access token is a routine event rather than a logout: refresh
- * proactively when the recorded expiry has passed, and refresh + retry
- * once when the server rejects the token anyway (a revoked-then-rotated
- * pair, or a clock the device disagrees with). Only a refresh the server
- * itself rejects surfaces as a 401 to the caller.
+ * Send an authenticated control-plane request, keeping the device session alive around it.
  */
 async function authorizedFetch(
   cfg: GovernanceConfig,
@@ -355,61 +316,40 @@ export interface CliBootstrapBudget {
 
 export interface CliBootstrapResponse {
   /**
-   * Coding assistants the member can run via `langwatch <slug>`. Empty when
-   * the org has published no coding-assistant tiles; the ceremony then falls
-   * back to its built-in default wrapper list. `undefined` on legacy servers
-   * without the field (same fallback).
+   * Coding assistants the member can run via `langwatch <slug>`. Empty when the org has
+   * published no coding-assistant tiles; the ceremony then falls back to its built-in
+   * default wrapper list. `undefined` on legacy servers without the field (same fallback).
    */
   tools?: CliBootstrapTool[];
   providers: CliBootstrapProvider[];
   /**
-   * Provider families (e.g. "openai") for which the org has a live, enabled
-   * credential the caller can reach - independent of whether a model_provider
-   * catalog tile was published. This is what the gateway can actually route
-   * through, so the wrapper preflight gates the gateway path on this, NOT on
-   * `providers` (which is the admin-curated mint-your-own-VK catalog).
-   * `undefined` on legacy servers without the field; the wrapper then falls
-   * back to the `providers` tile list for the check.
+   * Provider families (e.g. "openai") for which the org has a live, enabled credential the
+   * caller can reach - independent of whether a model_provider catalog tile was published.
    */
   gatewayProviders?: string[];
   budget: CliBootstrapBudget;
   /**
-   * Server-authoritative gateway base URL. Sourced from the backend's
-   * `LW_GATEWAY_BASE_URL` (or its self-hosted/SaaS-aware fallback).
-   * Older self-hosted servers without this field fall back to the
-   * CLI's local config default — so undefined is the legacy shape, not
-   * an error.
+   * Server-authoritative gateway base URL. Sourced from the backend's `LW_GATEWAY_BASE_URL`
+   * (or its self-hosted/SaaS-aware fallback).
    */
   gatewayUrl?: string;
   /**
-   * First org admin's email (by createdAt). Rendered as a mailto in
-   * wrapper preflight failure messages so non-admin users get a real
-   * contact path instead of a vague "ask your admin". `null` when the
-   * org has no admin yet; `undefined` on legacy servers without the
-   * field (CLI falls back to a generic line).
+   * First org admin's email (by createdAt). Rendered as a mailto in wrapper preflight
+   * failure messages so non-admin users get a real contact path instead of a vague "ask your
+   * admin".
    */
   adminEmail?: string | null;
   /**
-   * Per-(org, tool) path policy map (claude/codex/gemini/opencode/cursor
-   * → {allowVk, allowOtelDirect}). The CLI caches this into
-   * `cfg.tool_policies` so the wrapper gates path selection on the org's
-   * admin choices. `undefined` on legacy servers without the field; the
-   * wrapper then falls back to hardcoded defaults.
+   * Per-(org, tool) path policy map (claude/codex/gemini/opencode/cursor → {allowVk,
+   * allowOtelDirect}). The CLI caches this into `cfg.tool_policies` so the wrapper gates
+   * path selection on the org's admin choices.
    */
   toolPolicies?: PlatformToolPolicyMap;
 }
 
 /**
- * Fetch the Storyboard Screen 4 ceremony enrichment data —
- * inheritable providers + the user's effective monthly budget.
- *
- * Backend tRPC source: `api.user.cliBootstrap` (Sergey 32cad11ae).
- * REST adapter: `/api/auth/cli/bootstrap` (queued backend follow-up).
- *
- * Graceful degrade: returns null on 404 (older self-hosted server
- * without the REST endpoint) so the CLI ceremony falls back to the
- * basic header + try-it block. Other errors still throw so they can
- * be logged at the call site.
+ * Fetch the Storyboard Screen 4 ceremony enrichment data — inheritable providers + the
+ * user's effective monthly budget.
  */
 export async function getCliBootstrap(
   cfg: GovernanceConfig,
@@ -580,15 +520,9 @@ async function requestREST<T>(
 // Ingestion key minting ------------------------------------------------------
 
 /**
- * Mint a personal-project ingest-only ApiKey (the `ik-lw-<...>` shape)
- * for a wrapped tool. Returns the plaintext key (shown once) plus the
- * OTLP endpoint the caller should point the tool's exporter at.
- *
- * Device-session adapter route under /api/auth/cli/governance/* so the
- * wrapper's auto-mint flow works with the device-session
- * cfg.access_token (lw_at_*). The public REST mounted under
- * createProjectApp rejects Bearer access tokens with 401, so the CLI
- * uses the mirror route, same as the (now-retired) binding flow did.
+ * Mint a personal-project ingest-only ApiKey (the `ik-lw-<...>` shape) for a wrapped tool.
+ * Returns the plaintext key (shown once) plus the OTLP endpoint the caller should point
+ * the tool's exporter at.
  */
 export async function mintIngestionKey(
   cfg: GovernanceConfig,
@@ -604,11 +538,9 @@ export async function mintIngestionKey(
 }
 
 /**
- * Mint an ingest key scoped to a team project (id or slug within the
- * caller's org). Unlike the personal mint, the server creates an
- * ADDITIONAL key per device instead of rotating, so several machines can
- * be instrumented against the same project. Requires the caller to hold
- * `traces:create` on the target project.
+ * Mint an ingest key scoped to a team project (id or slug within the caller's org). Unlike
+ * the personal mint, the server creates an ADDITIONAL key per device instead of rotating,
+ * so several machines can be instrumented against the same project.
  */
 export async function mintProjectIngestionKey(
   cfg: GovernanceConfig,
@@ -636,10 +568,9 @@ export async function mintProjectIngestionKey(
 }
 
 /**
- * Issue the personal virtual key on demand. Called at the moment a tool
- * actually resolves to the gateway path with no VK stored; login no
- * longer auto-issues one, so subscription-only users never create VKs.
- * The secret is returned exactly once; the caller persists it.
+ * Issue the personal virtual key on demand. Called at the moment a tool actually resolves
+ * to the gateway path with no VK stored; login no longer auto-issues one, so
+ * subscription-only users never create VKs.
  */
 export async function issuePersonalVirtualKey(
   cfg: GovernanceConfig,
@@ -654,10 +585,9 @@ export async function issuePersonalVirtualKey(
 }
 
 /**
- * Extracts the 16-char lookupId from an ingestion token.
- * Token format: `ik-lw-{16-char lookupId}_{secret}`.
- * Returns the lookupId string, or undefined when the token doesn't match the
- * expected format (older token shapes, malformed cache entries).
+ * Extracts the 16-char lookupId from an ingestion token. Token format: `ik-lw-{16-char
+ * lookupId}_{secret}`. Returns the lookupId string, or undefined when the token doesn't
+ * match the expected format (older token shapes, malformed cache entries).
  */
 export function extractLookupIdFromToken(token: string): string | undefined {
   const match = /^ik-lw-([^_]+)_/.exec(token);
@@ -667,12 +597,9 @@ export function extractLookupIdFromToken(token: string): string | undefined {
 // Ingestion key listing -------------------------------------------------------
 
 /**
- * Lists all live (non-revoked) personal-project ingestion keys for the
- * caller's org. Used as a cache-liveness preflight (#4755): before reusing a
- * locally cached token, the wrapper calls this to confirm the key is still
- * active. If the server resolves and the cached lookupId is absent → the key
- * was revoked → mint fresh. If the call rejects (offline / older server) →
- * reuse the cache as-is (offline-first fallback).
+ * Lists all live (non-revoked) personal-project ingestion keys for the caller's org. Used
+ * as a cache-liveness preflight (#4755): before reusing a locally cached token, the
+ * wrapper calls this to confirm the key is still active.
  */
 export async function listIngestionKeys(
   cfg: GovernanceConfig,

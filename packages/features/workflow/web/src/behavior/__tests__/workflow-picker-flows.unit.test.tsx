@@ -275,13 +275,11 @@ describe("Workflow evaluator picker flow", () => {
       expect.objectContaining({
         id: "node-1",
         data: expect.objectContaining({
-          // Both REQUIRED, because that is what the generated catalogue says
-          // `langevals/exact_match` declares (`requiredFields: ["output",
-          // "expected_output"]`, `optionalFields: []`). The derivation marks
-          // `optional` only for the optional list; expecting it on both was
-          // asserting the no-definition FALLBACK shape, which is what a
-          // catalogue miss produces — so this passed only while the lookup
-          // was failing.
+          // Both REQUIRED, because that is what the generated catalogue says `langevals/exact_match`
+          // declares (`requiredFields: ["output", "expected_output"]`, `optionalFields: []`). The
+          // derivation marks `optional` only for the optional list; expecting it on both was
+          // asserting the no-definition FALLBACK shape, which is what a catalogue miss produces — so
+          // this passed only while the lookup was failing.
           inputs: [
             { identifier: "output", type: "str" },
             { identifier: "expected_output", type: "str" },

@@ -36,12 +36,6 @@ type DatasetServiceConfig = {
 
 /**
  * Service for managing dataset resources via the LangWatch API.
- *
- * Responsibilities:
- * - CRUD operations for datasets
- * - Record management (create, update, delete)
- * - File upload
- * - Error handling with contextual information
  */
 export class DatasetService {
   private readonly config: DatasetServiceConfig;
@@ -56,13 +50,7 @@ export class DatasetService {
     return createTracingProxy(this as DatasetService, tracer);
   }
 
-  /**
-   * Handles API errors by mapping status codes to appropriate error types.
-   * @param operation - Description of the operation being performed
-   * @param error - The error object from the API response
-   * @param status - The HTTP status code
-   * @param slugOrId - The dataset identifier (only passed for operations targeting an existing resource)
-   */
+  /** Handles API errors by mapping status codes to appropriate error types. */
   private handleApiError(
     operation: string,
     error: unknown,
@@ -81,18 +69,6 @@ export class DatasetService {
     const errorMessage = this.extractErrorMessage(error, status);
 
     // NO handled-error throw here, deliberately.
-    //
-    // Datasets is the one service that already HAS a typed error taxonomy —
-    // `DatasetNotFoundError`, `DatasetPlanLimitError`, and a `DatasetApiError`
-    // that carries the status — and all three are public API that callers catch
-    // by class. Raising a `LangWatchHandledError` in their place would be a
-    // breaking change dressed up as an improvement (a 409 would stop being a
-    // `DatasetApiError`), so this service keeps its own classes and the
-    // transport's throw is folded back into them by `asResponseEnvelope` above.
-    //
-    // Nothing is lost at the surface that matters: `DatasetApiError` keeps the
-    // raw body on `originalError`, so the CLI still reads the platform's `kind`
-    // back off it and still prints a typed `--format json` document.
     throw new DatasetApiError(`Failed to ${operation}: ${errorMessage}`, status, operation, error);
   }
 
@@ -116,21 +92,8 @@ export class DatasetService {
   }
 
   /**
-   * Puts a transport-thrown domain error back into the `{ error, response }`
-   * envelope this service reads.
-   *
-   * The HTTP client now THROWS a typed domain error on a named failure, before
-   * any service sees the response. Datasets is the one service that must not
-   * receive it: it maps failures onto error classes of its own —
-   * `DatasetNotFoundError`, `DatasetPlanLimitError`, `DatasetApiError` — and all
-   * three are public API that callers catch by class. A typed throw arriving
-   * first would silently take their place, which is a breaking change however
-   * good the intention.
-   *
-   * So the throw is caught here and handed back as the envelope it would have
-   * been, `unwrapResponse` runs exactly as it always has, and every dataset
-   * error class survives untouched. This service is deliberately EXACTLY as it
-   * was; the transport change is invisible to it.
+   * Puts a transport-thrown domain error back into the `{ error, response }` envelope this
+   * service reads.
    */
   private async asResponseEnvelope(
     request: Promise<{ data?: unknown; error?: unknown; response: { status: number } }>,
@@ -148,11 +111,6 @@ export class DatasetService {
   /**
    * Unwraps an API response, throwing a mapped error if the response contains an error.
    * Centralizes the repeated `if (error) handleApiError; return data` pattern.
-   *
-   * Also guards the case neither `data` nor `error` came back — an unreadable
-   * body (e.g. an empty 502 from a proxy) that `asResponseEnvelope`'s
-   * transport left alone. Without this the promise would resolve `undefined`
-   * instead of raising the same typed failure a named error produces (D12).
    */
   private unwrapResponse<T>(
     response: { data?: unknown; error?: unknown; response: { status: number } },
@@ -169,8 +127,6 @@ export class DatasetService {
   }
 
   /**
-   * Fetches a dataset by its slug or ID, returning metadata and entries.
-   *
    * @param slugOrId - The slug or ID of the dataset
    * @param _options - Optional configuration
    * @returns The dataset with metadata and entries
@@ -356,8 +312,6 @@ export class DatasetService {
   }
 
   /**
-   * Lists records in a dataset with optional pagination.
-   *
    * @param slugOrId - The slug or ID of the dataset
    * @param options - Pagination options (page, limit)
    * @returns Paginated list of records
@@ -386,15 +340,8 @@ export class DatasetService {
   }
 
   /**
-   * Sends a multipart/form-data request using raw fetch.
-   * openapi-fetch hardcodes content-type: application/json, so file uploads
-   * must bypass it. This helper centralizes URL building, auth headers,
-   * error parsing, and response unwrapping.
-   *
-   * @param path - The API path (appended to the endpoint)
-   * @param formData - The FormData payload
-   * @param operation - Human-readable operation name for error messages
-   * @param slugOrId - Optional dataset identifier (passed to handleApiError for 404 mapping)
+   * Sends a multipart/form-data request using raw fetch, since openapi-fetch
+   * hardcodes content-type: application/json and file uploads must bypass it.
    */
   private async fetchMultipart<T>(
     path: string,
@@ -430,7 +377,6 @@ export class DatasetService {
 
   /**
    * Creates a new dataset from a file upload.
-   *
    * @param options - The dataset name and file to upload
    * @returns The created dataset metadata with record count
    */
@@ -451,12 +397,9 @@ export class DatasetService {
   }
 
   /**
-   * Uploads a file with a strategy for handling existing datasets.
-   *
    * @param slugOrId - The slug or ID of the dataset
    * @param file - The file to upload (File or Blob)
    * @param ifExists - Strategy when dataset exists: "append" (default), "replace", or "error"
-   * @returns The upload result
    */
   async uploadWithStrategy(
     slugOrId: string,

@@ -1,9 +1,5 @@
 /**
  * The version half of prompt persistence, as the services see it.
- *
- * The row shapes are stated here rather than imported from the generated
- * client: a service that named a generated declaration would bind the feature
- * to one engine, and only `repositories/prisma` may name it at all.
  */
 import type { LatestConfigVersionSchema, SchemaVersion } from "@langwatch/prompt-contract";
 
@@ -41,9 +37,6 @@ export type CreateLlmConfigVersionParams = Omit<
 
 /**
  * Repository for managing LLM Configuration Versions.
- *
- * Generally, you should be using the LlmConfigRepository to get the latest
- * version of a config instead of this repository.
  */
 export abstract class LlmConfigVersionsRepository {
   abstract getVersionsForConfigByIdOrHandle(params: {

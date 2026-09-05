@@ -1,15 +1,7 @@
 /**
  * The per-process composition of connected agents: one pod id, one state
- * store, one registry and one dispatcher (ADR-128).
- *
- * The store is Redis when the process installed a connection and process
- * memory otherwise. Redis is INSTALLED by the composition root (ADR-093)
- * rather than read off a module singleton here, and the runtime is built
- * lazily, so a process that never dispatches a call never subscribes.
- *
- * A process that installs no connection still works and is correct only with
- * one replica: the memory store is not shared, so two replicas would each
- * believe they hold every instance.
+ * store, one registry and one dispatcher (ADR-128). Redis is installed
+ * by the composition root (ADR-093) rather than a module singleton.
  */
 
 import { nanoid } from "nanoid";
@@ -54,11 +46,6 @@ export class ConnectedAgentRuntimeAdapter {
 
   /**
    * Hands this process's Redis connection to the runtime it will build.
-   *
-   * Called once by the composition root, before anything dispatches.
-   * Installing after the runtime was built is refused rather than ignored:
-   * the runtime already holds a memory store, and a second store would leave
-   * two halves of the process disagreeing about who is connected.
    */
   static install(redis: RedisConnection): void {
     if (processRuntime) {

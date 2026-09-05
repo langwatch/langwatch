@@ -24,7 +24,6 @@ import {
 } from "../coding-agent-session-event/__tests__/support/clickhouse-endpoint.support";
 
 const clickHouseUrl = testClickHouseUrl();
-const integration = describe.skipIf(clickHouseUrl === null);
 
 class SingleClickHousePort extends CodingAgentClickHousePort {
   constructor(private readonly client: ClickHouseClient) {
@@ -83,7 +82,7 @@ afterAll(async () => {
   await ch.close();
 });
 
-integration("coding_agent_sessions git context round-trip", () => {
+describe.skipIf(clickHouseUrl === null)("coding_agent_sessions git context round-trip", () => {
   it("writes every column and reads the session back by its key", async () => {
     const row = session({
       tenantId,
@@ -387,7 +386,7 @@ integration("coding_agent_sessions git context round-trip", () => {
   });
 });
 
-integration("coding_agent_sessions by repository branch", () => {
+describe.skipIf(clickHouseUrl === null)("coding_agent_sessions by repository branch", () => {
   beforeAll(async () => {
     await sessions.upsert(
       session({
@@ -497,7 +496,7 @@ integration("coding_agent_sessions by repository branch", () => {
   });
 });
 
-integration("coding_agent_trace_sessions map", () => {
+describe.skipIf(clickHouseUrl === null)("coding_agent_trace_sessions map", () => {
   it("resolves a trace to its session", async () => {
     await traceSessions.ensure(
       [
@@ -519,7 +518,7 @@ integration("coding_agent_trace_sessions map", () => {
   });
 });
 
-integration("session_metric_series converged totals", () => {
+describe.skipIf(clickHouseUrl === null)("session_metric_series converged totals", () => {
   it("sums delta units and last-write-wins a re-observed cumulative unit", async () => {
     const sessionId = `${tag}-metrics`;
     // Two delta units of the same metric → each sums once.

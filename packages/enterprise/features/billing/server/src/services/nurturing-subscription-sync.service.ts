@@ -39,9 +39,6 @@ export class NurturingSubscriptionSyncService {
 
   /**
    * Syncs has_subscription trait to Customer.io for all members of an organization.
-   *
-   * Called from the Stripe webhook service when a subscription is activated or cancelled.
-   * Fire-and-forget: never throws, never blocks the webhook handler.
    */
   static fireSubscriptionSync({
     organizationId,

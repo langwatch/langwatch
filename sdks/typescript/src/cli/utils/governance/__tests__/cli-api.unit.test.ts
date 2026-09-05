@@ -439,12 +439,9 @@ describe("cli-api — request shape", () => {
   });
   describe("ingestion-templates clone-from-platform", () => {
     /**
-     * The command posted to `/ingestion-templates/clone-from-platform`. The
-     * route is `/ingestion-templates/clone`, which is also what the spec and
-     * the governance guide document, so the command 404'd every time it ran.
-     *
-     * The stub answers 404 for any path the app does not register, so a caller
-     * reaching for one fails here the way it failed in production.
+     * The command posted to `/ingestion-templates/clone-from-platform`. The route is
+     * `/ingestion-templates/clone`, which is also what the spec and the governance guide
+     * document, so the command 404'd every time it ran.
      */
     const REGISTERED_TEMPLATE_PATHS = new Set([
       "/api/v1/governance/ingestion-templates",

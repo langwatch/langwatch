@@ -1,9 +1,5 @@
 /**
  * @vitest-environment node
- *
- * `agents.testRun`, the "Test agent" mutation: it answers with the run ids
- * so the caller can open the run drawer on the run it just scheduled.
- *
  * @see specs/agents/agent-test-run.feature
  */
 import type { AgentTestRunResult } from "../../../ports/agent-test.port";

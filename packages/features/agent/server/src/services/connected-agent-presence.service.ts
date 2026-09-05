@@ -1,11 +1,6 @@
 /**
  * What the agents list and the agent detail read about presence: whether a
  * connected agent is online, and which instances hold it (ADR-128).
- *
- * Read off the registry of the runtime handed in, so a list of fifty agents
- * costs fifty sorted-set reads and no database round trip. The runtime is a
- * parameter rather than a module singleton, so a test hands in a fake
- * without mocking this module.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -43,13 +38,7 @@ export interface AgentOwnerView {
 }
 
 /**
- * The owner and the presence of one agent, as the response schemas declare
- * them.
- *
- * Both the REST routes and the tRPC router answer with these three fields, so
- * the fold lives here beside the presence it reads. An owner the name lookup
- * missed still reports its id, because the row knows the agent belongs to
- * somebody even when the person cannot be named.
+ * The owner and the presence of one agent, as the response schemas declare them.
  */
 export class ConnectedAgentPresenceService {
   static create(): ConnectedAgentPresenceService {

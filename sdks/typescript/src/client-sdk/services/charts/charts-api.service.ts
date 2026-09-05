@@ -31,20 +31,14 @@ export interface SavedChartDefinitionInput {
 }
 
 /**
- * The LangWatchQL analytics schema, as `GET /api/v1/query/schema` on the query
- * door answers it — the discovery endpoint this used to derive from
- * (`GET /api/v1/projects/{projectId}/analytics/schema`) was removed in favor
- * of that door (issue #7565). Re-exported under this family's own name so
- * existing imports keep working.
+ * The LangWatchQL analytics schema, as `GET /api/v1/query/schema` on the query door
+ * answers it — the discovery endpoint this used to derive from (`GET
+ * /api/v1/projects/{projectId}/analytics/schema`) was removed in favor of that door (issue
  */
 export type AnalyticsSchema = QuerySchemaResult;
 
 /**
- * The result of running a chart's statement through the LangWatchQL query
- * door. Re-exported from `QueryApiService`, which is what this now delegates
- * to — the dedicated REST endpoint this used to derive from
- * (`POST /api/v1/projects/{projectId}/analytics/query/clickhouse`) was
- * removed in favor of the shared query door (issue #7565).
+ * The result of running a chart's statement through the LangWatchQL query door.
  */
 export type ChartRunResult = QueryRunResult;
 
@@ -68,26 +62,13 @@ export class ChartsApiError extends Error {
 /**
  * Typed client for the saved workbench chart family
  * (`/api/v1/projects/{projectId}/analytics/charts`).
- *
- * The chart routes carry the project id in the path, unlike the older
- * project-implicit families, so the service resolves one once — the CLI's
- * request-scoped project first, then `LANGWATCH_PROJECT_ID` — and refuses
- * loudly when none is known rather than guessing.
  */
 export class ChartsApiService {
   private readonly apiClient: LangwatchApiClient;
   private readonly configuredProjectId: string | undefined;
   /**
-   * `schema()` and `runQuery()` delegate to the shared query door rather
-   * than a dedicated chart-family route (issue #7565). That door is
-   * project-implicit (no path/body slot — see `QueryApiService`'s own doc
-   * comment), so it only learns this family's project from the client it is
-   * given: when the caller supplied their own `langwatchApiClient`, this
-   * reuses it verbatim (that client's auth is the caller's to own);
-   * otherwise a client is built fresh, scoped to the same
-   * `configuredProjectId` CRUD resolves through `projectId()`, so a
-   * `ChartsApiService` configured for one project cannot leak a chart's
-   * query to a different project via ambient scope (issue #7565 follow-up).
+   * `schema()` and `runQuery()` delegate to the shared query door rather than a dedicated
+   * chart-family route (issue #7565).
    */
   private readonly queryApi: QueryApiService;
 
@@ -120,12 +101,9 @@ export class ChartsApiService {
   }
 
   /**
-   * The same `configuredProjectId ?? scopedProjectId() ?? env` chain
-   * `projectId()` throws on, without the throw — for the one caller that
-   * must tolerate "no project" rather than refuse on it: the query-door
-   * client build in the constructor above, which has to keep working for
-   * legacy project-scoped keys that carry no project in any of those three
-   * places (see `QueryApiService`'s own doc comment).
+   * The same `configuredProjectId ?? scopedProjectId() ?? env` chain `projectId()` throws
+   * on, without the throw — for the one caller that must tolerate "no project" rather than
+   * refuse on it: the query-door client build in the constructor above, which has to keep
    */
   private resolvedProjectId(): string | undefined {
     return this.configuredProjectId ?? scopedProjectId() ?? process.env.LANGWATCH_PROJECT_ID;
@@ -267,29 +245,14 @@ export class ChartsApiService {
 
   /**
    * The datasets and columns this key may write chart SQL against.
-   *
-   * Delegates to the shared query door's `GET /api/v1/query/schema` — the
-   * dedicated discovery route this used to call
-   * (`GET /api/v1/projects/{projectId}/analytics/schema`) was removed in
-   * favor of it (issue #7565). That door is project-implicit (the project is
-   * resolved into the underlying api client's auth, not a path segment), so
-   * this family's own `projectId()` resolution does not apply here.
    */
   async schema(): Promise<AnalyticsSchema> {
     return this.queryApi.schema();
   }
 
   /**
-   * Runs a saved chart's statement through the LangWatchQL query door — the
-   * same governed execution path the workbench uses. The caller supplies the
-   * chart's own SQL and stored parameter values (from `get`), plus the
-   * surface's time window and granularity for statements that declare the
-   * reserved `period_*` parameters.
-   *
-   * Delegates to the shared query door's `POST /api/v1/query` — the
-   * dedicated execution route this used to call
-   * (`POST /api/v1/projects/{projectId}/analytics/query/clickhouse`) was
-   * removed in favor of it (issue #7565).
+   * Runs a saved chart's statement through the LangWatchQL query door — the same governed
+   * execution path the workbench uses.
    */
   async runQuery(params: {
     sql: string;

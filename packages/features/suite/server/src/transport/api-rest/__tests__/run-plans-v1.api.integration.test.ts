@@ -1,16 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The run plans REST family, driven through the real Hono app over the real
- * suite application.
- *
- * A RUN PLAN is identified by its NAME, so what the suite has to pin is the
- * resolution: a run under a name nothing answers to creates the plan, the same
- * name again joins it, and a test suite id is simply not a member of this
- * family's address space. Those are decisions of `SuiteService`, which is why
- * this drives the real one over an in-memory repository rather than a stand-in
- * for the application.
- *
  * @see specs/api-reference/run-plans-rest-api.feature
  */
 import { describe, expect, it } from "vitest";

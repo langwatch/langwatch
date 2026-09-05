@@ -1,14 +1,5 @@
 /**
  * @vitest-environment node
- *
- * A run against connected agents, through `SuiteService.runPlan` and fakes
- * for the agent reads: who may run a personal one, and how one is addressed
- * by name. Main covers this with a real database
- * (`connected-targets.integration.test.ts`); `@langwatch/suite-server` has no
- * datastore lane of its own, so the same scenarios are proven here against
- * `AgentService` fakes instead — the level every other test in this package
- * already runs at.
- *
  * @see specs/agents/connected-agents.feature
  */
 import { describe, expect, it, vi } from "vitest";
@@ -328,7 +319,13 @@ describe("given a connected target unseen for thirty one days", () => {
     it("skips it the way it skips an archived target", async () => {
       const unseenAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
       const agents = connectedAgentService([
-        { id: "agent_1", name: "agent_1", environment: "production", ownerUserId: null, type: "http" },
+        {
+          id: "agent_1",
+          name: "agent_1",
+          environment: "production",
+          ownerUserId: null,
+          type: "http",
+        },
         {
           id: "agent_unseen",
           name: "agent_unseen",

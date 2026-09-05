@@ -40,11 +40,6 @@ export type StudioDrawerWrapperProps = {
 
 /**
  * StudioDrawerWrapper -- reusable drawer shell for the optimization studio.
- *
- * Renders a right-side Drawer that mirrors the header controls from
- * BasePropertiesPanel (play / expand / close) and, when expanded,
- * shows the InputPanel on the left and OutputPanel on the right with
- * a Framer Motion animation identical to PropertiesPanel.
  */
 export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioDrawerWrapperProps) {
   const { deselectAllNodes, propertiesExpanded, setPropertiesExpanded, duplicateNode, deleteNode } =

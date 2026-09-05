@@ -1,14 +1,5 @@
 /**
  * Prompt tag definitions over the process's tRPC transport.
- *
- * The organization's custom tag catalog (for example, behind
- * DeployPromptDialog). A tag is an organization-level name, and resolving the
- * project's organization is the application's job, not this door's — the
- * declared check still gates on the project the caller named.
- *
- * Transport only: gates, input parsing and delegation to {@link PromptApp}.
- * The tag service's domain failures reach the boundary as coded handled errors
- * raised by the application, so there is no translation table here.
  */
 import { PermissionDeniedError } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
@@ -17,10 +8,9 @@ import { z } from "zod";
 import type { PromptTrpcContext, PromptTrpcProcedures } from "./prompt.trpc-context";
 
 /**
- * A tag definition is one organization row and its assignments cascade to
- * every project in that organization, so the project the caller named is only
- * the first of the scopes the write reaches. The declared check covers that
- * one; the rest are probed here and the handler owns the refusal.
+ * A tag definition is one organization row and its assignments cascade to every project in
+ * that organization, so the project the caller named is only the first of the scopes the
+ * write reaches.
  */
 async function assertMayManageEveryProject(
   ctx: PromptTrpcContext,

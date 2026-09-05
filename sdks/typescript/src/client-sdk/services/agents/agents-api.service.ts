@@ -199,10 +199,9 @@ export class AgentsApiService {
   }
 
   /**
-   * Runs one scripted scenario against an agent: the user sends "ping", the
-   * agent answers, and the run succeeds when the answer arrives. The project
-   * gains no scenario, run plan or test suite, and the answer carries the run
-   * ids to follow.
+   * Runs one scripted scenario against an agent: the user sends "ping", the agent answers,
+   * and the run succeeds when the answer arrives. The project gains no scenario, run plan or
+   * test suite, and the answer carries the run ids to follow.
    */
   async test(id: string): Promise<AgentTestRunResponse> {
     const { data, error, response } = await this.apiClient.POST("/api/v1/agents/{id}/test", {

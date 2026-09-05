@@ -162,25 +162,8 @@ export class WorkflowsApiService {
 
   /**
    * Run a studio workflow evaluation and return per-row structured results.
-   *
-   * Starts the evaluation through the unified evaluations-v3 backend
-   * (`POST /api/v1/workflows/{workflowId}/evaluate`), polls to completion, fetches
-   * the per-row results, and maps them to the same row structure as the python
-   * SDK's results DataFrame.
-   *
    * @param workflowId - The studio workflow id
-   * @param options - Optional inputs, committed version override, and polling
-   *                   configuration. `data` and `datasetId` are mutually
-   *                   exclusive.
-   * @returns The run id, results URL, status, summary, and per-row results
-   *
-   * @example
-   * ```typescript
-   * const langwatch = new LangWatch();
-   * const { rows, runUrl } = await langwatch.workflows.run("workflow_123", {
-   *   data: [{ question: "What is 2 + 2?" }],
-   * });
-   * ```
+   * @param options - Optional inputs and polling configuration
    */
   async run(
     workflowId: string,

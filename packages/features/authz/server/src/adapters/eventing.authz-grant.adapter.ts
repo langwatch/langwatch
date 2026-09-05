@@ -3,39 +3,14 @@ import { Instance, Ksuid } from "@langwatch/ksuid";
 import type { LedgerPrincipal, LedgerScope } from "@langwatch/authz-contract";
 
 /**
- * Pinned, never read from the ambient environment. A KSUID's environment is a
- * display prefix (`dev_`, `staging_`, …), not content — but it lands in the
- * STRING this function returns, so deriving it from `getEnvironment()` would
- * make the id a function of the deriving process's configuration rather than
- * of the fact. Two processes disagreeing about `ENVIRONMENT` — a worker and a
- * web pod, a backfill and the fold that replays it — would then derive two
- * ids for one legacy row, and the projection's upserts would stop converging.
- * `"prod"` is the library's own default, i.e. no prefix at all.
+ * Pinned, never read from the ambient environment.
  */
 const GRANT_ID_ENVIRONMENT = "prod";
 
 /**
  * Deterministic grant identity (ADR-092 §13 doctrine: ids are functions of
- * event content). The id is a real KSUID — `grant_`-prefixed, k-sortable by
- * business time — but every bit of it is derived, none of it random: the
- * timestamp is the fact's `occurredAt`, and the instance and sequence bytes
- * come from a hash of the fact's content. The same fact always derives the
- * same id, which is what makes the genesis import, the backfill, and every
- * projection upsert idempotent without transactions.
- *
- * What is (and isn't) identity:
- * - The role is NOT part of it: changing a principal's role at a scope is
- *   `grant_role_changed` on the same id, not a new fact.
- * - Business time IS part of it (it is the KSUID timestamp): re-attaching
- *   the same principal at the same scope after a revoke is a new fact with
- *   a new id, while re-importing or retrying the SAME fact — whose
- *   `occurredAt` is fixed by the legacy row or by the originating command —
- *   derives the same id.
- * - Resource-tier grants key on the token: one resource can carry several
+ * event content).
  *   links (ADR-057 dropped one-share-per-resource), and the token is the
- *   credential's own identity.
- * - The AMBIENT ENVIRONMENT is not part of it either (see
- *   `GRANT_ID_ENVIRONMENT`): every byte comes from the arguments below.
  */
 export class EventingAuthzGrantAdapter {
   static create(): EventingAuthzGrantAdapter {

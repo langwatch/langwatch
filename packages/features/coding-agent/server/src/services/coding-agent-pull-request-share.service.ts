@@ -13,10 +13,9 @@ export interface PullRequestAttribution {
    */
   sessions: CodingAgentSessionBranchRecord[];
   /**
-   * The per-model event totals that belong to THIS pull request: rows stamped
-   * onto its branch, plus each attached session's unstamped rows where this
-   * pull request is the legacy winner. Per-call facts, deliberately unscaled —
-   * they are measurements, not shares.
+   * The per-model event totals that belong to THIS pull request: rows stamped onto its
+   * branch, plus each attached session's unstamped rows where this pull request is the
+   * legacy winner.
    */
   modelTotals: SessionModelTotalsRow[];
 }
@@ -34,44 +33,7 @@ const COUNTER_FIELDS = [
 ] as const;
 
 /**
- * The proportional rule: how much of one session's cost belongs to one pull
- * request.
- *
- * A session's cumulative counters stay the source of truth for WHAT was spent;
- * its stamped fact rows decide WHERE. Each `model_call` row carries the
- * repository and branch that were active when the call happened, so per pull
- * request the split is:
- *
- *   share      = (event tokens whose stamp lands on this pull request)
- *              / (all of the session's event tokens)
- *   PR portion = share x the session's cumulative counters
- *
- * Three buckets partition a session's event tokens, so its shares across pull
- * requests can never sum past one and a repository's pull requests never sum
- * to more than was spent:
- *
- *   - Stamped on this repository: goes to the branch's own tenure winner
- *     (`assignDrivingSessionsPerBranch`).
- *   - Stamped on another repository: counted in the denominator only; that
- *     repository's own read prices it.
- *   - Unstamped (history from before the stamp, sessions that never declared):
- *     follows the legacy whole-session rule, and ONLY in the repository the
- *     session's own row points at — the same place the legacy read charged it.
- *
- * A session with no event rows at all keeps the legacy rule whole: its full
- * total lands on its single winner, so nothing regresses to zero.
- *
- * The token counters are whole numbers, so the split hands out whole units by
- * the largest-remainder method across all of a session's buckets at once,
- * rather than rounding each pull request's share on its own. Rounding
- * separately would let a one-token session split two ways report a token to
- * each, and on a page about cost, understating is survivable where
- * overstating is not. Cost is a currency amount and stays exact.
- *
- * Pure and synchronous, like the assignment service: it decides from the rows
- * it is handed, so the same rule answers the same way in the rollup and in a
- * test.
- *
+ * The proportional rule: how much of one session's cost belongs to one pull request.
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 export class CodingAgentPullRequestShareService {
@@ -94,13 +56,6 @@ export class CodingAgentPullRequestShareService {
 
   /**
    * Attribute the candidate sessions' usage to one pull request.
-   *
-   * `rowMatchedSessionKeys` names the candidates whose own session row matches
-   * this repository; only those may receive the unstamped bucket here. A
-   * session discovered through its stamps alone belongs to another
-   * repository's row now, and that repository's read is where its unstamped
-   * tokens are priced — charging them here too would count them twice across
-   * the organization.
    */
   attribute({
     sessions,
@@ -294,12 +249,6 @@ export class CodingAgentPullRequestShareService {
 
   /**
    * This pull request's whole-token share of each of the session's counters.
-   *
-   * Each counter is handed out across ALL of the session's buckets by the
-   * largest-remainder method, and this pull request keeps the buckets it owns.
-   * Rounding each share on its own instead would let a one-token session split
-   * two ways report a token to each, and a page about cost may understate but
-   * must never overstate.
    */
   private static allocateCounters({
     session,
@@ -347,10 +296,7 @@ export class CodingAgentPullRequestShareService {
   }
 
   /**
-   * A row written before its session declared a working context. Stamps are
-   * written all-or-nothing (`isStampableContext`), so any missing field means
-   * the whole stamp is absent; checking each guards a partially stamped row
-   * from ever matching a pull request by accident.
+   * A row written before its session declared a working context.
    */
   private static isUnstamped(row: SessionModelTotalsRow): boolean {
     return row.repositoryOwner === "" || row.repositoryName === "" || row.branch === "";
@@ -383,13 +329,6 @@ export class CodingAgentPullRequestShareService {
 
   /**
    * The unit one session's rows are weighed in, and their total in that unit.
-   *
-   * Tokens whenever the session reports any: every agent reports them, and they
-   * are what the counters being split are made of. A session that priced its
-   * calls without reporting token counts is weighed by cost instead, so its
-   * stamps still decide where the money lands rather than the whole session
-   * falling back to the legacy rule. The unit is picked per session, so one
-   * ratio never mixes dollars with tokens.
    */
   private static weighing(rows: readonly SessionModelTotalsRow[]): {
     weightOf: (row: SessionModelTotalsRow) => number;

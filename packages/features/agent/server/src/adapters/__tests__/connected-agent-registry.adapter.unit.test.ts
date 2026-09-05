@@ -1,7 +1,6 @@
 /**
  * Presence reads off the instance registry: who is live now, and who has
  * aged out of the TTL window (ADR-128, "Presence").
- *
  * @see specs/agents/connected-agents.feature
  */
 import { PRESENCE_TTL_SECONDS } from "@langwatch/agent-contract";

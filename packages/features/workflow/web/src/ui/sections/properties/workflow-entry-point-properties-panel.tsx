@@ -14,12 +14,6 @@ import type {
 
 /**
  * Drawer for the workflow's entry point.
- *
- * The fields here are the workflow's INPUTS - user-owned and editable.
- * A dataset is an optional attachment that seeds those inputs with its
- * columns (merge + dedup, see attachEntryDataset) and provides the rows
- * for evaluations; it is rendered as a compact card, not a data grid,
- * so it never reads as "the inputs".
  */
 export function EntryPointPropertiesPanel({
   node,

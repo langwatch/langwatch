@@ -1,12 +1,6 @@
 /**
- * Integration tests asserting that the CLI surfaces actionable error
- * messages from the API instead of generic "Internal server error" blobs.
- *
- * Each scenario:
- *   1. Spins up a tiny HTTP server returning a known error body.
- *   2. Spawns the built CLI binary with a temp working directory pointing
- *      at that server via env vars.
- *   3. Asserts on the CLI stdout/stderr the user would actually see.
+ * Integration tests asserting that the CLI surfaces actionable error messages from the API
+ * instead of generic "Internal server error" blobs.
  */
 import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";

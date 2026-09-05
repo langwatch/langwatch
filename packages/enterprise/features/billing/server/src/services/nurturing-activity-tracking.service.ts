@@ -3,12 +3,8 @@ import { reportNurturingFailure, tryNurturingSink } from "./nurturing-sink";
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
 /**
- * In-memory cache of the last time each user was identified for activity tracking.
- * Keyed by userId, value is the timestamp of the last identify call.
- *
- * NOTE: debounce is process-local. In multi-instance deployments, each instance
- * tracks independently. This is acceptable — Customer.io's 3000 req/3s limit
- * is unlikely to be hit, and duplicate identify calls are idempotent.
+ * In-memory cache of the last time each user was identified for activity tracking. Keyed
+ * by userId, value is the timestamp of the last identify call.
  */
 const lastActivitySentAt = new Map<string, number>();
 
@@ -43,9 +39,6 @@ export class NurturingActivityTrackingService {
 
   /**
    * Pushes last_active_at to Customer.io for inactivity detection.
-   *
-   * Debounced to at most once per hour per user to avoid excessive API calls.
-   * Fire-and-forget: never throws, never blocks the session callback.
    */
   static fire({
     userId,

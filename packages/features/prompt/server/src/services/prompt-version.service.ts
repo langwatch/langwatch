@@ -45,11 +45,9 @@ export class PromptVersionService {
   }
 
   /**
-   * Validates that a prompt and system message are not set at the same time.
    * @param params - The parameters object
    * @param params.prompt - The prompt to validate
    * @param params.messages - The messages to validate
-   * @throws SystemPromptConflictError if a prompt and system message are set at the same time
    */
   assertNoSystemPromptConflict(params: {
     prompt?: string;

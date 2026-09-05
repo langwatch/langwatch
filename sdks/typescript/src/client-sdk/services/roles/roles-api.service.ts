@@ -1,8 +1,6 @@
 /**
- * The `/api/v1/roles` management family: the organization's custom RBAC roles and
- * the permission catalog they are built from.
- *
- * CLI-only, and deliberately not exported from the client SDK's public index.
+ * The `/api/v1/roles` management family: the organization's custom RBAC roles and the
+ * permission catalog they are built from.
  */
 import { resolveEndpoint } from "@/internal/endpoint";
 import {

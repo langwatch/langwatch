@@ -1,22 +1,7 @@
 /**
- * The role-bindings management REST family.
- *
- * A binding grants one role to exactly one principal (a user, a group, or an
- * API key) at one scope. Every reference is validated against the caller's
- * organization before the write, an identical declaration answers a
- * deterministic 409 (`role_binding_already_exists`), and a custom role that
- * carries an organization-exclusive permission is refused at team or project
- * scope at write time rather than silently never granting (ADR-021).
- *
- * A create for a user whose access until now came only from legacy team
- * membership reports `hasLegacyAccessNotice: true`: their first explicit binding
- * switches the team-derived fallback off, which is worth telling the operator
- * even though the write itself is exactly what they asked for.
- *
- * Every write here is a grants-ledger command (ADR-092 §13), so the audit
- * trail is the pipeline's insert-only subscriber (decision 17): these
- * handlers never emit `management.roleBinding.*` rows of their own — that
- * would record the same mutation twice.
+ * The role-bindings management REST family. A custom role that carries an
+ * organization-exclusive permission is refused at team or project scope at
+ * write time rather than silently never granting (ADR-021).
  */
 import type { EndpointVariables, ServiceContext } from "@langwatch/api/rest";
 import {
@@ -137,12 +122,6 @@ const rowMatchesFilters = (row: OrgBindingRow, query: z.infer<typeof listQuerySc
 
 /**
  * The organization the request is scoped to, as this transport reads it.
- *
- * Both routes take only `.id` off it, and typing the whole generated
- * `Organization` model here made the transport depend on Prisma's row shape for
- * one string — which is what `api-transport-import-boundary` reports. The
- * middleware still puts the full record on the context; this names the part
- * that is used.
  */
 type RequestOrganization = { id: string };
 
@@ -151,13 +130,8 @@ const organizationOf = (c: Context): RequestOrganization =>
 
 /**
  * The just-written binding as the list reports it, so a write's response is
- * byte-compatible with a later read — or null while the grants projection is
- * still behind the append that created it.
- *
- * Null is not an error here. `attachBindings` waits for the projection, but
- * that wait is bounded and timeout-tolerant, so a miss means "durable, not
- * yet projected". What each caller does with the miss differs, and is stated
- * at the call site.
+ * byte-compatible with a later read — or null while the grants projection is still behind
+ * the append that created it.
  */
 const readBackBinding = async ({
   authz,
@@ -175,20 +149,12 @@ const readBackBinding = async ({
 
 /**
  * REST for the organization's role bindings.
- *
- * The authorization and grants capabilities arrive as providers rather than
- * being read off the request, so this family can be mounted into any process
- * that has them.
  */
 export function createRoleBindingsRestApp(options: {
   security: AppRestSecurity;
   /**
-   * The Enterprise plan gate for this family's capability, applied after
-   * authentication and after the RBAC check on every route it declares.
-   *
-   * A plain middleware the mount supplies, not a feature of the builder: the
-   * REST service neither knows nor names Enterprise, and "you don't have
-   * access" still beats "your plan doesn't include this".
+   * The Enterprise plan gate for this family's capability, applied after authentication and
+   * after the RBAC check on every route it declares.
    */
   enterpriseGate: MiddlewareHandler;
   /**
@@ -295,11 +261,9 @@ export function createRoleBindingsRestApp(options: {
       bindingId: updated.id,
     });
     // A patch, unlike a create, changed a row the service had already read from
-    // the projection, so lag cannot explain its absence from the listing: only
-    // an unexpected state can (the principal leaving the organization while the
-    // request was in flight, say). Nothing the caller can act on, so it stays a
-    // plain Error and degrades to the generic failure plus a trace id (ADR-045)
-    // rather than pretending to be a nameable refusal.
+    // the projection, so lag cannot explain its absence: nothing the caller can
+    // act on, so it stays a plain Error and degrades to the generic failure plus
+    // a trace id (ADR-045).
     if (!binding) {
       throw new Error(`Role binding ${updated.id} was written but does not read back`);
     }

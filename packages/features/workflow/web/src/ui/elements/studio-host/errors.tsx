@@ -1,11 +1,5 @@
 /**
  * The failure surfaces this package renders INTO a page.
- *
- * Reporting a failure OVER the page is `showErrorToast` in
- * `@langwatch/ui-host/errors`, and the words for a code come from the one
- * code-keyed registry, `@langwatch/handled-error/presentation`. What is left
- * here is the rendering: an inline alert and a whole-page dead end, which have
- * no counterpart on the feedback port because they are layout, not a report.
  */
 
 import { Alert, Box, Button, Text, VStack } from "@chakra-ui/react";

@@ -1,7 +1,6 @@
 /**
- * What the agents list reads about presence, including what it shows when the
- * registry cannot answer for one agent.
- *
+ * What the agents list reads about presence, including what it shows when the registry
+ * cannot answer for one agent.
  * @see specs/agents/connected-agents.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";

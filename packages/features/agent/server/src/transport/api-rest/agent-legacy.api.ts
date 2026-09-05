@@ -25,12 +25,8 @@ import { describeRoute, resolver } from "hono-openapi";
 import { AgentApp } from "#app/agent.app";
 
 /**
- * The platform's own address for ONE agent: the agents page with the editor
- * drawer for that agent open.
- *
- * A port because the drawer the address opens is the application's own routing
- * vocabulary, shared with the Langy navigate fallback, and the origin comes
- * from the deployment's validated environment.
+ * The platform's own address for ONE agent: the agents page with the editor drawer for
+ * that agent open.
  */
 export type AgentPlatformUrlBuilder = (args: {
   projectSlug: string;
@@ -40,9 +36,6 @@ export type AgentPlatformUrlBuilder = (args: {
 
 /**
  * The deprecated `/api/agents` REST family.
- *
- * Every route is marked `deprecated` and tagged `Legacy` in the published
- * document; the surface remains mounted because deployed callers still use it.
  */
 export function createAgentLegacyRestApp(options: {
   security: AppRestSecurity;

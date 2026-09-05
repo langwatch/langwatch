@@ -19,7 +19,6 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 import { resultCapViolation } from "../../../rules/connected-agent-envelope.rules";
 import { ConnectedAgentRuntimeAdapter } from "../../../adapters/connected-agent-runtime.adapter";
-import type { ConnectedAgentRuntime } from "../../../ports/connected-agent-runtime.port";
 import { ConnectedAgentStateAdapter } from "../../../adapters/connected-agent-state.adapter";
 import { AgentSessionService } from "../../../services/connected-agent-session.service";
 import type { AgentRepository } from "../../../repositories/agent.repository";

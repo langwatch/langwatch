@@ -1,7 +1,6 @@
 /**
  * The agent client against a fake platform: a `ws` server on a random port
  * that records what the SDK sends and answers with the frames of ADR-128.
- *
  * @see specs/typescript-sdk/agent-wrapper.feature
  */
 import type { IncomingMessage } from "node:http";

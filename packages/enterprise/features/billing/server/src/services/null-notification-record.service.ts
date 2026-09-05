@@ -1,11 +1,5 @@
 /**
  * A notification record store that keeps nothing.
- *
- * `UsageLimitService.createNull()` uses it so a caller can exercise the
- * decision — should this alert be sent, to whom — without a database. It
- * answers "no notifications yet" to every read, so the 30-day window never
- * suppresses anything, and returns a plausible record from `create` rather
- * than nothing, because callers read the id off it.
  */
 
 import {

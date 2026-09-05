@@ -1,41 +1,7 @@
 /**
  * The grants ledger's app-side writer (ADR-092 §13): the ONE storage engine
- * behind every grant mutation. Callers keep their own validation and error
- * surfaces; this module owns emission — every write is a command whose
- * ClickHouse append is waited on, the fold lands it in the two-headed
- * Postgres projection through the per-org queue, and revocation-class writes
- * additionally apply their deny effect synchronously (decision 7: the one
- * sanctioned direct projection write, shaped so it can only make deny true
- * early, never grant).
- *
- * Read-your-writes: attach- and role-shaped writes wait (bounded) for the
- * projection to land their rows before returning. The wait is an
- * observation, not inline processing — a fold that cannot run (Redis down)
- * makes the wait time out, the write is still durable, and the rows appear
- * when the fold drains (ADR-007's breaker doctrine). Revocations never need
- * the wait: enforcement already deleted the rows.
- *
- * PER-ORGANIZATION, NOT PER-DEPLOY (decision 4). Every verb asks the write
- * gate first: an organization whose genesis import has landed writes
- * through the ledger, everyone else still takes the imperative Prisma
- * write, and an operator's `rolled_back` flip returns an organization to
- * the legacy path with no deploy. The fork lives HERE and nowhere else
- * — every call site keeps calling the same verb and never learns which side
- * answered it. Rows written imperatively while on the legacy side are
- * adopted by the next genesis pass (it takes each legacy row's own id as
- * the fact's id), which is what makes flip → rollback → re-flip safe.
- *
- * The audit trail forks with the writes: a migrated organization gets its
- * rows from the insert-only subscriber (decision 17); an unmigrated one
- * writes the same-shaped `AuditLog` row itself, best-effort, since a failed
- * audit insert must not fail a grant write.
- *
- * Identity: a runtime fact's grant id is the caller-minted binding KSUID,
- * the id the REST surface already returns to customers (decision 23's
- * house pattern). Retries reuse the commandId so the same payload dedupes
- * at the event store. Content-derived ids (`deriveGrantId`) are the
- * import/migration tool's, where identity must survive re-runs with no
- * caller to remember a mint.
+ * behind every grant mutation, waiting (bounded) for the projection to land
+ * attach- and role-shaped writes before returning (ADR-007's breaker doctrine).
  */
 import type { LedgerActor } from "@langwatch/actor";
 import {
@@ -68,10 +34,6 @@ const logger = createLogger("langwatch:authz:ledger");
 
 /**
  * Which writer authored a runtime fact — the event's `source` field.
- *
- * `read-through-mint` is the compatibility path (decision 1: no legacy-key
- * sunset): a credential whose access predates the ledger states it the first
- * time it is used, rather than being asked to be re-issued.
  */
 export type LedgerWriteSource = GrantEventSource;
 
@@ -81,11 +43,9 @@ const CONVERGENCE_TIMEOUT_MS = 8_000;
 export type LedgerBindingAttach = Omit<RoleBindingWrite, "organizationId">;
 
 /**
- * The audience a resource fact names. `ShareVisibility`'s three values in
- * the ledger's own vocabulary — PUBLIC is "anyone" (id null, because there
- * is nobody to name), and the other two name the organization or project
- * whose members the link is for. A union rather than the general principal
- * shape, so a resource mint cannot accidentally state a user or a key.
+ * The audience a resource fact names. `ShareVisibility`'s three values in the ledger's own
+ * vocabulary — PUBLIC is "anyone" (id null, because there is nobody to name), and the
+ * other two name the organization or project whose members the link is for.
  */
 export type LedgerResourcePrincipal =
   | { type: "anyone"; id: null }
@@ -107,10 +67,9 @@ export type LedgerResourceTerms = {
 };
 
 /**
- * The one principal a write names, in the port's exactly-one shape. Call
- * sites carry three optional columns (the legacy row shape); the port carries
- * a union that makes "two principals on one row" unrepresentable, and this is
- * the single place the two meet.
+ * The one principal a write names, in the port's exactly-one shape. Call sites carry three
+ * optional columns (the legacy row shape); the port carries a union that makes "two
+ * principals on one row" unrepresentable, and this is the single place the two meet.
  */
 export type AttachOutcome = {
   /** Binding ids actually emitted (duplicates skipped when asked to). */
@@ -215,14 +174,8 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
   }
 
   /**
-   * The audit row a migrated organization would have got from the subscriber,
-   * written here because an unmigrated one has no event to subscribe to. Same
-   * action vocabulary, same `metadata = the fact minus its actor`, same
-   * actor-to-`userId` rule; only the id differs, because there is no event id
-   * to derive one from, so the column's own default mints it.
-   *
-   * Best-effort on purpose: a write that succeeded must not be reported as
-   * failed because its trail did not land.
+   * The audit row a migrated organization would have got from the subscriber, written here
+   * because an unmigrated one has no event to subscribe to.
    */
   private async recordLegacyAudit({
     organizationId,
@@ -257,11 +210,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
   }
 
   /**
-   * INSERT one or more binding facts. `onDuplicate: "reject"` names the
-   * first identical row (the single-write surfaces' 409); `"skip"` filters
-   * them out (the `createMany … skipDuplicates` surfaces' semantics —
-   * re-asserting a row the principal already holds leaves exactly the state
-   * the caller asked for).
+   * INSERT one or more binding facts.
    */
   async attachBindings({
     organizationId,
@@ -279,28 +228,20 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     source?: LedgerWriteSource;
     onDuplicate: "reject" | "skip";
     /**
-     * A caller-derived command id, for writes that are not a user action and
-     * therefore have no retry to remember one (decision 23: migration-shaped
-     * writers derive theirs from the source row). Two concurrent emissions of
-     * the same derived fact then carry the same `<commandId>:<index>`
-     * idempotency key and dedupe at the event store. Omitted, a random one is
-     * minted, which is what a genuine repeat action wants.
+     * A caller-derived command id, for writes that are not a user action and therefore have no
+     * retry to remember one (decision 23: migration-shaped writers derive theirs from the
+     * source row).
      */
     commandId?: string;
     /**
-     * The fact's business time. Backdating writers pass the source row's own
-     * timestamp so the grant keeps the time it really started — and so a
-     * content-derived grant id, whose KSUID timestamp IS this value, stays
-     * stable across re-emissions. Defaults to now, which is true of every
-     * fact born from a live action.
+     * The fact's business time. Backdating writers pass the source row's own timestamp so the
+     * grant keeps the time it really started — and so a content-derived grant id, whose KSUID
+     * timestamp IS this value, stays stable across re-emissions.
      */
     occurredAtMs?: number;
     /**
-     * Whether to hold for the projection to land the rows. On by default:
-     * a caller that just wrote usually reads next. A write that is not on
-     * anybody's read path — the read-through mint, off the auth hot path —
-     * turns it off, because the append is already durable and waiting would
-     * only spend the request's time.
+     * Whether to hold for the projection to land the rows. On by default: a caller that just
+     * wrote usually reads next.
      */
     awaitProjection?: boolean;
   }): Promise<AttachOutcome> {
@@ -366,10 +307,9 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
   }
 
   /**
-   * Split a batch into the bindings that are genuinely new and the ids of the
-   * identical rows already present — the identity pre-check both sides of the
-   * fork run, so an organization's outcome does not change when it migrates.
-   * A repeat inside the same batch counts as a duplicate of itself.
+   * Split a batch into the bindings that are genuinely new and the ids of the identical rows
+   * already present — the identity pre-check both sides of the fork run, so an
+   * organization's outcome does not change when it migrates.
    */
   private async partitionByIdentity({
     organizationId,
@@ -456,12 +396,8 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
   }
 
   /**
-   * The pre-ledger attach, for an organization the genesis import has not
-   * reached: the rows are written directly (`insertBindingRows` below owns
-   * the two duplicate semantics). The identity pre-check above ran on this
-   * path too, so both sides answer the same `AttachOutcome`; the partial
-   * unique indexes remain the backstop for the race the pre-check cannot
-   * close.
+   * The pre-ledger attach, for an organization the genesis import has not reached: the rows
+   * are written directly (`insertBindingRows` below owns the two duplicate semantics).
    */
   private async attachBindingsImperatively({
     organizationId,
@@ -529,25 +465,6 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
   /**
    * INSERT one resource fact — a share link, as the ledger states it
    * (ADR-057's possession model intact, delivery-plan decision 22).
-   *
-   * Resource facts differ from binding facts in three ways, and all three
-   * are visible in the shape here: they carry no role (their single
-   * permission rides in the terms), their principal is an AUDIENCE rather
-   * than an identity (anyone / an organization / a project), and their
-   * compat head is `ShareLink` rather than `RoleBinding`. So the
-   * read-your-writes wait watches the share row: the caller mints the id,
-   * sends the fact, and then returns the row the fold wrote — which is the
-   * row the customer's token already resolves to, because the id is shared.
-   *
-   * Timing out is not a failure here either (the append is durable); it
-   * means the caller's read-back will come up empty and it is the caller's
-   * business what to say about that.
-   *
-   * No write-gate ask, on purpose: the only caller is the share
-   * repository's per-organization fork, which fires solely for a CUT-OVER
-   * organization — and cutover requires the genesis import finalized, a
-   * strictly stronger condition than the write gate's migrated-or-finalized.
-   * An organization that is not on ledger writes never reaches this verb.
    */
   async attachResourceGrant({
     organizationId,
@@ -623,25 +540,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
   }
 
   /**
-   * DELETE resource facts. This is the ledger half of `revokeBindings` under
-   * the name the resource tier calls it by — revocation is keyed on grant
-   * ids and knows nothing about tiers, so the command, the synchronous
-   * enforcement (decision 7) and the epoch bump are literally the same ones.
-   * The synchronous enforcement marks the authoritative `Grant` row; the
-   * compat `ShareLink` head is deleted by the caller
-   * (`share.ledger.repository`, before it returns), not by this enforcement,
-   * so a revoked link stops resolving on both heads without the fold running.
-   *
-   * NO `onLedger` gate, like `attachResourceGrant` and for a stronger
-   * reason: the caller (`share.ledger.repository`) has already routed here
-   * on an UNCACHED cutover read, and the write gate is a different, cached
-   * answer — a stale or failed `false` from it would send a cut-over
-   * organization's revocation to the legacy branch, which deletes only
-   * `RoleBinding` rows: no fact appended, the `Grant` head keeps the grant,
-   * and the fold re-projects the "revoked" link. Revocation must never come
-   * undone, so it goes straight to the append; on an organization that
-   * turns out to be on legacy the fact folds as a no-op and the enforcement
-   * delete is the same delete the legacy path wanted.
+   * DELETE resource facts.
    */
   async revokeResourceGrants({
     organizationId,
@@ -723,10 +622,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
   }
 
   /**
-   * UPDATE the role one binding carries, keeping its identity. Missing rows
-   * throw `BindingMissingError`; a sibling row already holding the target
-   * role at the same scope throws `DuplicateBindingError` — the same two
-   * knowable failures the imperative writer surfaced.
+   * UPDATE the role one binding carries, keeping its identity.
    */
   async changeBindingRole({
     organizationId,
@@ -795,18 +691,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
   }
 
   /**
-   * The ledger-side role change. A compat row can exist with no fact behind
-   * it in the fold's head: it was written imperatively during the write
-   * gate's negative-cache window (an organization the gate briefly, wrongly,
-   * read as legacy — see `engine-gate.ts`) or during the genesis
-   * snapshot -> flip gap, and `finalized` genesis passes never revisit it.
-   * Sending `grant_role_changed` for such an id targets a grantId the
-   * reducer has never seen; it no-ops silently there
-   * (`state.grants[grantId]` undefined), `awaitProjection` times out with
-   * only a warn, and the caller is told success while nothing changed. Adopt
-   * the row instead, exactly as genesis adopts a legacy row: an attach fact
-   * for this id, carrying the NEW role, both creates the head entry and
-   * lands the requested change in one step.
+   * The ledger-side role change.
    */
   private async changeBindingRoleOnLedger({
     organizationId,
@@ -883,11 +768,9 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
   }
 
   /**
-   * Adopt a stranded compat row into the fold as part of changing its role:
-   * an attach fact for the row's own id, carrying the role the caller asked
-   * for, so the reducer's overwrite-by-id semantics for `grant_attached`
-   * both create the head entry and land the change (mirrors
-   * `genesis-import.migration.ts`'s adoption of legacy rows by id).
+   * Adopt a stranded compat row into the fold as part of changing its role: an attach fact
+   * for the row's own id, carrying the role the caller asked for, so the reducer's
+   * overwrite-by-id semantics for `grant_attached` both create the head entry and land the
    */
   private async adoptStrandedRoleChange({
     organizationId,
@@ -968,12 +851,11 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     actor: LedgerActor;
   }): Promise<void> {
     try {
-      // `updateMany`, not `update` by bare id: the pre-read above already
-      // ran under `organizationId`, and the write should stay scoped to the
-      // same tenant rather than trust the id alone. `updateMany` never
-      // throws Prisma's not-found (P2025) the way a singular `update` does,
-      // so the same race — the row gone between the pre-read and here — is
-      // caught by the zero-match count instead.
+      // `updateMany`, not `update` by bare id: the pre-read above already ran under
+      // `organizationId`, and the write should stay scoped to the same tenant rather than trust
+      // the id alone. `updateMany` never throws Prisma's not-found (P2025) the way a singular
+      // `update` does, so the same race — the row gone between the pre-read and here — is caught
+      // by the zero-match count instead.
       const updated = await this.options.database.roleBinding.updateMany({
         where: { id: bindingId, organizationId },
         data: { role, customRoleId },
@@ -995,14 +877,8 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
   }
 
   /**
-   * DELETE binding facts — revocation-class (decision 7): the deny is applied
-   * synchronously on this path after the append, by marking the authoritative
-   * `Grant` row `revokedAt`. That is the head every migrated organization
-   * decides from, so the deny holds before the call returns even with the
-   * queue stopped. The compat `RoleBinding` is NOT deleted here — the fold
-   * sweeps it when the queue runs — so an organization rolled back to legacy
-   * inside a queue-stopped window can still read the stale binding until the
-   * projection catches up. Absent ids are no-ops.
+   * DELETE binding facts — revocation-class (decision 7): the deny is applied synchronously
+   * on this path after the append, by marking the authoritative `Grant` row `revokedAt`.
    */
   async revokeBindings({
     organizationId,
@@ -1053,25 +929,6 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
 
   /**
    * Revoke every binding matching a filter; answers how many it revoked.
-   *
-   * On the LEDGER fork the count is ADVISORY: it is the number of rows the
-   * lagging compat projection could see when the filter ran. The event
-   * carries a selector where one can be expressed, so the fold's sweep can
-   * revoke grants the count never included — `0` means "none visible yet",
-   * not "none existed". Callers must not derive existence from it. On the
-   * LEGACY fork (below) there is no fold to sweep anything later, so the
-   * delete is a single `deleteMany(where)` statement and its count is exact.
-   *
-   * SEAM, to be narrowed: `where` is a raw `Prisma.RoleBindingWhereInput`, so
-   * a storage type is part of a port every call site now depends on, and the
-   * filter cannot be carried onto the event except for the shapes
-   * `revocationSelector` can read back (principal, optionally at one scope).
-   * The replacement is a small closed vocabulary — the same union the
-   * selector already speaks — which is a call-site change across four
-   * repositories and belongs in its own commit rather than in a review fix.
-   * Until then, the two guards below stand in for the type: every filter is
-   * organization-scoped, and a filter naming no organization is refused
-   * rather than quietly running fleet-wide.
    */
   async revokeBindingsWhere({
     organizationId,
@@ -1094,12 +951,10 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     const legacyWhere = { ...where, organizationId };
 
     if (!(await this.onLedger(organizationId))) {
-      // The pre-ledger, filtered revoke: ONE `deleteMany(where)` statement,
-      // not a read followed by a delete-by-ids. There is no fold here to
-      // sweep a row that lands in the gap between the two — a row matching
-      // the filter, created between a read and a later delete, has to be
-      // caught by the single statement or it survives the revoke that was
-      // meant to catch it.
+      // The pre-ledger, filtered revoke: ONE `deleteMany(where)` statement, not a read followed
+      // by a delete-by-ids. There is no fold here to sweep a row that lands in the gap between
+      // the two — a row matching the filter, created between a read and a later delete, has to
+      // be caught by the single statement or it survives the revoke that was meant to catch it.
       const { count } = await this.options.database.roleBinding.deleteMany({
         where: legacyWhere,
       });
@@ -1120,12 +975,11 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
       return count;
     }
 
-    // The compat head is not the whole head. A Grant-head row a custom-role
-    // import wrote (roleKey with no compat binding), a PLATFORM-tier row, or
-    // one whose compat write hit a swallowed conflict has no RoleBinding to
-    // enumerate, so revoking only the ids `roleBinding.findMany` returns would
-    // leave those resolving. Mirror `offboardMember`: union the compat ids
-    // with the Grant-head rows the same filter names.
+    // The compat head is not the whole head. A Grant-head row a custom-role import wrote
+    // (roleKey with no compat binding), a PLATFORM-tier row, or one whose compat write hit a
+    // swallowed conflict has no RoleBinding to enumerate, so revoking only the ids
+    // `roleBinding.findMany` returns would leave those resolving. Mirror `offboardMember`:
+    // union the compat ids with the Grant-head rows the same filter names.
     const bindingRows = await this.options.database.roleBinding.findMany({
       where: legacyWhere,
       select: { id: true },
@@ -1159,14 +1013,8 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
   }
 
   /**
-   * Record one member's offboarding: the fact carries every revoked grant id
-   * the caller could see, and enforcement deletes those heads synchronously.
-   * The id list is the AUDIT record, not the instruction — the fold sweeps
-   * every grant the principal holds, so a grant appended between the caller's
-   * query and this append (invisible to the lagging projection) cannot
-   * survive the departure. Membership tables (OrganizationUser, TeamUser,
-   * group memberships, invites) are not grant facts — their deletes stay with
-   * the caller.
+   * Record one member's offboarding: the fact carries every revoked grant id the caller
+   * could see, and enforcement deletes those heads synchronously.
    */
   async offboardMember({
     organizationId,
@@ -1309,16 +1157,9 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
   }
 
   /**
-   * The pre-ledger role write. `role_defined` collapsed the editor's create
-   * and update into one verb; the upsert is that same collapse against the
-   * table, keyed on the id the caller minted — organization scoped on the
-   * update so a role can never be edited across tenants. The
-   * name-uniqueness pre-check lives at the service layer (`assertNameFree`)
-   * and runs on both sides — but it is advisory, read ahead of the append
-   * rather than inside it, so two concurrent renames can still both pass it
-   * and race for the same `(organizationId, name)` unique index here. The
-   * loser gets the deterministic conflict rather than a raw Prisma error
-   * degrading to an unknown 500.
+   * The pre-ledger role write. `role_defined` collapsed the editor's create and update into
+   * one verb; the upsert is that same collapse against the table, keyed on the id the caller
+   * minted — organization scoped on the update so a role can never be edited across tenants.
    */
   private async defineRoleImperatively({
     organizationId,
@@ -1379,10 +1220,9 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
   }
 
   /**
-   * Delete one role definition. Bindings carrying the role are the caller's
-   * to revoke first (`revokeBindingsWhere({ customRoleId })`) — revocation
-   * enforcement makes the deny instant; the definition's disappearance
-   * follows through the fold.
+   * Delete one role definition. Bindings carrying the role are the caller's to revoke first
+   * (`revokeBindingsWhere({ customRoleId })`) — revocation enforcement makes the deny
+   * instant; the definition's disappearance follows through the fold.
    */
   async deleteRole({
     organizationId,
@@ -1394,13 +1234,8 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     roleId: string;
     actor: LedgerActor;
     /**
-     * Whether to hold for the projection to drop the role row. On by
-     * default: a caller that deletes a role usually needs the name free
-     * again straight away. A caller that only retires a role nothing reads
-     * any more turns it off and saves a full fold pickup cycle on the
-     * request; the append is durable either way and the fold converges.
-     * Nothing here depends on the ordering of other commands, which the
-     * queue does not give: command jobs are grouped per command name.
+     * Whether to hold for the projection to drop the role row. On by default: a caller that
+     * deletes a role usually needs the name free again straight away.
      */
     awaitProjection?: boolean;
   }): Promise<void> {
@@ -1484,13 +1319,8 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
 }
 
 /**
- * The revocation entries one revoke command carries.
- *
- * The selector rides the FIRST entry only: the fold's sweep is absolute, so
- * repeating it on every entry would remove exactly the same grants while
- * writing the identity into every audit row. When the lagging projection
- * listed no id at all, the selector IS the whole instruction and is the only
- * entry — which is why a filtered revoke that matched nothing still appends.
+ * The revocation entries one revoke command carries. The selector rides the
+ * first entry only, since the fold's sweep is absolute.
  */
 /** One binding fact as the legacy table's three optional principal columns. */
 export class AuthzLedgerMapper {
@@ -1562,10 +1392,6 @@ export class AuthzLedgerMapper {
 
   /**
    * The subscriber's relevance guard, on the pre-ledger side (decision 17).
-   * `genesis-import` and `backfill-b` never reach this writer at all, and the
-   * read-through mint is gated off for an unmigrated organization, so in
-   * practice nothing is filtered here — the rule is stated anyway so the two
-   * audit paths cannot drift into disagreeing about what earns a row.
    */
   private static auditableSource(source: LedgerWriteSource): boolean {
     return source !== "read-through-mint" && source !== "migration";
@@ -1637,17 +1463,9 @@ export class AuthzLedgerMapper {
   }
 
   /**
-   * Translate a compat `RoleBinding` filter into the equivalent `Grant`-head
-   * predicate, so a filtered revoke reaches Grant rows the compat head never
-   * represented (a `roleKey`-only import, a PLATFORM-tier row).
-   *
-   * A bounded translation over exactly the columns the callers filter on
-   * (`apiKeyId` / `groupId` / `userId` → principal; `customRoleId` → the
-   * `custom:<id>` roleKey; `scopeType` / `scopeId` → the same tier and id on
-   * the Grant head; `id` shared by construction). Any other shape returns
-   * null and the caller falls back to the compat ids alone — the pre-existing
-   * behaviour, never a wrong revoke. This is the interim until the filter
-   * becomes the closed vocabulary `revokeBindingsWhere` documents.
+   * Translate a compat `RoleBinding` filter into the equivalent `Grant`-head predicate, so a
+   * filtered revoke reaches Grant rows the compat head never represented (a `roleKey`-only
+   * import, a PLATFORM-tier row).
    */
   static grantWhereFromBindingWhere(
     where: AuthzRoleBindingFilter,
@@ -1699,13 +1517,8 @@ export class AuthzLedgerMapper {
   }
 
   /**
-   * A scoped filter names the SAME tier and id on the Grant head — the three
-   * compat tiers spell identically in `GrantScopeType`. This is what lets a
-   * scoped replacement revoke (team member removal, invite replacement,
-   * team-role replacement) reach a Grant-only row: without it those callers
-   * fell back to the compat ids and a migrated organization kept a live
-   * roleKey-only grant after the role was replaced. Operator shapes are
-   * outside the caller vocabulary, so null and the caller bails.
+   * A scoped filter names the SAME tier and id on the Grant head — the three compat tiers
+   * spell identically in `GrantScopeType`.
    */
   private static scopeFromBindingFilter(
     where: AuthzRoleBindingFilter,

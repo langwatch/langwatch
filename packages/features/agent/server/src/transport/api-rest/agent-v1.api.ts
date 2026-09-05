@@ -1,14 +1,6 @@
 /**
  * The `/api/v1/agents` REST family: list, create, read, update, archive,
  * test, call and the HTTP long-poll `/connect/*` routes (ADR-128).
- *
- * Every read carries the presence and owner of a connected agent, and the run
- * parameters it declares, so a caller of this family never has to ask a
- * second endpoint whether an instance is online. The `/connect/*` and
- * `/:id/call` routes are registered from {@link ./agent-connect.api} and
- * {@link ./agent-call.api} — kept apart because they need dependencies (the
- * connected runtime, the long-poll transport, the owner-only run guard) this
- * file's own collection/item/archive/test routes do not.
  */
 
 import {

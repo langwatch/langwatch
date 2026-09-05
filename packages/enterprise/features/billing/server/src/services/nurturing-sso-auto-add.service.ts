@@ -6,11 +6,8 @@ export class NurturingSsoAutoAddService {
   }
 
   /**
-   * Identifies a user in Customer.io when they are auto-added to an
-   * organization via SSO domain matching.
-   *
-   * Fires identifyUser, groupUser, and a "joined_via_sso" event —
-   * all fire-and-forget so that Customer.io failures never block signup.
+   * Identifies a user in Customer.io when they are auto-added to an organization via SSO
+   * domain matching.
    */
   static fireSsoAutoAdd({
     userId,

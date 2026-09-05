@@ -1,14 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration test for the Publish menu in the optimization studio.
- *
- * Pins the regression: the studio Publish menu must NOT be gated by
- * `usage.activePlan.canPublish`. No Lock icon, no "Subscribe to unlock"
- * tooltip, no redirect to plan management — even when the active plan
- * has canPublish=false.
- *
- * See specs/studio/publish-not-gated.feature.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

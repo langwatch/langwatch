@@ -1,17 +1,5 @@
 /**
  * The checks every grant write runs before it touches a row.
- *
- * All three answer one question — does this write stay inside the
- * organization it claims to be for? — and all three answer it by reading the
- * grant repository. A binding must already belong to the organization, the
- * scope it points at must sit under that organization, and a custom role must
- * both belong to it and name permissions that exist.
- *
- * The last one is the least obvious and the most important: a custom role
- * carrying a permission string the registry has never heard of would evaluate
- * to a grant of nothing, silently. It is refused at write time so the customer
- * finds out while they are editing the role rather than when somebody cannot
- * open a page.
  */
 
 import {

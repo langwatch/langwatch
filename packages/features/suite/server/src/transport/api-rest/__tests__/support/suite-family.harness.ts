@@ -1,21 +1,5 @@
 /**
  * The three suite REST families over the REAL suite application.
- *
- * `/api/v1/run-plans`, `/api/v1/test-suites` and the deprecated `/api/suites`
- * alias all answer from ONE `SuiteApp`, which is why they are stood up
- * together: what a suite about them is really asking is whether two doors onto
- * one plan can disagree, and mounting one family at a time could not tell.
- *
- * Below the transport, everything that decides an answer is the product's own
- * code — `SuiteApp`, `SuiteService`, `SuiteExecutionService`. Only the
- * repositories are stood up here, in memory, with the semantics the Postgres
- * ones carry: a plan is matched by name, trimmed and without case; a slug is
- * derived once and kept across a rename; an archived row leaves the list. A
- * fake of `SuiteApp` would have made the "created" flag, the name resolution
- * and the test-suite/run-plan disjointness assertions about the fake.
- *
- * The event stack is a RECORDER rather than a queue: a run's real consequence
- * is the two commands it dispatches, and the suites read them back.
  */
 import type { AgentService } from "@langwatch/agent-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
@@ -153,7 +137,10 @@ export class SuiteWorld {
       id,
       projectId: TEST_PROJECT.id,
       name,
-      slug: nextAvailableSlug(slugify(name), [...this.testSuites.values()].map((one) => one.slug)),
+      slug: nextAvailableSlug(
+        slugify(name),
+        [...this.testSuites.values()].map((one) => one.slug),
+      ),
       description: null,
       scenarioIds: overrides.scenarioIds ?? [],
       targets: [],
@@ -176,11 +163,17 @@ export class SuiteWorld {
   }
 
   /** A test suite with `count` scenarios filed into it. */
-  addTestSuiteWithCases(name: string, count: number): { testSuite: ScenarioTestSuite; cases: ScenarioRow[] } {
+  addTestSuiteWithCases(
+    name: string,
+    count: number,
+  ): { testSuite: ScenarioTestSuite; cases: ScenarioRow[] } {
     const cases = Array.from({ length: count }, (_, index) =>
       this.addScenario({ name: `${name} scenario ${index}` }),
     );
-    return { testSuite: this.addTestSuite({ name, scenarioIds: cases.map((one) => one.id) }), cases };
+    return {
+      testSuite: this.addTestSuite({ name, scenarioIds: cases.map((one) => one.id) }),
+      cases,
+    };
   }
 
   addPlan(overrides: Partial<Suite> = {}): Suite {
@@ -192,7 +185,10 @@ export class SuiteWorld {
       name,
       slug:
         overrides.slug ??
-        nextAvailableSlug(slugify(name), [...this.plans.values()].map((one) => one.slug)),
+        nextAvailableSlug(
+          slugify(name),
+          [...this.plans.values()].map((one) => one.slug),
+        ),
       kind: "run_plan",
       description: null,
       scenarioIds: overrides.scenarioIds ?? [this.addScenario().id],
@@ -257,7 +253,9 @@ class MemorySuiteRepository extends SuiteRepository {
     if (input.scope.mode === "all") return active.map((one) => one.id);
     if (input.scope.mode === "test_suites") {
       const named = new Set(input.scope.testSuiteIds);
-      return active.filter((one) => one.testSuiteId && named.has(one.testSuiteId)).map((one) => one.id);
+      return active
+        .filter((one) => one.testSuiteId && named.has(one.testSuiteId))
+        .map((one) => one.id);
     }
     return [];
   }
@@ -393,10 +391,6 @@ class MemorySuiteRepository extends SuiteRepository {
 
 /**
  * The scenario half of the world.
- *
- * Only the operations the three families reach are implemented; every other
- * one is a NAMED absence, so a scenario that wandered into one fails saying so
- * rather than reading an empty answer.
  */
 function memoryScenarioService(world: SuiteWorld): ScenarioService {
   const active = (id: string) => {
@@ -413,8 +407,7 @@ function memoryScenarioService(world: SuiteWorld): ScenarioService {
     listTestSuites: async (input: { projectId: string; includeArchived?: boolean }) =>
       [...world.testSuites.values()].filter(
         (one) =>
-          one.projectId === input.projectId &&
-          (input.includeArchived || one.archivedAt === null),
+          one.projectId === input.projectId && (input.includeArchived || one.archivedAt === null),
       ),
     createTestSuite: async (input: { projectId: string; name: string }) =>
       world.addTestSuite({ name: input.name }),
@@ -512,10 +505,7 @@ function memoryAgentService(world: SuiteWorld): AgentService {
 }
 
 function memoryPromptService(): PromptService {
-  return namedAbsences(
-    { getExistingIds: async () => [], getNamesByIds: async () => [] },
-    "prompt",
-  );
+  return namedAbsences({ getExistingIds: async () => [], getNamesByIds: async () => [] }, "prompt");
 }
 
 /** The two Eventing commands a run dispatches, recorded rather than queued. */
@@ -545,17 +535,10 @@ export type SuiteFamilies = ReturnType<typeof mountSuiteFamilies>;
 
 /**
  * A handled refusal at its own status, carrying its own code.
- *
- * The process's own rendering is `ApiRestObservabilityComposition`, pinned by
- * its own suites; what these suites assert is the code and the status the
- * family raises, which is what a customer acts on either way.
  */
 const renderHandled: ErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {
-    return c.json(
-      { message: error.message, ...error.serialize() },
-      error.httpStatus as 400,
-    );
+    return c.json({ message: error.message, ...error.serialize() }, error.httpStatus as 400);
   }
   return c.json({ code: "internal_server_error", message: String(error) }, 500);
 };
@@ -570,9 +553,6 @@ export async function errorCodeOf(response: Response): Promise<string | undefine
 
 /**
  * Every caller authenticated as one project.
- *
- * `userId: null` is the distinct case of a key naming no person, which is what
- * decides whether a run records an actor.
  */
 function suiteTestSecurity(caller: RestFamilyCaller): AppRestSecurity {
   const pass: MiddlewareHandler = async (_c, next) => {
@@ -608,10 +588,6 @@ export type RestFamilyCaller = { userId?: string | null | undefined };
 
 /**
  * The three families, one application, one world.
- *
- * `caller` is passed straight through to the shared harness, so a suite about
- * the actor a run records says who the credential belongs to rather than
- * describing the credential chain again.
  */
 export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefined } = {}) {
   const world = new SuiteWorld();
@@ -660,7 +636,12 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
   hono.route("/", createTestSuitesV1RestApp({ security, suites: () => app, platformUrl }).hono);
   hono.route("/", createSuiteRestApp({ security, suites: () => app, platformUrl }).hono);
 
-  const send = (method: string, path: string, body?: unknown, headers: Record<string, string> = {}) =>
+  const send = (
+    method: string,
+    path: string,
+    body?: unknown,
+    headers: Record<string, string> = {},
+  ) =>
     hono.fetch(
       new Request(`http://api.test${path}`, {
         method,
@@ -685,9 +666,6 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
 
 /**
  * The given operations, with everything else refusing by name.
- *
- * A stub that answered emptily would let a scenario pass over a collaborator
- * this harness never composed.
  */
 function namedAbsences<T extends object>(implemented: T, subject: string): never {
   return new Proxy(implemented, {

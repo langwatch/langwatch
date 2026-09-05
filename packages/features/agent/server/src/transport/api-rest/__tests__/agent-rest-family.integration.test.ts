@@ -1,10 +1,6 @@
 /**
- * The `/api/v1/agents` REST family and its deprecated `/api/agents` alias,
- * driven through the real Hono apps `createAgentV1RestApp` and
- * `createAgentLegacyRestApp` build — mounted over a real `AgentService` on an
- * in-memory `AgentRepository`, so the validation, the 404/422 mapping and the
- * pagination are all the production ones.
- *
+ * The `/api/v1/agents` REST family and its deprecated `/api/agents` alias, driven through
+ * the real Hono apps `createAgentV1RestApp` and `createAgentLegacyRestApp` build — mounted
  * @see specs/agents/agents-rest-api.feature
  */
 import {

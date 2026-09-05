@@ -1,11 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for the system-prompt-required validation flow
- * (Issue #3196 — Bug 2 client-side). These exercise the real
- * `usePromptConfigForm` resolver + the same `useWatch`-driven Save-button
- * disabled wiring used by `PromptEditorDrawer`, so the scenarios bind the
- * behavior a user sees, not just the schema.
  */
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

@@ -59,13 +59,10 @@ export class SaaSPlanProviderService extends BillingService {
     const overrideAddingLimitations =
       !!user?.impersonator && isAdmin(this.adminEmails, user.impersonator);
 
-    // Unreachable through the wiring: a self-hosted deployment resolves its
-    // plan from the license provider, and this one is only constructed on
-    // the SaaS branch. It answers the free baseline rather than a tier,
-    // because a plan resolved without a subscription and without a license
-    // is not a plan anyone bought. Answering Enterprise here would hand a
-    // deployment that reached this line by mistake every entitlement the
-    // top tier carries, signed webhook delivery included.
+    // Unreachable through the wiring: a self-hosted deployment resolves its plan from the
+    // license provider, and this one is only constructed on the SaaS branch. It answers the
+    // free baseline rather than a tier, because a plan resolved without a subscription and
+    // without a license is not a plan anyone bought.
     if (!this.isSaas) {
       return {
         ...getFreePlanLimits(),

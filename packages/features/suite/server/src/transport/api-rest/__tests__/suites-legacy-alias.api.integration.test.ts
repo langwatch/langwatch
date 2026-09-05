@@ -1,14 +1,5 @@
 /**
  * @vitest-environment node
- *
- * `/api/suites`, the deprecated alias that predates the split between a run
- * plan and a test suite, driven through the real Hono app.
- *
- * The family keeps answering exactly as it did, and says so on the wire: every
- * response names its successor, a test suite run takes its targets from the
- * body because the row stores none, and a body naming targets the addressed
- * row does not take is refused rather than dropped.
- *
  * @see specs/api-reference/suites-legacy-alias.feature
  */
 import { describe, expect, it } from "vitest";
@@ -42,9 +33,7 @@ describe("given the project holds one run plan", () => {
     for (const response of [await api.get(BASE), await api.get(`${BASE}/${plan.id}`)]) {
       expect(response.status).toBe(200);
       expect(response.headers.get("Deprecation")).toBe("true");
-      expect(response.headers.get("Link")).toBe(
-        '</api/v1/run-plans>; rel="successor-version"',
-      );
+      expect(response.headers.get("Link")).toBe('</api/v1/run-plans>; rel="successor-version"');
     }
   });
 

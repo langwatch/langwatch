@@ -1,10 +1,5 @@
 /**
  * Unit tests for the reportUsageForMonth command handler.
- *
- * Mocks boundaries: OrganizationService, BillingCheckpointService,
- * ClickHouse (queryBillableEventsTotal), Stripe (UsageReportingService),
- * selfDispatch, and error capture.
- *
  * @see specs/licensing/billing-meter-dispatch.feature
  */
 

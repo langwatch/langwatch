@@ -22,10 +22,9 @@ const PROGRESS_CHUNK = 25;
 const SERVER_PAGE_CAP = 1000;
 
 /**
- * Page size used when spans are requested. Each coding-agent trace's spans
- * are joined with a bounded but heavy per-trace log read server-side, so the
- * CLI asks for smaller pages and lets the cursor walk cover the rest — same
- * total work, no long single request.
+ * Page size used when spans are requested. Each coding-agent trace's spans are joined with
+ * a bounded but heavy per-trace log read server-side, so the CLI asks for smaller pages
+ * and lets the cursor walk cover the rest — same total work, no long single request.
  */
 const SPANS_PAGE_CAP = 200;
 

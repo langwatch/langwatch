@@ -104,10 +104,9 @@ export class SessionMetricSeriesClickHouseRepository implements MetricSeriesRepo
   }
 
   /**
-   * `SUM(Value)` per (session, metric, `type` bucket) across units, deduped
-   * by the IN-tuple pattern with `max(AsOf)` per unit — never FINAL, and the
-   * sum happens strictly AFTER the dedup, so a re-observed cumulative total
-   * counts once at its newest value while delta units each count once.
+   * `SUM(Value)` per (session, metric, `type` bucket) across units, deduped by the IN-tuple
+   * pattern with `max(AsOf)` per unit — never FINAL, and the sum happens strictly AFTER the
+   * dedup, so a re-observed cumulative total counts once at its newest value while delta
    */
   async findTotalsBySessionIds({
     tenantId,
@@ -127,11 +126,10 @@ export class SessionMetricSeriesClickHouseRepository implements MetricSeriesRepo
     );
     const client = await this.clickHouse.resolve(tenantId);
 
-    // Converge each unit FIRST (argMax by AsOf per SeriesId), then sum the
-    // converged values. An IN-tuple filter on (SeriesId, max(AsOf)) is not
-    // enough here: a byte-identical re-delivery leaves two un-merged rows
-    // sharing the winning AsOf, both pass the filter, and a plain sum counts
-    // the unit twice. UpdatedAt breaks AsOf ties so a same-timestamp
+    // Converge each unit FIRST (argMax by AsOf per SeriesId), then sum the converged values.
+    // An IN-tuple filter on (SeriesId, max(AsOf)) is not enough here: a byte-identical
+    // re-delivery leaves two un-merged rows sharing the winning AsOf, both pass the filter,
+    // and a plain sum counts the unit twice. UpdatedAt breaks AsOf ties so a same-timestamp
     // correction converges on the newest write instead of an arbitrary row.
     const result = await client.query({
       query: `

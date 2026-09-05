@@ -1,12 +1,6 @@
 /**
- * The org-level tag routes of the prompts REST family: what a caller gets back
- * when they list, create and delete a custom prompt tag.
- *
- * The family is mounted over a pass-through security policy and a real
- * `PromptTagService` sitting on an in-memory tag table, so the validation, the
- * protected-tag guard, the unique-constraint mapping and the status codes the
- * routes answer with are all the production ones.
- *
+ * The org-level tag routes of the prompts REST family: what a caller gets back when they
+ * list, create and delete a custom prompt tag.
  * @see specs/features/prompts/custom-prompt-tags.feature
  */
 import {

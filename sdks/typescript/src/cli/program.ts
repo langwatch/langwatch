@@ -1,18 +1,5 @@
 /**
  * The commander command tree.
- *
- * Split out of `index.ts` as a FACTORY rather than a module-level singleton so
- * the daemon can build a fresh tree per request. Commander stores parsed option
- * values on the Command objects themselves, so reusing one tree across requests
- * would leak (say) a `--format json` from one caller into the next caller who
- * did not pass it.
- *
- * Keeping this out of `index.ts` also keeps the CLI entrypoint thin: on the
- * daemon-served path the client never loads commander or any command module at
- * all, which is most of the cold start it is trying to avoid.
- *
- * Every command registration below is unchanged from when it lived in
- * `index.ts` — this was a move, not a rewrite.
  */
 
 import { Command, Option } from "commander";
@@ -45,10 +32,6 @@ const WORKFLOW_PARAM_FLAG_HELP = `${PARAM_FLAG_HELP} The workflow receives it as
 
 /**
  * Collect a repeated `--param` into the list the run commands read.
- *
- * One value per occurrence rather than a variadic `<pair...>`: a variadic
- * option keeps eating argv until the next flag, so `--param env=prod my-suite`
- * would swallow the id the command is about to run.
  */
 const collectParam = (pair: string, previous: string[] = []): string[] => [...previous, pair];
 
@@ -103,12 +86,6 @@ const IDEMPOTENCY_KEY_FLAG_HELP =
 
 /**
  * Reads the `--test-suite` / `--no-test-suite` pair.
- *
- * Commander gives both flags ONE attribute, so whichever comes last on the
- * line silently wins and a caller passing both is never told. Each flag is
- * recorded as it is read instead, so the command can refuse the pair. The
- * reader clears what it read, so a second parse in the same process starts
- * from nothing.
  */
 const trackTestSuiteFlags = (
   command: Command,
@@ -180,17 +157,6 @@ const pushCommand = async (options?: {
 
 /**
  * The name to title usage, help and commander errors with.
- *
- * The package ships two bin names for the same bundle (see package.json): `lw`
- * (the advertised name) and `langwatch` (the long-standing alias). Whichever
- * one was invoked is the one the caller must be shown.
- *
- * `bin` is the CALLER's `process.argv[1]`, which is only distinct from this
- * process's when the program is built inside the daemon — one daemon serves
- * both bins (`resolveBuildId` stats the same symlink target either way), so its
- * own argv[1] is whichever bin happened to spawn it and is a coin flip for
- * everybody else. Absent, this falls back to the running process's argv, which
- * is correct for every in-process invocation.
  */
 function resolveProgramName(bin: string | undefined): string {
   const invoked = (bin ?? process.argv[1] ?? "").split(/[\\/]/).pop();
@@ -214,30 +180,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .showHelpAfterError()
     .showSuggestionAfterError();
 
-  // Record the output context of the command about to run, so that when it
-  // FAILS it fails in the shape the caller asked for — a structured document
-  // for any machine format, a human block otherwise (see utils/errorOutput.ts)
-  // — and so that agent mode turns colour and spinners off (utils/output.ts).
-  //
-  // Here rather than at the ~100 catch sites: a command that forgot would print
-  // prose at a parser, which is precisely the failure this is meant to end. Set
-  // on every action, including those without any output flag, so a daemon
-  // serving one command after another cannot leak the last caller's format
-  // into the next.
-  //
-  // Every spelling funnels through the one central preprocessor: the new
-  // `-o/--output`, `--json <fields>`, `--jq` and `--agent` (plus agent-mode
-  // env vars), and the legacy `-f/--format json` and bare boolean `--json`
-  // (the ingest/governance/daemon spelling) — all normalised by
-  // resolveOutputOptions. resolveActionOutputOptions additionally keeps a
-  // command's OWN `--json <json>` payload option (dataset records add/update)
-  // from being misread as machine-output intent.
-  //
-  // `assertFormatIsSupported` runs first: a command that has not been migrated
-  // to `emitsResult` cannot honour `-o json`, and answering it with a chalk
-  // table at exit 0 is the one failure a machine caller cannot detect. An
-  // explicit request there is an error; agent mode merely detected from the
-  // environment falls back to the table with a warning (see utils/output.ts).
+  // Record the output context of the command about to run, so that when it FAILS it fails in
+  // the shape the caller asked for — a structured document for any machine format, a human
+  // block otherwise (see utils/errorOutput.ts) — and so that agent mode turns colour and
+  // spinners off (utils/output.ts).
   program.hook("preAction", async (_thisCommand, actionCommand) => {
     const requested = resolveActionOutputOptions(actionCommand);
     const effective = await assertFormatIsSupported(actionCommand, requested);
@@ -367,14 +313,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       }
     });
 
-  // AI Gateway governance — wrapped tool runners.
-  // Each `langwatch <tool>` exec's the underlying binary with the
-  // right ANTHROPIC_*/OPENAI_*/GEMINI_* env vars injected pointing
-  // at the gateway, after a Screen-8 budget pre-check.
-  //
-  // Marked `hidden:true` so they don't pollute the top-level command list
-  // in `langwatch --help`; rendered together under a "Coding assistants:"
-  // section via addHelpText below. `langwatch <tool> --help` still works.
+  // AI Gateway governance — wrapped tool runners. Each `langwatch <tool>` exec's the
+  // underlying binary with the right ANTHROPIC_*/OPENAI_*/GEMINI_* env vars injected
+  // pointing at the gateway, after a Screen-8 budget pre-check.
   program
     .command("claude", { hidden: true })
     .description("Run `claude` (Claude Code) routed through the LangWatch gateway.")
@@ -813,12 +754,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       },
     );
 
-  // `langwatch ingest install <tool>` — hidden primitive used by CI /
-  // devcontainer / scripted setups. The user surface is
-  // `langwatch <tool>` (the wrapper auto-resolves Path A vs Path B
-  // per cfg.tool_mode + VK presence). Kept registered so existing
-  // scripts continue to work and so reviewers can find the install
-  // helper from the help with `--help --all` if needed.
+  // `langwatch ingest install <tool>` — hidden primitive used by CI / devcontainer /
+  // scripted setups. The user surface is `langwatch <tool>` (the wrapper auto-resolves Path
+  // A vs Path B per cfg.tool_mode + VK presence). Kept registered so existing scripts
+  // continue to work and so reviewers can find the install helper from the help with `--help
+  // --all` if needed.
   ingestCmd
     .command("install <tool>", { hidden: true })
     .description(
@@ -831,17 +771,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       await installCommand(tool, options);
     });
 
-  // `langwatch ingest hook <tool>`: what the agent's own hook entries run.
-  // Hidden: nobody types this, the install path writes it into the agent's
-  // settings. It reads its payload on stdin, writes nothing to stdout (a
-  // SessionStart hook's stdout is injected into the user's session context)
-  // and always exits zero, so a hook can never be why a session broke.
-  //
-  // Registered as rendering its own result because it renders NO result, in
-  // any format. Left unregistered, the auto-detected agent mode a hook always
-  // runs under (Claude Code sets CLAUDECODE in its children) would print
-  // "the table below is not machine-readable" to stderr on every session
-  // start and stop, about a table that does not exist.
+  // `langwatch ingest hook <tool>`: what the agent's own hook entries run. Hidden: nobody
+  // types this, the install path writes it into the agent's settings. It reads its payload
+  // on stdin, writes nothing to stdout (a SessionStart hook's stdout is injected into the
+  // user's session context) and always exits zero, so a hook can never be why a session
+  // broke.
   rendersOwnResult(
     ingestCmd
       .command("hook <tool>", { hidden: true })
@@ -857,13 +791,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     }
   });
 
-  // `langwatch ingest context`: the agent declares the repository and branch
-  // it is working on, run from inside the checkout. Visible, because its
-  // audience IS the agent reading `--help`: the always-loaded guidance the
-  // CLI installs names this command, and the agent runs it when it switches
-  // repository, branch or worktree mid-session. Renders its own result (one
-  // plain line) and never exits non-zero, so a declaration can never be why
-  // a session broke.
+  // `langwatch ingest context`: the agent declares the repository and branch it is working
+  // on, run from inside the checkout. Visible, because its audience IS the agent reading
+  // `--help`: the always-loaded guidance the CLI installs names this command, and the agent
+  // runs it when it switches repository, branch or worktree mid-session.
   rendersOwnResult(
     ingestCmd
       .command("context")
@@ -1305,12 +1236,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  // Help TOPICS (`gh help formatting` style). Registered as a real command:
-  // a command named `help` suppresses commander's implicit one (whose dispatch
-  // is internal and could never reach a topic page), so `langwatch help
-  // agent-mode` lands in this action. A REAL command always wins the lookup —
-  // `help agent` reaches the `agent` group — and topics are never named after
-  // a command (asserted in commands/__tests__); see commands/help.ts.
+  // Help TOPICS (`gh help formatting` style). Registered as a real command: a command named
+  // `help` suppresses commander's implicit one (whose dispatch is internal and could never
+  // reach a topic page), so `langwatch help agent-mode` lands in this action. A REAL command
+  // always wins the lookup — `help agent` reaches the `agent` group — and topics are never
+  // named after a command (asserted in commands/__tests__); see commands/help.ts.
   program
     .command("help [topic...]")
     .description(
@@ -4232,13 +4162,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  // ── Organization management ────────────────────────────────────────────────
-  // The families that provision an organization: the organization itself, its
-  // members and invites, teams, groups, custom roles, role bindings, SCIM
-  // tokens, and (self-hosted) the organizations on the instance. All of them
-  // take an organization API key and are available on Enterprise plans, except
-  // `organizations`, which provisions the organization an API key would belong
-  // to and so authenticates against the instance instead.
+  // ── Organization management ──────────────────────────────────────────────── The families
+  // that provision an organization: the organization itself, its members and invites, teams,
+  // groups, custom roles, role bindings, SCIM tokens, and (self-hosted) the organizations on
+  // the instance.
 
   const organizationCmd = program
     .command("organization")

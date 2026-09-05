@@ -1,9 +1,5 @@
 /**
  * Compatibility layer: next/navigation → the family's route port.
- *
- * `platform/app`'s shim mapped these onto react-router, which a feature-web
- * package may not import. Every one of them is a reading of the address, and
- * the address is exactly what `WorkflowHostPort.route()` hands over.
  */
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { useWorkflowHost } from "../../model/workflow-host";

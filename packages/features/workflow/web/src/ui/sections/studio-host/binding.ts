@@ -1,10 +1,5 @@
 /**
  * Publishes the mounted host as the feedback sink the toast singleton reports to.
- *
- * `toaster` and `showErrorToast` are module-scope calls rather than hooks —
- * most of them fire from a mutation callback where no hook can run — so the
- * host has to reach them some other way. The studio screen calls this once, at
- * the top of the tree everything else renders under.
  */
 
 import { currentUiFeedbackHost, setUiFeedbackHost } from "@langwatch/ui-host/toaster";

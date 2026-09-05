@@ -182,17 +182,8 @@ function getStorageKey(projectId: string) {
 }
 
 /**
- * Removes every persisted key belonging to a project's draggable tabs
- * browser store: each per-tab `${projectId}:tab:${tabId}` key plus the
- * light index key itself. Per-tab keys are discovered by scanning
- * the storage directly for the `${projectId}:tab:` prefix rather than by
- * parsing the light index key — this makes cleanup independent of the
- * index's integrity, so it finds and removes every per-tab key regardless
- * of whether the index is valid, corrupted, or was never written (e.g. if
- * `setItem` wrote per-tab keys but threw before writing the index).
- * Single Responsibility: Shared cleanup routine used by the public
- * `clearPromptTabsStore` utility and by the rehydration
- * error/inconsistency recovery paths in `onRehydrateStorage`.
+ * Removes every persisted key belonging to a project's draggable tabs browser store: each
+ * per-tab `${projectId}:tab:${tabId}` key plus the light index key itself.
  */
 function clearAllPersistedDataForProject(
   projectId: string,
@@ -233,14 +224,8 @@ function stripTransientFlags(data: TabData): TabData {
 }
 
 /**
- * Custom persist storage that splits the heavy per-tab `data` out of the
- * single windows/tabs storage key into its own key per tab
- * (`${projectId}:tab:${tabId}`). Only tabs whose `data` reference actually
- * changed since the last write are re-serialized/re-written, so editing one
- * tab no longer re-serializes and writes every open tab's content.
- *
- * Single Responsibility: Bridges the in-memory windows/tabs tree to a
- * per-tab-keyed storage representation.
+ * Custom persist storage that splits the heavy per-tab `data` out of the single
+ * windows/tabs storage key into its own key per tab (`${projectId}:tab:${tabId}`).
  */
 function createTabAwarePersistStorage(
   projectId: string,
@@ -265,15 +250,9 @@ function createTabAwarePersistStorage(
         const windows: Window[] = parsed.state.windows.map((w) => ({
           id: w.id,
           activeTabId: w.activeTabId,
-          // Resolve each tab's data from its own per-tab key. Fall back to the
-          // legacy embedded `t.data` (old single-key format) so existing users
-          // don't lose their open tabs on upgrade. Drop a tab only when data is
-          // truly unrecoverable, rather than fabricating an invalid tab:
-          // fabricating `undefined` would fail whole-state validation in
-          // onRehydrateStorage and wipe *every* tab, and letting JSON.parse
-          // throw would reject the entire store — either way one bad key loses
-          // all tabs. Downstream validation prunes now-empty windows and
-          // repairs a dangling activeTabId.
+          // Resolve each tab's data from its own per-tab key. Fall back to the legacy embedded
+          // `t.data` (old single-key format) so existing users don't lose their open tabs on
+          // upgrade.
           tabs: w.tabs.flatMap((t) => {
             const tabRaw = storage.getItem(getTabStorageKey(projectId, t.id));
             if (tabRaw) {
@@ -327,12 +306,11 @@ function createTabAwarePersistStorage(
           activeTabId: w.activeTabId,
           tabs: w.tabs.map((t) => {
             currentTabIds.add(t.id);
-            // Reference equality is sufficient (not deep-equal) only because
-            // this store is wrapped in Immer: `produce` structurally shares
-            // untouched branches, so an unedited tab's `data` object keeps
-            // the exact same reference across `set()` calls. If this store
-            // is ever updated outside Immer's `set()`, this check silently
-            // degrades to "always write" for every tab.
+            // Reference equality is sufficient (not deep-equal) only because this store is wrapped in
+            // Immer: `produce` structurally shares untouched branches, so an unedited tab's `data`
+            // object keeps the exact same reference across `set()` calls. If this store is ever
+            // updated outside Immer's `set()`, this check silently degrades to "always write" for
+            // every tab.
             if (lastPersistedDataRefs.get(t.id) !== t.data) {
               storage.setItem(
                 getTabStorageKey(projectId, t.id),
@@ -618,24 +596,8 @@ function createDraggableTabsBrowserStore(projectId: string, capabilities: Prompt
 
         /**
          * Update tab data using an updater function for flexible partial updates.
-         * Single Responsibility: Applies data transformations to a specific tab.
-         *
          * @example
-         * // Mark tab as having unsaved changes
-         * updateTabData({
-         *   tabId: 'tab-123',
-         *   updater: (data) => ({ ...data, hasUnsavedChanges: true })
-         * });
-         *
          * @example
-         * // Update prompt version
-         * updateTabData({
-         *   tabId: 'tab-123',
-         *   updater: (data) => ({
-         *     ...data,
-         *     prompt: { ...data.prompt, version: data.prompt.version + 1 }
-         *   })
-         * });
          */
         updateTabData: ({ tabId, updater }) => {
           set((state) => {
@@ -684,12 +646,11 @@ function createDraggableTabsBrowserStore(projectId: string, capabilities: Prompt
       {
         name: storageKey,
 
-        // Persist per-tab `data` (form values/chat/demonstrations) under its
-        // own storage key so editing one tab doesn't re-serialize and
-        // write every other open tab's content. See
-        // createTabAwarePersistStorage for details. Transient UI flags
-        // (meta.openHistoryOnLoad) are stripped there too, right before
-        // each tab's data is written, so they don't re-trigger on reload.
+        // Persist per-tab `data` (form values/chat/demonstrations) under its own storage key so
+        // editing one tab doesn't re-serialize and write every other open tab's content. See
+        // createTabAwarePersistStorage for details. Transient UI flags (meta.openHistoryOnLoad)
+        // are stripped there too, right before each tab's data is written, so they don't
+        // re-trigger on reload.
         partialize: (state) => ({
           windows: state.windows,
           activeWindowId: state.activeWindowId,
@@ -779,10 +740,6 @@ function createDraggableTabsBrowserStore(projectId: string, capabilities: Prompt
 
 /**
  * Hook to access the project-scoped draggable tabs browser store.
- *
- * The project id is supplied by the host application rather than read from a
- * session context here, so the store stays free of app composition. Callers in
- * the app bind it once in a thin adapter.
  */
 export function usePromptTabsStore<T>(
   {

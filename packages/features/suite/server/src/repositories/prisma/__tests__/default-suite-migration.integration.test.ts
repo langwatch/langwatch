@@ -1,17 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The migration that files every unfiled active scenario into a project's
- * new "Default" test suite, run against real data.
- *
- * This file runs the migration's own SQL, read from the migration
- * directory, so the rule under test is the one that shipped and not a copy
- * of it. Follows the precedent of
- * test-suite-execution-settings-migration.integration.test.ts in this same
- * package.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it.
- *
  * @see specs/suites/default-suite.feature
  */
 import { randomUUID } from "node:crypto";
@@ -85,7 +73,11 @@ async function createScenario(params: {
   });
 }
 
-async function createSuite(params: { projectId: string; name: string; kind: "test_suite" | "run_plan" }) {
+async function createSuite(params: {
+  projectId: string;
+  name: string;
+  kind: "test_suite" | "run_plan";
+}) {
   return database().simulationSuite.create({
     data: {
       projectId: params.projectId,
@@ -143,14 +135,18 @@ describe.skipIf(!databaseUrl)("The Default suite migration", () => {
   afterAll(async () => {
     try {
       if (teamId) {
-        const projects = await database().project.findMany({ where: { teamId }, select: { id: true } });
+        const projects = await database().project.findMany({
+          where: { teamId },
+          select: { id: true },
+        });
         const projectIds = projects.map((project) => project.id);
         await database().scenario.deleteMany({ where: { projectId: { in: projectIds } } });
         await database().simulationSuite.deleteMany({ where: { projectId: { in: projectIds } } });
         await database().project.deleteMany({ where: { teamId } });
         await database().team.deleteMany({ where: { id: teamId } });
       }
-      if (organizationId) await database().organization.deleteMany({ where: { id: organizationId } });
+      if (organizationId)
+        await database().organization.deleteMany({ where: { id: organizationId } });
     } finally {
       await connection?.closeOnce();
     }

@@ -11,10 +11,7 @@ const logger = createLogger("langwatch:billing:customerService");
 const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
 
 /**
- * The two organization reads billing does, named. `OrganizationService` has
- * thirty-five members covering teams, groups, personal workspaces and settings;
- * demanding all of them to call two says the coupling is wider than it is, and
- * made every double here a thirty-five-member stub or an `as` cast.
+ * The two organization reads billing does, named.
  */
 type BillingProfileSource = Pick<
   OrganizationService,

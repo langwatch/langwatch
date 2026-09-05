@@ -184,7 +184,7 @@ export function OptimizeModalContent({
       "params",
       Object.entries({ ...optimizer.params, ...params }).reduce(
         (acc, [key, value]) => {
-          // @ts-expect-error
+          // @ts-expect-error: the accumulator is keyed by the optimizer's dynamic param names, which OptimizeForm["params"] does not enumerate
           acc[key] = value ? value : optimizer.params[key];
           return acc;
         },

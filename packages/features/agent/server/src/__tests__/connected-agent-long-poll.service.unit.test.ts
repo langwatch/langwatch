@@ -28,7 +28,7 @@ import { LongPollTransportService } from "../services/connected-agent-long-poll.
 const projectId = "project_poll";
 const instanceId = "inst_poll";
 const agentId = "agent_poll";
-const token = "ait_test_token";
+const seededToken = "ait_test_token";
 
 const credentials = {
   authorization: "Bearer sk-lw-test",
@@ -58,9 +58,9 @@ function build({ pollWaitMs }: { pollWaitMs: number }) {
 /** A session as the register route would have stored it. */
 async function seedSession(store: AgentStateStorePort) {
   await store.set(
-    httpSessionKey(projectId, token),
+    httpSessionKey(projectId, seededToken),
     JSON.stringify({
-      token,
+      token: seededToken,
       instanceId,
       projectId,
       projectSlug: "poll",
@@ -132,7 +132,7 @@ describe("LongPollTransportService with a memory store", () => {
       const started = Date.now();
       const answer = await transport.poll({
         credentials,
-        token,
+        token: seededToken,
         inFlightCallIds: [],
       });
 
@@ -153,12 +153,12 @@ describe("LongPollTransportService with a memory store", () => {
 
       const first = await transport.poll({
         credentials,
-        token,
+        token: seededToken,
         inFlightCallIds: [],
       });
       const second = await transport.poll({
         credentials,
-        token,
+        token: seededToken,
         inFlightCallIds: [],
       });
 

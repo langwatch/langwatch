@@ -1,8 +1,5 @@
 /**
  * Unit tests for Dataset TypeScript SDK
- *
- * Tests facade method exposure, error mapping, pagination forwarding, and defaults.
- * Corresponds to @unit scenarios in specs/features/dataset-typescript-sdk.feature.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { LangWatch } from "@/client-sdk";

@@ -1,12 +1,5 @@
 /**
  * Experiment - Main class for running batch experiments
- *
- * Provides a clean API for running experiments over datasets with:
- * - Automatic tracing per iteration
- * - Parallel execution with concurrency control
- * - Batched result sending
- * - Built-in evaluator support
- * - Multi-target comparison with withTarget() context isolation
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -67,25 +60,11 @@ const DEBOUNCE_INTERVAL_MS = 1000;
 
 /**
  * How many rows of captured target outputs compare() keeps around.
- *
- * A comparison runs while its row is still being processed, and at most
- * `concurrency` rows are ever in flight, so this bound sits orders of
- * magnitude above what any run needs while keeping memory flat over a dataset
- * of any size.
  */
 const MAX_COMPARISON_ROWS_RETAINED = 1000;
 
 /**
  * How long an evaluator call may take before the socket is given up on.
- *
- * The ceiling has to clear the slowest legitimate judge: a comparison with
- * swap-and-reconcile on makes two sequential LLM calls over every candidate
- * the row produced, and a large reasoning model can spend minutes on each. It
- * exists because the alternative is worse: a judge that accepts the socket and
- * never answers would hold its slot in the concurrency window for the life of
- * the process, so a single dead connection stalls the whole run rather than
- * costing it one row. This is the ceiling the Python SDK already applies to
- * the same endpoint.
  */
 export const EVALUATOR_TIMEOUT_MS = 900_000;
 
@@ -99,14 +78,8 @@ type SummaryEvaluation = Pick<
 type SummaryEntry = Pick<BatchEntry, "duration" | "error" | "cost" | "target_id">;
 
 /**
- * AsyncLocalStorage for iteration context isolation.
- * This stores the current item, index and trace for each iteration,
- * preventing race conditions in concurrent execution.
- *
- * `traceId` is the row's own iteration trace, and is null for a row whose
- * targets each opened a trace of their own: there is no single trace such a
- * row belongs to, and naming one would attribute its comparison to a trace
- * that judged something else.
+ * AsyncLocalStorage for iteration context isolation. This stores the current item, index
+ * and trace for each iteration, preventing race conditions in concurrent execution.
  */
 type IterationContext = {
   index: number;
@@ -268,19 +241,9 @@ export class Experiment {
   }
 
   /**
-   * Run evaluation over a dataset with a callback
-   *
+   * Run evaluation over a dataset with a callback.
    * @param dataset - Array of items to evaluate
    * @param callback - Function called for each item with { item, index, span }
-   * @param options - Concurrency options
-   *
-   * @example
-   * ```typescript
-   * await evaluation.run(dataset, async ({ item, index, span }) => {
-   *   const response = await myAgent(item.question);
-   *   evaluation.log('accuracy', { index, score: 0.95 });
-   * }, { concurrency: 4 });
-   * ```
    */
   async run<T>(dataset: T[], callback: RunCallback<T>, options?: RunOptions): Promise<void> {
     if (!this.initialized) {
@@ -453,24 +416,9 @@ export class Experiment {
   }
 
   /**
-   * Log a custom metric result
-   *
    * @param metric - Name of the metric
    * @param options - Metric options including index, score, passed, etc.
-   *
-   * If called inside a withTarget() block, the target and index are automatically
-   * inferred from the context and don't need to be specified.
-   *
    * @example
-   * ```typescript
-   * // Explicit target (outside withTarget)
-   * evaluation.log('accuracy', { index, score: 0.95, target: 'gpt-4' });
-   *
-   * // Implicit target (inside withTarget)
-   * await evaluation.withTarget('gpt-4', { model: 'openai/gpt-4' }, async () => {
-   *   evaluation.log('accuracy', { score: 0.95 }); // target and index auto-inferred
-   * });
-   * ```
    */
   log(metric: string, options: LogOptions): void {
     // Get context from AsyncLocalStorage (if inside withTarget)
@@ -543,30 +491,9 @@ export class Experiment {
   }
 
   /**
-   * Run a built-in evaluator
-   *
    * @param evaluatorSlug - The evaluator identifier (e.g., 'ragas/faithfulness')
    * @param options - Evaluator options including data and settings
-   *
-   * If called inside a withTarget() block, the target and index are automatically
-   * inferred from the context and don't need to be specified.
-   *
    * @example
-   * ```typescript
-   * // Inside withTarget() - target and index auto-inferred
-   * await evaluation.withTarget('gpt-4', { model: 'openai/gpt-4' }, async () => {
-   *   await evaluation.evaluate('ragas/faithfulness', {
-   *     data: { input, output, contexts },
-   *   });
-   * });
-   *
-   * // Or explicit index/target
-   * await evaluation.evaluate('ragas/faithfulness', {
-   *   index,
-   *   data: { input, output, contexts },
-   *   target: 'gpt-4',
-   * });
-   * ```
    */
   async evaluate(evaluatorSlug: string, options: EvaluateOptions): Promise<void> {
     // Get context from AsyncLocalStorage (if inside withTarget)
@@ -699,43 +626,9 @@ export class Experiment {
   }
 
   /**
-   * Compare a row's targets and pick the best one
-   *
-   * Every target that recorded an output for the row is judged together in a
-   * single call, and the winner comes back named with the target name you
-   * registered. Call it once the row's withTarget() calls have all settled,
-   * which under the usual Promise.all is right after the await.
-   *
-   * The verdict grades no single target, so it is recorded against the row.
-   *
-   * The row is named the way log() names it: inside a run() callback it is
-   * inferred from the row being processed, and outside one it is required.
-   *
-   * A row with fewer than two outputs cannot be compared: it is recorded as
-   * skipped, naming the targets that produced nothing, and the run carries on.
-   * A judge that fails or cannot be reached comes back as an `error` verdict
-   * for the same reason, and stays distinct from `inconclusive`, which is the
-   * judge telling you something about your candidates. Naming a target that
-   * produced no output is a different thing again, and throws, because a
-   * two-way verdict read as the three-way one you asked for is worse than a
-   * failure.
-   *
    * @param options - How the judge should read the row, and which row when
-   *                  it cannot be inferred
    * @returns The verdict, including the candidates it actually saw
-   *
    * @example
-   * ```typescript
-   * await experiment.run(dataset, async ({ item }) => {
-   *   await Promise.all([
-   *     experiment.withTarget('gpt-5-mini', () => askGpt(item.question)),
-   *     experiment.withTarget('claude-sonnet-5', () => askClaude(item.question)),
-   *   ]);
-   *
-   *   const verdict = await experiment.compare({ input: item.question });
-   *   console.log(verdict.winner);
-   * });
-   * ```
    */
   async compare(options: ComparisonOptions = {}): Promise<ComparisonVerdict> {
     const { name = DEFAULT_COMPARISON_NAME, targets, input, golden } = options;
@@ -827,16 +720,6 @@ export class Experiment {
 
   /**
    * The row a comparison is about
-   *
-   * Inferred from the row being processed, the same way withTarget() and
-   * log() infer theirs, so a comparison inside a run() callback never repeats
-   * an index the SDK already has. It reads that row from the iteration's own
-   * context, which is what keeps a run of many rows at once from handing one
-   * row's comparison the row a neighbour happens to be on.
-   *
-   * What it deliberately does not do is fall back to a row: judging row 0
-   * because no row was named would hand back a confident verdict about
-   * candidates the caller never asked about.
    */
   private resolveComparisonRow(index?: number): number {
     const resolved = index ?? iterationContextStorage.getStore()?.index;
@@ -852,14 +735,6 @@ export class Experiment {
 
   /**
    * Record a comparison verdict against the row
-   *
-   * The verdict the caller is handed is the only input, so the row can never
-   * say one thing while the return value says another.
-   *
-   * Deliberately not routed through log(): a comparison grades no single
-   * target, so it must not pick one up from an ambient withTarget() context,
-   * and it is recorded under the judge's own evaluator id so the results page
-   * can tell it apart from a hand-logged metric.
    */
   private recordComparison({
     name,
@@ -903,38 +778,9 @@ export class Experiment {
   }
 
   /**
-   * Execute code within a target context with automatic tracing
-   *
-   * Creates a new span for this target execution and sets up context
-   * so that log() calls inside the callback automatically use this target.
-   * Duration and output are captured automatically.
-   *
-   * This creates a dataset entry per target (like Evaluations V3), enabling
-   * proper per-target latency and cost tracking.
-   *
+   * Execute code within a target context with automatic tracing.
    * @param targetName - Unique identifier for the target
-   * @param metadata - Optional metadata for comparison (e.g., { model: 'gpt-4' })
    * @param callback - Function to execute within the target context
-   * @returns The callback result along with captured metrics
-   *
-   * @example
-   * ```typescript
-   * await evaluation.run(dataset, async ({ item, index }) => {
-   *   // Compare GPT-4 and Claude on the same input
-   *   const [gpt4Result, claudeResult] = await Promise.all([
-   *     evaluation.withTarget('gpt-4', { model: 'openai/gpt-4' }, async () => {
-   *       const response = await openai.chat(item.question);
-   *       evaluation.log('quality', { score: 0.95 }); // target auto-inferred
-   *       return response;
-   *     }),
-   *     evaluation.withTarget('claude-3', { model: 'anthropic/claude-3' }, async () => {
-   *       const response = await anthropic.messages(item.question);
-   *       evaluation.log('quality', { score: 0.85 }); // target auto-inferred
-   *       return response;
-   *     }),
-   *   ]);
-   * });
-   * ```
    */
   async withTarget<R>(
     targetName: string,
@@ -1080,11 +926,6 @@ export class Experiment {
 
   /**
    * Keep a target's output for the row so compare() can reach it later
-   *
-   * The batch this output also went into is flushed on a timer and cleared, so
-   * a comparison that read its candidates from there would find them missing
-   * whenever the flush landed first. A target that produced nothing is not
-   * captured at all: it has no output to judge.
    */
   private captureTargetOutput({
     index,
@@ -1167,21 +1008,8 @@ export class Experiment {
 
   /**
    * Print a CI-friendly summary and optionally exit with code 1 on failure.
-   *
-   * Mirrors `ExperimentRunResult.printSummary` for parity — SDK-driven experiments
-   * can now fail CI builds the same way platform experiments do.
-   *
    * @param exitOnFailure - If true (default), calls `process.exit(1)` when any evaluation failed.
-   *
    * @example
-   * ```typescript
-   * const experiment = await langwatch.experiments.init("ci-quality-check");
-   * await experiment.run(dataset, async ({ item, index }) => {
-   *   const response = await myLLM(item.input);
-   *   await experiment.evaluate("ragas/faithfulness", { index, data: { input: item.input, output: response } });
-   * });
-   * experiment.printSummary();
-   * ```
    */
   printSummary(exitOnFailure = true): void {
     const evaluators = new Map<

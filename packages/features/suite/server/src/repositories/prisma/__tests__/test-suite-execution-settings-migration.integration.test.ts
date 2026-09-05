@@ -1,22 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The migration that clears the execution settings off test suite rows, run
- * against real data.
- *
- * The migration is the half of "a test suite holds no execution settings"
- * that fixes what is already stored; the update refusal in `suite.app.ts` is
- * the half that keeps new writes correct. This file runs the migration's own
- * SQL, read from the migration directory, so the rule under test is the one
- * that shipped and not a copy of it.
- *
- * Ported from
- * platform/app/src/server/suites/__tests__/test-suite-execution-settings-migration.integration.test.ts
- * (origin/main), adapted to the split feature-package architecture: this
- * package has no dedicated `test:integration` lane, so — following the
- * precedent set by `plan-identity.integration.test.ts` in this same
- * package — the suite skips itself when `DATABASE_URL` is absent.
- *
  * @see specs/suites/test-suite-run-plan-reuse.feature
  */
 import { randomUUID } from "node:crypto";
@@ -79,7 +62,11 @@ async function createProject(projectId: string) {
   });
 }
 
-async function createSuite(params: { projectId: string; name: string; kind: "test_suite" | "run_plan" }) {
+async function createSuite(params: {
+  projectId: string;
+  name: string;
+  kind: "test_suite" | "run_plan";
+}) {
   return database().simulationSuite.create({
     data: {
       projectId: params.projectId,
@@ -146,7 +133,8 @@ describe.skipIf(!databaseUrl)("The stored test suite execution settings", () => 
         await database().project.deleteMany({ where: { id: projectId } });
       }
       if (teamId) await database().team.deleteMany({ where: { id: teamId } });
-      if (organizationId) await database().organization.deleteMany({ where: { id: organizationId } });
+      if (organizationId)
+        await database().organization.deleteMany({ where: { id: organizationId } });
     } finally {
       await connection?.closeOnce();
     }

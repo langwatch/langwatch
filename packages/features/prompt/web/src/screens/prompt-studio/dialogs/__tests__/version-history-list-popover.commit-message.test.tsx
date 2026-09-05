@@ -1,12 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
  * @see specs/prompts/prompt-version-detail-visibility.feature
- *   ("A long commit message is shown in full")
- *
- * The version history popover must not truncate a commit message: a
- * reviewer choosing which version to restore needs the whole explanation,
- * however long, not a clipped preview.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

@@ -18,9 +18,6 @@ export type QuerySchemaResult =
 
 /**
  * The body a query request sends.
- *
- * Derived from the generated request body so a contract change to what the
- * endpoint accepts breaks this at compile time rather than drifting silently.
  */
 export type QueryRunParams = NonNullable<
   paths["/api/v1/query"]["post"]["requestBody"]
@@ -44,25 +41,9 @@ export class QueryApiError extends Error {
 }
 
 /**
- * Typed client for the LangWatchQL query doors (`POST /api/v1/query` and
- * `GET /api/v1/query/schema`) — the same governed query surface the workbench
- * and saved charts run through, exposed directly rather than only via a saved
- * chart's statement.
- *
- * Unlike the chart family, these routes carry no `projectId` in their path or
- * body — the generated operations declare `path?: never`. Project scope is
- * resolved once, when the underlying `LangwatchApiClient` is built
- * (`createLangWatchApiClient` bakes `scopedProjectId() ?? LANGWATCH_PROJECT_ID`
- * into that client's `Authorization`/`Basic` header at construction time —
- * see `src/internal/api/client.ts` and `src/internal/api/auth.ts`). A
- * per-call `projectId()` resolution the way `ChartsApiService` has one would
- * therefore be dead code here: there is no URL slot to put it in, and it
- * cannot retroactively change a header already baked into an existing
- * client. It would also wrongly force every caller to have a project in
- * scope — legacy `sk-lw-*` project keys carry their own project identity and
- * need none (see `buildAuthHeaders`). So this service takes the plain,
- * project-implicit config `AnalyticsApiService` does, and lets the api
- * client resolve the credential itself.
+ * Typed client for the LangWatchQL query doors (`POST /api/v1/query` and `GET
+ * /api/v1/query/schema`) — the same governed query surface the workbench and saved charts
+ * run through, exposed directly rather than only via a saved chart's statement.
  */
 export class QueryApiService {
   private readonly apiClient: LangwatchApiClient;
@@ -78,12 +59,11 @@ export class QueryApiService {
       error,
       options: { status },
     });
-    // A failure the platform NAMED (a code, a status, a meta bag) is raised as
-    // the typed `LangWatchHandledError`, so the CLI's error output carries the
-    // real code instead of degrading everything to `network_error`. The
-    // canonical envelope arrives at the top level of the body here, exactly
-    // where the shared reader looks — this family publishes the same error
-    // shape as every other one.
+    // A failure the platform NAMED (a code, a status, a meta bag) is raised as the typed
+    // `LangWatchHandledError`, so the CLI's error output carries the real code instead of
+    // degrading everything to `network_error`. The canonical envelope arrives at the top level
+    // of the body here, exactly where the shared reader looks — this family publishes the same
+    // error shape as every other one.
     throwIfHandledError({ operation, error, response, message });
     throw new QueryApiError(message, operation, error, status);
   }
@@ -105,10 +85,9 @@ export class QueryApiService {
   }
 
   /**
-   * Lists the LangWatchQL analytics datasets this key may query, with each
-   * column's type, description, the permissions that unlock it, and whether
-   * this caller holds them — plus each dataset's grain, join keys,
-   * partition-pruning time column, freshness and a runnable example query.
+   * Lists the LangWatchQL analytics datasets this key may query, with each column's type,
+   * description, the permissions that unlock it, and whether this caller holds them — plus
+   * each dataset's grain, join keys, partition-pruning time column, freshness and a runnable
    */
   async schema(): Promise<QuerySchemaResult> {
     const { data, error, response } = await this.apiClient.GET("/api/v1/query/schema", {});

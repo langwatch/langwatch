@@ -1,29 +1,5 @@
 /**
  * The suite feature's application: what both of its doors call.
- *
- * It holds every service the feature reaches — suites themselves, the scenario
- * test suites that ARE suites of kind "test_suite", the project's owning organization,
- * and the run summaries the suite list renders — and it is the one typed thing
- * a transport is given. The `SuiteApplication` type it replaces described the
- * same four capabilities, but it was a bag: any door could reach into it and
- * assemble its own version of an operation, and both did.
- *
- * What lives here as an operation is what both doors were assembling for
- * themselves:
- *
- *   - **a suite id might name a test suite.** "Try the suite, fall back to the
- *     test suite, and if neither is there it is not there" was written out twice,
- *     once per door, and a third writing would have been a third chance to get
- *     the fallback order wrong.
- *   - **a test suite is not a run plan.** An update that names a scope or a member
- *     list is refused for a test suite and accepted for a suite. Both doors made
- *     that decision, in two copies of the same three branches.
- *   - **resolving the project's organization.** Three call sites, three
- *     hand-built "Organization not found for project" refusals.
- *
- * A caller arrives as an argument, never read from a session or a request.
- * That is what lets one operation serve a browser session, an API key and a
- * background job without knowing which it is serving.
  */
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -56,11 +32,6 @@ import {
 
 /**
  * The project exists but no organization can be resolved behind it.
- *
- * Both doors answered 404 for this and built the refusal by hand — a
- * `TRPCError` on one side, a `c.json({ error }, 404)` on the other. It is a
- * cause we can name and the caller can act on (the project is not attached to
- * an organization they can see), so it is named here once.
  */
 export class OrganizationNotFoundForProjectError extends HandledError {
   declare readonly code: "organization_not_found_for_project";
@@ -142,16 +113,6 @@ export class SuiteApp {
 
   /**
    * One suite by id, whichever kind it turns out to be.
-   *
-   * The fallback order is the decision: a run plan is looked up first and a
-   * test suite second, so an id that names both — which cannot happen today, and
-   * would be a data fault if it ever did — resolves the same way at every
-   * door. Refuses with {@link SuiteNotFoundError} when neither is there.
-   *
-   * The suite service answers a test-suite id too, as a run-plan-shaped row of
-   * kind "test_suite". That is not what a door asking this question means, so
-   * such an answer falls through to the test-suite lookup below and comes back
-   * as the row it really is.
    */
   async getByIdOrTestSuite(input: SuiteIdInput): Promise<SuiteOrTestSuite> {
     try {
@@ -198,11 +159,6 @@ export class SuiteApp {
 
   /**
    * Updates one suite, whichever kind it turns out to be.
-   *
-   * A test suite runs the test cases filed in it, so it takes no scope and no
-   * member list; naming either is refused rather than silently dropped. Both
-   * doors made that call for themselves, in two copies of the same three
-   * branches, and the copies had to be read side by side to see they agreed.
    */
   async update(input: UpdateSuiteCommand): Promise<SuiteOrTestSuite> {
     const testSuite = await this.dependencies.scenarios.tryGetTestSuite({
@@ -270,11 +226,6 @@ export class SuiteApp {
 
   /**
    * Schedules one suite's runs, resolving the project's organization first.
-   *
-   * The organization is resolved here rather than by each door because it is
-   * not the caller's to supply: it is a property of the project the run is
-   * scheduled in, and a door that let it arrive on the wire would let a caller
-   * name someone else's.
    */
   async run(input: Omit<SuiteRunInput, "organizationId">): Promise<SuiteRunResult> {
     const organizationId = await this.requireOrganizationId(input.projectId);
@@ -301,10 +252,6 @@ export class SuiteApp {
 
   /**
    * The organization behind a project, refusing when there is none to resolve.
-   *
-   * `tryGetWithTeam` returning null and `getOrganizationId` raising
-   * `ProjectNotFoundError` are the same answer read two ways — the two doors
-   * used one each — so both collapse to the one refusal here.
    */
   async requireOrganizationId(projectId: string): Promise<string> {
     const project = await this.dependencies.projects.tryGetWithTeam(projectId);

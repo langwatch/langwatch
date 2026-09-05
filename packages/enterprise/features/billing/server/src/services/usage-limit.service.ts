@@ -35,11 +35,8 @@ const LIMIT_TYPE_DISPLAY_LABELS = {
 } as const;
 
 /**
- * Service layer for usage limit notification business logic.
- * Single Responsibility: Handle business logic for WHEN/WHAT to send.
- *
- * Delegates delivery to {@link NotificationService} (HOW to send).
- * Framework-agnostic - no tRPC dependencies.
+ * Service layer for usage limit notification business logic. Single Responsibility: Handle
+ * business logic for WHEN/WHAT to send.
  */
 export class UsageLimitService {
   private readonly notificationRecords: NotificationRecordService;
@@ -166,11 +163,8 @@ export class UsageLimitService {
   }
 
   /**
-   * Notifies internal channels that an organization has reached its plan limit.
-   * Absorbed from planLimitNotifier.ts.
-   *
-   * Checks IS_SAAS env, fetches org with admin members, enforces 30-day cooldown,
-   * then delegates to NotificationService for Slack and Hubspot delivery.
+   * Notifies internal channels that an organization has reached its plan limit. Absorbed
+   * from planLimitNotifier.ts.
    */
   async notifyPlanLimitReached({
     organizationId,
@@ -253,9 +247,6 @@ export class UsageLimitService {
 
   /**
    * Notifies internal channels that an organization has reached a resource limit.
-   *
-   * Uses an in-memory 24-hour cooldown keyed by organizationId:limitType to avoid
-   * duplicate Slack alerts. Each limit type has its own cooldown window.
    */
   async notifyResourceLimitReached({
     organizationId,

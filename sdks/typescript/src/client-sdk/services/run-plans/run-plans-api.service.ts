@@ -54,12 +54,6 @@ export class RunPlansApiError extends Error {
 
 /**
  * Typed client for the run plan family (`/api/v1/run-plans`).
- *
- * A run plan is identified by its NAME. Posting a configuration under a name
- * already in use replaces that plan's configuration and joins its history;
- * posting under a new name creates the plan; posting no name lets the platform
- * derive one from what the run covers and what it runs against.
- *
  * @see specs/typescript-sdk/run-plans-and-test-suites.feature
  */
 export class RunPlansApiService {
@@ -109,9 +103,6 @@ export class RunPlansApiService {
 
   /**
    * Runs a configuration under a name.
-   *
-   * A note of only spaces is no note: sending an empty string would store a
-   * value every reader then has to filter out.
    */
   async run(body: RunPlanRunBody): Promise<RunPlanRunResult> {
     const { data, error, response } = await this.apiClient.POST("/api/v1/run-plans/run", {

@@ -1,14 +1,5 @@
 /**
  * How far along a batch of simulation runs is.
- *
- * `--wait` used to poll `GET /api/v1/scenario-events?batchRunId=`, which no route
- * serves: that app registers two POSTs and a DELETE. Every poll 404'd, the
- * failure counter ran out, and the wait ended by reporting the status endpoint
- * as down. `GET /api/v1/simulation-runs?batchRunId=` is the endpoint that answers.
- *
- * It returns the runs rather than a tally, so the counting happens here. One
- * place, because two commands need the same answer and a batch that is "done"
- * in one and "still running" in the other is worse than either.
  */
 
 /** What the run list gives us. Narrower than the endpoint's full response. */
@@ -31,10 +22,6 @@ export interface BatchRunProgress {
 
 /**
  * Statuses that mean the run is over.
- *
- * `STALLED` counts as finished on purpose: a stalled run is not coming back,
- * and treating it as in-flight is what would make `--wait` hang until its
- * timeout rather than report what happened.
  */
 const FINISHED = new Set(["SUCCESS", "ERROR", "FAILED", "CANCELLED", "STALLED"]);
 
@@ -62,10 +49,6 @@ export function tallyBatchRuns(runs: BatchRun[]): BatchRunProgress {
 
 /**
  * Every run in a batch, following the cursor.
- *
- * The list endpoint pages at 100, and a suite can hold more scenarios than
- * that. Stopping at the first page would make `--wait` declare a large suite
- * finished as soon as its first hundred runs were in.
  */
 export async function fetchBatchRuns({
   endpoint,

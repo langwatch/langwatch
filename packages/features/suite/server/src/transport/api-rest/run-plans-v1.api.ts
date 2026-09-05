@@ -1,15 +1,5 @@
 /**
  * The `/api/v1/run-plans` REST family.
- *
- * A RUN PLAN is what you run, and it is identified by its NAME: a run started
- * under a name joins the plan of that name and replaces its configuration, or
- * creates the plan when nothing answers. That is why the family has both a
- * `POST /run`, which runs a configuration under a name, and a `POST /:id/run`,
- * which runs the configuration a plan already holds.
- *
- * Test suites are the other half of the model and live in their own family,
- * `/api/v1/test-suites`. `/api/suites` is the deprecated alias that predates
- * the split.
  */
 import { randomUUID } from "node:crypto";
 import { requires } from "@langwatch/api";

@@ -1,10 +1,6 @@
 /**
- * `langwatch scenario version list|get`: reading the saved versions of a test
- * scenario from the command line.
- *
- * The command line also WRITES history; that half is in
- * cli-scenarios-service.unit.test.ts.
- *
+ * `langwatch scenario version list|get`: reading the saved versions of a test scenario
+ * from the command line.
  * Spec: specs/features/scenario-cli.feature
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";

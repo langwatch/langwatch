@@ -1,11 +1,8 @@
 // @vitest-environment node
 
 /**
- * Leg 7 — the management families at their canonical `/api/v1` addresses, and
- * the workflow evaluation this deployment cannot run.
- *
- * Every REST family serves at `/api/v1/{family}` as well as bare, so these are
- * ordinary legs: what the leg refuses to accept is a 404.
+ * Leg 7 — the management families at their canonical `/api/v1` addresses, and the workflow
+ * evaluation this deployment cannot run.
  */
 import { describe, expect, it } from "vitest";
 

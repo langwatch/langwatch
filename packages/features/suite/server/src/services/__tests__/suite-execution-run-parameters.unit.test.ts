@@ -1,11 +1,5 @@
 /**
  * @vitest-environment node
- *
- * A target's own `runParameters` merge over the run's shared values before
- * they reach scenario parameter resolution, so an override is validated
- * exactly like a run-level value: an unknown key refuses the whole run
- * before anything is scheduled.
- *
  * @see specs/scenarios/scenario-run-parameters.feature
  */
 import { resolveRunParameters, type ScenarioService } from "@langwatch/scenario-contract";
@@ -71,9 +65,7 @@ function execute(
         parameters: [{ name: "account_tier", defaultValue: "gold" }],
       },
     ],
-    activeTargets: [
-      { type: "http", referenceId: "agent-1", runParameters },
-    ] as never,
+    activeTargets: [{ type: "http", referenceId: "agent-1", runParameters }] as never,
     repeatCount: 1,
     skippedArchived: { scenarios: [], targets: [] },
     idempotencyKey: `idem-${Math.random().toString(36).slice(2)}`,

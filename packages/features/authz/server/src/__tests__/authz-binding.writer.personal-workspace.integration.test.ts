@@ -1,27 +1,6 @@
 /**
  * @vitest-environment node
- *
  * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
- *
- * A personal workspace holds exactly one member, its owner, and role bindings
- * are the general form of "who reaches this scope". Every binding write is
- * therefore refused on a personal scope: granting a second person or a group
- * leaves the team flagged personal while it is shared in every way that
- * matters, and revoking or re-roling the owner's own binding takes the owner
- * out of the only workspace they have.
- *
- * Ported from `personal-workspace-invariants.integration.test.ts` on
- * platform/app, which drove the deleted `appRouter`'s `roleBinding.*` and
- * `group.addBinding` procedures. The refusal moved into
- * `AuthzBindingWriterService`, which is where every one of those entry points
- * lands now.
- *
- * The ledger throws on contact, so a refusal that arrived by any other route
- * than the guard would fail loudly rather than read as a pass; each case also
- * reads the rows back to prove nothing landed.
- *
- * Requires DATABASE_URL, the variable this package's integration lane reads.
- * Skips cleanly without it.
  */
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

@@ -73,13 +73,8 @@ const VersionNumberBox = ({
 };
 
 /**
- * Author line for a version: an avatar (SSO/OAuth photo → initials → generic
- * silhouette), the author's display name, and a tooltip revealing who it is.
- *
- * The name falls back to the author's email, then to "Unknown author", so the
- * row is never a bare, unlabelled icon. Versions created through the SDK/API
- * have no author on record; that is stated in the tooltip rather than left
- * blank (which previously rendered as a nameless silhouette with no hover).
+ * Author line for a version: an avatar (SSO/OAuth photo → initials → generic silhouette),
+ * the author's display name, and a tooltip revealing who it is.
  */
 function VersionAuthor({ author }: { author?: VersionHistoryItemData["author"] }) {
   const [brokenImageUrl, setBrokenImageUrl] = useState<string | null>(null);

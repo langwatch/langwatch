@@ -1,11 +1,5 @@
 /**
  * A scenario save made from the command line has to be recorded as such.
- *
- * The platform reads the author of a version row from the surface header on
- * the request, so the write commands go through a client that declares it.
- * Without that header a command-line edit is recorded as an anonymous API
- * save, and the scenario's history says the wrong thing.
- *
  * Spec: specs/features/scenario-cli.feature
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";

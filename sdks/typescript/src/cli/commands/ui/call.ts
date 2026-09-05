@@ -6,30 +6,11 @@ import type { CommandResult } from "../../utils/output";
 
 /**
  * Bound the request so a wedged control plane cannot hold the whole turn.
- *
- * This call blocks by design: the server keeps it open for the claim window
- * plus the action's execute budget, and caps the two together at 15s
- * (UI_ACTION_MAX_BUDGET_MS). It also runs inside an agent worker whose harness
- * stops any command at 30 seconds. At 60s this deadline could never fire
- * there: the harness always killed the command first, so the MAY_HAVE_APPLIED
- * warning below was unreachable in the one case it was written for.
- *
- * 20s clears the server ceiling by 5 seconds and sits 10 seconds under the
- * harness, so a slow page still answers here and a page that never answers is
- * reported by this command rather than by a kill the caller cannot read.
  */
 export const REQUEST_TIMEOUT_MS = 20_000;
 
 /**
  * True of EVERY failed dispatch, whichever way it failed.
- *
- * The page claims the action and carries it out before it answers, so a
- * failure here is only ever the ANSWER going missing: the column may already
- * be there. Retrying blind is what turns one duplicate into two, and it is the
- * obvious move for a caller told nothing else. It has to be said on the server
- * failures too, not only on the local deadline: a 504 from the dispatch is the
- * page taking longer than its budget, which is exactly the case where the work
- * did land.
  */
 const MAY_HAVE_APPLIED =
   "The action may still have applied: read the state again before you retry.";
@@ -59,24 +40,8 @@ const readPayloadFile = async (file: string): Promise<string> => {
 };
 
 /**
- * Dispatch one typed UI action to the page the user has open, and print the
- * result (specs/langy/langy-ui-actions.feature).
- *
- * This command only works while an agent turn is running: the control plane
- * publishes the action on that turn's live stream, the open page claims and
- * executes it, and the result comes back in this same HTTP call. Run
- * standalone in a terminal there is no turn and no page, and the server
- * answers `langy_ui_turn_inactive`.
- *
- * The payload is opaque here on purpose — the server owns the action schemas
- * (`langwatch ui actions` prints them) and refuses anything that does not
- * parse, so this command never has to track them.
- *
- * `--payload-file` exists because the payloads that matter carry prose. A
- * prompt draft has apostrophes in it, and one apostrophe ends the shell's
- * single-quoted argument: the rest of the prompt then arrives as separate
- * arguments, the command refuses them, and the edit is lost. A file (or `-`
- * for stdin) never passes through the shell's quoting at all.
+ * Dispatch one typed UI action to the page the user has open, and print the result
+ * (specs/langy/langy-ui-actions.feature).
  */
 export const uiCallCommand = async (
   kind: string,
@@ -164,13 +129,9 @@ export const uiCallCommand = async (
 
   const text = await response.text();
   if (!response.ok) {
-    // Through the shared reporter, not straight to stderr. The body is the
-    // platform's REST envelope (`{error: {...}}`), and the reader on the other
-    // end — the panel's tool card — parses the CLI's own failure document
-    // (`{ok: false, error: {...}}`). Written raw, the card could not read it
-    // and showed the customer the wire envelope: a wall of escaped JSON under
-    // "This step couldn't be completed", with the sentence explaining the
-    // failure buried in the middle of it.
+    // Through the shared reporter, not straight to stderr. The body is the platform's REST
+    // envelope (`{error: {...}}`), and the reader on the other end — the panel's tool card —
+    // parses the CLI's own failure document (`{ok: false, error: {...}}`).
     let body: unknown;
     try {
       body = JSON.parse(text);
@@ -195,11 +156,6 @@ export const uiCallCommand = async (
 
 /**
  * Hand the server's answer to the output contract without reshaping it.
- *
- * The action result is the server's document, so `data` is the parsed body and
- * `-o json|yaml|agents`, `--json` and `--jq` all project from it. The human
- * form stays the exact bytes the server sent, which is what an agent reading
- * the default output already expects.
  */
 export const asCommandResult = (text: string): CommandResult | void => {
   let data: unknown;

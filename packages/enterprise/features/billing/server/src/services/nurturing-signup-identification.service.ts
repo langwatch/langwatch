@@ -5,11 +5,6 @@ import type { CioPersonTraits } from "@langwatch/enterprise-billing-contract";
 
 /**
  * The onboarding answers a new person gives, as this signal reads them.
- *
- * The schema itself belongs to the sign-up form, which is a browser module;
- * what reaches Customer.io is these optional strings plus whatever attribution
- * the form collected, so the shape is stated here rather than importing a form
- * across the boundary.
  */
 type SignUpData = {
   yourRole?: string | null;
@@ -28,11 +23,9 @@ type SignUpData = {
 } & Record<string, unknown>;
 
 /**
- * Returns a new object with null, undefined, and empty-string values
- * removed. Lets call sites list traits as data (`lead_source: foo?.bar`)
- * instead of boilerplate conditional spreads. The return type narrows
- * values to `NonNullable<T[K]>` so the result is assignable to trait
- * containers that don't accept null.
+ * Returns a new object with null, undefined, and empty-string values removed. Lets call
+ * sites list traits as data (`lead_source: foo?.bar`) instead of boilerplate conditional
+ * spreads.
  */
 function pickDefined<T extends Record<string, unknown>>(
   obj: T,
@@ -54,9 +47,6 @@ export class NurturingSignupIdentificationService {
 
   /**
    * Identifies a new user in Customer.io during onboarding.
-   *
-   * Fires three calls — identifyUser, groupUser, trackEvent —
-   * all fire-and-forget so that Customer.io failures never block onboarding.
    */
   static fireSignup({
     userId,

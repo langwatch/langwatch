@@ -1,13 +1,5 @@
 /**
  * @vitest-environment node
- *
- * Integration tests for the Auth0 password service.
- *
- * We stand up a real local HTTP server that impersonates Auth0's
- * /oauth/token and /api/v2/users/{id} endpoints. This exercises the
- * full HTTP path — body parsing, headers, JSON round-trip, error
- * mapping — without hitting the real Auth0 API.
- *
  * Spec: specs/settings/change-password-auth0.feature
  */
 import { createServer, type IncomingMessage, type Server } from "node:http";

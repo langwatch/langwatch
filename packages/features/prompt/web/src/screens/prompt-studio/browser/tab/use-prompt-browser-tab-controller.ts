@@ -67,10 +67,11 @@ export function usePromptBrowserTabController() {
   const handleClose = (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    if (hasUnsavedChanges || isNewPrompt) {
-      if (!confirm("Your unsaved changes will be lost. Proceed anyway?")) {
-        return;
-      }
+    if (
+      (hasUnsavedChanges || isNewPrompt) &&
+      !confirm("Your unsaved changes will be lost. Proceed anyway?")
+    ) {
+      return;
     }
 
     removeTab({ tabId });

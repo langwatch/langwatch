@@ -837,17 +837,19 @@ export class EEWebhookService implements WebhookService {
 
         // Cancel in Stripe after DB is consistent (outside transaction)
         for (const oldSub of oldSubscriptions) {
-          if (oldSub.stripeSubscriptionId) {
-            try {
-              await this.stripe.subscriptions.cancel(oldSub.stripeSubscriptionId, {
-                prorate: true,
-              });
-            } catch (err) {
-              logger.error(
-                { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
-                "[stripeWebhook] CRITICAL: Failed to cancel old Stripe subscription during upgrade. Manual intervention required.",
-              );
-            }
+          if (!oldSub.stripeSubscriptionId) {
+            continue;
+          }
+
+          try {
+            await this.stripe.subscriptions.cancel(oldSub.stripeSubscriptionId, {
+              prorate: true,
+            });
+          } catch (err) {
+            logger.error(
+              { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
+              "[stripeWebhook] CRITICAL: Failed to cancel old Stripe subscription during upgrade. Manual intervention required.",
+            );
           }
         }
 

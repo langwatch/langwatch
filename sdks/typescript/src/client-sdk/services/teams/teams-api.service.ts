@@ -1,8 +1,5 @@
 /**
  * The `/api/v1/teams` REST family, which shipped without a CLI.
- *
- * Teams group projects and members; membership is a team-scoped role binding,
- * which is why adding a member takes the role they get on the team.
  */
 import { resolveEndpoint } from "@/internal/endpoint";
 import {

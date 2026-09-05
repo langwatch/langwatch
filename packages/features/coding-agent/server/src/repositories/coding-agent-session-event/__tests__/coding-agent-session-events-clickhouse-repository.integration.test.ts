@@ -1,8 +1,7 @@
 /**
- * Round-trips the per-call fact table (migration 00073) through its real
- * INSERT/SELECT SQL against the migrated ClickHouse the running job supplies:
- * the RecordId dedup the ReplacingMergeTree + `LIMIT 1 BY` read promise, and
- * the keyset pagination the REST export walks.
+ * Round-trips the per-call fact table (migration 00073) through its real INSERT/SELECT SQL
+ * against the migrated ClickHouse the running job supplies: the RecordId dedup the
+ * ReplacingMergeTree + `LIMIT 1 BY` read promise, and the keyset pagination the REST
  */
 import { randomUUID } from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";

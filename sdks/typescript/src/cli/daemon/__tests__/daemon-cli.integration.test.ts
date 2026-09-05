@@ -1,14 +1,7 @@
 /**
- * The end-to-end fidelity test: the REAL built CLI, running REAL commands
- * against a REAL HTTP server, once in-process and once through a real daemon,
- * asserting the two are indistinguishable.
- *
- * Everything else in the daemon test suite mocks something. This mocks nothing,
- * which is the only way to know that commander, chalk, ora, dotenv, the client
- * SDK and `process.exit` all behave the same inside a warm process as they do
- * in a cold one.
- *
- * Requires `pnpm build` (like the other CLI integration tests in this package).
+ * The end-to-end fidelity test: the REAL built CLI, running REAL commands against a REAL
+ * HTTP server, once in-process and once through a real daemon, asserting the two are
+ * indistinguishable.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { spawn } from "node:child_process";

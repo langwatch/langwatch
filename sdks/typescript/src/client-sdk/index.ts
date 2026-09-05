@@ -163,36 +163,12 @@ export class LangWatch {
 
   /**
    * Run experiments on LangWatch platform or via SDK.
-   *
-   * Platform experiments (CI/CD):
-   * ```typescript
-   * const result = await langwatch.experiments.run("my-experiment-slug");
-   * result.printSummary();
-   * ```
-   *
-   * SDK-defined experiments:
-   * ```typescript
-   * const experiment = await langwatch.experiments.init("my-experiment");
-   * // ... run evaluators using experiment.evaluate()
-   * ```
    */
   readonly experiments: ExperimentsFacade;
 
   /**
    * Run evaluators and guardrails in real-time (Online Evaluations).
-   *
    * @example
-   * ```typescript
-   * const guardrail = await langwatch.evaluations.evaluate("presidio/pii_detection", {
-   *   data: { input: userInput, output: generatedResponse },
-   *   name: "PII Detection",
-   *   asGuardrail: true,
-   * });
-   *
-   * if (!guardrail.passed) {
-   *   return "I'm sorry, I can't do that.";
-   * }
-   * ```
    */
   readonly evaluations: EvaluationsFacade;
 
@@ -294,13 +270,8 @@ export class LangWatch {
   }
 
   /**
-   * Teams, which group projects and the members who can reach them. These
-   * routes want an organization API key.
-   *
-   * Built on first use rather than in the constructor: the management
-   * families resolve their credential when constructed and refuse an empty
-   * one, so building this eagerly would make `new LangWatch()` throw for
-   * every caller that never touches a team.
+   * Teams, which group projects and the members who can reach them. These routes want an
+   * organization API key.
    */
   get teams(): TeamsApiService {
     this.#teams ??= new TeamsApiService(this.#managementConfig());

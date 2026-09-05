@@ -1,11 +1,5 @@
 /**
  * One Customer.io sink for every lifecycle-signal suite in this package.
- *
- * The signals reach their sink through the process registry, not a parameter,
- * so a suite that wants to see what was sent registers a real
- * `NurturingService` over a fake `fetch`: what the calls put on the wire is
- * the thing under test, and a hand-written double of the service would only
- * repeat the shape the test already assumed.
  */
 import { vi } from "vitest";
 import { BillingErrorReporter } from "../../../ports/error-reporter.port";

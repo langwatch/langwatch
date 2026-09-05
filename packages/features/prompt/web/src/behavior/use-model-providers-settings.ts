@@ -32,18 +32,6 @@ export function useModelProvidersSettings(params: { projectId: string | undefine
 
   /**
    * Per-model metadata, keyed by `<provider>/<modelId>`.
-   *
-   * `getAllForProjectForFrontend` answers the provider map alone; it used to
-   * answer `{ providers, modelMetadata }`, and reading `data?.modelMetadata`
-   * off the map resolved through its index signature to a provider row, so
-   * every lookup here missed. The value is the registry catalog merged with
-   * the custom models declared on the configured providers — the exact
-   * composition the dropped envelope carried — and both halves are pure, so
-   * it is derived where it is read rather than fetched.
-   *
-   * Stays `undefined` until the providers arrive: callers gate their form
-   * seeding on it, and a map without the project's custom models would seed
-   * a token ceiling those models never agreed to.
    */
   const modelMetadata = useMemo(
     () => (providers ? mergeCustomModelMetadata(catalogMetadata(), providers) : undefined),

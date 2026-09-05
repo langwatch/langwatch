@@ -1,18 +1,6 @@
 /**
- * The `/api/auth` REST family: the Better Auth catch-all, the session read the
- * browser polls, the explicit logout and the legacy API-key validation.
- *
- * ORDER IS BEHAVIOUR HERE, and it is the array's: the catch-all is registered
- * LAST because it swallows every `/auth/*` sibling registered after it, and
- * the whole `/api/auth/cli/*` family has to be mounted ahead of this app for
- * the same reason.
- *
- * Everything this family reaches is the deployment's rather than Auth's:
- * the one configured Better Auth instance (see
- * {@link AuthRestPorts.betterAuth} for why a second one would verify nothing
- * and answer "signed out" to everybody), the browser session as this process
- * resolves it, the project directory the legacy token check reads, and the
- * federated logout the deployment's IdP wants.
+ * The `/api/auth` REST family: the Better Auth catch-all, the session read the browser
+ * polls, the explicit logout and the legacy API-key validation.
  */
 
 import { publicEndpoint } from "@langwatch/api";
@@ -43,14 +31,9 @@ export type AuthRestSession = Readonly<{
 }>;
 
 /**
- * Where a `GET /api/auth/logout` sends the browser next.
- *
- * `null` keeps the local redirect to `/auth/signin`. A federated target ends
- * the IdP's session as well, which is the difference between signing out of
- * LangWatch and signing out of the identity that let you in — and it is
- * resolved rather than read from environment, because a deployment the licence
- * gate DENIES is coerced to email mode (ADR-027) and must not bounce the user
- * through an IdP it is not allowed to use.
+ * Where a `GET /api/auth/logout` sends the browser next. `null` keeps the
+ * local redirect; a federated target also ends the IdP's session, and is
+ * resolved rather than read from environment (ADR-027).
  */
 export type AuthRestFederatedLogout = (input: { returnTo: string }) => Promise<string | null>;
 
@@ -58,14 +41,6 @@ export type AuthRestFederatedLogout = (input: { returnTo: string }) => Promise<s
 export type AuthRestPorts = Readonly<{
   /**
    * The deployment's ONE Better Auth instance.
-   *
-   * One, and supplied rather than composed here, because everything that
-   * decides whether a cookie verifies lives in that instance's options: the
-   * signing secret, the base URL and trusted origins, the cookie prefix, the
-   * session model mapping, the mounted providers and the provider ids stored
-   * account rows are keyed by. A second instance built from a different option
-   * set would not fail — it would verify nothing and answer `null`, which
-   * every caller reads as "signed out".
    */
   betterAuth: () => Readonly<{
     handler(request: Request): Promise<Response>;
@@ -79,21 +54,12 @@ export type AuthRestPorts = Readonly<{
   resolveSession: (request: Request) => Promise<AuthRestSession | null>;
   /**
    * The project a legacy `X-Auth-Token` names, by slug.
-   *
-   * A port because the token is a PROJECT key rather than anything Auth
-   * issued: this route predates RBAC and predates the API-key service, and it
-   * answers only "does this token name a project, and which".
    */
   tryFindProjectSlugByToken: (input: { token: string }) => Promise<string | null>;
   /** This deployment's flag store, for the born-finalized entrance. */
   featureFlags: () => FeatureFlagService;
   /**
    * The typed client the born-finalized entrance reads its allowlist through.
-   *
-   * The same client the Better Auth instance's own hooks run on, for the same
-   * reason they take one: the entrance decides per ORGANIZATION, and a second
-   * connection would be a second answer to which organizations an operator
-   * has opted in.
    */
   database: () => PrismaClient;
   /** The origin every state-changing auth request is checked against. */
@@ -102,10 +68,6 @@ export type AuthRestPorts = Readonly<{
   federatedLogout: AuthRestFederatedLogout;
   /**
    * Runs the born-finalized handler inside Identity's birth context.
-   *
-   * A port because the context belongs to Identity: this door only decides
-   * WHICH requests enter through the born-finalized entrance, and the process
-   * that composed both features supplies the scope they share.
    */
   runWithIdentityBirth: <T>(run: () => Promise<T>) => Promise<T>;
 }>;

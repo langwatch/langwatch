@@ -1,10 +1,6 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * The shape of the usage answer: what it groups by, what it sums, and (the
- * part worth a test of its own) what it can never carry.
- *
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { describe, expect, it, vi, type Mock } from "vitest";
@@ -127,12 +123,9 @@ function stampedTotalsRow(over: Partial<SessionModelTotalsRow> = {}): SessionMod
 const allBilled = async () => false;
 
 /**
- * The mapping lookup answering only for the spelling it was asked about, so a
- * key the service failed to fold produces a visibly empty result rather than
- * being quietly forgiven. Deliberately stricter than the Prisma repository,
- * which folds host and repository itself: the service has to arrive with one
- * key per repository regardless, because the group it built is also what the
- * page renders as a row.
+ * The mapping lookup answering only for the spelling it was asked about, so a key the
+ * service failed to fold produces a visibly empty result rather than being quietly
+ * forgiven.
  */
 function findAllByBranchesLike(rows: GithubPullRequest[]) {
   return vi.fn(
@@ -523,12 +516,11 @@ describe("PullRequestUsageService", () => {
     });
   });
 
-  // A session stores whatever casing the git remote carries, and a host is
-  // case insensitive, so `GitHub.com` and `github.com` are one repository. Fold
-  // only the repository half of the group key and they become two: the reader
-  // sees the repository twice with its usage split between the rows, and the
-  // group whose host is not already lower case matches no mapping row, so
-  // every one of its branches is reported as having no pull request.
+  // A session stores whatever casing the git remote carries, and a host is case insensitive,
+  // so `GitHub.com` and `github.com` are one repository. Fold only the repository half of
+  // the group key and they become two: the reader sees the repository twice with its usage
+  // split between the rows, and the group whose host is not already lower case matches no
+  // mapping row, so every one of its branches is reported as having no pull request.
   describe("given one repository whose sessions report the host with different casing", () => {
     /** @scenario "One repository reported with two host spellings stays one repository" */
     it("lists it once, with every session, under the mapping's own spelling", async () => {

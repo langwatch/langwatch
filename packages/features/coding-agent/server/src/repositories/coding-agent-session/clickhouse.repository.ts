@@ -29,10 +29,9 @@ type CodingAgentSessionMetricSeriesRow = CodingAgentSession["metricSeries"][numb
 type CodingAgentBranchSessionRow = CodingAgentSessionBranchRecord;
 
 /**
- * The columns behind a `CodingAgentBranchSessionRow`: only what the
- * pull-request rollup adds up, groups by and names, plus the scalar tie-break
- * keys — never content. Shared by the branch read and the by-id read so the
- * two can never answer with different shapes.
+ * The columns behind a `CodingAgentBranchSessionRow`: only what the pull-request rollup
+ * adds up, groups by and names, plus the scalar tie-break keys — never content. Shared by
+ * the branch read and the by-id read so the two can never answer with different shapes.
  */
 const BRANCH_SESSION_COLUMNS = `
   SessionId,
@@ -56,14 +55,7 @@ const BRANCH_SESSION_COLUMNS = `
 `;
 
 /**
- * How much `findManyRecent` over-reads so its TypeScript dedup cannot shorten
- * the page.
- *
- * Duplicates only arise from an `UpdatedAt` tie between two versions of one
- * session, so they are the exception rather than the rule and a doubling is
- * ample headroom; anything the collapse still trims comes off the tail, which
- * `slice` was going to drop anyway. Set this to 1 and a tie silently costs the
- * caller a whole session.
+ * How much `findManyRecent` over-reads so its TypeScript dedup cannot shorten the page.
  */
 const LIST_READ_DEDUP_OVERFETCH = 2;
 
@@ -72,11 +64,6 @@ const logger = createLogger("langwatch:coding-agent:session-repository");
 /**
  * ClickHouse persistence for the coding-agent session row (ADR-056,
  * migration 00051).
- *
- * The UInt64 columns are serialised as STRINGS in the JSONEachRow body: JSON
- * numbers cannot safely round-trip past 2^53, and a long session's token counts
- * and byte totals are exactly the columns that get large. UInt32 / Float64 / Bool
- * fit in JSON numbers and pass through as-is.
  */
 interface ClickHouseWriteRecord {
   TenantId: string;
@@ -382,16 +369,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
   }
 
   /**
-   * Monotonic floor for the RMT version stamp this writer issues. The
-   * IN-tuple read pattern requires that no two versions of one session tie on
-   * UpdatedAt (dev/docs/best_practices/clickhouse-queries.md: "nextUpdatedAt =
-   * max(now, prevUpdatedAt + 1) … no ties possible"): a tie makes BOTH rows
-   * match max(UpdatedAt), and a windowed read can then resurrect the stale
-   * in-window version while the true latest sits outside the window. The
-   * stamp combines the superseded version's timestamp threaded through the
-   * row (the read-back path) with this writer's own last stamp (covers
-   * writers that did not read back); per-aggregate group serialization covers
-   * the cross-process window.
+   * Monotonic floor for the RMT version stamp this writer issues.
    */
   private lastVersionStampMs = 0;
 
@@ -435,12 +413,8 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
   }
 
   /**
-   * Reads the latest raw session record without `FINAL`: late signals can move
-   * `StartedAt`, leaving superseded ReplacingMergeTree rows until TTL. The
-   * unwindowed max-UpdatedAt subquery finds the real version; applying the
-   * caller's window there could return an older row instead of a recoverable
-   * outer miss. The remaining order is a deterministic tie-break over fold
-   * progress (event, span/log, metric and delivery watermarks).
+   * Reads the latest raw session record without `FINAL`: late signals can move `StartedAt`,
+   * leaving superseded ReplacingMergeTree rows until TTL.
    */
   private async findLatestRecord({
     tenantId,
@@ -528,13 +502,9 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
   }
 
   /**
-   * Read newest sessions after tenant-wide deduplication. `StartedAt` and
-   * `UserId` filter only the outer scope because either may change between
-   * versions; applying them inside `max(UpdatedAt)` can surface a superseded
-   * row. The inner scan therefore reads only key columns across the tenant,
-   * while the outer range still prunes returned rows. ADR-071 records the cost
-   * and the immutable-anchor change that would make inner pruning safe. The
-   * injected read-metrics port measures whether the compact scan stays viable.
+   * Read newest sessions after tenant-wide deduplication: the inner scan reads
+   * only key columns across the tenant, while the outer range prunes returned
+   * rows (ADR-071 records the cost).
    */
   async findManyRecent({
     tenantId,
@@ -587,14 +557,11 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
           tenantId,
           from: fromMs,
           to: toMs,
-          // Over-fetched because the collapse happens in TypeScript, below.
-          // Two versions of one session can tie on `max(UpdatedAt)` and both
-          // satisfy the IN-tuple — the tie `preferredOf` exists to resolve —
-          // so a page cut to `limit` HERE spends slots on rows that are about
-          // to merge, and the caller silently receives fewer sessions than it
-          // asked for. Through `getUsageTotals` that is not a short page but
-          // an omitted session's cost and tokens: the mirror of the double
-          // count the tiebreak prevents.
+          // Over-fetched because the collapse happens in TypeScript, below. Two versions of one
+          // session can tie on `max(UpdatedAt)` and both satisfy the IN-tuple — the tie
+          // `preferredOf` exists to resolve — so a page cut to `limit` HERE spends slots on rows
+          // that are about to merge, and the caller silently receives fewer sessions than it asked
+          // for.
           limit: limit * LIST_READ_DEDUP_OVERFETCH,
           ...(userId !== undefined ? { userId } : {}),
         },
@@ -620,15 +587,6 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
 
   /**
    * Reads pull-request usage across one organization's project tenants.
-   *
-   * `TenantId IN (...)` preserves the table's tenant-first read shape. The
-   * required `startedAtFromMs` bounds the partition scan; there is no upper
-   * bound because an open pull request continues accruing usage.
-   *
-   * Dedup remains unwindowed because `StartedAt` can move between versions.
-   * Branch matching uses both the final scalar and bounded history, while the
-   * select carries only rollup fields and scalar tie-break keys; absent array
-   * tie-break fields rank as no progress in `preferredOf`.
    */
   async listByRepositoryBranch({
     tenantIds,
@@ -714,13 +672,11 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       `,
       query_params: {
         tenantIds,
-        // Case-folded on both sides. A session stores the remote's casing
-        // verbatim, while the pull-request mapping stores its host and
-        // repository lowercased, so an exact match here would silently drop
-        // every remote whose host, owner or name is not already lower case.
-        // All three come from the same remote URL, and none of them is in the
-        // sort key, so folding costs no pruning; `TenantId` and `StartedAt`
-        // still do all of it.
+        // Case-folded on both sides. A session stores the remote's casing verbatim, while the
+        // pull-request mapping stores its host and repository lowercased, so an exact match here
+        // would silently drop every remote whose host, owner or name is not already lower case.
+        // All three come from the same remote URL, and none of them is in the sort key, so folding
+        // costs no pruning; `TenantId` and `StartedAt` still do all of it.
         repositoryHost: repositoryHost.toLowerCase(),
         repositoryOwner: repositoryOwner.toLowerCase(),
         repositoryName: repositoryName.toLowerCase(),
@@ -750,11 +706,9 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
   }
 
   /**
-   * The same row shape as `listByRepositoryBranch`, anchored on session ids:
-   * the second leg of fact-stamp discovery, fetching the session rows for
-   * sessions whose stamped events named a repository their own row has since
-   * moved away from. Same tenant grouping, same unwindowed dedup, same
-   * per-tenant collapse, for the reasons documented there.
+   * The same row shape as `listByRepositoryBranch`, anchored on session ids: the second leg
+   * of fact-stamp discovery, fetching the session rows for sessions whose stamped events
+   * named a repository their own row has since moved away from.
    */
   async listBySessionIds({
     tenantIds,
@@ -919,25 +873,9 @@ const asNumberMap = (value: unknown): Record<string, number> => {
 };
 
 /**
- * Collapse versions the IN-tuple could not separate.
- *
- * The dedup subquery matches `(TenantId, SessionId, max(UpdatedAt))`, so two
- * versions of one session sharing that `max(UpdatedAt)` BOTH satisfy it and the
- * session renders TWICE. Such versions differ in `StartedAt` — that is why they
- * are both still there — so they differ in the RMT sort key and no merge ever
- * collapses them (ADR-071 consequence 1). `getUsageTotals` reduces over this
- * array, so a duplicate does not merely look wrong: it counts that session's
- * cost, tokens and active time twice.
- *
- * `findLatestRecord` closes the identical tie with `ORDER BY … LIMIT 1`. A list
- * read cannot — its own `ORDER BY` is the caller's sort — so the same ranking is
- * applied per session here. Like the point read's, this is DEFENCE IN DEPTH:
- * `nextVersionStamp` makes the tie unreachable while per-aggregate serialization
- * holds, and this covers the residual where two writers resumed from the same
- * committed version outside that window.
- *
- * Insertion order is not relied on — the caller re-sorts — so this only has to
- * pick the right version, not preserve a position.
+ * Collapse versions the IN-tuple could not separate: two versions sharing a
+ * `max(UpdatedAt)` both satisfy the dedup subquery and render twice
+ * (ADR-071 consequence 1).
  */
 function dedupToLatestPerSession(records: Record<string, unknown>[]): Record<string, unknown>[] {
   const bySession = new Map<string, Record<string, unknown>>();
@@ -951,10 +889,6 @@ function dedupToLatestPerSession(records: Record<string, unknown>[]): Record<str
 
 /**
  * `findLatestRecord`'s ranking, key for key, applied in TypeScript.
- *
- * See that query's docblock for why each key is here and, in particular, why
- * `StartedAt ASC` closes the ordering without being a progress signal. Ties on
- * every key return the incumbent, so the result does not depend on read order.
  */
 function preferredOf(
   incumbent: Record<string, unknown>,
@@ -994,15 +928,6 @@ function preferredOf(
 
 /**
  * Decode one `JSONEachRow` record.
- *
- * Every DateTime64(3) goes through `parseClickHouseDateTimeMs`: ClickHouse emits
- * them without a zone suffix ("2026-07-24 12:00:00.123") and V8 reads a bare
- * datetime as LOCAL time, so `new Date(str)` skews each one by the host's UTC
- * offset. `LastEventOccurredAt` makes that load-bearing rather than cosmetic —
- * `EventingCodingAgentSessionStoreAdapter` reads it as the "was this row written after
- * migration 00053" discriminator, and a pre-00053 row's `1970-01-01
- * 00:00:00.000` decodes POSITIVE anywhere west of UTC, which would let the
- * store decode exactly the rows its gate exists to reject.
  */
 function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
   const steps = Array.isArray(record.Steps) ? record.Steps : [];

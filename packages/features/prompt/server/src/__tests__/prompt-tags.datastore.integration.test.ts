@@ -1,14 +1,5 @@
 /**
  * @vitest-environment node
- *
- * What a prompt tag is worth once real rows are involved: a tag can only be
- * assigned while it exists in the organization's catalogue, deleting one takes
- * its assignments with it, and a new organization starts with the two seeded
- * tags.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL (or DATABASE_URL). Skips cleanly
- * without one.
- *
  * @see specs/features/prompts/custom-prompt-tags.feature
  */
 import {

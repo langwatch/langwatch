@@ -1,11 +1,7 @@
 /**
- * The two-step verification and passkey plugins mount only when their
- * deployment flag is on (D06/D07). Both default off, so the check imports
- * the instance under each setting rather than trusting one that happens to
- * pass because nothing was ever turned on.
- *
- * Corresponds to specs/identity/mfa-and-session-shape.feature and
- * specs/identity/passkeys.feature.
+ * The two-step verification and passkey plugins mount only when their deployment flag is
+ * on (D06/D07). Both default off, so the check imports the instance under each setting
+ * rather than trusting one that happens to pass because nothing was ever turned on.
  */
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { describe, expect, it } from "vitest";
@@ -35,8 +31,7 @@ function pluginIdsFor(overrides: Partial<BetterAuthDeploymentConfiguration>): st
     auth: {} as never,
     database: {} as never,
     storage: {
-      adapter: () =>
-        memoryAdapter({ user: [], session: [], account: [], verification: [] }),
+      adapter: () => memoryAdapter({ user: [], session: [], account: [], verification: [] }),
     } as never,
     deployment: deployment(overrides),
     federation: {

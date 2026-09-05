@@ -3,12 +3,9 @@ import { isLangWatchHandledError } from "@/internal/api/errors";
 import type { LangwatchApiClient } from "@/internal/api/client";
 
 /**
- * The delegated query door has no path/body slot for project id (see
- * `QueryApiService`'s doc comment), so a `projectId` config can only reach
- * it through which client the door is built with. Proving that means
- * catching the client-construction call itself — `clientWith` below fakes
- * the transport, but that alone can't see which project a freshly-built
- * client was scoped to.
+ * The delegated query door has no path/body slot for project id (see `QueryApiService`'s
+ * doc comment), so a `projectId` config can only reach it through which client the door is
+ * built with.
  */
 const createLangWatchApiClientMock = vi.hoisted(() => vi.fn());
 
@@ -117,11 +114,9 @@ describe("ChartsApiService", () => {
     });
 
     /**
-     * Regression coverage for the bug CodeRabbit flagged on
-     * `PRRT_kwDOKRXhvM6c3Oui`: `new ChartsApiService({ projectId: "A" })`
-     * did chart CRUD against project A, but its delegated `schema()` /
-     * `runQuery()` rode the api client's ambient project scope instead —
-     * which could be a different project, or none.
+     * Regression coverage for the bug CodeRabbit flagged on `PRRT_kwDOKRXhvM6c3Oui`: `new
+     * ChartsApiService({ projectId: "A" })` did chart CRUD against project A, but its
+     * delegated `schema()` / `runQuery()` rode the api client's ambient project scope instead
      */
     it("scopes the delegated query client to the configured projectId, not ambient scope", () => {
       const schemaResult = { database: "analytics", datasets: [] };

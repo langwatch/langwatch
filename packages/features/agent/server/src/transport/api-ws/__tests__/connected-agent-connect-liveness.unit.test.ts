@@ -1,9 +1,6 @@
 /**
- * The gateway's own heartbeat: a socket that never answers a ping is
- * retired, a pong that lands inside its own wait keeps the socket even when
- * the next ping already went out, and a socket that closed mid-registration
- * leaves nothing behind (ADR-128, "Transport").
- *
+ * The gateway's own heartbeat: an unanswered ping retires the socket, and a
+ * mid-registration close leaves nothing behind (ADR-128, "Transport").
  * @see specs/agents/connected-agents.feature
  */
 import { createServer, type Server } from "node:http";

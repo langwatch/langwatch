@@ -1,17 +1,5 @@
 /**
  * @vitest-environment node
- *
- * `PromptApp.applySourceToCopy` — the single description of what a copy
- * receives from its source.
- *
- * The rule matters because the two doors that used to spell it out had already
- * stopped agreeing: `pushToCopies` forwarded the source's `responseFormat` and
- * `syncFromSource` silently dropped it, so a prompt brought up to date by a
- * push and the same prompt brought up to date by a sync did not end up the
- * same. Both paths call this one method now, and it forwards `responseFormat`.
- *
- * No transport here: the copy rule is the application's, and both doors reach
- * it through the same argument list.
  */
 import type {
   PromptService,

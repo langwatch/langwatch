@@ -1,9 +1,5 @@
 /**
  * @vitest-environment node
- *
- * Unit tests for auth credential sanitization in HTTP agent traces.
- * Verifies that sensitive auth data (tokens, keys, passwords) is redacted
- * before being included in trace metadata.
  */
 import { describe, expect, it } from "vitest";
 import { buildTraceTestContext, sanitizeHeadersForTrace } from "../agent-test-tracing";

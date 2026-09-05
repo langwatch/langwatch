@@ -1,11 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for the run-until-here dialog: opening from the node
- * menu store, prefill priority (last submitted values over first dataset
- * row), running with typed values, and the select-dataset-row flow.
- *
- * UX contract: specs/workflows/run-until-here-dialog.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

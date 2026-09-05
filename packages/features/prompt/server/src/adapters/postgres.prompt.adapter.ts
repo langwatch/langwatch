@@ -18,12 +18,8 @@ import {
 import type { PromptVersionDatabase } from "../repositories/prisma/prisma.prompt-version.repository";
 
 /**
- * Everything Prompt persistence touches, as the four private repositories
- * below declare it.
- *
- * A composed slice rather than the generated client: a process hands the one
- * it already holds and it fits, while this file — and every layer above it —
- * names no generated declaration at all.
+ * Everything Prompt persistence touches, as the four private repositories below declare
+ * it.
  */
 export type PromptPersistence = PromptConfigDatabase &
   PromptVersionDatabase &
@@ -34,10 +30,6 @@ export interface PostgresPromptAdapterOptions {
   database: PromptPersistence;
   /**
    * The provider cascade a prompt created without a model falls back to.
-   *
-   * Optional because one caller composes no provider at all: the Langy prompt
-   * seed script, which runs outside any App root and relies on the
-   * repository's own last-resort default. Every process root injects one.
    */
   modelProvider?: ModelProviderService;
 }

@@ -1,10 +1,6 @@
 /**
- * Finding H7 of the 2026-09-04 feature-surface security pass: the prompt
- * lookup this route makes deliberately also matches ORGANIZATION-scoped
- * prompts a sibling project owns, so the row's own `projectId` is not the one
- * the credential was authorized on. The assignment is written for the
- * authorized project.
- *
+ * Finding H7 of the 2026-09-04 feature-surface security pass: the prompt lookup this route
+ * makes deliberately also matches ORGANIZATION-scoped prompts a sibling project owns, so
  * Spec: specs/security/resource-scope-permission-checks.feature
  */
 import {
@@ -17,11 +13,7 @@ import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  createPromptsRestApp,
-  type PromptRestPorts,
-  type PromptRestService,
-} from "../prompt.api";
+import { createPromptsRestApp, type PromptRestPorts, type PromptRestService } from "../prompt.api";
 
 const AUTHORIZED_PROJECT = "project_authorized";
 const OWNING_PROJECT = "project_owner";

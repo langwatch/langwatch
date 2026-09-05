@@ -7,9 +7,6 @@ export class NurturingFeatureAdoptionService {
 
   /**
    * Fires nurturing calls when a team member is invited.
-   *
-   * Updates the user's team_member_count trait and tracks the event.
-   * All calls are fire-and-forget.
    */
   static fireTeamMemberInvited({
     userId,
@@ -42,9 +39,6 @@ export class NurturingFeatureAdoptionService {
 
   /**
    * Fires nurturing calls when a workflow is created.
-   *
-   * Updates the user's workflow_count trait and tracks the event.
-   * All calls are fire-and-forget.
    */
   static fireWorkflowCreated({
     userId,
@@ -80,9 +74,6 @@ export class NurturingFeatureAdoptionService {
 
   /**
    * Fires nurturing calls when a scenario is created.
-   *
-   * Updates the user's scenario_count trait and tracks the event.
-   * All calls are fire-and-forget.
    */
   static fireScenarioCreated({
     userId,

@@ -20,10 +20,8 @@ import { PromptHostProvider } from "../../../../model/prompt-host";
 import { FakePromptHost } from "../../../../testing";
 
 /**
- * One host for the whole file: nothing here asserts on what the screen asked
- * the application to do, so a default fake is the whole composition these
- * components need. Its tab storage is in-memory, which is what keeps one case's
- * open tabs out of the next one's.
+ * One host for the whole file: nothing here asserts on what the screen asked the
+ * application to do, so a default fake is the whole composition these components need.
  */
 const testHost = new FakePromptHost();
 
@@ -190,13 +188,11 @@ describe("PromptPlaygroundChat ref methods", () => {
     });
   });
 
-  // Regression: prior dedup keyed only on message IDs. The latest
-  // assistant message kept its ID stable across streaming chunks, so
-  // the persistence effect skipped every content delta and the snapshot
-  // saved to the tab store had its content stuck at empty. On refresh,
-  // `convertScenarioMessagesToCopilotKit` dropped empty-content rows
-  // and the latest assistant reply vanished from the chat. Key must
-  // include content length so streaming deltas re-trigger persistence.
+  // Regression: prior dedup keyed only on message IDs. The latest assistant message kept its
+  // ID stable across streaming chunks, so the persistence effect skipped every content delta
+  // and the snapshot saved to the tab store had its content stuck at empty. On refresh,
+  // `convertScenarioMessagesToCopilotKit` dropped empty-content rows and the latest
+  // assistant reply vanished from the chat.
   describe("persistedMessagesKey (refresh persistence)", () => {
     it("changes when a message's content grows even if IDs are unchanged", () => {
       const placeholder = persistedMessagesKey([
@@ -280,12 +276,11 @@ describe("PromptPlaygroundChat ref methods", () => {
 
     describe("when the message content starts with [ERROR]", () => {
       it("renders the error alert without reciting the provider's message", () => {
-        // `api_error` is the PROVIDER's discriminant, not one of ours, and
-        // "boom" is its own sentence. This asserted that "boom" rendered,
-        // which is how a provider's prose — and anything it quotes, including
-        // the API key it just rejected — reached the playground. The type is
-        // narrowed to `unknown` at the parse boundary now and the customer
-        // reads the registry's copy.
+        // `api_error` is the PROVIDER's discriminant, not one of ours, and "boom" is its own
+        // sentence. This asserted that "boom" rendered, which is how a provider's prose — and
+        // anything it quotes, including the API key it just rejected — reached the playground. The
+        // type is narrowed to `unknown` at the parse boundary now and the customer reads the
+        // registry's copy.
         renderAssistantMessage({
           content: '[ERROR]{"type":"api_error","message":"boom"}',
         });

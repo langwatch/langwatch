@@ -1,8 +1,5 @@
 /**
  * Integration tests for Dataset TypeScript SDK
- *
- * Tests all CRUD operations for datasets and records with mocked API boundaries (MSW).
- * Corresponds to @integration scenarios in specs/features/dataset-typescript-sdk.feature.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";

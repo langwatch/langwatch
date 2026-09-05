@@ -1,11 +1,5 @@
 /**
  * @vitest-environment node
- *
- * `httpProxy.execute` dispatches the same `http` node a real run builds to
- * the workflow engine, so a private-address refusal, a template variable,
- * an auth secret and a response header are all shaped by the engine's
- * report of that node — never rebuilt or re-checked at this transport.
- *
  * @see specs/agents/http-agent-test-parity.feature
  */
 import { initTRPC } from "@trpc/server";

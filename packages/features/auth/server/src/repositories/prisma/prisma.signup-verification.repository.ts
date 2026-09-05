@@ -6,11 +6,6 @@ import type {
 
 /**
  * Sign-up's address-confirmation tokens, over the `VerificationToken` table.
- *
- * The table is a plain single-use token store keyed by an opaque identifier
- * string, which is exactly the shape this needs — so sign-up verification
- * costs no schema of its own. The identifier the service writes is
- * namespaced, so a token minted here can only ever be spent here.
  */
 export class PrismaSignUpVerificationTokenRepository implements SignUpVerificationTokenStore {
   private constructor(private readonly prisma: PrismaClient) {}
@@ -34,10 +29,9 @@ export class PrismaSignUpVerificationTokenRepository implements SignUpVerificati
   }
 
   /**
-   * Deleting is the claim. A token that survived the delete never existed or
-   * was already spent, and one that is deleted but out of date is refused all
-   * the same — the row goes either way, so a spent link cannot be replayed
-   * even by the racer that lost.
+   * Deleting is the claim. A token that survived the delete never existed or was already
+   * spent, and one that is deleted but out of date is refused all the same — the row goes
+   * either way, so a spent link cannot be replayed even by the racer that lost.
    */
   async claim({
     token,
@@ -56,10 +50,9 @@ export class PrismaSignUpVerificationTokenRepository implements SignUpVerificati
 }
 
 /**
- * Whether an address already has an account. Case-insensitive for the same
- * reason `user.register` is: rows written before sign-up lowercased addresses
- * may carry capitals, and a case-twin beside one would leave two accounts
- * answering for one person.
+ * Whether an address already has an account. Case-insensitive for the same reason
+ * `user.register` is: rows written before sign-up lowercased addresses may carry capitals,
+ * and a case-twin beside one would leave two accounts answering for one person.
  */
 export class PrismaSignUpAccountDirectoryRepository implements SignUpAccountDirectory {
   private constructor(private readonly prisma: PrismaClient) {}

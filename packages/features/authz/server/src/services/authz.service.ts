@@ -1,22 +1,7 @@
 /**
  * ADR-092 §11 — the checking API, a service over the collector. The app
- * builds ONE instance in its composition root
- * (the application AuthZ composition root) and everything asks it:
- *
- *   authz.can({ principal, permission: "prompts:update", scope })
- *   authz.check({ ... })                → full AuthzDecision, never throws
- *   authz.effectivePermissions({ ... }) → string[] (feeds useCan)
- *
  * ADR-092 §9 — api-key principals never answer from their own bindings
- * alone: effective(key) = grants(key) ∩ grants(owner), so demoting the
- * owner shrinks every key they own on the next check. A key with no owner
- * (a service key) has no ceiling, which is the legacy behaviour.
- *
  * ADR-092 §6 step RECORD — denials emit one structured log line here. That
- * is the whole of RECORD today: nothing is PERSISTED, and the decision
- * store the A4 mismatch dashboard reads lands with it. Allows are not
- * logged at all yet, for the same reason.
- *
  */
 import {
   ALL_PERMISSIONS,
@@ -108,10 +93,7 @@ export type AuthzServiceOptions = {
   /** Rollout head used only by legacy app fallbacks during migration. */
   /**
    * Whether an organization has cut over to the authz engine. Seven production
-   * call sites branch on the answer, so it is required: an absent gate used to
-   * default to `true`, which is the service claiming a migration state it has
-   * no evidence for. The only production composition
-   * (`postgres.authz.adapter.ts`) has always supplied it.
+   * call sites branch on the answer, so it is required.
    */
   isOnEngine: (organizationId: string) => Promise<boolean>;
   /** Finalized cutover time used by compatibility fact minting. */
@@ -153,10 +135,9 @@ export class AuthzService extends AuthzServiceContract {
   }
 
   /**
-   * check() plus the collected snapshot - for adapters that must also
-   * surface legacy context fields (the tRPC middleware sets
-   * ctx.organizationRole from it). For an api-key principal the snapshot
-   * returned is the KEY's, not the owner's: the owner only ever caps.
+   * check() plus the collected snapshot - for adapters that must also surface legacy context
+   * fields (the tRPC middleware sets ctx.organizationRole from it). For an api-key principal
+   * the snapshot returned is the KEY's, not the owner's: the owner only ever caps.
    */
   async checkDetailed({ principal, permission, scope }: CheckArgs): Promise<{
     decision: AuthzDecision;
@@ -227,11 +208,9 @@ export class AuthzService extends AuthzServiceContract {
   }
 
   /**
-   * The caller's full effective permission set at a scope — the frontend's
-   * single source of truth (useCan). Computed by testing the whole registry
-   * against one collected snapshot: pure decides over ~126 permissions.
-   * The §9 owner ceiling applies here exactly as it does to a single
-   * check, so a key's advertised set can never exceed its owner's.
+   * The caller's full effective permission set at a scope — the frontend's single source of
+   * truth (useCan). Computed by testing the whole registry against one collected snapshot:
+   * pure decides over ~126 permissions.
    */
   async effectivePermissions({
     principal,
@@ -262,15 +241,8 @@ export class AuthzService extends AuthzServiceContract {
   }
 
   /**
-   * The same question as `check`, asked with the ids a caller already holds
-   * instead of a resolved scope ref. Most call sites have a projectId or a
-   * teamId and nothing else, and resolving the ref themselves is the step
-   * they used to get wrong; the collector resolves it here, most specific
-   * first.
-   *
-   * `ceiling: false` reports the named principal's own grants and nothing
-   * else — the contract of the seams that answer "what does THIS binding
-   * give you", which must not be capped by an api key's owner.
+   * The same question as `check`, asked with the ids a caller already holds instead of a
+   * resolved scope ref.
    */
   async checkByIds({
     principal,
@@ -353,11 +325,10 @@ export class AuthzService extends AuthzServiceContract {
       return { allowed: false, organizationRole: null };
     }
 
-    // Same api-key owner ceiling every other decision path applies: an
-    // api-key principal is capped at its owner's grants, so demoting the owner
-    // shrinks the key here too. `ownerGrantsFor` returns null for a user
-    // principal, and `decideWithCeiling` with a null ceiling is a plain
-    // decide — so this is a no-op for the user callers this has today and
+    // Same api-key owner ceiling every other decision path applies: an api-key principal is
+    // capped at its owner's grants, so demoting the owner shrinks the key here too.
+    // `ownerGrantsFor` returns null for a user principal, and `decideWithCeiling` with a null
+    // ceiling is a plain decide — so this is a no-op for the user callers this has today and
     // closes the hole before an api-key caller reaches it.
     const scopeOrg = scopeOrganizationId(scope);
     const pass = this.collector.beginPass();
@@ -411,11 +382,9 @@ export class AuthzService extends AuthzServiceContract {
   }
 
   /**
-   * One permission across many scopes in one organization: one collection,
-   * N pure decisions. Deciding per scope would turn a flat batch into a
-   * collect per scope, which is the pool-starving fan-out this replaces.
-   * Only a project whose team the caller does not already know costs a
-   * resolution, and those resolve in parallel.
+   * One permission across many scopes in one organization: one collection, N pure decisions.
+   * Deciding per scope would turn a flat batch into a collect per scope, which is the
+   * pool-starving fan-out this replaces.
    */
   async canBatchByIds({
     principal,
@@ -450,13 +419,7 @@ export class AuthzService extends AuthzServiceContract {
   }
 
   /**
-   * MANY permissions across many scopes in one organization — and still ONE
-   * collection. `canBatchByIds` above is this with a single permission; this
-   * exists because the api-key project ceiling asks two permissions of every
-   * project, and two single-permission batches would collect the same
-   * snapshot twice. Deciding is pure, so permissions × scopes costs no
-   * further queries; each project's scope is resolved once, not once per
-   * permission, and only when the caller does not already know its team.
+   * MANY permissions across many scopes in one organization — and still ONE collection.
    */
   async canBatchPermissionsByIds({
     principal,
@@ -801,9 +764,8 @@ export class AuthzService extends AuthzServiceContract {
 
   /**
    * ADR-092 §6 — render the walk for a decision against the CURRENT grant
-   * snapshot, not the one the decision was made against: a grant write
-   * between the decision and this call changes the rendered walk. Carrying
-   * the decision's own snapshot lands with the stage E explain surface.
+   * snapshot, not the one the decision was made against: a grant write between the decision
+   * and this call changes the rendered walk.
    */
   async explainDecision({ decision }: { decision: AuthzDecision }): Promise<string[]> {
     const grants = await this.snapshots.collectCached({
@@ -816,9 +778,7 @@ export class AuthzService extends AuthzServiceContract {
 
   /**
    * ADR-092 §6 step RECORD, as far as it goes today: one structured line per
-   * DENY, carrying the five facts a mismatch investigation starts from. Allows
-   * are deliberately not logged - the volume only pays for itself once there
-   * is a decision store behind it, which lands with the A4 dashboard.
+   * DENY, carrying the five facts a mismatch investigation starts from.
    */
   private recordDenial(decision: AuthzDecision): void {
     if (decision.allowed) {

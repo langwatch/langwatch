@@ -1,12 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Dedup and tiebreak behaviour of the session ClickHouse repository
- * (ADR-071): what happens when two versions of one session tie on the RMT
- * `max(UpdatedAt)` dedup key. The write-side version stamp and the
- * DateTime64 decode are covered by ../../adapters/__tests__/coding-agent-session-repository.unit.test.ts;
- * this file pins the read-side tiebreak the stamp defends against.
- *
+ * Dedup and tiebreak behaviour of the session ClickHouse repository (ADR-071).
  * @see specs/coding-agent/session-aggregate.feature
  */
 import { describe, expect, it } from "vitest";
@@ -226,14 +220,9 @@ describe("CodingAgentSessionClickHouseRepository point-read tiebreak", () => {
       describe("when the session is point-read", () => {
         /** @scenario "the most complete version of a session is the one that is read" */
         it("resolves the fully-tied case the same way whichever order the rows arrive in", async () => {
-          // StartedAt is the last-resort key that makes the ordering TOTAL,
-          // and nothing more. WHICH of the two it lands on carries no
-          // meaning: StartedAt can be re-stamped FORWARDS when a read-back
-          // miss re-runs init() (ADR-071), so its direction is not a
-          // progress signal. What is pinned here is that the pick is
-          // deterministic — ASC — and identical under the opposite
-          // insertion order rather than whatever the scan happened to emit
-          // first.
+          // StartedAt is the last-resort key that makes the ordering TOTAL, and nothing more. WHICH
+          // of the two it lands on carries no meaning: it can be re-stamped either way when a
+          // read-back miss re-runs init() (ADR-071).
           const later = { StartedAt: "2026-07-24 11:30:00.000", Commits: 1 };
           const earlier = { StartedAt: "2026-07-24 09:00:00.000", Commits: 9 };
 
@@ -287,13 +276,8 @@ function inScope(
 
 /**
  * A client that ANSWERS the list read by executing both scopes off the SQL
- * the repository sent, rather than replaying the fixture.
- *
- * A passthrough mock would return whatever rows it was handed, so windowing
- * the inner dedup subquery (the ADR-071 consequence-4 bug) would still look
- * correct. Here the inner's predicates decide which version wins
- * `max(UpdatedAt)`, so putting the range filter back changes the ANSWER: the
- * drifted session reappears as its stale in-window version.
+ * the repository sent, rather than replaying the fixture: a passthrough mock
+ * would not catch windowing the inner dedup subquery (ADR-071 consequence-4).
  */
 function listClient(rows: Array<Record<string, unknown>>): {
   client: CodingAgentClickHouseClient;
@@ -405,12 +389,10 @@ describe("CodingAgentSessionClickHouseRepository list-read dedup scope", () => {
     describe("when that user's sessions are listed", () => {
       /** @scenario "a user-narrowed list is never answered from a superseded version" */
       it("omits the session rather than serving the superseded version's totals", async () => {
-        // v1 folded from Claude's log events, which stamp identity. v2 — the
-        // true latest — folded from spans, which carry none, after a
-        // read-back miss re-ran init() and cleared the user. Narrowing the
-        // dedup scope on UserId would hide v2 from its own group, resolve
-        // max(UpdatedAt) to v1, and answer with v1's stale cost under the
-        // user's filter.
+        // v1 folded from Claude's log events, which stamp identity. v2 — the true latest — folded
+        // from spans, which carry none, after a read-back miss re-ran init() and cleared the user.
+        // Narrowing the dedup scope on UserId would hide v2 from its own group, resolve
+        // max(UpdatedAt) to v1, and answer with v1's stale cost under the user's filter.
         const { client } = listClient([
           version({
             sessionId: "identified",

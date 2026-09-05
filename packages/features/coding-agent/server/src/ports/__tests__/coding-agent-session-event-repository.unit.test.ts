@@ -92,11 +92,8 @@ describe("Coding Agent session-event ClickHouse repository", () => {
 });
 
 /**
- * A stored row as ClickHouse hands it back over JSONEachRow: every numeric
- * column arrives as a STRING. That is the whole reason `findBySessionId` maps
- * rather than casts, and it is what the cursor depends on — a `timeUnixMs`
- * left as text would make the next page's `(TimeUnixMs, RecordId) > (…)`
- * comparison a string comparison, which orders "1000" before "9".
+ * A stored row as ClickHouse hands it back over JSONEachRow: every numeric column arrives
+ * as a STRING.
  */
 function storedRow(over: Record<string, unknown> = {}) {
   return {

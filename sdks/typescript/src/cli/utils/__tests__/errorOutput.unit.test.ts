@@ -198,12 +198,6 @@ describe("given a server echoes a credential back in its message", () => {
 
 /**
  * The other half of the redaction contract, and the one it is easy to get wrong.
- *
- * `meta` is a payload the platform CURATES for a user to act on — it never holds
- * a secret by construction. Scrubbing it anyway would be worse than useless: the
- * credential patterns match legitimate identifiers, so an over-eager scrub turns
- * the id the user needed into `[redacted]` and hides the answer inside the error
- * that was supposed to give it.
  */
 describe("given a domain error whose meta holds an actionable identifier", () => {
   const withKeyLikeIds = () =>
@@ -399,10 +393,8 @@ describe("given a failure the platform sent NO advice with", () => {
 });
 
 /**
- * The daemon runs requests that share an execution window CONCURRENTLY, and
- * they can disagree about `--format`/`--agent`. The output context is scoped
- * per request (AsyncLocalStorage, entered by withExecutionContext) precisely
- * so the second writer cannot clobber the first request's error rendering.
+ * The daemon runs requests that share an execution window CONCURRENTLY, and they can
+ * disagree about `--format`/`--agent`.
  */
 describe("given two concurrent daemon requests in one window", () => {
   const contextFor = (id: string) => new ExecutionContext(id, () => undefined);

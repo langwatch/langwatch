@@ -1,8 +1,5 @@
 /**
  * @vitest-environment node
- *
- * Every run started from the app is recorded against the signed-in person.
- *
  * @see specs/scenarios/run-actor-on-runs.feature
  */
 import type { SuiteApp } from "#app/suite.app";

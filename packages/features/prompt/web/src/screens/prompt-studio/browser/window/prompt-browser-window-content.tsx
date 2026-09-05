@@ -66,14 +66,7 @@ export function PromptBrowserWindowContent() {
   );
 }
 
-/**
- * PromptBrowserWindowInner component
- * Single Responsibility: Manages form state and syncs form changes with tab data.
- * @param props - Component props
- * @param props.initialConfigValues - Initial form values for the prompt configuration
- * @param props.tabId - ID of the tab to sync form data with
- * @param props.layoutMode - Layout mode: "vertical" (stacked) or "horizontal" (side-by-side)
- */
+/** Manages form state and syncs form changes with tab data. */
 function PromptBrowserWindowInner(props: {
   initialConfigValues: DeepPartial<PromptConfigFormValues>;
   tabId: string;

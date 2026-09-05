@@ -1,20 +1,7 @@
 /**
- * The prompts REST family: a project's prompts, their versions and the tags
- * that point at them.
- *
+ * The prompts REST family: a project's prompts, their versions and the tags that point at
+ * them.
  * Moved out of the application unchanged (ADR-128): the routes, the wire
- * schemas, the OpenAPI declarations and the three refusal mappers below are
- * exactly what `/api/prompts` published before, and the process's capabilities
- * that used to be read off the Hono context now arrive as ports.
- *
- * ## Why the raw service and not {@link PromptApp}
- *
- * `/api/prompts` authenticates a project API key, whose `apiKeyUserId` is
- * OPTIONAL — a service key acts as nobody. The application's write operations
- * stamp `authorId` from their caller, and `authorId` is a real foreign key to
- * User, so there is no valid author to stamp for a service credential. The
- * narrow service surface is what the credential can honestly reach; the
- * application stays the browser's door.
  */
 import { requires } from "@langwatch/api";
 import {
@@ -125,10 +112,9 @@ const apiResponsePromptSchemaBase = z.object({
 });
 
 /**
- * Tag association for a prompt version.
- * `versionId` is the version this tag currently points to —
- * included so callers can distinguish whether the tag points
- * to the prompt/version they're looking at.
+ * Tag association for a prompt version. `versionId` is the version this tag currently
+ * points to — included so callers can distinguish whether the tag points to the
+ * prompt/version they're looking at.
  */
 export const apiResponsePromptTagSchema = z.object({
   name: z.string(),
@@ -179,10 +165,6 @@ export type ApiResponsePrompt = z.infer<typeof apiResponsePromptWithVersionDataS
 
 /**
  * The prompt reads and writes this family makes.
- *
- * The raw service rather than {@link PromptApp}: see the module comment — a
- * project API key may act as nobody, and the application's writes stamp an
- * `authorId` that is a foreign key to a real user.
  */
 export type PromptRestService = PromptApp["promptService"];
 
@@ -201,10 +183,9 @@ export interface PromptRestPorts {
    */
   afterPromptCreated(input: { projectId: string; userId?: string | null }): void;
   /**
-   * The columns a database unique-constraint violation names, or an empty list
-   * when the failure is not one. Duck-typed against the driver's error shapes,
-   * which is a fact about the process's database client rather than about
-   * prompts.
+   * The columns a database unique-constraint violation names, or an empty list when the
+   * failure is not one. Duck-typed against the driver's error shapes, which is a fact about
+   * the process's database client rather than about prompts.
    */
   uniqueConstraintTargets(error: unknown): string[];
 }
@@ -212,21 +193,9 @@ export interface PromptRestPorts {
 // ── OpenAPI + refusal helpers ────────────────────────────────────────────────
 
 /**
- * Builds a standard success response object for OpenAPI route definitions.
- *
- * This utility creates a consistent response structure for successful API operations,
- * converting a Zod schema into the OpenAPI response format expected by hono-openapi.
- *
  * @param zodSchema - The Zod schema that defines the shape of the response data
  * @returns A RouteResponse object with standardized success structure
- * @throws Error if zodSchema is not provided
- *
  * @example
- * ```typescript
- * const userSchema = z.object({ id: z.string(), name: z.string() });
- * const response = buildStandardSuccessResponse(userSchema);
- * // Returns: { description: "Success", content: { "application/json": { schema: ... } } }
- * ```
  */
 export const buildStandardSuccessResponse = (zodSchema: ZodSchema): RouteResponse => {
   return {
@@ -238,10 +207,6 @@ export const buildStandardSuccessResponse = (zodSchema: ZodSchema): RouteRespons
 };
 
 /**
- * Handles a conflict error by throwing a 409 error with a message
- * indicating that the prompt handle already exists for the given scope.
- * If the error is not a conflict error, it will be re-thrown, it does nothing.
- *
  * @param ports - The process's capabilities; the constraint decoder is its own
  * @param error - The error to handle
  * @returns void
@@ -260,18 +225,7 @@ export const handlePossibleConflictError = (
 };
 
 /**
- * Maps system-prompt HandledErrors thrown by the prompt service to Hono HTTP
- * exceptions with the correct status code.
- *
- *   - {@link SystemPromptConflictError} → 409 Conflict
- *     (both top-level `prompt` and a system message supplied)
- *   - {@link SystemPromptRequiredError} → 400 Bad Request
- *     (neither supplied — added in #3196)
- *
- * Any other error type is re-thrown unchanged so the global handler can deal
- * with it. The error's own `message` is forwarded as the response body, since
- * both HandledErrors carry user-facing copy.
- *
+ * Maps system-prompt HandledErrors thrown by the prompt service to Hono HTTP exceptions
  * @param error - The error to handle
  * @returns void
  */

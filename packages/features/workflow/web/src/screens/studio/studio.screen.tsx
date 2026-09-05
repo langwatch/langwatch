@@ -75,17 +75,10 @@ export default function Studio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!workflow.data]);
 
-  // A missing workflow is a thing we can name, and the person looking at it
-  // needs a way out — this was a bare full-screen "404 / An error occurred"
-  // with no navigation, while the query underneath held `workflow_not_found`.
-  // Inside `DashboardLayout` for the same reason the experiments page does it:
-  // the sidebar is the way back.
-  //
-  // On `isError` alone. The old condition also fired on "fetched but no data",
-  // which only meant anything while a missing workflow came back as an empty
-  // success; `getById` raises now. What that arm can still catch is a moment
-  // mid-refetch where `data` is briefly undefined — flashing a dead end over a
-  // studio someone is working in, which is worse than what it guarded.
+  // A missing workflow is a thing we can name, and the person looking at it needs a way out
+  // — this was a bare full-screen "404 / An error occurred" with no navigation, while the
+  // query underneath held `workflow_not_found`. Inside `DashboardLayout` for the same reason
+  // the experiments page does it: the sidebar is the way back.
   if (workflow.isError) {
     return (
       // `DashboardLayout` DID NOT TRAVEL: chrome belongs to the route tree, and

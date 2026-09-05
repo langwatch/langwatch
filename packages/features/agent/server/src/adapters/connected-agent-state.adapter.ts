@@ -1,10 +1,7 @@
 /**
  * The connected-agent state store, over Redis or over process memory
  * (ADR-128).
- *
  * The Redis connection is handed in by the composing process (ADR-093), never
- * read from a module singleton here. The key family both implementations are
- * addressed with lives in `rules/connected-agent-keys.rules.ts`.
  */
 
 import { EventEmitter } from "node:events";
@@ -18,9 +15,6 @@ import type { AgentStateStorePort } from "../ports/agent-state-store.port";
 
 /**
  * The channel half of the Redis store, with the handlers by channel.
- *
- * One subscriber connection per store; ioredis puts a subscribing connection
- * into subscriber mode, so it cannot share the command one.
  */
 function createRedisChannels(
   redis: RedisConnection,

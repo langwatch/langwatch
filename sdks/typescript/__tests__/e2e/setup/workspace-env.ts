@@ -1,8 +1,7 @@
 /**
- * The workspace `.env`, resolved from the repository root the way every
- * application resolves it. Node's loader leaves a variable that is already set
- * alone, so the shell still wins, and a worktree without the file is not an
- * error. Nothing here reads or reports the file's contents.
+ * The workspace `.env`, resolved from the repository root the way every application
+ * resolves it. Node's loader leaves a variable that is already set alone, so the shell
+ * still wins, and a worktree without the file is not an error.
  */
 import { resolve } from "node:path";
 

@@ -3,13 +3,6 @@ import type { CioOrgTraits, CioPersonTraits } from "@langwatch/enterprise-billin
 
 /**
  * Tracks which users have had a full CIO profile sync this process lifetime.
- *
- * On first login after server restart, we send the complete profile so that
- * existing users (who signed up before nurturing was deployed) get backfilled.
- * Since CIO identify is idempotent, re-syncing after restart is harmless.
- *
- * NOTE: process-local. In multi-instance deployments each pod syncs
- * independently on first login — acceptable because identify is idempotent.
  */
 const syncedUserIds = new Set<string>();
 
@@ -104,14 +97,8 @@ export class NurturingUserSyncService {
   }
 
   /**
-   * Ensures a user's full profile is synced to Customer.io at least once
-   * per process lifetime.
-   *
-   * On first login after server restart: queries Prisma for user + org + project
-   * data, then calls identifyUser with full traits and groupUser for org
-   * association. Subsequent logins skip entirely.
-   *
-   * Fire-and-forget: never throws, never blocks the session callback.
+   * Ensures a user's full profile is synced to Customer.io at least once per process
+   * lifetime.
    */
   static ensureUserSynced({
     userId,

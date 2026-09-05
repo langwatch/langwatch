@@ -38,39 +38,14 @@ type SeatEventDatabase = {
 };
 
 /**
- * The two fields a seat quote is allowed to read, and the only invoice they
- * mean anything on: an `always_invoice` preview, where the invoice IS the
- * immediate one — only the proration lines, not next cycle's recurring and
- * metered usage. On any other invoice `total` includes those, and the
- * arithmetic below quotes a number the card is never charged. The narrow type
- * is what keeps a future caller from handing it one.
+ * The two fields a seat quote is allowed to read, and the only invoice they mean anything
+ * on: an `always_invoice` preview, where the invoice IS the immediate one — only the
+ * proration lines, not next cycle's recurring and metered usage.
  */
 type AlwaysInvoicePreview = Pick<Stripe.Invoice, "total" | "amount_due">;
 
 /**
  * The two money figures a seat quote reports, read off a previewed invoice.
- *
- * **`total`, never a sum over `lines.data`.** Line amounts are pre-tax, so a
- * customer billed in a tax-exclusive currency was quoted a fifth under what
- * their card is debited; and `lines` is a paginated sublist, so a subscription
- * carrying enough pending prorations silently drops the ones past page one.
- *
- * **The charge is `amount_due`, not `total`.** `amount_due` is the total after
- * any credit the account already holds is spent against it, and it is the
- * figure the charge is raised for. Measured on one purchase, two accounts:
- *
- *     clean      total 293.70   amount_due 293.70   charged 293.70
- *     credited   total 293.70   amount_due  93.70   charged  93.70
- *
- * Quoting the total there tells a customer with a balance they are about to
- * pay 293.70 while their card takes 93.70. Both are true; only one of them is
- * what "Due today" means.
- *
- * **But `amount_due` is not simply the better field.** It clamps a negative
- * invoice to zero, so a seat REDUCTION previewing a total of -587.39 reports 0
- * and the dialog would say nothing happens over a 587.39 credit. Hence the
- * branch: a credit is described by the signed total, a charge by the amount
- * actually due.
  */
 const quotedAmounts = (preview: AlwaysInvoicePreview) => {
   const invoiceTotalCents = preview.total;
@@ -86,17 +61,8 @@ const quotedAmounts = (preview: AlwaysInvoicePreview) => {
 };
 
 /**
- * The seat change itself — read by BOTH the preview and the update, so the
- * quote cannot describe a different operation from the one performed.
- *
- * They diverged before: the update reverses a scheduled cancellation (the
- * customer buying a seat is choosing to keep the plan), while the preview
- * modelled the subscription as still cancelling. On an annual plan billed
- * alongside a monthly meter, cancellation truncates the seat line to the
- * monthly boundary, so the same 6→8 seat change quoted €54.25 and charged
- * €639.91. `always_invoice` matters for the same reason: it bills every
- * pending proration immediately, including any the subscription already
- * carried, so the preview must count those rather than net them out.
+ * The seat change itself — read by BOTH the preview and the update, so the quote cannot
+ * describe a different operation from the one performed.
  */
 const seatChangeParams = ({
   stripeSubscription,
@@ -133,20 +99,11 @@ const seatChangeParams = ({
 
 /**
  * How long a quote may be confirmed against the instant it priced.
- *
- * Long enough to read a dialog and decide; short enough that the pinned
- * instant is still a fair description of "now". Past this the confirmation
- * is refused and the customer gets a fresh quote — see {@link QuoteExpiredError}.
  */
 const QUOTE_VALIDITY_SECONDS = 15 * 60;
 
 /**
  * The instant to price a seat change at.
- *
- * With no quote to honour (the background seat sync, which nobody is
- * watching a number for) this is simply now. With one, it is the instant the
- * quote priced — unless that is stale or in the future, which no quote we
- * issued can be.
  */
 const resolveProrationDate = (quotedAt: number | undefined) => {
   const now = Math.floor(Date.now() / 1000);
@@ -198,16 +155,7 @@ export class SeatEventSubscriptionService {
   }
 
   /**
-   * The subscription a seat change should act on, or a named reason there
-   * isn't one.
-   *
-   * Reads the candidates once and ranks them, rather than querying for a
-   * linked row first: `cancel()` keeps `stripeSubscriptionId` on a CANCELLED
-   * row deliberately, so a churned subscription is a permanent tombstone. A
-   * "most recent row that has an id" lookup therefore returns that tombstone
-   * forever — beating a live ACTIVE row that happens to be older, and hiding
-   * an ACTIVE-but-never-linked row behind `subscription_sync_failed`, whose
-   * copy promises the customer it catches up on its own. It never does.
+   * The subscription a seat change should act on, or a named reason there isn't one.
    */
   private async findSeatSubscription(organizationId: string) {
     const candidates = await this.db.subscription.findMany({
@@ -554,15 +502,6 @@ export class SeatEventSubscriptionService {
     const { prorationCents, creditAppliedCents } = quotedAmounts(preview);
 
     // Recurring total: new seat count × per-seat price.
-    //
-    // No `?? 0` fallback. Stripe reports `unit_amount: null` for tiered and
-    // metered prices, and a seat line without a per-seat figure has no
-    // recurring total to quote — defaulting to zero would print "€0 per year"
-    // beside a button that charges the card, which is the same class of lie
-    // this whole change exists to remove. Today the seat line is always one
-    // of four flat licensed prices, so this is unreachable; it becomes
-    // reachable the moment someone adds a tiered seat price to the catalog,
-    // and it should fail loudly then rather than misprice the purchase.
     const unitAmountCents = seatItem.price.unit_amount;
     if (unitAmountCents === null) {
       throw new SubscriptionItemNotFoundError("seat_unit_amount");

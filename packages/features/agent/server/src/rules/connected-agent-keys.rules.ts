@@ -1,11 +1,5 @@
 /**
  * The Redis key family of connected agents (ADR-128).
- *
- * Every key and channel is built here so no module hand-copies a format. The
- * `v1` segment is the shape version: a later incompatible layout takes `v2`
- * and the two never read each other's keys. Every key of an instance, a call
- * or a session carries the project id, because the instance id is chosen by
- * the client: without it one project's key names another project's state.
  */
 
 const PREFIX = "v1";

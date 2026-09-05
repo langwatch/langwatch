@@ -1,12 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
  * @see specs/prompts/editing-modes.feature
- *   ("The mode title reads as clickable without hovering")
- *
- * The Prompt/Messages mode title is a menu trigger, so it has to read as
- * clickable on its own — a chevron next to the title, visible before any
- * hover, rather than only appearing on `:hover`.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

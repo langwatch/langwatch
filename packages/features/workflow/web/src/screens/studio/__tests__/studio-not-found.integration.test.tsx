@@ -1,23 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * A workflow that isn't there explains itself, inside the app.
- *
- * A live UX pass opened `/[project]/studio/does-not-exist` and got a bare
- * full-screen "404 / An error occurred" — no navigation, no way back, and no
- * hint of what was missing — while the query underneath it held a perfectly
- * good `workflow_not_found`. Two things were wrong and both are asserted here:
- * the words, and the shell that lets the reader leave.
- *
- * `DashboardLayout` NO LONGER APPEARS HERE. Chrome belongs to the route tree,
- * and this address is served without a layout route above it — so the dead end
- * owns the viewport and the way out is the button rather than the sidebar. That
- * button is what the first scenario asserts instead.
- *
- * THE WORDS ARE THE HOST'S. The code-keyed presentation registry stayed in the
- * composing application, so what this screen guarantees is the action that
- * failed ("Couldn't open this workflow") plus a live region — not the
- * registry's own sentence for `workflow_not_found`.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

@@ -62,12 +62,6 @@ class CallTimeoutError extends Error {
 
 /**
  * Puts a hard floor under every network call status makes.
- *
- * `Promise.allSettled` never rejects, so without this there is no upper bound
- * on how long status blocks: the trace-search POST runs a ClickHouse COUNT over
- * a 24h partition and can hang indefinitely, and a hung call would simply never
- * settle. A timeout is reported the same way any other section failure is —
- * as an `errors` entry — so it withholds the all-clear rather than hiding.
  */
 async function withTimeout<T>(operation: () => Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -115,15 +109,7 @@ export interface BudgetAtRisk {
 }
 
 /**
- * The "what needs my attention" half of the status document. Each section is
- * independent: a section that fails (no gateway access → 403 on budgets, a
- * backend hiccup on trace search) sets its field to `null` and records WHY in
- * `errors`, and never breaks the rest of status.
- *
- * Monitors are deliberately absent: the monitors REST surface
- * (`GET /api/v1/monitors`) exposes configuration only — no firing/health state —
- * so there is nothing cheap and honest to report here. (Firing state lives in
- * ClickHouse evaluation results, which the API does not expose as a count.)
+ * The "what needs my attention" half of the status document.
  */
 export interface AttentionReport {
   erroredTraces24h: number | null;
@@ -206,14 +192,9 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   async function fetchRunningExperiments(): Promise<RunningExperiment[]> {
     const service = new ExperimentsApiService();
     const list = await service.listExperiments({ pageSize: EXPERIMENT_PAGE_SIZE });
-    // "Running" is a property of a run, and runs are only listed per
-    // experiment — so check the latest run of just the most recently active
-    // experiments rather than fanning out over all of them.
-    //
-    // Deliberately NOT windowed to the last 24h. `running` has no bounded
-    // duration: an experiment wedged in `running` for three days has a 72h-old
-    // `lastRunAt`, and those are precisely the ones worth surfacing. Recency is
-    // used to RANK candidates, never to filter them out.
+    // "Running" is a property of a run, and runs are only listed per experiment — so check the
+    // latest run of just the most recently active experiments rather than fanning out over all
+    // of them.
     const recent = list.experiments
       .filter((experiment) => experiment.lastRunAt !== null)
       .sort((a, b) => new Date(b.lastRunAt ?? 0).getTime() - new Date(a.lastRunAt ?? 0).getTime());
@@ -258,14 +239,11 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     const running = checks.flatMap((check) =>
       check.status === "fulfilled" && check.value !== null ? [check.value] : [],
     );
-    // Only a gap when the cap plausibly HID something. Every experiment that
-    // ever ran has a non-null `lastRunAt`, so "there are more than 5 of them"
-    // describes almost every real project and would suppress the all-clear
-    // permanently. The candidates are ranked most-recently-active first: if
-    // every one we checked came back finished, the older, less-recently-active
-    // tail behind them is not evidence of anything running. It is only when the
-    // sample itself turned up a live run that the cap is hiding a population we
-    // have concrete reason to believe contains more.
+    // Only a gap when the cap plausibly HID something. Every experiment that ever ran has a
+    // non-null `lastRunAt`, so "there are more than 5 of them" describes almost every real
+    // project and would suppress the all-clear permanently. The candidates are ranked
+    // most-recently-active first: if every one we checked came back finished, the older,
+    // less-recently-active tail behind them is not evidence of anything running.
     if (running.length > 0 && recent.length > candidates.length) {
       gaps.push(
         `only the ${RUNNING_EXPERIMENT_CANDIDATES} most recently active of ${recent.length} candidate experiments were checked`,
@@ -282,12 +260,9 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   }
 
   /**
-   * `GET /api/gateway/v1/budgets` returns every scope dimension: org, team,
-   * project, virtual-key, principal, group, and per-person, with live ledger
-   * spend, so a virtual-key budget at 100% with `on_breach: block` is visible
-   * here like any other. The one honesty signal is `spend_available`: when the
-   * server could not total spend, the numbers are not real spend and the scan
-   * must say so instead of ticking green.
+   * `GET /api/gateway/v1/budgets` returns every scope dimension: org, team, project,
+   * virtual-key, principal, group, and per-person, with live ledger spend, so a virtual-key
+   * budget at 100% with `on_breach: block` is visible here like any other.
    */
   async function fetchBudgetsAtRisk(): Promise<BudgetAtRisk[]> {
     const budgets = await new GatewayBudgetsApiService({
@@ -385,14 +360,6 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   }
 
   // Fetch counts for all major resources in parallel.
-  //
-  // Annotated rather than inferred: the array mixes `apiClient.GET` (whose
-  // FetchResponse is a DIFFERENT structural type per path) with `fetchCount`,
-  // so an inferred `fn` is a union of thunks that `withTimeout<T>` cannot
-  // unify. This is the shape the counting below actually reads.
-  // The annotation is what pins `fn` (see above), but `keyof typeof results` on
-  // a `Record<string, …>` is just `string` — it looks like key safety and isn't,
-  // so a typo'd key type-checks and emits a bogus row. Spell the keys out.
   const fetchers: {
     key: ResourceKey;
     fn: () => Promise<{

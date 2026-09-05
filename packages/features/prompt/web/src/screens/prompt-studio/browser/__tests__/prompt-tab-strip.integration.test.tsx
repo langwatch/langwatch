@@ -1,15 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The strip is the only place that decides which tab is active and whether the
- * row is crowded. `PromptBrowserTab` is thoroughly tested against those two
- * props, but nothing proved the strip hands it the right ones: swap them and
- * every tab test still passes while the close buttons appear on exactly the
- * wrong tabs.
- *
- * Only the strip's collaborators are mocked — the overflow measurement, which
- * jsdom cannot perform, and the switcher, which has its own suite. The tabs
- * render for real.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { type Tab, useIsOverflowing, useTabId } from "../../studio-internals";

@@ -1,55 +1,5 @@
 /**
- * ADR-110 — the one migration that moves an organization onto the grants
- * engine. Every legacy table is a source of facts; the migration states each
- * row as an event, checks once that the projection agrees with what it
- * stated, and finishing IS the switch: the moment this returns `finalized`
- * the engine gate answers permission checks from the projection
- * (engine-gate.ts reads this migration's status and nothing else).
- *
- * Adoption, not re-creation. A fact with a legacy row of its own — a
- * RoleBinding, a CustomRole, a ShareLink — keeps that row's id, because the
- * id is the upstream identity the REST surface already returns to customers.
- * A fact the legacy schema only INFERRED — the org-member floor, the
- * legacy-admin fallback, a lite member, a team membership with no binding, a
- * project credential — derives its id from its content (`deriveGrantId`), so
- * every pass derives the same id for the same fact.
- *
- * Idempotent by construction, not by bookkeeping: each pass re-reads the
- * legacy tables, restates every fact (command ids are content-derived, so a
- * restated fact dedupes at the event store and a CHANGED one appends), emits
- * compensating revocations for facts whose legacy row is gone, and proves
- * the heads against the rows it just read. Nothing here consults `previous`;
- * there is no partial state a failed pass could leave behind that the next
- * full pass does not simply redo.
- *
- * The migration does not wait (ADR-110): it cannot write the projection —
- * it can only state events — so it checks once and reports. A projection
- * that has not caught up is a HELD organization (`migrated`), not an error:
- * the next pass revisits it and the check heals as the fold drains. A head
- * that disagrees with legacy on a field is also held, with the disagreement
- * named in the report.
- *
- * Nothing legacy changes before an organization finalizes: the projection's
- * compat writes are update-only for migration-sourced facts (see
- * prisma.authz-projection.repository.ts), so an adopted row converges onto
- * itself and a derived fact — whose legacy representation is the membership
- * or credential row it came from — creates no binding row at all.
- *
- * Two disagreements are named rather than repaired, deliberately — each
- * holds the organization with a diff an operator reads, and both fail
- * toward LESS access, never more:
- *
- * - A DERIVED fact whose head was revoked and whose legacy source came back
- *   (a membership toggled off and on) re-derives the id of the revoked
- *   head; the restated attach dedupes and would lose the head's guard
- *   anyway, so the check reports `grant_revoked` each pass. Remediation is
- *   the operator's (a projection replay, or withdrawing enrollment until
- *   the toggle settles).
- * - A `custom:<id>` role reassignment cannot be repaired by
- *   `changeGrantRole`, because that event clears `legacyRole` (the
- *   escalation rule in the projection) while the expected fact still
- *   carries it; the check names the `legacyRole` disagreement instead.
- *
+ * ADR-110 -- the one migration that moves an organization onto the grants engine.
  * @see specs/migration/authz-grants-rollout.feature
  * @see dev/docs/adr/110-grant-aggregates-are-grants.md
  */
@@ -104,9 +54,8 @@ const MAX_REPORTED = 50;
 
 /**
  * The migration's door into the ledger — one command, one entity (ADR-110).
- * A send while the queue is unavailable throws `AuthzLedgerUnavailableError`,
- * which parks the organization naming the queue as the cause; the runner
- * retries on a later pass.
+ * A send while the queue is unavailable throws `AuthzLedgerUnavailableError`, which parks
+ * the organization naming the queue as the cause; the runner retries on a later pass.
  */
 export interface AuthzEngineLedger {
   attachGrant(args: {
@@ -187,13 +136,9 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       inventory,
     });
 
-    // The budget handover rides every pass, monotonically upward, and it
-    // PRECEDES the projection read: legacy keeps counting views while the
-    // organization is held, and this write raises the usage row the read
-    // below returns. Seeded after that read, the proof compared a count the
-    // same pass had already superseded, so a link viewed between passes was
-    // reported outstanding forever and a frequently viewed one held its
-    // organization indefinitely.
+    // The budget handover rides every pass, monotonically upward, and it PRECEDES the
+    // projection read: legacy keeps counting views while the organization is held, and this
+    // write raises the usage row the read below returns.
     await this.deps.store.seedResourceGrantUsage({
       organizationId,
       seeds: expected.shareLinks.map((link) => ({
@@ -203,12 +148,11 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       })),
     });
 
-    // The projection, read ONCE per pass (the spec's own words) — before
-    // anything is stated, so nothing here waits on a fold. Staging, reconcile
-    // and the check all walk this read: what this pass states is invisible to
-    // it by construction, lands as `outstanding`, and the NEXT pass sees it
-    // folded and finalizes. Holding a first pass to finalize a later one is
-    // the design, not a shortcut.
+    // The projection, read ONCE per pass (the spec's own words) — before anything is stated,
+    // so nothing here waits on a fold. Staging, reconcile and the check all walk this read:
+    // what this pass states is invisible to it by construction, lands as `outstanding`, and
+    // the NEXT pass sees it folded and finalizes. Holding a first pass to finalize a later one
+    // is the design, not a shortcut.
     const heads = await this.readHeads(organizationId);
 
     await this.state({ organizationId, expected, heads, signal });
@@ -291,12 +235,6 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
 
   /**
    * Roles before grants: a custom binding's roleKey names its role.
-   *
-   * Only what the heads do not already carry is staged. A restated fact
-   * dedupes at the event store, but the queue has already paid to carry it,
-   * and a grant is its own aggregate — a held organization with a large
-   * share-link population restaged one group per grant on every pass and
-   * converged on nothing while it repeated them.
    */
   private async state({
     organizationId,
@@ -346,12 +284,9 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
   }
 
   /**
-   * The deny direction: a legacy row deleted while the organization was off
-   * the engine has no event of its own (legacy deletes are imperative
-   * row-deletes), so any migration-owned head fact whose legacy row is gone
-   * gets a compensating revocation. Safe without waiting on the projection:
-   * it only ever names ids the head ALREADY carries, so a fact stated
-   * moments ago is simply not a candidate.
+   * The deny direction: a legacy row deleted while the organization was off the engine has
+   * no event of its own (legacy deletes are imperative row-deletes), so any migration-owned
+   * head fact whose legacy row is gone gets a compensating revocation.
    */
   private async reconcileStale({
     organizationId,
@@ -366,13 +301,9 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
   }): Promise<void> {
     const occurredAtMs = this.deps.now();
 
-    // Both heads: the non-resource rows, and the RESOURCE tier — a share
-    // link deleted legacy-side is a live bearer token until this revokes
-    // it, and `findResourceGrantRows` already fences on live rows, so no
-    // already-revoked row can be re-revoked. A row legacy still HAS but the
-    // migration chose not to express (`retainedGrantIds`) is not stale —
-    // revoking it would delete a legacy row through the compat head, the
-    // one change the migration promises not to make.
+    // Both heads: the non-resource rows, and the RESOURCE tier — a share link deleted
+    // legacy-side is a live bearer token until this revokes it, and `findResourceGrantRows`
+    // already fences on live rows, so no already-revoked row can be re-revoked.
     const staleGrants = [
       ...heads.grantRows
         .filter(
@@ -397,12 +328,11 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       send: (grantId) =>
         this.deps.ledger.revokeGrant({
           organizationId,
-          // The pass's business time is in the key for the reason the repair
-          // keys carry it: a legacy row deleted, restored under the same id,
-          // then deleted again would otherwise collide with the first deny's
-          // idempotency key and be swallowed, leaving a live head with no
-          // legacy row behind it. A live head is the only sweep candidate, so
-          // a re-appended deny costs at most one event while the fold lags.
+          // The pass's business time is in the key for the reason the repair keys carry it: a legacy
+          // row deleted, restored under the same id, then deleted again would otherwise collide with
+          // the first deny's idempotency key and be swallowed, leaving a live head with no legacy
+          // row behind it. A live head is the only sweep candidate, so a re-appended deny costs at
+          // most one event while the fold lags.
           commandId: AuthzMigrationCommandMapper.contentId({
             kind: "deny:grant",
             id: grantId,
@@ -445,24 +375,8 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
   }
 
   /**
-   * Drift repair, covering the in-place legacy mutations: a binding's role
-   * reassignment (onto a BUILT-IN key) and any edit to a custom role. Both
-   * are stated with today's business time — a restated fact cannot carry
-   * them, because the head's upsert guard refuses an event that is not
-   * strictly newer than the row, and an adopted fact's business time is
-   * pinned to the legacy row's createdAt.
-   *
-   * The pass's `occurredAtMs` is part of every repair's command id: a
-   * repair whose target oscillates back to a value it held before would
-   * otherwise collide with the first repair's idempotency key and be
-   * swallowed at the event store forever. A retried held pass re-appends
-   * the repair instead, which is harmless — the change events are
-   * state-setting and tie-tolerant.
-   *
-   * A reassignment onto a `custom:<id>` key is NOT repaired: the change
-   * event clears `legacyRole` (the projection's escalation rule) while the
-   * expected fact still carries it, so that repair could never converge —
-   * the proof names the disagreement instead (see the module header).
+   * Drift repair, covering the in-place legacy mutations: a binding's role reassignment
+   * (onto a BUILT-IN key) and any edit to a custom role.
    */
   private async repairDrift({
     organizationId,
@@ -532,10 +446,8 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
 
   /**
    * The check, over the pass's one projection read (ADR-110: the migration
-   * does not wait). What that read cannot see is `outstanding` — facts this
-   * pass stated, and revocations it sent; a later pass sees them folded.
-   * What it sees and disagrees with is a `diff`, named so an operator can
-   * act on it.
+   * does not wait). What that read cannot see is `outstanding` — facts this pass stated, and
+   * revocations it sent; a later pass sees them folded.
    */
   private check({
     organizationId,
@@ -583,11 +495,9 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
 }
 
 /**
- * A command id derived from the fact's identity AND its content. Identity
- * alone is not enough: the event store dedupes on the idempotency key, so a
- * legacy row edited between two passes would restate under the first pass's
- * key and be silently swallowed. Content in the key means the same fact
- * always dedupes and a changed one always appends.
+ * A command id derived from the fact's identity AND its content. Identity alone is not
+ * enough: the event store dedupes on the idempotency key, so a legacy row edited between
+ * two passes would restate under the first pass's key and be silently swallowed.
  */
 class AuthzMigrationCommandMapper {
   static contentId({ kind, id, content }: { kind: string; id: string; content: unknown }): string {
@@ -598,9 +508,8 @@ class AuthzMigrationCommandMapper {
 
 /**
  * The sources this migration owns in the Grant head — its own, plus the
- * three-stage rollout's it replaces (ADR-110 collapsed genesis-import,
- * backfill-b and cutover-import into this one migration; rows they wrote
- * are this migration's to reconcile and to prove).
+ * three-stage rollout it replaces (ADR-110 collapsed genesis-import,
+ * backfill-b and cutover-import into this one migration).
  */
 export const MIGRATION_OWNED_SOURCES = [
   "migration",
@@ -620,12 +529,7 @@ export class AuthzMigrationOwnershipMapper {
 export type BindingCoverage = (args: { row: LegacyBindingRow; userId: string }) => boolean;
 
 /**
- * The coverage predicate, built once per organization from its group
- * memberships. The legacy resolver reads a group-held binding exactly like a
- * user-held one, so every rule phrased as "this user already holds a
- * binding" — the team-membership suppression AND the admin fallback — has to
- * read them the same way. Two predicates that disagree would state a fact on
- * one path that the other suppresses.
+ * The coverage predicate, built once per organization from its group memberships.
  */
 class AuthzBindingCoverageMapper {
   static create({
@@ -776,14 +680,9 @@ export class AuthzExpectedFactsMapper {
   }
 
   /**
-   * A RoleBinding as the ledger attaches it. The grant id IS the row id. A row
-   * naming no principal cannot be expressed as a grant and is skipped; the
-   * proof does not expect it either, so it holds nothing up.
-   *
-   * A custom key erases which legacy `role` column value the row carried, so
-   * it travels as `legacyRole`: the legacy resolver falls back to that column
-   * whenever the custom role's permission list is empty, and dropping it would
-   * turn an ADMIN with an empty custom role into a viewer.
+   * A RoleBinding as the ledger attaches it. The grant id IS the row id. A row naming no
+   * principal cannot be expressed as a grant and is skipped; the proof does not expect it
+   * either, so it holds nothing up.
    */
   private static bindingToFact({ row }: { row: LegacyBindingRow }): GrantFact | null {
     const principal = this.bindingPrincipal(row);
@@ -810,19 +709,8 @@ export class AuthzExpectedFactsMapper {
 
   /**
    * Team memberships stated DIRECTLY (ADR-110), never promoted into binding
-   * rows first — and only where the legacy resolver actually grants from
-   * them. Its predicate, mirrored exactly:
-   *
-   * - A membership is suppressed when the user holds ANY binding at the
-   *   scopes in play (the organization, or the membership's own team) —
-   *   directly or through a group. The resolver counts a binding of any role
-   *   there, so the suppression must not key on role: keeping a role in the
-   *   key stated an EXTRA grant beside a differing-role binding, a union the
-   *   legacy path never answers.
-   * - A `CUSTOM` membership row is never stated: the resolver's fallback
-   *   denies that shape outright ("leave those to the binding path"), with
-   *   or without an assigned role, so a fact for it would grant access
-   *   legacy refuses.
+   * rows first — and only where the legacy resolver actually grants from them. Its
+   * predicate, mirrored exactly:
    */
   private static teamMembershipFacts({
     organizationId,
@@ -870,19 +758,6 @@ export class AuthzExpectedFactsMapper {
 
   /**
    * The facts the legacy schema inferred instead of storing.
-   *
-   * The floor: one org-scoped `member` grant whose principal is the
-   * organization's membership itself, so a member holding no binding anywhere
-   * holds exactly the floor and nothing beyond it.
-   *
-   * The legacy-admin fallback: an ADMIN with no binding anywhere is served
-   * today by the resolver's fallback. `legacy-admin`, NOT `admin`, and the
-   * difference is load-bearing: `admin` would grant the full admin bag where
-   * the fallback grants a narrower one; the untranslatable key keeps the fact
-   * dormant until the contract gives it the bag the fallback actually grants.
-   *
-   * Lite members: `OrganizationUser.role = EXTERNAL`, the org-scoped cap the
-   * legacy schema kept as a membership column.
    */
   private static organizationLevelFacts({
     organizationId,
@@ -1156,14 +1031,9 @@ export class AuthzMigrationProofMapper {
   }
 
   /**
-   * What a pass has to state: the facts the heads do not already carry.
-   * Every skip is the check's own predicate read backwards — a fact the
-   * check would call converged is one the ledger already holds — so what a
-   * pass skips can never change what it reports. An organization whose heads
-   * are empty, its first pass, still states everything.
-   *
-   * A share link whose head only LAGS on views is carried: the budget rides
-   * `seedResourceGrantUsage`, and no restated attach could carry it.
+   * What a pass has to state: the facts the heads do not already carry. Every skip is the
+   * check's own predicate read backwards — a fact the check would call converged is one the
+   * ledger already holds — so what a pass skips can never change what it reports.
    */
   static unstated({
     organizationId,
@@ -1272,22 +1142,9 @@ export class AuthzMigrationProofMapper {
   }
 
   /**
-   * Field equality for one imported link against its RESOURCE head row, and
-   * the id when its head lags. The stored spellings differ (the head keeps
-   * the database's uppercase), so the comparison is against what the import
-   * said, mapped to that spelling.
-   *
-   * The view budget cuts both ways and the two directions mean different
-   * things. A head BEHIND the legacy count is convergence lag — views land
-   * legacy-side between passes and the monotonic seed raises the usage row
-   * next pass — so it is `outstanding`, not a disagreement; reporting it as
-   * one made an actively-viewed link re-hold the organization forever. A
-   * head AHEAD of the legacy count is a budget that grew back, which nothing
-   * legitimate produces, so that is the named diff.
-   *
-   * Tokens are bearer credentials and the report is persisted and rendered
-   * on the ops page, so a token disagreement reports fingerprints, never the
-   * values.
+   * Field equality for one imported link against its RESOURCE head row, and the id when its
+   * head lags. The stored spellings differ (the head keeps the database's uppercase), so the
+   * comparison is against what the import said, mapped to that spelling.
    */
   private static resourceDiffs({
     organizationId,

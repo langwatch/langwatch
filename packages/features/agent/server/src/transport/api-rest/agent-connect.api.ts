@@ -1,13 +1,7 @@
 /**
- * The HTTP long-poll transport of connected agents, as three endpoints under
+ * The HTTP long-poll transport of connected agents, as three endpoints under /poll` and
+ * `POST /frames`.
  * `/api/v1/agents/connect` (ADR-128, "Transport"): `POST /register`, `GET
- * /poll` and `POST /frames`. Same credentials as the socket: the API key as
- * a bearer token, plus `X-Project-Id` when the key reaches several projects.
- *
- * The endpoints authenticate inside the handler, through the same check the
- * socket runs, so a refusal is the same `refused` frame the SDK already
- * reads. A poll or a frame for a token the platform no longer knows answers
- * `agent_session_unknown` with status 410, and the SDK registers again.
  */
 
 import {
@@ -46,12 +40,6 @@ type RequestBodySchema = NonNullable<
 
 /**
  * A zod schema as a `requestBody` schema object.
- *
- * `resolver()` is the normal way to put a zod schema into `describeRoute`, but
- * it only types against `responses`; hono-openapi wants a plain schema object
- * under `requestBody`. These two routes parse their body by hand (a refusal
- * has to become a protocol frame, not a validator error), so there is no
- * `zValidator` for the generator to read one off either.
  */
 const requestBodySchema = (schema: z.ZodType): RequestBodySchema =>
   z.toJSONSchema(schema, { target: "openapi-3.0", reused: "inline" }) as RequestBodySchema;

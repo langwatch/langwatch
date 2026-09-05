@@ -207,12 +207,11 @@ describe("createAnnotationCommand()", () => {
     });
   });
 
-  // The server answers the two omissions with a 400 (routes/annotations.ts),
-  // so the command refuses before spending a round trip. The flag conflict
-  // never reaches it — `CreateAnnotationBody` carries a single `isThumbsUp`,
-  // so the pair cannot be expressed on the wire. All three refuse through the
-  // shared error port, so `--format json` gets a document on stdout rather
-  // than a bare exit code and an ANSI sentence on stderr.
+  // The server answers the two omissions with a 400 (routes/annotations.ts), so the command
+  // refuses before spending a round trip. The flag conflict never reaches it —
+  // `CreateAnnotationBody` carries a single `isThumbsUp`, so the pair cannot be expressed on
+  // the wire. All three refuse through the shared error port, so `--format json` gets a
+  // document on stdout rather than a bare exit code and an ANSI sentence on stderr.
   describe("given --format json is active", () => {
     const stdoutDocument = () =>
       JSON.parse(
@@ -232,9 +231,9 @@ describe("createAnnotationCommand()", () => {
 
     describe("when --comment is omitted", () => {
       it("refuses without calling the API", async () => {
-        await expect(
-          createAnnotationCommand("trace_abc", { thumbsUp: true }),
-        ).rejects.toThrow(ProcessExitError);
+        await expect(createAnnotationCommand("trace_abc", { thumbsUp: true })).rejects.toThrow(
+          ProcessExitError,
+        );
 
         expect(mockCreate).not.toHaveBeenCalled();
         const document = stdoutDocument();

@@ -27,10 +27,6 @@ const suiteRunEvents = [
 
 /**
  * Type-safe fold projection for suite run state.
- *
- * - `implements FoldEventHandlers` enforces a handler exists for every event schema
- * - Handler names derived from event type strings (e.g. `"lw.suite_run.started"` → `handleSuiteRunStarted`)
- * - `UpdatedAt` is auto-managed by the base class after each handler call
  */
 export class SuiteRunStateFoldProjection
   extends AbstractFoldProjection<SuiteRunStateData, typeof suiteRunEvents>

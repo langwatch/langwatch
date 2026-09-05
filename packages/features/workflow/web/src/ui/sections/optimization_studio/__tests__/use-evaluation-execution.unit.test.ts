@@ -1,13 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Unit tests for useEvaluationExecution hook.
- * Tests the timeout mechanism for evaluation execution.
- *
- * Acceptance criteria:
- * - When evaluation stays in "waiting" status past timeout, it transitions to error
- * - When evaluation transitions away from "waiting" before timeout, no error is set
- * - When stop evaluation stays in "running" status past timeout, it transitions to error
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

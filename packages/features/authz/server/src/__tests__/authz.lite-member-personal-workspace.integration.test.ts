@@ -1,24 +1,6 @@
 /**
  * @vitest-environment node
- *
  * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
- *
- * A seat decision leaves a member's personal workspace alone, and it costs
- * nothing to, because the organization role already decides what they can do
- * inside it: a Lite Member reads their workspace and writes nothing while
- * holding the same ADMIN binding on it they always did, so giving them their
- * full access back restores writing with nothing to repair.
- *
- * That is also why the workspace is kept out of the access an admin manages:
- * it is not a grant anyone chose, and nothing an admin does to it is allowed.
- *
- * Ported from `personal-workspace-invariants.integration.test.ts` on
- * platform/app, which asked the deleted `hasProjectPermission` and the
- * deleted `roleBinding.listForUser` / `listForOrg`. Both answers live on
- * `AuthzService` now, over the same rows.
- *
- * Requires DATABASE_URL, the variable this package's integration lane reads.
- * Skips cleanly without it.
  */
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

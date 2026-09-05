@@ -1,12 +1,5 @@
 /**
  * `actionParams` must never reach machine output.
- *
- * `/api/v1/triggers` returns delivery credentials — Slack webhook URLs, custom
- * endpoint URLs and their headers — in plaintext, and the human "Trigger
- * Details" block has always omitted them. Machine output is the MORE exposed
- * surface (it gets logged, piped, and pasted into agent context, and agent mode
- * auto-activates from CLAUDECODE), so it must not be the one place the secret
- * appears. These tests fail loudly if that ever regresses.
  */
 import { describe, it, expect } from "vitest";
 import { redactTriggerSecrets, redactTriggerListSecrets } from "../redact";

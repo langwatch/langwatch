@@ -40,9 +40,8 @@ export function useCreateDraftPrompt() {
   );
 
   /**
-   * createDraftPrompt
-   * Single Responsibility: Creates a new draft prompt tab with default configuration values.
-   * Uses buildDefaultFormValues for consistency across all contexts.
+   * createDraftPrompt Single Responsibility: Creates a new draft prompt tab with default
+   * configuration values. Uses buildDefaultFormValues for consistency across all contexts.
    * @returns Promise resolving to object with defaultValues
    */
   const createDraftPrompt = useCallback(async () => {

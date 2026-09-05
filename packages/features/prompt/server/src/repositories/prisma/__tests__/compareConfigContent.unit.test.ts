@@ -2,18 +2,13 @@ import { describe, expect, it } from "vitest";
 import { PrismaLlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository";
 
 /**
- * Comparing two configs reads no row, so the repository is composed over a
- * persistence double that answers nothing. Naming the feature's own slice
- * rather than the generated client is what keeps this test honest: if the
- * comparison ever grows a query, the double stops compiling.
+ * Comparing two configs reads no row, so the repository is composed over a persistence
+ * double that answers nothing.
  */
 const noPersistence = {} as PromptConfigDatabase;
 
 /**
  * Tests for compareConfigContent covering:
- * - Deep nested object comparison (Root Cause 2: JSON.stringify array replacer bug)
- * - Sampling parameter comparison
- * - Structured output comparison
  */
 describe("PrismaLlmConfigRepository", () => {
   describe("compareConfigContent()", () => {

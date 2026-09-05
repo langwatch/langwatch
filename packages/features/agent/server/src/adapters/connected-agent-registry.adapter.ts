@@ -1,12 +1,5 @@
 /**
  * Presence of connected agent instances (ADR-128, "Presence").
- *
- * One sorted set per agent holds its live instance ids scored by last seen,
- * with the same TTL, refresh and retirement rules as the scenario tab
- * registry: a member ages out on its own when its socket dies without a
- * goodbye, and a goodbye only ever lowers a score. A hash per instance keeps
- * what the agents page shows, and a counter per instance keeps the calls in
- * flight for the concurrency pick.
  */
 
 import {
@@ -66,10 +59,6 @@ export class ConnectedAgentRegistryAdapter extends ConnectedAgentRegistryPort {
 
   /**
    * Refreshes the last-seen score of an instance on every agent it serves.
-   *
-   * With `meta`, a hash that aged out while the instance was still there (a
-   * stalled pod, a poll later than the TTL) is written again, so the
-   * instance reads live instead of vanishing until it registers again.
    */
   async refresh({
     projectId,

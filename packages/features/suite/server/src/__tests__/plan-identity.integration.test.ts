@@ -1,19 +1,5 @@
 /**
  * @vitest-environment node
- *
- * A run plan is identified by its NAME: a run started under a name joins the
- * plan of that name and replaces its config, or creates the plan.
- *
- * Ported from platform/app/src/server/suites/__tests__/plan-identity.integration.test.ts
- * (origin/main), adapted to the split feature-package architecture: the
- * name-matching/locking behaviour lives in `PrismaSuiteRepository`
- * (`findOrCreatePlanByName`), used here for real against Postgres. The
- * `ScenarioService`/`AgentService`/`PromptService` collaborators `SuiteService`
- * depends on are faked (scenarios/test-suites are read straight off the same
- * database so scope resolution — which the repository does with raw Prisma
- * queries — stays real; agents and prompts are boundary services with no
- * bearing on plan identity, so they are in-memory).
- *
  * @see specs/suites/run-plan-identity-by-name.feature
  */
 import { randomUUID } from "node:crypto";
@@ -106,7 +92,13 @@ function fakePromptService(): PromptService {
  * test-suite/scenario references are real, not re-implemented. */
 function fakeScenarioService(): ScenarioService {
   return {
-    tryGetTestSuite: async ({ testSuiteId, projectId: pid }: { testSuiteId: string; projectId: string }) => {
+    tryGetTestSuite: async ({
+      testSuiteId,
+      projectId: pid,
+    }: {
+      testSuiteId: string;
+      projectId: string;
+    }) => {
       const row = await database().simulationSuite.findFirst({
         where: { id: testSuiteId, projectId: pid, kind: "test_suite" },
       });
@@ -126,7 +118,13 @@ function fakeScenarioService(): ScenarioService {
       });
       return rows;
     },
-    getRunConfigs: async ({ ids, projectId: pid }: { ids: string[]; projectId: string }): Promise<ScenarioRunConfig[]> => {
+    getRunConfigs: async ({
+      ids,
+      projectId: pid,
+    }: {
+      ids: string[];
+      projectId: string;
+    }): Promise<ScenarioRunConfig[]> => {
       if (ids.length === 0) return [];
       const rows = await database().scenario.findMany({
         where: { id: { in: ids }, projectId: pid },
@@ -290,7 +288,9 @@ describe.skipIf(!databaseUrl)("Run plan identity by name", () => {
       data: { name: namespace, slug: namespace },
     });
     organizationId = organization.id;
-    const team = await db.team.create({ data: { name: namespace, slug: namespace, organizationId } });
+    const team = await db.team.create({
+      data: { name: namespace, slug: namespace, organizationId },
+    });
     teamId = team.id;
     const project = await db.project.create({
       data: {
@@ -544,7 +544,11 @@ describe.skipIf(!databaseUrl)("Run plan identity by name", () => {
         // The first target spells the declared default of "model" out, which
         // is no override: it is stored, keyed and named as "locale=de" alone.
         const targets: SuiteTarget[] = [
-          { type: "http", referenceId: agent.id, runParameters: { locale: "de", model: "gpt-5-mini" } },
+          {
+            type: "http",
+            referenceId: agent.id,
+            runParameters: { locale: "de", model: "gpt-5-mini" },
+          },
           { type: "http", referenceId: agent.id, runParameters: { locale: "de", model: "gpt-5" } },
         ];
         const scope: SuiteScope = { mode: "test_suites", testSuiteIds: [refunds.id] };
@@ -558,7 +562,11 @@ describe.skipIf(!databaseUrl)("Run plan identity by name", () => {
         expect(sortSuiteTargets(stored.targets as SuiteTarget[])).toEqual(
           sortSuiteTargets([
             { type: "http", referenceId: agent.id, runParameters: { locale: "de" } },
-            { type: "http", referenceId: agent.id, runParameters: { locale: "de", model: "gpt-5-mini" } },
+            {
+              type: "http",
+              referenceId: agent.id,
+              runParameters: { locale: "de", model: "gpt-5-mini" },
+            },
           ]),
         );
 
@@ -643,7 +651,10 @@ describe.skipIf(!databaseUrl)("Run plan identity by name", () => {
 
         const everything = await runUnderName({
           name: "Nightly",
-          scope: { mode: "test_suites", testSuiteIds: [refunds.id, loose.testSuiteId ?? "default"] },
+          scope: {
+            mode: "test_suites",
+            testSuiteIds: [refunds.id, loose.testSuiteId ?? "default"],
+          },
           targets: [{ type: "http", referenceId: agent.id }],
         });
 

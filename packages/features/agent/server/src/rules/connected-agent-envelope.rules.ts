@@ -1,16 +1,17 @@
 /**
  * What the dispatcher and the gateway write for each other in Redis, and the
  * messages they nudge each other with (ADR-128, "Transport").
- *
- * The dispatcher, on the pod that took the relay request, writes the envelope
- * and nudges the instance channel; the gateway, on the pod that holds the
- * socket, reads the envelope and sends the frame. The result travels back the
- * same way: a key the gateway writes, a nudge on the dispatcher pod's reply
- * channel, and a poll of the key as the fallback.
  */
 
 import { z } from "zod";
-import { CALL_ENVELOPE_KEYS, type CallEnvelope, callEnvelopeSchema, outputSchema, resultErrorSchema, sessionSchema } from "@langwatch/agent-contract";
+import {
+  CALL_ENVELOPE_KEYS,
+  type CallEnvelope,
+  callEnvelopeSchema,
+  outputSchema,
+  resultErrorSchema,
+  sessionSchema,
+} from "@langwatch/agent-contract";
 
 /** The value under `agent_call:v1:<callId>`. */
 export const storedCallSchema = z.object({
@@ -32,12 +33,8 @@ export const payloadViolationSchema = z.object({
 export type PayloadViolation = z.infer<typeof payloadViolationSchema>;
 
 /**
- * The error a stored result carries: what the instance sent, plus the fields
- * the gateway adds when the refusal is its own.
- *
- * The sizes travel as fields rather than inside the message, so the
- * dispatcher raises the same handled error without reading the copy, and an
- * instance cannot claim a platform refusal by sending its code.
+ * The error a stored result carries: what the instance sent, plus the fields the gateway
+ * adds when the refusal is its own.
  */
 export const storedResultErrorSchema = resultErrorSchema.extend({
   payload: payloadViolationSchema.optional(),
@@ -84,10 +81,6 @@ export type InstanceGone = z.infer<typeof instanceGoneSchema>;
 
 /**
  * The envelope for one turn, holding the contract fields and nothing else.
- *
- * Built from named fields rather than by spreading the request, so a field
- * the relay body carries beyond the contract (a judgment request, platform
- * metadata) can never reach an instance.
  */
 export function buildCallEnvelope(fields: {
   callId: string;
@@ -130,10 +123,6 @@ export function jsonByteLength(value: unknown): number {
 
 /**
  * The cap a result breaks, or nothing when it fits.
- *
- * The session is checked on its own first: it is the small value the SDK
- * echoes on every later turn, so a session at the size of a result would
- * make every turn of the thread carry it.
  */
 export function resultCapViolation({
   output,

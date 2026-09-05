@@ -1,20 +1,5 @@
 /**
  * The agent feature's application: what all of its doors call.
- *
- * It holds every service the feature needs, and it is the one typed thing a
- * transport is given. Before it, the tRPC door declared its own
- * `Readonly<{ agents: AgentService }>` while the deprecated `/api/agents` Hono
- * family reached a second facade over the same service — two descriptions of
- * one bag, agreeing by attention rather than by construction.
- *
- * Most operations are the service's own, reached through {@link agents}. What
- * lives here as a rule is what a door would otherwise have to know: today that
- * is the platform's agent-id scheme, which the tRPC door and the REST family
- * each spelled out for themselves.
- *
- * A caller arrives as an argument, never read from a session or a request, so
- * one operation serves a browser session, an API key and a background job
- * without knowing which it is serving.
  */
 import type { AgentService, AgentWithFields } from "@langwatch/agent-contract";
 import { nanoid } from "nanoid";
@@ -39,16 +24,12 @@ export interface AgentAppDependencies {
   agents: AgentService;
   /**
    * Runs "Test agent" through the Scenario feature's execution pipeline.
-   * Absent on a process that composes no Scenario application: `testTurn` and
-   * `testRun` then throw a plain `Error`, the same way an agent copy refuses
-   * when this process holds no Workflow application.
    */
   testing?: AgentTestPort;
   /**
    * Reads presence (ADR-128) off the connected-agent runtime. Absent on a
-   * process that never installed the runtime (a test double, or a process
-   * that composes no connected-agent transport): every agent then reads as
-   * offline with no instances, the same degrade `NO_PRESENCE` gives one row.
+   * process that never installed the runtime (a test double, or a process that composes no
+   * connected-agent transport): every agent then reads as offline with no instances, the
    */
   connected?: {
     presence: (input: {
@@ -67,13 +48,6 @@ export class AgentApp {
 
   /**
    * The platform's agent-id scheme.
-   *
-   * Static because the two doors mint at different moments — the tRPC door
-   * hands the generator to its input schema, which is built once at module
-   * load, while the REST family mints inside the request — and neither moment
-   * should be a second copy of what an agent id looks like. It was two copies
-   * before this: `agent_${nanoid()}` in `transport/api-trpc/agent.api.ts` and again
-   * in `transport/api-rest/agent-legacy.api.ts`.
    */
   static nextAgentId(): string {
     return `agent_${nanoid()}`;
@@ -81,9 +55,8 @@ export class AgentApp {
 
   /**
    * Every non-archived agent in one project, each carrying what ADR-128
-   * added: the parameters a connected agent declares, the owner of a
-   * personal one, and its presence. Other kinds read as offline with no
-   * instances and no owner.
+   * added: the parameters a connected agent declares, the owner of a personal one, and its
+   * presence. Other kinds read as offline with no instances and no owner.
    */
   async getAll(input: Parameters<AgentService["getAll"]>[0]) {
     const agents = await this.dependencies.agents.getAll(input);

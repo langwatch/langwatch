@@ -1,18 +1,6 @@
 /**
  * @vitest-environment node
- *
  * @see specs/prompts/prompt-soft-delete.feature
- *
- * A prompt's handle used to stay unique forever: `@@unique([handle])` on
- * `LlmPromptConfig` counted archived rows, so deleting a prompt and creating
- * a fresh one with the same handle — or the CLI's sync flow doing the same —
- * threw "Prompt handle already exists". `PrismaLlmConfigRepository.
- * deleteConfig` nulls the handle out on archive now, and Postgres treats
- * NULL as distinct per row under a plain unique constraint, so the handle
- * is free for a new prompt to claim.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL (or DATABASE_URL). Skips cleanly
- * without one.
  */
 import {
   PrismaConfigService,
@@ -90,7 +78,9 @@ describe.skipIf(!DB_URL)("given a prompt handle after the prompt is archived", (
   describe("when a prompt was previously created and then archived", () => {
     /** @scenario "A user can reuse the handle of an archived prompt for a new prompt" */
     it("allows creating a new prompt with the same handle", async () => {
-      const handle = `reuse-handle-${nanoid(6).toLowerCase().replace(/[^a-z0-9_-]/g, "x")}`;
+      const handle = `reuse-handle-${nanoid(6)
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, "x")}`;
 
       const original = await prompts.createPrompt({
         projectId,
@@ -114,7 +104,9 @@ describe.skipIf(!DB_URL)("given a prompt handle after the prompt is archived", (
 
     /** @scenario "A user can sync a fresh prompt from the CLI after the previous one was archived" */
     it("allows the CLI sync flow to recreate a prompt with the same handle", async () => {
-      const handle = `sync-reuse-${nanoid(6).toLowerCase().replace(/[^a-z0-9_-]/g, "x")}`;
+      const handle = `sync-reuse-${nanoid(6)
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, "x")}`;
       const configData = {
         prompt: "v1",
         messages: [],

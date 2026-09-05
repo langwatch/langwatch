@@ -1,8 +1,7 @@
 /**
  * ADR-027 site #4: the ssoDomain auto-join `afterUserCreate` runs is
- * federation, and it rides the same platform SSO license gate as every other
- * provider — a domain-matched organization must not gain a member off a
- * licensing store answer of "no genuine license".
+ * federation, and it rides the same platform SSO license gate as every other provider — a
+ * domain-matched organization must not gain a member off a licensing store answer of "no
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";

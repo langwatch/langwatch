@@ -6,11 +6,8 @@ import { promptApi } from "./prompt-api";
 import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store";
 
 /**
- * Custom hook to open a new tab based on a promptId in the URL.
- * Single Responsibility: Opens a new tab based on a promptId in the URL.
- *
- * Note: we don't check for the prompt if it's already open in a tab,
- * since multiple tabs can be open for the same prompt.
+ * Custom hook to open a new tab based on a promptId in the URL. Single Responsibility:
+ * Opens a new tab based on a promptId in the URL.
  */
 export function useUrlParamToOpenNewTab() {
   const { project } = usePromptProject();

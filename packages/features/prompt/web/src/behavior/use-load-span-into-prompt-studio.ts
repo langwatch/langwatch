@@ -115,17 +115,11 @@ export function coerceToString(value: unknown): string | undefined {
 export function createDefaultPromptFormValues(
   spanData: PromptStudioSpanResult,
 ): PromptConfigFormValues {
-  if (!spanData.llmConfig?.model) {
-  }
-
   const systemPrompt = spanData.llmConfig?.systemPrompt
     ? typeof spanData.llmConfig.systemPrompt === "string"
       ? spanData.llmConfig.systemPrompt
       : JSON.stringify(spanData.llmConfig.systemPrompt)
     : "";
-
-  if (systemPrompt.length === 0) {
-  }
 
   // Build LLM config dynamically from the parameter map
   const llm: Record<string, unknown> = {
@@ -307,9 +301,7 @@ export function useLoadSpanIntoPromptPlayground() {
   const { spanId, action, clearParamsFromUrl } = useSpanIdFromUrl();
   const trpc = promptApi.useUtils();
   const addTab = useDraggableTabsBrowserStore((state) => state.addTab);
-  const updateTabData = useDraggableTabsBrowserStore(
-    (state) => state.updateTabData,
-  );
+  const updateTabData = useDraggableTabsBrowserStore((state) => state.updateTabData);
   const removeTab = useDraggableTabsBrowserStore((state) => state.removeTab);
 
   useEffect(() => {

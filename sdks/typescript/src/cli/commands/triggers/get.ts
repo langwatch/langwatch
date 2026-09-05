@@ -11,10 +11,9 @@ import type { CommandResult } from "../../utils/output";
 import { redactTriggerSecrets } from "./redact";
 
 /**
- * Returns the trigger rather than printing it: the output port renders it in
- * whatever format the caller asked for (utils/output.ts). `data` is the raw
- * record, so a machine caller keeps `actionParams` and `updatedAt`, which the
- * human view omits.
+ * Returns the trigger rather than printing it: the output port renders it in whatever
+ * format the caller asked for (utils/output.ts). `data` is the raw record, so a machine
+ * caller keeps `actionParams` and `updatedAt`, which the human view omits.
  */
 export const getTriggerCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();

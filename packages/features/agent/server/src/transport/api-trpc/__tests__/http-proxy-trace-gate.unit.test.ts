@@ -1,10 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The agentId gate. A test run from an unsaved agent has nothing to attach a
- * trace to, so the transport must neither record a span nor push a traceparent
- * onto the outgoing request — otherwise the customer's own service correlates
- * against a trace that was never written.
  */
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";

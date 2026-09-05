@@ -1,18 +1,7 @@
 /**
- * The fixture the cross-project-access suites share: a real HTTP server
- * standing in for the platform, a temporary CLI config, and a runner that
- * spawns the REAL built CLI against both.
- *
- * The server records the exact `Authorization` header of every data request,
- * because that header IS the feature: a user-scoped key carries no project
- * identity, so `Basic base64(projectId:key)` is the only thing that tells the
- * platform which project the command means.
- *
- * Requires `pnpm build` (like the other CLI integration tests in this
- * package). One `installCrossProjectHarness()` call per suite file installs
- * the hooks and returns everything the cases read.
- *
- * Feature: specs/typescript-sdk/cli-cross-project-access.feature
+ * The fixture the cross-project-access suites share: a real HTTP server standing in for
+ * the platform, a temporary CLI config, and a runner that spawns the REAL built CLI
+ * against both.
  */
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
@@ -230,12 +219,11 @@ export function installCrossProjectHarness(): CrossProjectHarness {
     env?: Record<string, string>;
   }): Promise<RunResult> =>
     new Promise((resolve) => {
-      // The runner's own shell (and the repo .env vitest loads) may carry a
-      // real LANGWATCH_API_KEY; every case here is about a CLI with NO key in
-      // its environment except where the case sets one. The agent-mode
-      // markers are scrubbed too, or an agent running this suite would flip
-      // the CLI into agents format and change which rendering the assertions
-      // see.
+      // The runner's own shell (and the repo .env vitest loads) may carry a real
+      // LANGWATCH_API_KEY; every case here is about a CLI with NO key in its environment except
+      // where the case sets one. The agent-mode markers are scrubbed too, or an agent running
+      // this suite would flip the CLI into agents format and change which rendering the
+      // assertions see.
       const baseEnv: Record<string, string | undefined> = { ...process.env };
       delete baseEnv.LANGWATCH_API_KEY;
       delete baseEnv.LANGWATCH_PROJECT_ID;

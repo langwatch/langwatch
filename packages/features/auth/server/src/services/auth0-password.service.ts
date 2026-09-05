@@ -31,25 +31,12 @@ export class Auth0ApiError extends Error {
 }
 
 /**
- * The Auth0 tenant this deployment manages passwords in, as its environment
- * spells it.
- *
- * The values arrive from the process rather than being read here, so this
- * module names no environment variable and a test can exercise the
- * not-configured refusal without mutating one. Which variables carry them is
- * still the deployment's business, and the refusal below says so by name.
+ * The Auth0 tenant this deployment manages passwords in, as its environment spells it.
  */
 export type Auth0ManagementCredentials = Readonly<{
   issuer: string | undefined;
   /**
    * Client ID for the Management API `client_credentials` grant.
-   *
-   * The dedicated Machine-to-Machine application, where the deployment
-   * configured one. The user-login Auth0 application is typically a Single
-   * Page Application, which cannot use the `client_credentials` grant at all,
-   * so a separate M2M app is normally required; falling back to the login
-   * app's credentials works only for tenants where it is a Regular Web
-   * Application with that grant enabled, which is uncommon.
    */
   mgmtClientId: string | undefined;
   /** Client secret for that same grant. Never logged, never reported. */
@@ -66,11 +53,6 @@ interface Auth0Config {
 
 /**
  * Validates the deployment's credentials, or refuses by name.
- *
- * A refusal here is a configuration fault rather than a customer one, which is
- * why it is a 500 and why the message names the variables an operator has to
- * set — nothing on it is a secret, and an operator reading "not configured"
- * with no list has to go looking.
  */
 function loadConfig(credentials: Auth0ManagementCredentials): Auth0Config {
   const { issuer, mgmtClientId, mgmtClientSecret } = credentials;
@@ -102,19 +84,13 @@ async function parseJsonSafe(res: Response): Promise<unknown> {
 }
 
 /**
- * Hard cap on Auth0 HTTP calls. The default is "wait forever," which lets
- * an upstream stall hold a tRPC mutation hostage. 10s is well above
- * normal Auth0 latency (typically <300ms) but short enough that the
- * rate-limited user gets a useful error rather than a hung request.
+ * Hard cap on Auth0 HTTP calls. The default is "wait forever," which lets an upstream
+ * stall hold a tRPC mutation hostage.
  */
 const AUTH0_HTTP_TIMEOUT_MS = 10_000;
 
 /**
  * Wrap `fetch` so that:
- *   1. Every Auth0 call has an `AbortSignal.timeout()`.
- *   2. Transport-layer errors (network, DNS, abort) are normalized to
- *      `Auth0ApiError` — callers depend on `instanceof Auth0ApiError` to
- *      surface the right operator message.
  */
 async function fetchAuth0(url: string, init: Omit<RequestInit, "signal">): Promise<Response> {
   try {
@@ -135,10 +111,9 @@ async function fetchAuth0(url: string, init: Omit<RequestInit, "signal">): Promi
 }
 
 /**
- * In-memory cache for the Management API token. Auth0 issues these for the
- * full `expires_in` duration (typically 24h for M2M). We keyed it on the
- * mgmtClientId so a credential rotation invalidates automatically. A 60s
- * safety window guards against using a token that's about to expire.
+ * In-memory cache for the Management API token. Auth0 issues these for the full
+ * `expires_in` duration (typically 24h for M2M). We keyed it on the mgmtClientId so a
+ * credential rotation invalidates automatically.
  */
 interface CachedToken {
   token: string;
@@ -149,18 +124,8 @@ let cachedToken: CachedToken | null = null;
 const TOKEN_SAFETY_WINDOW_MS = 60_000;
 
 /**
- * Pull the operator-friendly message out of an Auth0 password-policy 400.
- * Returns null if the body isn't a recognizable policy error.
- *
- * Auth0 envelopes:
- *   { statusCode: 400, error: "Bad Request",
- *     message: "PasswordStrengthError: Password is too weak" }
- *   { statusCode: 400, error: "Bad Request",
- *     message: "PasswordHistoryError: Password has previously been used" }
- *   { statusCode: 400, error: "Bad Request",
- *     message: "PasswordDictionaryError: Password is too common" }
- *   { statusCode: 400, error: "Bad Request",
- *     message: "PasswordNoUserInfoError: Password contains user information" }
+ * Pull the operator-friendly message out of an Auth0 password-policy 400. Returns null if
+ * the body isn't a recognizable policy error.
  */
 function extractPasswordPolicyMessage(
   body: { errorCode?: string; message?: string; error?: string } | undefined,
@@ -202,10 +167,7 @@ export class Auth0PasswordService {
   }
 
   /**
-   * Get a Management API access token via client_credentials grant. Caches the
-   * token for its declared `expires_in` minus a 60s safety window so successive
-   * password changes don't each pay a token-issuance round-trip and don't burn
-   * the tenant's token-issuance rate budget unnecessarily.
+   * Get a Management API access token via client_credentials grant.
    */
   static async getManagementApiToken(credentials: Auth0ManagementCredentials): Promise<string> {
     const config = loadConfig(credentials);
@@ -266,10 +228,9 @@ export class Auth0PasswordService {
   }
 
   /**
-   * Update a user's password via Auth0 Management API.
-   * Throws Auth0ApiError with code="insufficient_scope" when the Auth0
-   * application lacks the `update:users` scope — callers should surface a
-   * configuration error message to the operator.
+   * Update a user's password via Auth0 Management API. Throws Auth0ApiError with
+   * code="insufficient_scope" when the Auth0 application lacks the `update:users` scope —
+   * callers should surface a configuration error message to the operator.
    */
   static async updateUserPassword(args: {
     credentials: Auth0ManagementCredentials;
@@ -354,19 +315,8 @@ export class Auth0PasswordService {
   }
 
   /**
-   * Verify the user's current Auth0 password using Resource Owner Password
-   * Grant against the Management M2M client. Returns:
-   *   - `true`  on 200 (Auth0 minted a token, so the credentials are valid).
-   *   - `false` if Auth0 returns `invalid_grant` (wrong email or password).
-   * Throws Auth0ApiError for everything else — most importantly
-   * `password_grant_not_enabled` when the M2M app's allowed grant types
-   * doesn't include "Password", which is the operator-fixable misconfig.
-   *
-   * Why the M2M client and not the user-login (SPA) one: the SPA is a
-   * public client (no secret) and Auth0 routes its grant types through
-   * Universal Login by design. The M2M client is confidential and we
-   * already use it for the Management API, so it's the natural place to
-   * authorize the Password grant.
+   * Verify the user's current Auth0 password using Resource Owner Password Grant against the
+   * Management M2M client. Returns:
    */
   static async verifyCurrentPassword(args: {
     credentials: Auth0ManagementCredentials;
@@ -436,18 +386,7 @@ export class Auth0PasswordService {
   }
 
   /**
-   * Verify the user's current Auth0 password, then update it via the
-   * Management API.
-   *
-   * Returns `{ ok: true }` on success, `{ ok: false, reason: "wrong_password" }`
-   * when verification fails. Throws Auth0ApiError for non-credential failures
-   * (config, scope, transport).
-   *
-   * Caller protections that backstop this:
-   *   - Authenticated session (enforced by tRPC `protectedProcedure`).
-   *   - 5 attempts per 15min per user rate limit (enforced in the router) —
-   *     also guards against brute-forcing the current password through this
-   *     entry point.
+   * Verify the user's current Auth0 password, then update it via the Management API.
    */
   static async changeAuth0Password(args: {
     credentials: Auth0ManagementCredentials;

@@ -243,14 +243,8 @@ export class StripeUsageReportingService implements UsageReportingService {
   }
 
   /**
-   * The meter read behind {@link getUsageSummary}, with the two named,
-   * non-retryable rejections separated from everything else.
-   *
-   * A malformed request or refused credentials are our configuration, so the
-   * caller gets a code it can render ("Couldn't build that usage report")
-   * rather than a generic unknown. Timeouts and provider 5xx are re-thrown
-   * untouched: retryable, and not something we can name — they degrade to
-   * "unknown" with a trace id, which is the correct outcome.
+   * The meter read behind {@link getUsageSummary}, with the two named, non-retryable
+   * rejections separated from everything else.
    */
   private async listEventSummaries({
     stripeCustomerId,

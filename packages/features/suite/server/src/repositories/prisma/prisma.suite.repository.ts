@@ -17,10 +17,9 @@ import {
 import { SuiteRepository } from "../suite.repository";
 
 /**
- * Max wall-clock the locked transaction may run, the wait for the lock
- * included. The body is three small queries; the budget is for the queue in
- * front of it when many runs of one plan name start together — Prisma's 5s
- * default fails the tail of that queue.
+ * Max wall-clock the locked transaction may run, the wait for the lock included. The body
+ * is three small queries; the budget is for the queue in front of it when many runs of one
+ * plan name start together — Prisma's 5s default fails the tail of that queue.
  */
 const PLAN_NAME_TXN_TIMEOUT_MS = 15_000;
 const PLAN_NAME_TXN_MAX_WAIT_MS = 10_000;
@@ -103,13 +102,11 @@ export class PrismaSuiteRepository extends SuiteRepository {
 
   async resolveDynamicRunMembership(input: SuiteIdInput): Promise<string[]> {
     return this.database.$transaction(async (transaction) => {
-      // The row lock is by id and projectId alone. A `kind`/`archivedAt`
-      // predicate here would only ever narrow which row this locks, never
-      // widen it — and a plan row's kind is "run_plan" (see `create` above),
-      // not "custom", so a `kind = 'custom'` predicate locked zero rows and
-      // let two runs of the same plan each write a scenarioIds list from a
-      // read the other had already moved past. The existence and archived
-      // checks already happen below, on the read that decides what to write.
+      // The row lock is by id and projectId alone. A `kind`/`archivedAt` predicate here would
+      // only ever narrow which row this locks, never widen it — and a plan row's kind is
+      // "run_plan" (see `create` above), not "custom", so a `kind = 'custom'` predicate locked
+      // zero rows and let two runs of the same plan each write a scenarioIds list from a read
+      // the other had already moved past.
       await transaction.$executeRaw`
         SELECT id
         FROM "SimulationSuite"

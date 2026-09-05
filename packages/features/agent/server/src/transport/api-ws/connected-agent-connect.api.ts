@@ -2,14 +2,6 @@
  * The socket side of connected agents: `GET /api/v1/agents/connect` upgrades,
  * authenticates, registers the process's agents and holds the socket for
  * every call the dispatcher writes for its instance (ADR-128, "Transport").
- *
- * The gateway reads envelopes off Redis, never off the nudge message, and
- * rescans the instance's pending set when it registers, so a call written
- * while the socket was reconnecting is still delivered. It publishes the
- * instance as gone when the socket closes, so the dispatcher fails that
- * instance's calls at once instead of at the deadline. What a session means
- * to the platform lives in `AgentSessionService`, shared with the HTTP
- * long-poll transport; this file owns the socket and its clocks.
  */
 
 import type { IncomingMessage } from "node:http";
@@ -112,12 +104,11 @@ export class ConnectGateway {
       return;
     }
 
-    // The SDK sends its register frame the moment the socket opens, which
-    // is before the credential lookup below has answered. The first frame is
-    // held until then, so it is never lost to an unattached listener. Later
-    // frames are dropped: only the register frame is read here, and a peer
-    // that is not authenticated yet must not be able to fill the memory of
-    // the process with the frames after it.
+    // The SDK sends its register frame the moment the socket opens, which is before the
+    // credential lookup below has answered. The first frame is held until then, so it is never
+    // lost to an unattached listener. Later frames are dropped: only the register frame is
+    // read here, and a peer that is not authenticated yet must not be able to fill the memory
+    // of the process with the frames after it.
     let held: WebSocket.RawData | undefined;
     const hold = (raw: WebSocket.RawData) => {
       held ??= raw;

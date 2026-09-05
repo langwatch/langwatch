@@ -1,10 +1,6 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * The fold-side trigger: which folded sessions ask GitHub about their branch,
- * and what happens when the ask fails.
- *
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { describe, expect, it, vi } from "vitest";
@@ -176,12 +172,9 @@ describe("pullRequestMapping subscriber", () => {
     });
 
     /**
-     * The dedup contract, pinned. A dedup key + ttl alone does NOT collapse
-     * anything: with no delay the job dispatches on the first event, dispatch
-     * takes it out of staging, and every later event misses the lookup and
-     * stages its own job. A non-zero delay is what gives the key something to
-     * collapse into, so a future edit that drops it would silently return this
-     * subscriber to a GitHub-facing job per fold commit.
+     * The dedup contract, pinned. A dedup key + ttl alone does NOT collapse anything: with no
+     * delay the job dispatches on the first event, dispatch takes it out of staging, and every
+     * later event misses the lookup and stages its own job.
      */
     it("holds a real window so one branch's events collapse into one job", () => {
       const options = registrationWith().options;

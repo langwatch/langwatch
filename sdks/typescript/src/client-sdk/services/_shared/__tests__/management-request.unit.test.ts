@@ -1,7 +1,6 @@
 /**
- * The request path every management family shares: what it does with a success
- * that carries no body, and what it refuses before a request is made.
- *
+ * The request path every management family shares: what it does with a success that
+ * carries no body, and what it refuses before a request is made.
  * @see specs/typescript-sdk/cli-management-apis.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

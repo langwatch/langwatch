@@ -1,12 +1,5 @@
 /**
  * The `/api/v1/groups` REST family, which shipped without a CLI.
- *
- * A group is a container of members that carries role bindings, so granting a
- * group access grants every member it. Groups are an Enterprise capability:
- * every route answers 402 `enterprise_plan_required` below that plan, which
- * the CLI renders with upgrade guidance.
- *
- * CLI-only, and deliberately not exported from the client SDK's public index.
  */
 import { resolveEndpoint } from "@/internal/endpoint";
 import {

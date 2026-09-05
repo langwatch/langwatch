@@ -18,21 +18,11 @@ import type {
 
 /**
  * The KSUID resource prefix a role-binding row is minted under.
- *
- * Spelled here rather than read from an application constants table because it
- * is a PERSISTED format: rows written under a different prefix are rows the
- * authorization queries do not find. The prefix travelled with the code.
  */
 const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
 
 /**
  * The collaborators every hook in this file reaches, handed in together.
- *
- * One record rather than a parameter each, because the hooks call one another
- * (an account create reconciles, a user create joins an organization) and each
- * step needs a different subset. Threading eight parameters through three
- * levels is how one of them ends up defaulted at a call site and silently
- * absent for that path only.
  */
 export type BetterAuthHookCollaborators = Readonly<{
   federation: BetterAuthFederationPort;
@@ -46,11 +36,7 @@ const logger = createLogger("langwatch:better-auth:hooks");
 
 /**
  * Atomically deletes every OAuth account row for the user EXCEPT the one being
- * linked/refreshed, and clears `pendingSsoSetup`. Used by both
- * `beforeAccountCreate` (first time the correct SSO provider is linked) and
- * `afterAccountUpdate` (subsequent sign-ins via the correct provider when the
- * Account row already exists). Credential accounts are preserved for on-prem /
- * email-mode deployments.
+ * linked/refreshed, and clears `pendingSsoSetup`.
  */
 const reconcileSsoAccounts = async ({
   prisma,
@@ -80,14 +66,6 @@ const reconcileSsoAccounts = async ({
 
 /**
  * Called before a new user is created (via OAuth signup or email+password signup).
- *
- * Ports the "new user with matching SSO domain" branch from the old NextAuth
- * signIn callback: when the email domain matches an org with ssoDomain, allow
- * the create and add the org membership in the `after` hook.
- *
- * Blocks deactivated users. We only get here for BRAND new users, so
- * deactivatedAt should always be null — but we check defensively in case of
- * a pre-seeded deactivated row.
  */
 export const beforeUserCreate = async ({
   user,
@@ -105,10 +83,9 @@ export const beforeUserCreate = async ({
 };
 
 /**
- * The organization-scoped grant that comes with a default membership.
- * Idempotent by construction: an identical row already present is skipped,
- * so calling this twice grants nothing twice, and calling it after a
- * membership row turned up on its own is the repair.
+ * The organization-scoped grant that comes with a default membership. Idempotent by
+ * construction: an identical row already present is skipped, so calling this twice grants
+ * nothing twice, and calling it after a membership row turned up on its own is the repair.
  */
 const grantDefaultOrgMembership = ({
   writer,
@@ -175,13 +152,9 @@ const announceSsoAutoJoin = ({
 };
 
 /**
- * Membership + grant for one domain-matched organization. A pending invite
- * wins when one exists (its role and team assignments carry their own
- * grants); otherwise the default MEMBER membership plus the organization-
- * scoped grant beside it. P2002 on the membership means a concurrent OAuth
- * callback or a retry created the row first — treated as success, with the
- * grant re-asserted rather than assumed, because the concurrent callback
- * may have died between the two writes.
+ * Membership + grant for one domain-matched organization. A pending invite wins when one
+ * exists (its role and team assignments carry their own grants); otherwise the default
+ * MEMBER membership plus the organization- scoped grant beside it.
  */
 const joinSsoOrganization = async ({
   prisma,
@@ -218,11 +191,10 @@ const joinSsoOrganization = async ({
       },
     });
   } catch (err) {
-    // P2002 (unique constraint) on THIS insert means another concurrent
-    // OAuth callback or a retry already created this membership. Idempotent
-    // success. The catch guards the membership write alone — a P2002 from
-    // any other constraint (an applied invite's rows, the grant below) is a
-    // real failure and propagates instead of being logged as an
+    // P2002 (unique constraint) on THIS insert means another concurrent OAuth callback or a
+    // retry already created this membership. Idempotent success. The catch guards the
+    // membership write alone — a P2002 from any other constraint (an applied invite's rows,
+    // the grant below) is a real failure and propagates instead of being logged as an
     // already-present membership.
     if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") {
       throw err;
@@ -252,44 +224,9 @@ const joinSsoOrganization = async ({
 };
 
 /**
- * Called after a new user is created. Fires the `signed_up` analytics event
- * for every new user (fire-and-forget, no-op without POSTHOG_KEY), then, if
- * the user's email domain matches an organization with ssoDomain,
- * auto-onboard the user:
- *
- *   - If a PENDING invite exists for (org, email), apply it — the invite's
- *     role and team assignments take precedence, and the invite is marked
- *     ACCEPTED so it stops appearing as an outstanding link. This fixes the
- *     bug where an SSO signup bypassed an existing invite and landed the user
- *     in the org with only the default MEMBER role while the invite kept
- *     looking unused.
- *   - Otherwise, fall back to the default behavior and add them as MEMBER.
- *
- * The OrganizationUser row and the grant that comes with it can no longer
- * share a transaction: the membership is a table write and the grant is a
- * ledger command (ADR-092 delivery-plan PR 2). What replaces the transaction
- * is a re-assert — the grant write is idempotent, and the P2002 path in
- * `joinSsoOrganization`, which is a concurrent callback or a retry, runs it
- * again rather than assuming the other attempt got that far. Otherwise the
- * user is left "in the org" with no grant: org membership to legacy code,
- * zero access under RBAC.
- *
- * Outer catch: the whole auto-add is best-effort. If the write fails
- * outright (transient DB issue, concurrent signup we didn't catch via P2002),
- * we LOG and SWALLOW so the signup itself still succeeds — failing would
- * orphan the user (the User row was just committed by the preceding Prisma
- * adapter call) and surface as a confusing "unable to create user" error in
- * the OAuth callback. The user can always be added later via invite or admin
- * action, and the pendingSsoSetup + afterAccountUpdate self-heal path covers
- * re-attempts on subsequent sign-ins.
- *
- * ADR-027 (Decision 7, v5 MAJOR fix): this auto-join is federation — a login
- * capability — and runs on email+password signup too, not just OAuth. In a
- * denied (coerced-to-email) deployment with fresh signup open, an unverified
- * `POST /sign-up/email` at a customer's domain would otherwise auto-join
- * that org with zero IdP round-trip. Guarded on the SAME platform gate every
- * other provider rides — no per-org license check, just "is SSO allowed at
- * all on this deployment".
+ * Called after a new user is created. Fires the `signed_up` analytics event,
+ * then auto-onboards the user into an SSO-matched organization, granting
+ * access via a re-assertable ledger command (ADR-092 delivery-plan PR 2).
  */
 export const afterUserCreate = async ({
   prisma,
@@ -308,11 +245,10 @@ export const afterUserCreate = async ({
   if (!domain) return;
 
   // ADR-027 site #4: domain auto-join is federation and rides the platform
-  // gate. When it denies (unlicensed deployment), skip the join — but log it,
-  // because on an email-mode install the gate-resolution warning is suppressed
-  // (sso-gate.ts), so a staff-set ssoDomain silently losing auto-join would
-  // otherwise leave zero trace for an operator debugging "why wasn't this user
-  // added to the org".
+  // gate. When it denies (unlicensed deployment), skip the join — but log it, because on an
+  // email-mode install the gate-resolution warning is suppressed (sso-gate.ts), so a
+  // staff-set ssoDomain silently losing auto-join would otherwise leave zero trace for an
+  // operator debugging "why wasn't this user added to the org".
   const ssoAllowed = await collaborators.federation.platformSsoAllowed();
   if (!ssoAllowed) {
     // warn, matching the gate's own denial-resolution level in sso-gate.ts:
@@ -343,21 +279,6 @@ export const afterUserCreate = async ({
 /**
  * Called before a new Account row is created. Ports the provider-linking and
  * pendingSsoSetup logic from the NextAuth signIn callback.
- *
- * Rules (preserving NextAuth behavior):
- * - new user + SSO org + wrong OAuth provider → HARD BLOCK (SSO_PROVIDER_NOT_ALLOWED).
- *   The original NextAuth signIn callback enforced this via
- *   checkIfSsoProviderIsAllowed — new signups at an SSO-enforced domain must
- *   use the configured provider. "New" = this is the user's first account.
- *   Credential accounts (providerId = "credential") are exempt because
- *   credentials signup only runs in on-prem / email-mode deployments where
- *   SSO isn't configured.
- * - existing user + SSO org + correct provider → set pendingSsoSetup=false and
- *   remove stale accounts for this provider that have a different providerAccountId
- * - existing user + SSO org + wrong provider → set pendingSsoSetup=true,
- *   DO NOT hard-block (we let them in so existing users aren't locked out
- *   during a migration), banner is shown in DashboardLayout
- * - no SSO org → let BetterAuth handle account creation normally
  */
 export const beforeAccountCreate = async ({
   prisma,
@@ -389,12 +310,7 @@ export const beforeAccountCreate = async ({
   }
 
   // ADR-027: when the platform SSO gate denies, all ssoDomain enforcement is
-  // off (site #4, mirroring `afterUserCreate`). Critically, this stops the
-  // `pendingSsoSetup=true` soft-flag below from being written when the v6
-  // reset-recovery path creates a `credential` account for an OAuth-born user
-  // on an unlicensed install — that flag would otherwise strand them behind a
-  // permanent "Link your SSO account" banner they can never clear (every SSO
-  // path 403s on a denied deployment).
+  // off (site #4, mirroring `afterUserCreate`).
   if (!(await federation.platformSsoAllowed())) {
     // warn for the same reason the `afterUserCreate` site does: an operator
     // grepping warn for "why is federation not happening" has to find both
@@ -470,16 +386,8 @@ export const beforeAccountCreate = async ({
 
 /**
  * Called after a new Account row is created. Runs the SSO reconciliation that
- * `beforeAccountCreate` used to perform inline, but deferred to this hook so
- * the cleanup only commits once the new Account row exists.
- *
- * Handles the two stale-row cases from the beforeAccountCreate comment:
- *   1) Same provider with a different providerAccountId (SSO subject rotated).
- *   2) A different OAuth provider (user had Google linked while the org's
- *      configured SSO is Auth0).
- *
- * Credential accounts (providerId = "credential") skip this entirely — on-prem
- * email-mode deployments don't configure SSO.
+ * `beforeAccountCreate` used to perform inline, but deferred to this hook so the cleanup
+ * only commits once the new Account row exists.
  */
 export const afterAccountCreate = async ({
   prisma,
@@ -529,20 +437,6 @@ export const afterAccountCreate = async ({
  * Called after an existing Account row is updated. On an OAuth sign-in via
  * `handleOAuthUserInfo`, BetterAuth refreshes tokens on the linked Account row
  * (`internalAdapter.updateAccount`), which fires this hook.
- *
- * Closes the dual-account edge case for pendingSsoSetup:
- * - User previously signed in with WRONG provider → pendingSsoSetup=true,
- *   wrong Account row exists.
- * - User later signs in with the CORRECT provider for the first time →
- *   `beforeAccountCreate` fires and clears the flag / deletes the stale row.
- * - BUT if the correct-provider Account already exists (e.g. user bounced
- *   between the two methods), no new Account is created on subsequent correct
- *   sign-ins, so `beforeAccountCreate` never fires and pendingSsoSetup stays
- *   stuck.
- *
- * This hook runs on every account token refresh, so when the user signs in via
- * the correct SSO provider — even without a new Account — we detect the
- * reconciliation opportunity and clean up.
  */
 export const afterAccountUpdate = async ({
   prisma,
@@ -615,14 +509,9 @@ export const beforeSessionCreate = async ({
 };
 
 /**
- * Called after a Session is created. Updates User.lastLoginAt and fires
- * fire-and-forget nurturing hooks. The lastLoginAt update is awaited so the
- * invariant holds immediately for subsequent requests on the same session.
- * Ported from the NextAuth session callback.
- *
- * Skipped entirely when the session is an admin-impersonation session
- * (detected via the `impersonating` JSON field on the new Session row) — we
- * don't want an admin's activity to ghost-write the target user's lastLoginAt.
+ * Called after a Session is created. Updates User.lastLoginAt and fires fire-and-forget
+ * nurturing hooks. The lastLoginAt update is awaited so the invariant holds immediately
+ * for subsequent requests on the same session. Ported from the NextAuth session callback.
  */
 export const afterSessionCreate = async ({
   prisma,

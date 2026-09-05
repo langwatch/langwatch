@@ -1,20 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The test suites REST family, driven through the real Hono app over the real
- * suite application.
- *
- * A TEST SUITE holds what it collects and nothing about how a run of it is
- * executed, so the targets arrive with the run request and the run is filed
- * under the run plan the scope resolves. That crossing between the two
- * families is what the suite is about, which is why both are mounted over one
- * application here.
- *
- * Every route that addresses ONE test suite is exercised here, because that is
- * where the family used to refuse itself: `readTestSuite` asks the application
- * for `kind: "test_suite"`, and the application now answers the test-suite row
- * rather than the run-plan-shaped one the suite service converts it into.
- *
  * @see specs/api-reference/test-suites-rest-api.feature
  */
 import { describe, expect, it } from "vitest";
@@ -33,7 +18,11 @@ describe("given the project holds one test suite and one run plan", () => {
     const response = await api.get(BASE);
 
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { id: string; scenarioCount: number; platformUrl: string }[];
+    const body = (await response.json()) as {
+      id: string;
+      scenarioCount: number;
+      platformUrl: string;
+    }[];
     expect(body.map((one) => one.id)).toEqual([testSuite.id]);
     expect(body[0]?.scenarioCount).toBe(0);
     expect(body[0]?.platformUrl).toContain("/acme/");
@@ -152,10 +141,7 @@ describe("given a test suite holds active and archived scenarios", () => {
   // @scenario "Running a test suite schedules its active scenarios against the chosen targets"
   it("schedules active scenarios against every target and leaves archived ones out", async () => {
     const { api, world, commands } = mountSuiteFamilies();
-    const active = [
-      world.addScenario({ name: "One" }),
-      world.addScenario({ name: "Two" }),
-    ];
+    const active = [world.addScenario({ name: "One" }), world.addScenario({ name: "Two" })];
     const archived = world.addScenario({ name: "Old", archivedAt: new Date() });
     const testSuite = world.addTestSuite({
       name: "Refunds",

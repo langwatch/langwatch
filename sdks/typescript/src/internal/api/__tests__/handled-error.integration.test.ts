@@ -1,15 +1,5 @@
 /**
  * The transport's error path, driven end to end.
- *
- * These go through the REAL openapi-fetch client and the REAL service wrapper,
- * with only the network faked, because the thing under test is a middleware that
- * sits between them: asserting on a parser in isolation would prove nothing
- * about whether a service actually throws what these tests say it throws.
- *
- * The wire shapes below are not invented. They are what
- * `packages/api/src/errors.ts` emits — the handler every
- * `SecuredApp` mounts via `onError` — which flattens a `HandledError` to
- * `{ error: <kind>, message, ...meta }` at its `httpStatus`.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";

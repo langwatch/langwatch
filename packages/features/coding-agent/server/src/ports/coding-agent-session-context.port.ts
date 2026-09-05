@@ -1,18 +1,8 @@
 import type { SessionWorkingContext } from "@langwatch/coding-agent-contract";
 
 /**
- * The durable "context the session last declared" the contribute command
- * stamps fact rows from.
- *
- * Correctness leans on the pipeline's own ordering guarantee, not on this
- * store: contributions are keyed per session, one session is one queue group,
- * and coalescing preserves the group's order. So within a session, every `set`
- * happens-before the `get`s of the records that follow it, and the memo never
- * races itself.
- *
- * A missing answer (expired key, flushed Redis, a session that never declared)
- * produces an unstamped row, which the usage read prices under the legacy
- * whole-session rule — degraded attribution, never lost tokens.
+ * The durable "context the session last declared" the contribute command stamps fact rows
+ * from.
  */
 export abstract class CodingAgentSessionContextMemoPort {
   /** The one key shape both memo adapters store a session's context under. */

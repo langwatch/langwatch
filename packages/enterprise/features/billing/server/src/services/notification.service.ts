@@ -66,13 +66,8 @@ type NotificationServiceOptions = {
 // ---------------------------------------------------------------------------
 
 /**
- * Channel dispatch service: owns all delivery channels (email, Slack, Hubspot).
- * Contains no business logic -- just "send X via channel Y."
- *
- * Absorbed from:
- * - billingNotificationRegistration.ts (Slack/Hubspot implementations)
- * - slackLicenseNotification.ts (Slack license purchase)
- * - notificationHandlers.ts (error safety wrapper)
+ * Channel dispatch service: owns all delivery channels (email, Slack, Hubspot). Contains
+ * no business logic -- just "send X via channel Y."
  */
 export class NotificationService {
   private readonly config: NotificationServiceOptions["config"];
@@ -203,15 +198,8 @@ export class NotificationService {
   }
 
   /**
-   * Sends a Slack alert when an annual subscription could not be given its
-   * events billing threshold.
-   *
-   * This failure is invisible everywhere else: checkout completion answers
-   * Stripe with a 200 either way (a non-2xx would make Stripe retry the whole
-   * checkout webhook, which must not happen), so Stripe's own redelivery never
-   * fires for it. Without this alert the subscription silently falls back to
-   * one oversized renewal invoice — the exact risk the threshold exists to
-   * remove — and only a log grep would ever reveal it.
+   * Sends a Slack alert when an annual subscription could not be given its events billing
+   * threshold.
    */
   async sendSlackBillingThresholdFailureAlert({
     stripeSubscriptionId,

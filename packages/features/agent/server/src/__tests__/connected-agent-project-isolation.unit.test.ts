@@ -1,8 +1,6 @@
 /**
- * The project fence of connected agents: the instance id is chosen by the
- * connecting process, so a session of one project must never read, drain or
- * answer a call of another.
- *
+ * The project fence of connected agents: the instance id is chosen by the connecting
+ * process, so a session of one project must never read, drain or answer a call of another.
  * @see specs/agents/connected-agents.feature
  */
 import {

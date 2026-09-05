@@ -15,12 +15,6 @@ export interface CliResult {
 
 /**
  * Handles CLI command execution with integrated logging.
- *
- * Responsibilities:
- * - Execute CLI commands synchronously and asynchronously
- * - Handle interactive CLI commands with input simulation
- * - Log all CLI interactions to replicate terminal experience
- * - Manage process lifecycle and timeouts
  */
 export class CliRunner {
   private logPath: string;
@@ -103,13 +97,7 @@ export class CliRunner {
     }
   }
 
-  /**
-   * Runs a CLI command with interactive input simulation.
-   * @param command CLI command string
-   * @param inputs Array of input strings to send to stdin
-   * @param timeout Optional timeout in milliseconds (default: 10000)
-   * @returns Promise<CliResult>
-   */
+  /** Runs a CLI command with interactive input simulation. */
   runInteractive({
     command,
     inputs = [],
@@ -172,12 +160,11 @@ export class CliRunner {
         });
       });
 
-      // A command that finishes before its scripted inputs run out leaves
-      // stdin closed, and `killed` stays false because nothing signalled the
-      // child. Writing then raises EPIPE from a timer, outside any test, and
-      // vitest reports it as an unhandled error that fails the whole run.
-      // Ask the stream whether it can still take a write, and let a pipe that
-      // closes mid-write end the input quietly.
+      // A command that finishes before its scripted inputs run out leaves stdin closed, and
+      // `killed` stays false because nothing signalled the child. Writing then raises EPIPE from
+      // a timer, outside any test, and vitest reports it as an unhandled error that fails the
+      // whole run. Ask the stream whether it can still take a write, and let a pipe that closes
+      // mid-write end the input quietly.
       child.stdin.on("error", (error: NodeJS.ErrnoException) => {
         // A pipe that closes between the check and the write is the
         // expected race. Any other error is a real fault, so it joins

@@ -1,22 +1,5 @@
 /**
  * One workflow on the list, with the four things its menu offers.
- *
- * A MOVE of `platform/app/src/optimization_studio/components/workflow/WorkflowCard.tsx`,
- * which was already an adapter over this package's own `WorkflowCardDisplay`
- * and `WorkflowCardActions`: what it added was the transport, the delete
- * cascade and the two copy dialogs. All of that is here now, unchanged in
- * behaviour.
- *
- * THE DELETE IS STILL TWO PATHS AND STILL DECIDES BY WHAT IT FINDS.
- * `getRelatedEntities` is read while the confirmation is open; a workflow with
- * linked evaluators or agents takes `cascadeArchive` and reports what went with
- * it, and one with neither takes the plain `archive`. Getting that backwards
- * would archive a project's evaluators without saying so, which is what the
- * confirmation exists to prevent.
- *
- * The toaster and the error toast are the host's. Every outcome — the sync, the
- * delete, both cascades — goes through `succeeded` / `failed`, so the
- * code-keyed presentation registry still decides the words a customer reads.
  */
 
 import { useCallback, useState, type ComponentProps, type ReactNode } from "react";

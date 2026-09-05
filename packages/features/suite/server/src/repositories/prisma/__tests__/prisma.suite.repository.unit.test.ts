@@ -2,12 +2,7 @@
 
 /**
  * `resolveDynamicRunMembership`'s row lock.
- *
  * Spec: specs/suites/run-plan-dynamic-scopes.feature
- *
- * A unit test, and named one: Prisma is a stub, so nothing here opens a
- * socket. The raw-SQL guard is asserted as SQL because that is what it is;
- * whether Postgres honours it is the integration lane's question.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PrismaSuiteRepository, type SuiteDatabase } from "../prisma.suite.repository";
@@ -114,10 +109,9 @@ describe("PrismaSuiteRepository.resolveDynamicRunMembership", () => {
 });
 
 /**
- * `.list()` has no `kind` parameter at all — the Prisma `where` hardcodes
- * `kind: "run_plan"`, so there is no way for a caller of this method to ask
- * for test suite rows through it. Test suites are listed through the
- * scenario feature's own `listTestSuites`, not here.
+ * `.list()` has no `kind` parameter at all — the Prisma `where` hardcodes `kind:
+ * "run_plan"`, so there is no way for a caller of this method to ask for test suite rows
+ * through it.
  */
 describe("PrismaSuiteRepository.list", () => {
   function buildList() {
@@ -173,7 +167,12 @@ describe("PrismaSuiteRepository.findOrCreatePlanByName", () => {
     /** @scenario "Starting a run holds the plan-name lock past the tenancy guard" */
     it("takes an advisory lock the tenancy guard lets through, keyed by the project", async () => {
       const { repository, executeRaw, findFirst, update } = build();
-      findFirst.mockResolvedValue({ id: "suite_1", kind: "run_plan", name: "Refunds", slug: "refunds" });
+      findFirst.mockResolvedValue({
+        id: "suite_1",
+        kind: "run_plan",
+        name: "Refunds",
+        slug: "refunds",
+      });
       update.mockResolvedValue({
         id: "suite_1",
         projectId: "project_1",
@@ -210,4 +209,3 @@ describe("PrismaSuiteRepository.findOrCreatePlanByName", () => {
     });
   });
 });
-

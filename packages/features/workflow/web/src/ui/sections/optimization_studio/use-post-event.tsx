@@ -411,7 +411,7 @@ export const useHandleServerMessage = ({
         default:
           toaster.create({
             title: "Unknown message type on client",
-            //@ts-expect-error
+            //@ts-expect-error: the switch is exhaustive, so `message` is `never` in the default branch
             description: message.type,
             type: "warning",
             duration: 5000,

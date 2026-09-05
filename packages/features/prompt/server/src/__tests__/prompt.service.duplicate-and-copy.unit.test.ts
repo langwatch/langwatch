@@ -27,9 +27,8 @@ const SOURCE_PROMPT: VersionedPrompt = {
 };
 
 /**
- * Builds a service whose database-touching methods are stubbed, so the handle
- * generation that sits between them runs for real.
- *
+ * Builds a service whose database-touching methods are stubbed, so the handle generation
+ * that sits between them runs for real.
  * @param takenHandles - handles an existing prompt already occupies
  */
 function buildService({

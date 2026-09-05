@@ -1,14 +1,5 @@
 /**
  * The `/api/v1/test-suites` REST family.
- *
- * A TEST SUITE is a group of scenarios. It holds what it collects and nothing
- * about how a run of it is executed, so the targets, the repeat count and the
- * models arrive with the run request and are written onto the run plan that
- * run resolves.
- *
- * Run plans are the other half of the model and live in their own family,
- * `/api/v1/run-plans`. `/api/suites` is the deprecated alias that predates the
- * split.
  */
 import { randomUUID } from "node:crypto";
 import { requires } from "@langwatch/api";

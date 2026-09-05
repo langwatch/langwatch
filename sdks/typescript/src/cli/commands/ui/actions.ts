@@ -10,10 +10,9 @@ import { asCommandResult } from "./call";
 const REQUEST_TIMEOUT_MS = 60_000;
 
 /**
- * List every UI action the platform can dispatch to an open page, with each
- * action's JSON schema and required permission
- * (specs/langy/langy-ui-actions.feature). The companion to `ui call`: read
- * the schema here, then dispatch with a payload that matches it.
+ * List every UI action the platform can dispatch to an open page, with each action's JSON
+ * schema and required permission (specs/langy/langy-ui-actions.feature). The companion to
+ * `ui call`: read the schema here, then dispatch with a payload that matches it.
  */
 export const uiActionsCommand = async (): Promise<CommandResult | void> => {
   const { apiKey, endpoint } = await resolveCredentials();

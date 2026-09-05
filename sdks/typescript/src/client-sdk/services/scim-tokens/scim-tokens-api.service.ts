@@ -1,11 +1,6 @@
 /**
- * The `/api/v1/scim-tokens` management family: the bearer tokens an identity
- * provider holds to reach `/api/scim/v2`.
- *
- * The token value exists in the create response and nowhere else; listing
- * describes tokens and never returns a value or a hash.
- *
- * CLI-only, and deliberately not exported from the client SDK's public index.
+ * The `/api/v1/scim-tokens` management family: the bearer tokens an identity provider
+ * holds to reach `/api/scim/v2`.
  */
 import { resolveEndpoint } from "@/internal/endpoint";
 import {

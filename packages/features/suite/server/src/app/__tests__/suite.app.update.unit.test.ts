@@ -1,10 +1,5 @@
 /**
  * @vitest-environment node
- *
- * `SuiteApp.update` is the one place both doors' "a test suite is not a run
- * plan" refusal now lives: an update naming a scope or a hand-picked member
- * list is refused for a test suite kind, since a test suite's scenarios come
- * from `Scenario.testSuiteId`, not a stored list.
  */
 import { describe, expect, it, vi } from "vitest";
 import type { ScenarioService, ScenarioTestSuite } from "@langwatch/scenario-contract";

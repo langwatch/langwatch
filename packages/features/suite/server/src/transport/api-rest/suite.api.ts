@@ -38,10 +38,6 @@ const DEPRECATION_NOTE = "Deprecated: use /api/v1/run-plans and /api/v1/test-sui
 
 /**
  * A refused run, at the status this family publishes one with.
- *
- * The successor families answer a refused run 422. This alias answered 400
- * before they existed and keeps doing so, carrying the domain's own code and
- * remediation either way, which is what a caller branches on.
  */
 class SuiteAliasRunRefusedError extends HandledError {
   constructor(refusal: SuiteExecutionError) {
@@ -57,10 +53,6 @@ class SuiteAliasRunRefusedError extends HandledError {
 
 /**
  * The refusal for a body that names targets the addressed row does not take.
- *
- * A run plan holds its own configuration and a test suite holds no execution
- * setting at all, so either way the request is malformed rather than the
- * domain refusing something it understood.
  */
 function storedTargetsRefusal(operation: "run" | "update"): ValidationError {
   const message =
@@ -72,11 +64,6 @@ function storedTargetsRefusal(operation: "run" | "update"): ValidationError {
 
 /**
  * What a run plan covers, in the words this family was published with.
- *
- * The domain calls these modes `test_suites` and `scenarios`. This family was
- * published with `folders` and `cases`, so it answers and accepts those and
- * maps at the boundary through {@link toDomainScope} and {@link toWireScope}.
- * An integrator sees no change.
  */
 const wireScopeSchema = z
   .discriminatedUnion("mode", [
@@ -176,9 +163,6 @@ function refuseTestSuiteExtras(body: CreateSuiteBody, ctx: z.RefinementCtx): voi
 
 /**
  * A run plan states what it runs and what it runs against.
- *
- * A plan that covers a rule resolves its own list at run time, so only a plan
- * that runs a hand-picked list has to name one here.
  */
 function refusePlanGaps(body: CreateSuiteBody, ctx: z.RefinementCtx): void {
   const picksCases = !body.scope || body.scope.mode === "cases";
@@ -320,17 +304,8 @@ function toTestSuiteResponse(testSuite: ScenarioTestSuite) {
 }
 
 /**
- * REST for suites — the run plans a project assembles by hand, and the test
- * suites scenarios are filed into. One family serves both kinds: `kind`
- * on the request picks which, and a lookup by id tries a suite first and falls
- * back to a test suite, exactly as it did in the application.
- *
- * The application arrives as a per-request provider rather than off the Hono
- * context, so the family can be mounted into any process that has one and
- * built with none by the OpenAPI generator. It is the SAME {@link SuiteApp}
- * the tRPC surface is given, so the suite-or-test-suite fallback, the test suite
- * update rules and the project's organization are decided once rather than
- * once per door.
+ * REST for suites — the run plans a project assembles by hand, and the test suites
+ * scenarios are filed into.
  */
 export function createSuiteRestApp(options: {
   security: AppRestSecurity;
@@ -439,13 +414,11 @@ export function createSuiteRestApp(options: {
     },
   );
 
-  // ── Create Suite ───────────────────────────────────────────
-  // Creating a run plan asks for `scenarios:create`, not `scenarios:manage`.
-  // `:manage` still implies `:create` through the RBAC hierarchy, so every role
-  // and key that could create a suite yesterday still can; what changes is that a
-  // credential issued at the CREATE grain — which the product does issue — is now
-  // honoured instead of refused at the door. A viewer holds only `scenarios:view`
-  // and is declined exactly as before.
+  // ── Create Suite ─────────────────────────────────────────── Creating a run plan asks for
+  // `scenarios:create`, not `scenarios:manage`. `:manage` still implies `:create` through
+  // the RBAC hierarchy, so every role and key that could create a suite yesterday still can;
+  // what changes is that a credential issued at the CREATE grain — which the product does
+  // issue — is now honoured instead of refused at the door.
   secured.access(requires("scenarios:create")).post(
     "/",
     describeRoute({
@@ -617,15 +590,11 @@ export function createSuiteRestApp(options: {
     },
   );
 
-  // ── Run Suite ──────────────────────────────────────────────
-  // RUNNING A SUITE IS NOT ADMINISTERING IT. The run creates scenario runs; the
-  // suite definition, its scenarios and its targets are left exactly as they
-  // were. `scenarios:manage` is the grain that also carries delete, so gating a
-  // run on it meant "you may only execute this if you may also destroy it" — and
-  // it refused every credential the product issues at the write grain. A run
-  // creates a run, so it asks for `scenarios:create`. `:manage` still implies it,
-  // so nobody who could run a suite yesterday loses that today, and a viewer is
-  // declined as before.
+  // ── Run Suite ────────────────────────────────────────────── RUNNING A SUITE IS NOT
+  // ADMINISTERING IT. The run creates scenario runs; the suite definition, its scenarios and
+  // its targets are left exactly as they were. `scenarios:manage` is the grain that also
+  // carries delete, so gating a run on it meant "you may only execute this if you may also
+  // destroy it" — and it refused every credential the product issues at the write grain.
   secured.access(requires("scenarios:create")).post(
     "/:id/run",
     describeRoute({

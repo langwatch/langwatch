@@ -33,10 +33,9 @@ import { sortKeysDeep } from "@langwatch/prompt-contract";
 const logger = createLogger("langwatch:prompt-config:prisma.prompt.repository");
 
 /**
- * The client slice prompt persistence binds to, transaction included: a
- * config row, its versions, the project row an organization is resolved
- * through, and the transaction that keeps a config and its first version from
- * ever existing apart.
+ * The client slice prompt persistence binds to, transaction included: a config row, its
+ * versions, the project row an organization is resolved through, and the transaction that
+ * keeps a config and its first version from ever existing apart.
  */
 export type PromptConfigDatabase = Pick<
   PrismaClient,
@@ -550,9 +549,6 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
 
   /**
    * Delete an LLM config and all its versions
-   *
-   * NOTE: This will only delete the config if the provided projectId matches the config's projectId
-   * otherwise it will throw.
    */
   async deleteConfig({
     idOrHandle,
@@ -580,15 +576,8 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
       );
     }
 
-    // Soft-delete: set deletedAt instead of hard-deleting, so existing
-    // suite references can still identify the prompt as deleted.
-    //
-    // Null out handle to free it for reuse — the @@unique([handle]) constraint
-    // treats NULL as distinct per row in Postgres, so future prompts can
-    // reclaim the same handle. Preserve the existing display name; only fall
-    // back to the (unprefixed) handle when the stored name is empty, so any
-    // custom title the user gave the prompt survives archival in suite/history
-    // listings.
+    // Soft-delete: set deletedAt instead of hard-deleting, so existing suite references can
+    // still identify the prompt as deleted.
     const displayName = this.tryRemoveHandlePrefixes(config.handle, projectId, organizationId);
     const archivedName =
       config.name && config.name.trim() !== "" ? config.name : (displayName ?? config.name);
@@ -607,21 +596,13 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
 
   /**
    * Create config with initial version
-   *
-   * We want to use this method to create a config with an initial version
-   * because it ensures that the config and version are created in the same
-   * transaction, which is important for maintaining data integrity,
-   * and because all configs should have an initial version.
    * @deprecated This is a bad pattern. We should only create drafts via the UI/API/Clients.
    */
   async createConfigWithInitialVersion(params: {
     configData: CreateLlmConfigParams;
     /**
-     * If no version data is provided, we'll create a default version.
-     * If version data is provided, we'll use it to create the initial version.
-     *
-     * The version data should not include the configId, or projectId.
-     * These will be set automatically from the newly created config.
+     * If no version data is provided, we'll create a default version. If version data is
+     * provided, we'll use it to create the initial version.
      */
     versionData?: Omit<CreateLlmConfigVersionParams, "configId" | "projectId"> & {
       prompt?: string;
@@ -656,14 +637,10 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
           scope: configData.scope,
         },
       });
-      // Resolve the project's DEFAULT model via the cascade, but only on
-      // the paths that actually need one: no version data at all, or a
-      // version without a model. A prompt that ships its own model, like
-      // every prompt pushed by the CLI's sync, must not require the
-      // project to have a default model configured. We let
-      // ModelNotConfiguredError propagate so the missing-model toast
-      // fires; only swallow resolver-internal crashes and fall back to
-      // DEFAULT_MODEL as a last-resort placeholder.
+      // Resolve the project's DEFAULT model via the cascade, but only on the paths that actually
+      // need one: no version data at all, or a version without a model. A prompt that ships its
+      // own model, like every prompt pushed by the CLI's sync, must not require the project to
+      // have a default model configured.
       const resolveDefaultModel = async (): Promise<string> =>
         (
           await this.modelProvider?.tryGetResolvedDefault({
@@ -732,14 +709,6 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
   /**
    * Creates a fully qualified handle by combining organization, project, and user-provided handle.
    * Format: {projectId}/{handle} or {organizationId}/{handle}
-   *
-   * This ensures handles are unique across the entire system and provides clear ownership context.
-   *
-   * @param handle - The user-provided handle
-   * @param scope - The scope of the handle (PROJECT or ORGANIZATION)
-   * @param projectId - The project ID to fetch organization context
-   * @param organizationId - The organization ID to fetch project context
-   * @returns Formatted handle string
    */
   createHandle(
     args:

@@ -1,21 +1,6 @@
 /**
- * The shared guard every apiClient-backed service method funnels its
- * `{ data, error, response }` triplet through before returning.
- *
- * openapi-fetch answers a request with `data` on success and `error` on a
- * decline. But a response it cannot read at all — an empty body on a non-2xx
- * status, which is exactly what many reverse-proxy error pages and a 5xx with
- * `Content-Length: 0` answer with — sets NEITHER: openapi-fetch's own
- * empty-body short-circuit returns `{ data: undefined, error: undefined }`
- * without attempting to parse anything. Left unguarded, `return data` after
- * `if (error) …` resolves the promise with `undefined`, and the caller fails
- * far from the real cause with something like "Cannot read properties of
- * undefined" (D12).
- *
- * This throws the SAME typed error the service's own `handleApiError` raises
- * for a named failure, carrying the HTTP status (from `response`, falling
- * back to whatever the error body itself carries) and the operation name — an
- * unreadable body now fails exactly as loudly as a readable one.
+ * The shared guard every apiClient-backed service method funnels its `{ data, error,
+ * response }` triplet through before returning.
  */
 export interface UnwrapApiResultParams<T> {
   /** What was being attempted, e.g. `create evaluator`. */

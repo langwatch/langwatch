@@ -42,10 +42,9 @@ export interface ApiKeyInfo {
 }
 
 /**
- * One key as GET /:id and PATCH /:id report it. `roleBindings` is the shape
- * the listing publishes; `bindings` is the same set in the shape a write
- * accepts, so reading a key back after a write is a comparison rather than a
- * translation.
+ * One key as GET /:id and PATCH /:id report it. `roleBindings` is the shape the listing
+ * publishes; `bindings` is the same set in the shape a write accepts, so reading a key
+ * back after a write is a comparison rather than a translation.
  */
 export interface ApiKeyDetail extends ApiKeyInfo {
   keyType: "personal" | "service";

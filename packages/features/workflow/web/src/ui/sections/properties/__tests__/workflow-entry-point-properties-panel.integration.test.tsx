@@ -1,10 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Entry point drawer: the fields are user-owned workflow inputs, the dataset
- * is an optional attachment rendered as a compact card, and the drawer links
- * across to the End node. The variables editor is the real component (not a
- * stub) since the editable inputs ARE the behavior under test.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -51,7 +46,10 @@ const createEntryNode = (overrides: Partial<Entry> = {}): Node<Entry> => ({
   } as Entry,
 });
 
-const renderPanel = (node: Node<Entry> = createEntryNode(), datasetTotal: number | undefined = undefined) =>
+const renderPanel = (
+  node: Node<Entry> = createEntryNode(),
+  datasetTotal: number | undefined = undefined,
+) =>
   render(
     <ChakraProvider value={defaultSystem}>
       <EntryPointPropertiesPanel

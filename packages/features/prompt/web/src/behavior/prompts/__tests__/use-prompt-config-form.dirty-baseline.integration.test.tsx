@@ -1,21 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
  * @see specs/prompts/prompt-editor-dirty-state.feature
- *
- * Opening a seeded prompt and touching nothing must not report a modified
- * prompt. The dirty flag is what tells a reader whether their work is safe,
- * and a form that claims changes on an untouched prompt teaches people to
- * dismiss the warning, which is exactly when it stops protecting anything.
- *
- * This exercises the real `usePromptConfigForm` and the real
- * `versionedPromptToPromptConfigFormValuesWithSystemMessage` converter,
- * driven the way `PromptEditorDrawer`'s own init effect drives them: mount
- * with no initial values (the form settles on generic defaults first, the
- * way it does before the server prompt arrives), then `methods.reset(...)`
- * with the converted server values once they "arrive" — because the defect
- * this guards against lived in what the converter's derived shape and the
- * form's own defaults do to each other, not in either alone.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
@@ -30,11 +15,8 @@ import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "../../
 import { usePromptConfigForm } from "../use-prompt-config-form";
 
 /**
- * A prompt as the seeder writes one: a system prompt, one input, one
- * output, and no demonstrations. The form derives demonstration columns
- * from the inputs and outputs, which is the derived value the stored
- * document never carries — exactly the shape the original defect tripped
- * on.
+ * A prompt as the seeder writes one: a system prompt, one input, one output, and no
+ * demonstrations.
  */
 const SEEDED_PROMPT: VersionedPrompt = {
   id: "prompt-seeded",
@@ -83,7 +65,9 @@ function DirtyBaselineHarness({ onIsDirty }: { onIsDirty: (isDirty: boolean) => 
       value={systemMessage}
       onChange={(e) => {
         const messages = methods.getValues("version.configData.messages") ?? [];
-        const next = messages.map((m) => (m.role === "system" ? { ...m, content: e.target.value } : m));
+        const next = messages.map((m) =>
+          m.role === "system" ? { ...m, content: e.target.value } : m,
+        );
         methods.setValue("version.configData.messages", next, { shouldDirty: true });
       }}
     />

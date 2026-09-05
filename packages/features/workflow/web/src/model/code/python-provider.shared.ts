@@ -32,13 +32,8 @@ export interface ContractRef {
 }
 
 /**
- * Monaco's `CompletionItemInsertTextRule` is a flag enum; the runtime API
- * exposes the singular name (the plural is a long-standing source of
- * confusion across versions). Bypass the namespace lookup and use the numeric
- * value directly so we don't trip over const-enum erasure or version drift.
- *
- * See microsoft/monaco-editor monaco.d.ts:
- *   enum CompletionItemInsertTextRule { None = 0, KeepWhitespace = 1, InsertAsSnippet = 4 }
+ * Monaco's `CompletionItemInsertTextRule` is a flag enum; the runtime API exposes the
+ * singular name (the plural is a long-standing source of confusion across versions).
  */
 export const INSERT_AS_SNIPPET = 4;
 
@@ -239,12 +234,8 @@ export const CALL_METHOD_SNIPPET = [
 ].join("\n");
 
 /**
- * Track which stdlib modules have been imported (via `import X` or `from X
- * import …`) so attribute access on them resolves to real member lists.
- *
- * Returns a map of bound-name -> module so `import X as Y` resolves `Y.foo`
- * to module X. Only top-level stdlib modules are tracked; user-defined names
- * fall back to generic identifier completion.
+ * Track which stdlib modules have been imported (via `import X` or `from X import …`) so
+ * attribute access on them resolves to real member lists.
  */
 export function scanImports(source: string): Map<string, PyModule> {
   const map = new Map<string, PyModule>();

@@ -1,9 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The HTTP long-poll transport's own doors: a frames body the endpoint does
- * not recognize, and one above the frame cap.
- *
  * @see specs/agents/connected-agents.feature
  */
 import {

@@ -16,10 +16,9 @@ const TABLE_NAME = "coding_agent_session_events" as const;
 const logger = createLogger("langwatch:app-layer:coding-agent:session-events-repository");
 
 /**
- * One (session, model, working context) group's totals. The context fields are
- * '' for rows written before the session declared where it was working (or
- * before the stamp existed); those unstamped totals are priced under the
- * legacy whole-session rule.
+ * One (session, model, working context) group's totals. The context fields are '' for rows
+ * written before the session declared where it was working (or before the stamp existed);
+ * those unstamped totals are priced under the legacy whole-session rule.
  */
 export interface SessionModelTotalsRow {
   tenantId: string;
@@ -349,16 +348,9 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     sessionIds: string[];
     fromMs: number;
   }): Promise<SessionModelTotalsRow[]> {
-    // The inner scope dedups un-merged versions of one row before anything is
-    // summed, so a redelivered call cannot be counted twice. `LIMIT 1 BY` is
-    // safe here for the same reason it is in `findBySessionId`: every column
-    // this table holds is a small scalar.
-    //
-    // `TimeUnixMs` is bounded in BOTH scopes on purpose. The rule against
-    // range-filtering a dedup scope guards columns a fold can move after the
-    // fact; this table is a map projection whose row time is the record's own
-    // and never changes, so bounding it inside prunes partitions without ever
-    // dropping the true latest version out of its group.
+    // The inner scope dedups un-merged versions of one row before anything is summed, so a
+    // redelivered call cannot be counted twice. `LIMIT 1 BY` is safe here for the same reason
+    // it is in `findBySessionId`: every column this table holds is a small scalar.
     const result = await client.query({
       query: `
         SELECT

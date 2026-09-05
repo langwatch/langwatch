@@ -1,19 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The mapping throttle under the workload the feature exists for: several agent
- * worktrees running against ONE branch at the same time.
- *
- * These drive the real staging Lua (`GroupStagingScripts.stage`) against real
- * Redis, because the defect is inside it. The dedup key is queue-global, but the
- * squash it guards is conditional on `ZRANK(group:<groupId>:jobs, existingJobId)`
- * — the rank of the existing job in the NEW payload's OWN group. Two sessions
- * on one branch share a dedup id and, with the subscriber's default per-aggregate
- * grouping, land in two different groups: the rank lookup misses, the script
- * reads that as "already dispatched", and (with `shouldSurviveDispatch` off)
- * DELETES the dedup key and stages a second job. Both call GitHub, and the key
- * that was protecting the first is gone.
- *
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 
@@ -60,12 +46,9 @@ const subscriber = buildTestCodingAgentProcessingPipeline(
 ).foldSubscribers.get("pullRequestMapping")!.definition;
 
 /**
- * The group id `QueueManager.initializeSubscriberQueues` builds for a subscriber
- * payload, transcribed: `${tenantId}/${jobPath}/${domainKey}`, where the domain
- * key is the subscriber's own `groupKeyFn` when it declares one and
- * `${aggregateType}:${aggregateId}` otherwise. Transcribed rather than imported
- * because `buildGroupKey` is private; the companion unit test pins the
- * subscriber's half of it.
+ * The group id `QueueManager.initializeSubscriberQueues` builds for a subscriber payload,
+ * transcribed: `${tenantId}/${jobPath}/${domainKey}`, where the domain key is the
+ * subscriber's own `groupKeyFn` when it declares one and `${aggregateType}:${aggregateId}`
  */
 function groupIdFor(payload: ReturnType<typeof payloadFor>): string {
   const jobPath = "fold/codingAgentSession/reactor/pullRequestMapping";

@@ -1,27 +1,5 @@
 /**
  * Creating a workflow, from a template or from an imported file.
- *
- * A MOVE of `platform/app/src/components/workflows/CreateWorkflowButton.tsx`,
- * which was already an adapter over this package's own `WorkflowCreateDialog`
- * view: what it added was the transport, the form, the icon picker and the
- * navigation to the new workflow's studio. All of that is here now.
- *
- * THE CREATE ENDS BY LEAVING THIS PAGE, and it is the reason this family's host
- * port has a `navigate` at all: a created workflow is only useful in the
- * studio, which `platform/app` still serves at `/:project/studio/:id`. A page
- * moved into a package and an address still served by the application are the
- * same product to the reader, and the route table is what makes that true.
- *
- * `trackEvent("workflow_create")` did not travel. It is the application's own
- * product-analytics client, there is no capability that answers for it, and a
- * feature-web package may not reach a browser singleton. RECORDED rather than
- * reimplemented.
- *
- * `applyHandledErrorToForm` did not travel either — it reads the code-keyed
- * presentation registry, which is the application's. A refused create reports
- * through the host's failure notice, so the registry still decides the words;
- * what is lost is the field-level placement of a validation refusal, and the
- * only fields here are a name and a description.
  */
 
 import { Button, Field, HStack, Input, Textarea, useDisclosure, VStack } from "@chakra-ui/react";

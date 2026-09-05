@@ -14,13 +14,6 @@ export class NurturingPromptCreationService {
   }
 
   /**
-   * Fires nurturing calls when a prompt is created.
-   *
-   * Always sends has_prompts: true + prompt_count on every call (idempotent).
-   * Only sends first_prompt_created event when orgPromptCount === 1.
-   *
-   * All calls are fire-and-forget.
-   *
    * @param userId - The org admin user ID
    * @param projectId - The project where the prompt was created
    * @param orgPromptCount - The org-wide prompt count AFTER the prompt was created
@@ -58,14 +51,6 @@ export class NurturingPromptCreationService {
   }
 
   /**
-   * Counts org-wide non-deleted prompts that have at least one version,
-   * resolves the org admin userId, and fires the prompt creation nurturing hook.
-   *
-   * Used at prompt creation call sites (tRPC and REST API) to avoid
-   * duplicating the counting and userId resolution logic.
-   *
-   * Entirely fire-and-forget: errors are captured but never thrown.
-   *
    * @param prisma - PrismaClient for database queries
    * @param projectId - The project where the prompt was created
    * @param userId - The user who created the prompt (optional; resolved via resolveOrgAdmin if missing)

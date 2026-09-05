@@ -293,13 +293,8 @@ export class SuiteService extends SuiteServiceContract {
   }
 
   /**
-   * Starts a run under a NAME, which is what identifies a run plan: the name
-   * either joins an existing plan and replaces its config, or creates one.
-   *
-   * The plan is written only once the run holds up — everything is resolved
-   * and validated first, exactly as `run` does it for an existing plan id —
-   * so a refused run touches no row under a name it will not use.
-   *
+   * Starts a run under a NAME, which is what identifies a run plan: the name either joins an
+   * existing plan and replaces its config, or creates one.
    * @see specs/suites/run-plan-identity-by-name.feature
    */
   async runPlan(input: SuiteRunPlanInput): Promise<SuiteRunPlanResult> {
@@ -605,10 +600,9 @@ export class SuiteService extends SuiteServiceContract {
   }
 
   /**
-   * The name a run takes when its caller sends none: the scope, then the
-   * targets it goes against — the same words the run dialog suggests, so a
-   * run started from the command line and one started from the dialog over
-   * the same scope and targets land on one plan.
+   * The name a run takes when its caller sends none: the scope, then the targets it goes
+   * against — the same words the run dialog suggests, so a run started from the command line
+   * and one started from the dialog over the same scope and targets land on one plan.
    */
   private async defaultPlanName(params: {
     projectId: string;

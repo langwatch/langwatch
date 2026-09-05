@@ -58,10 +58,8 @@ const parseLimitOption = (raw: string | undefined): number => {
 };
 
 /**
- * `--from`/`--to` as epoch ms. Both spellings the help promises are accepted:
- * an ISO string and a bare epoch-ms integer. Anything else stops the command
- * here, because `new Date(...).getTime()` on unparsable input is NaN and the
- * server would receive the literal string "NaN" as the bound.
+ * `--from`/`--to` as epoch ms. Both spellings the help promises are accepted: an ISO
+ * string and a bare epoch-ms integer.
  */
 const parseTimeOption = (raw: string | undefined, flag: string): number | undefined => {
   if (raw === undefined) return undefined;

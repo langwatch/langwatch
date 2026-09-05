@@ -1,12 +1,7 @@
 /**
  * ADR-092 §11 (setting) + §10 (offboarding) — the one write surface for
- * grants. Every mutation validates against the registry/tenancy and bumps
- * the org's authz epoch so caches and passports die on the caller's next
- * request. Storage is behind AuthzGrantRepository — since delivery-plan
- * PR 2 the app's implementation emits grants ledger commands (the actor
- * every write carries is stamped onto the fact), and the audit trail is the
- * ledger's insert-only subscriber (decision 17), not a direct write here.
- * This service owns validation, failure naming, and the offboarding proof.
+ * grants. Every mutation validates against the registry/tenancy and bumps the org's authz
+ * epoch so caches and passports die on the caller's next request.
  */
 import { toLedgerActor, type Actor, type LedgerActor } from "@langwatch/actor";
 import {
@@ -56,12 +51,9 @@ import { AuthzBindingWriterService } from "./authz-binding-writer.service";
 import { AuthzOffboardingService } from "./authz-offboarding.service";
 
 /**
- * The app-owned effect seams, composed once in the app's runtime
- * (the application AuthZ composition root): the audit writer, the
- * KSUID minter for binding ids, the redis-backed epoch bump, and the
- * collector factory the offboarding proof re-binds to its transaction
- * (injected rather than constructed so this module keeps no value import of
- * the collector).
+ * The app-owned effect seams, composed once in the app's runtime (the application AuthZ
+ * composition root): the audit writer, the KSUID minter for binding ids, the redis-backed
+ * epoch bump, and the collector factory the offboarding proof re-binds to its transaction
  */
 export type AuthzGrantsServiceOptions = {
   repository: AuthzGrantRepository;

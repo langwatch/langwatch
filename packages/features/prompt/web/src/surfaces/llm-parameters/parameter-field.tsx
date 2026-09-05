@@ -1,8 +1,5 @@
 /**
  * ParameterField Component
- *
- * Renders an LLM parameter input based on its type (slider or select).
- * Used in LLMConfigPopover to dynamically display model-supported parameters.
  */
 
 import { HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";

@@ -15,14 +15,6 @@ import type { IngestionTemplateRow } from "@/cli/utils/governance/cli-api";
 
 /**
  * `langwatch governance ingestion-templates <verb>`
- *
- * Mirrors the Hono routes at /api/v1/governance/ingestion-templates
- * (Sergey 0bb951160). Every mutating call carries
- * `X-LangWatch-Surface: cli` so audit rows land with
- * `metadata.surface = 'cli'`.
- *
- * Verbs: list / admin-list / get / create / update-ottl-rules /
- * archive / clone-from-platform.
  */
 
 function requireLogin() {

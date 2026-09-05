@@ -45,13 +45,7 @@ function escapeRegExp(value: string): string {
 }
 
 /**
- * Single-line Monaco editor for the if/else Liquid condition. Beyond syntax
- * highlighting it validates the expression live (via liquidjs, the same way
- * the engine evaluates it): a malformed expression shows a red error and a
- * reference to an input that does not exist shows an orange warning, both as
- * Monaco squiggles and an inline message. The `{%`/`%}` adornments signal
- * that the field is a Liquid condition; the stored value stays the bare
- * expression.
+ * Single-line Monaco editor for the if/else Liquid condition.
  */
 export function LiquidConditionEditor({
   value,

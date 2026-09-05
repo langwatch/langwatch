@@ -1,9 +1,6 @@
 /**
- * What every leg of the SDK application journey shares: the client the
- * application builds, the names it invents, and bounded waiting.
- *
- * Nothing here reaches past the published surface — the client comes from the
- * built package, exactly as an application's would.
+ * What every leg of the SDK application journey shares: the client the application builds,
+ * the names it invents, and bounded waiting.
  */
 import { LangWatch } from "../../../../dist";
 

@@ -1,7 +1,6 @@
 /**
- * The Redis half of the agent state store, against a fake connection: when a
- * subscriber starts receiving, and what a failed transaction command does.
- *
+ * The Redis half of the agent state store, against a fake connection: when a subscriber
+ * starts receiving, and what a failed transaction command does.
  * @see specs/agents/connected-agents.feature
  */
 import type { RedisConnection } from "@langwatch/redis-client";

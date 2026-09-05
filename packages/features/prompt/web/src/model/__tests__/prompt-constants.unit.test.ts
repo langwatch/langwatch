@@ -1,10 +1,6 @@
 /**
- * `DEFAULT_MODEL` is auto-derived from the model registry, so drift is
- * impossible by construction. The remaining guarantees worth pinning: the
- * helper still finds an OpenAI flagship, that flagship is in the registry,
- * and it supports structured outputs (the point of a modern default for
- * prompts that return strict JSON).
- *
+ * `DEFAULT_MODEL` is auto-derived from the model registry, so drift is impossible by
+ * construction.
  * @see specs/prompts/prompt-sync-fidelity.feature
  */
 import { describe, expect, it } from "vitest";

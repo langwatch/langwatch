@@ -57,13 +57,10 @@ export const RenderCode = ({
     };
   }, [code, language, colorMode]);
 
-  // Tagged with its inputs and compared here, rather than cleared inside the
-  // effect: highlighting is async, so on the render right after `code` changes
-  // the PREVIOUS highlight is still in state, and rendering it shows the
-  // previous snippet — visible when switching language tabs. Deriving "is this
-  // highlight still current?" from the props keeps the plain-text fallback
-  // showing the right code until the new highlight lands, with no dependence
-  // on effect or microtask ordering.
+  // Tagged with its inputs and compared here, rather than cleared inside the effect:
+  // highlighting is async, so on the render right after `code` changes the PREVIOUS
+  // highlight is still in state, and rendering it shows the previous snippet — visible when
+  // switching language tabs.
   const html =
     highlighted &&
     highlighted.code === code &&

@@ -3,16 +3,6 @@ import { fetchBatchRuns, tallyBatchRuns } from "../batchRunProgress";
 
 /**
  * `--wait` polls for the state of a batch of simulation runs.
- *
- * It used to poll `GET /api/v1/scenario-events?batchRunId=`, which no route
- * serves: that app registers two POSTs and a DELETE and nothing else. So the
- * flag never worked — every poll 404'd, the failure budget ran out, and the
- * wait ended by blaming the status endpoint for being down.
- *
- * The stub below is the point of these tests: it serves exactly the routes the
- * app really registers, and answers 404 for anything else. A caller reaching
- * for a path that does not exist fails here the same way it failed in
- * production, rather than passing against a mock built to agree with it.
  */
 
 const mockFetch = vi.fn();

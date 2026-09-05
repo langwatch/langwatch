@@ -1,9 +1,5 @@
 /**
- * What the management commands SEND, and what they hand back as machine
- * output. Driven through the command functions with `fetch` stubbed, so the
- * flag grammar, the request it composes and the response it returns are all
- * checked on the path a caller actually takes.
- *
+ * What the management commands SEND, and what they hand back as machine output.
  * @see specs/typescript-sdk/cli-management-apis.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";

@@ -1,8 +1,6 @@
 /**
- * The stale-connected-agent visibility rule applied at the query, not read
- * back into memory and filtered after: a connected agent unseen for thirty
- * days drops out of every list the same way an archived one does (ADR-128).
- *
+ * The stale-connected-agent visibility rule applied at the query: an agent
+ * unseen for thirty days drops out of every list (ADR-128).
  * @see specs/agents/connected-agents.feature
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -21,7 +19,8 @@ function matches(row: Row, where: Row = {}): boolean {
     if (typeof condition === "object" && condition !== null) {
       const test = condition as Row;
       if ("not" in test) return value !== test.not;
-      if ("gte" in test) return value instanceof Date && value.getTime() >= (test.gte as Date).getTime();
+      if ("gte" in test)
+        return value instanceof Date && value.getTime() >= (test.gte as Date).getTime();
       if ("in" in test) return (test.in as unknown[]).includes(value);
       return false;
     }

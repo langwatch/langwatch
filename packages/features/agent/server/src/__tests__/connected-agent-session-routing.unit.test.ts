@@ -1,9 +1,6 @@
 /**
  * The instance-agent fence a session reads a call through: an instance only
- * ever sees calls for the agents it registered itself, even when something
- * upstream (a forged presence entry, a routing bug) names it for another
- * agent's call (ADR-128, "No inbound access").
- *
+ * ever sees calls for the agents it registered itself (ADR-128, "No inbound access").
  * @see specs/agents/connected-agents.feature
  */
 import type { AgentService } from "@langwatch/agent-contract";

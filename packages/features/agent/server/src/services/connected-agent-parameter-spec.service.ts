@@ -2,12 +2,6 @@
  * A JSON Schema object as the SDK sends it, normalized into the parameter
  * definitions the run dialog and the scheduler read (ADR-128, "Parameters
  * declared by the agent").
- *
- * Only what a run can address survives: string, number and boolean
- * properties, a closed list from `enum`, a default and a description. An
- * unsupported type becomes text, with a note the SDK prints at startup. The
- * name grammar and the caps are the scenario ones, so an agent-declared
- * parameter and a scenario-declared one are one kind of thing.
  */
 
 import {
@@ -245,11 +239,6 @@ function normalizeProperty({
 
 /**
  * Our own sentence for a shape the scenario schema refused.
- *
- * The schema writes its messages for the person editing a scenario, and the
- * duplicate-name one repeats the name it was given. Nothing the SDK sent is
- * echoed back to the customer, so the reason is chosen here from the rule
- * that failed. The name of the parameter travels beside it on `meta.name`.
  */
 function shapeFailureReason(rule: unknown): string {
   switch (rule) {
@@ -285,10 +274,6 @@ function assertScenarioShape(parameters: ScenarioParameterDefinition[]): void {
 
 /**
  * Normalizes one JSON Schema object into parameter definitions.
- *
- * @throws {AgentParameterInvalidError} when a name breaks the grammar or is
- *   a turn field, when more than the cap are declared, or when the schema is
- *   not an object schema at all.
  */
 export class ConnectedAgentParameterSpecService {
   static create(): ConnectedAgentParameterSpecService {

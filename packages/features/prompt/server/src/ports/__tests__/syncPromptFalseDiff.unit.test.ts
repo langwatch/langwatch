@@ -7,22 +7,11 @@ import { transformCamelToSnake } from "../prompt-transform-db.port";
 
 /**
  * Regression tests for the false diff bug in prompt sync.
- *
- * Root cause: older CLIs send response_format alongside outputs in the
- * configData payload. The server's syncPrompt builds remoteConfigData
- * WITHOUT response_format (since it's derived from outputs). When
- * compareConfigContent normalizes both through Zod, one has response_format
- * and the other doesn't, causing a false diff on every sync.
- *
- * Fix: compareConfigContent strips response_format before comparing,
- * because it's always derivable from outputs and not a real difference.
  */
 describe("compareConfigContent()", () => {
   /**
-   * Comparing two configs reads no row, so the repository is composed over a
-   * persistence double that answers nothing. Naming the feature's own slice
-   * rather than the generated client is what keeps this test honest: if the
-   * comparison ever grows a query, the double stops compiling.
+   * Comparing two configs reads no row, so the repository is composed over a persistence
+   * double that answers nothing.
    */
   const noPersistence = {} as PromptConfigDatabase;
   const repository = PrismaLlmConfigRepository.create({ prisma: noPersistence });

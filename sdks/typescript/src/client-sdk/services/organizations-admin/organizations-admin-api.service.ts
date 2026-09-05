@@ -1,16 +1,5 @@
 /**
  * The `/api/v1/organizations` instance-provisioning family: self-hosted only.
- *
- * The one management surface that exists before any organization does, so it
- * authenticates with the instance administrator credential
- * (`LANGWATCH_INSTANCE_ADMIN_API_KEY`) rather than an organization API key.
- * Creating an organization returns an organization-scoped admin key, which is
- * the credential every other management family then takes.
- *
- * A deployment with no instance credential configured, and every cloud
- * deployment, answers 404 on these paths: the family is absent, not forbidden.
- *
- * CLI-only, and deliberately not exported from the client SDK's public index.
  */
 import { resolveEndpoint } from "@/internal/endpoint";
 import { createManagementRequest, type ManagementRequest } from "../_shared/management-request";
@@ -52,12 +41,6 @@ export const INSTANCE_ADMIN_KEY_ENV = "LANGWATCH_INSTANCE_ADMIN_API_KEY";
 
 /**
  * The instance credential, or a refusal naming what to set.
- *
- * Deliberately NOT falling back to the organization key: this credential
- * authenticates against the instance, and LANGWATCH_API_KEY would send an
- * organization key to a surface that cannot accept one. Nor to an empty
- * string, which ships `Authorization: Bearer ` and lets the family's 404 tell
- * an operator who forgot the variable that the surface does not exist.
  */
 export const resolveInstanceAdminToken = ({ instanceKey }: { instanceKey?: string }): string => {
   const token = instanceKey ?? process.env[INSTANCE_ADMIN_KEY_ENV];

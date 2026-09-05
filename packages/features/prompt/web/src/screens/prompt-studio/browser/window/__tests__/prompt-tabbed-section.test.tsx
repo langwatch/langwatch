@@ -1,11 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for PromptTabbedSection features:
- * - Locked input variable handling
- * - Demonstrations tab visibility
- * - Variable values persistence
- * - Layout mode switching (horizontal/vertical)
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen } from "@testing-library/react";
@@ -26,10 +20,8 @@ import { PromptHostProvider } from "../../../../../model/prompt-host";
 import { FakePromptHost } from "../../../../../testing";
 
 /**
- * One host for the whole file: nothing here asserts on what the screen asked
- * the application to do, so a default fake is the whole composition these
- * components need. Its tab storage is in-memory, which is what keeps one case's
- * open tabs out of the next one's.
+ * One host for the whole file: nothing here asserts on what the screen asked the
+ * application to do, so a default fake is the whole composition these components need.
  */
 const testHost = new FakePromptHost();
 
@@ -729,11 +721,6 @@ describe("PromptTabbedSection Layout Modes", () => {
 
 /**
  * The Conversation tab on a deployment that runs no chat runtime.
- *
- * `apps/api` declares `/api/copilotkit` absent at boot, so on this application
- * the chat had nowhere to post: it rendered, took a message, and 404'd. What
- * the tab must do instead is say so — and it must not offer to reset a chat
- * that is not mounted.
  */
 describe("given a deployment that runs no playground chat", () => {
   const unavailableHost = new FakePromptHost({

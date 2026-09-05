@@ -1,12 +1,6 @@
 /**
- * The `/api/v1/organization` management family: the organization profile, its
- * members and its invites, all implied by the credential rather than addressed
- * by an id.
- *
- * CLI-only, like the other management services: it is deliberately not exported
- * from the client SDK's public index, because an application talking to
- * LangWatch instruments and reads data, it does not provision the organization
- * it runs inside.
+ * The `/api/v1/organization` management family: the organization profile, its members and
+ * its invites, all implied by the credential rather than addressed by an id.
  */
 import { resolveEndpoint } from "@/internal/endpoint";
 import {

@@ -9,14 +9,9 @@ import {
 import type { SuiteClickHouseClient } from "../ports/suite-clickhouse.port";
 
 /**
- * The Redis keyspace the suite-run fold's read-through cache occupies.
- *
- * Frozen twin: `PipelineRegistry.registerSuiteRunPipeline` passes this same
- * literal to its own `cached(...)`, and the two graphs share one Redis. They
- * may only change together — a prefix that drifted would leave each side
- * reading a cache the other never writes, and the fold cache is the read-
- * your-write consistency layer (ADR-066), so the failure is stale reads rather
- * than an error anything notices.
+ * The Redis keyspace the suite-run fold's read-through cache occupies. A
+ * prefix drift would leave each side reading a cache the other never writes,
+ * and the fold cache is the read-your-write consistency layer (ADR-066).
  */
 const SUITE_RUN_FOLD_CACHE_KEY_PREFIX = "suite_runs";
 
@@ -26,38 +21,17 @@ export type ClickHouseSuiteRunProcessingAdapterOptions = {
   defaultRetentionDays: number;
   /**
    * The process's own Redis, required rather than optional.
-   *
-   * The fold cache is not a latency knob here: it carries the applied-event
-   * ids the executor drops a redelivery on, and the suite-run fold accumulates
-   * by addition. A graph that composed this pipeline without one would
-   * double-count a redelivered item and could flip a run to SUCCESS or FAILURE
-   * before it finished — so an absent Redis is a composition that must not be
-   * expressible, not one that quietly degrades.
    */
   redis: Redis | Cluster;
   /**
    * The cache's consistency TTL, as the process resolved it.
-   *
-   * Read from the same environment variable the App reads, because the App
-   * still produces into this pipeline while this process consumes it: two
-   * graphs writing one keyspace under different TTLs would expire each other's
-   * entries early. Absent means the store's own default, which already sits at
-   * the replication-lag floor.
    */
   foldCacheTtlSeconds?: number;
 };
 
 /**
- * Durable suite-run processing, composed from a tenant-keyed ClickHouse client
- * and the process's own Redis.
- *
- * This is the whole seam a background worker needs. The App reached the same
- * pipeline through `PipelineRegistry`, which built the fold store out of three
- * pieces held in three different places — the projection store on the suite
- * runtime, the projection version in the contract, and the Redis cache on the
- * registry — so nothing outside the App could assemble one. Stating the
- * assembly here is what makes the pipeline buildable by whichever process
- * consumes it.
+ * Durable suite-run processing, composed from a tenant-keyed ClickHouse client and the
+ * process's own Redis.
  */
 export class ClickHouseSuiteRunProcessingAdapter {
   static create(

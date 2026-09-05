@@ -13,55 +13,12 @@ export const BORN_FINALIZED_SIGNUP_FLAG = "release_identity_born_finalized_signu
 
 /**
  * better-auth's own email sign-up route, normalized.
- *
- * Normalization is load-bearing rather than tidy: rou3 resolves
- * `/sign-up/email/` to the same handler, so a raw-suffix match would let a
- * one-character variant walk past this check — the same trap
- * `ssoPathGate.ts` documents for the SSO gates.
  */
 const SIGN_UP_PATH_SUFFIX = "/sign-up/email";
 
 /**
- * Whether THIS request may create its user on the identity branch.
- *
- * ## Where the decision has to be made
- *
- * At the route boundary, and nowhere lower. The storage adapter cannot ask
- * the question — the user does not exist yet, so there is no organization to
- * evaluate a flag against and no state row for the gate to read. Below this
- * function the answer is carried as a request-scoped marker and nothing
- * re-decides it.
- *
- * ## What the request actually tells us
- *
- * Only the email address. better-auth's sign-up body is `{ name, email,
- * password, callbackURL }` — no organization id, no invite token; the invite
- * is redeemed on a separate page after sign-in. So the organization is
- * resolved the same way `afterUserCreate` resolves it: by the address's
- * domain against `Organization.ssoDomain`. For the common case of a fresh
- * signup at a non-SSO domain there IS no organization, and an org-targeted
- * rule correctly does not match — which keeps the entrance off, which is the
- * safe direction.
- *
- * ## What is NOT covered, said plainly
- *
- * **The product's own sign-up page.** It posts to `api.user.register`, which
- * writes the `User` row through Prisma directly and never reaches
- * `auth.api.signUpEmail` — so it does not pass this gate at all, and today
- * the entrance is reachable only by a client calling better-auth's sign-up
- * route itself. Routing the tRPC path through `auth.api.signUpEmail` is
- * future work (ADR-116 §3); until it lands, a flagged organization signing up
- * through the UI is created on the legacy branch and adopted by the backfill.
- *
- * A social sign-up. A new user minted inside an OAuth callback arrives on
- * the same URL an existing user's sign-in uses, with no address in the body
- * to evaluate a flag against, so it is indistinguishable here and takes the
- * legacy branch. That is a gap in the entrance's reach, not in its
- * correctness: an unflagged sign-up behaves exactly as it always has, and
- * the backfill adopts the user afterwards like any other.
- *
- * Fails CLOSED on everything: a body it cannot parse, a flag it cannot
- * read, a lookup that throws. Off means "created the way it always was".
+ * Whether THIS request may create its user on the identity branch, gated by
+ * the allowlist flag (ADR-116 §3).
  */
 export async function isBornFinalizedSignUp({
   featureFlags,

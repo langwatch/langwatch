@@ -27,9 +27,6 @@ export interface ExperimentRunStartRequest {
 
 /**
  * Build the snake_case run-start request body from camelCase options.
- *
- * Returns `undefined` when no overrides are provided so the caller can send a
- * body-less request (the server then uses the configured inputs).
  */
 export const toRunStartRequest = ({
   data,
@@ -55,10 +52,6 @@ export type ExperimentRunStatusResponse =
 
 /**
  * Status payload for `GET /api/evaluations/v3/runs/{runId}` (polling).
- *
- * Hand-written because the v3 path is served via a legacy-alias that rewrites
- * to `/api/v1/experiments/...`, so only the legacy path is declared in the
- * generated OpenAPI types. Kept structurally aligned with that legacy schema.
  */
 export interface ExperimentV3RunStatusResponse {
   runId: string;
@@ -159,11 +152,6 @@ export interface ExperimentRunsListResponse {
 
 /**
  * Per-row results for a completed experiment run.
- *
- * Mirrors `ExperimentRunWithItems` from the control plane
- * (`packages/features/experiment/contract/src/experiment-run.ts`). Hand-written
- * because the `/runs/{runId}/results` route is not yet exposed via the
- * generated OpenAPI types.
  */
 export interface ExperimentRunDatasetEntry {
   index: number;
@@ -209,17 +197,13 @@ export interface ExperimentRunResultsResponse {
 }
 
 /**
- * The workbench types below are projections of the generated OpenAPI `paths`,
- * never hand-written copies of them. The control plane owns these shapes, so a
- * restated interface can only drift out of date, and a cast onto it would hide
- * the drift instead of failing the build.
+ * The workbench types below are projections of the generated OpenAPI `paths`, never
+ * hand-written copies of them.
  */
 
 /**
- * The experiment setup as the API carries it: datasets, targets and
- * evaluators. Read it, change it, send it back whole. The canonical shape is
- * the control plane's `persistedEvaluationsV3StateSchema`, which validates
- * every write, so this stays open rather than restating it here.
+ * The experiment setup as the API carries it: datasets, targets and evaluators. Read it,
+ * change it, send it back whole.
  */
 export type ExperimentWorkbenchState =
   paths["/api/v1/experiments/{slug}/workbench-state"]["put"]["requestBody"]["content"]["application/json"]["state"];
@@ -355,9 +339,6 @@ export class ExperimentsApiService {
 
   /**
    * Start a saved experiment by slug.
-   *
-   * The body stays off the wire entirely when no overrides are given, so the
-   * run uses the inputs the experiment is configured with.
    */
   async startRun(
     slug: string,
@@ -381,10 +362,6 @@ export class ExperimentsApiService {
 
   /**
    * Create an experiment.
-   *
-   * Sending no state creates a blank workbench with one inline dataset, so a
-   * caller that only wants somewhere to put its setup does not have to build
-   * one first.
    */
   async create({
     name,
@@ -410,10 +387,6 @@ export class ExperimentsApiService {
 
   /**
    * Read an experiment's setup, with the version to send back when saving.
-   *
-   * `fields: "version"` answers with the version and timestamp only, which is
-   * what a poller checking for changes wants: it costs the same round trip and
-   * none of the payload.
    */
   async getWorkbenchState(options: {
     slug: string;
@@ -450,10 +423,6 @@ export class ExperimentsApiService {
 
   /**
    * Save an experiment's setup.
-   *
-   * Send `expectedVersion` with the version you read and the platform refuses
-   * the save with a 409 when someone else wrote first, instead of overwriting
-   * their work.
    */
   async setWorkbenchState({
     slug,
@@ -556,10 +525,6 @@ export class ExperimentsApiService {
 
   /**
    * List experiments for the current project.
-   *
-   * Hits `GET /api/v1/experiments` through the configured API client transport.
-   * The route is not yet declared in generated OpenAPI types, so the path is
-   * dispatched through a narrow untyped helper.
    */
   async listExperiments({
     pageSize,
@@ -580,10 +545,6 @@ export class ExperimentsApiService {
 
   /**
    * List experiment runs for an experiment slug.
-   *
-   * Hits `GET /api/v1/experiments/runs?experimentSlug=...` through the
-   * configured API client transport because the route is not yet declared in
-   * the generated OpenAPI.
    */
   async listRuns({
     experimentSlug,
@@ -606,10 +567,6 @@ export class ExperimentsApiService {
 
   /**
    * Fetch per-row results for a completed experiment run.
-   *
-   * Hits `GET /api/v1/experiments/runs/{runId}/results` through the
-   * configured API client transport because the route is not yet declared in
-   * the generated OpenAPI `paths`.
    */
   async getRunResults({
     runId,
@@ -635,13 +592,8 @@ export class ExperimentsApiService {
   }
 
   /**
-   * Start a saved Evaluations V3 experiment by slug through the unified
-   * evaluations-v3 backend.
-   *
-   * Hits `POST /api/evaluations/v3/{slug}/run`. The optional body overrides
-   * the configured inputs (`data` / `dataset_id` are mutually exclusive on the
-   * server). The route accepts a body, but the generated OpenAPI types declare
-   * it body-less, so the call is dispatched through a narrow untyped helper.
+   * Start a saved Evaluations V3 experiment by slug through the unified evaluations-v3
+   * backend.
    */
   async startV3Run({
     slug,
@@ -671,9 +623,6 @@ export class ExperimentsApiService {
 
   /**
    * Fetch per-row results for an Evaluations V3 run.
-   *
-   * Hits `GET /api/evaluations/v3/runs/{runId}/results`. `experimentSlug` is
-   * optional for runs created in the last 24h and required afterwards.
    */
   async getV3RunResults({
     runId,

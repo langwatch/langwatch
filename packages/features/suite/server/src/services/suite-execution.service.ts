@@ -40,10 +40,8 @@ export type SuiteExecutionRequest = {
   /** Who started the run; every run of the batch records it. */
   actor?: RunActor;
   /**
-   * The simulation models the plan was configured with. Stamped onto every
-   * run so the run dialog can read a configuration back off the runs and not
-   * only off the plan row. Also the "plan" half of the model-resolution
-   * chain: what the run really ran on is stamped beside it.
+   * The simulation models the plan was configured with. Stamped onto every run so the run
+   * dialog can read a configuration back off the runs and not only off the plan row.
    */
   simulatorModel?: string | null;
   judgeModel?: string | null;
@@ -63,10 +61,9 @@ export class SuiteExecutionService extends SuiteExecutionPort {
     ids: SuiteRunIdPort;
     scenarios: ScenarioService;
     /**
-     * Reads, once per batch, the models each queued run really runs on.
-     * Absent in a context with no model-default resolution behind it; the
-     * runs then record no resolved model, the same as a run recorded before
-     * the field existed.
+     * Reads, once per batch, the models each queued run really runs on. Absent in a context
+     * with no model-default resolution behind it; the runs then record no resolved model, the
+     * same as a run recorded before the field existed.
      */
     resolveRunModels?: SuiteRunModelsResolver;
   }): SuiteExecutionService {
@@ -135,17 +132,8 @@ export class SuiteExecutionService extends SuiteExecutionPort {
   }
 
   /**
-   * Run parameters per target, per scenario, with the secret-bearing ones
-   * kept apart so they can be attached to the queued run rather than to its
-   * metadata.
-   *
-   * A target's own `runParameters` are merged over the run's values, the
-   * target winning — the run dialog lets one agent run twice with different
-   * overrides ("prod-agent on gpt-5 vs prod-agent on gpt-5-mini"), and every
-   * such target must read its own values back, not the run's shared ones.
-   * Two targets that resolve to the same key (same agent, same overrides)
-   * resolve once. Secrets are run-level, so every target resolves the same
-   * ones; only the first target's resolution is kept.
+   * Run parameters per target, per scenario, with the secret-bearing ones kept apart so they
+   * can be attached to the queued run rather than to its metadata.
    */
   private async resolveParameters(input: SuiteExecutionRequest): Promise<{
     parameters: Map<string, Map<string, SuiteRunParameters>>;
@@ -265,12 +253,6 @@ export class SuiteExecutionService extends SuiteExecutionPort {
 
   /**
    * The simulation models the plan was configured with, or nothing at all.
-   *
-   * A plan that names no model runs on the project default, and records no
-   * model rather than the default's name: a configuration is what a person
-   * chose, so the same choice has to key the same way after a project
-   * default changes.
-   *
    * @see specs/scenarios/run-configuration-on-runs.feature
    */
   private static withSimulationModels(models: {

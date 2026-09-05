@@ -34,7 +34,7 @@ export class BillingAlertCooldownService implements BillingCooldownCache {
 
   private readonly values = new Map<string, number>();
 
-  constructor(private readonly ttlMs: number) {}
+  private constructor(private readonly ttlMs: number) {}
 
   async get(key: string): Promise<boolean | null> {
     const expiresAt = this.values.get(key);

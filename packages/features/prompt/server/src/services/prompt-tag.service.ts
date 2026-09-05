@@ -25,11 +25,6 @@ const PURELY_NUMERIC_REGEX = /^\d+$/;
 
 /**
  * Service for managing prompt tag definitions.
- *
- * Owns all business logic for custom tag CRUD:
- * - validates tag names before persistence
- * - delegates persistence to PromptTagRepository
- * - enforces the protected tag guard on delete
  */
 export class PromptTagService {
   static create(repository: PromptTagRepository): PromptTagService {
@@ -40,10 +35,6 @@ export class PromptTagService {
 
   /**
    * Validates a custom tag name.
-   * - Must not be empty
-   * - Must not be purely numeric
-   * - Must match /^[a-z][a-z0-9_-]*$/
-   * - Must not clash with protected tags
    */
   static validateTagName(name: string): void {
     if (!name) {
@@ -82,9 +73,6 @@ export class PromptTagService {
 
   /**
    * Creates a custom tag definition for the given org.
-   *
-   * @throws {PromptTagValidationError} if the tag name is invalid
-   * @throws {PromptTagConflictError} if a tag with that name already exists
    */
   async create({
     organizationId,
@@ -110,10 +98,6 @@ export class PromptTagService {
 
   /**
    * Deletes a custom tag definition and cascades to PromptTagAssignment rows.
-   *
-   * Returns the deleted tag, or null if it was not found.
-   *
-   * @throws {PromptTagProtectedError} if the tag is a protected system tag
    */
   async tryDelete({
     id,
@@ -139,10 +123,6 @@ export class PromptTagService {
 
   /**
    * Deletes a custom tag definition by name and cascades to PromptTagAssignment rows.
-   *
-   * Returns the deleted tag, or null if it was not found.
-   *
-   * @throws {PromptTagProtectedError} if the tag is a protected system tag
    */
   async tryDeleteByName({
     organizationId,
@@ -168,10 +148,6 @@ export class PromptTagService {
 
   /**
    * Renames a tag definition and updates all corresponding PromptTagAssignment rows.
-   *
-   * @throws {PromptTagValidationError} if the new name is invalid
-   * @throws {PromptTagProtectedError} if the old tag name is a protected system tag
-   * @throws {PromptTagConflictError} if a tag with the new name already exists
    */
   async rename({
     organizationId,

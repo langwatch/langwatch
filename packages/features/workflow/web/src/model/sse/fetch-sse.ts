@@ -115,12 +115,10 @@ export async function fetchSSE<T>({
         const event = JSON.parse(ev.data) as T;
         onEvent(event);
 
-        if (shouldStopProcessing?.(event)) {
-          if (!isSettled) {
-            isSettled = true;
-            cleanup();
-            resolve();
-          }
+        if (shouldStopProcessing?.(event) && !isSettled) {
+          isSettled = true;
+          cleanup();
+          resolve();
         }
       },
 

@@ -1,11 +1,5 @@
 /**
  * Resolves the stack every SDK and CLI end-to-end file runs against.
- *
- * The helper decides which one: `LANGWATCH_E2E_BASE_URL`, else this worktree's
- * haven stack, else one already answering at `LANGWATCH_ENDPOINT`, else it
- * boots one on `E2E_STACK_PORT` and this file puts it back down afterwards.
- * The seeded project's key is what every leg authenticates with, so the setup
- * proves the key works and seeds once when it does not.
  */
 import { execFileSync } from "node:child_process";
 import { REPO_ROOT, seededProject, startStack, type RunningStack } from "@langwatch/e2e-stack";

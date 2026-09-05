@@ -1,8 +1,6 @@
 /**
- * Cross-tenant fan-out for the branch-list read, and the list-read cost
- * signal ADR-071 step 3's deferred pruning promise leans on.
- *
- * @see specs/coding-agent/pull-request-linkage.feature
+ * Cross-tenant fan-out for the branch-list read, and the list-read cost signal
+ * ADR-071 step 3's deferred pruning promise leans on.
  * @see specs/coding-agent/session-aggregate.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -137,10 +135,9 @@ describe("CodingAgentSessionClickHouseRepository branch-list routing", () => {
 });
 
 /**
- * A fake metrics port that just counts observations per outcome, rather than
- * the prom-client registry main pinned this against — the read now reaches
- * ClickHouse through an injected `CodingAgentReadMetricsPort`, so this is the
- * seam the package's own tests observe it at.
+ * A fake metrics port that just counts observations per outcome, rather than the
+ * prom-client registry main pinned this against — the read now reaches ClickHouse through
+ * an injected `CodingAgentReadMetricsPort`, so this is the seam the package's own tests
  */
 class CountingReadMetricsPort extends CodingAgentReadMetricsPort {
   counts = { hit: 0, empty: 0, error: 0 };
@@ -177,9 +174,8 @@ function listClient(rows: Array<Record<string, unknown>>): ClickHouseClient {
 
 /**
  * ADR-071 sequencing step 2 traded partition pruning on the dedup scope for a
- * correct answer, and step 3's freeze — the thing that buys the pruning back —
- * is deferred on the claim that the unpruned scan stays cheap. These pin the
- * only evidence that claim will ever have.
+ * correct answer, and step 3's freeze — the thing that buys the pruning back — is deferred
+ * on the claim that the unpruned scan stays cheap.
  */
 describe("CodingAgentSessionClickHouseRepository list-read cost signal", () => {
   describe("given a window holding a session", () => {

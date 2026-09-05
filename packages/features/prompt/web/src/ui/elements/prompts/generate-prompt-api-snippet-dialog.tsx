@@ -14,12 +14,6 @@ interface GeneratePromptApiSnippetButtonProps {
 
 /**
  * GeneratePromptApiSnippetDialog
- *
- * Renders an icon-only button that, when clicked, opens a modal (Dialog)
- * for displaying API code snippets for prompt usage.
- *
- * Single Responsibility: This component specifically handles prompt API snippet generation
- * and documentation display for the Get Prompt endpoint.
  */
 export function GeneratePromptApiSnippetDialog({
   promptHandle,

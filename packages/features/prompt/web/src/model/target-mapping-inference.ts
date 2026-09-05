@@ -1,13 +1,5 @@
 /**
  * Mapping Inference Utility for Evaluations V3
- *
- * Provides automatic inference of mappings between target/evaluator inputs
- * and dataset columns based on name matching and semantic equivalents.
- *
- * This implements a heuristic-based approach:
- * 1. Exact name matches take priority
- * 2. Semantic equivalents from a predefined dictionary
- * 3. Cross-dataset propagation from existing mappings
  */
 
 import type { Field } from "@langwatch/workflow-contract";
@@ -25,12 +17,8 @@ import type {
 // ============================================================================
 
 /**
- * Maps common field names to their semantic equivalents.
- * Key = canonical name, Value = array of equivalent names
- *
- * This dictionary is used bidirectionally:
- * - input -> question, user_input, user_query, query
- * - question -> input
+ * Maps common field names to their semantic equivalents. Key = canonical name, Value =
+ * array of equivalent names
  */
 export const SEMANTIC_EQUIVALENTS: Record<string, string[]> = {
   // Input-related
@@ -94,13 +82,8 @@ const REVERSE_SEMANTIC_LOOKUP = buildReverseLookup();
 // ============================================================================
 
 /**
- * Normalize a name to a canonical form for comparison.
- * Converts both camelCase and snake_case to lowercase with no separators.
- * Examples:
- * - "threadId" -> "threadid"
- * - "thread_id" -> "threadid"
- * - "myVariableName" -> "myvariablename"
- * - "my_variable_name" -> "myvariablename"
+ * Normalize a name to a canonical form for comparison. Converts both camelCase and
+ * snake_case to lowercase with no separators. Examples:
  */
 export const normalizeForComparison = (name: string): string => {
   return name
@@ -110,12 +93,6 @@ export const normalizeForComparison = (name: string): string => {
 
 /**
  * Find the best matching column for a field in a dataset.
- *
- * Priority:
- * 1. Exact name match (case-insensitive)
- * 2. Normalized match (camelCase/snake_case equivalence: threadId == thread_id)
- * 3. Semantic equivalent match
- *
  * @returns The matching column name, or undefined if no match found
  */
 export const findMatchingColumn = (
@@ -163,14 +140,7 @@ export const findMatchingColumn = (
   return undefined;
 };
 
-/**
- * Infer mappings for a target's input fields from a dataset.
- *
- * @param inputFields - The target's input fields
- * @param dataset - The dataset to infer from
- * @param existingMappings - Any existing mappings to preserve
- * @returns New mappings to apply (only for fields that don't already have mappings)
- */
+/** Infer mappings for a target's input fields from a dataset. */
 export const inferTargetMappings = (
   inputFields: Field[],
   dataset: DatasetReference,
@@ -200,15 +170,9 @@ export const inferTargetMappings = (
 };
 
 /**
- * Propagate mappings from an existing dataset to a new dataset.
- *
- * If field "question" is mapped to "input" on dataset A,
- * and dataset B has "input" or a semantic equivalent, propagate the mapping.
- *
- * @param inputFields - The target's input fields
- * @param existingMappings - Mappings from another dataset (datasetId -> fieldName -> mapping)
- * @param newDataset - The new dataset to propagate to
- * @returns New mappings for the new dataset
+ * Propagate mappings from an existing dataset to a new dataset: when a field
+ * is mapped on one dataset and the new one has that field (or a semantic
+ * equivalent), carry the mapping over.
  */
 export const propagateMappingsToNewDataset = (
   inputFields: Field[],
@@ -262,22 +226,12 @@ export const propagateMappingsToNewDataset = (
 };
 
 /**
- * Identifiers whose only sensible source is the runner/target output. The
- * heuristic never falls back to a same-named dataset column for these —
- * letting an evaluator's `output` map back to a dataset column produces the
- * very tautology the user did not want (grading the dataset against itself).
+ * Identifiers whose only sensible source is the runner/target output.
  */
 const TARGET_OUTPUT_FIELDS = new Set(["output", "response", "answer", "result", "generated"]);
 
 /**
- * Identifiers whose only sensible source is the dataset. The heuristic never
- * falls back to a same-named runner output for these — the whole reason a
- * dataset row carries an expected answer or an input is to grade against it,
- * and reading those back from the runner would be a tautology too.
- *
- * Anything outside both sets (custom evaluator inputs like `score`,
- * `threshold`, `label`) keeps the original dual-try behavior so the
- * restriction stays narrow.
+ * Identifiers whose only sensible source is the dataset.
  */
 const DATASET_INPUT_FIELDS = new Set([
   // Input family (the prompt's input)
@@ -302,21 +256,9 @@ const DATASET_INPUT_FIELDS = new Set([
 ]);
 
 /**
- * Infer mappings for an evaluator's inputs.
- *
- * Evaluator inputs can map to:
- * - Dataset columns (e.g., input, expected_output)
- * - Target outputs (e.g., output)
- *
- * Heuristic:
- * - "output" and similar fields PRIORITIZE target outputs
- * - "input", "expected_output" and similar PRIORITIZE dataset columns
- *
- * @param evaluatorInputs - The evaluator's input fields
- * @param dataset - The dataset to infer from
- * @param target - The target whose outputs can be used
- * @param existingMappings - Any existing mappings to preserve
- * @returns New mappings to apply
+ * Infer mappings for an evaluator's inputs: fields like "output" prioritize
+ * target outputs, while fields like "input" or "expected_output" prioritize
+ * dataset columns.
  */
 export const inferEvaluatorMappings = (
   evaluatorInputs: Field[],
@@ -408,8 +350,6 @@ export const inferEvaluatorMappings = (
 };
 
 /**
- * Infer all mappings for a target across all datasets.
- *
  * @param target - The target to infer mappings for
  * @param datasets - All available datasets
  * @returns Updated mappings for the target (merged with existing)
@@ -435,14 +375,7 @@ export const inferAllTargetMappings = (
   return result;
 };
 
-/**
- * Infer all mappings for an evaluator across all datasets and targets.
- *
- * @param evaluator - The evaluator to infer mappings for
- * @param datasets - All available datasets
- * @param targets - All targets that use this evaluator
- * @returns Updated mappings for the evaluator (merged with existing)
- */
+/** Infer all mappings for an evaluator across all datasets and targets. */
 export const inferAllEvaluatorMappings = (
   evaluator: EvaluatorConfig,
   datasets: DatasetReference[],
@@ -478,22 +411,8 @@ export const inferAllEvaluatorMappings = (
 };
 
 /**
- * Derive per-row field mappings for a column-style comparison evaluator target
- * from its high-level comparison config.
- *
- * The ComparisonConfigForm is a variants + golden UI — the orchestrator still
- * needs the underlying field mappings to do the row-level lookup. Rather than
- * expose those rows in the UI, we compute them deterministically.
- *
- * Only `input` and `golden` are derivable here. The judge's `candidates` list
- * is not a per-target field source: it is assembled per row from every
- * variant's completed output (with structured-output narrowing and metrics
- * applied) by `generateComparisonCells`, which bakes it onto the cell.
- *
- * - input defaults to a dataset column literally named "input" (or a semantic
- *   equivalent) when one exists; otherwise omitted, so validation surfaces it
- *   through the optional-field path.
- * - golden uses the user-picked goldenField directly.
+ * Derive per-row field mappings for a column-style comparison evaluator target from its
+ * high-level comparison config.
  */
 export const deriveComparisonTargetMappings = (
   comparison: ComparisonEvaluatorConfig,

@@ -1,9 +1,5 @@
 /**
  * The config half of prompt persistence, as the services see it.
- *
- * Row shapes are stated here rather than imported from the generated client:
- * only `repositories/prisma` may name that client, and a service holding this
- * class stays free of it.
  */
 import type {
   LatestConfigVersionSchema,
@@ -34,9 +30,6 @@ export type PromptConfigRow = {
 
 /**
  * Interface for LLM Config data transfer objects.
- *
- * `authorId` is optional because it is not required for the config to be
- * created, and is not available via the API.
  */
 export type CreateLlmConfigParams = Omit<
   PromptConfigRow,

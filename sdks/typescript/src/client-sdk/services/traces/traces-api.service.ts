@@ -33,12 +33,6 @@ export class TracesApiError extends Error {
     public readonly originalError?: unknown,
     /**
      * The HTTP status the platform answered with.
-     *
-     * The client returns the `Response` alongside the error body and this used to
-     * be dropped, which meant a caller could recover WHAT went wrong (the body's
-     * error kind) but never whether the platform had declined the request (4xx) or
-     * fallen over (5xx) — a distinction the CLI's live error events, and anything
-     * else deciding whether to blame the user, depend on.
      */
     public readonly status?: number,
   ) {

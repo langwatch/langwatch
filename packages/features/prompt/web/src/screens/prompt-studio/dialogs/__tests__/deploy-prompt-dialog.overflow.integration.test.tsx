@@ -1,18 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
  * @see specs/prompts/deploy-prompt-dialog.feature
- *   ("Version Select inputs stay within the modal width")
- *
- * A long commit message in the version list must not stretch a tag row's
- * Version Select wider than the dialog. Each `Select.Root` for a tag row
- * carries the anti-overflow layout props (`flex="1"`, `maxWidth="280px"`)
- * that clamp the trigger to the row width regardless of its content.
- *
- * `@langwatch/design-system/select` is mocked to expose those two props as
- * data attributes, since Chakra compiles style props to CSS classes rather
- * than inline styles — the props themselves are the contract under test,
- * not their resolved computed style.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

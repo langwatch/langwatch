@@ -1,10 +1,7 @@
 /**
  * ADR-092 §2 — COLLECT: the policy half of reading authorization data. The
- * queries live behind AuthzReadRepository (the app's Prisma implementation);
- * this service owns what the rows MEAN: group expansion, the lenient
- * custom-role parse, share-link liveness, audience mapping, and scope
- * resolution. One snapshot per (principal, organization) feeds any number
- * of pure decide() calls.
+ * queries live behind AuthzReadRepository (the app's Prisma implementation); this service
+ * owns what the rows MEAN: group expansion, the lenient custom-role parse, share-link
  */
 import type {
   AuthzPrincipalRef,
@@ -40,10 +37,9 @@ export class AuthzCollectorService {
   }
 
   /**
-   * Resolve a scope reference from the ids a request carries. Project ids
-   * are resolved to their owning team + organization (the tenant comes from
-   * the resource, never from the caller — same posture as the legacy
-   * project path). Returns null when the id does not exist.
+   * Resolve a scope reference from the ids a request carries. Project ids are resolved to
+   * their owning team + organization (the tenant comes from the resource, never from the
+   * caller — same posture as the legacy project path).
    */
   async tryResolveScopeRef({
     projectId,
@@ -86,16 +82,6 @@ export class AuthzCollectorService {
 
   /**
    * Resolve a resource-tier scope from a stored resource's own facts.
-   *
-   * What this method verifies: the project's team/organization lineage is
-   * read from storage here, never taken from the request - same posture as
-   * resolveScopeRef. What it CANNOT verify: that `id` lives in `projectId`,
-   * and that `parentThreadId` is the trace's own thread - traces live in
-   * ClickHouse. Both anchors MUST come off the stored row the caller
-   * already fetched (that read is scoped by projectId, which is what
-   * enforces them). Passing request input for either reopens the
-   * forged-parent hole: one shared thread would unlock unrelated traces
-   * through the parent link. Returns null when the project does not exist.
    */
   async tryResolveResourceScopeRef({
     projectId,
@@ -149,11 +135,9 @@ export class AuthzCollectorService {
     principal: AuthzPrincipalRef;
     organizationId: string;
     /**
-     * An already-open pass, for a caller collecting SEVERAL snapshots that
-     * feed one decision (the api-key ceiling intersects the key's and the
-     * owner's): sharing the pass shares its routing decision, so a gate
-     * expiry between the collects cannot intersect a legacy binding list
-     * with a ledger one. Omitted, the collect opens its own pass.
+     * An already-open pass, for a caller collecting SEVERAL snapshots that feed one decision
+     * (the api-key ceiling intersects the key's and the owner's): sharing the pass shares its
+     * routing decision, so a gate expiry between the collects cannot intersect a legacy
      */
     reader?: AuthzReadRepository;
   }): Promise<CollectedGrants> {
@@ -202,17 +186,8 @@ export class AuthzCollectorService {
 
   /**
    * ADR-092 §8 / stage A5 — resource-tier grants for a resource scope's
-   * links (the resource itself plus shareable ancestors).
-   *
    * SHIM: storage is the ADR-057 `ShareLink` table, read as grants of
    * `traces:view` with the audience its visibility implies. Two ADR-057
-   * invariants are preserved here: possession of the token — not row
-   * existence — is what activates a grant (no presented tokens, no reads,
-   * no grants), and liveness (expiry, view budget) is filtered before the
-   * engine ever sees a row. View CONSUMPTION stays in ShareService: this
-   * reader is pure. The C5 migration extends ShareLink into full
-   * ResourceGrant storage (per-row permission, principal audiences) rather
-   * than adding a parallel table.
    */
   async collectResourceGrants({ scope }: { scope: AuthzScopeRef }): Promise<ResourceGrant[]> {
     if (scope.type !== "resource") {
@@ -230,12 +205,11 @@ export class AuthzCollectorService {
       links.push(...scope.parents);
     }
 
-    // Same one-pass discipline as collectGrants above: the composition
-    // root holds ONE reader for the process's lifetime, and a routed
-    // reader's head decision is memoized per instance. A gated read taken
-    // on that instance directly would pin the organization's head until
-    // the pod restarted — defeating the rollback lever. The pass-scoped
-    // reader pins for exactly this read and is then dropped.
+    // Same one-pass discipline as collectGrants above: the composition root holds ONE reader
+    // for the process's lifetime, and a routed reader's head decision is memoized per
+    // instance. A gated read taken on that instance directly would pin the organization's head
+    // until the pod restarted — defeating the rollback lever. The pass-scoped reader pins for
+    // exactly this read and is then dropped.
     const rows = await this.beginPass().findShareLinks({
       projectId: scope.projectId,
       tokens: scope.shareTokens,
@@ -338,17 +312,11 @@ export class AuthzCollectorService {
     ]);
 
     const bindings = [...directBindings, ...groupBindings];
-    // A seat-disabled membership is NOT a membership: the person keeps their
-    // row, their role and everything they did, and holds no access until an
-    // admin re-enables them (seat-reconciliation.feature). Reporting it as a
-    // membership is what let a disabled member keep every permission - only
-    // the org switcher hid the organization, and a direct call still worked.
-    //
-    // `organizationRole` follows `isOrgMember` rather than the stored role:
-    // the engine reads it to apply the EXTERNAL cap, and a role that outlived
-    // its membership would be answering for a principal who has none.
-    // `membershipDisabled` is carried separately so the denial can say WHICH
-    // gate closed instead of claiming they were never here.
+    // A seat-disabled membership is NOT a membership: the person keeps their row, their role
+    // and everything they did, and holds no access until an admin re-enables them
+    // (seat-reconciliation.feature). Reporting it as a membership is what let a disabled
+    // member keep every permission - only the org switcher hid the organization, and a direct
+    // call still worked.
     const isOrgMember = membership != null && !membership.disabled;
 
     return {
@@ -393,13 +361,9 @@ export class AuthzCollectorService {
   }
 
   /**
-   * Lenient parse, matching the legacy tRPC resolver's net behaviour:
-   * malformed or non-array permission JSON degrades to an empty list, which
-   * the engine treats as "fall through to the built-in bag", never as a
-   * grant. The legacy API-key resolver is STRICTER here - it rejects a mixed
-   * array outright rather than dropping the non-string entries - so on that
-   * path this parse is deliberately the more permissive of the two, and the
-   * shadow comparison is where that shows up.
+   * Lenient parse, matching the legacy tRPC resolver's net behaviour: malformed or non-array
+   * permission JSON degrades to an empty list, which the engine treats as "fall through to
+   * the built-in bag", never as a grant.
    */
   private parseCustomRolePermissions(
     rows: CustomRolePermissionsRow[],
@@ -447,14 +411,6 @@ export class AuthzCollectorService {
   /**
    * The ADR-057 visibility a link was created with, as the ADR-092 audience
    * it means.
-   *
-   * KNOWN NARROWING (C5): the PROJECT audience resolves through
-   * project-scoped bindings only (see audienceMatches in the engine), while
-   * legacy's project-visibility check probes actual project membership - so a
-   * caller who reaches the project through a team or organization binding
-   * matches legacy and not this. The membership probe lands with the C5
-   * storage pass; until then this is narrower than legacy, which fails
-   * closed.
    */
   private audienceForVisibility({
     visibility,

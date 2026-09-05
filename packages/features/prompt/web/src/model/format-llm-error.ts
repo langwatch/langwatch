@@ -71,7 +71,9 @@ export function parseLLMError(raw: string): ParsedLLMError {
           `"${pyUnescaped.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`,
         );
       }
-    } catch {}
+    } catch {
+      // Leave the message unescaped when it is not a decodable payload.
+    }
     return {
       type: "unknown",
       message: unescapedMessage ? `${errorType}\n${unescapedMessage}` : raw,

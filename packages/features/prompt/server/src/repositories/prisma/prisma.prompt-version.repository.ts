@@ -16,12 +16,8 @@ import { PrismaLlmConfigRepository } from "./prisma.prompt.repository";
 import { getVersionValidator, parseRuntimeParameters } from "@langwatch/prompt-contract";
 
 /**
- * The client slice version persistence binds to, transaction included: a
- * version row and the config row whose pointer it moves land together.
- *
- * `project` is here because two reads below re-enter the config repository to
- * confirm the config exists before writing a version, and that lookup resolves
- * an organization-scoped handle through the project's team.
+ * The client slice version persistence binds to, transaction included: a version row and
+ * the config row whose pointer it moves land together.
  */
 export type PromptVersionDatabase = Pick<
   PrismaClient,
@@ -29,11 +25,8 @@ export type PromptVersionDatabase = Pick<
 >;
 
 /**
- * Repository for managing LLM Configuration Versions
- * Follows Single Responsibility Principle by focusing only on LLM config versions data access
- *
- * Generally, you should be using the LlmConfigRepository to get the latest version of a config
- * instead of this repository.
+ * Repository for managing LLM Configuration Versions Follows Single Responsibility
+ * Principle by focusing only on LLM config versions data access
  */
 export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsRepository {
   static create({ prisma }: { prisma: PromptVersionDatabase }): PrismaLlmConfigVersionsRepository {
@@ -108,10 +101,9 @@ export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsReposito
   }
 
   /**
-   * Returns the id of the most recent version for a config, or null when no
-   * version exists. Non-throwing variant intended for read-path enrichment
-   * (e.g. deciding whether a returned version is "latest") where a missing
-   * row is a legitimate case, not an error.
+   * Returns the id of the most recent version for a config, or null when no version exists.
+   * Non-throwing variant intended for read-path enrichment (e.g. deciding whether a returned
+   * version is "latest") where a missing row is a legitimate case, not an error.
    */
   async tryFindLatestId(params: {
     configId: string;

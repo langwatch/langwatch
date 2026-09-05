@@ -1,9 +1,5 @@
 /**
  * The coding-agent reads over a project-scoped REST family, `/api/coding-agent`.
- *
- * It answers from the same {@link CodingAgentApp} the tRPC surface reaches, so
- * the tenancy boundary on a cross-project read — which organization a project
- * belongs to, and what the caller may see of it — is decided once for both.
  */
 import {
   type CodingAgentSessionCursor,
@@ -107,11 +103,7 @@ const sessionEventSchema = z.object({
 });
 
 /**
- * Query parsing that REFUSES what it cannot honour. Every field here was once
- * a silent fallback, and each one lied in its own way: an unparseable cursor
- * restarted the walk at page 1, so a client following `nextCursor` looped
- * forever, and a malformed bound dropped the window and answered over a wider
- * range than was asked for.
+ * Query parsing that REFUSES what it cannot honour.
  */
 const eventsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(MAX_PAGE).default(DEFAULT_PAGE),

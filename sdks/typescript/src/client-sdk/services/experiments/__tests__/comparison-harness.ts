@@ -1,12 +1,6 @@
 /**
- * Shared setup for the Experiment.compare() unit suites, n-way judging of a
- * row's targets.
- *
+ * Shared setup for the Experiment.compare() unit suites, n-way judging of a row's targets.
  * Spec: specs/experiments/comparison-sdk.feature
- *
- * The transport is stubbed, so what those suites assert is the contract the
- * SDK speaks: which keys reach the judge, which are deliberately absent so the
- * judge's own defaults apply, and the shape of what lands in the batch.
  */
 
 import { afterEach, beforeEach, vi } from "vitest";
@@ -133,19 +127,8 @@ export const createHarness = () => {
 };
 
 /**
- * Register the lifecycle every comparison suite needs: a fresh harness and
- * stubbed transport per test, a quiet console, and an environment left exactly
- * as it was found.
- *
- * The harness arrives through a callback rather than a return value because
- * the stubbed fetch closes over the instance it was built with. Handing back a
- * long-lived object and refilling it each test would leave that closure
- * pointing at the previous one, so a `respond` a test installed would never be
- * the one called.
- *
- * `LANGWATCH_API_KEY` is unset for the duration so `ensureSetup()` stays a
- * no-op and every suite passes its key explicitly, which is what keeps a real
- * key in the developer's environment from changing what a test exercises.
+ * Register the lifecycle every comparison suite needs: a fresh harness and stubbed
+ * transport per test, a quiet console, and an environment left exactly as it was found.
  */
 export const useComparisonHarness = (assign: (harness: ComparisonHarness) => void): void => {
   const previousApiKey = process.env.LANGWATCH_API_KEY;
