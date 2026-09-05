@@ -135,7 +135,7 @@ Feature: Custom prompt tag management
 
   # --- End-to-end ---
 
-  @e2e
+  @integration
   Scenario: Full lifecycle of a custom tag
     When I create a tag named "canary" via the API
     And I assign the "canary" tag to a prompt version
@@ -145,7 +145,7 @@ Feature: Custom prompt tag management
     Then "canary" no longer appears in the list
     And the prompt version no longer has a "canary" assignment
 
-  @e2e
+  @integration
   Scenario: Delete and recreate a seeded tag
     When I delete the "production" tag via the API
     And I create a tag named "production" via the API

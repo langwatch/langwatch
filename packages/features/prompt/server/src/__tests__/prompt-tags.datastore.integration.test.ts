@@ -203,7 +203,9 @@ describe.skipIf(!DB_URL)("given an organization with a prompt version to tag", (
       await tags.tryDeleteByName({ organizationId, name: "production" });
       const recreated = await tags.create({ organizationId, name: "production" });
 
-      expect((await tags.getAll({ organizationId })).map((tag) => tag.name)).toContain("production");
+      expect((await tags.getAll({ organizationId })).map((tag) => tag.name)).toContain(
+        "production",
+      );
 
       const assignment = await prompts.assignTag({
         configId,

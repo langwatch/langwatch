@@ -15,7 +15,7 @@
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { ClickHouseMigrateTask, DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
-import { startTestClickHouseEndpoints } from "@langwatch/test-harness";
+import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
 
 /** The one endpoint name every migrated-schema analytics suite asks for. */
 const MIGRATED_ENDPOINT_SUITE = "analytics-migrated";
@@ -28,7 +28,6 @@ export interface MigratedClickHouse {
   database: string;
 }
 
-const migratedUrls = new Set<string>();
 let endpoint: MigratedClickHouse | undefined;
 
 /**
@@ -46,23 +45,25 @@ export async function startMigratedClickHouse(): Promise<MigratedClickHouse> {
   });
   if (!provisioned) throw new Error("No ClickHouse endpoint was provisioned for the schema suite");
 
-  if (!migratedUrls.has(provisioned.url)) {
-    const previousCluster = process.env.CLICKHOUSE_CLUSTER;
-    delete process.env.CLICKHOUSE_CLUSTER;
-    try {
-      await ClickHouseMigrateTask.createFromConfig({
-        config: {
-          buildTime: false,
-          skipped: false,
-          sharedUrl: provisioned.url,
-          privateEndpoints: [],
-        },
-      }).execute();
-    } finally {
-      if (previousCluster !== undefined) process.env.CLICKHOUSE_CLUSTER = previousCluster;
-    }
-    migratedUrls.add(provisioned.url);
-  }
+  await migrateTestClickHouseOnce({
+    url: provisioned.url,
+    migrate: async () => {
+      const previousCluster = process.env.CLICKHOUSE_CLUSTER;
+      delete process.env.CLICKHOUSE_CLUSTER;
+      try {
+        await ClickHouseMigrateTask.createFromConfig({
+          config: {
+            buildTime: false,
+            skipped: false,
+            sharedUrl: provisioned.url,
+            privateEndpoints: [],
+          },
+        }).execute();
+      } finally {
+        if (previousCluster !== undefined) process.env.CLICKHOUSE_CLUSTER = previousCluster;
+      }
+    },
+  });
 
   endpoint = {
     client: createClient({

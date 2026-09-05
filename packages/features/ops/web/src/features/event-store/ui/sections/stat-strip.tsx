@@ -134,12 +134,20 @@ function DeadLetterStat({
   // turn red when the rest arrives — which on an ops surface reads as a new
   // incident rather than as the tile finishing loading. An unknown says so.
   if (!isOutboxCountKnown) {
-    return <LinkedStat label="Dead letters" value="—" sublabel="counting" />;
+    return (
+      <LinkedStat
+        label="Dead letters"
+        value="—"
+        sublabel="counting"
+        testId="ops-dead-letters-stat"
+      />
+    );
   }
   const total = queueDead + outboxDead;
   return (
     <LinkedStat
       label="Dead letters"
+      testId="ops-dead-letters-stat"
       href="/ops/event-sourcing/dead-letters"
       value={formatCount(total)}
       sublabel={

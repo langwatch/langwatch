@@ -3,6 +3,7 @@
  */
 export { cleanupTestRows, requireAssigned, type CleanupEntry } from "./cleanup-test-rows";
 export {
+  migrateTestClickHouseOnce,
   nativeClickHouseBaseUrl,
   privateRouteOrgId,
   startTestClickHouseEndpoints,

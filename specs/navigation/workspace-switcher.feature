@@ -75,17 +75,23 @@ Feature: Workspace switcher
     When I open the workspace switcher
     Then the team row shows no "Create project" button
 
-  @integration
+  # The "+" icon button these three describe is gone: the switcher is a combobox
+  # (packages/features/navigation/web/src/ui/blocks/project-switcher-combobox.tsx)
+  # whose per-team create entry is an always-visible menu row, so there is no
+  # tooltip to auto-open, no icon button to focus and no hover to test. Tagged
+  # @unimplemented rather than deleted because retiring a scenario needs a
+  # ruling; see dev/docs/plans/restore-or-retire-2026-09-05.md.
+  @unimplemented
   Scenario: The "Create project" tooltip never auto-opens on switcher mount
     When I open the workspace switcher
     Then no "Create project" tooltip is visible before I hover the button
 
-  @integration
+  @unimplemented
   Scenario: The "+" button is not auto-focused on dropdown open
     When I open the workspace switcher
     Then the "Create project" button does not carry focus
 
-  @integration
+  @unimplemented
   Scenario: The "Create project" tooltip still appears on actual pointer hover
     Given the workspace switcher is open
     When I hover the "Create project" button

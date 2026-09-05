@@ -137,6 +137,32 @@ export function nativeClickHouseBaseUrl(): string | null {
 }
 
 /**
+ * URLs whose schema this process has already migrated.
+ *
+ * goose is blocking and applies the whole set; every file in a shard that
+ * asked for the same endpoint would otherwise re-run it against a database
+ * that already carries it.
+ */
+const migratedUrls = new Set<string>();
+
+/**
+ * Runs `migrate` at most once per ClickHouse URL in this process. A second
+ * call for the same URL returns without migrating; a different URL migrates
+ * on its own.
+ */
+export async function migrateTestClickHouseOnce({
+  url,
+  migrate,
+}: {
+  url: string;
+  migrate: () => Promise<void>;
+}): Promise<void> {
+  if (migratedUrls.has(url)) return;
+  await migrate();
+  migratedUrls.add(url);
+}
+
+/**
  * Provisions one isolated endpoint per entry in `names`.
  *
  * `suite` and the names together form each database name, so two suites asking

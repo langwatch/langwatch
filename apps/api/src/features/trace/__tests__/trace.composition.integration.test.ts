@@ -7,6 +7,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import { TraceApp, type TraceAppDependencies } from "@langwatch/trace-server";
+import { SHARE_MAX_FULL_SPANS } from "@langwatch/trace-contract";
 import superjson from "superjson";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -1069,8 +1070,33 @@ describe("given the anonymous share read composed on this process", () => {
     });
   });
 
+  describe("when an anonymous caller knows the trace id but holds no share token", () => {
+    /** @scenario Knowing a shared trace's id is not enough to read it */
+    it("refuses the authenticated trace read, leaving the token the only way in", async () => {
+      const { application } = composeShareApplication();
+      if (!application.hono) throw new Error("HTTP composition was not created.");
+
+      // The same trace, asked for by id on the explorer's own read. There is no
+      // session, so this is the surface an anonymous holder of a trace id has:
+      // it must refuse, or the share token would not be authorizing anything.
+      const input = encodeURIComponent(
+        JSON.stringify({ json: { projectId: "project-1", traceId: "trace-1" } }),
+      );
+      const refused = await application.hono.request(
+        `http://127.0.0.1/api/trpc/tracesV2.header?input=${input}`,
+        { headers: { "x-forwarded-for": CLIENT_IP } },
+      );
+      expect(refused.status).toBeGreaterThanOrEqual(400);
+
+      // ...while the token-bearing read on the same process answers.
+      const served = await readShare(application, "share-token-1", CLIENT_IP);
+      expect(served.status).toBe(200);
+    });
+  });
+
   describe("when one share token is read past its per-minute ceiling", () => {
     /** @scenario "A share link read past its ceiling is refused with the code its copy is written for" */
+    /** @scenario Opening a shared link too often is refused for a moment */
     it("refuses with share_read_rate_limited once the token's window is spent", async () => {
       const { application } = composeShareApplication();
 
@@ -1099,6 +1125,245 @@ describe("given the anonymous share read composed on this process", () => {
 
       expect(handledCodeOf(body)).toBeNull();
       expect(status).toBe(200);
+    });
+  });
+});
+
+/**
+ * The share payload the anonymous viewer actually receives, assembled rather
+ * than replayed from cache: what the read costs, what it is allowed to see,
+ * and what it must never carry.
+ */
+describe("given the anonymous share read assembles its payload", () => {
+  const PROJECT_ID = "project-1";
+  const TRACE_ID = "trace-1";
+  const CLIENT_IP = "203.0.113.9";
+  const CUTOFF_MS = 1_600_000_000_000;
+
+  /** A read stack answering the viewer's redactions with a retention window. */
+  function shareReadStack(): ApiTraceReadStackPort {
+    return stub<ApiTraceReadStackPort>("traceReads", {
+      readers: () => testTraceReaders(),
+      legacyPorts: () => ({
+        listInputSchema: anySchema,
+        filterInputSchema: anySchema,
+        evaluatorTypeSchema: anySchema,
+        preconditionSchema: anySchema,
+      }),
+      readPorts: () => ({ mappers: {} }),
+      explorerPorts: () => ({}),
+      editOverlayRedaction: () => ({}),
+      getViewerProtections: async () => ({ visibilityCutoffMs: null, canSeeCosts: true }),
+      tryGetShareViewerProtections: async () => ({
+        visibilityCutoffMs: CUTOFF_MS,
+        canSeeCosts: false,
+      }),
+      isTraceNotFound: () => false,
+    });
+  }
+
+  function spanFixture(index: number) {
+    return {
+      spanId: `span-${index}`,
+      parentSpanId: null,
+      traceId: TRACE_ID,
+      name: `span-${index}`,
+      type: "llm",
+      startTimeMs: 1_700_000_000_000,
+      endTimeMs: 1_700_000_000_010,
+      durationMs: 10,
+      statusCode: 1,
+      statusMessage: null,
+      spanAttributes: {},
+      events: [],
+      links: [],
+    };
+  }
+
+  /** Composes the share read with every store answering, and no cache hit. */
+  function composeAssemblingShare({ spanCount }: { spanCount: number }) {
+    const summaryReads: Array<{ visibilityCutoffMs: number | null }> = [];
+    const resolveCalls: Array<{ token: string; viewerKey?: string }> = [];
+    const { broadcast } = testBroadcast();
+    const group = composeTraceFeature({
+      prisma: testPrisma(),
+      authz: testAuthz(),
+      projects: stub<ProjectService>("projects"),
+      broadcast,
+      peers: { share: stub("share"), topics: stub("topics") },
+      resolveClickHouseClient: null,
+      rateLimit: async () => ({ allowed: true }),
+      processName: "langwatch-api",
+      traceReads: shareReadStack(),
+    });
+
+    const traces = group.traces as unknown as Record<string, unknown>;
+    Object.assign(traces, {
+      resolveShareForViewer: async (input: { token: string; viewerKey?: string }) => {
+        resolveCalls.push(input);
+        return { resourceType: "TRACE", projectId: PROJECT_ID, resourceId: TRACE_ID };
+      },
+      readCachedSharePayload: async () => null,
+      writeCachedSharePayload: async () => undefined,
+      readTraceSummary: async (input: { visibilityCutoffMs: number | null }) => {
+        summaryReads.push(input);
+        return {
+          traceId: TRACE_ID,
+          occurredAt: 1_700_000_000_000,
+          traceName: "trace",
+          spanCount,
+          totalCost: 4.2,
+          conversationId: "conversation-1",
+        };
+      },
+      readProject: async () => ({
+        name: "Acme",
+        slug: "acme",
+        language: "python",
+        framework: "openai",
+      }),
+      readSpanSummaries: async () => [],
+      readSpans: async () => Array.from({ length: spanCount }, (_, i) => spanFixture(i)),
+      readLangwatchSignals: async () => [],
+      readSpanResources: async () => [],
+      readTraceEvents: async () => [],
+      readEvaluations: async () => ({}),
+    });
+
+    const collaborators = stubCollaborators({
+      broadcast,
+      traces: group.traces,
+      planProvider: group.planProvider,
+    });
+    const features = ApiTrpcFeaturesComposition.tryCompose({
+      composed: { ...stubComposedFeatures(), trace: group },
+      infrastructure: {
+        ...stubInfrastructureEntitlements(),
+        prisma: {} as unknown as PrismaClient,
+        authz: testAuthz(),
+        audit: undefined,
+      },
+      collaborators,
+    });
+    if (!features) throw new Error("the record refused to compose against its collaborators");
+
+    return {
+      summaryReads,
+      resolveCalls,
+      application: ApiApplication.create({
+        agents: new MissingAgentService(),
+        secrets: new MissingSecretService(),
+        features,
+        http: {
+          createContext: async () => ({
+            actor: () => ({ id: "user-1" }),
+            tryActor: () => null,
+            authorize: async () => undefined,
+            session: null,
+          }),
+        },
+      }),
+    };
+  }
+
+  async function readShare(
+    application: ApiApplication,
+    token: string,
+    headers: Record<string, string>,
+  ): Promise<{ status: number; payload: Record<string, unknown> }> {
+    if (!application.hono) throw new Error("HTTP composition was not created.");
+    const encoded = encodeURIComponent(JSON.stringify({ json: { token } }));
+    const response = await application.hono.request(
+      `http://127.0.0.1/api/trpc/sharedTrace.get?input=${encoded}`,
+      { headers },
+    );
+    const body = (await response.json()) as {
+      result?: { data?: { json?: Record<string, unknown> } };
+    };
+    return { status: response.status, payload: body.result?.data?.json ?? {} };
+  }
+
+  const viewerHeaders = { "x-forwarded-for": CLIENT_IP, "user-agent": "Reader/1.0" };
+
+  describe("when one reader opens the link twice from the same session", () => {
+    /** @scenario One viewing session counts as a single view */
+    /** @scenario One page load counts as one view */
+    it("resolves the token once per page load, under one stable viewer key", async () => {
+      const { application, resolveCalls } = composeAssemblingShare({ spanCount: 2 });
+
+      await readShare(application, "share-token-1", viewerHeaders);
+      await readShare(application, "share-token-1", viewerHeaders);
+
+      // One resolution per page load — never one per read the assembly makes...
+      expect(resolveCalls).toHaveLength(2);
+      // ...and both carry the SAME viewer key, which is what collapses the two
+      // loads of one session into a single counted viewing.
+      expect(resolveCalls[0]?.viewerKey).toBeDefined();
+      expect(resolveCalls[1]?.viewerKey).toBe(resolveCalls[0]?.viewerKey);
+    });
+
+    it("mints a different viewer key for a different reader", async () => {
+      const { application, resolveCalls } = composeAssemblingShare({ spanCount: 2 });
+
+      await readShare(application, "share-token-1", viewerHeaders);
+      await readShare(application, "share-token-1", {
+        "x-forwarded-for": "203.0.113.10",
+        "user-agent": "Other/2.0",
+      });
+
+      expect(resolveCalls[1]?.viewerKey).not.toBe(resolveCalls[0]?.viewerKey);
+    });
+  });
+
+  describe("when the project's data-retention window bounds what the viewer may see", () => {
+    /** @scenario A shared view cannot see beyond the project's data-retention window */
+    it("carries the viewer's visibility cutoff into the trace read", async () => {
+      const { application, summaryReads } = composeAssemblingShare({ spanCount: 2 });
+
+      const { status } = await readShare(application, "share-token-1", viewerHeaders);
+
+      expect(status).toBe(200);
+      // The cutoff the share viewer's protections resolved to reaches the read
+      // itself, so an older trace is not assembled and then filtered.
+      expect(summaryReads[0]?.visibilityCutoffMs).toBe(CUTOFF_MS);
+    });
+  });
+
+  describe("given the trace belongs to a conversation", () => {
+    /** @scenario A shared link never reveals the surrounding conversation */
+    it("carries no conversation in the payload", async () => {
+      const { application } = composeAssemblingShare({ spanCount: 2 });
+
+      const { payload } = await readShare(application, "share-token-1", viewerHeaders);
+
+      expect(payload).not.toHaveProperty("conversation");
+      expect(payload.header).not.toHaveProperty("conversationId");
+    });
+  });
+
+  describe("given a trace with more spans than one share payload may carry", () => {
+    /**
+     * The endpoint is unauthenticated, so a wide trace must not assemble every
+     * span's captured content into one unbounded response. The waterfall stays
+     * complete; only per-span detail stops, and the payload says so.
+     */
+    /** @scenario A very large trace shares its timeline without every step's detail */
+    it("caps the span detail and flags the truncation", async () => {
+      const { application } = composeAssemblingShare({ spanCount: SHARE_MAX_FULL_SPANS + 25 });
+
+      const { payload } = await readShare(application, "share-token-1", viewerHeaders);
+
+      expect((payload.spansFull as unknown[]).length).toBe(SHARE_MAX_FULL_SPANS);
+      expect(payload.isSpanDetailTruncated).toBe(true);
+    });
+
+    it("carries every span and flags no truncation when the trace fits", async () => {
+      const { application } = composeAssemblingShare({ spanCount: 3 });
+
+      const { payload } = await readShare(application, "share-token-1", viewerHeaders);
+
+      expect((payload.spansFull as unknown[]).length).toBe(3);
+      expect(payload.isSpanDetailTruncated).toBe(false);
     });
   });
 });

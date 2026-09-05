@@ -239,6 +239,7 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
     describe("when group-by is changed to Scenario", () => {
       /** @scenario "All run types appear together" */
       /** @scenario "Grouped results include runs from all suites" */
+      /** @scenario User groups All Runs results by scenario */
       it("groups runs from every suite under the one scenario", async () => {
         const runsFromTwoSuites = [
           {

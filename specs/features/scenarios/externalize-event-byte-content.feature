@@ -231,10 +231,10 @@ Feature: Externalize event byte content to stored_objects
   # ---------------------------------------------------------------
 
   @unit
-  Scenario: StoredObjectsService exposes storeFromBytes, getById, headById, deleteOwnedBy
+  Scenario: StoredObjectsService exposes storeFromBytes, tryGetById, headById, deleteOwnedBy
     Given the StoredObjectsService class
     Then it exposes storeFromBytes
-    And it exposes getById
+    And it exposes tryGetById
     And it exposes headById
     And it exposes deleteOwnedBy
     And it depends on StoredObjectsRepository and the storage registry as interfaces
@@ -872,7 +872,7 @@ Feature: Externalize event byte content to stored_objects
   # AC14 "Missing badge placeholder when GET returns status missing"         -> Scenario: Trace timeline shows a missing badge when the byte content is no longer retrievable
   # AC15 "Rows carry project_id; future purge handler cascades"              -> Scenario: Stored objects rows are tenant-tagged so a future project-purge can cascade
   # AC16 "No automatic retention, GC, or orphan reaping"                     -> Scenario: No automatic retention, time-based GC, or orphan reaping runs
-  # AC17 "Layered route -> service -> (repo | storage) with Zod data"       -> Scenario: StoredObjectsService exposes storeFromBytes, getById, deleteOwnedBy
+  # AC17 "Layered route -> service -> (repo | storage) with Zod data"       -> Scenario: StoredObjectsService exposes storeFromBytes, tryGetById, deleteOwnedBy
   #                                                                          -> Scenario: Route handlers delegate to the service and never touch the repository directly
   # AC18 "OpenTelemetry spans on ingest extraction and on file reads"        -> Scenario: OpenTelemetry spans wrap extraction during ingest and reads via /api/files/:id
   # AC19 "Counter/histogram metrics for extract, dedup, failures, size"      -> Scenario: Prometheus metrics emit for ingest, dedup, write and read failures, and size distribution

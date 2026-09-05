@@ -15,7 +15,7 @@ Feature: Settings Plans Comparison Page
   #   - "Enterprise plan column shows custom commercial option"
   #   - "Plan details are visually comparable by row"
 
-  @e2e
+  @integration
   Scenario: Member compares plans on the plans page
     Given my organization runs on a self-hosted deployment with no license
     When I navigate to /settings/plans

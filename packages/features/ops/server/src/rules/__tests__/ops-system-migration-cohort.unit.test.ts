@@ -28,7 +28,10 @@ describe("organizationMigrates", () => {
   });
 
   describe("when the installation is cloud and the migration is paced by enrollment", () => {
-    /** @scenario "Cloud rollout processes only enrolled organizations" */
+    /**
+     * @scenario "Cloud rollout processes only enrolled organizations"
+     * @scenario Enrollment alone decides which organizations migrate
+     */
     it("includes exactly the enrolled organizations", () => {
       // Through `paced`, which supplies `enrolledAutomatically: false` — the
       // premise of this describe. Calling `organizationMigrates` directly

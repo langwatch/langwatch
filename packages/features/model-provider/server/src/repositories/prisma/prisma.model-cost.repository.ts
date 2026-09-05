@@ -5,6 +5,7 @@ import {
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
 import { ModelCostRepository } from "../../ports/model-provider.port";
+import { byScopePrecedence } from "../../rules/model-cost-scope-precedence.rules";
 
 type Database = Pick<PrismaClient, "customLLMModelCost">;
 
@@ -25,7 +26,10 @@ export class PrismaModelCostRepository extends ModelCostRepository {
       orderBy: { createdAt: "desc" },
     });
 
-    return rows.map(toCost);
+    // Most specific scope first: the matcher takes the first row whose pattern
+    // matches, so a project row has to precede an organization row that names
+    // the same model, whichever was saved last.
+    return byScopePrecedence(rows.map(toCost));
   }
 
   async tryFindById(id: string): Promise<ModelCost | null> {

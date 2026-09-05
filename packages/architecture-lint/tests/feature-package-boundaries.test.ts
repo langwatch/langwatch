@@ -216,6 +216,28 @@ describe("feature package boundary lint", () => {
     expect(policies()).toContain("feature-layout");
   });
 
+  /**
+   * A convention that differs from version 0 cannot arrive by declaring a
+   * number nobody implemented: the workspace reader refuses the version and
+   * stops governing the package, so the only way to introduce one is to build
+   * it as a version with rules of its own.
+   */
+  /** @scenario Layout evolution is explicit */
+  it("refuses a layout version it does not implement, rather than guessing at its rules", () => {
+    featurePackage({ feature: "agent", role: "contract" });
+    write("packages/features/agent/feature.json", JSON.stringify({ layoutVersion: 1 }));
+
+    const violations = lintWorkspace({ root, declarations: false });
+    const refusal = violations.find(
+      (violation) =>
+        violation.policy === "feature-source-layout" && violation.message.includes("layoutVersion"),
+    );
+
+    expect(refusal?.message).toContain("1");
+    // ...and version 0's own rules did not silently apply to it either.
+    expect(violations.filter((violation) => violation.policy === "feature-layout")).toEqual([]);
+  });
+
   /** @scenario "Retired schema runtimes cannot re-enter feature packages" */
   it("rejects the retired Zod runtime in a feature contract", () => {
     featurePackage({

@@ -46,7 +46,10 @@ function required<T>(value: T | undefined): T {
 }
 
 describe("ClickHouseRetroactiveRetentionRepository", () => {
-  /** @scenario "Apply retention to existing project data" */
+  /**
+   * @scenario "Apply retention to existing project data"
+   * @scenario Retroactive retention update applies uniformly across all retention-managed tables
+   */
   it("updates every traces table, including event_log, with parameterized values", async () => {
     const { commands, repository } = createRepository([]);
 

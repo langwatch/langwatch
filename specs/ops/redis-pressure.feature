@@ -31,19 +31,19 @@ Feature: Redis pressure visibility on the Ops dashboard
     When the dashboard loads
     Then the Redis mem tile is rendered in the warning color
 
-  @unit
+  @integration
   Scenario: Memory warning uses the raw ratio so 79.95% does not round up to 80%
     Given Redis reports used_memory and maxmemory at a ratio of 79.95%
     When the dashboard data is built
     Then the Redis mem tile is NOT rendered in the warning color
     And the displayed percent is 80% (rounded to one decimal)
 
-  @unit
+  @integration
   Scenario: Memory tile handles missing maxmemory configuration
     Given Redis reports maxmemory=0 (unlimited)
     When the dashboard loads
     Then the memory percent is omitted instead of showing "Infinity%"
-    And the sublabel falls back to "peak <bytes>"
+    And the sublabel falls back to the word "memory"
 
   # ---------------------------------------------------------------------------
   # Engine CPU: new metric — the one that mattered in the incident
@@ -105,11 +105,11 @@ Feature: Redis pressure visibility on the Ops dashboard
   Scenario: Redis stats appear inline with the throughput/latency tiles
     Given the dashboard renders
     When I view the top stat strip
-    Then Redis mem, Redis CPU, and Redis conns tiles appear alongside Staged/s, Completed/s, etc.
-    And the tiles wrap to a second row when the viewport is too narrow
+    Then the Redis tile appears alongside Staged/s, Completed/s, etc.
+    And the strip scrolls sideways when the viewport is too narrow
 
   @integration
   Scenario: Connected clients count is visible
     Given Redis reports 24 connected clients
     When the dashboard loads
-    Then the Redis conns tile shows "24" with a "clients" sublabel
+    Then the Redis tile shows "24" with a "connections" sublabel

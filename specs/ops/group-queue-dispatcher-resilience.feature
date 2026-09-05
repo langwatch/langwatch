@@ -24,9 +24,9 @@ Feature: GroupQueue dispatcher connection resilience
 
   @unit
   Scenario: ClickHouse migration guard prevents duplicate migrations per URL
-    Given startTestContainers has been called once for a given ClickHouse URL
-    When startTestContainers is called again with the same ClickHouse URL
-    Then initializeClickHouseSchema is not called a second time for that URL
+    Given a test ClickHouse URL has already been migrated in this process
+    When a suite asks for that same URL to be migrated again
+    Then the migration does not run a second time for that URL
 
   @unit
   Scenario: Cluster connections also get a dedicated blocking connection

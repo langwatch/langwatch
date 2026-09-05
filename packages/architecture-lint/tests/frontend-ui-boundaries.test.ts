@@ -827,6 +827,35 @@ describe("frontend UI architecture boundaries", () => {
     expect(policies([]).filter((policy) => policy === "ui-browser-capability")).toHaveLength(3);
   });
 
+  /**
+   * The pilot's own strictness. There is no suppression file for this policy
+   * and no per-edge allowance in its findings, so a new violation in apps/ui
+   * or in an opted-in web package fails the run outright — the only way past
+   * it is to stop importing the thing.
+   */
+  /** @scenario New browser architecture is strict while legacy application debt shrinks */
+  it("fails a new violation outright, with no baseline entry to record it against", () => {
+    const promptWeb = webPackage("prompt", { ".": "./src/index.ts" });
+    writeCatalogue([{ id: "prompt-studio" }], ["@langwatch/prompt-web"]);
+    write("apps/ui/src/features/prompt-studio/route.ts", 'import "@langwatch/prompt-server";');
+    write("packages/features/prompt/web/src/index.ts", 'import "@langwatch/prisma-client";');
+
+    const violations = lint([promptWeb]);
+
+    // Both the new apps/ui file and the opted-in web package are reported...
+    const files = violations.map((violation) => violation.file);
+    expect(files.some((file) => file.includes("apps/ui/src/features/prompt-studio/route.ts"))).toBe(
+      true,
+    );
+    expect(files.some((file) => file.includes("packages/features/prompt/web"))).toBe(true);
+    // ...and neither is recorded as tolerated. A finding this policy hands
+    // back is a failure; there is no allowed/baselined shape for it to take.
+    for (const violation of violations) {
+      expect(violation).not.toHaveProperty("baselined");
+      expect(violation).not.toHaveProperty("allowedByBaseline");
+    }
+  });
+
   it("allows frontend features to import the UI platform packages ui-drawer and ui-host", () => {
     writeCatalogue([{ id: "prompt-studio" }]);
     write(

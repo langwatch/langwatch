@@ -40,6 +40,7 @@ afterEach(cleanup);
 describe("RedisStatTile", () => {
   describe("given normal Redis pressure", () => {
     describe("when the tile renders", () => {
+      /** @scenario Memory tile shows used as the primary value */
       it("shows the memory used as a single MB/GB value", () => {
         renderTile({ redisMemoryUsedBytes: 3_200_000_000 });
         // 3.2 * 10^9 / 1024^3 ≈ 2.98GB
@@ -61,6 +62,7 @@ describe("RedisStatTile", () => {
         expect(screen.getByTestId("redis-engine-cpu-stat").textContent).toContain("12.3%");
       });
 
+      /** @scenario Connected clients count is visible */
       it("shows the connection count", () => {
         renderTile({ redisConnectedClients: 24 });
         expect(screen.getByTestId("redis-clients-stat").textContent).toContain("24");
@@ -96,6 +98,7 @@ describe("RedisStatTile", () => {
 
   describe("given Redis memory is near eviction", () => {
     describe("when the used:max ratio crosses the 80% threshold", () => {
+      /** @scenario Memory tile turns red when Redis is near eviction */
       it("marks the tile as warning", () => {
         renderTile({
           redisMemoryUsedBytes: 9_500_000_000,
@@ -116,6 +119,7 @@ describe("RedisStatTile", () => {
         expect(tile().getAttribute("data-warning")).toBe("false");
       });
 
+      /** @scenario Memory warning uses the raw ratio so 79.95% does not round up to 80% */
       it("uses the raw ratio, so 79.95% does not round up and trigger it", () => {
         renderTile({
           redisMemoryUsedBytes: 7_995_000_000,
@@ -130,6 +134,7 @@ describe("RedisStatTile", () => {
   });
 
   describe("given the engine processor crosses its threshold", () => {
+    /** @scenario Engine CPU turns red when sustained load saturates the Redis main thread */
     it("marks the tile as warning", () => {
       renderTile({ redisEngineCpuPercent: 85 });
       expect(tile().getAttribute("data-warning")).toBe("true");
@@ -137,6 +142,7 @@ describe("RedisStatTile", () => {
   });
 
   describe("given Redis has no maximum memory configured", () => {
+    /** @scenario Memory tile handles missing maxmemory configuration */
     it("labels the figure without inventing a percentage", () => {
       renderTile({ redisMemoryMaxBytes: 0 });
       expect(tile().textContent).toContain("memory");

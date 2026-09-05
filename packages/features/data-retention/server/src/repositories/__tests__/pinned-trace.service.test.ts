@@ -88,7 +88,10 @@ describe("DataRetentionService pin lifecycle", () => {
     expect(retroactive.calls).toEqual([]);
   });
 
-  /** @scenario "Manual pins survive share removal" */
+  /**
+   * @scenario "Manual pins survive share removal"
+   * @scenario Manual pin survives unsharing an auto-shared trace
+   */
   it("keeps a manual pin when auto-unpin runs", async () => {
     const service = create(new Pins());
     await service.autoPin({ projectId: "project", traceId: "trace" });

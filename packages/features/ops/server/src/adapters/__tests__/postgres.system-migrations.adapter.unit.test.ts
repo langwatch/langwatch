@@ -176,6 +176,32 @@ describe("PostgresSystemMigrationsAdapter", () => {
       await expect(adapter.runPass({})).resolves.toMatchObject({ tenantsSeen: 0 });
     });
   });
+
+  describe("when an operator enrols an organization between two passes", () => {
+    /** @scenario Enrolling an organization takes effect on the next pass */
+    it("reads enrollment fresh on each pass rather than caching the first answer", async () => {
+      const enrollmentReads = vi.fn().mockResolvedValue([]);
+      const database = {
+        systemMigrationEnrollment: { findMany: enrollmentReads },
+        organization: { findMany: vi.fn().mockResolvedValue([]) },
+        user: { findMany: vi.fn().mockResolvedValue([]) },
+        organizationUser: { findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+      } as unknown as PrismaClient;
+      const { adapter } = adapterOn(database);
+
+      await adapter.runPass({});
+      const afterFirstPass = enrollmentReads.mock.calls.length;
+      enrollmentReads.mockResolvedValue([
+        { organizationId: "org_acme", migrationName: IDENTIFIER_BACKFILL },
+      ]);
+      await adapter.runPass({});
+
+      // The second pass reads enrollment again, so an enrolment made between
+      // the two is what it paces on. A cohort cached across passes would not.
+      expect(afterFirstPass).toBeGreaterThan(0);
+      expect(enrollmentReads.mock.calls.length).toBeGreaterThan(afterFirstPass);
+    });
+  });
 });
 
 /** The pass's own enrollment reader, over the same faked storage. */

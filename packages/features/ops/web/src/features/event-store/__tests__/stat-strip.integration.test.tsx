@@ -168,4 +168,42 @@ describe("StatStrip", () => {
       expect(strip.textContent).not.toContain("6 queue");
     });
   });
+  describe("given Redis is under pressure while dead letters exist", () => {
+    describe("when the strip renders", () => {
+      /** @scenario The legacy "redisMemoryUsed sublabel under DLQ" affordance is removed */
+      it("keeps Redis memory out of the dead-letter tile", () => {
+        renderStrip({
+          redisMemoryUsedBytes: 3_200_000_000,
+          redisMemoryMaxBytes: 10_400_000_000,
+          queues: [
+            {
+              name: "queue-a",
+              displayName: "Queue A",
+              pendingGroupCount: 0,
+              blockedGroupCount: 0,
+              activeGroupCount: 0,
+              totalPendingJobs: 0,
+              dlqCount: 6,
+              parkedGroupCount: 0,
+            },
+          ],
+        });
+        const deadLetters = screen.getByTestId("ops-dead-letters-stat");
+        expect(deadLetters.textContent).toContain("Dead letters");
+        expect(deadLetters.textContent).not.toContain("GB");
+        expect(deadLetters.textContent).not.toContain("memory");
+        // The memory figure is the Redis tile's, and only the Redis tile's.
+        expect(screen.getByTestId("redis-memory-stat").textContent).toContain("2.98GB");
+      });
+
+      /** @scenario Redis stats appear inline with the throughput/latency tiles */
+      it("carries the Redis tile in the same strip as the throughput tiles", () => {
+        renderStrip({ redisConnectedClients: 24 });
+        const strip = screen.getByTestId("ops-stat-strip");
+        expect(strip.textContent).toContain("Staged/s");
+        expect(strip.textContent).toContain("Completed/s");
+        expect(strip.contains(screen.getByTestId("redis-stat-tile"))).toBe(true);
+      });
+    });
+  });
 });

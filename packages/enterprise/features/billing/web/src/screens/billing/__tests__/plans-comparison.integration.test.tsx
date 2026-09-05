@@ -52,6 +52,24 @@ describe("PlansComparisonPage", () => {
     });
   });
 
+  describe("given a self-hosted deployment with no license", () => {
+    describe("when the comparison is viewed", () => {
+      /** @scenario Member compares plans on the plans page */
+      it("shows the three plans side by side and marks none as current", () => {
+        // No plan describes an unlicensed self-hosted deployment, so the page
+        // must not claim one of these tiers is what the reader is on.
+        renderPlans();
+
+        expect(within(column("free")).getByText("Free")).toBeInTheDocument();
+        expect(within(column("growth")).getByText("Growth")).toBeInTheDocument();
+        expect(within(column("enterprise")).getByText("Enterprise")).toBeInTheDocument();
+        expect(isMarkedCurrent("free")).toBe(false);
+        expect(isMarkedCurrent("growth")).toBe(false);
+        expect(isMarkedCurrent("enterprise")).toBe(false);
+      });
+    });
+  });
+
   describe("given an organization on the Growth plan", () => {
     describe("when the comparison is viewed", () => {
       /** @scenario "Growth organizations see Growth as current" */

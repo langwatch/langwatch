@@ -152,15 +152,23 @@ export function ColorModeProvider(props: ColorModeProviderProps) {
   // Chakra v3 uses ".dark &" selector for dark mode, so we need attribute="class"
   return (
     <>
+      {/*
+        The colour-mode cross-fade is decoration, so a reader who has asked for
+        less motion gets the switch without it. Scoped by the media query rather
+        than by a hook: the rule then never applies in the first place, instead
+        of being applied and then undone on a later render.
+      */}
       <style>{`
-        html {
-          transition: background-color 0.3s ease, color 0.3s ease;
-        }
-        html *,
-        html *::before,
-        html *::after {
-          transition: background-color 0.3s ease, border-color 0.3s ease,
-            box-shadow 0.3s ease;
+        @media (prefers-reduced-motion: no-preference) {
+          html {
+            transition: background-color 0.3s ease, color 0.3s ease;
+          }
+          html *,
+          html *::before,
+          html *::after {
+            transition: background-color 0.3s ease, border-color 0.3s ease,
+              box-shadow 0.3s ease;
+          }
         }
       `}</style>
       <ThemeProvider
