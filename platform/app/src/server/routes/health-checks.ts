@@ -539,13 +539,20 @@ secured
 
 // ── GET /scenarios ───────────────────────────────────────────────────
 
-// Fires a real scenario run in the dedicated canary project and reports what
-// broke. Authenticated by the shared internal secret (a status-page poller has
-// no user session and no project API key), checked BEFORE any run is queued.
+// Fires a real scenario run for the run plan named by `?runPlanId=<SimulationSuite
+// id>` (a `run_plan` suite holding exactly one scenario and one target) and
+// reports what broke. The plan's own row supplies the project, scenario and
+// target — nothing else on the request can redirect the run. Authenticated by
+// the shared internal secret (a status-page poller has no user session and no
+// project API key), checked BEFORE the run plan is read or any run is queued.
 //
-//   200 { status: "ok", scenarioRunId, durationMs }        healthy
+//   400 { message }                                         no runPlanId given
+//   200 { status: "ok", scenarioRunId, durationMs }         healthy
 //   503 { status: "unhealthy", reason, scenarioRunId?, durationMs }
 //   429 { status: "busy" }                                  already in flight
+//
+// Every response carries `Cache-Control: no-store` — a monitor must see each
+// run's real result, never a cached one.
 //
 // @see specs/scenarios/scenario-canary-healthcheck.feature
 secured
@@ -556,6 +563,11 @@ secured
     ),
   )
   .get("/scenarios", async (c) => {
+    // A monitor may poll this on an interval; a cached 200/503 would hide the
+    // next run's real result, so no response on any path is cacheable. Set once
+    // before the branches so every return below inherits it.
+    c.header("Cache-Control", "no-store");
+
     if (!c.req.header("authorization")) {
       return c.json(
         { message: "Authentication token is required." },
@@ -566,7 +578,15 @@ secured
       return c.json({ message: "Invalid auth token." }, { status: 403 });
     }
 
-    const result = await runScenarioHealthCanary();
+    const runPlanId = c.req.query("runPlanId")?.trim();
+    if (!runPlanId) {
+      return c.json(
+        { message: "runPlanId query parameter is required." },
+        { status: 400 },
+      );
+    }
+
+    const result = await runScenarioHealthCanary(runPlanId);
 
     if ("busy" in result) {
       return c.json({ status: "busy" }, { status: 429 });

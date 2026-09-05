@@ -22,19 +22,28 @@ Feature: A scenario canary health check that fires a real run and says what brok
   stall watchdog already reaps a stuck run to terminal ERROR, so nothing is
   orphaned by walking away from it.
 
-  A run that cannot even be launched — the launcher throws, or the server-side
-  canary config is missing or names a target type outside the simulation-target
-  union — is `run_failed`, reported inside the same 200/503/429 contract rather
-  than escaping as a raw 500. The config is validated up front, before any run
-  is queued.
+  The scenario and target the canary runs are not server-side config: they are
+  named per request by a `?runPlanId=<SimulationSuite id>` query parameter,
+  pointing at a run plan (a suite with kind `run_plan`) that holds exactly one
+  scenario and exactly one target. The plan's own row supplies the project, so
+  nothing else on the request can redirect the run. A request with no runPlanId
+  is a bad request (400) — distinct from a plan that does not resolve. A run
+  that cannot even be launched — the launcher throws, or the named run plan is
+  not found, or it does not hold exactly one scenario and one target — is
+  `run_failed`, reported inside the same 200/503/429 contract rather than
+  escaping as a raw 500. The run plan is validated up front, before any run is
+  queued.
 
   Auth is the shared `CRON_API_KEY` secret (`validateInternalSecret`), checked
   before any run is queued: a status-page poller has no user session and no
   project API key, only this one shared secret. The route is declared as an
   internal-secret endpoint, so the generated OpenAPI spec never advertises this
-  LLM-spend endpoint as needing no auth. A second request arriving while a
-  canary is already running starts no second LLM run — it is told the probe is
-  busy.
+  LLM-spend endpoint as needing no auth. A second request for the same run plan
+  arriving while its canary is already running starts no second LLM run — it is
+  told the probe is busy; the guard is keyed per run plan, so two monitors
+  probing two different plans never block each other. Every response carries
+  `Cache-Control: no-store`, so a monitor always sees the current run's result
+  rather than a cached one.
 
   # Bindings:
   #   platform/app/src/server/health-probes/scenario-canary.service.ts
@@ -128,11 +137,11 @@ Feature: A scenario canary health check that fires a real run and says what brok
     And the response is 200 with the queued scenarioRunId
 
   @integration
-  Scenario: Canary runs are confined to the dedicated canary project regardless of caller input
-    Given a request carrying the correct internal secret
+  Scenario: Canary runs are confined to the run plan's own project regardless of caller input
+    Given a request carrying the correct internal secret and a runPlanId
     When the scenario canary endpoint is called
-    Then the run is queued against the configured canary project id
-    And that project id is never taken from the caller's request
+    Then the run is queued against the project id held on that run plan
+    And that project id is never taken from any other value on the caller's request
 
   @unit
   Scenario: The probe abandons the retry once the total budget is spent
@@ -157,13 +166,54 @@ Feature: A scenario canary health check that fires a real run and says what brok
     And no raw error escapes the documented contract
 
   @unit
-  Scenario: A misconfigured canary reports unhealthy without launching a run
-    Given a canary config value is missing or names an unknown target type
-    When the config is validated
-    Then the config is rejected before any run is launched
+  Scenario: A misconfigured run plan reports unhealthy without launching a run
+    Given a run plan that is missing, or does not hold exactly one scenario and one target, or names an unknown target type
+    When the run plan is validated
+    Then the run plan is rejected before any run is launched
+
+  @integration
+  Scenario: A request with no runPlanId is a bad request
+    Given a request carrying the correct internal secret but no runPlanId
+    When the scenario canary endpoint is called
+    Then the response is 400
+    And no scenario run is queued
 
   @integration
   Scenario: The scenario canary route is declared internal-secret, never public
     Given the scenario canary route gates in-handler on the internal secret
     When its registered access policy is read
     Then the policy is declared internal-secret, not a public endpoint
+
+  @unit
+  Scenario: An archived run plan is rejected without launching a run
+    Given a runPlanId naming an archived but otherwise valid one-scenario one-target run plan
+    When the run plan is resolved
+    Then the run plan is rejected before any run is launched
+    And the outcome is unhealthy with reason "run_failed"
+
+  @unit
+  Scenario: A suite that is not a run plan is rejected without launching a run
+    Given a runPlanId naming a suite whose kind is not run_plan
+    When the run plan is resolved
+    Then the run plan is rejected before any run is launched
+    And the outcome is unhealthy with reason "run_failed"
+
+  @unit
+  Scenario: Two concurrent canaries for different run plans both start a run
+    Given a canary already in flight for one run plan
+    When a second canary is requested for a different run plan
+    Then both runs are started
+    And neither request is told the probe is busy
+
+  @integration
+  Scenario: A blank runPlanId is a bad request
+    Given a request carrying the correct internal secret and a blank or whitespace-only runPlanId
+    When the scenario canary endpoint is called
+    Then the response is 400
+    And no scenario run is queued
+
+  @integration
+  Scenario: Canary responses are never cacheable
+    Given a request carrying the correct internal secret
+    When the scenario canary endpoint returns any response
+    Then the response carries Cache-Control no-store

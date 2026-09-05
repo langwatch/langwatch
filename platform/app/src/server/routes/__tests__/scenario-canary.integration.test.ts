@@ -126,7 +126,7 @@ describe("GET /api/health/scenarios", () => {
       });
       const app = await getApp();
 
-      const res = await app.request("/api/health/scenarios", {
+      const res = await app.request("/api/health/scenarios?runPlanId=plan-1", {
         headers: { authorization: `Bearer ${SECRET}` },
       });
       const body = (await res.json()) as Record<string, unknown>;
@@ -137,6 +137,7 @@ describe("GET /api/health/scenarios", () => {
         scenarioRunId: "canary-run-abc",
         durationMs: 4200,
       });
+      expect(runScenarioHealthCanary).toHaveBeenCalledWith("plan-1");
     });
 
     it.each([
@@ -152,7 +153,7 @@ describe("GET /api/health/scenarios", () => {
       });
       const app = await getApp();
 
-      const res = await app.request("/api/health/scenarios", {
+      const res = await app.request("/api/health/scenarios?runPlanId=plan-1", {
         headers: { authorization: `Bearer ${SECRET}` },
       });
       const body = (await res.json()) as Record<string, unknown>;
@@ -166,7 +167,7 @@ describe("GET /api/health/scenarios", () => {
       runScenarioHealthCanary.mockResolvedValue({ busy: true });
       const app = await getApp();
 
-      const res = await app.request("/api/health/scenarios", {
+      const res = await app.request("/api/health/scenarios?runPlanId=plan-1", {
         headers: { authorization: `Bearer ${SECRET}` },
       });
       const body = (await res.json()) as Record<string, unknown>;
@@ -175,8 +176,74 @@ describe("GET /api/health/scenarios", () => {
       expect(body).toMatchObject({ status: "busy" });
     });
 
-    /** @scenario "Canary runs are confined to the dedicated canary project regardless of caller input" */
-    it("invokes the canary entrypoint with no caller-supplied project id, however the request is shaped", async () => {
+    /** @scenario "A request with no runPlanId is a bad request" */
+    it("responds 400 and queues no run when runPlanId is absent", async () => {
+      const app = await getApp();
+
+      const res = await app.request("/api/health/scenarios", {
+        headers: { authorization: `Bearer ${SECRET}` },
+      });
+
+      expect(res.status).toBe(400);
+      // A missing pointer is a bad request, distinct from the 503 a plan that
+      // does not resolve reports — the probe is never even invoked.
+      expect(runScenarioHealthCanary).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A blank runPlanId is a bad request" */
+    it.each([
+      ["empty", "?runPlanId="],
+      ["whitespace-only", "?runPlanId=%20%20"],
+    ])("responds 400 and queues no run when runPlanId is %s", async (_label, query) => {
+      const app = await getApp();
+
+      const res = await app.request(`/api/health/scenarios${query}`, {
+        headers: { authorization: `Bearer ${SECRET}` },
+      });
+
+      expect(res.status).toBe(400);
+      // A blank/whitespace pointer never reaches the DB — it is rejected
+      // exactly like an absent one, not passed through to a run plan lookup.
+      expect(runScenarioHealthCanary).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Canary responses are never cacheable" */
+    it("sets Cache-Control no-store on a healthy 200", async () => {
+      runScenarioHealthCanary.mockResolvedValue({
+        healthy: true,
+        scenarioRunId: "canary-run-abc",
+        durationMs: 1000,
+      });
+      const app = await getApp();
+
+      const res = await app.request("/api/health/scenarios?runPlanId=plan-1", {
+        headers: { authorization: `Bearer ${SECRET}` },
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("cache-control")).toBe("no-store");
+    });
+
+    /** @scenario "Canary responses are never cacheable" */
+    it("sets Cache-Control no-store on an unhealthy 503", async () => {
+      runScenarioHealthCanary.mockResolvedValue({
+        healthy: false,
+        reason: "run_failed",
+        scenarioRunId: "canary-run-abc",
+        durationMs: 9000,
+      });
+      const app = await getApp();
+
+      const res = await app.request("/api/health/scenarios?runPlanId=plan-1", {
+        headers: { authorization: `Bearer ${SECRET}` },
+      });
+
+      expect(res.status).toBe(503);
+      expect(res.headers.get("cache-control")).toBe("no-store");
+    });
+
+    /** @scenario "Canary runs are confined to the run plan's own project regardless of caller input" */
+    it("passes only the runPlanId to the entrypoint, never a caller-supplied project id", async () => {
       runScenarioHealthCanary.mockResolvedValue({
         healthy: true,
         scenarioRunId: "canary-run-abc",
@@ -185,15 +252,15 @@ describe("GET /api/health/scenarios", () => {
       const app = await getApp();
 
       await app.request(
-        "/api/health/scenarios?projectId=some-customer-project-id",
+        "/api/health/scenarios?runPlanId=plan-1&projectId=some-customer-project-id",
         { headers: { authorization: `Bearer ${SECRET}` } },
       );
 
-      // The entrypoint takes no arguments at all — the canary project id is
-      // resolved entirely from server-side config, never from the request,
+      // The entrypoint is handed the runPlanId and nothing else — the canary
+      // project id comes from the run plan's own row, never from the request,
       // so no query/body value can redirect a canary run into a customer
       // project.
-      expect(runScenarioHealthCanary).toHaveBeenCalledWith();
+      expect(runScenarioHealthCanary).toHaveBeenCalledWith("plan-1");
     });
   });
 });

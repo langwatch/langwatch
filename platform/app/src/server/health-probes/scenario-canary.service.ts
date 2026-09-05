@@ -16,10 +16,11 @@
  *    reads its queue/poll boundary and its clock from injected
  *    {@link ScenarioCanaryDeps}.
  *  - {@link createSingleFlightScenarioCanary} wraps the orchestrator so a
- *    second call while one is in flight starts no second run.
+ *    second call for the same run plan while one is in flight starts no second
+ *    run — a different run plan is unaffected.
  *  - {@link runScenarioHealthCanary} is the production entrypoint the route
- *    crosses: it validates the server-side config, builds the real deps and
- *    drives the single-flight guard.
+ *    crosses: it looks up the run plan named by `?runPlanId=`, validates it,
+ *    builds the real deps and drives the single-flight guard.
  *
  * Two failure modes the injected clock alone cannot bound are handled with a
  * real timer instead: a boundary await (`queueRun` / `getScenarioRunData`) that
@@ -37,7 +38,6 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { env } from "~/env.mjs";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { launchScenarioRun } from "~/server/scenarios/launch-scenario-run.service";
@@ -48,10 +48,8 @@ import {
   Verdict,
 } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioResults } from "~/server/scenarios/schemas/event-schemas";
-import {
-  type SimulationTarget,
-  simulationTargetSchema,
-} from "~/server/scenarios/simulation-target";
+import type { SimulationTarget } from "~/server/scenarios/simulation-target";
+import { parseSuiteTargets } from "~/server/suites/types";
 
 const logger = createLogger("langwatch:scenario-canary");
 
@@ -267,21 +265,23 @@ export async function runScenarioCanary(
 
 /**
  * Wraps an orchestrator so that while one canary run is in flight, a concurrent
- * call starts no second run and is told the probe is busy instead. In-process
- * only — one guard per process, which is enough for a probe polled every few
- * minutes.
+ * call for the SAME run plan starts no second run and is told the probe is busy
+ * instead. The guard is keyed by run plan id, not global: two monitors probing
+ * two different plans must not deadlock each other — only a duplicate poll of
+ * the same plan is deduped. In-process only, which is enough for a probe polled
+ * every few minutes.
  */
 export function createSingleFlightScenarioCanary(
   run: (deps: ScenarioCanaryDeps) => Promise<CanaryOutcome>,
-): (deps: ScenarioCanaryDeps) => Promise<CanaryResult> {
-  let inFlight: Promise<CanaryOutcome> | null = null;
+): (key: string, deps: ScenarioCanaryDeps) => Promise<CanaryResult> {
+  const inFlight = new Map<string, Promise<CanaryOutcome>>();
 
-  return (deps) => {
-    if (inFlight) return Promise.resolve({ busy: true });
+  return (key, deps) => {
+    if (inFlight.has(key)) return Promise.resolve({ busy: true });
     const attempt = run(deps).finally(() => {
-      inFlight = null;
+      inFlight.delete(key);
     });
-    inFlight = attempt;
+    inFlight.set(key, attempt);
     return attempt;
   };
 }
@@ -297,48 +297,56 @@ export interface CanaryConfig {
 }
 
 /**
- * Validates the four server-side config values the canary needs BEFORE any run
- * is launched, so a misconfiguration reports a clear unhealthy reason instead
- * of dying deep inside the launch prefetch. The target type is parsed against
- * the real {@link simulationTargetSchema} union rather than cast past the type
- * system, so an unknown type is caught here.
+ * Validates the run plan the canary is pointed at BEFORE any run is launched,
+ * so a misconfiguration reports a clear unhealthy reason instead of dying deep
+ * inside the launch prefetch. This probe only ever launches and polls ONE
+ * scenario run, so a plan is valid only when it names exactly one scenario and
+ * exactly one target; a plan carrying more of either is a misconfiguration for
+ * this probe and is rejected rather than silently running the first of many.
+ *
+ * Pure and id-less like the config parser it replaces: the caller logs which
+ * run plan id was invalid, this function only says how. The targets are parsed
+ * against the real {@link parseSuiteTargets} schema rather than cast past the
+ * type system, so an unknown target type is caught here.
  */
-export function parseCanaryConfig(raw: {
-  projectId: string | undefined;
-  scenarioId: string | undefined;
-  targetType: string | undefined;
-  referenceId: string | undefined;
-}): CanaryConfig | { invalid: string } {
-  const { projectId, scenarioId, referenceId } = raw;
-  const parsedType = simulationTargetSchema.shape.type.safeParse(
-    raw.targetType ?? "prompt",
-  );
-  const missing = [
-    !projectId && "SCENARIO_CANARY_PROJECT_ID",
-    !scenarioId && "SCENARIO_CANARY_SCENARIO_ID",
-    !referenceId && "SCENARIO_CANARY_TARGET_ID",
-    !parsedType.success && "SCENARIO_CANARY_TARGET_TYPE",
-  ].filter((entry): entry is string => Boolean(entry));
-
-  if (!projectId || !scenarioId || !referenceId || !parsedType.success) {
-    return { invalid: `scenario canary misconfigured: ${missing.join(", ")}` };
+export function parseRunPlanConfig(
+  suite: { projectId: string; scenarioIds: string[]; targets: unknown } | null,
+): CanaryConfig | { invalid: string } {
+  if (!suite) {
+    return { invalid: "run plan not found" };
   }
-
+  if (suite.scenarioIds.length !== 1) {
+    return { invalid: "run plan must have exactly one scenario" };
+  }
+  let targets: SimulationTarget[] | null;
+  try {
+    targets = parseSuiteTargets(suite.targets);
+  } catch {
+    targets = null;
+  }
+  if (targets?.length !== 1) {
+    return { invalid: "run plan must have exactly one target" };
+  }
+  const target = targets[0]!;
   return {
-    projectId,
-    scenarioId,
-    target: { type: parsedType.data, referenceId },
+    projectId: suite.projectId,
+    scenarioId: suite.scenarioIds[0]!,
+    target: { type: target.type, referenceId: target.referenceId },
   };
 }
 
-/** Reads and validates the canary config off server-side env. */
-function resolveCanaryConfig(): CanaryConfig | { invalid: string } {
-  return parseCanaryConfig({
-    projectId: env.SCENARIO_CANARY_PROJECT_ID,
-    scenarioId: env.SCENARIO_CANARY_SCENARIO_ID,
-    targetType: env.SCENARIO_CANARY_TARGET_TYPE,
-    referenceId: env.SCENARIO_CANARY_TARGET_ID,
+/** Reads and validates the canary config off the named run plan's suite row. */
+async function resolveCanaryConfigFromRunPlan(
+  runPlanId: string,
+): Promise<CanaryConfig | { invalid: string }> {
+  const suite = await prisma.simulationSuite.findFirst({
+    // `kind: "run_plan"` and `archivedAt: null` are load-bearing filters, not
+    // conveniences: a 1×1 `test_suite` or an archived plan would otherwise
+    // launch a real run the operator meant to retire. Filtering in the query
+    // keeps that decision in one place instead of re-checking it after the read.
+    where: { id: runPlanId, archivedAt: null, kind: "run_plan" },
   });
+  return parseRunPlanConfig(suite);
 }
 
 /**
@@ -374,27 +382,37 @@ export function buildProductionDeps(config: CanaryConfig): ScenarioCanaryDeps {
 }
 
 /**
- * The one guard for the whole process: a second request while a canary is in
- * flight starts no new run.
+ * The process-wide guard, keyed per run plan: a second request for a plan
+ * already in flight starts no new run, while a different plan runs freely.
  */
 const singleFlightCanary = createSingleFlightScenarioCanary(runScenarioCanary);
 
 /**
- * The route's single entrypoint. Takes no arguments — the canary project,
- * scenario, target and model are resolved entirely from server-side config, so
- * no value on the caller's request can redirect a canary run into a customer
- * project. A misconfiguration reports unhealthy `run_failed` without launching
- * anything.
+ * The route's single entrypoint. Takes the id of the run plan (a
+ * `SimulationSuite` with `kind: "run_plan"`) the canary is pointed at. The
+ * canary project, scenario and target all come from that plan's own row — never
+ * from any other value on the caller's request — so pointing at a plan cannot
+ * redirect a run into a customer project the plan does not own. A missing
+ * runPlanId or a plan that does not resolve to exactly one scenario and one
+ * target reports unhealthy `run_failed` without launching anything.
  */
-export async function runScenarioHealthCanary(): Promise<CanaryResult> {
-  logger.info("Running scenario canary health check");
-  const config = resolveCanaryConfig();
-  if ("invalid" in config) {
+export async function runScenarioHealthCanary(
+  runPlanId: string | undefined,
+): Promise<CanaryResult> {
+  logger.info({ runPlanId }, "Running scenario canary health check");
+  if (!runPlanId) {
     logger.error(
-      { reason: config.invalid },
-      "Scenario canary misconfigured; reporting unhealthy without launching a run",
+      "Scenario canary called with no runPlanId; reporting unhealthy without launching a run",
     );
     return { healthy: false, reason: "run_failed", durationMs: 0 };
   }
-  return singleFlightCanary(buildProductionDeps(config));
+  const config = await resolveCanaryConfigFromRunPlan(runPlanId);
+  if ("invalid" in config) {
+    logger.error(
+      { runPlanId, reason: config.invalid },
+      "Scenario canary run plan invalid; reporting unhealthy without launching a run",
+    );
+    return { healthy: false, reason: "run_failed", durationMs: 0 };
+  }
+  return singleFlightCanary(runPlanId, buildProductionDeps(config));
 }
