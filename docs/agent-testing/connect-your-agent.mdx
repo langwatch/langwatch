@@ -278,10 +278,10 @@ langwatch scenario create 'Order status question' \
   --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate" \
   --test-suite 'Smoke'
 
-langwatch test-suite run 'Smoke' --target connected:support-agent@development --wait
+langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 ```
 
-- `--target connected:<name>@<environment>` names the agent by identity. `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints both.
+- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id.
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
@@ -293,8 +293,8 @@ When the first run is green and the agent declares a parameter with an option li
 
 ```bash
 langwatch run-plan run --test-suite 'Smoke' \
-  --target 'connected:support-agent@development?model=gpt-5' \
-  --target 'connected:support-agent@development?model=gpt-5-mini' \
+  --target 'connected:support-agent?model=gpt-5' \
+  --target 'connected:support-agent?model=gpt-5-mini' \
   --name 'Smoke: model comparison' --format json
 ```
 
@@ -579,13 +579,13 @@ The agent appears on the **Agents** page with a green **Online** mark, its envir
 langwatch agent list
 ```
 
-Run a test suite against it by name and environment:
+Run a test suite against it by name:
 
 ```bash
-langwatch test-suite run 'Smoke' --target connected:support-agent@development --wait
+langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 ```
 
-`connected:<agent-id>` is the same target. `langwatch agent list --format json` prints both forms.
+`connected:<name>` runs the agent in `development`. When no process is connected there but one other environment is online, the run uses that one. When several are online, or none, the run is refused with `agent_environment_unresolved` and names them: pick one as `connected:<name>@<environment>`. `connected:<agent-id>` is the same target, and `langwatch agent list --format json` prints the id.
 
 ## What the agent receives
 
@@ -853,7 +853,7 @@ The decorator never stops the application from starting. Every problem is one wa
 
     | Option | Default | Effect |
     |---|---|---|
-    | `name` | required | The agent's name, and the first half of a `connected:<name>@<environment>` target. |
+    | `name` | required | The agent's name, and the `connected:<name>` target. |
     | `environment` | resolved, see above | Which environment row this process registers under. |
     | `parameters` | read from the signature | An explicit parameter declaration that replaces what the signature declares. |
     | `enabled` | `True`, `False` under `CI` | Whether this process connects at all. Takes any boolean, and replaces the `CI` default rather than adding to it. |
@@ -872,7 +872,7 @@ The decorator never stops the application from starting. Every problem is one wa
 
     | Option | Default | Effect |
     |---|---|---|
-    | `name` | required | The agent's name, and the first half of a `connected:<name>@<environment>` target. |
+    | `name` | required | The agent's name, and the `connected:<name>` target. |
     | `environment` | resolved, see above | Which environment row this process registers under. |
     | `parameters` | none | A zod schema, a definition map, or a JSON Schema object. |
     | `enabled` | `true`, `false` under `CI` | Whether this process connects at all. Takes any boolean, and replaces the `CI` default rather than adding to it. |

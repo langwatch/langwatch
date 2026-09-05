@@ -99,28 +99,24 @@ for file in "${FILES[@]}"; do
 
   # Blank out code fences (including indented ones, up to 3 spaces per the
   # CommonMark spec) and founder-decision exemptions. Print blank lines for
-  # skipped records so grep -n reports the real source line number. A fence
-  # closes only on a fence of the same character at least as long as the one
-  # that opened it, so a four-backtick block that quotes three-backtick fences
-  # stays one block.
+  # skipped records so grep -n reports the real source line number.
+  #
+  # A block opened with N fence characters closes only on a line of at least N
+  # of the same character with nothing after it, so a shorter or labelled fence
+  # inside it is content. Toggling on every fence line instead inverts the state
+  # for the rest of a page that nests fences, and everything after it reads as
+  # prose.
   cleaned=$(awk '
-    function fence_length(line,    m) {
-      m = line
-      sub(/^ {0,3}/, "", m)
-      match(m, /^(`+|~+)/)
-      return RLENGTH
-    }
-    function fence_char(line,    m) {
-      m = line
-      sub(/^ {0,3}/, "", m)
-      return substr(m, 1, 1)
-    }
     /^ {0,3}(`{3,}|~{3,})/ {
+      line = $0
+      sub(/^ {0,3}/, "", line)
+      char = substr(line, 1, 1)
+      length_ = 0
+      while (substr(line, length_ + 1, 1) == char) length_++
+      rest = substr(line, length_ + 1)
       if (!in_code) {
-        in_code = 1
-        open_char = fence_char($0)
-        open_length = fence_length($0)
-      } else if (fence_char($0) == open_char && fence_length($0) >= open_length) {
+        in_code = 1; fence_char = char; fence_length = length_
+      } else if (char == fence_char && length_ >= fence_length && rest ~ /^[[:space:]]*$/) {
         in_code = 0
       }
       print ""; next
@@ -152,22 +148,37 @@ for file in "${FILES[@]}"; do
 
   # Paragraph length. Frontmatter, headings, tables, JSX tags, imports and
   # blank lines end a paragraph and are not counted; everything else is prose.
+  # A heading may carry up to three leading spaces, and a table may be written
+  # without its outer pipes, in which case the separator row is what identifies
+  # it and the header row above it has to be taken back out of the count.
   long=$(echo "$cleaned" | awk -v max="$MAX_PARAGRAPH_WORDS" '
     function flush() {
       if (words > max) printf "%d\t%d\n", start, words
-      words = 0; start = 0
+      words = 0; start = 0; last = 0
     }
     NR == 1 && /^---$/   { in_front = 1; next }
     in_front && /^---$/  { in_front = 0; next }
     in_front             { next }
     /^[[:space:]]*$/     { flush(); next }
-    /^#/                 { flush(); next }
+    /^ {0,3}#/           { flush(); next }
     /^[[:space:]]*[|<]/  { flush(); next }
     /^import /           { flush(); next }
-    /^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]/ { flush(); start = NR; words = NF; next }
+    /^[[:space:]]*:?-+[-:|[:space:]]*\|[-:|[:space:]]*$/ {
+      words -= last
+      if (words <= 0) { words = 0; start = 0 }
+      last = 0
+      in_table = 1
+      next
+    }
+    in_table && /\|/     { next }
+    in_table             { in_table = 0 }
+    /^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]/ {
+      flush(); start = NR; words = NF - 1; last = words; next
+    }
     {
       if (words == 0) start = NR
       words += NF
+      last = NF
     }
     END { flush() }
   ')

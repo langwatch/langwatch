@@ -199,10 +199,10 @@ langwatch scenario create 'Order status question' \
   --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate" \
   --test-suite 'Smoke'
 
-langwatch test-suite run 'Smoke' --target connected:support-agent@development --wait
+langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 ```
 
-- `--target connected:<name>@<environment>` names the agent by identity. `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints both.
+- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id.
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
@@ -214,8 +214,8 @@ When the first run is green and the agent declares a parameter with an option li
 
 ```bash
 langwatch run-plan run --test-suite 'Smoke' \
-  --target 'connected:support-agent@development?model=gpt-5' \
-  --target 'connected:support-agent@development?model=gpt-5-mini' \
+  --target 'connected:support-agent?model=gpt-5' \
+  --target 'connected:support-agent?model=gpt-5-mini' \
   --name 'Smoke: model comparison' --format json
 ```
 

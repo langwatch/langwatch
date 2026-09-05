@@ -5,9 +5,11 @@ keywords: langwatch, optimization algorithms, dspy optimizers, gepa, miprov2, co
 description: What each optimization algorithm changes, what it needs, how many suite runs it costs, and when to use it.
 ---
 
-Every algorithm below takes a program, a set of examples and a metric, and returns the program with better text in it. With a scenario suite as the metric, one metric call is one simulated conversation, which is why the number of metric calls is the cost that matters in the table. The guided loop is listed first because it is the one to start with: it changes code and tools, and no algorithm does that.
+On this page we show which algorithm to pick for improving your agent, from the guided loop to the DSPy optimizers, when the metric is a scenario suite.
 
-## The table
+The metric is what sets the cost: every metric call is one simulated conversation, so an optimizer that plans hundreds of calls costs hundreds of conversations. The table counts those calls on the six-scenario example of [Optimize with DSPy](/improve-your-agent/optimize-with-dspy).
+
+## Algorithms side by side
 
 | Algorithm | Changes | Needs | Metric calls on 6 scenarios | Tracked in LangWatch | Use when |
 |---|---|---|---|---|---|
@@ -16,21 +18,21 @@ Every algorithm below takes a program, a set of examples and a metric, and retur
 | BootstrapFewShotWithRandomSearch | Same, and searches over sets of examples | A metric | 50 to 100 | Yes | Few-shot examples help and you can afford the search |
 | COPRO | Rewrites the instructions, breadth-first then depth-first | A metric | About 50 with `breadth=3, depth=2` | Yes | Instructions only, on a small budget |
 | MIPROv2 | Proposes instructions and few-shot sets, then searches over the combinations | A metric | 52 zero-shot with `num_candidates=4, num_trials=6`: 10 to bootstrap, 42 over seven full evaluations. 42 minutes and $0.93 on the example | Yes | The default choice for instructions, with or without examples |
-| GEPA | Rewrites the instructions from text feedback, keeps a Pareto front of candidates | A metric that returns a score and feedback text | Set `max_metric_calls`: 48 took 51 runs, 31 minutes and $0.64 on the example | Through the callback in the example | The judge's reasoning is the feedback, which is the scenario case |
+| GEPA | Rewrites the instructions from text feedback, keeps a Pareto front of candidates | A metric that returns a score and feedback text | Set `max_metric_calls`: 48 took 51 runs, 31 minutes and $0.64 on the example | Yes | The judge's reasoning is the feedback, which is the scenario case |
 | SIMBA | Rewrites instructions and examples from self-reflection over mini-batches | A metric | About 60 with `max_steps=4` | No | Larger example sets, where mini-batches pay off |
 
 The instruction optimizers above (COPRO, MIPROv2, GEPA, SIMBA) rewrite the instructions of every predictor in the program, and on a `dspy.ReAct` program the instructions contain the tool descriptions, so those optimizers change the tools as well. `BootstrapFewShot` and `BootstrapFewShotWithRandomSearch` leave the instructions alone and only add demonstrations. See [Optimize with DSPy](/improve-your-agent/optimize-with-dspy).
 
-## Which one
+## Which algorithm to pick
 
 - **Start with the guided loop.** Most of the turns in a long conversation come from a tool contract or a harness setting, and an algorithm cannot change either, while one hypothesis in the guided loop costs one suite run.
-- **GEPA when the metric returns text feedback.** A scenario judge writes why a candidate failed, and GEPA's reflection reads that text and proposes the next candidate from it, without you reviewing each step.
-- **MIPROv2 when the metric is a number.** An evaluator that returns a score with no reasoning, or a dataset with expected outputs, fits MIPROv2, and LangWatch tracks every trial of it.
+- **GEPA when the metric returns text feedback.** The scenario judge writes why a candidate failed, and GEPA's reflection reads that text and proposes the next candidate from it, without you reviewing each step.
+- **MIPROv2 when the metric is a number.** Use MIPROv2 with an evaluator that returns a score and no reasoning, or with a dataset of expected outputs; LangWatch tracks every trial.
 - **COPRO on a small budget**, when you want the instructions rewritten in a few calls and have no examples to add.
 - **BootstrapFewShot when the format is the problem**, meaning the instructions are right and the model gets the shape of the answer wrong.
 
 ## Tracking a run
 
-`langwatch.dspy.init(experiment=..., optimizer=optimizer)` records every trial of a tracked optimizer in **Experiments**, with the score, the instructions of each predictor and the examples it chose. For an optimizer without a tracked class, the [custom optimizer](/dspy-visualization/custom-optimizer) page shows how to log a step yourself.
+`langwatch.dspy.init(experiment=..., optimizer=optimizer)` records every trial of a tracked optimizer in **Experiments**, with the score, the instructions of each predictor and the examples it chose. The tracked optimizers are BootstrapFewShot, BootstrapFewShotWithRandomSearch, COPRO, MIPROv2 and GEPA. For any other optimizer, the [custom optimizer](/dspy-visualization/custom-optimizer) page shows how to log a step yourself.
 
 <Info>**Also check:** [Improve your agent](/improve-your-agent/overview) (the loop the algorithms run inside), [DSPy visualization](/dspy-visualization/quickstart), [Prompt optimization with Langy](/langy/prompt-optimization).</Info>

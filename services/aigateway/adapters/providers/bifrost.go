@@ -1207,6 +1207,13 @@ type account struct {
 	// logger is passed to credentialToBifrostKey for the dropped
 	// api_version warning. May be nil.
 	logger *zap.Logger
+	// warnedAzureAPIVersionIDs tracks credential IDs that have already
+	// logged the dropped-api_version warning, so a long-lived account
+	// (dispatched to concurrently by bifrost's worker pool) warns at most
+	// once per credential rather than once per dispatch. Bounded by the
+	// number of distinct Azure credential IDs seen over this process's
+	// lifetime, not by request volume.
+	warnedAzureAPIVersionIDs sync.Map
 }
 
 func (a *account) GetConfiguredProviders() ([]bfschemas.ModelProvider, error) {
@@ -1218,8 +1225,27 @@ func (a *account) GetKeysForProvider(ctx context.Context, provider bfschemas.Mod
 	if cred.ID == "" {
 		return nil, fmt.Errorf("no credential on context for provider %s", provider)
 	}
-	key := credentialToBifrostKey(cred, provider, a.logger)
+	key := credentialToBifrostKey(cred, provider, a.azureAPIVersionWarnLogger(cred))
 	return []bfschemas.Key{key}, nil
+}
+
+// azureAPIVersionWarnLogger returns the account's logger only on the first
+// sight of a credential that carries an api-version override, and nil
+// thereafter. GetKeysForProvider sits on bifrost's per-request key-selection
+// path, so without this a static configuration fact would be logged on every
+// dispatch. LoadOrStore is the atomic check-and-set: exactly one of a set of
+// concurrent first dispatches keeps the logger. Suppressing by nil-ing the
+// logger is only sound while credentialToBifrostKey uses it for that one
+// warning — if it ever logs anything else, move this dedup into
+// warnIgnoredAzureAPIVersion instead.
+func (a *account) azureAPIVersionWarnLogger(cred domain.Credential) *zap.Logger {
+	if cred.Extra["api_version"] == "" {
+		return a.logger
+	}
+	if _, alreadyWarned := a.warnedAzureAPIVersionIDs.LoadOrStore(cred.ID, struct{}{}); alreadyWarned {
+		return nil
+	}
+	return a.logger
 }
 
 // ProviderRequestTimeoutSeconds is the gateway-wide upstream request timeout,
@@ -1305,9 +1331,6 @@ func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfsch
 	return cfg, nil
 }
 
-// credentialToBifrostKey converts a domain.Credential into bifrost's Key
-// format. logger may be nil (e.g. bare tests); used only to warn on a
-// dropped api_version override.
 // warnIgnoredAzureAPIVersion logs when a caller supplied an Azure api_version
 // override that bifrost v1.5 no longer forwards. logger may be nil.
 func warnIgnoredAzureAPIVersion(cred domain.Credential, logger *zap.Logger) {
@@ -1317,6 +1340,9 @@ func warnIgnoredAzureAPIVersion(cred domain.Credential, logger *zap.Logger) {
 	}
 }
 
+// credentialToBifrostKey converts a domain.Credential into bifrost's Key
+// format. logger may be nil (e.g. bare tests); used only to warn on a
+// dropped api_version override.
 func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProvider, logger *zap.Logger) bfschemas.Key {
 	k := bfschemas.Key{
 		ID:     cred.ID,

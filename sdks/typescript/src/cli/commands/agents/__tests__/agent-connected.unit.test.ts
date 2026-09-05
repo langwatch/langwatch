@@ -313,10 +313,13 @@ describe("the agent command help", () => {
   });
 
   /** @scenario "The target help names the connected forms" */
-  it("names connected:<id> and connected:<name>@<environment> in the target help", () => {
+  it("names connected:<name> first, then connected:<name>@<environment> and connected:<id>, in the target help", () => {
     const targetHelp = program.slice(program.indexOf("const TARGET_FLAG_HELP"), program.indexOf("const RUN_NAME_FLAG_HELP"));
-    expect(targetHelp).toContain("connected:agent_abc123");
+    expect(targetHelp).toContain("connected:support-agent.");
+    expect(targetHelp).toContain("connected:<name> runs the agent in development");
     expect(targetHelp).toContain("connected:<name>@<environment>");
+    expect(targetHelp).toContain("connected:<id>");
+    expect(targetHelp.indexOf("connected:<name>")).toBeLessThan(targetHelp.indexOf("connected:<id>"));
   });
 });
 
