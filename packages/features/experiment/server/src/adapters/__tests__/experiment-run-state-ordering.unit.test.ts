@@ -20,14 +20,14 @@ import { describe, expect, it } from "vitest";
 import {
   EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_EVENT_VERSIONS,
-} from "../eventing.experiment-run-event-types.adapter";
+} from "../../rules/experiment-run-event-types.rules";
 import type {
   EvaluatorResultEvent,
   ExperimentRunCompletedEvent,
   ExperimentRunProcessingEvent,
   ExperimentRunStartedEvent,
   TargetResultEvent,
-} from "../eventing.experiment-run-events.adapter";
+} from "../../processes/experiment-run-events.process";
 import {
   type ExperimentRunStateData,
   ExperimentRunStateFoldProjection,
@@ -187,7 +187,7 @@ function eventLabel(e: ExperimentRunProcessingEvent): string {
 
 describe("experiment run fold — event ordering invariants", () => {
   const store = createReplacingMergeTreeStore();
-  const projection = new ExperimentRunStateFoldProjection({ store });
+  const projection = ExperimentRunStateFoldProjection.create({ store });
 
   function assertCorrectFinalState(state: ExperimentRunStateData, label: string) {
     expect(state.FinishedAt, `${label}: FinishedAt must be set`).not.toBeNull();

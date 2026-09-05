@@ -1,5 +1,5 @@
 /**
- * Tests executeConnectedCell: running a connected agent as a workbench column.
+ * Tests ExperimentRunOrchestratorService.executeConnectedCell: running a connected agent as a workbench column.
  *
  * The relay dispatcher is injected, so the turn is scripted rather than sent
  * to a real process, and the studio port is a fake that replays scripted
@@ -22,13 +22,12 @@ import type { EvaluationsV3State, TargetConfig } from "@langwatch/experiment-con
 import { createInitialResults, createInitialUIState } from "@langwatch/experiment-contract";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { CallOutcome } from "@langwatch/agent-contract";
-import { AgentBusyError, AgentOfflineError } from "@langwatch/agent-contract";
+import { AgentBusyError, AgentOfflineError, AgentOwnerOnlyError } from "@langwatch/agent-contract";
 import {
   type ConnectedDispatch,
-  executeConnectedCell,
+  ExperimentRunOrchestratorService,
   type ExperimentRunPorts,
   type OrchestratorInput,
-  runOrchestrator,
 } from "../experiment-run-orchestrator.service";
 import type { EvaluationV3Event, ExecutionCell } from "@langwatch/experiment-contract";
 
@@ -147,7 +146,7 @@ const run = async ({
   now?: () => number;
 }): Promise<EvaluationV3Event[]> => {
   const events: EvaluationV3Event[] = [];
-  for await (const event of executeConnectedCell({
+  for await (const event of ExperimentRunOrchestratorService.executeConnectedCell({
     cell,
     projectId: "p1",
     agent,
@@ -319,7 +318,7 @@ describe("given a connected agent column", () => {
     it("fails the row with the busy code once the budget ends", async () => {
       const events: EvaluationV3Event[] = [];
       let clock = 0;
-      for await (const event of executeConnectedCell({
+      for await (const event of ExperimentRunOrchestratorService.executeConnectedCell({
         cell: makeCell(),
         projectId: "p1",
         agent,
@@ -388,6 +387,25 @@ describe("given a personal development agent of another person", () => {
     ownerUserId: "user_someone_else",
   } as unknown as typeof agent;
 
+  /**
+   * The rule itself lives in the Suite feature and is composed onto this port
+   * in apps/api. What this file pins is the seam: the run hands the port every
+   * loaded agent and whoever started it, and refuses on the port's refusal
+   * before a single cell exists.
+   */
+  const assertRunnable = vi.fn(async () => {
+    throw new AgentOwnerOnlyError({
+      agentId: "agent_1",
+      agentName: "Support",
+      ownerUserId: "user_someone_else",
+      ownerName: null,
+    });
+  });
+  const ownershipPorts = {
+    ...ports,
+    connectedAgentOwnership: { assertRunnable },
+  } as unknown as ExperimentRunPorts;
+
   const stateWithConnectedTarget = (): EvaluationsV3State => ({
     name: "Evaluation",
     datasets: [{ id: "dataset-1", name: "Dataset" } as EvaluationsV3State["datasets"][0]],
@@ -407,7 +425,7 @@ describe("given a personal development agent of another person", () => {
     datasetColumns: [{ id: "col_1", name: "question", type: "string" }],
     loadedPrompts: new Map(),
     loadedAgents: new Map([["agent_1", personalAgent]]),
-    ports,
+    ports: ownershipPorts,
     workflows,
     defaultConcurrency: 1,
     ...(actor ? { actor } : {}),
@@ -418,12 +436,18 @@ describe("given a personal development agent of another person", () => {
     it("refuses the run with the owner-only code", async () => {
       const events: EvaluationV3Event[] = [];
       await expect(async () => {
-        for await (const event of runOrchestrator(inputFor({ id: "user_me", label: "user" }))) {
+        for await (const event of ExperimentRunOrchestratorService.runOrchestrator(
+          inputFor({ id: "user_me", label: "user" }),
+        )) {
           events.push(event);
         }
       }).rejects.toMatchObject({ code: "agent_owner_only" });
 
       expect(events).toEqual([]);
+      expect(assertRunnable).toHaveBeenCalledWith({
+        agents: [personalAgent],
+        actor: { id: "user_me", label: "user" },
+      });
     });
   });
 
@@ -431,10 +455,16 @@ describe("given a personal development agent of another person", () => {
     /** @scenario "Another person's development agent is refused" */
     it("refuses it too", async () => {
       await expect(async () => {
-        for await (const event of runOrchestrator(inputFor(undefined))) {
+        for await (const event of ExperimentRunOrchestratorService.runOrchestrator(
+          inputFor(undefined),
+        )) {
           void event;
         }
       }).rejects.toMatchObject({ code: "agent_owner_only" });
+      expect(assertRunnable).toHaveBeenCalledWith({
+        agents: [personalAgent],
+        actor: undefined,
+      });
     });
   });
 });

@@ -6,7 +6,7 @@
  * follow a run it had just started. The streaming route mirrors the run into
  * the same run-state store the polling runner writes, so a browser run and a
  * CI run are readable the same way. This exercises the real
- * `createRunStateMirror`, wired to a fake `progress` port, rather than
+ * `ExperimentRunStateMirrorService`, wired to a fake `progress` port, rather than
  * stubbing the mirror away.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
@@ -17,25 +17,29 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const orchestratorEvents = vi.hoisted(() => ({ events: [] as unknown[] }));
 
 vi.mock("../../../services/experiment-run-orchestrator.service", () => ({
-  requestAbort: vi.fn(),
-  runOrchestrator: vi.fn(async function* () {
-    for (const event of orchestratorEvents.events) yield event;
-  }),
+  ExperimentRunOrchestratorService: {
+    requestAbort: vi.fn(),
+    runOrchestrator: vi.fn(async function* () {
+      for (const event of orchestratorEvents.events) yield event;
+    }),
+  },
 }));
 
 vi.mock("../../../services/experiment-execution-data.service", () => ({
-  loadExecutionData: vi.fn(async () => ({
-    datasetRows: [{ input: "one" }],
-    datasetColumns: [{ id: "input", name: "input", type: "string" }],
-    loadedPrompts: new Map(),
-    loadedAgents: new Map(),
-    loadedEvaluators: new Map(),
-    loadedWorkflows: new Map(),
-  })),
+  ExperimentExecutionDataService: {
+    loadExecutionData: vi.fn(async () => ({
+      datasetRows: [{ input: "one" }],
+      datasetColumns: [{ id: "input", name: "input", type: "string" }],
+      loadedPrompts: new Map(),
+      loadedAgents: new Map(),
+      loadedEvaluators: new Map(),
+      loadedWorkflows: new Map(),
+    })),
+  },
 }));
 
 vi.mock("../../../services/experiment-run-results-writer.service", () => ({
-  runResultsWriterFor: () => undefined,
+  ExperimentRunResultsWriterService: { writerFor: () => undefined },
 }));
 
 import { createExperimentV3RestApp } from "../experiment-v3.api";

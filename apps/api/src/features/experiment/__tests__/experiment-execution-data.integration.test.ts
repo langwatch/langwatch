@@ -1,5 +1,9 @@
 /**
- * Integration tests for loadExecutionData against the real database.
+ * Integration tests for the execution-data load against the real database.
+ *
+ * Composed here rather than inside the Experiment feature package: the load
+ * reads prompts through the Prompt feature's own server adapter, and no
+ * feature server package may import another's.
  *
  * Regression coverage for: a workflow built in Optimization Studio and saved
  * as an agent (agent.type === "workflow") has no code of its own — it only
@@ -32,12 +36,10 @@ import type { DatasetService } from "@langwatch/dataset-contract";
 import type { Evaluator, EvaluatorService } from "@langwatch/evaluator-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import { PostgresPromptAdapter } from "@langwatch/prompt-server";
-import type { ExperimentWorkflowDslPort } from "../../ports/experiment-workflow-dsl.port";
 import {
-  loadExecutionData,
-  promptLoadKey,
-  workflowLoadKey,
-} from "../experiment-execution-data.service";
+  ExperimentExecutionDataService,
+  type ExperimentWorkflowDslPort,
+} from "@langwatch/experiment-server";
 
 /**
  * This suite writes and reads the rows itself and does not exercise
@@ -249,7 +251,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       });
       cleanupAgentIds.push(agent.id);
 
-      const result = await loadExecutionData(
+      const result = await ExperimentExecutionDataService.loadExecutionData(
         PROJECT_ID,
         {
           type: "inline",
@@ -265,7 +267,9 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
         throw new Error(`loadExecutionData failed: ${result.error}`);
       }
 
-      const loadedWorkflow = result.loadedWorkflows.get(workflowLoadKey({ workflowId }));
+      const loadedWorkflow = result.loadedWorkflows.get(
+        ExperimentExecutionDataService.workflowLoadKey({ workflowId }),
+      );
       expect(loadedWorkflow).toBeDefined();
       expect(loadedWorkflow?.id).toBe(workflowId);
       expect(loadedWorkflow?.versionId).toBe(versionId);
@@ -301,7 +305,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       });
       cleanupAgentIds.push(agent.id);
 
-      const result = await loadExecutionData(
+      const result = await ExperimentExecutionDataService.loadExecutionData(
         PROJECT_ID,
         {
           type: "inline",
@@ -326,7 +330,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       it("fails and names the missing agent", async () => {
         const missingAgentId = `test_agent_${nanoid(8)}`;
 
-        const result = await loadExecutionData(
+        const result = await ExperimentExecutionDataService.loadExecutionData(
           PROJECT_ID,
           {
             type: "inline",
@@ -368,7 +372,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
         });
         expect(second.version).toBe(2);
 
-        const result = await loadExecutionData(
+        const result = await ExperimentExecutionDataService.loadExecutionData(
           PROJECT_ID,
           {
             type: "inline",
@@ -388,10 +392,16 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
         }
 
         const first = result.loadedPrompts.get(
-          promptLoadKey({ promptId: created.id, promptVersionNumber: 1 }),
+          ExperimentExecutionDataService.promptLoadKey({
+            promptId: created.id,
+            promptVersionNumber: 1,
+          }),
         );
         const latest = result.loadedPrompts.get(
-          promptLoadKey({ promptId: created.id, promptVersionNumber: 2 }),
+          ExperimentExecutionDataService.promptLoadKey({
+            promptId: created.id,
+            promptVersionNumber: 2,
+          }),
         );
 
         expect(first?.version).toBe(1);
@@ -408,7 +418,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       it("fails and names the missing evaluator", async () => {
         const missingEvaluatorId = `test_eval_${nanoid(8)}`;
 
-        const result = await loadExecutionData(
+        const result = await ExperimentExecutionDataService.loadExecutionData(
           PROJECT_ID,
           {
             type: "inline",

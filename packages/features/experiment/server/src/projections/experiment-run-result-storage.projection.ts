@@ -5,7 +5,7 @@ import {
   evaluatorResultEventSchema,
   type TargetResultEvent,
   targetResultEventSchema,
-} from "../adapters/eventing.experiment-run-events.adapter";
+} from "../processes/experiment-run-events.process";
 import { normalizeDurationMs } from "../processes/experiment-run-duration.process";
 import { ExperimentRunIds } from "../processes/experiment-run-id.process";
 
@@ -78,9 +78,15 @@ export class ExperimentRunResultStorageMapProjection
       `experiment:${event.data.experimentId}:result:${event.data.runId}:item:${event.data.index}`,
   };
 
-  constructor(deps: { store: AppendStore<ClickHouseExperimentRunResultRecord> }) {
+  private constructor(deps: { store: AppendStore<ClickHouseExperimentRunResultRecord> }) {
     super();
     this.store = deps.store;
+  }
+
+  static create(deps: {
+    store: AppendStore<ClickHouseExperimentRunResultRecord>;
+  }): ExperimentRunResultStorageMapProjection {
+    return new ExperimentRunResultStorageMapProjection(deps);
   }
 
   mapExperimentRunTargetResult(event: TargetResultEvent): ClickHouseExperimentRunResultRecord {

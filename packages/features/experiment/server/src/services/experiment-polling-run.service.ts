@@ -18,18 +18,17 @@ import {
   type ExecutionScope,
   type ExecutionSummary,
 } from "@langwatch/experiment-contract";
-import { getRunUrl } from "../adapters/experiment-run-url.adapter";
+import { getRunUrl } from "../rules/experiment-run-url.rules";
 import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-error-reporting.port";
 import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress.port";
 import { mapThrownErrorEvent } from "../processes/experiment-result-mapping.process";
 import {
-  persistRunResults,
+  ExperimentRunResultsWriterService,
   type RunResultsPersistence,
 } from "./experiment-run-results-writer.service";
 import {
-  countScopedCells,
+  ExperimentRunOrchestratorService,
   type OrchestratorInput,
-  runOrchestrator,
 } from "./experiment-run-orchestrator.service";
 
 const logger = createLogger("langwatch:experiment:polling-run");
@@ -151,7 +150,7 @@ const runExecution = async ({
       return;
     }
 
-    await persistRunResults({
+    await ExperimentRunResultsWriterService.persistRunResults({
       persistence: persistResults,
       projectId: orchestratorInput.projectId,
       experimentId: orchestratorInput.experimentId,
@@ -173,7 +172,7 @@ const runExecution = async ({
   };
 
   try {
-    const orchestrator = runOrchestrator({
+    const orchestrator = ExperimentRunOrchestratorService.runOrchestrator({
       ...orchestratorInput,
       scope,
       runId,
@@ -209,75 +208,87 @@ const runExecution = async ({
 };
 
 /**
- * Registers a run, starts the orchestrator in the background, and returns
- * immediately with the run id and results URL. The run streams its events into
- * the run-state manager so the caller can poll GET /runs/:runId(/results).
+ * Starts a run the caller polls for rather than streams from.
  */
-export const startPollingRun = async (
-  input: StartPollingRunInput,
-): Promise<{ runId: string; runUrl: string; total: number }> => {
-  const {
-    projectSlug,
-    experimentSlug,
-    scope,
-    persistResults,
-    baseUrl,
-    progress,
-    errorReporting,
-    ...orchestratorInput
-  } = input;
-  const effectiveScope: ExecutionScope = scope ?? { type: "full" };
-  const totalCells = countScopedCells({
-    state: orchestratorInput.state,
-    datasetRows: orchestratorInput.datasetRows,
-    scope: effectiveScope,
-    ...(orchestratorInput.seedTargetOutputs
-      ? { seedTargetOutputs: orchestratorInput.seedTargetOutputs }
-      : {}),
-  });
-  const runId = generateHumanReadableId();
-  const runUrl = getRunUrl({ baseUrl, projectSlug, experimentSlug, runId });
+export class ExperimentPollingRunService {
+  private constructor() {}
 
-  await progress.createRun({
-    runId,
-    projectId: orchestratorInput.projectId,
-    experimentId: orchestratorInput.experimentId,
-    experimentSlug,
-    total: totalCells,
-  });
+  static create(): ExperimentPollingRunService {
+    return new ExperimentPollingRunService();
+  }
 
-  // The last handler on this promise. `runExecution` reports a failed run
-  // itself, so a rejection reaching here means its own recovery failed too (an
-  // unreachable run-state store rejects both the event write and the failure
-  // write). Without a handler that rejection is unhandled, which ends the
-  // process under Node's default.
-  void runExecution({
-    orchestratorInput,
-    scope: effectiveScope,
-    runId,
-    runUrl,
-    experimentSlug,
-    persistResults,
-    progress,
-    errorReporting,
-  }).catch((error: unknown) => {
-    logger.error(
-      {
-        error,
-        runId,
-        experimentSlug,
-        projectId: orchestratorInput.projectId,
-      },
-      "Run execution could not record its own failure",
-    );
-    errorReporting?.captureException(error, {
-      extra: {
-        runId,
-        experimentSlug,
-        projectId: orchestratorInput.projectId,
-      },
+  /**
+   * Registers a run, starts the orchestrator in the background, and returns
+   * immediately with the run id and results URL. The run streams its events
+   * into the run-state manager so the caller can poll
+   * GET /runs/:runId(/results).
+   */
+  static async startPollingRun(
+    input: StartPollingRunInput,
+  ): Promise<{ runId: string; runUrl: string; total: number }> {
+    const {
+      projectSlug,
+      experimentSlug,
+      scope,
+      persistResults,
+      baseUrl,
+      progress,
+      errorReporting,
+      ...orchestratorInput
+    } = input;
+    const effectiveScope: ExecutionScope = scope ?? { type: "full" };
+    const totalCells = ExperimentRunOrchestratorService.countScopedCells({
+      state: orchestratorInput.state,
+      datasetRows: orchestratorInput.datasetRows,
+      scope: effectiveScope,
+      ...(orchestratorInput.seedTargetOutputs
+        ? { seedTargetOutputs: orchestratorInput.seedTargetOutputs }
+        : {}),
     });
-  });
+    const runId = generateHumanReadableId();
+    const runUrl = getRunUrl({ baseUrl, projectSlug, experimentSlug, runId });
 
-  return { runId, runUrl, total: totalCells };
-};
+    await progress.createRun({
+      runId,
+      projectId: orchestratorInput.projectId,
+      experimentId: orchestratorInput.experimentId,
+      experimentSlug,
+      total: totalCells,
+    });
+
+    // The last handler on this promise. `runExecution` reports a failed run
+    // itself, so a rejection reaching here means its own recovery failed too (an
+    // unreachable run-state store rejects both the event write and the failure
+    // write). Without a handler that rejection is unhandled, which ends the
+    // process under Node's default.
+    void runExecution({
+      orchestratorInput,
+      scope: effectiveScope,
+      runId,
+      runUrl,
+      experimentSlug,
+      persistResults,
+      progress,
+      errorReporting,
+    }).catch((error: unknown) => {
+      logger.error(
+        {
+          error,
+          runId,
+          experimentSlug,
+          projectId: orchestratorInput.projectId,
+        },
+        "Run execution could not record its own failure",
+      );
+      errorReporting?.captureException(error, {
+        extra: {
+          runId,
+          experimentSlug,
+          projectId: orchestratorInput.projectId,
+        },
+      });
+    });
+
+    return { runId, runUrl, total: totalCells };
+  }
+}

@@ -6,7 +6,7 @@
  * the module ceiling.
  */
 
-import { promptLoadKey } from "../services/experiment-execution-data.service";
+import { ExperimentExecutionDataService } from "../services/experiment-execution-data.service";
 import { disambiguateNames, type TargetConfig } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 
@@ -94,7 +94,7 @@ export const variantIdentifierFor = ({
   loadedPrompts?: Map<string, VersionedPrompt>;
 }): string => {
   if (target.type === "prompt" && target.promptId) {
-    const handle = loadedPrompts?.get(promptLoadKey(target))?.handle;
+    const handle = loadedPrompts?.get(ExperimentExecutionDataService.promptLoadKey(target))?.handle;
     if (handle) return handle;
   }
   return target.id;
@@ -134,7 +134,7 @@ export const variantDisplayNameFor = ({
 }): string => {
   if (target.type === "prompt") {
     if (!target.promptId) return "New Prompt";
-    const loaded = loadedPrompts?.get(promptLoadKey(target));
+    const loaded = loadedPrompts?.get(ExperimentExecutionDataService.promptLoadKey(target));
     return loaded?.handle ?? loaded?.name ?? "New Prompt";
   }
   if (target.type === "evaluator" && target.targetEvaluatorId) {

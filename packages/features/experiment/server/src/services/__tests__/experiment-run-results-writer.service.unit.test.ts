@@ -6,13 +6,13 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluationV3Event, ExperimentService } from "@langwatch/experiment-contract";
-import { createRunResultsWriter } from "../experiment-run-results-writer.service";
+import { ExperimentRunResultsWriterService } from "../experiment-run-results-writer.service";
 
 const recordWorkbenchRunResults = vi.fn();
 const getWorkbenchState = vi.fn();
 
 const writerFor = () =>
-  createRunResultsWriter({
+  ExperimentRunResultsWriterService.create({
     persistence: {
       experiments: {
         getWorkbenchState,
@@ -61,7 +61,7 @@ beforeEach(() => {
   recordWorkbenchRunResults.mockResolvedValue({ version: 4 });
 });
 
-describe("createRunResultsWriter", () => {
+describe("ExperimentRunResultsWriterService", () => {
   describe("when the run ends before it names itself", () => {
     /** @scenario "A run that ends before it names itself writes nothing" */
     it("writes nothing into the saved state", async () => {

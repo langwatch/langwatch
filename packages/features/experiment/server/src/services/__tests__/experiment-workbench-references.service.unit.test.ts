@@ -62,12 +62,8 @@ function servicesAnswering(answers: Answers = {}) {
     throw new WorkflowNotFoundError("workflow_missing");
   };
 
-  return new ExperimentWorkbenchReferencesService({
-    prompts,
-    agents,
-    evaluators,
-    workflows,
-    dataset,
+  return ExperimentWorkbenchReferencesService.create({
+    references: { prompts, agents, evaluators, workflows, dataset },
   });
 }
 

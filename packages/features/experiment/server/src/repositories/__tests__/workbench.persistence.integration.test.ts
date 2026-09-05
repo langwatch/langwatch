@@ -24,6 +24,8 @@ import { ExperimentDspyRepository } from "../experiment-dspy.repository";
 import { ExperimentRunRepository } from "../experiment-run.repository";
 import { PrismaExperimentRepository } from "../prisma/prisma.experiment.repository";
 import { ExperimentService } from "../../services/experiment.service";
+import { UnavailableExperimentExecutionAdapter } from "../../adapters/unavailable-experiment-execution.adapter";
+import { NoopExperimentWorkbenchUpdatesAdapter } from "../../adapters/noop-experiment-workbench-updates.adapter";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -69,6 +71,8 @@ const service = (): ExperimentServiceContract =>
         .replaceAll(/^-|-$/g, ""),
     newId: () => `experiment_${randomUUID()}`,
     references,
+    execution: UnavailableExperimentExecutionAdapter.create(),
+    updates: NoopExperimentWorkbenchUpdatesAdapter.create(),
   });
 
 const state = (
@@ -453,11 +457,14 @@ describe.skipIf(!databaseUrl)("Experiment workbench persistence", () => {
         const experiments = service();
         const experimentId = await typeThenCommitTwice(experiments);
 
-        const { versions } = await experiments.listWorkbenchVersions({ projectId, id: experimentId });
+        const { versions } = await experiments.listWorkbenchVersions({
+          projectId,
+          id: experimentId,
+        });
 
-        expect(versions.map((entry) => (entry.autoSaved ? "autosave" : `v${entry.version}`))).toEqual(
-          ["v3", "autosave", "v2", "v1"],
-        );
+        expect(
+          versions.map((entry) => (entry.autoSaved ? "autosave" : `v${entry.version}`)),
+        ).toEqual(["v3", "autosave", "v2", "v1"]);
         expect(versions[0]?.commitMessage).toBe("Second");
         expect(versions[2]?.commitMessage).toBe("First");
       });
@@ -494,7 +501,11 @@ describe.skipIf(!databaseUrl)("Experiment workbench persistence", () => {
         });
 
         const written = await database().experimentVersion.findFirstOrThrow({
-          where: { projectId, experimentId: created.experimentId, counterVersion: restored.version },
+          where: {
+            projectId,
+            experimentId: created.experimentId,
+            counterVersion: restored.version,
+          },
         });
         expect(written.commitMessage).toBe("Restored from the autosave");
       });

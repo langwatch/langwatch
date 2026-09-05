@@ -1,7 +1,7 @@
 /**
  * @see specs/experiments-v3/workbench-versioning.feature
  *
- * `persistRunResults` is the seam both execution paths write through: the
+ * `ExperimentRunResultsWriterService.persistRunResults` is the seam both execution paths write through: the
  * polling runner calls it directly when a run completes or stops, and the
  * streaming writer calls it once the last frame arrives. This exercises the
  * merge it performs against the saved workbench state, mocking only the
@@ -10,7 +10,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { EvaluationV3Event, ExperimentService } from "@langwatch/experiment-contract";
 import { applyRunEvent, emptyRunResultsDraft } from "@langwatch/experiment-contract";
-import { persistRunResults } from "../experiment-run-results-writer.service";
+import { ExperimentRunResultsWriterService } from "../experiment-run-results-writer.service";
 
 const TARGET_ID = "target-1";
 const EVALUATOR_ID = "evaluator-1";
@@ -78,7 +78,7 @@ describe("given an evaluation whose saved state carries no results", () => {
         ...cellEvents({ rowIndex: 1, output: "two", score: 0 }),
       ]);
 
-      await persistRunResults({
+      await ExperimentRunResultsWriterService.persistRunResults({
         persistence: { experiments, actor: { userId: "user_1", label: "user" } },
         projectId: "project_1",
         experimentId: "experiment_1",
@@ -123,7 +123,7 @@ describe("given an evaluation whose saved state already holds results for every 
       });
       const draft = foldedDraft(cellEvents({ rowIndex: 0, output: "fresh", score: 1 }));
 
-      await persistRunResults({
+      await ExperimentRunResultsWriterService.persistRunResults({
         persistence: { experiments, actor: { userId: "user_1", label: "user" } },
         projectId: "project_1",
         experimentId: "experiment_1",
@@ -154,7 +154,7 @@ describe("given a backend run that filled some cells before it was stopped", () 
       const { experiments, recordWorkbenchRunResults } = persistenceFor();
       const draft = foldedDraft(cellEvents({ rowIndex: 0, output: "before the stop", score: 1 }));
 
-      await persistRunResults({
+      await ExperimentRunResultsWriterService.persistRunResults({
         persistence: { experiments, actor: { userId: "user_1", label: "user" } },
         projectId: "project_1",
         experimentId: "experiment_1",

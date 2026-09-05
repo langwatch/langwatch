@@ -5,14 +5,14 @@
  * @see specs/experiments-v3/execution-inputs.feature
  */
 import { describe, expect, it } from "vitest";
-import { applyParametersToRows } from "../experiment-execution-data.service";
+import { ExperimentExecutionDataService } from "../experiment-execution-data.service";
 
 describe("applyParametersToRows", () => {
   describe("given rows and a parameter for a new field", () => {
     describe("when the parameters are applied", () => {
       /** @scenario "Parameters bind as constant columns overriding entry fields on every row" */
       it("sets the parameter on every row and preserves the original values", () => {
-        const { rows, columns } = applyParametersToRows({
+        const { rows, columns } = ExperimentExecutionDataService.applyParametersToRows({
           rows: [{ question: "a" }, { question: "b" }, { question: "c" }],
           columns: [{ id: "question", name: "question", type: "string" }],
           parameters: { feature_flag: "variant-b" },
@@ -32,7 +32,7 @@ describe("applyParametersToRows", () => {
     describe("when the parameters are applied", () => {
       /** @scenario "A parameter that names a dataset column overrides it for every row" */
       it("overrides that column on every row without duplicating it", () => {
-        const { rows, columns } = applyParametersToRows({
+        const { rows, columns } = ExperimentExecutionDataService.applyParametersToRows({
           rows: [{ model: "gpt-5-nano" }, { model: "gpt-5" }],
           columns: [{ id: "model", name: "model", type: "string" }],
           parameters: { model: "gpt-5-mini" },
@@ -48,7 +48,7 @@ describe("applyParametersToRows", () => {
     describe("when the parameters are applied", () => {
       /** @scenario "Parameters with no dataset evaluate a single synthetic row" */
       it("synthesizes a single row containing the parameters", () => {
-        const { rows } = applyParametersToRows({
+        const { rows } = ExperimentExecutionDataService.applyParametersToRows({
           rows: [],
           columns: [],
           parameters: { feature_flag: "on", threshold: 5, enabled: true },
@@ -67,7 +67,7 @@ describe("applyParametersToRows", () => {
           columns: [{ id: "a", name: "a", type: "string" }],
         };
 
-        const result = applyParametersToRows(input);
+        const result = ExperimentExecutionDataService.applyParametersToRows(input);
 
         expect(result.rows).toEqual(input.rows);
         expect(result.columns).toEqual(input.columns);

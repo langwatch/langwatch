@@ -35,21 +35,89 @@ export interface RunStateMirror {
   }): Promise<void>;
 }
 
-/** Open a mirror for one run of one experiment. */
-export const createRunStateMirror = ({
-  projectId,
-  experimentId,
-  experimentSlug,
-  progress,
-}: {
-  projectId: string;
-  experimentId?: string;
-  experimentSlug: string;
-  /** Where the frames are mirrored so a poll on another process finds them. */
-  progress: ExperimentRunProgressPort;
-}): RunStateMirror => {
-  let runId: string | undefined;
-  let ended = false;
+/** Opens a mirror for one run of one experiment. */
+export class ExperimentRunStateMirrorService implements RunStateMirror {
+  private runId: string | undefined;
+  private ended = false;
+
+  private constructor(
+    private readonly projectId: string,
+    private readonly experimentId: string | undefined,
+    private readonly experimentSlug: string,
+    private readonly progress: ExperimentRunProgressPort,
+  ) {}
+
+  static create(options: {
+    projectId: string;
+    experimentId?: string;
+    experimentSlug: string;
+    /** Where the frames are mirrored so a poll on another process finds them. */
+    progress: ExperimentRunProgressPort;
+  }): ExperimentRunStateMirrorService {
+    return new ExperimentRunStateMirrorService(
+      options.projectId,
+      options.experimentId,
+      options.experimentSlug,
+      options.progress,
+    );
+  }
+
+  async record(event: EvaluationV3Event): Promise<void> {
+    if (event.type === "execution_started") {
+      this.runId = event.runId;
+      await this.mirrored("createRun", () =>
+        this.progress.createRun({
+          runId: event.runId,
+          projectId: this.projectId,
+          experimentId: this.experimentId,
+          experimentSlug: this.experimentSlug,
+          total: event.total,
+        }),
+      );
+
+      return;
+    }
+
+    const id = this.runId;
+    if (!id) {
+      return;
+    }
+
+    await this.mirrored("addEvent", () => this.progress.addEvent(id, event));
+    await this.recordEnd(event);
+  }
+
+  async fail(failure: {
+    code: string;
+    domainError?: SerializedHandledError;
+    traceId?: string;
+  }): Promise<void> {
+    const id = this.runId;
+    if (!id || this.ended) {
+      return;
+    }
+
+    await this.mirrored("failRun", () => this.progress.failRun(id, failure));
+  }
+
+  private async recordEnd(event: EvaluationV3Event): Promise<void> {
+    const id = this.runId;
+    if (!id) {
+      return;
+    }
+
+    if (event.type === "done") {
+      this.ended = true;
+      await this.mirrored("completeRun", () => this.progress.completeRun(id, event.summary));
+
+      return;
+    }
+
+    if (event.type === "stopped") {
+      this.ended = true;
+      await this.mirrored("stopRun", () => this.progress.stopRun(id));
+    }
+  }
 
   /**
    * The mirror never fails the run it is watching.
@@ -58,72 +126,14 @@ export const createRunStateMirror = ({
    * must not reach the `for await` loop the run is streaming through: that
    * would write an error frame to the customer and abandon a healthy run.
    */
-  const mirrored = async (what: string, write: () => Promise<unknown>): Promise<void> => {
+  private async mirrored(what: string, write: () => Promise<unknown>): Promise<void> {
     try {
       await write();
     } catch (error) {
       logger.warn(
-        { error, projectId, runId, what },
+        { error, projectId: this.projectId, runId: this.runId, what },
         "run-state mirror write failed; the run itself is unaffected",
       );
     }
-  };
-
-  const recordEnd = async (event: EvaluationV3Event): Promise<void> => {
-    const id = runId;
-    if (!id) {
-      return;
-    }
-
-    if (event.type === "done") {
-      ended = true;
-      await mirrored("completeRun", () => progress.completeRun(id, event.summary));
-
-      return;
-    }
-
-    if (event.type === "stopped") {
-      ended = true;
-      await mirrored("stopRun", () => progress.stopRun(id));
-    }
-  };
-
-  return {
-    async record(event: EvaluationV3Event): Promise<void> {
-      if (event.type === "execution_started") {
-        runId = event.runId;
-        await mirrored("createRun", () =>
-          progress.createRun({
-            runId: event.runId,
-            projectId,
-            experimentId,
-            experimentSlug,
-            total: event.total,
-          }),
-        );
-
-        return;
-      }
-
-      const id = runId;
-      if (!id) {
-        return;
-      }
-
-      await mirrored("addEvent", () => progress.addEvent(id, event));
-      await recordEnd(event);
-    },
-    async fail(failure: {
-      code: string;
-      domainError?: SerializedHandledError;
-      traceId?: string;
-    }): Promise<void> {
-      const id = runId;
-      if (!id || ended) {
-        return;
-      }
-
-      await mirrored("failRun", () => progress.failRun(id, failure));
-    },
-  };
-};
+  }
+}

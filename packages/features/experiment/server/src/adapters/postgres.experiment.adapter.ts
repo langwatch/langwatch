@@ -20,6 +20,7 @@ import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/c
 import type { ExperimentDspyRetentionPort } from "../ports/experiment-dspy-retention.port";
 import type { ExperimentWorkbenchUpdatesPort } from "../ports/experiment-workbench-updates.port";
 import { UnavailableExperimentExecutionAdapter } from "./unavailable-experiment-execution.adapter";
+import { NoopExperimentWorkbenchUpdatesAdapter } from "./noop-experiment-workbench-updates.adapter";
 import { ExperimentService } from "../services/experiment.service";
 
 export type PostgresExperimentAdapterOptions = {
@@ -176,7 +177,8 @@ export class PostgresExperimentAdapter {
         retention: options.dspyRetention,
         telemetry: options.runHistoryTelemetry,
       }),
-      execution: options.execution ?? new UnavailableExperimentExecutionAdapter(),
+      execution: options.execution ?? UnavailableExperimentExecutionAdapter.create(),
+      updates: options.updates ?? NoopExperimentWorkbenchUpdatesAdapter.create(),
     });
   }
 }

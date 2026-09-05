@@ -35,7 +35,13 @@ export type ExperimentWorkbenchReferenceServices = {
 type ReferenceType = "prompt" | "agent" | "evaluator" | "workflow" | "dataset";
 
 export class ExperimentWorkbenchReferencesService {
-  constructor(private readonly references: ExperimentWorkbenchReferenceServices) {}
+  private constructor(private readonly references: ExperimentWorkbenchReferenceServices) {}
+
+  static create(options: {
+    references: ExperimentWorkbenchReferenceServices;
+  }): ExperimentWorkbenchReferencesService {
+    return new ExperimentWorkbenchReferencesService(options.references);
+  }
 
   async assertAllExist({
     projectId,

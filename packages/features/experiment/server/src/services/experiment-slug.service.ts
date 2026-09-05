@@ -24,10 +24,17 @@ export type ExperimentSlugRepository = {
 };
 
 export class ExperimentSlugService {
-  constructor(
+  private constructor(
     private readonly repository: ExperimentSlugRepository,
     private readonly newId: () => string,
   ) {}
+
+  static create(options: {
+    repository: ExperimentSlugRepository;
+    newId: () => string;
+  }): ExperimentSlugService {
+    return new ExperimentSlugService(options.repository, options.newId);
+  }
 
   async generateUnique(input: {
     baseSlug: string;

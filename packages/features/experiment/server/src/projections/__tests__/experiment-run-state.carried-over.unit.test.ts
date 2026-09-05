@@ -16,12 +16,12 @@ import { describe, expect, it } from "vitest";
 import {
   EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_EVENT_VERSIONS,
-} from "../../adapters/eventing.experiment-run-event-types.adapter";
+} from "../../rules/experiment-run-event-types.rules";
 import type {
   EvaluatorResultEvent,
   ExperimentRunProcessingEvent,
   TargetResultEvent,
-} from "../../adapters/eventing.experiment-run-events.adapter";
+} from "../../processes/experiment-run-events.process";
 import {
   type ExperimentRunStateData,
   ExperimentRunStateFoldProjection,
@@ -108,7 +108,7 @@ const verdict = ({
 
 /** The run's state after the fold has seen these events, in this order. */
 const fold = (events: ExperimentRunProcessingEvent[]): ExperimentRunStateData => {
-  const projection = new ExperimentRunStateFoldProjection({
+  const projection = ExperimentRunStateFoldProjection.create({
     store: {
       store: async () => undefined,
       get: async () => null,

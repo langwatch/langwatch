@@ -1,20 +1,20 @@
 import type { FoldProjectionStore, Projection } from "@langwatch/eventing";
 import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
-import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../adapters/eventing.experiment-run-event-types.adapter";
+import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../rules/experiment-run-event-types.rules";
 import type {
   EvaluatorResultEvent,
   ExperimentRunCompletedEvent,
   ExperimentRunStartedEvent,
   TargetResultEvent,
   TraceMetricsComputedEvent,
-} from "../adapters/eventing.experiment-run-events.adapter";
+} from "../processes/experiment-run-events.process";
 import {
   evaluatorResultEventSchema,
   experimentRunCompletedEventSchema,
   experimentRunStartedEventSchema,
   targetResultEventSchema,
   traceMetricsComputedEventSchema,
-} from "../adapters/eventing.experiment-run-events.adapter";
+} from "../processes/experiment-run-events.process";
 import { normalizeDurationMs } from "../processes/experiment-run-duration.process";
 
 /**
@@ -120,7 +120,13 @@ export class ExperimentRunStateFoldProjection
 
   protected readonly events = experimentRunEvents;
 
-  constructor(deps: { store: FoldProjectionStore<ExperimentRunStateData> }) {
+  static create(deps: {
+    store: FoldProjectionStore<ExperimentRunStateData>;
+  }): ExperimentRunStateFoldProjection {
+    return new ExperimentRunStateFoldProjection(deps);
+  }
+
+  private constructor(deps: { store: FoldProjectionStore<ExperimentRunStateData> }) {
     super();
     this.store = deps.store;
   }

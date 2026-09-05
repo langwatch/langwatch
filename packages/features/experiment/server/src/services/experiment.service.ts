@@ -62,9 +62,7 @@ import type { ExperimentRunRepository } from "../repositories/experiment-run.rep
 import type { ExperimentDspyRepository } from "../repositories/experiment-dspy.repository";
 import type { ExperimentExecutionPort } from "../ports/experiment-execution.port";
 import type { ExperimentWorkbenchUpdatesPort } from "../ports/experiment-workbench-updates.port";
-import { UnavailableExperimentExecutionAdapter } from "../adapters/unavailable-experiment-execution.adapter";
-import { NoopExperimentWorkbenchUpdatesAdapter } from "../adapters/noop-experiment-workbench-updates.adapter";
-import { PostgresUniqueConflict } from "../adapters/postgres.unique-conflict.adapter";
+import { isPostgresUniqueConflict } from "../rules/postgres-unique-conflict.rules";
 import { ExperimentSlugService } from "./experiment-slug.service";
 import { ExperimentWorkbenchService } from "./experiment-workbench.service";
 import {
@@ -76,12 +74,12 @@ export type ExperimentServiceOptions = {
   repository: ExperimentRepository;
   runRepository: ExperimentRunRepository;
   dspyRepository: ExperimentDspyRepository;
-  execution?: ExperimentExecutionPort;
+  execution: ExperimentExecutionPort;
   slugify: (value: string) => string;
   newId: () => string;
   now?: () => Date;
   references: ExperimentWorkbenchReferenceServices;
-  updates?: ExperimentWorkbenchUpdatesPort;
+  updates: ExperimentWorkbenchUpdatesPort;
 };
 
 export class ExperimentService extends ExperimentServiceContract {
@@ -97,11 +95,16 @@ export class ExperimentService extends ExperimentServiceContract {
 
   private constructor(private readonly options: ExperimentServiceOptions) {
     super();
-    this.execution = options.execution ?? new UnavailableExperimentExecutionAdapter();
-    this.updates = options.updates ?? new NoopExperimentWorkbenchUpdatesAdapter();
-    this.slugs = new ExperimentSlugService(options.repository, options.newId);
-    this.workbenchReferences = new ExperimentWorkbenchReferencesService(options.references);
-    this.workbench = new ExperimentWorkbenchService({
+    this.execution = options.execution;
+    this.updates = options.updates;
+    this.slugs = ExperimentSlugService.create({
+      repository: options.repository,
+      newId: options.newId,
+    });
+    this.workbenchReferences = ExperimentWorkbenchReferencesService.create({
+      references: options.references,
+    });
+    this.workbench = ExperimentWorkbenchService.create({
       repository: options.repository,
       newId: options.newId,
       updates: this.updates,
@@ -208,7 +211,7 @@ export class ExperimentService extends ExperimentServiceContract {
         throw new ExperimentNotFoundError(command.id, { reasons: [error] });
       }
 
-      if (!PostgresUniqueConflict.matches(error)) {
+      if (!isPostgresUniqueConflict(error)) {
         throw error;
       }
 

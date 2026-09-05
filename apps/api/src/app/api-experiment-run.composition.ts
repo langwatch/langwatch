@@ -52,7 +52,10 @@ import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { EventSourcing } from "@langwatch/eventing";
 import type { ExperimentService, TargetConfig } from "@langwatch/experiment-contract";
 import {
-  createExperimentRunProcessingPipeline,
+  ExperimentEventingAdapter,
+  ExperimentConnectedAgentOwnershipPort,
+  ExperimentConnectedDispatchPort,
+  type ExperimentConnectedAgentSubject,
   ExperimentEvaluationReportingPort,
   ExperimentModelCostPort,
   ExperimentSandboxCredentialPort,
@@ -62,8 +65,8 @@ import {
   RedisExperimentRunAbortAdapter,
   RedisExperimentRunProgressAdapter,
   WorkflowEvaluationService,
-  resolveWorkbenchTargetNames,
-  startPollingRun,
+  ExperimentWorkbenchTargetNamesService,
+  ExperimentPollingRunService,
   type ExecutionDataServices,
   type ExperimentRunPorts,
   type ExperimentRunProcessingPipelineDeps,
@@ -92,6 +95,10 @@ import {
   UnconfiguredWorkflowStudioStreamAdapter,
   WorkflowStudioDispatchService,
 } from "@langwatch/workflow-server";
+import { getConnectedAgentRuntime } from "@langwatch/agent-server";
+import { assertConnectedAgentsRunnable } from "@langwatch/suite-server";
+import type { CallOutcome, DispatchAgent, DispatchCall } from "@langwatch/agent-contract";
+import type { RunActor } from "@langwatch/scenario-contract";
 
 /**
  * The four dispatchers a run's HISTORY is written through, or `undefined`
@@ -143,7 +150,7 @@ export function composeApiExperimentRunCommands(options: {
 
   const processName = options.processName;
   const registered = options.eventing.register(
-    createExperimentRunProcessingPipeline({
+    ExperimentEventingAdapter.pipeline({
       experimentRunStateFoldStore: new ProducerOnlyExperimentRunStateStore(processName),
       experimentRunItemAppendStore: new ProducerOnlyExperimentRunItemStore(processName),
     }),
@@ -372,7 +379,7 @@ export function composeApiExperimentRun(options: ApiExperimentRunOptions): ApiEx
     projectId: string;
     targets: TargetConfig[];
   }): Promise<Record<string, string>> =>
-    resolveWorkbenchTargetNames({
+    ExperimentWorkbenchTargetNamesService.create().resolve({
       projectId: input.projectId,
       targets: input.targets,
       prompts: options.prompts,
@@ -426,6 +433,8 @@ export function composeApiExperimentRun(options: ApiExperimentRunOptions): ApiEx
       prisma: options.prisma,
       apiKeys: options.apiKeys,
     }),
+    connectedDispatch: ApiExperimentConnectedDispatchAdapter.create(),
+    connectedAgentOwnership: ApiExperimentConnectedAgentOwnershipAdapter.create(),
   };
 
   const workflowEvaluation = WorkflowEvaluationService.create({
@@ -447,7 +456,7 @@ export function composeApiExperimentRun(options: ApiExperimentRunOptions): ApiEx
     baseUrl,
     defaultConcurrency: API_EXPERIMENT_RUN_DEFAULT_CONCURRENCY,
     startRun: (input) =>
-      startPollingRun({
+      ExperimentPollingRunService.startPollingRun({
         ...input,
         ports,
         workflows: options.workflows,
@@ -458,6 +467,42 @@ export function composeApiExperimentRun(options: ApiExperimentRunOptions): ApiEx
     evaluateWorkflow: (input) => workflowEvaluation.triggerEvaluationForRest(input),
     resolveTargetNames,
   };
+}
+
+/**
+ * The connected-agent dispatcher a run's turns go through (ADR-128).
+ *
+ * Composed here because neither feature server package may import the other:
+ * the runtime lives in `@langwatch/agent-server` and the run loop in
+ * `@langwatch/experiment-server`.
+ */
+class ApiExperimentConnectedDispatchAdapter extends ExperimentConnectedDispatchPort {
+  static create(): ApiExperimentConnectedDispatchAdapter {
+    return new ApiExperimentConnectedDispatchAdapter();
+  }
+
+  dispatch(input: {
+    projectId: string;
+    agent: DispatchAgent;
+    call: DispatchCall;
+    signal: AbortSignal;
+  }): Promise<CallOutcome> {
+    return getConnectedAgentRuntime().dispatcher.dispatch(input);
+  }
+}
+
+/** Joins the experiment run's ownership port to suite's rule, for the same reason. */
+class ApiExperimentConnectedAgentOwnershipAdapter extends ExperimentConnectedAgentOwnershipPort {
+  static create(): ApiExperimentConnectedAgentOwnershipAdapter {
+    return new ApiExperimentConnectedAgentOwnershipAdapter();
+  }
+
+  assertRunnable(input: {
+    agents: readonly ExperimentConnectedAgentSubject[];
+    actor: RunActor | undefined;
+  }): Promise<void> {
+    return assertConnectedAgentsRunnable({ agents: input.agents, actor: input.actor });
+  }
 }
 
 /**

@@ -1,7 +1,7 @@
 import { RedisCachedFoldStore } from "@langwatch/eventing";
 import type { Cluster, Redis } from "ioredis";
 import {
-  createExperimentRunProcessingPipeline,
+  ExperimentEventingAdapter,
   type ExperimentRunProcessingPipeline,
 } from "./eventing.experiment-run-processing.adapter";
 import {
@@ -9,9 +9,9 @@ import {
   type ExperimentEventingClickHouseResolver,
 } from "./experiment-clickhouse.adapter";
 import type { ExperimentRunStateData } from "../projections/experiment-run-state.projection";
-import { ExperimentRunStateRepositoryClickHouse } from "../repositories/clickhouse/clickhouse.experiment-run-state.repository";
-import { createExperimentRunItemAppendStore } from "../stores/experiment-run-item.clickhouse.store";
-import { createExperimentRunStateFoldStore } from "../stores/experiment-run-state.store";
+import { ClickHouseExperimentRunStateRepository } from "../repositories/clickhouse/clickhouse.experiment-run-state.repository";
+import { ExperimentRunItemStore } from "../stores/eventing/eventing.experiment-run-item.store";
+import { ExperimentRunStateStore } from "../stores/eventing/eventing.experiment-run-state.store";
 
 /**
  * The Redis keyspace the experiment-run fold's read-through cache occupies.
@@ -80,11 +80,14 @@ export class ClickHouseExperimentRunProcessingAdapter {
   buildProcessing(): ExperimentRunProcessingPipeline {
     const clickHouse = ExperimentClickHouseAdapter.create(this.options.resolveClient);
 
-    return createExperimentRunProcessingPipeline({
+    return ExperimentEventingAdapter.pipeline({
       experimentRunStateFoldStore: new RedisCachedFoldStore<ExperimentRunStateData>(
-        createExperimentRunStateFoldStore(
-          new ExperimentRunStateRepositoryClickHouse(clickHouse, this.options.defaultRetentionDays),
-        ),
+        ExperimentRunStateStore.create({
+          repository: ClickHouseExperimentRunStateRepository.create({
+            clickhouse: clickHouse,
+            defaultRetentionDays: this.options.defaultRetentionDays,
+          }),
+        }),
         this.options.redis,
         {
           keyPrefix: EXPERIMENT_RUN_FOLD_CACHE_KEY_PREFIX,
@@ -93,10 +96,10 @@ export class ClickHouseExperimentRunProcessingAdapter {
             : { ttlSeconds: this.options.foldCacheTtlSeconds }),
         },
       ),
-      experimentRunItemAppendStore: createExperimentRunItemAppendStore(
-        clickHouse,
-        this.options.defaultRetentionDays,
-      ),
+      experimentRunItemAppendStore: ExperimentRunItemStore.create({
+        clickhouse: clickHouse,
+        defaultRetentionDays: this.options.defaultRetentionDays,
+      }),
     });
   }
 }

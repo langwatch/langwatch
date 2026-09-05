@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { promptLoadKey } from "../experiment-execution-data.service";
+import { ExperimentExecutionDataService } from "../experiment-execution-data.service";
 import { ExperimentResultDispatchService } from "../experiment-result-dispatch.service";
 
 const dispatches = ExperimentResultDispatchService.create();
@@ -83,14 +83,20 @@ describe("buildTargetMetadata — the judge model recorded on a run", () => {
     it("records each column's own version, not whichever loaded last", () => {
       const loadedPrompts = new Map([
         [
-          promptLoadKey({ promptId: "prompt-1", promptVersionNumber: 1 }),
+          ExperimentExecutionDataService.promptLoadKey({
+            promptId: "prompt-1",
+            promptVersionNumber: 1,
+          }),
           {
             name: "greeter",
             model: "openai/gpt-5-mini",
           } as any,
         ],
         [
-          promptLoadKey({ promptId: "prompt-1", promptVersionNumber: 2 }),
+          ExperimentExecutionDataService.promptLoadKey({
+            promptId: "prompt-1",
+            promptVersionNumber: 2,
+          }),
           {
             name: "greeter",
             model: "anthropic/claude-sonnet-5",

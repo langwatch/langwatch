@@ -12,15 +12,16 @@ import { ExperimentSlugService, type ExperimentSlugRepository } from "../experim
 
 const repositoryOf = (slugs: string[]): ExperimentSlugRepository => ({
   findSlugsByPrefix: async (input) =>
-    slugs.filter(
-      (slug) => slug === input.slugPrefix || slug.startsWith(`${input.slugPrefix}-`),
-    ),
+    slugs.filter((slug) => slug === input.slugPrefix || slug.startsWith(`${input.slugPrefix}-`)),
 });
 
 describe("ExperimentSlugService", () => {
   /** @scenario New experiment gets deduplicated slug when slug conflicts with existing experiment */
   it("appends -2 suffix when base slug already exists", async () => {
-    const slugs = new ExperimentSlugService(repositoryOf(["dedup-base"]), () => "fallback");
+    const slugs = ExperimentSlugService.create({
+      repository: repositoryOf(["dedup-base"]),
+      newId: () => "fallback",
+    });
 
     const result = await slugs.generateUnique({
       baseSlug: "dedup-base",
@@ -33,10 +34,9 @@ describe("ExperimentSlugService", () => {
   /** @scenario Updating an existing experiment does not trigger slug deduplication against itself */
   it("returns the same slug when excluding the experiment that owns it", async () => {
     const repository: ExperimentSlugRepository = {
-      findSlugsByPrefix: async (input) =>
-        input.excludeId === "existing" ? [] : ["dedup-self"],
+      findSlugsByPrefix: async (input) => (input.excludeId === "existing" ? [] : ["dedup-self"]),
     };
-    const slugs = new ExperimentSlugService(repository, () => "fallback");
+    const slugs = ExperimentSlugService.create({ repository, newId: () => "fallback" });
 
     const result = await slugs.generateUnique({
       baseSlug: "dedup-self",
@@ -49,10 +49,10 @@ describe("ExperimentSlugService", () => {
 
   /** @scenario Multiple slug conflicts increment the suffix */
   it("increments suffix to -3 when -2 is also taken", async () => {
-    const slugs = new ExperimentSlugService(
-      repositoryOf(["dedup-multi", "dedup-multi-2"]),
-      () => "fallback",
-    );
+    const slugs = ExperimentSlugService.create({
+      repository: repositoryOf(["dedup-multi", "dedup-multi-2"]),
+      newId: () => "fallback",
+    });
 
     const result = await slugs.generateUnique({
       baseSlug: "dedup-multi",
@@ -64,7 +64,10 @@ describe("ExperimentSlugService", () => {
 
   /** @scenario Slug with no conflict returns unchanged */
   it("returns the base slug unchanged when no conflict exists", async () => {
-    const slugs = new ExperimentSlugService(repositoryOf([]), () => "fallback");
+    const slugs = ExperimentSlugService.create({
+      repository: repositoryOf([]),
+      newId: () => "fallback",
+    });
 
     const result = await slugs.generateUnique({
       baseSlug: "dedup-fresh",
@@ -76,10 +79,10 @@ describe("ExperimentSlugService", () => {
 
   /** @scenario Unrelated slug sharing the same prefix is not treated as a conflict */
   it("does not treat prefix-sharing slugs as conflicts", async () => {
-    const slugs = new ExperimentSlugService(
-      repositoryOf(["dedup-prefix-extended"]),
-      () => "fallback",
-    );
+    const slugs = ExperimentSlugService.create({
+      repository: repositoryOf(["dedup-prefix-extended"]),
+      newId: () => "fallback",
+    });
 
     const result = await slugs.generateUnique({
       baseSlug: "dedup-prefix",

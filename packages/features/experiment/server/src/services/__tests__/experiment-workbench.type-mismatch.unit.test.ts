@@ -43,7 +43,7 @@ function makeService(): ExperimentWorkbenchService {
     },
   } as unknown as ExperimentRepository;
 
-  return new ExperimentWorkbenchService({
+  return ExperimentWorkbenchService.create({
     repository,
     newId: () => "generated-id",
     updates: { publish: async () => undefined } as never,

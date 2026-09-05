@@ -20,6 +20,8 @@ import { ExperimentDspyRepository } from "../experiment-dspy.repository";
 import { ExperimentRunRepository } from "../experiment-run.repository";
 import { PrismaExperimentRepository } from "../prisma/prisma.experiment.repository";
 import { ExperimentService } from "../../services/experiment.service";
+import { UnavailableExperimentExecutionAdapter } from "../../adapters/unavailable-experiment-execution.adapter";
+import { NoopExperimentWorkbenchUpdatesAdapter } from "../../adapters/noop-experiment-workbench-updates.adapter";
 
 /**
  * @see specs/experiments-v3/experiment-archive.feature
@@ -72,12 +74,19 @@ const service = (): ExperimentServiceContract =>
         .replaceAll(/^-|-$/g, ""),
     newId: () => `experiment_${randomUUID()}`,
     references,
+    execution: UnavailableExperimentExecutionAdapter.create(),
+    updates: NoopExperimentWorkbenchUpdatesAdapter.create(),
   });
 
 const state = (name: string) => ({
   name,
   datasets: [
-    { id: "dataset_1", name: "Inline", type: "inline" as const, columns: [{ id: "input", name: "input", type: "string" }] },
+    {
+      id: "dataset_1",
+      name: "Inline",
+      type: "inline" as const,
+      columns: [{ id: "input", name: "input", type: "string" }],
+    },
   ],
   activeDatasetId: "dataset_1",
   targets: [],
@@ -96,9 +105,13 @@ const handledCode = async (operation: Promise<unknown>): Promise<string | null> 
 describe.skipIf(!databaseUrl)("Experiment archive persistence", () => {
   beforeAll(async () => {
     const db = database();
-    const organization = await db.organization.create({ data: { name: namespace, slug: namespace } });
+    const organization = await db.organization.create({
+      data: { name: namespace, slug: namespace },
+    });
     organizationId = organization.id;
-    const team = await db.team.create({ data: { name: namespace, slug: namespace, organizationId } });
+    const team = await db.team.create({
+      data: { name: namespace, slug: namespace, organizationId },
+    });
     teamId = team.id;
     const projects = await Promise.all(
       ["main", "other"].map((suffix) =>
@@ -201,9 +214,9 @@ describe.skipIf(!databaseUrl)("Experiment archive persistence", () => {
         });
         await experiments.archive({ projectId, id: created.experimentId });
 
-        expect(await handledCode(experiments.getById({ projectId, id: created.experimentId }))).toBe(
-          "experiment_not_found",
-        );
+        expect(
+          await handledCode(experiments.getById({ projectId, id: created.experimentId })),
+        ).toBe("experiment_not_found");
       });
     });
   });

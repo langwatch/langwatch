@@ -12,7 +12,10 @@
 import type { EvaluatorConfig } from "@langwatch/experiment-contract";
 import type { StudioServerEvent, WorkflowService } from "@langwatch/workflow-contract";
 import { beforeEach, describe, expect, it } from "vitest";
-import { executeCell, type ExperimentRunPorts } from "../experiment-run-orchestrator.service";
+import {
+  ExperimentRunOrchestratorService,
+  type ExperimentRunPorts,
+} from "../experiment-run-orchestrator.service";
 import type { EvaluationV3Event, ExecutionCell } from "@langwatch/experiment-contract";
 
 const scripted: {
@@ -113,7 +116,14 @@ const makeCell = (evaluator: EvaluatorConfig): ExecutionCell => ({
 /** Run one cell to its end and collect every event it produced. */
 const runCell = async (cell: ExecutionCell): Promise<EvaluationV3Event[]> => {
   const events: EvaluationV3Event[] = [];
-  for await (const event of executeCell(cell, "p1", ports, datasetColumns, {}, workflows)) {
+  for await (const event of ExperimentRunOrchestratorService.executeCell(
+    cell,
+    "p1",
+    ports,
+    datasetColumns,
+    {},
+    workflows,
+  )) {
     events.push(event);
   }
   return events;
@@ -234,7 +244,7 @@ describe("given an evaluator run as its own column", () => {
 
   const runColumn = async (cell: ExecutionCell): Promise<EvaluationV3Event[]> => {
     const events: EvaluationV3Event[] = [];
-    for await (const event of executeCell(
+    for await (const event of ExperimentRunOrchestratorService.executeCell(
       cell,
       "p1",
       ports,

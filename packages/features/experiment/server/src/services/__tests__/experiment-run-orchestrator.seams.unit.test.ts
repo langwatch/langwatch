@@ -7,10 +7,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { EvaluationsV3State } from "@langwatch/experiment-contract";
 import type { CallOutcome } from "@langwatch/agent-contract";
 import {
-  buildEvaluatorInputs,
-  executeConnectedCell,
-  generateCells,
   type ConnectedDispatch,
+  ExperimentRunOrchestratorService,
   type ExperimentRunPorts,
 } from "../experiment-run-orchestrator.service";
 
@@ -81,9 +79,13 @@ describe("given two datasets where the active one is not the first", () => {
   describe("when the run builds its cells", () => {
     /** @scenario "The run reads its mappings from the dataset the rows come from" */
     it("reads the mapping bucket of the active dataset", () => {
-      const cells = generateCells(twoDatasetState(), createTestDataset(1), {
-        type: "full",
-      });
+      const cells = ExperimentRunOrchestratorService.generateCells(
+        twoDatasetState(),
+        createTestDataset(1),
+        {
+          type: "full",
+        },
+      );
 
       expect(cells).toHaveLength(1);
       expect(cells[0]?.datasetEntry._datasetId).toBe("dataset-active");
@@ -91,11 +93,19 @@ describe("given two datasets where the active one is not the first", () => {
 
     /** @scenario "The run reads its mappings from the dataset the rows come from" */
     it("resolves the evaluator's inputs instead of dispatching an empty payload", () => {
-      const cells = generateCells(twoDatasetState(), createTestDataset(1), {
-        type: "full",
-      });
+      const cells = ExperimentRunOrchestratorService.generateCells(
+        twoDatasetState(),
+        createTestDataset(1),
+        {
+          type: "full",
+        },
+      );
 
-      expect(buildEvaluatorInputs(cells[0]!, "eval-1", { output: "Answer 0" })).toEqual({
+      expect(
+        ExperimentRunOrchestratorService.buildEvaluatorInputs(cells[0]!, "eval-1", {
+          output: "Answer 0",
+        }),
+      ).toEqual({
         output: "Answer 0",
         expected_output: "Answer 0",
       });
@@ -145,7 +155,7 @@ describe("given a run whose target is a connected agent", () => {
     const now = vi.fn(() => 42);
 
     const events = [];
-    for await (const event of executeConnectedCell({
+    for await (const event of ExperimentRunOrchestratorService.executeConnectedCell({
       cell,
       projectId: "p1",
       agent,

@@ -1,11 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ExperimentClickHouseAdapter } from "../../../adapters/experiment-clickhouse.adapter";
-import {
-  ExperimentIdLookupClickHouseRepository,
-  NullExperimentIdLookupRepository,
-} from "../clickhouse.experiment-id-lookup.repository";
+import { ClickHouseExperimentIdLookupRepository } from "../clickhouse.experiment-id-lookup.repository";
 
-describe("ExperimentIdLookupClickHouseRepository", () => {
+describe("ClickHouseExperimentIdLookupRepository", () => {
   const resolveClient = vi.fn();
   const mockQuery = vi.fn();
 
@@ -20,9 +17,9 @@ describe("ExperimentIdLookupClickHouseRepository", () => {
         mockQuery.mockResolvedValue({
           json: async () => [{ ExperimentId: "exp-1" }],
         });
-        const repository = new ExperimentIdLookupClickHouseRepository(
-          ExperimentClickHouseAdapter.create(resolveClient),
-        );
+        const repository = ClickHouseExperimentIdLookupRepository.create({
+          clickhouse: ExperimentClickHouseAdapter.create(resolveClient),
+        });
 
         const result = await repository.findExperimentId({
           tenantId: "tenant-1",
@@ -46,9 +43,9 @@ describe("ExperimentIdLookupClickHouseRepository", () => {
     describe("when the experiment id is looked up", () => {
       it("returns null", async () => {
         mockQuery.mockResolvedValue({ json: async () => [] });
-        const repository = new ExperimentIdLookupClickHouseRepository(
-          ExperimentClickHouseAdapter.create(resolveClient),
-        );
+        const repository = ClickHouseExperimentIdLookupRepository.create({
+          clickhouse: ExperimentClickHouseAdapter.create(resolveClient),
+        });
 
         const result = await repository.findExperimentId({
           tenantId: "tenant-1",
@@ -58,15 +55,5 @@ describe("ExperimentIdLookupClickHouseRepository", () => {
         expect(result).toBeNull();
       });
     });
-  });
-});
-
-describe("NullExperimentIdLookupRepository", () => {
-  it("always returns null", async () => {
-    const repository = new NullExperimentIdLookupRepository();
-
-    await expect(
-      repository.findExperimentId({ tenantId: "tenant-1", runId: "run-1" }),
-    ).resolves.toBeNull();
   });
 });

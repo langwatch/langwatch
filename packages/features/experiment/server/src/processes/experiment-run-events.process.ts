@@ -2,7 +2,7 @@ import { EventSchema } from "@langwatch/eventing";
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 import { experimentRunEventingTargetSchema as targetSchema } from "@langwatch/experiment-contract";
-import { EXPERIMENT_RUN_EVENT_TYPES } from "./eventing.experiment-run-event-types.adapter";
+import { EXPERIMENT_RUN_EVENT_TYPES } from "../rules/experiment-run-event-types.rules";
 
 /**
  * Base metadata for experiment run events.
@@ -173,11 +173,3 @@ export type ExperimentRunProcessingEvent =
   | EvaluatorResultEvent
   | TraceMetricsComputedEvent
   | ExperimentRunCompletedEvent;
-
-export {
-  isEvaluatorResultEvent,
-  isExperimentRunCompletedEvent,
-  isExperimentRunStartedEvent,
-  isTargetResultEvent,
-  isTraceMetricsComputedEvent,
-} from "../processes/experiment-run-event-guards.process";

@@ -21,11 +21,11 @@ import {
 import {
   RecordEvaluatorResultCommand,
   RecordTargetResultCommand,
-} from "../eventing.experiment-run-commands.adapter";
+} from "../eventing.experiment-run-processing.adapter";
 import type {
   EvaluatorResultEventData,
   TargetResultEventData,
-} from "../eventing.experiment-run-events.adapter";
+} from "../../processes/experiment-run-events.process";
 
 const TENANT = createTenantId("project_test");
 const RUN = "bold-jolly-bee";

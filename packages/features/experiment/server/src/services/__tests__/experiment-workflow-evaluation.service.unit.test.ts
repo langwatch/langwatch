@@ -101,10 +101,12 @@ function buildWorkflowSource(workflows: Record<string, FakeWorkflow>): Experimen
   };
 }
 
-function buildDeps(overrides: {
-  workflows?: Record<string, FakeWorkflow>;
-  findOrCreateForWorkflow?: ReturnType<typeof vi.fn>;
-} = {}): { deps: WorkflowEvaluationDependencies; findOrCreateForWorkflow: ReturnType<typeof vi.fn> } {
+function buildDeps(
+  overrides: {
+    workflows?: Record<string, FakeWorkflow>;
+    findOrCreateForWorkflow?: ReturnType<typeof vi.fn>;
+  } = {},
+): { deps: WorkflowEvaluationDependencies; findOrCreateForWorkflow: ReturnType<typeof vi.fn> } {
   const workflows =
     overrides.workflows ??
     ({
@@ -137,7 +139,11 @@ function buildDeps(overrides: {
   const deps: WorkflowEvaluationDependencies = {
     experiments: { findOrCreateForWorkflow } as never,
     workflowSource,
-    ports: {} as never,
+    // The ownership check runs before any cell exists; a stub that passes is
+    // what lets the run reach the part this file is about.
+    ports: {
+      connectedAgentOwnership: { assertRunnable: vi.fn(async () => undefined) },
+    } as never,
     workflows: {} as never,
     services: {
       datasets: {} as never,

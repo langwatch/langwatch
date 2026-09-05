@@ -10,16 +10,16 @@ import { describe, expect, it } from "vitest";
 import {
   EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_EVENT_VERSIONS,
-} from "../../adapters/eventing.experiment-run-event-types.adapter";
+} from "../../rules/experiment-run-event-types.rules";
 import type {
   EvaluatorResultEvent,
   TargetResultEvent,
-} from "../../adapters/eventing.experiment-run-events.adapter";
+} from "../../processes/experiment-run-events.process";
 import { ExperimentRunResultStorageMapProjection } from "../experiment-run-result-storage.projection";
 
 const TENANT = createTenantId("project_test");
 
-const projection = new ExperimentRunResultStorageMapProjection({
+const projection = ExperimentRunResultStorageMapProjection.create({
   store: { append: async () => undefined },
 });
 

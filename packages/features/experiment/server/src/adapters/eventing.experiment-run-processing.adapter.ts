@@ -1,17 +1,11 @@
 import {
   type AppendStore,
   defineAggregate,
+  defineCommand,
   defineEvents,
   definePipeline,
   type FoldProjectionStore,
 } from "@langwatch/eventing";
-import {
-  CompleteExperimentRunCommand,
-  ComputeExperimentRunMetricsCommand,
-  RecordEvaluatorResultCommand,
-  RecordTargetResultCommand,
-  StartExperimentRunCommand,
-} from "./eventing.experiment-run-commands.adapter";
 import {
   type ClickHouseExperimentRunResultRecord,
   ExperimentRunResultStorageMapProjection,
@@ -20,69 +14,157 @@ import {
   type ExperimentRunStateData,
   ExperimentRunStateFoldProjection,
 } from "../projections/experiment-run-state.projection";
-import { EXPERIMENT_RUN_PROCESSING_EVENT_TYPES } from "./eventing.experiment-run-event-types.adapter";
-import type { ExperimentRunProcessingEvent } from "./eventing.experiment-run-events.adapter";
+import { EXPERIMENT_RUN_PROCESSING_EVENT_TYPES } from "../rules/experiment-run-event-types.rules";
+import {
+  evaluatorResultEventDataSchema,
+  experimentRunCompletedEventDataSchema,
+  experimentRunStartedEventDataSchema,
+  type ExperimentRunProcessingEvent,
+  targetResultEventDataSchema,
+  traceMetricsComputedEventDataSchema,
+} from "../processes/experiment-run-events.process";
+import { makeExperimentRunKey } from "../processes/experiment-run-key.process";
+import type { ExperimentClickHousePort } from "../ports/experiment-clickhouse.port";
 import {
   ExperimentClickHouseAdapter,
   type ExperimentEventingClickHouseResolver,
 } from "./experiment-clickhouse.adapter";
-import {
-  ExperimentIdLookupClickHouseRepository,
-  NullExperimentIdLookupRepository,
-  type ExperimentIdLookup,
-} from "../repositories/clickhouse/clickhouse.experiment-id-lookup.repository";
-import { ExperimentRunStateRepositoryClickHouse } from "../repositories/clickhouse/clickhouse.experiment-run-state.repository";
-import { ExperimentRunStateRepositoryMemory } from "../repositories/memory/memory.experiment-run-state.repository";
+import { ClickHouseExperimentIdLookupRepository } from "../repositories/clickhouse/clickhouse.experiment-id-lookup.repository";
+import { MemoryExperimentIdLookupRepository } from "../repositories/memory/memory.experiment-id-lookup.repository";
+import type { ExperimentIdLookupRepository } from "../repositories/experiment-id-lookup.repository";
+import { ClickHouseExperimentRunStateRepository } from "../repositories/clickhouse/clickhouse.experiment-run-state.repository";
+import { MemoryExperimentRunStateRepository } from "../repositories/memory/memory.experiment-run-state.repository";
 import type { ExperimentRunStateRepository } from "../repositories/experiment-run-state.repository";
-import { createExperimentRunItemAppendStore } from "../stores/experiment-run-item.clickhouse.store";
-import { createExperimentRunStateFoldStore } from "../stores/experiment-run-state.store";
+import { ExperimentRunItemStore } from "../stores/eventing/eventing.experiment-run-item.store";
+
+/**
+ * All experiment-run-processing commands defined from event data schemas.
+ *
+ * The event data schemas in processes/experiment-run-events.process.ts are the
+ * single source of truth.
+ * Command data = envelope (tenantId, occurredAt) + event data.
+ */
+
+export const StartExperimentRunCommand = defineCommand({
+  commandType: "lw.experiment_run.start",
+  eventType: "lw.experiment_run.started",
+  eventVersion: "2025-02-01",
+  aggregateType: "experiment_run",
+  schema: experimentRunStartedEventDataSchema,
+  aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
+  idempotencyKey: (d) => `${d.tenantId}:${d.runId}:start`,
+  spanAttributes: (d) => ({
+    "payload.run.id": d.runId,
+    "payload.experiment.id": d.experimentId,
+    "payload.total": d.total,
+  }),
+  makeJobId: (d) => `${d.tenantId}:${d.runId}:start`,
+});
+
+/**
+ * The identity of one cell result, used both to order the event and to name
+ * its queue job.
+ *
+ * The store deduplicates on the idempotency key and the queue deduplicates on
+ * the job id, so the two must always describe the same cell. One builder for
+ * both keeps them that way.
+ */
+const targetResultIdentity = (d: {
+  tenantId: string;
+  runId: string;
+  targetId: string;
+  index: number;
+}) => `${d.tenantId}:${d.runId}:target:${d.targetId}:${d.index}`;
+
+const evaluatorResultIdentity = (d: {
+  tenantId: string;
+  runId: string;
+  targetId: string;
+  evaluatorId: string;
+  index: number;
+}) => `${d.tenantId}:${d.runId}:evaluator:${d.targetId}:${d.evaluatorId}:${d.index}`;
+
+export const RecordTargetResultCommand = defineCommand({
+  commandType: "lw.experiment_run.record_target_result",
+  eventType: "lw.experiment_run.target_result",
+  eventVersion: "2025-02-01",
+  aggregateType: "experiment_run",
+  schema: targetResultEventDataSchema,
+  aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
+  groupKey: (d) => `${d.experimentId}:${d.runId}:item:${d.index}`,
+  idempotencyKey: targetResultIdentity,
+  spanAttributes: (d) => ({
+    "payload.run.id": d.runId,
+    "payload.experiment.id": d.experimentId,
+    "payload.target.id": d.targetId,
+    "payload.index": d.index,
+  }),
+  makeJobId: targetResultIdentity,
+});
+
+/**
+ * A verdict is identified by its target as well as its evaluator and its row.
+ *
+ * Every evaluator runs against every target, so two columns produce a verdict
+ * for the same evaluator on the same row. `event_log` is a ReplacingMergeTree
+ * ordered by the idempotency key, so a key without the target makes those two
+ * verdicts one row and one column loses its score.
+ */
+export const RecordEvaluatorResultCommand = defineCommand({
+  commandType: "lw.experiment_run.record_evaluator_result",
+  eventType: "lw.experiment_run.evaluator_result",
+  eventVersion: "2025-02-01",
+  aggregateType: "experiment_run",
+  schema: evaluatorResultEventDataSchema,
+  aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
+  groupKey: (d) => `${d.experimentId}:${d.runId}:item:${d.index}`,
+  idempotencyKey: evaluatorResultIdentity,
+  spanAttributes: (d) => ({
+    "payload.run.id": d.runId,
+    "payload.experiment.id": d.experimentId,
+    "payload.target.id": d.targetId,
+    "payload.evaluator.id": d.evaluatorId,
+    "payload.index": d.index,
+  }),
+  makeJobId: evaluatorResultIdentity,
+});
+
+export const ComputeExperimentRunMetricsCommand = defineCommand({
+  commandType: "lw.experiment_run.compute_trace_metrics",
+  eventType: "lw.experiment_run.trace_metrics_computed",
+  eventVersion: "2026-04-15",
+  aggregateType: "experiment_run",
+  schema: traceMetricsComputedEventDataSchema,
+  aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
+  idempotencyKey: (d) => `${d.tenantId}:${d.runId}:trace-metrics:${d.traceId}`,
+  spanAttributes: (d) => ({
+    "payload.run.id": d.runId,
+    "payload.experiment.id": d.experimentId,
+    "payload.trace.id": d.traceId,
+    "payload.total_cost": d.totalCost,
+  }),
+  makeJobId: (d) => `${d.tenantId}:${d.runId}:trace-metrics:${d.traceId}`,
+});
+
+export const CompleteExperimentRunCommand = defineCommand({
+  commandType: "lw.experiment_run.complete",
+  eventType: "lw.experiment_run.completed",
+  eventVersion: "2025-02-01",
+  aggregateType: "experiment_run",
+  schema: experimentRunCompletedEventDataSchema,
+  aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
+  idempotencyKey: (d) => `${d.tenantId}:${d.runId}:complete`,
+  spanAttributes: (d) => ({
+    "payload.run.id": d.runId,
+    "payload.experiment.id": d.experimentId,
+  }),
+  makeJobId: (d) => `${d.tenantId}:${d.runId}:complete`,
+});
 
 export type ExperimentRunEventingStateRepository = ExperimentRunStateRepository;
-export type ExperimentRunEventingIdLookup = ExperimentIdLookup;
+export type ExperimentRunEventingIdLookup = ExperimentIdLookupRepository;
 export type ExperimentRunEventingResultRecord = ClickHouseExperimentRunResultRecord;
 export type ExperimentRunEventingState = ExperimentRunStateData;
-
-export class ExperimentEventingAdapter {
-  static createStateRepository(input: {
-    resolveClient: ExperimentEventingClickHouseResolver;
-    clickhouseEnabled: boolean;
-    defaultRetentionDays: number;
-  }): ExperimentRunStateRepository {
-    return input.clickhouseEnabled
-      ? new ExperimentRunStateRepositoryClickHouse(
-          ExperimentClickHouseAdapter.create(input.resolveClient),
-          input.defaultRetentionDays,
-        )
-      : new ExperimentRunStateRepositoryMemory();
-  }
-
-  static createIdLookup(input: {
-    resolveClient: ExperimentEventingClickHouseResolver;
-    clickhouseEnabled: boolean;
-  }): ExperimentIdLookup {
-    return input.clickhouseEnabled
-      ? new ExperimentIdLookupClickHouseRepository(
-          ExperimentClickHouseAdapter.create(input.resolveClient),
-        )
-      : new NullExperimentIdLookupRepository();
-  }
-
-  static createItemStore(
-    resolveClient: ExperimentEventingClickHouseResolver,
-    defaultRetentionDays: number,
-  ): AppendStore<ClickHouseExperimentRunResultRecord> {
-    return createExperimentRunItemAppendStore(
-      ExperimentClickHouseAdapter.create(resolveClient),
-      defaultRetentionDays,
-    );
-  }
-
-  static createStateFoldStore(
-    repository: ExperimentRunStateRepository,
-  ): FoldProjectionStore<ExperimentRunStateData> {
-    return createExperimentRunStateFoldStore(repository);
-  }
-}
 
 export interface ExperimentRunProcessingPipelineDeps {
   experimentRunStateFoldStore: FoldProjectionStore<ExperimentRunStateData>;
@@ -90,58 +172,82 @@ export interface ExperimentRunProcessingPipelineDeps {
 }
 
 /**
- * Creates the experiment run processing pipeline definition.
+ * The Eventing side of experiment run processing: the storage this feature's
+ * pipeline reads and writes through, and the pipeline definition itself.
  *
- * This pipeline uses experiment_run aggregates (aggregateId = runId).
- * It tracks the lifecycle of experiment runs:
- * - started -> target results received -> evaluator results received -> completed
- *
- * Fold Projection: experimentRunState
- * - Computes summary statistics (progress, costs, scores, pass rate)
- * - Stored in experiment_runs ClickHouse table
- *
- * Map Projection: experimentRunResultStorage
- * - Writes individual results to experiment_run_items for query-optimized access
- * - Enables efficient filtering/sorting of detailed results
- *
- * Commands:
- * - startExperimentRun: Emits ExperimentRunStartedEvent when run begins
- * - recordTargetResult: Emits TargetResultEvent per row/target
- * - recordEvaluatorResult: Emits EvaluatorResultEvent per row/evaluator
- * - completeExperimentRun: Emits ExperimentRunCompletedEvent when run finishes
+ * The pipeline uses experiment_run aggregates (aggregateId = runId) and tracks
+ * the lifecycle of a run: started -> target results -> evaluator results ->
+ * completed. Its fold projection keeps the run summary (progress, costs,
+ * scores, pass rate) in `experiment_runs`; its map projection writes each
+ * individual result to `experiment_run_items` for query-optimized access.
  */
-export function createExperimentRunProcessingPipeline(deps: ExperimentRunProcessingPipelineDeps) {
-  const builder = definePipeline<ExperimentRunProcessingEvent>({
-    name: "experiment_run_processing",
-    aggregate: defineAggregate({
-      type: "experiment_run",
-      events: defineEvents(EXPERIMENT_RUN_PROCESSING_EVENT_TYPES),
-    }),
-  })
-    .withClickHouseFoldProjection(
-      new ExperimentRunStateFoldProjection({
-        store: deps.experimentRunStateFoldStore,
-      }),
-    )
-    .withClickHouseMapProjection(
-      new ExperimentRunResultStorageMapProjection({
-        store: deps.experimentRunItemAppendStore,
-      }),
-    );
+export class ExperimentEventingAdapter {
+  private constructor(private readonly clickhouse: ExperimentClickHousePort | null) {}
 
-  return builder
-    .withCommand("startExperimentRun", StartExperimentRunCommand)
-    .withCommand("recordTargetResult", RecordTargetResultCommand)
-    .withCommand("recordEvaluatorResult", RecordEvaluatorResultCommand)
-    .withCommand("computeExperimentRunMetrics", ComputeExperimentRunMetricsCommand)
-    .withCommand("completeExperimentRun", CompleteExperimentRunCommand)
-    .build();
+  static create(input: {
+    resolveClient: ExperimentEventingClickHouseResolver;
+    clickhouseEnabled: boolean;
+  }): ExperimentEventingAdapter {
+    return new ExperimentEventingAdapter(
+      input.clickhouseEnabled ? ExperimentClickHouseAdapter.create(input.resolveClient) : null,
+    );
+  }
+
+  stateRepository(input: { defaultRetentionDays: number }): ExperimentRunStateRepository {
+    return this.clickhouse
+      ? ClickHouseExperimentRunStateRepository.create({
+          clickhouse: this.clickhouse,
+          defaultRetentionDays: input.defaultRetentionDays,
+        })
+      : MemoryExperimentRunStateRepository.create();
+  }
+
+  idLookup(): ExperimentIdLookupRepository {
+    return this.clickhouse
+      ? ClickHouseExperimentIdLookupRepository.create({ clickhouse: this.clickhouse })
+      : MemoryExperimentIdLookupRepository.create();
+  }
+
+  itemStore(input: {
+    defaultRetentionDays: number;
+  }): AppendStore<ClickHouseExperimentRunResultRecord> {
+    return ExperimentRunItemStore.create({
+      clickhouse: this.clickhouse,
+      defaultRetentionDays: input.defaultRetentionDays,
+    });
+  }
+
+  static pipeline(deps: ExperimentRunProcessingPipelineDeps) {
+    const builder = definePipeline<ExperimentRunProcessingEvent>({
+      name: "experiment_run_processing",
+      aggregate: defineAggregate({
+        type: "experiment_run",
+        events: defineEvents(EXPERIMENT_RUN_PROCESSING_EVENT_TYPES),
+      }),
+    })
+      .withClickHouseFoldProjection(
+        ExperimentRunStateFoldProjection.create({
+          store: deps.experimentRunStateFoldStore,
+        }),
+      )
+      .withClickHouseMapProjection(
+        ExperimentRunResultStorageMapProjection.create({
+          store: deps.experimentRunItemAppendStore,
+        }),
+      );
+
+    return builder
+      .withCommand("startExperimentRun", StartExperimentRunCommand)
+      .withCommand("recordTargetResult", RecordTargetResultCommand)
+      .withCommand("recordEvaluatorResult", RecordEvaluatorResultCommand)
+      .withCommand("computeExperimentRunMetrics", ComputeExperimentRunMetricsCommand)
+      .withCommand("completeExperimentRun", CompleteExperimentRunCommand)
+      .build();
+  }
 }
 
 /**
  * The definition this feature registers, named so a composition root can hold
  * one without restating its shape.
  */
-export type ExperimentRunProcessingPipeline = ReturnType<
-  typeof createExperimentRunProcessingPipeline
->;
+export type ExperimentRunProcessingPipeline = ReturnType<typeof ExperimentEventingAdapter.pipeline>;

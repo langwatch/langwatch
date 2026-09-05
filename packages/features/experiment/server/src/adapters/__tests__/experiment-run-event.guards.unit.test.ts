@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_EVENT_VERSIONS,
-} from "../eventing.experiment-run-event-types.adapter";
-import type { ExperimentRunProcessingEvent } from "../eventing.experiment-run-events.adapter";
+} from "../../rules/experiment-run-event-types.rules";
+import type { ExperimentRunProcessingEvent } from "../../processes/experiment-run-events.process";
 import {
   isEvaluatorResultEvent,
   isExperimentRunCompletedEvent,

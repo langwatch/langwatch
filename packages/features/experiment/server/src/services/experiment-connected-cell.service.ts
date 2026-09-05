@@ -20,7 +20,6 @@ import {
   type DispatchCall,
 } from "@langwatch/agent-contract";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
-import { getConnectedAgentRuntime } from "@langwatch/agent-server";
 import {
   CONNECTED_OUTPUT_FIELD,
   connectedParameterDefinitions,
@@ -67,11 +66,12 @@ export type ConnectedCellExecutionInput = {
 
 export class ExperimentConnectedCellService {
   /**
-   * `ports`/`workflows` are accepted (not stored) to give this the same
-   * `create` shape as every other cell executor — `cells` already closes
-   * over them, so this service never reaches them directly.
+   * `workflows` is accepted (not stored) to give this the same `create` shape
+   * as every other cell executor — `cells` already closes over it. `ports` is
+   * read for the connected dispatcher the turn goes through.
    */
   static create({
+    ports,
     cells,
     dispatch,
     sleep,
@@ -86,7 +86,7 @@ export class ExperimentConnectedCellService {
   }): ExperimentConnectedCellService {
     return new ExperimentConnectedCellService(
       cells,
-      dispatch ?? ((params) => getConnectedAgentRuntime().dispatcher.dispatch(params)),
+      dispatch ?? ((params) => ports.connectedDispatch.dispatch(params)),
       sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms))),
       now ?? (() => Date.now()),
     );

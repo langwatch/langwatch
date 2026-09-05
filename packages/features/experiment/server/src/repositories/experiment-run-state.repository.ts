@@ -5,13 +5,21 @@ import type {
   ProjectionStoreWriteContext,
 } from "@langwatch/eventing";
 
-export interface ExperimentRunStateRepository<
+export abstract class ExperimentRunStateRepository<
   ProjectionType extends Projection = Projection,
-> extends ProjectionStore<ProjectionType> {
-  getProjection(
+> implements ProjectionStore<ProjectionType> {
+  abstract getProjection(
     aggregateId: string,
     context: ProjectionStoreReadContext,
   ): Promise<ProjectionType | null>;
 
-  storeProjection(projection: ProjectionType, context: ProjectionStoreWriteContext): Promise<void>;
+  abstract storeProjection(
+    projection: ProjectionType,
+    context: ProjectionStoreWriteContext,
+  ): Promise<void>;
+
+  abstract storeProjectionBatch?(
+    projections: ProjectionType[],
+    context: ProjectionStoreWriteContext,
+  ): Promise<void>;
 }

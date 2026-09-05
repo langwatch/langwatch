@@ -19,6 +19,7 @@ import { DatasetService } from "@langwatch/dataset-contract";
 import { EvaluatorService } from "@langwatch/evaluator-contract";
 import { PromptService } from "@langwatch/prompt-contract";
 import { WorkflowService } from "@langwatch/workflow-contract";
+import { NoopExperimentWorkbenchUpdatesAdapter } from "../../adapters/noop-experiment-workbench-updates.adapter";
 
 const prompts: PromptService = Object.create(PromptService.prototype);
 prompts.getAllPrompts = async () => [];
@@ -373,6 +374,7 @@ const build = (
       newId: () => "generated",
       now: () => new Date(1),
       references,
+      updates: NoopExperimentWorkbenchUpdatesAdapter.create(),
     }),
   };
 };

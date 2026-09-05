@@ -1,4 +1,4 @@
-import { EXPERIMENT_RUN_EVENT_TYPES } from "../adapters/eventing.experiment-run-event-types.adapter";
+import { EXPERIMENT_RUN_EVENT_TYPES } from "../rules/experiment-run-event-types.rules";
 import type {
   EvaluatorResultEvent,
   ExperimentRunCompletedEvent,
@@ -6,7 +6,7 @@ import type {
   ExperimentRunStartedEvent,
   TargetResultEvent,
   TraceMetricsComputedEvent,
-} from "../adapters/eventing.experiment-run-events.adapter";
+} from "./experiment-run-events.process";
 
 export function isExperimentRunStartedEvent(
   event: ExperimentRunProcessingEvent,

@@ -1,12 +1,7 @@
 import type { ExperimentClickHousePort } from "../../ports/experiment-clickhouse.port";
+import { ExperimentIdLookupRepository } from "../experiment-id-lookup.repository";
 
 const TABLE_NAME = "experiment_runs" as const;
-
-/** Looks up the experiment a run belongs to, for cross-pipeline wiring. */
-export interface ExperimentIdLookup {
-  /** The run's ExperimentId, or null if the run has no row yet. */
-  findExperimentId(input: { tenantId: string; runId: string }): Promise<string | null>;
-}
 
 /**
  * Backs `experimentMetricsSync`'s late-bound lookup (see pipelineRegistry.ts,
@@ -14,8 +9,16 @@ export interface ExperimentIdLookup {
  * the `experimentId` it belongs to, and only `experiment_runs` carries that
  * mapping.
  */
-export class ExperimentIdLookupClickHouseRepository implements ExperimentIdLookup {
-  constructor(private readonly clickhouse: ExperimentClickHousePort) {}
+export class ClickHouseExperimentIdLookupRepository extends ExperimentIdLookupRepository {
+  private constructor(private readonly clickhouse: ExperimentClickHousePort) {
+    super();
+  }
+
+  static create(options: {
+    clickhouse: ExperimentClickHousePort;
+  }): ClickHouseExperimentIdLookupRepository {
+    return new ClickHouseExperimentIdLookupRepository(options.clickhouse);
+  }
 
   async findExperimentId({
     tenantId,
@@ -40,15 +43,5 @@ export class ExperimentIdLookupClickHouseRepository implements ExperimentIdLooku
 
     const rows = await result.json<{ ExperimentId: string }>();
     return rows[0]?.ExperimentId ?? null;
-  }
-}
-
-/** No-op lookup for deployments without ClickHouse. */
-export class NullExperimentIdLookupRepository implements ExperimentIdLookup {
-  // Parameter declared though unused: a caller holding this type still passes
-  // it, and a zero-arity signature makes that a type error even though it
-  // satisfies the interface.
-  async findExperimentId(_input: { tenantId: string; runId: string }): Promise<string | null> {
-    return null;
   }
 }

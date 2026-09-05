@@ -7,7 +7,6 @@ export {
 } from "./adapters/clickhouse.experiment-run-processing.adapter";
 export {
   ExperimentEventingAdapter,
-  createExperimentRunProcessingPipeline,
   type ExperimentRunProcessingPipeline,
   type ExperimentRunEventingIdLookup,
   type ExperimentRunEventingResultRecord,
@@ -18,7 +17,7 @@ export {
 export {
   EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
-} from "./adapters/eventing.experiment-run-event-types.adapter";
+} from "./rules/experiment-run-event-types.rules";
 export {
   ExperimentApp,
   type ExperimentAppDependencies,
@@ -77,8 +76,13 @@ export {
   buildStripScoreEvaluatorIds,
   shouldStripScore,
 } from "./processes/experiment-evaluator-score-filter.process";
-export { getRunUrl } from "./adapters/experiment-run-url.adapter";
+export { getRunUrl } from "./rules/experiment-run-url.rules";
 export { ExperimentRunAbortPort } from "./ports/experiment-run-abort.port";
+export { ExperimentConnectedDispatchPort } from "./ports/experiment-connected-dispatch.port";
+export {
+  ExperimentConnectedAgentOwnershipPort,
+  type ExperimentConnectedAgentSubject,
+} from "./ports/experiment-connected-agent-ownership.port";
 export { RedisExperimentRunAbortAdapter } from "./adapters/redis.experiment-run-abort.adapter";
 
 export { ExperimentEvaluationReportingPort } from "./ports/experiment-evaluation-reporting.port";
@@ -97,52 +101,37 @@ export { ExperimentWorkflowDslPort } from "./ports/experiment-workflow-dsl.port"
 export { RedisExperimentRunProgressAdapter } from "./adapters/redis.experiment-run-progress.adapter";
 
 export {
-  countScopedCells,
-  executeCell,
-  executeWorkflowCell,
-  priceMetrics,
-  requestAbort,
-  resolveScopedRowIndices,
-  runOrchestrator,
+  ExperimentRunOrchestratorService,
   type ExperimentRunPorts,
   type OrchestratorInput,
 } from "./services/experiment-run-orchestrator.service";
 export {
-  startPollingRun,
+  ExperimentPollingRunService,
   type StartPollingRunInput,
 } from "./services/experiment-polling-run.service";
 export {
-  createRunResultsWriter,
-  persistRunResults,
-  runResultsWriterFor,
+  ExperimentRunResultsWriterService,
   type RunResultsPersistence,
   type RunResultsWriter,
 } from "./services/experiment-run-results-writer.service";
 export {
-  buildStateFromWorkbench,
-  planSavedRunCarryOver,
-  planSavedRunSeeding,
-  prepareSavedStateExecution,
+  ExperimentSavedStateExecutionService,
   type SavedStateExecution,
   type SavedStateExecutionRefusal,
 } from "./services/experiment-saved-state-execution.service";
 export {
-  applyParametersToRows,
-  loadDataset,
-  loadExecutionData,
-  promptLoadKey,
-  workflowLoadKey,
   type ExecutionDataInputs,
   type ExecutionDataServices,
+  ExperimentExecutionDataService,
   type LoadedDataset,
   type LoadedExecutionData,
   type LoadedWorkflow,
 } from "./services/experiment-execution-data.service";
 export {
-  createRunStateMirror,
+  ExperimentRunStateMirrorService,
   type RunStateMirror,
 } from "./services/experiment-run-state-mirror.service";
-export { resolveWorkbenchTargetNames } from "./services/experiment-workbench-target-names.service";
+export { ExperimentWorkbenchTargetNamesService } from "./services/experiment-workbench-target-names.service";
 export {
   EvaluationInputError,
   NoCommittedVersionError,

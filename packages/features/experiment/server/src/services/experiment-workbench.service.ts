@@ -44,7 +44,10 @@ import {
   type WorkbenchStateView,
   type WorkbenchVersionsPage,
 } from "@langwatch/experiment-contract";
-import { PostgresUniqueConflict } from "../adapters/postgres.unique-conflict.adapter";
+import {
+  isPostgresUniqueConflict,
+  postgresUniqueConflictTargets,
+} from "../rules/postgres-unique-conflict.rules";
 import type { ExperimentWorkbenchUpdatesPort } from "../ports/experiment-workbench-updates.port";
 import type { ExperimentRepository } from "../repositories/experiment.repository";
 import type { ExperimentSlugService } from "./experiment-slug.service";
@@ -75,7 +78,11 @@ export class ExperimentWorkbenchService {
   private readonly references: ExperimentWorkbenchReferencesService;
   private readonly draftNames: ExperimentDraftNames;
 
-  constructor(options: ExperimentWorkbenchServiceOptions) {
+  static create(options: ExperimentWorkbenchServiceOptions): ExperimentWorkbenchService {
+    return new ExperimentWorkbenchService(options);
+  }
+
+  private constructor(options: ExperimentWorkbenchServiceOptions) {
     this.repository = options.repository;
     this.newId = options.newId;
     this.updates = options.updates;
@@ -257,7 +264,7 @@ export class ExperimentWorkbenchService {
         commitMessage: input.commitMessage,
       });
     } catch (error) {
-      if (!PostgresUniqueConflict.matches(error)) {
+      if (!isPostgresUniqueConflict(error)) {
         throw error;
       }
 
@@ -277,11 +284,11 @@ export class ExperimentWorkbenchService {
           commitMessage: input.commitMessage,
         });
       } catch (retryError) {
-        const targets = PostgresUniqueConflict.targets(retryError).map((target) =>
+        const targets = postgresUniqueConflictTargets(retryError).map((target) =>
           target.toLowerCase(),
         );
         const slugConflict = targets.some((target) => target.includes("slug"));
-        if (input.requestedId && PostgresUniqueConflict.matches(retryError) && !slugConflict) {
+        if (input.requestedId && isPostgresUniqueConflict(retryError) && !slugConflict) {
           const reasons = retryError instanceof Error ? [retryError] : [];
 
           throw new ExperimentNotFoundError(input.requestedId, { reasons });

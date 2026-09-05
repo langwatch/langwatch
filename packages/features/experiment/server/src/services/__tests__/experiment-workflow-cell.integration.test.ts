@@ -1,5 +1,5 @@
 /**
- * Tests executeWorkflowCell: running a whole studio workflow as an
+ * Tests ExperimentRunOrchestratorService.executeWorkflowCell: running a whole studio workflow as an
  * evaluations-v3 target. The studio boundary is a fake port fed a scripted
  * set of server events (the platform version mocked three `~/`-rooted
  * modules; the cell takes its studio boundary as a port now, so the fake is
@@ -18,7 +18,7 @@ import type {
 } from "@langwatch/workflow-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  executeWorkflowCell,
+  ExperimentRunOrchestratorService,
   type ExperimentRunPorts,
 } from "../experiment-run-orchestrator.service";
 import type { EvaluationV3Event, ExecutionCell } from "@langwatch/experiment-contract";
@@ -108,7 +108,7 @@ const gradingEvaluator = (sourceField: string): EvaluatorConfig => ({
 
 const run = async (cell: ExecutionCell): Promise<EvaluationV3Event[]> => {
   const events: EvaluationV3Event[] = [];
-  for await (const event of executeWorkflowCell({
+  for await (const event of ExperimentRunOrchestratorService.executeWorkflowCell({
     cell,
     projectId: "p1",
     workflowDsl,
@@ -208,7 +208,7 @@ beforeEach(() => {
   scripted.dispatched = [];
 });
 
-describe("executeWorkflowCell", () => {
+describe("ExperimentRunOrchestratorService.executeWorkflowCell", () => {
   describe("given a workflow run that succeeds with an evaluator node", () => {
     describe("when the cell is executed", () => {
       /** @scenario "A workflow target produces one result per dataset row" */

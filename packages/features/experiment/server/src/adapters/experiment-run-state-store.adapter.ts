@@ -13,8 +13,8 @@ import type {
   ExperimentClickHousePort,
   ExperimentEventingClickHouseClient,
 } from "../ports/experiment-clickhouse.port";
-import { ExperimentRunStateRepositoryClickHouse } from "../repositories/clickhouse/clickhouse.experiment-run-state.repository";
-import { createExperimentRunStateFoldStore } from "../stores/experiment-run-state.store";
+import { ClickHouseExperimentRunStateRepository } from "../repositories/clickhouse/clickhouse.experiment-run-state.repository";
+import { ExperimentRunStateStore } from "../stores/eventing/eventing.experiment-run-state.store";
 import type { ExperimentRunStateData } from "../projections/experiment-run-state.projection";
 
 export class ExperimentRunStateStoreAdapter {
@@ -32,13 +32,16 @@ export class ExperimentRunStateStoreAdapter {
   }): ExperimentRunStateStoreAdapter {
     const clickhouse: ExperimentClickHousePort = { resolveClient: options.resolveClient };
     return new ExperimentRunStateStoreAdapter(
-      new ExperimentRunStateRepositoryClickHouse(clickhouse, options.defaultRetentionDays),
+      ClickHouseExperimentRunStateRepository.create({
+        clickhouse,
+        defaultRetentionDays: options.defaultRetentionDays,
+      }),
     );
   }
 
-  private constructor(private readonly repository: ExperimentRunStateRepositoryClickHouse) {}
+  private constructor(private readonly repository: ClickHouseExperimentRunStateRepository) {}
 
   createFoldStore(): FoldProjectionStore<ExperimentRunStateData> {
-    return createExperimentRunStateFoldStore(this.repository);
+    return ExperimentRunStateStore.create({ repository: this.repository });
   }
 }

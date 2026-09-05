@@ -72,13 +72,23 @@ type ClickHouseExperimentRunWriteRecord = WithDateWrites<
   "CreatedAt" | "UpdatedAt" | "StartedAt" | "FinishedAt" | "StoppedAt" | "LastEventOccurredAt"
 >;
 
-export class ExperimentRunStateRepositoryClickHouse<
+export class ClickHouseExperimentRunStateRepository<
   ProjectionType extends Projection = Projection,
 > implements ExperimentRunStateRepository<ProjectionType> {
-  constructor(
+  private constructor(
     private readonly clickhouse: ExperimentClickHousePort,
     private readonly defaultRetentionDays: number,
   ) {}
+
+  static create<ProjectionType extends Projection = Projection>(options: {
+    clickhouse: ExperimentClickHousePort;
+    defaultRetentionDays: number;
+  }): ClickHouseExperimentRunStateRepository<ProjectionType> {
+    return new ClickHouseExperimentRunStateRepository<ProjectionType>(
+      options.clickhouse,
+      options.defaultRetentionDays,
+    );
+  }
 
   private mapClickHouseRecordToProjectionData(
     record: ClickHouseExperimentRunRecord,
@@ -157,7 +167,7 @@ export class ExperimentRunStateRepositoryClickHouse<
     aggregateId: string,
     context: ProjectionStoreReadContext,
   ): Promise<ProjectionType | null> {
-    EventUtils.validateTenantId(context, "ExperimentRunStateRepositoryClickHouse.getProjection");
+    EventUtils.validateTenantId(context, "ClickHouseExperimentRunStateRepository.getProjection");
 
     // aggregateId is the composite key (experimentId:runId) — parse to raw values
     const { experimentId, runId } = parseExperimentRunKey(String(aggregateId));
@@ -230,7 +240,7 @@ export class ExperimentRunStateRepositoryClickHouse<
       );
       throw new StoreError(
         "getProjection",
-        "ExperimentRunStateRepositoryClickHouse",
+        "ClickHouseExperimentRunStateRepository",
         `Failed to get projection for run ${runId}: ${errorMessage}`,
         classifyClickHouseError(error),
         { runId },
@@ -243,7 +253,7 @@ export class ExperimentRunStateRepositoryClickHouse<
     projection: ProjectionType,
     context: ProjectionStoreWriteContext,
   ): Promise<void> {
-    EventUtils.validateTenantId(context, "ExperimentRunStateRepositoryClickHouse.storeProjection");
+    EventUtils.validateTenantId(context, "ClickHouseExperimentRunStateRepository.storeProjection");
 
     if (!EventUtils.isValidProjection(projection)) {
       throw new ValidationError(
@@ -298,7 +308,7 @@ export class ExperimentRunStateRepositoryClickHouse<
       );
       throw new StoreError(
         "storeProjection",
-        "ExperimentRunStateRepositoryClickHouse",
+        "ClickHouseExperimentRunStateRepository",
         `Failed to store projection ${projection.id} for run ${projection.aggregateId}: ${errorMessage}`,
         classifyClickHouseError(error),
         { projectionId: projection.id, runId: String(projection.aggregateId) },
@@ -315,7 +325,7 @@ export class ExperimentRunStateRepositoryClickHouse<
 
     EventUtils.validateTenantId(
       context,
-      "ExperimentRunStateRepositoryClickHouse.storeProjectionBatch",
+      "ClickHouseExperimentRunStateRepository.storeProjectionBatch",
     );
 
     for (const projection of projections) {
@@ -367,7 +377,7 @@ export class ExperimentRunStateRepositoryClickHouse<
       );
       throw new StoreError(
         "storeProjectionBatch",
-        "ExperimentRunStateRepositoryClickHouse",
+        "ClickHouseExperimentRunStateRepository",
         `Failed to batch store ${projections.length} projections: ${errorMessage}`,
         classifyClickHouseError(error),
         { count: projections.length },

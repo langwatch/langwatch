@@ -19,8 +19,8 @@ import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress
 import type { ExperimentWorkflowDslPort } from "../ports/experiment-workflow-dsl.port";
 import type { ExperimentRunPorts } from "./experiment-run-orchestrator.service";
 import type { ExecutionDataServices } from "./experiment-execution-data.service";
-import { loadExecutionData } from "./experiment-execution-data.service";
-import { startPollingRun } from "./experiment-polling-run.service";
+import { ExperimentExecutionDataService } from "./experiment-execution-data.service";
+import { ExperimentPollingRunService } from "./experiment-polling-run.service";
 
 export type WorkflowEvaluationParameters = Record<string, string | number | boolean>;
 
@@ -257,7 +257,7 @@ export class WorkflowEvaluationService {
       }
     }
 
-    const dataResult = await loadExecutionData(
+    const dataResult = await ExperimentExecutionDataService.loadExecutionData(
       projectId,
       datasetRef,
       [target],
@@ -326,7 +326,7 @@ export class WorkflowEvaluationService {
       ) as FindOrCreateWorkflowExperimentInput["workbenchState"],
     });
 
-    const { runId, runUrl } = await startPollingRun({
+    const { runId, runUrl } = await ExperimentPollingRunService.startPollingRun({
       projectId,
       projectSlug,
       experimentId: experiment.id,

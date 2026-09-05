@@ -5,12 +5,9 @@
  */
 import { describe, expect, it } from "vitest";
 import type { EvaluationsV3State } from "@langwatch/experiment-contract";
-import {
-  comparisonSkipMessage,
-  generateComparisonCells,
-} from "../experiment-run-orchestrator.service";
+import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service";
 
-// Helper to create test state (partial state with just what generateCells needs)
+// Helper to create test state (partial state with just what ExperimentRunOrchestratorService.generateCells needs)
 const createTestState = ({
   targetCount,
   evaluatorCount,
@@ -98,7 +95,7 @@ const createTestDataset = (rowCount = 3) =>
     expected: `Answer ${i}`,
   }));
 
-describe("generateComparisonCells given a comparison the user has not finished configuring", () => {
+describe("ExperimentRunOrchestratorService.generateComparisonCells given a comparison the user has not finished configuring", () => {
   const columnTarget = (comparison: Record<string, unknown>): EvaluationsV3State["targets"][0] =>
     ({
       id: "comparison-column",
@@ -113,7 +110,7 @@ describe("generateComparisonCells given a comparison the user has not finished c
   const runWith = (target: EvaluationsV3State["targets"][0]) => {
     const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
     state.targets.push(target);
-    return generateComparisonCells({
+    return ExperimentRunOrchestratorService.generateComparisonCells({
       scopedRowIndices: undefined,
       state,
       datasetRows: createTestDataset(2),
@@ -143,7 +140,9 @@ describe("generateComparisonCells given a comparison the user has not finished c
       expect(skipReasons.map((r) => r.rowIndex)).toEqual([0, 1]);
       expect(skipReasons[0]?.kind).toBe("too-few-variants");
       expect(skipReasons[0]?.targetId).toBe("comparison-column");
-      expect(comparisonSkipMessage(skipReasons[0]!).errorType).toBe("TooFewComparisonVariants");
+      expect(
+        ExperimentRunOrchestratorService.comparisonSkipMessage(skipReasons[0]!).errorType,
+      ).toBe("TooFewComparisonVariants");
     });
   });
 
@@ -163,7 +162,9 @@ describe("generateComparisonCells given a comparison the user has not finished c
       expect(cells).toHaveLength(0);
       expect(skipReasons).toHaveLength(2);
       expect(skipReasons[0]?.kind).toBe("golden-not-set");
-      expect(comparisonSkipMessage(skipReasons[0]!).errorType).toBe("GoldenFieldNotSet");
+      expect(
+        ExperimentRunOrchestratorService.comparisonSkipMessage(skipReasons[0]!).errorType,
+      ).toBe("GoldenFieldNotSet");
     });
   });
 
@@ -183,7 +184,9 @@ describe("generateComparisonCells given a comparison the user has not finished c
       expect(cells).toHaveLength(0);
       expect(skipReasons).toHaveLength(2);
       expect(skipReasons[0]?.kind).toBe("variant-not-found");
-      expect(comparisonSkipMessage(skipReasons[0]!).errorType).toBe("ComparisonVariantNotFound");
+      expect(
+        ExperimentRunOrchestratorService.comparisonSkipMessage(skipReasons[0]!).errorType,
+      ).toBe("ComparisonVariantNotFound");
     });
   });
 
@@ -205,7 +208,7 @@ describe("generateComparisonCells given a comparison the user has not finished c
         },
       } as unknown as EvaluationsV3State["evaluators"][0]);
 
-      const { cells, skipReasons } = generateComparisonCells({
+      const { cells, skipReasons } = ExperimentRunOrchestratorService.generateComparisonCells({
         scopedRowIndices: [1],
         state,
         datasetRows: createTestDataset(2),
