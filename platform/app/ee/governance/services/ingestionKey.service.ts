@@ -264,9 +264,14 @@ export class IngestionKeyService {
   /**
    * Issues an ingestion key for the caller's personal project WITHOUT
    * touching the keys other machines hold for the same tool: the create-only
-   * shape, capped at `PERSONAL_INGEST_KEYS_PER_TOOL_CAP` live keys per
+   * shape, held to `PERSONAL_INGEST_KEYS_PER_TOOL_CAP` live keys per
    * (workspace, sourceType, template). Past the cap the least recently used
    * key is revoked, oldest-created first among keys never used.
+   *
+   * The mint always succeeds and the trim follows it, so the cap is a bound
+   * the next mint restores rather than one a single call holds: two devices
+   * minting in the same moment can leave one key over it until either mints
+   * again. See `revokePastCap` for why that trade is the right one.
    *
    * This is the CLI device-session mint (`langwatch instrument <tool>`,
    * `langwatch <tool>`): every device that signs in gets its own key, and no

@@ -181,6 +181,74 @@ describe("the session context hook's self-heal", () => {
     });
   });
 
+  describe("given two sessions that both find the same expired claim", () => {
+    /** @scenario "Two sessions taking over the same stale claim mint one key" */
+    it("lets one of the two reach the healer", async () => {
+      // A claim left by a run that died mid-heal. Replacing it is a delete
+      // then a create, so without an exclusive right to do that, the second
+      // hook would delete the claim the first one just wrote and both would
+      // mint.
+      fs.mkdirSync(hook.stateDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(hook.stateDir, "heal-claude_code.json"),
+        JSON.stringify({ attemptedAt: NOW - 11 * 60_000 }),
+      );
+      const healRevokedKey = vi.fn().mockImplementation(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return DECLINED;
+      });
+
+      await Promise.all([
+        hook.runHook({
+          env: OLD_KEY_ENV,
+          fetchImpl: rotatedCollector,
+          healRevokedKey,
+        }),
+        hook.runHook({
+          env: OLD_KEY_ENV,
+          fetchImpl: rotatedCollector,
+          healRevokedKey,
+        }),
+      ]);
+
+      expect(healRevokedKey).toHaveBeenCalledTimes(1);
+      // The takeover marker is not left behind to cost the next window.
+      expect(
+        fs.existsSync(
+          path.join(hook.stateDir, "heal-claude_code.json.takeover"),
+        ),
+      ).toBe(false);
+    });
+
+    /** @scenario "A hook that loses the takeover leaves the winner's claim alone" */
+    it("stands down while another hook holds the takeover", async () => {
+      // The state another hook is in between deleting the stale claim and
+      // writing its own. This hook must not delete what that one is about to
+      // write, so it stands down on the marker rather than on the claim.
+      fs.mkdirSync(hook.stateDir, { recursive: true });
+      const claim = path.join(hook.stateDir, "heal-claude_code.json");
+      fs.writeFileSync(
+        claim,
+        JSON.stringify({ attemptedAt: NOW - 11 * 60_000 }),
+      );
+      fs.writeFileSync(
+        `${claim}.takeover`,
+        JSON.stringify({ attemptedAt: NOW }),
+      );
+      const healRevokedKey = vi.fn().mockResolvedValue(DECLINED);
+
+      await hook.runHook({
+        env: OLD_KEY_ENV,
+        fetchImpl: rotatedCollector,
+        healRevokedKey,
+      });
+
+      expect(healRevokedKey).not.toHaveBeenCalled();
+      // The claim the winner is mid-way through replacing is still there.
+      expect(fs.existsSync(claim)).toBe(true);
+    });
+  });
+
   describe("given a 401 on a target that carried no key", () => {
     /** @scenario "A 401 the device sent no key with is not this key's failure" */
     it("hands the healer no rejected token, and stays silent when it declines", async () => {

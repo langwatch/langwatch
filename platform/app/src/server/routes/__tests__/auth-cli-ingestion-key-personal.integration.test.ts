@@ -182,15 +182,17 @@ describe("POST /api/auth/cli/governance/ingestion-key for the personal workspace
   });
 
   describe("given a source type no wrapped tool stamps", () => {
-    /** @scenario "A personal key is minted only for a tool the CLI wraps" */
-    it("answers 400 and mints nothing under that value", async () => {
-      const made_up = await mintPersonal("made_up");
-      const other = await mintPersonal("toString");
+    describe("when the CLI submits an unsupported source type", () => {
+      /** @scenario "A personal key is minted only for a tool the CLI wraps" */
+      it("answers 400 and mints nothing under that value", async () => {
+        const made_up = await mintPersonal("made_up");
+        const other = await mintPersonal("toString");
 
-      expect(made_up.status).toBe(400);
-      expect(other.status).toBe(400);
-      expect(await liveKeysFor("made_up")).toHaveLength(0);
-      expect(await liveKeysFor("toString")).toHaveLength(0);
+        expect(made_up.status).toBe(400);
+        expect(other.status).toBe(400);
+        expect(await liveKeysFor("made_up")).toHaveLength(0);
+        expect(await liveKeysFor("toString")).toHaveLength(0);
+      });
     });
   });
 
@@ -302,9 +304,13 @@ describe("POST /api/auth/cli/governance/ingestion-key for the personal workspace
         const key = await prisma.apiKey.findFirstOrThrow({
           where: { lookupId: lookupIdOf(contested.token) },
         });
-        const revokedAt = new Date();
-
         await revoke({ token: contested.token });
+
+        const revoked = await prisma.apiKey.findUniqueOrThrow({
+          where: { id: key.id },
+        });
+        const revokedAt = revoked.revokedAt;
+        expect(revokedAt).not.toBeNull();
 
         // The cap read this key live a moment before the person's revoke
         // landed, so its write arrives at a row that is already revoked. The
@@ -320,9 +326,7 @@ describe("POST /api/auth/cli/governance/ingestion-key for the personal workspace
         });
         expect(after.revocationCause).toBe("user");
         // The losing write did not move the moment of death either.
-        expect(after.revokedAt?.getTime()).toBeLessThan(
-          revokedAt.getTime() + 60_000,
-        );
+        expect(after.revokedAt?.getTime()).toBe(revokedAt?.getTime());
       });
     });
   });

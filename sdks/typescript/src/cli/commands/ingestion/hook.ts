@@ -338,10 +338,19 @@ function healStateFile({
  * The window is claimed before the mint and with an exclusive create, so two
  * sessions that start together and read the same 401 cannot both ask the
  * platform to replace the same dead key: the second finds the first one's
- * claim and stands down. A claim older than the window belonged to a run that
- * died mid-heal, and is taken over the same atomic way, so only one of the
- * hooks waiting on it wins. A state directory that cannot be written claims
- * nothing and costs one extra attempt, the same trade the fingerprints make.
+ * claim and stands down.
+ *
+ * A claim older than the window belonged to a run that died mid-heal, and
+ * replacing it is a delete followed by a create, which two hooks holding the
+ * same stale reading could interleave into two winners. So the right to
+ * replace it is itself an exclusive create: whoever lands the takeover marker
+ * does the delete, and the hooks that lose the marker stand down instead of
+ * racing it. The marker is held across two filesystem calls rather than the
+ * whole heal, so a run has to die inside those to strand one, and its own
+ * staleness is bounded by the same window.
+ *
+ * A state directory that cannot be written claims nothing and costs one extra
+ * attempt, the same trade the fingerprints make.
  */
 function claimHealWindow({
   stateDir,
@@ -353,10 +362,11 @@ function claimHealWindow({
   now: () => number;
 }): boolean {
   const file = healStateFile({ stateDir, agent });
+  const marker = `${file}.takeover`;
   const claim = JSON.stringify({ attemptedAt: now() });
-  const write = (): "claimed" | "taken" | "unwritable" => {
+  const write = (at: string): "claimed" | "taken" | "unwritable" => {
     try {
-      fs.writeFileSync(file, claim, { flag: "wx" });
+      fs.writeFileSync(at, claim, { flag: "wx" });
       return "claimed";
     } catch (error) {
       return (error as NodeJS.ErrnoException).code === "EEXIST"
@@ -371,14 +381,40 @@ function claimHealWindow({
     return true;
   }
 
-  if (write() !== "taken") return true;
+  if (write(file) !== "taken") return true;
   if (standingClaimIsFresh({ file, now })) return false;
+  if (!claimTakeover({ marker, now, write })) return false;
   try {
     fs.rmSync(file, { force: true });
-  } catch {
-    return true;
+    return write(file) !== "taken";
+  } finally {
+    try {
+      fs.rmSync(marker, { force: true });
+    } catch {
+      // The next stale claim reclaims it by its own age; a marker left behind
+      // costs this device one heal window, never the heal itself.
+    }
   }
-  return write() !== "taken";
+}
+
+/** Whether this hook won the right to replace a claim it read as stale. */
+function claimTakeover({
+  marker,
+  now,
+  write,
+}: {
+  marker: string;
+  now: () => number;
+  write: (at: string) => "claimed" | "taken" | "unwritable";
+}): boolean {
+  if (write(marker) !== "taken") return true;
+  if (standingClaimIsFresh({ file: marker, now })) return false;
+  try {
+    fs.rmSync(marker, { force: true });
+  } catch {
+    return false;
+  }
+  return write(marker) !== "taken";
 }
 
 /** Whether the claim on disk is young enough to still stand for its run. */

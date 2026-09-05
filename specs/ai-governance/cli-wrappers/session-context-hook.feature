@@ -332,6 +332,26 @@ Rule: A revoked ingest key heals itself
     When they run at the same time
     Then only one of them reaches the healer
 
+  # A claim left by a run that died mid-heal is replaced by a delete and a
+  # create, and two hooks reading it stale could interleave those into two
+  # winners. The right to replace it is claimed exclusively first, so the
+  # hooks that lose it stand down rather than deleting the winner's claim.
+
+  @unit
+  Scenario: Two sessions taking over the same stale claim mint one key
+    Given a heal claim left behind by a run that died mid-heal
+    And two hooks that start together, both exporting with the rejected key
+    When they run at the same time
+    Then only one of them reaches the healer
+
+  @unit
+  Scenario: A hook that loses the takeover leaves the winner's claim alone
+    Given a heal claim left behind by a run that died mid-heal
+    And another hook already holding the right to replace it
+    When the hook runs
+    Then it does not reach the healer
+    And the claim being replaced is left in place
+
   @unit
   Scenario: A tool pinned to a project is not re-minted on the personal path
     Given a tool pinned to a project key

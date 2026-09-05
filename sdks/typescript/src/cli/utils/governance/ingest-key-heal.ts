@@ -140,23 +140,8 @@ export async function healRevokedIngestKey({
   const cached = cfg.default_personal_ingest_keys?.[agent]?.secret;
   if (!cached || rejectedToken !== cached) return DECLINED;
 
-  const lookupId = extractLookupIdFromToken(cached);
-  if (lookupId) {
-    // A platform that does not answer is not a platform that said "re-mint".
-    // The one revocation the device must not mint past is a person's, so a
-    // status call that times out or errors ends the heal rather than falling
-    // through to the mint; the next session asks again once the window is up.
-    const described = await deps
-      .describeIngestionKey(cfg, lookupId, { timeoutMs: DESCRIBE_TIMEOUT_MS })
-      .catch(() => null);
-    if (!described) return { status: "failed" };
-    if (
-      described.status === "revoked" &&
-      !PLATFORM_REVOCATION_CAUSES.has(described.revocationCause)
-    ) {
-      return { status: "withheld" };
-    }
-  }
+  const blocked = await revocationBlocksHeal({ cfg, cached, deps });
+  if (blocked) return blocked;
 
   const resolved = await deps.resolveLiveIngestionKey({
     cfg,
@@ -165,12 +150,67 @@ export async function healRevokedIngestKey({
   });
   if (!resolved.minted) return { status: "failed" };
 
-  // The cache and the wiring must never name different keys. The next 401 is
-  // repaired only when the rejected bearer is the key the cache holds, so a
-  // pair that disagrees declines a repair this device could have made. The
-  // cache is written first and put back when the wiring lands no target, and
-  // a cache that cannot be written at all is a failed heal rather than a
-  // healed one whose key this device would not recognise next time.
+  return adoptMintedKey({ agent, tool, cfg, resolved, deps });
+}
+
+/**
+ * The status check that stands between the 401 and the mint, as an outcome
+ * when it ends the heal and `null` when the key may be replaced.
+ *
+ * A platform that does not answer is not a platform that said "re-mint". The
+ * one revocation the device must not mint past is a person's, so a status
+ * call that times out or errors ends the heal rather than falling through to
+ * the mint; the next session asks again once the window is up.
+ */
+async function revocationBlocksHeal({
+  cfg,
+  cached,
+  deps,
+}: {
+  cfg: GovernanceConfig;
+  cached: string;
+  deps: HealDeps;
+}): Promise<HealOutcome | null> {
+  const lookupId = extractLookupIdFromToken(cached);
+  if (!lookupId) return null;
+
+  const described = await deps
+    .describeIngestionKey(cfg, lookupId, { timeoutMs: DESCRIBE_TIMEOUT_MS })
+    .catch(() => null);
+  if (!described) return { status: "failed" };
+  if (
+    described.status === "revoked" &&
+    !PLATFORM_REVOCATION_CAUSES.has(described.revocationCause)
+  ) {
+    return { status: "withheld" };
+  }
+  return null;
+}
+
+/**
+ * Put a freshly minted key into the cache and the tool's wiring, or leave
+ * both naming the key that was there before.
+ *
+ * The cache and the wiring must never name different keys. The next 401 is
+ * repaired only when the rejected bearer is the key the cache holds, so a
+ * pair that disagrees declines a repair this device could have made. The
+ * cache is written first and put back when the wiring lands no target, and a
+ * cache that cannot be written at all is a failed heal rather than a healed
+ * one whose key this device would not recognise next time.
+ */
+function adoptMintedKey({
+  agent,
+  tool,
+  cfg,
+  resolved,
+  deps,
+}: {
+  agent: string;
+  tool: string;
+  cfg: GovernanceConfig;
+  resolved: Awaited<ReturnType<HealDeps["resolveLiveIngestionKey"]>>;
+  deps: HealDeps;
+}): HealOutcome {
   const cachedKeys = cfg.default_personal_ingest_keys;
   cfg.default_personal_ingest_keys = {
     ...(cachedKeys ?? {}),
