@@ -37278,7 +37278,7 @@ The `CI` half of each expression keeps the default the SDK applies on its own. W
 title: Evaluators
 sidebarTitle: Evaluators
 keywords: langwatch, agent testing, evaluators, test suite, fields, mappings, required, gate, tool call, contexts, golden answer, sql
-description: An evaluator attached to a test suite runs after every scenario run, reads the conversation, the scenario's fields or the trace, and reports beside the judge's verdict. A required one that fails fails the scenario.
+description: An evaluator attached to a test suite runs after every scenario run, reads the conversation, the scenario's fields or the trace, and reports beside the judge's verdict. A required pass or fail evaluator fails the scenario when it fails, and a score-only evaluator never gates.
 ---
 
 ## When to attach an evaluator
@@ -37310,7 +37310,9 @@ Every evaluator input reads from one source:
 
 Mappings are inferred when an evaluator is attached. An input named `input`, `question` or `user_input` reads the first user message; `output`, `response` or `answer` reads the last agent message; `transcript`, `conversation` or `messages` reads the transcript; `contexts` or `retrieved_contexts` reads the trace's contexts.
 
-An input named `expected_output`, `expected_contexts` or another `expected_*` reads the field whose name matches, so `expected_output` matches `golden_sql` and `expected_contexts` matches `table_schema`. A suite with one field maps an expected input to it. A tool call or the spans are never inferred: set them by hand. `spans` hands a code or LLM evaluator the whole run, every span of every trace as JSON, when one tool call at a time is not enough.
+An input named `expected_output`, `expected_contexts` or another `expected_*` reads a suite field. A field identifier equal to the input name wins. Otherwise the words of the identifier decide: `expected_output` takes a field carrying `golden`, `answer`, `sql`, `query`, `label` or `target`, which is how it takes `golden_sql`; `expected_contexts` takes one carrying `schema`, `context` or `table`, which is how it takes `table_schema`.
+
+Two fields matching leaves the input unmapped, so you pick one in the drawer. With no match at all, a suite with a single field maps the input to it. A tool call or the spans are never inferred: set them by hand. `spans` hands a code or LLM evaluator the whole run, every span of every trace as JSON, when one tool call at a time is not enough.
 
 The example of a text-to-SQL agent: the suite declares `golden_sql` and `table_schema`, and **SQL Query Equivalence** reads `output` from `tool_calls.run_sql.input`, `expected_output` from `fields.golden_sql` and `expected_contexts` from `fields.table_schema`.
 
@@ -39572,7 +39574,7 @@ A suite declares up to 30 fields. A field an attached evaluator still reads cann
 
 ## Evaluators
 
-The evaluators attached to a suite run after every scenario run and report beside the judge's verdict. A required one that fails fails the scenario. See [Evaluators](/agent-testing/evaluators) for the mappings, the gate and what each run reports.
+The evaluators attached to a suite run after every scenario run and report beside the judge's verdict. A required pass or fail evaluator fails the scenario when it fails, and a score-only evaluator never gates. See [Evaluators](/agent-testing/evaluators) for the mappings, the gate and what each run reports.
 
 ## Run a test suite
 
