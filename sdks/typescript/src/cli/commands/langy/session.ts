@@ -235,8 +235,13 @@ export function startLangySession(options: LangySessionOptions): LangySession {
   const onCall = (call: LocalCall): void => {
     // The platform replays the calls it has no answer for after a reconnect.
     // A call this session already took is running here or has already run, so
-    // taking it again would run the same command a second time.
-    if (handled.has(call.callId)) return;
+    // taking it again would run the same command a second time. One that ran
+    // is answered again, because the answer it was given may have gone down
+    // with the connection.
+    if (handled.has(call.callId)) {
+      client.resendResult(call.callId);
+      return;
+    }
     handled.add(call.callId);
     client.noteInFlight(call.callId);
     const decision = decide({

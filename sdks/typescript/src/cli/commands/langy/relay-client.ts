@@ -89,6 +89,13 @@ export interface RelayClientConfig {
 
 const CLOSE_GRACE_MS = 500;
 
+/**
+ * How many answers this session keeps, so a replayed call is answered from
+ * what already ran rather than run again. A turn makes tens of calls, and the
+ * platform only replays the ones of the connection it lost.
+ */
+export const REMEMBERED_RESULTS = 200;
+
 const machineName = (): string => {
   try {
     return os.hostname();
@@ -125,6 +132,15 @@ export class RelayClient {
    * connection. The answer this machine already has is sent again instead.
    */
   private readonly unsentResults = new Map<string, LocalResultFrame>();
+  /**
+   * The answers this session already gave, newest last.
+   *
+   * A result can be sent on a socket that dies before the platform reads it.
+   * The platform then has a call with no answer and replays it, and a CLI
+   * that only skips a call it has already run leaves that call waiting for
+   * ever. The answer is sent again instead.
+   */
+  private readonly completedResults = new Map<string, LocalResultFrame>();
 
   private activeTransport: AgentTransport;
   private upgradeStatus: number | null = null;
@@ -196,8 +212,35 @@ export class RelayClient {
    * with what it did, rather than run again.
    */
   sendResult(frame: LocalResultFrame): void {
+    this.remember(frame);
     if (this.registered && this.send(frame)) return;
     this.unsentResults.set(frame.callId, frame);
+  }
+
+  /**
+   * Sends the answer to a call again, and says whether there was one.
+   *
+   * False means the call is still being worked on here, which the register
+   * frame already says with its in-flight call ids.
+   */
+  resendResult(callId: string): boolean {
+    const frame = this.completedResults.get(callId);
+    if (!frame) return false;
+    if (!this.registered || !this.send(frame)) {
+      this.unsentResults.set(callId, frame);
+    }
+    return true;
+  }
+
+  /** Keeps the answer, and forgets the oldest one past the limit. */
+  private remember(frame: LocalResultFrame): void {
+    this.completedResults.delete(frame.callId);
+    this.completedResults.set(frame.callId, frame);
+    while (this.completedResults.size > REMEMBERED_RESULTS) {
+      const oldest = this.completedResults.keys().next();
+      if (oldest.done === true) break;
+      this.completedResults.delete(oldest.value);
+    }
   }
 
   /** Sends the results that no earlier connection could carry. */

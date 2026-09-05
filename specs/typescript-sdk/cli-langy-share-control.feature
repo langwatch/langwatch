@@ -331,6 +331,13 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       And the platform receives one answer for it
 
     @unit
+    Scenario: A call replayed after its answer was lost is answered again
+      Given a command that already ran and was answered
+      When the connection drops before the platform read the answer and the call is sent again
+      Then the CLI sends the same answer again
+      And the command is not run a second time
+
+    @unit
     Scenario: A result that no connection carried is sent again
       Given a command that finished while the connection was down
       When the CLI registers again

@@ -923,6 +923,38 @@ describe("given a folder whose connection drops while Langy is working", () => {
     expect(live().sentOf("result")).toHaveLength(1);
   });
 
+  /** @scenario "A call replayed after its answer was lost is answered again" */
+  it("answers a replayed call from what already ran, and runs nothing twice", async () => {
+    start();
+    await settle();
+    register();
+
+    const marker = path.join(root, "runs.txt");
+    const call = callFrame({
+      tool: "local_bash",
+      params: { command: "echo run >> runs.txt" },
+    });
+    live().deliver(call);
+    await waitUntil(() => live().sentOf("result").length === 1, {
+      what: "the command to answer",
+    });
+    const answered = live().sentOf("result")[0]!;
+
+    // The socket dies before the platform read that answer, so the platform
+    // replays the call on the next connection.
+    live().close(1006);
+    await waitUntil(() => sockets.length === 2, { what: "the reconnect" });
+    register();
+    live().deliver(call);
+
+    await waitUntil(() => live().sentOf("result").length === 1, {
+      what: "the answer to be sent again",
+    });
+    await settle(200);
+    expect(live().sentOf("result")[0]).toEqual(answered);
+    expect(fs.readFileSync(marker, "utf8").trim().split("\n")).toEqual(["run"]);
+  });
+
   /** @scenario "A result that no connection carried is sent again" */
   it("sends the answer of a command that finished while the socket was down", async () => {
     start();
