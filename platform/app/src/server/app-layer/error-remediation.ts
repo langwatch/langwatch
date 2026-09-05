@@ -752,6 +752,13 @@ const registry = {
     tips: ["An update interrupted this reply; resend the message"],
   },
 
+  // ---- guided onboarding ----
+  guided_onboarding_path_unknown: {
+    tips: [
+      "Use one of the paths in meta.knownPaths: llmops, coding, gateway or governance",
+    ],
+  },
+
   // ---- licensing ----
   license_signing_key_not_pem: {
     tips: [

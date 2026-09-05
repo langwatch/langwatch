@@ -2998,6 +2998,11 @@ const presentations = {
     title: "You don't have permission to attach guardrails",
     describe: () => "Ask an admin on your team for access to this project.",
   },
+  guided_onboarding_path_unknown: {
+    title: "That onboarding path doesn't exist",
+    describe: () =>
+      "Pick one of Evals & LLM Ops, Coding Agent Tracking, Gateway or Governance.",
+  },
   github_not_connected: {
     title: "GitHub is not connected",
     describe: () =>

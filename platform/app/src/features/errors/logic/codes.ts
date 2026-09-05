@@ -131,6 +131,7 @@ export const APP_ERROR_CODES = [
   "group_not_found",
   "group_not_in_organization",
   "guardrail_attach_forbidden",
+  "guided_onboarding_path_unknown",
   "health_check_failed",
   "idempotency_error",
   "identity_detach_strands_user",
