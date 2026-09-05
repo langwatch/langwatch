@@ -223,6 +223,59 @@ describe("given a command that is not on the read-only list", () => {
     });
   });
 
+  describe("when the developer answers in the terminal", () => {
+    /** @scenario "An answer given in the terminal settles the card" */
+    it("records the place, and the patterns the terminal granted", async () => {
+      const wait = await startPermission();
+
+      await service.answer({
+        waitId: wait.waitId,
+        userId,
+        decision: "allow_pattern",
+        source: "terminal",
+        patterns: ["uv"],
+      });
+
+      expect(await service.read(wait.waitId)).toMatchObject({
+        state: "answered",
+        decision: "allow_pattern",
+        source: "terminal",
+        patterns: ["uv"],
+      });
+      expect(events.ended.at(-1)).toMatchObject({
+        outcome: "answered",
+        source: "terminal",
+      });
+      expect(buffer.permissions.at(-1)).toMatchObject({
+        status: "answered",
+        source: "terminal",
+      });
+    });
+
+    /** @scenario "The ask keeps the first answer it was given" */
+    it("refuses a terminal answer to a card the panel already settled", async () => {
+      const wait = await startPermission();
+      await service.answer({
+        waitId: wait.waitId,
+        userId,
+        decision: "allow_once",
+      });
+
+      await expect(
+        service.answer({
+          waitId: wait.waitId,
+          userId,
+          decision: "deny",
+          source: "terminal",
+        }),
+      ).rejects.toMatchObject({ code: "langy_wait_expired" });
+      expect(await service.read(wait.waitId)).toMatchObject({
+        decision: "allow_once",
+        source: "panel",
+      });
+    });
+  });
+
   describe("when nobody answers for the whole budget", () => {
     /** @scenario "A card left unanswered expires and Langy ends its turn in words" */
     it("expires the card and releases the call", async () => {

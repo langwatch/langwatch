@@ -5,9 +5,10 @@ Feature: The CLI decides what Langy may run on the developer's machine
 
   # The CLI is the trust boundary. It holds the folder root, the read-only
   # allowlist, the grants I gave this session and the skip state. The chat
-  # card is the way to get my answer; the server only relays it. The one
-  # thing the server gates is the skip toggle, on the model that runs the
-  # conversation (specs/settings/model-provider-skip-permissions.feature).
+  # card and the terminal are both ways to get my answer, and the first
+  # answer wins; the server only relays it. The one thing the server gates
+  # is the skip toggle, on the model that runs the conversation
+  # (specs/settings/model-provider-skip-permissions.feature).
   #
   # The read-only set is fixed and decided by parsing the command, never by
   # the model. Every precedent that used a blocklist, or trusted the model's
@@ -214,6 +215,39 @@ Feature: The CLI decides what Langy may run on the developer's machine
       Given I allowed a pattern for this session
       When the CLI exits and a new share starts for the same conversation
       Then the pattern asks again
+
+  Rule: The card and the terminal both answer, and the first answer wins
+
+    # The developer is already looking at the terminal when the ask arrives, so
+    # asking them to reach for the browser costs them the flow they came for.
+    # Both places answer the same ask, and the ask settles once.
+
+    @integration
+    Scenario: An answer given in the terminal settles the card
+      Given a permission card for a command I answer in my terminal
+      When the command line reports the answer
+      Then the card stops asking and reads answered
+      And the record says the answer came from the terminal
+
+    @integration
+    Scenario: The ask keeps the first answer it was given
+      Given a permission card I answered in the panel
+      When the terminal reports an answer for the same command afterwards
+      Then the card keeps the answer I gave in the panel
+      And the later answer changes nothing
+
+    @integration
+    Scenario: The settled card says the answer came from the terminal
+      Given a card answered in the terminal with a session grant
+      Then the card reads that it was answered in the terminal
+      And it names the pattern the grant covers
+
+    @unit
+    Scenario: The answer place travels with the card to every tab
+      Given a card answered in the terminal
+      When another tab reads the conversation record
+      Then that card also reads answered in the terminal
+      And a card answered in the panel names no terminal
 
   Rule: A card sits where it happened, and never after the answer
 

@@ -254,6 +254,13 @@ Feature: Langy works in a folder shared from the developer's machine
       Then the turn's live stream is still readable
       And a page reload shows the turn in flight with the waiting card
 
+    @integration
+    Scenario: The command line reports an answer given in the terminal
+      Given a call waiting on a permission card
+      When the command line sends the answer the developer gave in the terminal
+      Then the platform settles that card from the frame
+      And a frame for a card that already settled is ignored
+
   Rule: The session key is the only credential and it ends with the conversation
 
     @integration

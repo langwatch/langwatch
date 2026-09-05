@@ -23,6 +23,7 @@
  */
 
 import type {
+  LangyPermissionAnswerSource,
   LangyUserWaitEndedEventData,
   LangyUserWaitStartedEventData,
 } from "@langwatch/langy";
@@ -71,6 +72,8 @@ export const storedUserWaitSchema = z.object({
   hostname: z.string().optional(),
   questions: z.unknown().optional(),
   decision: z.enum(["allow_once", "allow_pattern", "deny"]).optional(),
+  /** Where the answer was given. Absent means the card in the panel. */
+  source: z.enum(["panel", "terminal"]).optional(),
   answers: z.unknown().optional(),
   answeredBy: z.string().optional(),
 });
@@ -288,7 +291,9 @@ export class UserWaitService {
   }
 
   /**
-   * The developer answered.
+   * The developer answered, on the card or in the terminal that shares the
+   * folder. The first answer wins: a wait that already settled refuses the
+   * second one, and `source` records the place the answer came from.
    *
    * @throws {LangyWaitExpiredError} the card is not waiting any more, so the
    * panel falls back to sending the answer as the next message
@@ -298,11 +303,17 @@ export class UserWaitService {
     userId,
     decision,
     answers,
+    source = "panel",
+    patterns,
   }: {
     waitId: string;
     userId: string;
     decision?: "allow_once" | "allow_pattern" | "deny";
     answers?: Array<{ question: string; selected: string[]; other?: string }>;
+    /** Where the answer was given. The card in the panel unless said otherwise. */
+    source?: LangyPermissionAnswerSource;
+    /** What a terminal grant covers, when the terminal named it. */
+    patterns?: string[];
   }): Promise<StoredUserWait> {
     const wait = await this.readSettlingExpiry(waitId);
     if (wait?.state !== "pending") {
@@ -318,8 +329,12 @@ export class UserWaitService {
       ...wait,
       state: "answered",
       answeredBy: userId,
-      ...(decision ? { decision } : {}),
-      ...(answers ? { answers } : {}),
+      source,
+      ...given({
+        decision,
+        answers,
+        patterns: patterns?.length ? patterns : undefined,
+      }),
     };
     await this.persist(answered);
     await this.end(answered, "answered");
@@ -432,6 +447,7 @@ export class UserWaitService {
       outcome,
       ...(wait.answeredBy ? { userId: wait.answeredBy } : {}),
       ...(wait.decision ? { decision: wait.decision } : {}),
+      ...(wait.source ? { source: wait.source } : {}),
       ...(wait.answers
         ? {
             answers: wait.answers as Array<{
@@ -489,6 +505,7 @@ export class UserWaitService {
           toolCallId: wait.toolCallId,
           timeoutSeconds: wait.timeoutSeconds,
           decision: wait.decision,
+          source: wait.source,
         }),
       },
     });

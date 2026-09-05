@@ -53,6 +53,7 @@ const PENDING: LangyPermissionCardData = {
   waitId: "wait-1",
   status: "pending",
   decision: null,
+  source: null,
   command: "pnpm typecheck",
   pattern: "pnpm *",
   patterns: ["pnpm *"],
@@ -196,6 +197,69 @@ describe("given a card that already settled", () => {
   it("says a stopped turn took the card with it", () => {
     renderCard({ card: { ...PENDING, status: "cancelled" } });
     expect(screen.getByText("Cancelled with the turn")).toBeDefined();
+  });
+
+  /** @scenario "The settled card says the answer came from the terminal" */
+  it("names the terminal, and the pattern the grant there covers", () => {
+    renderCard({
+      card: {
+        ...PENDING,
+        status: "answered",
+        decision: "allow_pattern",
+        source: "terminal",
+        pattern: "uv",
+        patterns: ["uv"],
+      },
+    });
+
+    expect(
+      screen.getByText(
+        'Answered in the terminal: allowed "uv" for this session',
+      ),
+    ).toBeDefined();
+    expect(screen.queryByText("Allow once")).toBeNull();
+  });
+
+  it("names the terminal for an allow once and for a denial too", () => {
+    renderCard({
+      card: {
+        ...PENDING,
+        status: "answered",
+        decision: "allow_once",
+        source: "terminal",
+      },
+    });
+    expect(
+      screen.getByText("Answered in the terminal: allowed this command once"),
+    ).toBeDefined();
+
+    cleanup();
+    renderCard({
+      card: {
+        ...PENDING,
+        status: "answered",
+        decision: "deny",
+        source: "terminal",
+      },
+    });
+    expect(
+      screen.getByText("Answered in the terminal: denied this command"),
+    ).toBeDefined();
+  });
+
+  it("keeps the developer's own voice for an answer given on the card", () => {
+    renderCard({
+      card: {
+        ...PENDING,
+        status: "answered",
+        decision: "allow_pattern",
+        source: "panel",
+      },
+    });
+
+    expect(
+      screen.getByText('You allowed "pnpm *" for the session'),
+    ).toBeDefined();
   });
 });
 

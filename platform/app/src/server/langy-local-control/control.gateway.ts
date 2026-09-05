@@ -248,6 +248,9 @@ export class LocalControlGateway {
       case "permission_required":
         await this.core.permissionRequired(live.session, frame);
         return;
+      case "permission_answered":
+        await this.core.permissionAnswered(live.session, frame);
+        return;
       case "deregister":
         await this.exit(live);
         live.socket.close(1000, "deregister");

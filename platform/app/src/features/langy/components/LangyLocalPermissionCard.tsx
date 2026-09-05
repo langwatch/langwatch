@@ -22,6 +22,7 @@ import { describeError } from "~/features/errors";
 import { api } from "~/utils/api";
 
 import type {
+  LangyPermissionAnswerSource,
   LangyPermissionCardData,
   LangyPermissionDecision,
 } from "../logic/langyLocalWaits";
@@ -53,14 +54,23 @@ export function langyPatternList(patterns: readonly string[]): string {
  * patterns: they cover every future command that matches them, and the
  * session's grants are readable nowhere else, so "this pattern" left the
  * reader with no way to know what they had given away.
+ *
+ * An ask can also be answered in the terminal that shares the folder, and the
+ * reader looking at the card did not see that happen. The card then says where
+ * the answer came from, so a card that settled on its own is not a mystery.
  */
 export function langyDecisionLabel({
   decision,
   patterns,
+  source,
 }: {
   decision: LangyPermissionDecision | null;
   patterns: readonly string[];
+  source?: LangyPermissionAnswerSource | null;
 }): string {
+  if (source === "terminal") {
+    return `Answered in the terminal: ${terminalAnswer({ decision, patterns })}`;
+  }
   if (decision === "allow_once") return "You allowed this command once";
   if (decision === "deny") return "You denied this command";
   if (decision === "allow_pattern") {
@@ -70,6 +80,25 @@ export function langyDecisionLabel({
       : "You allowed this pattern for the session";
   }
   return "You answered this card";
+}
+
+/** The second half of the terminal line: what the developer chose there. */
+function terminalAnswer({
+  decision,
+  patterns,
+}: {
+  decision: LangyPermissionDecision | null;
+  patterns: readonly string[];
+}): string {
+  if (decision === "allow_once") return "allowed this command once";
+  if (decision === "deny") return "denied this command";
+  if (decision === "allow_pattern") {
+    const named = langyPatternList(patterns);
+    return named
+      ? `allowed ${named} for this session`
+      : "allowed this pattern for this session";
+  }
+  return "answered";
 }
 
 /**
@@ -310,6 +339,7 @@ function Outcome({ card }: { card: LangyPermissionCardData }) {
           {langyDecisionLabel({
             decision: card.decision,
             patterns: card.patterns,
+            source: card.source,
           })}
         </Text>
       </HStack>

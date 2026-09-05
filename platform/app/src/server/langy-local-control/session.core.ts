@@ -37,6 +37,7 @@ import type { LocalCallDispatcher } from "./call.dispatcher";
 import { workspaceNudgeSchema } from "./call.dispatcher";
 import { PRESENCE_HEARTBEAT_MS } from "./constants";
 import type { ControlRequestService } from "./control-request.service";
+import { LangyWaitExpiredError } from "./errors";
 import { workspaceChannel } from "./keys";
 import type {
   ConnectedWorkspace,
@@ -47,6 +48,7 @@ import {
   type CallEnvelope,
   LOCAL_CONTROL_PROTOCOL_VERSION,
   type LocalControlRefusedCode,
+  type PermissionAnsweredFrame,
   type PermissionRequiredFrame,
   type PlatformFrame,
   type RegisterFrame,
@@ -482,6 +484,42 @@ export class LocalControlSessionCore {
       callId: call.callId,
       waitId: wait.waitId,
     });
+  }
+
+  /**
+   * The developer answered in the terminal instead of on the card.
+   *
+   * The command line has already applied the answer and is running or refusing
+   * the call, so this only settles the wait the card is holding: the card
+   * stops asking and says where it was answered. The first answer wins, so a
+   * wait the card already settled ignores this frame; the `permission` frame
+   * for that answer is on its way to the command line, which drops it.
+   */
+  async permissionAnswered(
+    session: ControlSession,
+    frame: PermissionAnsweredFrame,
+  ): Promise<void> {
+    const call = await this.dispatcher.read(frame.callId);
+    if (!call || call.conversationId !== session.conversationId) return;
+    if (!call.waitId) return;
+    try {
+      await this.waits.answer({
+        waitId: call.waitId,
+        userId: session.userId,
+        decision: frame.decision,
+        source: "terminal",
+        ...(frame.patterns ? { patterns: frame.patterns } : {}),
+      });
+    } catch (error) {
+      if (LangyWaitExpiredError.is(error)) {
+        logger.info(
+          { callId: frame.callId, conversationId: session.conversationId },
+          "the terminal answered a permission card that had already settled",
+        );
+        return;
+      }
+      throw error;
+    }
   }
 
   /**

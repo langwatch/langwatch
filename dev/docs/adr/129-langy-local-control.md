@@ -60,7 +60,33 @@ The tracing, connect-agent, scenarios and prompts skills change from instruction
 
 The app gains one WebSocket path, three long-poll routes, a Redis key family, six conversation events, two cards and one chip. The worker gains the `code_access`, `question` and `local_*` tools. `User` gains a code access preference column and `ModelProvider` gains the skip-permissions model list. Self-hosted deployments need the WebSocket upgrade on `/api/v1/langy/control/connect` and a read timeout above the long-poll hold, the same requirement ADR-128 added. The control routes are public on purpose: the developer's machine dials them from outside the cluster, so they live under `/api/v1` like the connected-agents relay and not under `/api/internal`, which the chart blackholes. The upgrade authenticates with the bearer session key only and checks no `Origin` header, so the dev proxy and the ingress need no per-path entry.
 
-Live command output does not stream into the panel in this version, because the pi harness drops `tool_update`. A terminal answer to a permission card is not in this version either; the terminal points at the panel.
+Live command output does not stream into the panel in this version, because the pi harness drops `tool_update`. A permission card was answered in the panel alone at first; the amendment below adds the terminal as a second place to answer.
+
+## Amendment (2026-09-05): the terminal answers too, and the first answer wins
+
+The consequence above said a terminal answer to a permission card was not in
+this version and that the terminal points at the panel. It is in now.
+
+The developer is already in the terminal when the ask arrives, so sending them
+to the browser for one keystroke costs them the flow they came for. The command
+line draws a selector under the transcript: allow the pattern for this session,
+allow once, or deny with an optional line of pushback. It applies its own answer
+at once, because it is the trust boundary and holds the grants, and reports it
+to the platform with one new CLI frame, `permission_answered`. Not a terminal
+(a pipe, CI) draws no selector, and the card is then the only way to answer.
+
+Both places stay open, and the FIRST answer wins. The card settles from the
+terminal frame and says where the answer came from ("Answered in the terminal:
+allowed "uv" for this session"), so a card that settles while nobody touched it
+is not a mystery. A `permission_answered` frame for a wait the card already
+settled is ignored, and a `permission` frame the platform sends for a card the
+terminal already answered is dropped by the command line, which has run or
+refused the call by then. `source` (`panel` or `terminal`, absent reads as
+`panel`) travels on the wait answer, the `user_wait_ended` event, the fold, the
+durable local record and the live entry, so every tab reads the same thing.
+
+The skip-all-permissions switch stays on the card alone: the platform gates it
+on the model, and that gate has no counterpart in the terminal.
 
 ## References
 

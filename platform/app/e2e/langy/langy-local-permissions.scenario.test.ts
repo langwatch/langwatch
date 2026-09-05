@@ -83,6 +83,8 @@ describe("Langy stays inside the folder and takes the developer's answer", () =>
 
         const seenTurns: string[] = [];
         let asksBeforeSecondRun = -1;
+        /** The one ask the developer answers in their terminal. */
+        let terminalAnswer: Promise<string> | null = null;
 
         /**
          * Put the developer's card answers in the record.
@@ -165,12 +167,32 @@ describe("Langy stays inside the folder and takes the developer's answer", () =>
               async (_state, executor) => {
                 await developerAnswers(executor);
               },
-              // The grant: one ask, answered with the pattern.
+              // The grant: one ask, answered in the terminal with the pattern.
+              // Armed before the message, because the selector opens while the
+              // turn is in flight.
+              async () => {
+                // The developer is already in the terminal, so they answer
+                // there, on the default option, which is the session grant.
+                watcher!.leaveNextPermissionToTerminal(/\buv\b/);
+                terminalAnswer = terminal!
+                  .answerNextPermission()
+                  .catch((error) => {
+                    console.log(
+                      `[fixture] the terminal answer did not land: ${String(error)}`,
+                    );
+                    return "";
+                  });
+              },
               scenario.user(
                 "run the project's tests with uv and tell me the result",
               ),
               scenario.agent(),
               async (_state, executor) => {
+                const terminalText = await terminalAnswer;
+                console.log(
+                  "[layer2] the terminal answered:",
+                  (terminalText ?? "").split("\n").slice(-3).join(" | "),
+                );
                 asksBeforeSecondRun = watcher!.permissions.length;
                 await developerAnswers(executor);
               },
@@ -225,6 +247,11 @@ describe("Langy stays inside the folder and takes the developer's answer", () =>
         // second command of the same family with no ask of its own.
         const granted = asks.filter((ask) => ask.decision === "allow_pattern");
         expect(granted.length).toBeGreaterThan(0);
+        // One of them was answered in the terminal, and the grant it gave held
+        // for the rest of the session the same way a card answer does.
+        expect(
+          asks.filter((ask) => ask.answeredIn === "terminal"),
+        ).toHaveLength(1);
         const grantedPattern = granted[0]?.pattern ?? "";
         expect(
           asks.filter((ask) => ask.pattern === grantedPattern).length,

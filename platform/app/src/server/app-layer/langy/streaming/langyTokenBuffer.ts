@@ -111,6 +111,8 @@ export type LangyStreamEntry =
       hostname: string;
       status: "pending" | "answered" | "expired" | "cancelled";
       decision?: string;
+      /** Where the answer was given. Absent means the card in the panel. */
+      source?: "panel" | "terminal";
     }
   | {
       type: "question";

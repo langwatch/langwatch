@@ -69,6 +69,7 @@ describe("permissionAnswerNote", () => {
     pattern: "uv run pytest*",
     reason: "run the tests",
     skipOffered: false,
+    answeredIn: "panel" as const,
     turnId: "langyturn_1",
     askedAt: 0,
   };
@@ -99,6 +100,20 @@ describe("permissionAnswerNote", () => {
           decision: "deny",
         }),
       ).toBe("[developer denied in the panel: rm -rf tests]");
+    });
+  });
+
+  describe("when the developer answers in the terminal", () => {
+    it("says the terminal, so the judge reads it as an answer given there", () => {
+      expect(
+        permissionAnswerNote({
+          ...ask,
+          decision: "allow_pattern",
+          answeredIn: "terminal",
+        }),
+      ).toBe(
+        "[developer allowed the pattern `uv run pytest*` for this session in the terminal: uv run pytest]",
+      );
     });
   });
 });

@@ -222,6 +222,9 @@ export class LocalControlLongPoll {
         case "permission_required":
           await this.core.permissionRequired(entry.session, frame);
           break;
+        case "permission_answered":
+          await this.core.permissionAnswered(entry.session, frame);
+          break;
         case "deregister":
           await this.retire(token, "cli_exit");
           return { ok: true };

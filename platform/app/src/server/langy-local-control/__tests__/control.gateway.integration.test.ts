@@ -904,6 +904,99 @@ describe("given a folder shared with the conversation", () => {
       });
     });
   });
+
+  describe("when the developer answers in the terminal", () => {
+    /** Raises one card and hands back the wait the command line is holding. */
+    const askAndWait = async (command: string) => {
+      const call = await podA.runtime.dispatcher.start({
+        projectId,
+        conversationId,
+        turnId,
+        call: { tool: "local_bash", params: { command } },
+        timeoutMs: 30_000,
+      });
+      await cli.next("call");
+      cli.send({
+        type: "permission_required",
+        callId: call.callId,
+        summary: command,
+        pattern: "uv",
+        reason: "runs the project's own checks",
+        skipOffered: true,
+      });
+      // A plain wait, not an assertion: this helper runs outside the test body.
+      const deadline = Date.now() + 5_000;
+      for (;;) {
+        const [wait] = await podA.runtime.waits.listPending({
+          conversationId,
+          turnId,
+        });
+        if (wait) return { callId: call.callId, waitId: wait.waitId };
+        if (Date.now() > deadline) {
+          throw new Error(`no card was raised for ${command} inside 5s`);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    };
+
+    /** @scenario "An answer given in the terminal settles the card" */
+    /** @scenario "The command line reports an answer given in the terminal" */
+    it("settles the card from the frame and records where it was answered", async () => {
+      const { callId, waitId } = await askAndWait("uv run pytest");
+
+      cli.send({
+        type: "permission_answered",
+        callId,
+        decision: "allow_pattern",
+        patterns: ["uv"],
+      });
+
+      await expect
+        .poll(() => podA.runtime.waits.read(waitId), { timeout: 5_000 })
+        .toMatchObject({
+          state: "answered",
+          decision: "allow_pattern",
+          source: "terminal",
+        });
+      expect(
+        events.find(
+          (event) =>
+            event.name === "user_wait_ended" && event.data.waitId === waitId,
+        )?.data,
+      ).toMatchObject({ outcome: "answered", source: "terminal" });
+      expect(
+        liveEntries.filter((entry) => entry.kind === "local_permission").at(-1)
+          ?.payload,
+      ).toMatchObject({ status: "answered", source: "terminal" });
+    });
+
+    /** @scenario "The ask keeps the first answer it was given" */
+    it("keeps the card's answer when the terminal answers afterwards", async () => {
+      const { callId, waitId } = await askAndWait("uv run ruff check");
+
+      await podB.runtime.waits.answer({
+        waitId,
+        userId,
+        decision: "allow_once",
+      });
+      await cli.next("permission");
+
+      cli.send({
+        type: "permission_answered",
+        callId,
+        decision: "deny",
+      });
+
+      // Nothing to poll for on a frame that changes nothing, so the assertion
+      // waits out the round trip the frame would have needed.
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(await podA.runtime.waits.read(waitId)).toMatchObject({
+        state: "answered",
+        decision: "allow_once",
+        source: "panel",
+      });
+    });
+  });
 });
 
 describe("given a folder whose socket dropped", () => {

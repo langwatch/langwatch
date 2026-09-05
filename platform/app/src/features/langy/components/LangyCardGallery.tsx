@@ -651,6 +651,7 @@ function LangyLocalControlGallery() {
     waitId: "gallery-wait",
     status: "pending",
     decision: null,
+    source: null,
     command: "pnpm typecheck",
     pattern: "pnpm *",
     patterns: ["pnpm *"],
@@ -677,6 +678,16 @@ function LangyLocalControlGallery() {
       <LangyLocalPermissionCard
         {...shared}
         card={{ ...permission, status: "answered", decision: "allow_pattern" }}
+        skipAllowed
+      />
+      <LangyLocalPermissionCard
+        {...shared}
+        card={{
+          ...permission,
+          status: "answered",
+          decision: "allow_pattern",
+          source: "terminal",
+        }}
         skipAllowed
       />
       <LangyLocalPermissionCard

@@ -5,7 +5,9 @@
  * machine. Langy's local tools become `call` frames the CLI executes in the
  * shared folder; the CLI answers with `result`. When a call needs the
  * developer's approval the CLI says so with `permission_required`, the panel
- * renders the card, and the platform answers with `permission`.
+ * renders the card, and the platform answers with `permission`. The developer
+ * can also answer in the terminal, which the CLI reports with
+ * `permission_answered`. The first answer wins.
  *
  * Every frame is JSON text with a `type` and the protocol version. The CLI
  * keeps a copy of these shapes in `sdks/typescript/src/agent/local-control-protocol.ts`;
@@ -295,6 +297,22 @@ export type PermissionRequiredFrame = z.infer<
   typeof permissionRequiredFrameSchema
 >;
 
+/**
+ * The developer answered a permission ask in the terminal. The platform settles
+ * the wait from it unless the card answered first, in which case it is ignored:
+ * the `permission` frame for that answer is already on its way.
+ */
+export const permissionAnsweredFrameSchema = versioned.extend({
+  type: z.literal("permission_answered"),
+  callId: z.string(),
+  decision: z.enum(["allow_once", "allow_pattern", "deny"]),
+  /** The patterns the session grant covers, when the decision is allow_pattern. */
+  patterns: z.array(z.string().max(500)).max(50).optional(),
+});
+export type PermissionAnsweredFrame = z.infer<
+  typeof permissionAnsweredFrameSchema
+>;
+
 export const PERMISSION_DECISIONS = [
   "allow_once",
   "allow_pattern",
@@ -332,6 +350,7 @@ export const cliFrameSchema = z.discriminatedUnion("type", [
   ackFrameSchema,
   resultFrameSchema,
   permissionRequiredFrameSchema,
+  permissionAnsweredFrameSchema,
   deregisterFrameSchema,
 ]);
 export type CliFrame = z.infer<typeof cliFrameSchema>;

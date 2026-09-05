@@ -23,6 +23,7 @@ const permissionWait = (over: Record<string, unknown> = {}) => ({
   hostname: "rogerio-mbp",
   questions: null,
   decision: null,
+  source: null,
   answers: null,
   answeredBy: null,
   answeredAt: null,
@@ -71,6 +72,56 @@ describe("langyPermissionCards", () => {
 
       expect(card?.status).toBe("answered");
       expect(card?.decision).toBe("allow_once");
+    });
+
+    /** @scenario "The answer place travels with the card to every tab" */
+    it("reads the place the answer came from off the record", () => {
+      const [terminal] = langyPermissionCards({
+        record: [
+          {
+            ...permissionWait({
+              waitId: "wait-terminal",
+              status: "answered",
+              decision: "allow_pattern",
+              source: "terminal",
+            }),
+            toolCallId: "call-terminal",
+          },
+        ] as never,
+      });
+      expect(terminal).toMatchObject({
+        status: "answered",
+        source: "terminal",
+      });
+
+      const [panel] = langyPermissionCards({
+        record: [
+          {
+            ...permissionWait({
+              waitId: "wait-panel",
+              status: "answered",
+              decision: "allow_once",
+              source: "panel",
+            }),
+            toolCallId: "call-panel",
+          },
+        ] as never,
+      });
+      expect(panel?.source).toBe("panel");
+
+      const [live] = langyPermissionCards({
+        live: {
+          "wait-live": {
+            waitId: "wait-live",
+            kind: "permission",
+            status: "answered",
+            summary: "uv run pytest",
+            decision: "allow_pattern",
+            source: "terminal",
+          } satisfies LangyLiveWait,
+        },
+      });
+      expect(live?.source).toBe("terminal");
     });
   });
 

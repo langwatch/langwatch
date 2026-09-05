@@ -60,17 +60,21 @@ A refused action is not silent. The CLI tells Langy why it was refused, and Lang
 
 ## Permissions
 
-When a command needs approval, the chat shows a permission card with the command, the folder and the machine name. The terminal points you to the chat.
+When a command needs approval, you can answer in the terminal or in the chat. The terminal shows a selector under the transcript, and the chat shows a permission card with the command, the folder and the machine name. Both offer the same three answers:
 
+- **Allow this pattern this session** runs this command and, until you disconnect, every command that starts the same way, for example `pnpm *`. This is the first option in the terminal, so Enter takes it.
 - **Allow once** runs this command.
-- **Allow this pattern this session** runs this command and, until you disconnect, every command that starts the same way, for example `pnpm *`.
-- **Deny** refuses it. Langy does not run it again in that turn.
+- **Deny** refuses it. Langy does not run it again in that turn. In the terminal you can add one line saying what to do instead.
+
+The first answer wins. Answer in the terminal and the card settles and says so, for example "Answered in the terminal: allowed "uv" for this session". Answer on the card and the terminal closes its selector and prints the answer.
+
+When the command line is not running in a terminal, in a pipe or in CI, it shows no selector and the card is the only way to answer.
 
 A card that gets no answer within 10 minutes expires, and Langy ends its turn and says what it still needs.
 
 ### Skip permission checks
 
-The permission card carries a switch to skip all permission checks for the rest of the connection. Refusals for paths outside the folder and for `sudo` still apply.
+The permission card carries a switch to skip all permission checks for the rest of the connection. It is on the card only, because the model gate behind it lives on the server. Refusals for paths outside the folder and for `sudo` still apply.
 
 The switch is enabled only for models your provider settings allow. Open the provider in **Settings > Model providers**, section **Advanced**, field **Models allowed to skip permission checks**: one pattern per line. The defaults allow the frontier OpenAI and Anthropic models and no others. When the conversation's model is not on the list, the switch is disabled and says so.
 

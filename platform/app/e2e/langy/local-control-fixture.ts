@@ -525,6 +525,15 @@ export interface CliTerminal {
   sendKeys: (...keys: string[]) => void;
   /** Wait for the approve question and answer it with Approve. */
   approve: (timeoutMs?: number) => Promise<void>;
+  /**
+   * Answer the next permission ask in the terminal, on the default option.
+   *
+   * Arm it BEFORE the message that raises the ask, and await it after: the
+   * selector opens while the turn is in flight, and Enter takes the first
+   * option, which is the session grant. Resolves with the terminal's own text
+   * once the settled line replaced the selector.
+   */
+  answerNextPermission: (timeoutMs?: number) => Promise<string>;
   /** Ctrl-C twice, which is how a developer stops sharing. */
   disconnect: () => Promise<void>;
   isRunning: () => boolean;
@@ -683,6 +692,13 @@ export async function startShareControl({
       sendKeys("Enter");
       await waitForText("Connected", 60_000);
     },
+    answerNextPermission: async (timeoutMs = 300_000) => {
+      await waitForText("Do you want to allow this?", timeoutMs);
+      // The selector paints before it listens, the way the approve prompt does.
+      await sleep(500);
+      sendKeys("Enter");
+      return await waitForText(/Allowed |Denied/, 60_000);
+    },
     disconnect: async () => {
       if (!isRunning()) return;
       sendKeys("C-c");
@@ -720,6 +736,8 @@ export interface PermissionAsk {
   reason: string;
   skipOffered: boolean;
   decision: "allow_once" | "allow_pattern" | "deny";
+  /** Where the developer answered it. */
+  answeredIn: "panel" | "terminal";
   turnId: string;
   askedAt: number;
 }
@@ -790,6 +808,15 @@ export interface ConversationWatcher {
    * record.
    */
   drainAnswerNotes: () => string[];
+  /**
+   * Leave the next card whose command matches to the terminal, and answer
+   * nothing here for it.
+   *
+   * Arm it beside `CliTerminal.answerNextPermission`, which is what answers it
+   * there. Only ONE card is left: a second match is answered on the card as
+   * usual, so an unanswered selector can never stall the rest of the run.
+   */
+  leaveNextPermissionToTerminal: (match: RegExp) => void;
   /** `connected` and `disconnected` entries, in order. */
   workspaceEvents: Array<{ state: string; name: string; root: string }>;
   /** Every turn the watcher observed, in the order it observed them. */
@@ -873,14 +900,16 @@ export function answerOfTurn(
  * as an action taken in the panel rather than as something said in the chat.
  */
 export function permissionAnswerNote(ask: PermissionAsk): string {
+  const where =
+    ask.answeredIn === "terminal" ? "in the terminal" : "in the panel";
   if (ask.decision === "deny") {
-    return `[developer denied in the panel: ${ask.summary}]`;
+    return `[developer denied ${where}: ${ask.summary}]`;
   }
   if (ask.decision === "allow_pattern") {
     const pattern = ask.pattern || ask.summary;
-    return `[developer allowed the pattern \`${pattern}\` for this session in the panel: ${ask.summary}]`;
+    return `[developer allowed the pattern \`${pattern}\` for this session ${where}: ${ask.summary}]`;
   }
-  return `[developer allowed once in the panel: ${ask.summary}]`;
+  return `[developer allowed once ${where}: ${ask.summary}]`;
 }
 
 /**
@@ -1007,6 +1036,8 @@ export function watchLangyConversation({
   /** What the developer answered, waiting to be put in front of the judge. */
   let answerNotes: string[] = [];
   let stopped = false;
+  /** The one card the terminal is about to answer, while it is armed. */
+  let leftToTerminal: RegExp | null = null;
 
   const decide = (summary: string): "allow_once" | "allow_pattern" | "deny" => {
     if ((policy.deny ?? []).some((rule) => rule.test(summary))) return "deny";
@@ -1025,7 +1056,11 @@ export function watchLangyConversation({
     if (entry.status !== "pending") return;
     answeredWaits.add(waitId);
     const summary = String(entry.summary ?? "");
-    const decision = decide(summary);
+    // The terminal takes the first matching card, on its default option, which
+    // is the session grant. Nothing is sent from here for that one.
+    const inTerminal = leftToTerminal?.test(summary) === true;
+    if (inTerminal) leftToTerminal = null;
+    const decision = inTerminal ? "allow_pattern" : decide(summary);
     const ask: PermissionAsk = {
       waitId,
       callId: String(entry.callId ?? ""),
@@ -1034,11 +1069,13 @@ export function watchLangyConversation({
       reason: String(entry.reason ?? ""),
       skipOffered: entry.skipOffered === true,
       decision,
+      answeredIn: inTerminal ? "terminal" : "panel",
       turnId,
       askedAt: Date.now(),
     };
     permissions.push(ask);
     answerNotes.push(permissionAnswerNote(ask));
+    if (inTerminal) return;
     const cookie = await getSessionCookie();
     await trpcMutate({
       cookie,
@@ -1267,6 +1304,9 @@ export function watchLangyConversation({
       const notes = answerNotes;
       answerNotes = [];
       return notes;
+    },
+    leaveNextPermissionToTerminal: (match) => {
+      leftToTerminal = match;
     },
     workspaceEvents,
     turnIds,

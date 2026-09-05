@@ -31,6 +31,7 @@ import type {
   LangyAgentResponseFailedEventData,
   LangyAgentRespondedEventData,
   LangyAgentTurnAcceptedEventData,
+  LangyPermissionAnswerSource,
   LangyPlanItemData,
   LangyPlanUpdatedEventData,
   LangyToolCallFailedEventData,
@@ -114,6 +115,8 @@ export type LangyTurnWait = {
   hostname: string | null;
   questions: LangyJsonValue;
   decision: LangyPermissionDecision | null;
+  /** Where a permission answer was given: the card, or the terminal. */
+  source: LangyPermissionAnswerSource | null;
   answers: LangyJsonValue;
   answeredBy: string | null;
   answeredAt: number | null;
@@ -152,6 +155,12 @@ export const langyTurnWaitSchema = z.object({
       z.literal(LANGY_PERMISSION_DECISIONS.DENY),
     ])
     .nullable(),
+  // Records written before the terminal could answer carry none, and they read
+  // back as answered on the card, which is where they were answered.
+  source: z
+    .union([z.literal("panel"), z.literal("terminal")])
+    .nullable()
+    .default(null),
   answers: langyJsonValueSchema,
   answeredBy: z.string().nullable(),
   answeredAt: z.number().nullable(),
@@ -203,6 +212,7 @@ function pendingWait(data: LangyUserWaitStartedEventData): LangyTurnWait {
     hostname: permission?.hostname ?? null,
     questions: (data.questions ?? null) as LangyJsonValue,
     decision: null,
+    source: null,
     answers: null,
     answeredBy: null,
     answeredAt: null,
@@ -219,6 +229,7 @@ function endedWait(
     ...wait,
     status: data.outcome,
     decision: data.decision ?? null,
+    source: data.source ?? null,
     answers: (data.answers ?? null) as LangyJsonValue,
     answeredBy: data.userId ?? null,
     answeredAt: occurredAt,

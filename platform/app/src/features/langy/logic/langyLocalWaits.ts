@@ -25,6 +25,13 @@ export type LangyWaitStatus = "pending" | "answered" | "expired" | "cancelled";
 export type LangyPermissionDecision = "allow_once" | "allow_pattern" | "deny";
 
 /**
+ * Where a permission answer was given. An ask can be answered on the card or
+ * in the terminal that shares the folder, and the settled card names the
+ * terminal so the reader knows the answer was not lost.
+ */
+export type LangyPermissionAnswerSource = "panel" | "terminal";
+
+/**
  * One live stream entry about a wait, in the shape the transport hands over.
  * Deliberately structural rather than the stream union: this module is the
  * only reader, and typing it here keeps the panel's live path and the card's
@@ -45,6 +52,7 @@ export interface LangyLiveWait {
   workspaceName?: string;
   hostname?: string;
   decision?: string;
+  source?: string;
   questions?: unknown;
   answers?: unknown;
 }
@@ -54,6 +62,8 @@ export interface LangyPermissionCardData {
   waitId: string;
   status: LangyWaitStatus;
   decision: LangyPermissionDecision | null;
+  /** Where the answer was given. Null reads as the card in the panel. */
+  source: LangyPermissionAnswerSource | null;
   /** The exact command, as it will run. */
   command: string;
   /** The pattern a session grant would cover, when one is offered. */
@@ -84,6 +94,14 @@ const DECISIONS = new Set<string>(["allow_once", "allow_pattern", "deny"]);
 function readDecision(value: unknown): LangyPermissionDecision | null {
   return typeof value === "string" && DECISIONS.has(value)
     ? (value as LangyPermissionDecision)
+    : null;
+}
+
+const ANSWER_SOURCES = new Set<string>(["panel", "terminal"]);
+
+function readSource(value: unknown): LangyPermissionAnswerSource | null {
+  return typeof value === "string" && ANSWER_SOURCES.has(value)
+    ? (value as LangyPermissionAnswerSource)
     : null;
 }
 
@@ -151,6 +169,7 @@ function mergeDurable({
     ...next,
     status: mergeLangyWaitStatus({ durable: known.status, live: next.status }),
     decision: next.decision ?? known.decision,
+    source: next.source ?? known.source,
     command: next.command || known.command,
     pattern: next.pattern ?? known.pattern,
     patterns: next.patterns.length > 0 ? next.patterns : known.patterns,
@@ -210,6 +229,7 @@ function fromDurable(wait: LangyTurnWait): LangyPermissionCardData {
     waitId: wait.waitId,
     status: wait.status,
     decision: readDecision(wait.decision),
+    source: readSource(wait.source),
     command: wait.summary ?? "",
     pattern: wait.pattern,
     patterns: patternsOf({ patterns: wait.patterns, pattern: wait.pattern }),
@@ -254,6 +274,7 @@ function withLive(
       live: entry.status,
     }),
     decision: durable?.decision ?? readDecision(entry.decision),
+    source: durable?.source ?? readSource(entry.source),
     command: durable?.command || (entry.summary ?? ""),
     pattern: durable?.pattern ?? entry.pattern ?? null,
     patterns: mergePatterns({ durable, entry }),

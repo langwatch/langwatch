@@ -506,9 +506,18 @@ export const langyUserWaitQuestionAnswerSchema = z.object({
   other: z.string().optional(),
 });
 
+/** Where an answer came from. Absent reads as the card in the panel. */
+export const langyPermissionAnswerSources = ["panel", "terminal"] as const;
+export type LangyPermissionAnswerSource =
+  (typeof langyPermissionAnswerSources)[number];
+
 /**
  * UserWaitEnded — the wait reached its one terminal. An answered permission
  * wait carries the decision; an answered question wait carries the choices.
+ *
+ * A permission ask can be answered on the card or in the terminal that shares
+ * the folder, and the first answer wins, so `source` says which one closed it
+ * and the settled card can name the place the reader is not looking at.
  */
 export const langyUserWaitEndedEventDataSchema = z.object({
   conversationId: z.string(),
@@ -520,6 +529,8 @@ export const langyUserWaitEndedEventDataSchema = z.object({
   /** Who answered. Absent when the wait expired or was cancelled. */
   userId: z.string().optional(),
   decision: z.enum(["allow_once", "allow_pattern", "deny"]).optional(),
+  /** Where the answer was given. Absent means the card in the panel. */
+  source: z.enum(langyPermissionAnswerSources).optional(),
   answers: z.array(langyUserWaitQuestionAnswerSchema).optional(),
 });
 export type LangyUserWaitEndedEventData = z.infer<
