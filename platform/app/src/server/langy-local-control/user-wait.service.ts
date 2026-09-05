@@ -185,6 +185,9 @@ export class UserWaitService {
       budgetMs: PERMISSION_WAIT_BUDGET_MS,
     });
     await this.persist(wait);
+    // The live entry first, so the card is on screen while the event store
+    // catches up. Same order as `end` below, and for the same reason.
+    await this.publishPermission(wait);
     await this.events.startUserWait({
       tenantId: wait.projectId,
       occurredAt: wait.createdAt,
@@ -208,7 +211,6 @@ export class UserWaitService {
         hostname: params.hostname,
       },
     });
-    await this.publishPermission(wait);
     return wait;
   }
 
@@ -226,6 +228,7 @@ export class UserWaitService {
       budgetMs: QUESTION_WAIT_BUDGET_MS,
     });
     await this.persist(wait);
+    await this.publishQuestion(wait);
     await this.events.startUserWait({
       tenantId: wait.projectId,
       occurredAt: wait.createdAt,
@@ -237,7 +240,6 @@ export class UserWaitService {
       expiresAt: wait.expiresAt,
       questions: params.questions,
     });
-    await this.publishQuestion(wait);
     return wait;
   }
 
@@ -322,6 +324,7 @@ export class UserWaitService {
         waitId,
         ...(ended ? { outcome: ended } : {}),
         ...(wait?.decision ? { decision: wait.decision } : {}),
+        ...(wait?.source ? { source: wait.source } : {}),
       });
     }
 
@@ -431,11 +434,23 @@ export class UserWaitService {
     return expired;
   }
 
-  /** Writes the terminal event and locks the card on the live edge. */
+  /**
+   * Locks the card on the live edge, then writes the terminal event.
+   *
+   * The live entry goes FIRST, and that order is the point. An answer given in
+   * the terminal reaches the panel only through this entry, and it used to be
+   * written after the durable event: the card kept its buttons for as long as
+   * the event store took, four seconds on a quiet machine and thirteen on a
+   * busy one, with the command already running behind it. The panel's own
+   * answer never had that lag, because the card settles itself the moment its
+   * mutation returns.
+   */
   private async end(
     wait: StoredUserWait,
     outcome: "answered" | "expired" | "cancelled",
   ): Promise<void> {
+    if (wait.kind === "permission") await this.publishPermission(wait);
+    else await this.publishQuestion(wait);
     await this.events.endUserWait({
       tenantId: wait.projectId,
       occurredAt: this.now(),
@@ -462,8 +477,6 @@ export class UserWaitService {
       turnWaitsKey(wait.conversationId, wait.turnId),
       wait.waitId,
     );
-    if (wait.kind === "permission") await this.publishPermission(wait);
-    else await this.publishQuestion(wait);
   }
 
   /**

@@ -18,7 +18,7 @@ import { useState } from "react";
 
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
-import { describeError } from "~/features/errors";
+import { describeError, readHandledError } from "~/features/errors";
 import { api } from "~/utils/api";
 
 import type {
@@ -112,6 +112,39 @@ export function langyTimeLimitText(seconds: number): string {
     return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
   }
   return `${seconds} ${seconds === 1 ? "second" : "seconds"}`;
+}
+
+/**
+ * The answer an ask already had, read off the refusal a second answer gets.
+ *
+ * The terminal that shares the folder answers the same ask, and a card that
+ * was still on screen when it did carries buttons for an answer that is
+ * already given. The click is refused, and the refusal says who answered and
+ * what they chose, so the card settles itself into the state it should
+ * already have been in rather than showing the reader a failure.
+ */
+export function settledAnswerOf(error: unknown): {
+  decision: LangyPermissionDecision | null;
+  source: LangyPermissionAnswerSource | null;
+} | null {
+  const handled = readHandledError(error);
+  if (handled?.code !== "langy_wait_expired") return null;
+  const meta = (handled.meta ?? {}) as {
+    outcome?: unknown;
+    decision?: unknown;
+    source?: unknown;
+  };
+  if (meta.outcome !== "answered") return null;
+  const decision =
+    typeof meta.decision === "string" &&
+    ["allow_once", "allow_pattern", "deny"].includes(meta.decision)
+      ? (meta.decision as LangyPermissionDecision)
+      : null;
+  const source =
+    meta.source === "terminal" || meta.source === "panel"
+      ? (meta.source as LangyPermissionAnswerSource)
+      : null;
+  return { decision, source };
 }
 
 export interface LangyLocalPermissionCardProps {
@@ -209,8 +242,13 @@ export function LangyLocalPermissionCard({
             card={card}
             skipAllowed={skipAllowed}
             skipPermissions={skipPermissions}
-            onSettled={(decision) =>
-              settleWait({ waitId: card.waitId, status: "answered", decision })
+            onSettled={({ decision, source }) =>
+              settleWait({
+                waitId: card.waitId,
+                status: "answered",
+                ...(decision ? { decision } : {}),
+                ...(source ? { source } : {}),
+              })
             }
             onFailure={setFailure}
           />
@@ -243,14 +281,27 @@ function PendingAnswers({
   card: LangyPermissionCardData;
   skipAllowed: boolean;
   skipPermissions: boolean;
-  onSettled: (decision: LangyPermissionDecision) => void;
+  onSettled: (answered: {
+    decision: LangyPermissionDecision | null;
+    source?: LangyPermissionAnswerSource | null;
+  }) => void;
   onFailure: (message: string | null) => void;
 }) {
   const answer = api.langy.answerLocalPermission.useMutation({
-    onError: (error) =>
+    // A refused answer is not always a failure. The terminal may have answered
+    // this ask a moment ago, and then the honest thing to show is the answer
+    // it gave, not a red line under a card that is simply out of date.
+    onError: (error) => {
+      const settled = settledAnswerOf(error);
+      if (settled) {
+        onFailure(null);
+        onSettled(settled);
+        return;
+      }
       onFailure(
         describeError({ error, fallbackTitle: "Could not send your answer" }),
-      ),
+      );
+    },
   });
   const setPolicy = api.langy.setLocalPolicy.useMutation({
     onError: (error) =>
@@ -269,7 +320,7 @@ function PendingAnswers({
     onFailure(null);
     answer.mutate(
       { projectId, conversationId, waitId: card.waitId, decision },
-      { onSuccess: () => onSettled(decision) },
+      { onSuccess: () => onSettled({ decision, source: "panel" }) },
     );
   };
 

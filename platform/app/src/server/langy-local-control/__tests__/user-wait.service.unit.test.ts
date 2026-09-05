@@ -252,6 +252,45 @@ describe("given a command that is not on the read-only list", () => {
       });
     });
 
+    /** @scenario "The panel learns about a terminal answer at once" */
+    it("puts the settled card on the live stream before the event store", async () => {
+      const wait = await startPermission();
+      // The event store is the slow half. While it was first in this chain the
+      // card kept its buttons for as long as it took, which was up to thirteen
+      // seconds with the command already running behind it.
+      let released = () => undefined as void;
+      const slowStore = new Promise<void>((resolve) => {
+        released = () => resolve();
+      });
+      const order: string[] = [];
+      events.endUserWait = async (data: unknown) => {
+        order.push("event");
+        events.ended.push(data);
+        await slowStore;
+      };
+      buffer.appendLocalPermission = async (args: { entry: unknown }) => {
+        order.push("live");
+        buffer.permissions.push(args.entry);
+      };
+
+      const answering = service.answer({
+        waitId: wait.waitId,
+        userId,
+        decision: "allow_once",
+        source: "terminal",
+      });
+      await vi.waitFor(() => expect(order).toContain("event"));
+
+      expect(order).toEqual(["live", "event"]);
+      expect(buffer.permissions.at(-1)).toMatchObject({
+        status: "answered",
+        source: "terminal",
+      });
+
+      released();
+      await answering;
+    });
+
     /** @scenario "The ask keeps the first answer it was given" */
     it("refuses a terminal answer to a card the panel already settled", async () => {
       const wait = await startPermission();
@@ -272,6 +311,29 @@ describe("given a command that is not on the read-only list", () => {
       expect(await service.read(wait.waitId)).toMatchObject({
         decision: "allow_once",
         source: "panel",
+      });
+    });
+
+    /** @scenario "A click on a card the terminal already answered answers nothing" */
+    it("tells a second answer which answer closed the card, and where", async () => {
+      const wait = await startPermission();
+      await service.answer({
+        waitId: wait.waitId,
+        userId,
+        decision: "allow_pattern",
+        source: "terminal",
+        patterns: ["gh pr"],
+      });
+
+      await expect(
+        service.answer({ waitId: wait.waitId, userId, decision: "allow_once" }),
+      ).rejects.toMatchObject({
+        code: "langy_wait_expired",
+        meta: {
+          outcome: "answered",
+          decision: "allow_pattern",
+          source: "terminal",
+        },
       });
     });
   });

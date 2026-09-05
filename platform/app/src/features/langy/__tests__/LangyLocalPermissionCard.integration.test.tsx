@@ -16,14 +16,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const answerPermission = vi.fn();
 const setLocalPolicy = vi.fn();
+/** What the answer mutation does, so one test can make the server refuse it. */
+const answerOutcome: { refusal: unknown } = { refusal: null };
 
 vi.mock("~/utils/api", () => ({
   api: {
     langy: {
       answerLocalPermission: {
-        useMutation: () => ({
+        useMutation: (hooks?: { onError?: (error: unknown) => void }) => ({
           mutate: (input: unknown, options?: { onSuccess?: () => void }) => {
             answerPermission(input);
+            if (answerOutcome.refusal) {
+              hooks?.onError?.(answerOutcome.refusal);
+              return;
+            }
             options?.onSuccess?.();
           },
           isPending: false,
@@ -47,6 +53,8 @@ afterEach(cleanup);
 beforeEach(() => {
   answerPermission.mockClear();
   setLocalPolicy.mockClear();
+  answerOutcome.refusal = null;
+  useLangyLocalControlStore.setState({ waits: {} });
 });
 
 const PENDING: LangyPermissionCardData = {
@@ -352,5 +360,35 @@ describe("given the command line offered no session grant", () => {
 
     expect(screen.getByText("Allow once")).toBeDefined();
     expect(screen.queryByText(/this session$/)).toBeNull();
+  });
+});
+
+describe("given a card the terminal answered while it was still on screen", () => {
+  /** @scenario "A click on a card the terminal already answered answers nothing" */
+  it("settles on the terminal's answer instead of showing a failure", async () => {
+    answerOutcome.refusal = {
+      data: {
+        error: {
+          code: "langy_wait_expired",
+          httpStatus: 410,
+          meta: {
+            waitId: "wait-1",
+            outcome: "answered",
+            decision: "allow_pattern",
+            source: "terminal",
+          },
+        },
+      },
+    };
+    renderCard();
+
+    await userEvent.click(screen.getByRole("button", { name: "Allow once" }));
+
+    expect(useLangyLocalControlStore.getState().waits["wait-1"]).toMatchObject({
+      status: "answered",
+      decision: "allow_pattern",
+      source: "terminal",
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });

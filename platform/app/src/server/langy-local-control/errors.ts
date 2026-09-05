@@ -123,12 +123,19 @@ export class LangyWaitExpiredError extends HandledError {
     waitId,
     outcome,
     decision,
+    source,
   }: {
     waitId: string;
     /** How the card ended, when the record still holds it. */
     outcome?: "answered" | "expired" | "cancelled";
     /** The answer that closed an already-answered card. */
     decision?: "allow_once" | "allow_pattern" | "deny";
+    /**
+     * Where that answer was given. The card the click landed on then settles
+     * itself with the right words rather than showing a failure for an answer
+     * that was already given somewhere else.
+     */
+    source?: "panel" | "terminal";
   }) {
     super(
       "langy_wait_expired",
@@ -142,6 +149,7 @@ export class LangyWaitExpiredError extends HandledError {
           waitId,
           ...(outcome ? { outcome } : {}),
           ...(decision ? { decision } : {}),
+          ...(source ? { source } : {}),
         },
         ...remediation("langy_wait_expired"),
       },

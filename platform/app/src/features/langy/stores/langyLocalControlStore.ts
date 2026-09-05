@@ -74,6 +74,12 @@ interface LangyLocalControlState {
     status: LangyLiveWait["status"];
     /** What the reader answered, so the settled card can say it at once. */
     decision?: string;
+    /**
+     * Where the answer was given. A card settled by the refusal its own click
+     * got names the terminal that answered first, so the reader is told who
+     * answered rather than only that the card is closed.
+     */
+    source?: string;
   }) => void;
   /** Open another conversation: everything here belonged to the last one. */
   reset: (conversationId: string | null) => void;
@@ -127,7 +133,7 @@ export const useLangyLocalControlStore = create<LangyLocalControlState>(
       });
     },
 
-    settleWait: ({ waitId, kind = "permission", status, decision }) => {
+    settleWait: ({ waitId, kind = "permission", status, decision, source }) => {
       const state = get();
       const wait = state.waits[waitId] ?? { waitId, kind, status: "pending" };
       set({
@@ -137,6 +143,7 @@ export const useLangyLocalControlStore = create<LangyLocalControlState>(
             ...wait,
             status,
             ...(decision === undefined ? {} : { decision }),
+            ...(source === undefined ? {} : { source }),
           },
         },
       });
