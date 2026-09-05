@@ -22,7 +22,7 @@ import type { FieldMapping, Variable } from "@langwatch/prompt-web/surfaces/vari
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { WorkflowCardDisplay } from "@langwatch/workflow-web";
+import { WorkflowCardDisplay } from "@langwatch/workflow-web/surfaces/workflow-card";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import type {
   CustomComponentConfig,

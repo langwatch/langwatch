@@ -16,7 +16,7 @@
       "types": "./src/ui/elements/model-selector.tsx",
       "default": "./src/ui/elements/model-selector.tsx"
     },
-    "./components/NoModelsConfiguredCallout": {
+    "./surfaces/no-models-configured-callout": {
       "types": "./src/ui/elements/no-models-configured-callout.tsx",
       "default": "./src/ui/elements/no-models-configured-callout.tsx"
     },
@@ -24,19 +24,19 @@
       "types": "./src/ui/elements/provider-model-selector.tsx",
       "default": "./src/ui/elements/provider-model-selector.tsx"
     },
-    "./components/icons/AISparklesLoader": {
+    "./surfaces/ai-sparkles-loader": {
       "types": "./src/ui/elements/icons/ai-sparkles-loader.tsx",
       "default": "./src/ui/elements/icons/ai-sparkles-loader.tsx"
     },
-    "./components/icons/Copy": {
+    "./surfaces/copy-icon": {
       "types": "./src/ui/elements/icons/copy.tsx",
       "default": "./src/ui/elements/icons/copy.tsx"
     },
-    "./components/icons/History": {
+    "./surfaces/history-icon": {
       "types": "./src/ui/elements/icons/history.tsx",
       "default": "./src/ui/elements/icons/history.tsx"
     },
-    "./components/modelProviders/iconsMap": {
+    "./surfaces/provider-icons": {
       "types": "./src/ui/elements/modelProviders/icons-map.tsx",
       "default": "./src/ui/elements/modelProviders/icons-map.tsx"
     },
@@ -56,7 +56,7 @@
       "types": "./src/screens/model-provider/index.ts",
       "default": "./src/screens/model-provider/index.ts"
     },
-    "./utils/clampMaxTokens": {
+    "./surfaces/clamp-max-tokens": {
       "types": "./src/model/clamp-max-tokens.ts",
       "default": "./src/model/clamp-max-tokens.ts"
     }

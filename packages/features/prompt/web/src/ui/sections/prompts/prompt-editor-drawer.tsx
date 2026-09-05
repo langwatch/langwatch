@@ -14,8 +14,8 @@ import {
   FormVariablesSection,
 } from "@langwatch/prompt-web/surfaces/variables";
 import { useEvaluationMappings } from "@langwatch/experiment-web/experiments-v3/hooks/useEvaluationMappings";
-import type { LocalPromptConfig } from "@langwatch/experiment-web/experiments-v3/types";
-import { getFieldsUsedByPromptTemplate } from "@langwatch/experiment-web/experiments-v3/utils/mappingValidation";
+import type { LocalPromptConfig } from "@langwatch/experiment-web/surfaces/workbench-types";
+import { getFieldsUsedByPromptTemplate } from "@langwatch/experiment-web/surfaces/mapping-validation";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import {
   getComplexProps,
@@ -25,7 +25,7 @@ import {
 } from "@langwatch/ui-host/use-drawer";
 import { useModelProvidersSettings } from "@langwatch/model-provider-web/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { useRegisterDrawerFooter } from "@langwatch/workflow-web";
+import { useRegisterDrawerFooter } from "@langwatch/workflow-web/surfaces/studio-drawer-footer";
 import { PromptEditorFooter } from "./prompt-editor-footer";
 import { PromptEditorHeader } from "./prompt-editor-header";
 import { VersionBadge } from "@langwatch/prompt-web/surfaces/prompt-version";
@@ -49,7 +49,7 @@ import {
 import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
-import type { LlmConfigInputType } from "@langwatch/workflow-web/types";
+import type { LlmConfigInputType } from "@langwatch/workflow-web/surfaces/component-types";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { localConfigToFormValues } from "../../../model/prompts/local-config-to-form-values";
 

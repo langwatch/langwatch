@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { ScenarioRunExportDialog } from "@langwatch/suite-web";
+import { ScenarioRunExportDialog } from "@langwatch/suite-web/surfaces/run-dialogs";
 import { RunDialog } from "../run/run-dialog";
 import type { RunPlanResultsColumnState } from "./use-run-plan-results-column";
 

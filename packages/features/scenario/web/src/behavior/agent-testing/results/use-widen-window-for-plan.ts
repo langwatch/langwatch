@@ -6,7 +6,7 @@
 
 import { subDays } from "date-fns";
 import { useEffect } from "react";
-import type { Period } from "@langwatch/analytics-web/components/PeriodSelector";
+import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
 import { widenedWindowDays } from "./run-plans";
 
 /**

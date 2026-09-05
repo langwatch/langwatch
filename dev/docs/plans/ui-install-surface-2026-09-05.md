@@ -123,3 +123,32 @@ re-exported. `automationsAllPageLoaders` becomes `automationsPageLoaders`.
 
 "UI loader lines" is retired once this lands; its replacement is
 `features not installed = 0`, read from the guard test.
+
+## A web surface is a door, not a second implementation
+
+Applied 2026-09-05, alongside the cross-feature web import burn-down.
+
+`ui-surface-closure` used to admit only `src/surfaces/<id>/**` and
+`src/model/**` as the implementation a surface entry may reach, while
+`ui-web-public-boundary-leakage` forbids private code from importing
+`src/surfaces/**`. A component used both inside its own package and by
+another feature therefore had exactly one legal home: hoisted as a `.tsx`
+into `model/`, which is the wrong layer for presentation.
+
+The rule now reads a surface as the package's public door:
+
+```
+src/surfaces/<id>/index.ts   ── the door, exported as ./surfaces/<id>
+        │  may reach
+        ├─ src/surfaces/<id>/**   its own directory
+        ├─ src/model/**           shared model
+        ├─ src/behavior/**        shared behavior
+        └─ src/ui/**              shared presentation
+              (nothing else: features/, screens/, internal/, queries/,
+               routes/, state/, stores/, transport/ all still fail)
+```
+
+Everything else about the walk is unchanged: `SURFACE_FORBIDDEN_DIRECTORIES`,
+the browser-capability ban, the portable-import checks and the refusal to
+reach another surface all still apply through the full closure, and private
+code still may not import a surface.

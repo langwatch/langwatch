@@ -6,8 +6,13 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GroupRow, RunRow, type RunGroup, type RunGroupSummary } from "@langwatch/suite-web";
-import { makeBatchRun, makeScenarioRunData, makeSummary } from "@langwatch/suite-web/testing";
+import { GroupRow, RunRow } from "@langwatch/suite-web/surfaces/run-cards";
+import { type RunGroup, type RunGroupSummary } from "@langwatch/suite-web/surfaces/run-formatters";
+import {
+  makeBatchRun,
+  makeScenarioRunData,
+  makeSummary,
+} from "@langwatch/suite-web/surfaces/test-doubles";
 
 vi.mock("../use-prefetch-run-state", () => ({
   usePrefetchRunState: () => vi.fn(),

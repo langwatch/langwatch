@@ -1,4 +1,4 @@
-import type { LocalPromptConfig } from "@langwatch/experiment-web/experiments-v3/types";
+import type { LocalPromptConfig } from "@langwatch/experiment-web/surfaces/workbench-types";
 import {
   buildDefaultFormValues,
   type PromptConfigFormValues,

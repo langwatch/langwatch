@@ -34,7 +34,7 @@ import {
 } from "recharts";
 import type { Experiment, Project } from "@langwatch/workflow-contract";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { FormatMoney } from "@langwatch/workflow-web/optimization_studio/components/FormatMoney";
+import { FormatMoney } from "@langwatch/workflow-web/surfaces/format-money";
 import { VersionBox } from "@langwatch/workflow-web/optimization_studio/components/History";
 import type { WorkflowApiRouter } from "@langwatch/workflow-web/surfaces/workflow-api";
 import type {

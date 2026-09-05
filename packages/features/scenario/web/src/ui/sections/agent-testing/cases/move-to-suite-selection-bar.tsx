@@ -7,7 +7,7 @@ import { Box, chakra, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { Folder } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { SelectionActionBar } from "@langwatch/trace-web";
+import { SelectionActionBar } from "@langwatch/trace-web/surfaces/trace-selection";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button";
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases";

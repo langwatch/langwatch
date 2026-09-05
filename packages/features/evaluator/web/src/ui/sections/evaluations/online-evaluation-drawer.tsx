@@ -29,7 +29,7 @@ import {
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import { createEvaluatorEditorCallbacks } from "@langwatch/experiment-web/experiments-v3/utils/evaluatorEditorCallbacks";
-import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-web/experiments-v3/utils/mappingValidation";
+import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-web/surfaces/mapping-validation";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import {
   getComplexProps,

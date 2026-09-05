@@ -10,9 +10,9 @@ import type {
   Period,
   PeriodMode,
   RelativePresetKey,
-} from "@langwatch/analytics-web/components/PeriodSelector";
+} from "@langwatch/analytics-web/surfaces/period-selector";
 import { NewSimulationsCallout } from "../../suites/new-simulations-callout";
-import { SuiteArchiveDialog } from "@langwatch/suite-web";
+import { SuiteArchiveDialog } from "@langwatch/suite-web/surfaces/run-dialogs";
 import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing";
 import { SuiteRailFooter } from "./suite-rail-footer";
 import { SuiteRailSections } from "./suite-rail-sections";

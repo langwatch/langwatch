@@ -246,7 +246,11 @@
       "root": "navigation",
       "uses": {
         "screens": ["@langwatch/navigation-web/screens/navigation"],
-        "surfaces": []
+        "surfaces": [
+          "@langwatch/langy-web/surfaces/langy-mark",
+          "@langwatch/langy-web/surfaces/langy-store",
+          "@langwatch/navigation-web/surfaces/command-bar"
+        ]
       }
     },
     {

@@ -4,8 +4,8 @@ import {
   getAvailablePreconditionFields,
   PRECONDITION_ALLOWED_RULES,
 } from "@langwatch/analytics-web/server/filters/precondition-matchers";
-import { availableFilters } from "@langwatch/analytics-web/server/filters/registry";
-import type { FilterField } from "@langwatch/analytics-web/server/filters/types";
+import { availableFilters } from "@langwatch/analytics-web/surfaces/filter-registry";
+import type { FilterField } from "@langwatch/analytics-web/surfaces/filter-types";
 
 /** Human-readable labels for precondition rules */
 export const RULE_LABELS: Record<CheckPreconditionRule, string> = {

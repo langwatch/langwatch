@@ -1,6 +1,6 @@
 import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
-import type { LocalPromptConfig } from "@langwatch/experiment-web/experiments-v3/types";
+import type { LocalPromptConfig } from "@langwatch/experiment-web/surfaces/workbench-types";
 import {
   type Component,
   type LLMConfig,
@@ -23,7 +23,7 @@ import {
   LlmConfigInputTypes,
   type LlmConfigOutputType,
   LlmConfigOutputTypes,
-} from "@langwatch/workflow-web/types";
+} from "@langwatch/workflow-web/surfaces/component-types";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { kebabCase } from "@langwatch/design-system/string-casing";
 

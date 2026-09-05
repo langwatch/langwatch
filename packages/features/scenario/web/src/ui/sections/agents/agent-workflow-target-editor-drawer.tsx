@@ -16,7 +16,7 @@ import {
   useDrawerParams,
 } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { WorkflowCardDisplay } from "@langwatch/workflow-web";
+import { WorkflowCardDisplay } from "@langwatch/workflow-web/surfaces/workflow-card";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { useWorkflowTargetAgentData } from "../../../behavior/agents/use-workflow-target-agent-data";
 

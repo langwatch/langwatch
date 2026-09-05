@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { TimeRange } from "@langwatch/trace-web";
+import type { TimeRange } from "@langwatch/trace-web/surfaces/trace-filters";
 import { useFilterStore, useViewStore } from "@langwatch/trace-web";
 import type { LangyContextChip } from "../../../index";
 

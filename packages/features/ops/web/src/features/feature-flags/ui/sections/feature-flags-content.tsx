@@ -1,5 +1,5 @@
 import { Center, Spinner } from "@chakra-ui/react";
-import { OperatorFeatureFlagCatalogueView } from "@langwatch/feature-flag-web";
+import { OperatorFeatureFlagCatalogueView } from "@langwatch/feature-flag-web/surfaces/experiment-catalogue";
 import { HandledErrorAlert } from "../../../../ui/elements/ops-handled-error-alert";
 import { useOpsPermission } from "../../../../behavior/ops-session";
 import { useOpsHost } from "../../../../model/ops-host";

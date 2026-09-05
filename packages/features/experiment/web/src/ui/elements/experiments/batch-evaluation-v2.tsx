@@ -20,8 +20,8 @@ import type { Experiment, Project } from "@langwatch/workflow-contract";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { Link } from "@langwatch/ui-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useDejaViewLink } from "@langwatch/workflow-web/hooks/useDejaViewLink";
-import { FormatMoney } from "@langwatch/workflow-web/optimization_studio/components/FormatMoney";
+import { useDejaViewLink } from "@langwatch/workflow-web/surfaces/deja-view-link";
+import { FormatMoney } from "@langwatch/workflow-web/surfaces/format-money";
 import { VersionBox } from "@langwatch/workflow-web/optimization_studio/components/History";
 import type {
   WorkflowApiRouter,

@@ -484,6 +484,42 @@ describe("frontend UI architecture boundaries", () => {
     );
   });
 
+  /** @scenario "A surface is the public door onto its package implementation" */
+  it("lets a surface entry reach its package's own model, behavior and ui layers", () => {
+    const promptWeb = webPackage("prompt", {
+      "./surfaces/prompt-reference": "./src/surfaces/prompt-reference/index.ts",
+    });
+    writeCatalogue([
+      { id: "trace-explorer", surfaces: ["@langwatch/prompt-web/surfaces/prompt-reference"] },
+    ]);
+    write(
+      "apps/ui/src/features/trace-explorer/route.ts",
+      'import "@langwatch/prompt-web/surfaces/prompt-reference";',
+    );
+    write(
+      "packages/features/prompt/web/src/surfaces/prompt-reference/index.ts",
+      [
+        'export { PromptReference } from "../../ui/sections/prompt-reference";',
+        'export { usePromptReference } from "../../behavior/use-prompt-reference";',
+        'export type { PromptReferenceValue } from "../../model/prompt-reference";',
+      ].join("\n"),
+    );
+    write(
+      "packages/features/prompt/web/src/ui/sections/prompt-reference.tsx",
+      'import { promptReferenceLabel } from "../../model/prompt-reference"; export const PromptReference = promptReferenceLabel;',
+    );
+    write(
+      "packages/features/prompt/web/src/behavior/use-prompt-reference.ts",
+      "export const usePromptReference = () => undefined;",
+    );
+    write(
+      "packages/features/prompt/web/src/model/prompt-reference.ts",
+      'export type PromptReferenceValue = string; export const promptReferenceLabel = "prompt";',
+    );
+
+    expect(policies([promptWeb]).filter((policy) => policy === "ui-surface-closure")).toEqual([]);
+  });
+
   /** @scenario "An owner-only screen remains browser-safe" */
   it("keeps owner-only screens browser-safe while allowing private presentation code", () => {
     const promptWeb = webPackage("prompt", {

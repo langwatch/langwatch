@@ -6,13 +6,13 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/navigation-web/command-bar", () => ({
+vi.mock("@langwatch/navigation-web/surfaces/command-bar", () => ({
   CommandPalette: () => <input placeholder="ask" />,
   useCommandBar: () => ({ registerInlinePalette: () => () => undefined }),
 }));
 
 const askLangy = vi.fn();
-vi.mock("@langwatch/langy-web", () => ({
+vi.mock("@langwatch/langy-web/surfaces/langy-store", () => ({
   useLangyStore: (selector: (s: { askLangy: () => void }) => unknown) => selector({ askLangy }),
   selectLangySuggestions: ({ reach }: { reach: { hasTraces: boolean } }) =>
     reach.hasTraces

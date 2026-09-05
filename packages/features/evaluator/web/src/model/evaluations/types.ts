@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { filterFieldsEnum } from "@langwatch/analytics-web/server/filters/types";
+import { filterFieldsEnum } from "@langwatch/analytics-web/surfaces/filter-types";
 import type {
   EvaluationResult,
   EvaluationResultError,

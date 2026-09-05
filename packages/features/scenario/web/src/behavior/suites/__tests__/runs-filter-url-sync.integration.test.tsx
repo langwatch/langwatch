@@ -20,7 +20,7 @@ import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
 
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { createRunHistoryStore } from "@langwatch/suite-web";
+import { createRunHistoryStore } from "@langwatch/suite-web/surfaces/run-history-store";
 import { ALL_RUNS_ID, EXTERNAL_SET_PREFIX, useSuiteRouting } from "../use-suite-routing";
 
 type Store = ReturnType<typeof createRunHistoryStore>;

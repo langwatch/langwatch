@@ -6,7 +6,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { LangyUiActionHandlers } from "@langwatch/langy-web";
+import type { LangyUiActionHandlers } from "@langwatch/langy-web/surfaces/langy-ui-actions";
 
 /** What the page hands to `useRegisterLangyActions`, captured on render. */
 const captured = vi.hoisted(() => ({

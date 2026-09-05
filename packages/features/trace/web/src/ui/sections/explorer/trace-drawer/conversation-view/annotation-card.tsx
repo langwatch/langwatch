@@ -1,4 +1,4 @@
-import { AnnotationCard as PackageAnnotationCard } from "@langwatch/annotation-web";
+import { AnnotationCard as PackageAnnotationCard } from "@langwatch/annotation-web/surfaces/annotation-card";
 import { UserAvatar } from "../../../../elements/user-avatar";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids";
 import { useJumpToAnnotationAnchor } from "../../hooks/use-jump-to-annotation-anchor";

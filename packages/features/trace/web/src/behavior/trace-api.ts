@@ -29,7 +29,7 @@ import type { SimulationRunStatus } from "@langwatch/scenario-contract";
 import type { MediaProbeResult } from "@langwatch/scenario-web";
 import type { ShareLink, ShareResourceType, ShareVisibility } from "@langwatch/share-contract";
 import type { CodingAgentTranscript } from "@langwatch/coding-agent-contract";
-import type { CodingAgentSessionDisplay } from "@langwatch/coding-agent-web";
+import type { CodingAgentSessionDisplay } from "@langwatch/coding-agent-web/surfaces/agent-traces";
 import { createFeatureApi } from "@langwatch/platform-api-client";
 import type { ConversationTurn } from "../model/explorer/conversation-turn";
 import type { SessionGroupPayloadItem } from "../model/explorer/session-group-payload";

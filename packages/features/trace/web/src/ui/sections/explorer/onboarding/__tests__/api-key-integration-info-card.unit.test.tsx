@@ -31,15 +31,12 @@ vi.mock("../../../use-public-env", () => ({
   usePublicEnv: () => ({ data: { BASE_HOST: mockBaseHost } }),
 }));
 
-vi.mock(
-  "@langwatch/onboarding-web/features/onboarding/components/sections/observability/CodePreview",
-  () => ({
-    CodePreview: (props: Record<string, unknown>) => {
-      capturedCodePreviewProps = props;
-      return <div data-testid="code-preview">{String(props.code)}</div>;
-    },
-  }),
-);
+vi.mock("@langwatch/onboarding-web/surfaces/code-preview", () => ({
+  CodePreview: (props: Record<string, unknown>) => {
+    capturedCodePreviewProps = props;
+    return <div data-testid="code-preview">{String(props.code)}</div>;
+  },
+}));
 
 // ─── Module under test ──────────────────────────────────────────────────────────
 

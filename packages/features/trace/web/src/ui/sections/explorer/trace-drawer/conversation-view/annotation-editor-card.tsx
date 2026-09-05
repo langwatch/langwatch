@@ -6,7 +6,7 @@ import {
   readAnnotationScoreOptions,
   SuggestBody,
   type AnnotationFormState,
-} from "@langwatch/annotation-web";
+} from "@langwatch/annotation-web/surfaces/annotation-form";
 import { useEffect } from "react";
 import { type AnnotationDraft, useAnnotationDraftStore } from "../../../../../index";
 import { useAnnotationMutations } from "./use-annotation-form";

@@ -10,7 +10,10 @@ import { useDrawer } from "../../../behavior/use-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
-import { evaluationPassed, evaluationStatusColor } from "@langwatch/evaluator-web";
+import {
+  evaluationPassed,
+  evaluationStatusColor,
+} from "@langwatch/evaluator-web/surfaces/evaluation-status";
 import { HoverableBigText } from "../hoverable-big-text";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";

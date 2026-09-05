@@ -31,12 +31,12 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
 }));
 
 const flagEnabled = vi.hoisted(() => ({ value: true }));
-vi.mock("@langwatch/workflow-web/hooks/useFeatureFlag", () => ({
+vi.mock("@langwatch/workflow-web/surfaces/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: flagEnabled.value }),
 }));
 
-import { useLangyContextTargetStore } from "@langwatch/langy-web";
-import { useLangyStore } from "@langwatch/langy-web";
+import { useLangyContextTargetStore } from "@langwatch/langy-web/surfaces/langy-context";
+import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
 import { TargetHeader } from "../../../ui/sections/experiments-v3/TargetSection/target-header";
 import { useEvaluationsV3Store } from "../use-evaluations-v3-store";
 import { useOptimizeWithLangy } from "../use-optimize-with-langy";

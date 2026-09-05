@@ -31,7 +31,7 @@ import {
   useDrawerParams,
 } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { explainExecutionStateError } from "@langwatch/workflow-web/optimization_studio/utils/executionStateError";
+import { explainExecutionStateError } from "@langwatch/workflow-web/surfaces/execution-state-error";
 import { api } from "../../../behavior/scenario-api";
 
 const inputMappingsSchema = z.record(z.string(), agentInputBindingSchema);

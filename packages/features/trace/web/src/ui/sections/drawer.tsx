@@ -6,8 +6,8 @@ import {
   LANGY_DODGE_STAGGER_MS,
   LANGY_TRANSITION,
   SIDEBAR_PANEL_WIDTH,
-  useLangyStore,
-} from "@langwatch/langy-web";
+} from "@langwatch/langy-web/surfaces/langy-panel-layout";
+import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
 import { CloseButton } from "../elements/close-button";
 import { IsolatedErrorBoundary } from "./isolated-error-boundary";
 

@@ -6,7 +6,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LangyUiActionHandlers } from "@langwatch/langy-web";
+import type { LangyUiActionHandlers } from "@langwatch/langy-web/surfaces/langy-ui-actions";
 
 const captured = vi.hoisted(() => ({
   handlers: undefined as LangyUiActionHandlers | undefined,

@@ -6,7 +6,7 @@ import { LLMConfigPopover, type Output } from "./llm-config-popover";
 import { AddModelProviderKey } from "@langwatch/workflow-web/optimization_studio/components/AddModelProviderKey";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import type { ModelOption } from "@langwatch/topic-contract";
-import { NoModelsConfiguredCallout } from "@langwatch/model-provider-web/components/NoModelsConfiguredCallout";
+import { NoModelsConfiguredCallout } from "@langwatch/model-provider-web/surfaces/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import { LLMModelDisplay } from "./llm-model-display";
 

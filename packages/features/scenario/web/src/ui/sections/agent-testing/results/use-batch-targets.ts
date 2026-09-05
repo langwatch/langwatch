@@ -10,7 +10,7 @@ import {
   groupRunsByTargetKey,
   type RunGroupSummary,
   targetKeyOfRun,
-} from "@langwatch/suite-web";
+} from "@langwatch/suite-web/surfaces/run-formatters";
 import {
   type TargetIdentity,
   useTargetIdentityMap,

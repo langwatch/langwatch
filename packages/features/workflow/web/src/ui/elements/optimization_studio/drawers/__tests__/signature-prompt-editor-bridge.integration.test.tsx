@@ -4,7 +4,7 @@
 import { render } from "@testing-library/react";
 import type { Node } from "@xyflow/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { LocalPromptConfig } from "@langwatch/experiment-web/experiments-v3/types";
+import type { LocalPromptConfig } from "@langwatch/experiment-web/surfaces/workbench-types";
 import type { Component, Signature } from "@langwatch/workflow-contract";
 
 // ---- Mocks ----

@@ -1,5 +1,8 @@
 import { Box, Text } from "@chakra-ui/react";
-import { presenceUserColor, presenceUserDisplayName } from "@langwatch/presence-web";
+import {
+  presenceUserColor,
+  presenceUserDisplayName,
+} from "@langwatch/presence-web/surfaces/presence-indicators";
 import { memo, useRef } from "react";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { useCursorBroadcast } from "./hooks/use-cursor-broadcast";

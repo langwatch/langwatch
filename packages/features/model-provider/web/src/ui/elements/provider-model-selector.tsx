@@ -8,7 +8,7 @@ import { titleCase } from "@langwatch/design-system/string-casing";
 import {
   MODEL_ICON_SIZE,
   MODEL_ICON_SIZE_SM,
-} from "@langwatch/prompt-web/components/llmPromptConfigs/constants";
+} from "@langwatch/prompt-web/surfaces/llm-config-constants";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Select } from "@langwatch/design-system/select";
 

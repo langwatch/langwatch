@@ -8,7 +8,7 @@ import {
   TERMINAL_TOKENS,
   TerminalSkeleton,
   TerminalView,
-} from "@langwatch/coding-agent-web";
+} from "@langwatch/coding-agent-web/surfaces/agent-traces";
 import { useSessionScrollback } from "./use-session-scrollback";
 
 /** Stable identity while the transcript is still in flight. */

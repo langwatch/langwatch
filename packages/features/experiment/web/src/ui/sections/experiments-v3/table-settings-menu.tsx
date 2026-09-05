@@ -5,7 +5,7 @@ import { Box, Button, HStack, Input, Text, useDisclosure, VStack } from "@chakra
 import { ListChevronsDownUp, ListChevronsUpDown, SlidersHorizontal, Terminal } from "lucide-react";
 import React, { useState } from "react";
 import { LuGauge } from "react-icons/lu";
-import type { RowHeightMode } from "@langwatch/dataset-web";
+import type { RowHeightMode } from "@langwatch/dataset-web/surfaces/dataset-table";
 import { Popover } from "@langwatch/design-system/popover";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { Tooltip } from "@langwatch/design-system/tooltip";

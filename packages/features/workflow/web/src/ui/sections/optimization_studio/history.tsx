@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
 import { UserAvatar } from "../../elements/user-avatar";
 
-import { HistoryIcon } from "@langwatch/model-provider-web/components/icons/History";
+import { HistoryIcon } from "@langwatch/model-provider-web/surfaces/history-icon";
 import { Popover } from "@langwatch/design-system/popover";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";

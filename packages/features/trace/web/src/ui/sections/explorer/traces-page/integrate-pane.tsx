@@ -11,7 +11,7 @@ import { SetupWithAgentButton } from "../../setup-with-agent-button";
 import {
   type ActiveProjectContextValue,
   ActiveProjectProvider,
-} from "@langwatch/onboarding-web/features/onboarding/contexts/ActiveProjectContext";
+} from "@langwatch/onboarding-web/surfaces/active-project-context";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { usePublicEnv } from "../../use-public-env";
 import { ApiKeyIntegrationInfoCard } from "../onboarding/api-key-integration-info-card";

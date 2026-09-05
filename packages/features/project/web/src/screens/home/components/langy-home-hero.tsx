@@ -1,8 +1,8 @@
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CommandPalette, useCommandBar } from "@langwatch/navigation-web/command-bar";
-import { selectLangySuggestions } from "@langwatch/langy-web";
-import { useLangyStore } from "@langwatch/langy-web";
+import { CommandPalette, useCommandBar } from "@langwatch/navigation-web/surfaces/command-bar";
+import { selectLangySuggestions } from "@langwatch/langy-web/surfaces/langy-store";
+import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
 import { useHomeDevState } from "./dev/home-dev-state";
 import "./homeHeroScroll.css";
 import { OnboardAgentPill } from "./onboard-agent-pill";

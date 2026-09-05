@@ -6,10 +6,10 @@ import {
   BatchRunsSidebar,
   BatchSummaryFooter,
   transformBatchEvaluationData,
-} from "@langwatch/experiment-web";
+} from "@langwatch/experiment-web/surfaces/batch-results";
 import { ExternalImage } from "@langwatch/design-system/external-image";
-import { EvaluatorResultChip } from "@langwatch/evaluator-web/components/shared/EvaluatorResultChip";
-import { describeCellFailure } from "@langwatch/experiment-web/experiments-v3/utils/cellFailure";
+import { EvaluatorResultChip } from "@langwatch/evaluator-web/surfaces/evaluator-result-chip";
+import { describeCellFailure } from "@langwatch/experiment-web/surfaces/cell-failure";
 import { TraceIdPeek } from "@langwatch/trace-web/explorer/components/TraceIdPeek";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useBatchEvaluationState } from "@langwatch/experiment-web/components/experiments/BatchEvaluationV2";

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useFormContext } from "react-hook-form";
 import { useDebounceCallback } from "usehooks-ts";
 
-import { AISparklesLoader } from "@langwatch/model-provider-web/components/icons/AISparklesLoader";
+import { AISparklesLoader } from "@langwatch/model-provider-web/surfaces/ai-sparkles-loader";
 import {
   allModelOptions,
   useModelSelectionOptions,

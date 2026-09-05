@@ -20,7 +20,7 @@ import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { tryToMapPreviousColumnsToNewColumns } from "@langwatch/workflow-web";
+import { tryToMapPreviousColumnsToNewColumns } from "@langwatch/workflow-web/surfaces/studio-dataset-columns";
 import {
   type DatasetColumns,
   type DatasetRecordForm,

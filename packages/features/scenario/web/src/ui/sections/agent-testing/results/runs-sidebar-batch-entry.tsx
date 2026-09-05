@@ -4,7 +4,10 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { type BatchRun, computeBatchRunSummary } from "@langwatch/suite-web";
+import {
+  type BatchRun,
+  computeBatchRunSummary,
+} from "@langwatch/suite-web/surfaces/run-formatters";
 import { useNow } from "../../../../behavior/use-now";
 import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
 import {

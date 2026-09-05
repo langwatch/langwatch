@@ -1,7 +1,7 @@
 import { type Dispatch, type SetStateAction, useCallback, useRef, useState } from "react";
 import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "@langwatch/ui-host/errors";
-import type { ExportProgressEvent } from "@langwatch/trace-web/model/export-types";
+import type { ExportProgressEvent } from "@langwatch/trace-web/surfaces/export-types";
 import type {
   ScenarioRunExportMode,
   ScenarioRunExportRequest,

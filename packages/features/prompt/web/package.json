@@ -8,7 +8,7 @@
   ],
   "type": "module",
   "exports": {
-    "./components/llmPromptConfigs/constants": {
+    "./surfaces/llm-config-constants": {
       "types": "./src/model/llmPromptConfigs/constants.ts",
       "default": "./src/model/llmPromptConfigs/constants.ts"
     },

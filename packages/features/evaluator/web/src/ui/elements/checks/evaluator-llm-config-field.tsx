@@ -9,7 +9,7 @@ import {
   allModelOptions,
   useModelSelectionOptions,
 } from "@langwatch/model-provider-web/components/ModelSelector";
-import { NoModelsConfiguredCallout } from "@langwatch/model-provider-web/components/NoModelsConfiguredCallout";
+import { NoModelsConfiguredCallout } from "@langwatch/model-provider-web/surfaces/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 

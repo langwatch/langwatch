@@ -3,9 +3,9 @@ import Mustache from "mustache";
 import { useState } from "react";
 import { ExternalLink } from "react-feather";
 
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/workflow-web/surfaces/studio-scope";
 
-import { CopyIcon } from "@langwatch/model-provider-web/components/icons/Copy";
+import { CopyIcon } from "@langwatch/model-provider-web/surfaces/copy-icon";
 import { Link as UiLink } from "@langwatch/ui-host/link";
 import { Popover } from "@langwatch/design-system/popover";
 

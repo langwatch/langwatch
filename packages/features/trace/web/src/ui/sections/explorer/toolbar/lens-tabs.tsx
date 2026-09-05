@@ -2,7 +2,7 @@ import { Box, Button, HStack, Tabs, Text } from "@chakra-ui/react";
 import { ChevronDown, PanelLeftOpen, RotateCcw } from "lucide-react";
 import type React from "react";
 import { startTransition, useMemo, useRef, useState } from "react";
-import { Kbd } from "@langwatch/ops-web";
+import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@langwatch/design-system/menu";
 import { useErrorCount } from "../hooks/use-error-count";

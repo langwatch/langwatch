@@ -26,11 +26,7 @@
       "types": "./src/ui/sections/datasets/editor/dataset-editor-table.tsx",
       "default": "./src/ui/sections/datasets/editor/dataset-editor-table.tsx"
     },
-    "./components/datasets/editor/DatasetPreviewTable": {
-      "types": "./src/ui/elements/datasets/editor/dataset-preview-table.tsx",
-      "default": "./src/ui/elements/datasets/editor/dataset-preview-table.tsx"
-    },
-    "./components/datasets/editor/renderDatasetImage": {
+    "./surfaces/render-dataset-image": {
       "types": "./src/ui/elements/datasets/editor/render-dataset-image.tsx",
       "default": "./src/ui/elements/datasets/editor/render-dataset-image.tsx"
     },
@@ -49,6 +45,18 @@
     "./screens/datasets": {
       "types": "./src/screens/datasets/index.ts",
       "default": "./src/screens/datasets/index.ts"
+    },
+    "./surfaces/dataset-table": {
+      "types": "./src/ui/sections/dataset-table.surface.ts",
+      "default": "./src/ui/sections/dataset-table.surface.ts"
+    },
+    "./surfaces/dataset-preview-table": {
+      "types": "./src/ui/blocks/dataset-preview-table.tsx",
+      "default": "./src/ui/blocks/dataset-preview-table.tsx"
+    },
+    "./surfaces/dataset-image-preview-table": {
+      "types": "./src/ui/blocks/datasets/editor/dataset-preview-table.tsx",
+      "default": "./src/ui/blocks/datasets/editor/dataset-preview-table.tsx"
     }
   },
   "scripts": {

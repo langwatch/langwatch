@@ -3,7 +3,10 @@ import { Bot, Boxes, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { modelProviderIcons } from "./model-provider-marks";
-import { ASSISTANT_PRESETS, type AssistantKind } from "@langwatch/coding-agent-web";
+import {
+  ASSISTANT_PRESETS,
+  type AssistantKind,
+} from "@langwatch/coding-agent-web/surfaces/agent-identity";
 import type { AiToolType } from "../../model/ai-tool-catalog";
 import { resolveToolPreset, TOOL_PRESETS } from "./tool-presets";
 

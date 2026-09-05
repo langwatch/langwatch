@@ -12,11 +12,11 @@ import {
   allModelOptions,
   useModelSelectionOptions,
 } from "@langwatch/model-provider-web/components/ModelSelector";
-import { NoModelsConfiguredCallout } from "@langwatch/model-provider-web/components/NoModelsConfiguredCallout";
+import { NoModelsConfiguredCallout } from "@langwatch/model-provider-web/surfaces/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
-import type { LlmConfigOutputType } from "@langwatch/workflow-web/types";
+import type { LlmConfigOutputType } from "@langwatch/workflow-web/surfaces/component-types";
 
 type ModelSelectFieldMiniProps = {
   /** Whether to show the structured outputs section in the config popover */

@@ -12,7 +12,10 @@ import {
 } from "@langwatch/trace-contract";
 import { durationColor } from "../../../model/duration-color";
 import { formatMilliseconds } from "../../../model/format-milliseconds";
-import { evaluationPassed, evaluationStatusColor } from "@langwatch/evaluator-web";
+import {
+  evaluationPassed,
+  evaluationStatusColor,
+} from "@langwatch/evaluator-web/surfaces/evaluation-status";
 import { OverflownTextWithTooltip } from "../../elements/overflown-text";
 import { Link } from "../../blocks/link";
 import { Menu } from "@langwatch/design-system/menu";

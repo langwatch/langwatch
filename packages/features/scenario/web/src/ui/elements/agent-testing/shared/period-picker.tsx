@@ -8,13 +8,13 @@ import type {
   Period,
   RelativePresetKey,
   PeriodMode,
-} from "@langwatch/analytics-web/components/PeriodSelector";
+} from "@langwatch/analytics-web/surfaces/period-selector";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
 import {
   describePeriod,
   matchPeriodPreset,
   PeriodSelector,
-} from "@langwatch/analytics-web/components/PeriodSelector";
+} from "@langwatch/analytics-web/surfaces/period-selector";
 
 /**
  * How many days the window spans, counted the way the shared period control

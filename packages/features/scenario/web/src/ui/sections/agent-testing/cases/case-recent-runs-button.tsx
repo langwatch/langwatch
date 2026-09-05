@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { usePeriodSelector } from "@langwatch/analytics-web/components/PeriodSelector";
+import { usePeriodSelector } from "@langwatch/analytics-web/surfaces/period-selector";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api } from "../../../../behavior/scenario-api";

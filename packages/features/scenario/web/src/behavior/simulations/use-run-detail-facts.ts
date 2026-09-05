@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { runParameterValuesSchema } from "@langwatch/scenario-contract";
-import { buildDisplayTitle } from "@langwatch/suite-web";
+import { buildDisplayTitle } from "@langwatch/suite-web/surfaces/run-formatters";
 import { useTargetNameMap } from "../use-target-name-map";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { shouldShowNoResponse } from "../..";

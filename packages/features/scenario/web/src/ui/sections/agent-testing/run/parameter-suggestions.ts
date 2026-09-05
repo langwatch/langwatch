@@ -8,8 +8,8 @@ import {
   getSuggestionState,
   PARAMETER_LINE_GRAMMAR,
   type SuggestionState,
-} from "@langwatch/trace-web/explorer/components/SearchBar/getSuggestionState";
-import { rankByMatch } from "@langwatch/trace-web/explorer/components/SearchBar/suggestionItems";
+} from "@langwatch/trace-web/surfaces/suggestion-state";
+import { rankByMatch } from "@langwatch/trace-web/surfaces/suggestion-items";
 import type { SuggestionRow } from "@langwatch/trace-web/explorer/components/SearchBar/suggestionUI";
 import { displayTypedValue } from "@langwatch/design-system/json-value-text";
 import { parseParameterLine } from "../../../../model/agent-testing/run/parameter-line";

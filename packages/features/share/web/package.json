@@ -13,6 +13,14 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./surfaces/share-link-views": {
+      "types": "./src/surfaces/share-link-views.ts",
+      "default": "./src/surfaces/share-link-views.ts"
+    },
+    "./surfaces/share-links": {
+      "types": "./src/surfaces/share-links.ts",
+      "default": "./src/surfaces/share-links.ts"
     }
   },
   "scripts": {

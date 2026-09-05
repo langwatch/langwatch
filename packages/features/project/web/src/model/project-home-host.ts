@@ -4,7 +4,7 @@
  * THE PAGE IS A COMPOSITION, and that is what shapes this port. Everything the
  * home draws that belongs to another FAMILY it reaches through that family's
  * published entry — the search palette and the feature icons from
- * `@langwatch/navigation-web/command-bar`, the assistant from `@langwatch/langy-web`,
+ * `@langwatch/navigation-web/surfaces/command-bar`, the assistant from `@langwatch/langy-web`,
  * the traces chart and the period selector from `@langwatch/analytics-web`.
  * What it reaches through THIS port is everything that used to be
  * `platform/app`'s and is nobody's feature: who is reading, which project and

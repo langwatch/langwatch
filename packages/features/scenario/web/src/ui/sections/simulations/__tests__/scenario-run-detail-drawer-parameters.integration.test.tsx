@@ -54,7 +54,7 @@ vi.mock("../../../../behavior/use-organization-team-project", () => ({
     project: { id: "project_1", slug: "test-project" },
   }),
 }));
-vi.mock("@langwatch/workflow-web/hooks/useDejaViewLink", () => ({
+vi.mock("@langwatch/workflow-web/surfaces/deja-view-link", () => ({
   useDejaViewLink: () => ({ href: null }),
 }));
 vi.mock("../../../../behavior/use-drawer-run-callbacks", () => ({

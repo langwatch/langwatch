@@ -1,5 +1,5 @@
 import { computeMetricStats, type MetricStats } from "../../index";
-import { parseEvaluationResult } from "@langwatch/evaluator-web/utils/evaluationResults";
+import { parseEvaluationResult } from "@langwatch/evaluator-web/surfaces/evaluation-results";
 import type { EvaluationResults, EvaluatorConfig, TargetConfig } from "./types";
 import { resolveVerdictLabel, toComparisonConfig } from "@langwatch/experiment-contract";
 

@@ -20,7 +20,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
 
 // TraceIdPeek (rendered transitively) calls useFeatureFlag → tRPC, which has
 // no withTRPC wrapper in these tests.
-vi.mock("@langwatch/workflow-web/hooks/useFeatureFlag", () => ({
+vi.mock("@langwatch/workflow-web/surfaces/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 

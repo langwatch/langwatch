@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
 import type { Experiment } from "@langwatch/experiment-contract";
 import type { Project } from "@langwatch/workflow-contract";
-import { EvaluatorResultChip } from "@langwatch/evaluator-web/components/shared/EvaluatorResultChip";
+import { EvaluatorResultChip } from "@langwatch/evaluator-web/surfaces/evaluator-result-chip";
 import { ExternalImage } from "@langwatch/design-system/external-image";
 import { Link } from "@langwatch/ui-host/link";
 import { describeCellFailure } from "../../../model/experiments-v3/cell-failure";

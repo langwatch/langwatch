@@ -5,8 +5,11 @@
  */
 
 import { useMemo } from "react";
-import type { Period } from "@langwatch/analytics-web/components/PeriodSelector";
-import { computeBatchRunSummary, groupRunsByBatchId } from "@langwatch/suite-web";
+import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
+import {
+  computeBatchRunSummary,
+  groupRunsByBatchId,
+} from "@langwatch/suite-web/surfaces/run-formatters";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api } from "../../../../behavior/scenario-api";
 import { type PlanIdentity, planOfSet } from "./plan-of-set";

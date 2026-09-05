@@ -5,7 +5,7 @@
 
 import { Box, VStack } from "@chakra-ui/react";
 import { DashboardLayout } from "../dashboard-layout";
-import { NowProvider } from "@langwatch/suite-web";
+import { NowProvider } from "@langwatch/suite-web/surfaces/run-dialogs";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { usePreloadDrawer } from "../../../behavior/use-preload-drawer";
 import { api } from "../../../behavior/scenario-api";

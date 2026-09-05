@@ -14,13 +14,33 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./activity": {
+    "./surfaces/activity": {
       "types": "./src/activity.ts",
       "default": "./src/activity.ts"
     },
     "./testing": {
       "types": "./src/testing.tsx",
       "default": "./src/testing.tsx"
+    },
+    "./surfaces/session-table": {
+      "types": "./src/surfaces/session-table.ts",
+      "default": "./src/surfaces/session-table.ts"
+    },
+    "./surfaces/pull-requests": {
+      "types": "./src/surfaces/pull-requests.ts",
+      "default": "./src/surfaces/pull-requests.ts"
+    },
+    "./surfaces/agent-identity": {
+      "types": "./src/surfaces/agent-identity.ts",
+      "default": "./src/surfaces/agent-identity.ts"
+    },
+    "./surfaces/agent-metrics": {
+      "types": "./src/surfaces/agent-metrics.ts",
+      "default": "./src/surfaces/agent-metrics.ts"
+    },
+    "./surfaces/agent-traces": {
+      "types": "./src/surfaces/agent-traces.ts",
+      "default": "./src/surfaces/agent-traces.ts"
     }
   },
   "scripts": {

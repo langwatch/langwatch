@@ -8,7 +8,7 @@ import { Accordion, Box, Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/
 import { RunDetailSection } from "../../../..";
 import { ScenarioMessageRenderer } from "../../simulations/scenario-message-renderer";
 import { ParameterRow, SECRET_VALUE_MASK } from "../../simulations/scenario-run-detail-drawer";
-import { ConversationExpandContext } from "@langwatch/trace-web/explorer/components/TraceDrawer/conversationView/expandContext";
+import { ConversationExpandContext } from "@langwatch/trace-web/surfaces/conversation-expand-context";
 import { isTerminalStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { RunVerdictPanel } from "../../../elements/agent-testing/drawers/run-verdict-panel";
 import { nextSpeakerOf } from "../../../elements/next-speaker";

@@ -22,8 +22,8 @@ import {
 } from "react-resizable-panels";
 import { useShallow } from "zustand/react/shallow";
 import Head from "../../elements/compat/next-head";
-import { DatasetPreviewTable } from "@langwatch/dataset-web/components/datasets/editor/DatasetPreviewTable";
-import { EvaluationProgressBar } from "@langwatch/experiment-web/components/experiments/BatchEvaluationV2/EvaluationProgressBar";
+import { DatasetPreviewTable } from "@langwatch/dataset-web/surfaces/dataset-image-preview-table";
+import { EvaluationProgressBar } from "@langwatch/experiment-web/surfaces/evaluation-progress-bar";
 import { LogoIcon } from "../../elements/logo-icon";
 import {
   useColorMode,

@@ -5,13 +5,16 @@
 import { Box, Button, EmptyState, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { FlaskConical, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Period } from "@langwatch/analytics-web/components/PeriodSelector";
+import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
 import { SetupWithAgentButton } from "@langwatch/trace-web/components/SetupWithAgentButton";
 import { ShadowDivider } from "../../elements/shadow-divider";
 import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import { HandledErrorAlert } from "../../../behavior/errors";
-import { LangyContextTarget, scenarioContextChip } from "@langwatch/langy-web";
+import {
+  LangyContextTarget,
+  scenarioContextChip,
+} from "@langwatch/langy-web/surfaces/langy-context";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener";
@@ -23,12 +26,15 @@ import { api } from "../../../behavior/scenario-api";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import {
   GroupRow,
-  RunHistoryFilters,
   RunHistorySkeleton,
   RunRow,
   RunSummaryCounts,
-  type RunHistoryFilterValues,
   type ScenarioRunContextRenderer,
+} from "@langwatch/suite-web/surfaces/run-cards";
+import { ScenarioRunExportDialog } from "@langwatch/suite-web/surfaces/run-dialogs";
+import {
+  RunHistoryFilters,
+  type RunHistoryFilterValues,
   computeBatchRunSummary,
   computeGroupSummary,
   computeRunHistoryTotals,
@@ -36,11 +42,12 @@ import {
   groupRunsByScenarioId,
   groupRunsByTarget,
   resolveOriginLabel,
-  ScenarioRunExportDialog,
+} from "@langwatch/suite-web/surfaces/run-formatters";
+import {
   useAutoExpansion,
   useRunHistoryStore,
   useScrollToBatch,
-} from "@langwatch/suite-web";
+} from "@langwatch/suite-web/surfaces/run-history-store";
 import { useCancelScenarioRun } from "../../../behavior/suites/use-cancel-scenario-run";
 import { useExportScenarioRuns } from "../../../behavior/suites/use-export-scenario-runs";
 import { useRunHistoryPagination } from "../../../behavior/suites/use-run-history-pagination";

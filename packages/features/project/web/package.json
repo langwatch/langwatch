@@ -16,7 +16,7 @@
       "types": "./src/screens/project-settings/index.ts",
       "default": "./src/screens/project-settings/index.ts"
     },
-    "./ui/blocks/tech-stack": {
+    "./surfaces/tech-stack": {
       "types": "./src/ui/blocks/tech-stack.tsx",
       "default": "./src/ui/blocks/tech-stack.tsx"
     }

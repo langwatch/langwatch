@@ -19,7 +19,7 @@ vi.mock("@langwatch/trace-web/components/SetupWithAgentButton", () => ({
   SetupWithAgentButton: () => null,
 }));
 
-vi.mock("@langwatch/trace-web/hooks/usePageVisibility", () => ({
+vi.mock("@langwatch/trace-web/surfaces/page-visibility", () => ({
   usePageVisibility: () => true,
 }));
 

@@ -1,7 +1,7 @@
 import { Box, HStack, Input, Portal, Tag, Text, VStack } from "@chakra-ui/react";
 import { Check, ChevronRight, Database, Type } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ColorfulBlockIcon, ComponentIcon } from "@langwatch/workflow-web";
+import { ColorfulBlockIcon, ComponentIcon } from "@langwatch/workflow-web/surfaces/workflow-icons";
 import type { ComponentType, Field } from "@langwatch/workflow-contract";
 import { VariableTypeBadge, VariableTypeIcon } from "./variable-type";
 

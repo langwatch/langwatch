@@ -10,7 +10,7 @@ import {
   isCompactStreamingEvent,
 } from "@langwatch/scenario-contract";
 import { api } from "./scenario-api";
-import { usePageVisibility } from "@langwatch/trace-web/hooks/usePageVisibility";
+import { usePageVisibility } from "@langwatch/trace-web/surfaces/page-visibility";
 import { useSSESubscription } from "@langwatch/trace-web/hooks/useSSESubscription";
 
 const logger = createLogger("useSimulationUpdateListener");

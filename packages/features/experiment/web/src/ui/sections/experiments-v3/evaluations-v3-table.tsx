@@ -16,7 +16,7 @@ import {
   datasetTableCss,
   useTableKeyboardNavigation,
   VirtualizedTableBody,
-} from "@langwatch/dataset-web";
+} from "@langwatch/dataset-web/surfaces/dataset-table";
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import {
   getFlowCallbacks,

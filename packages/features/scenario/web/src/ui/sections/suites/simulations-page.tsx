@@ -11,7 +11,7 @@ import {
   type Period,
   PeriodSelector,
   usePeriodSelector,
-} from "@langwatch/analytics-web/components/PeriodSelector";
+} from "@langwatch/analytics-web/surfaces/period-selector";
 import { ExternalSetDetailPanel } from "./external-set-detail-panel";
 import { ReturnToNewSimulationsBanner } from "./return-to-new-simulations-banner";
 import { RunHistoryPanel } from "./run-history-panel";
@@ -20,7 +20,7 @@ import {
   SuiteContextMenu,
   SuiteRunConfirmationDialog,
   NowProvider,
-} from "@langwatch/suite-web";
+} from "@langwatch/suite-web/surfaces/run-dialogs";
 import { SuiteDetailPanel, SuiteEmptyState } from "./suite-detail-panel";
 import { SuiteSidebar } from "./suite-sidebar";
 import { useRunSuite } from "../../../behavior/suites/use-run-suite";

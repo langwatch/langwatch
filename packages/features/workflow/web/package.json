@@ -14,7 +14,7 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./components/CopyButton": {
+    "./surfaces/copy-button": {
       "types": "./src/ui/sections/copy-button.tsx",
       "default": "./src/ui/sections/copy-button.tsx"
     },
@@ -34,7 +34,7 @@
       "types": "./src/ui/sections/blocks/code-block-editor.tsx",
       "default": "./src/ui/sections/blocks/code-block-editor.tsx"
     },
-    "./components/code/RenderCode": {
+    "./surfaces/render-code": {
       "types": "./src/ui/sections/code/render-code.tsx",
       "default": "./src/ui/sections/code/render-code.tsx"
     },
@@ -50,23 +50,23 @@
       "types": "./src/ui/sections/run-via-api/use-run-via-api-tabs.ts",
       "default": "./src/ui/sections/run-via-api/use-run-via-api-tabs.ts"
     },
-    "./components/ui/IsolatedErrorBoundary": {
+    "./surfaces/isolated-error-boundary": {
       "types": "./src/ui/elements/isolated-error-boundary.tsx",
       "default": "./src/ui/elements/isolated-error-boundary.tsx"
     },
-    "./components/ui/RedactedField": {
+    "./surfaces/redacted-field": {
       "types": "./src/ui/sections/redacted-field.tsx",
       "default": "./src/ui/sections/redacted-field.tsx"
     },
-    "./hooks/useDejaViewLink": {
+    "./surfaces/deja-view-link": {
       "types": "./src/behavior/use-deja-view-link.ts",
       "default": "./src/behavior/use-deja-view-link.ts"
     },
-    "./hooks/useFeatureFlag": {
+    "./surfaces/feature-flag": {
       "types": "./src/behavior/use-feature-flag.ts",
       "default": "./src/behavior/use-feature-flag.ts"
     },
-    "./model/workflow-host": {
+    "./surfaces/workflow-host": {
       "types": "./src/model/workflow-host.ts",
       "default": "./src/model/workflow-host.ts"
     },
@@ -74,7 +74,7 @@
       "types": "./src/ui/elements/optimization_studio/add-model-provider-key.tsx",
       "default": "./src/ui/elements/optimization_studio/add-model-provider-key.tsx"
     },
-    "./optimization_studio/components/FormatMoney": {
+    "./surfaces/format-money": {
       "types": "./src/ui/elements/optimization_studio/format-money.tsx",
       "default": "./src/ui/elements/optimization_studio/format-money.tsx"
     },
@@ -90,7 +90,7 @@
       "types": "./src/ui/sections/optimization_studio/properties/modals/emoji-picker-modal.tsx",
       "default": "./src/ui/sections/optimization_studio/properties/modals/emoji-picker-modal.tsx"
     },
-    "./optimization_studio/utils/executionStateError": {
+    "./surfaces/execution-state-error": {
       "types": "./src/ui/sections/optimization_studio/execution-state-error.ts",
       "default": "./src/ui/sections/optimization_studio/execution-state-error.ts"
     },
@@ -98,11 +98,11 @@
       "types": "./src/screens/workflows/index.ts",
       "default": "./src/screens/workflows/index.ts"
     },
-    "./studio-host/errors": {
+    "./surfaces/handled-error-views": {
       "types": "./src/ui/elements/studio-host/errors.tsx",
       "default": "./src/ui/elements/studio-host/errors.tsx"
     },
-    "./studio-host/use-organization-team-project": {
+    "./surfaces/studio-scope": {
       "types": "./src/behavior/studio-host/use-organization-team-project.ts",
       "default": "./src/behavior/studio-host/use-organization-team-project.ts"
     },
@@ -110,33 +110,57 @@
       "types": "./src/model/workflow-api-client.ts",
       "default": "./src/model/workflow-api-client.ts"
     },
-    "./types": {
+    "./surfaces/component-types": {
       "types": "./src/model/types.ts",
       "default": "./src/model/types.ts"
     },
-    "./utils/compat/next-link": {
+    "./surfaces/next-link": {
       "types": "./src/ui/elements/compat/next-link.tsx",
       "default": "./src/ui/elements/compat/next-link.tsx"
     },
-    "./utils/constants": {
+    "./surfaces/platform-defaults": {
       "types": "./src/model/constants.ts",
       "default": "./src/model/constants.ts"
     },
-    "./utils/crispBubblePolicy": {
+    "./surfaces/crisp-bubble-policy": {
       "types": "./src/behavior/crisp-bubble-policy.ts",
       "default": "./src/behavior/crisp-bubble-policy.ts"
     },
-    "./utils/routes": {
+    "./surfaces/workflow-routes": {
       "types": "./src/model/routes.ts",
       "default": "./src/model/routes.ts"
     },
-    "./utils/sse/fetchSSE": {
+    "./surfaces/fetch-sse": {
       "types": "./src/model/sse/fetch-sse.ts",
       "default": "./src/model/sse/fetch-sse.ts"
     },
     "./utils/trpcError": {
       "types": "./src/behavior/trpc-error.ts",
       "default": "./src/behavior/trpc-error.ts"
+    },
+    "./surfaces/workflow-icons": {
+      "types": "./src/ui/sections/workflow-icons.surface.ts",
+      "default": "./src/ui/sections/workflow-icons.surface.ts"
+    },
+    "./surfaces/workflow-card": {
+      "types": "./src/ui/sections/workflow-card.surface.ts",
+      "default": "./src/ui/sections/workflow-card.surface.ts"
+    },
+    "./surfaces/code-agent": {
+      "types": "./src/ui/sections/code-agent.surface.ts",
+      "default": "./src/ui/sections/code-agent.surface.ts"
+    },
+    "./surfaces/workflow-templates": {
+      "types": "./src/ui/sections/workflow-templates.surface.ts",
+      "default": "./src/ui/sections/workflow-templates.surface.ts"
+    },
+    "./surfaces/studio-dataset-columns": {
+      "types": "./src/ui/sections/studio-dataset-columns.surface.ts",
+      "default": "./src/ui/sections/studio-dataset-columns.surface.ts"
+    },
+    "./surfaces/studio-drawer-footer": {
+      "types": "./src/ui/sections/studio-drawer-footer.surface.ts",
+      "default": "./src/ui/sections/studio-drawer-footer.surface.ts"
     }
   },
   "scripts": {

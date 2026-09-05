@@ -20,7 +20,7 @@ import { useRouter } from "@langwatch/ui-host/use-router";
 import { slugify } from "@langwatch/design-system/slugify";
 import { useAvailableEvaluators } from "../../../behavior/use-available-evaluators";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-web/utils/constants";
+import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-web/surfaces/platform-defaults";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { DEFAULT_MAPPINGS, migrateLegacyMappings } from "@langwatch/evaluator-contract";
 import { evaluatorDisplayName } from "@langwatch/evaluator-contract";

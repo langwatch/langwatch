@@ -1,6 +1,6 @@
 import { Box, HStack, type SystemStyleObject, Text } from "@chakra-ui/react";
 import type React from "react";
-import type { LangyContextTargetProps } from "@langwatch/langy-web";
+import type { LangyContextTargetProps } from "@langwatch/langy-web/surfaces/langy-context";
 import type { TraceStatus } from "../types/trace";
 import { Tbody } from "../../../elements/explorer/trace-table/table-primitives";
 

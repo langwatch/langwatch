@@ -4,7 +4,8 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { type BatchRun, ScenarioRunContent, targetKeyOfRun } from "@langwatch/suite-web";
+import { ScenarioRunContent } from "@langwatch/suite-web/surfaces/run-cards";
+import { type BatchRun, targetKeyOfRun } from "@langwatch/suite-web/surfaces/run-formatters";
 import { useCan } from "../../../../behavior/use-can";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { VStack } from "@chakra-ui/react";

@@ -7,7 +7,7 @@ import {
   type SavedRecord,
 } from "../../model/experiments-v3/types";
 import { extractPersistedState } from "../../model/experiments-v3/types/persistence";
-import { HandledErrorAlert } from "@langwatch/workflow-web/studio-host/errors";
+import { HandledErrorAlert } from "@langwatch/workflow-web/surfaces/handled-error-views";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";

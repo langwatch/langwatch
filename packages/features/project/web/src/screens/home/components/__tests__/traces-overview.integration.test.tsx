@@ -18,11 +18,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const period = { daysDifference: 1 };
 const setRelativePeriod = vi.fn();
-vi.mock("@langwatch/analytics-web/components/PeriodSelector", () => ({
+vi.mock("@langwatch/analytics-web/surfaces/period-selector", () => ({
   usePeriodSelector: () => ({ ...period, setRelativePeriod }),
 }));
 
-vi.mock("@langwatch/analytics-web/components/CustomGraph", () => ({
+vi.mock("@langwatch/analytics-web/surfaces/custom-graph", () => ({
   CustomGraph: ({
     emptyState,
     input,

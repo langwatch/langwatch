@@ -29,7 +29,7 @@ vi.mock("@langwatch/trace-web/hooks/useSSESubscription", () => ({
 }));
 
 let mockIsVisible = true;
-vi.mock("@langwatch/trace-web/hooks/usePageVisibility", () => ({
+vi.mock("@langwatch/trace-web/surfaces/page-visibility", () => ({
   usePageVisibility: () => mockIsVisible,
 }));
 

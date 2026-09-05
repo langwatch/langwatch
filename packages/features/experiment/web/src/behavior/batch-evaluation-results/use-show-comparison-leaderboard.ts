@@ -1,4 +1,4 @@
-import { useFeatureFlag } from "@langwatch/workflow-web/hooks/useFeatureFlag";
+import { useFeatureFlag } from "@langwatch/workflow-web/surfaces/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 

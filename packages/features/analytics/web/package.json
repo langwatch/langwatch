@@ -15,15 +15,15 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./analytics-registry": {
+    "./surfaces/analytics-registry": {
       "types": "./src/model/analytics-registry.ts",
       "default": "./src/model/analytics-registry.ts"
     },
-    "./components/CustomGraph": {
+    "./surfaces/custom-graph": {
       "types": "./src/ui/sections/custom-graph.tsx",
       "default": "./src/ui/sections/custom-graph.tsx"
     },
-    "./components/PeriodSelector": {
+    "./surfaces/period-selector": {
       "types": "./src/ui/elements/period-selector.tsx",
       "default": "./src/ui/elements/period-selector.tsx"
     },
@@ -47,11 +47,11 @@
       "types": "./src/model/filters/precondition-matchers.ts",
       "default": "./src/model/filters/precondition-matchers.ts"
     },
-    "./server/filters/registry": {
+    "./surfaces/filter-registry": {
       "types": "./src/model/filters/registry.ts",
       "default": "./src/model/filters/registry.ts"
     },
-    "./server/filters/types": {
+    "./surfaces/filter-types": {
       "types": "./src/model/filters/types.ts",
       "default": "./src/model/filters/types.ts"
     },

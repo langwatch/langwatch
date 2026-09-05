@@ -17,7 +17,7 @@ import {
   ScenarioRunStatusIcon,
 } from "../../../..";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { Chip } from "@langwatch/trace-web/explorer/components/TraceDrawer/Chip";
+import { Chip } from "@langwatch/trace-web/surfaces/trace-drawer-chip";
 import { CaseVersionChip } from "../../../elements/agent-testing/shared/case-version-chip";
 import { CASE_EDITOR_DRAWER } from "../cases/drawer-keys";
 import type {

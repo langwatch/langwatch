@@ -6,7 +6,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "./errors";
 import { useCanAskLangy } from "../../behavior/langy/use-can-ask-langy";
-import { useLangyStore } from "@langwatch/langy-web";
+import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
 import { withCredentials } from "../../model/skills/setup-prompt";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 import { api } from "../../behavior/trace-api";

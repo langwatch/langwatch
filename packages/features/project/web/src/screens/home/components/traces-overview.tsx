@@ -1,12 +1,9 @@
 import { Box, chakra, Grid, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { LuArrowRight, LuChevronDown, LuChevronRight } from "react-icons/lu";
-import { analyticsMetrics } from "@langwatch/analytics-web/analytics-registry";
-import {
-  CustomGraph,
-  type CustomGraphInput,
-} from "@langwatch/analytics-web/components/CustomGraph";
-import { usePeriodSelector } from "@langwatch/analytics-web/components/PeriodSelector";
+import { analyticsMetrics } from "@langwatch/analytics-web/surfaces/analytics-registry";
+import { CustomGraph, type CustomGraphInput } from "@langwatch/analytics-web/surfaces/custom-graph";
+import { usePeriodSelector } from "@langwatch/analytics-web/surfaces/period-selector";
 import { Link } from "../../../ui/elements/app-link";
 import { HomeCard } from "./home-card";
 import { HOME_SECTION_PADDING, HomeSectionHeader } from "./home-section-header";

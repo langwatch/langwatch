@@ -6,7 +6,7 @@
 
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { Folder } from "lucide-react";
-import { PICKER_UNFILED_GROUP_NAME } from "@langwatch/suite-web";
+import { PICKER_UNFILED_GROUP_NAME } from "@langwatch/suite-web/surfaces/suite-pickers";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { TagPill } from "../../../elements/tag-pill";
 import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields";

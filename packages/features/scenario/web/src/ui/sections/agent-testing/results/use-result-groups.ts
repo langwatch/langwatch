@@ -4,7 +4,7 @@
  */
 
 import { useMemo } from "react";
-import type { Period, PeriodMode } from "@langwatch/analytics-web/components/PeriodSelector";
+import type { Period, PeriodMode } from "@langwatch/analytics-web/surfaces/period-selector";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { useTargetIdentityMap } from "../../../../behavior/use-target-name-map";
 import type {

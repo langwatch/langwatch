@@ -10,7 +10,7 @@ import {
   langwatchEndpoint,
   langwatchEndpointEnv,
 } from "@langwatch/design-system/langwatch-endpoint-env";
-import { RenderCode } from "@langwatch/workflow-web/components/code/RenderCode";
+import { RenderCode } from "@langwatch/workflow-web/surfaces/render-code";
 import {
   DialogBody,
   DialogCloseTrigger,

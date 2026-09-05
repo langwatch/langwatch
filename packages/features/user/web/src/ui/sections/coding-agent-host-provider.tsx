@@ -19,7 +19,7 @@ import {
   type CodingAgentFailure,
   type CodingAgentNotice,
   type CodingAgentRouteReading,
-} from "@langwatch/coding-agent-web/activity";
+} from "@langwatch/coding-agent-web/surfaces/activity";
 import { useMemo, type ComponentType, type ReactNode } from "react";
 
 import {

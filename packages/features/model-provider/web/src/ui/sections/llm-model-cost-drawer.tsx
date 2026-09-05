@@ -15,7 +15,7 @@ import { InputGroup } from "@langwatch/design-system/input-group";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-web/surfaces/scope-picker";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { applyHandledErrorToForm } from "@langwatch/ui-host/errors";
-import { FormServerError } from "@langwatch/workflow-web/studio-host/errors";
+import { FormServerError } from "@langwatch/workflow-web/surfaces/handled-error-views";
 
 import { modelProviderApi } from "../../behavior/model-provider-api";
 import { useModelProviderHost } from "../../model/model-provider-host";

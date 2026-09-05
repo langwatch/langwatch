@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Kbd } from "@langwatch/ops-web";
+import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";

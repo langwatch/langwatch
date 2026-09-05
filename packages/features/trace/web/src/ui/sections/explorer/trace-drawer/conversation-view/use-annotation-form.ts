@@ -12,7 +12,7 @@ import {
   type AnnotationMutations,
   type PopoverAnnotationFormInput,
   type TraceAnnotation,
-} from "@langwatch/annotation-web";
+} from "@langwatch/annotation-web/surfaces/annotation-form";
 import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "../../../errors";
 import { useAnnotationInvalidation } from "../../../use-annotation-invalidation";

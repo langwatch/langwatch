@@ -10,7 +10,7 @@ import {
   type WorkflowRouteReading,
   type WorkflowScope,
   type WorkflowSuccessNotice,
-} from "@langwatch/workflow-web/model/workflow-host";
+} from "@langwatch/workflow-web/surfaces/workflow-host";
 import { useMemo, type ReactNode } from "react";
 
 import { showErrorToast } from "@langwatch/ui-host/errors";

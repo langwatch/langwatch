@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Info } from "react-feather";
 
 import { DeleteConfirmationDialog } from "@langwatch/design-system/delete-confirmation-dialog";
-import { CopyButton } from "@langwatch/workflow-web/components/CopyButton";
+import { CopyButton } from "@langwatch/workflow-web/surfaces/copy-button";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -26,7 +26,7 @@ import {
 import { Select } from "@langwatch/design-system/select";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/workflow-web/surfaces/studio-scope";
 import { GeneratePromptApiSnippetDialog } from "../../elements/prompts/generate-prompt-api-snippet-dialog";
 import { usePromptTags } from "../../../behavior/prompts/use-prompt-tags";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";

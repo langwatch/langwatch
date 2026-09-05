@@ -29,7 +29,7 @@ vi.mock("@langwatch/design-system/toaster", () => ({
 }));
 
 const askLangyMock = vi.fn();
-vi.mock("@langwatch/langy-web", () => ({
+vi.mock("@langwatch/langy-web/surfaces/langy-store", () => ({
   useLangyStore: (selector: (s: { askLangy: (p: string) => void }) => unknown) =>
     selector({ askLangy: askLangyMock }),
 }));

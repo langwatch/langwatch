@@ -38,7 +38,7 @@ import { Drawer } from "@langwatch/design-system/drawer";
 import {
   COMPARISON_EVALUATOR_TYPE,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
-} from "@langwatch/experiment-web/experiments-v3/types";
+} from "@langwatch/experiment-web/surfaces/workbench-types";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 import { formatDistanceToNow } from "date-fns";
 import { Plus } from "lucide-react";

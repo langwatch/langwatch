@@ -43,7 +43,11 @@ import {
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { CodeEditorModal } from "@langwatch/workflow-web/optimization_studio/components/code/workflow-code-editor.transport";
 import type { CodeComponentConfig, Field as DSLField } from "@langwatch/workflow-contract";
-import { buildCodeConfig, DEFAULT_CODE, getCodeFromConfig } from "@langwatch/workflow-web";
+import {
+  buildCodeConfig,
+  DEFAULT_CODE,
+  getCodeFromConfig,
+} from "@langwatch/workflow-web/surfaces/code-agent";
 import type {
   AgentConfig as AgentComponentConfig,
   AgentWithFields,

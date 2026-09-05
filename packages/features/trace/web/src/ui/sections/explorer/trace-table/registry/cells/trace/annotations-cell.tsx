@@ -5,7 +5,7 @@ import {
   AnnotationCommentsChip,
   AnnotationScoresChip,
   AnnotationSuggestionsChip,
-} from "@langwatch/annotation-web";
+} from "@langwatch/annotation-web/surfaces/annotation-chips";
 import { useScoreNamesById } from "../../../../../use-score-names-by-id";
 import type { TraceListItem } from "../../../../types/trace";
 import type { CellDef } from "../../types";

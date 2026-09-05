@@ -20,7 +20,7 @@ vi.mock("../../../../../behavior/langy/use-can-ask-langy", () => ({
 vi.mock("../../../langy/hooks/use-show-langy", () => ({
   useShowLangy: () => langyMock.showLangy,
 }));
-vi.mock("@langwatch/langy-web", async (importOriginal) => ({
+vi.mock("@langwatch/langy-web/surfaces/langy-store", async (importOriginal) => ({
   ...((await importOriginal()) as object),
   useLangyStore: (
     selector: (s: {

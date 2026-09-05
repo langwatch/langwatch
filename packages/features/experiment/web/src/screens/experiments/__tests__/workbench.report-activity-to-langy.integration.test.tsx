@@ -153,7 +153,7 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   },
 }));
 
-import { useLangyStore } from "@langwatch/langy-web";
+import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
 import WorkbenchPage from "../workbench.screen";
 
 const reported = () => useLangyStore.getState().pageActivity;

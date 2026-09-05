@@ -1,7 +1,7 @@
 import { Button, createListCollection, Field, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { showErrorToast } from "@langwatch/ui-host/errors";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/workflow-web/surfaces/studio-scope";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/studio-dialog";

@@ -6,7 +6,7 @@
 
 import { Skeleton, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect } from "react";
-import { usePeriodSelector } from "@langwatch/analytics-web/components/PeriodSelector";
+import { usePeriodSelector } from "@langwatch/analytics-web/surfaces/period-selector";
 import { useNewRunPlanFlow } from "../use-agent-testing-page-flows";
 import { useAgentTestingRouting } from "../../../../behavior/agent-testing/use-agent-testing-routing";
 import { useAgentTestingStore } from "../use-agent-testing-store";

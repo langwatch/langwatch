@@ -20,7 +20,7 @@ import {
 } from "react-icons/lu";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { ColorfulBlockIcon } from "@langwatch/workflow-web";
+import { ColorfulBlockIcon } from "@langwatch/workflow-web/surfaces/workflow-icons";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { VersionBadge } from "@langwatch/prompt-web/surfaces/prompt-version";
 import { useLatestPromptVersion } from "@langwatch/prompt-web/prompts/hooks/useLatestPromptVersion";

@@ -1233,7 +1233,16 @@ function lintWebSurfaceClosures(
         continue;
       }
       const surfaceRoot = join(sourceRoot, "surfaces", capability.id);
-      const globalModelRoot = join(sourceRoot, "model");
+      // A surface is the public door onto the package's own implementation, not a
+      // second copy of it. The door may reach the package's shared model, behavior
+      // and ui layers as well as its own directory; the forbidden directories, the
+      // browser-capability ban and the one-surface rule still hold.
+      const implementationRoots = [
+        surfaceRoot,
+        join(sourceRoot, "model"),
+        join(sourceRoot, "behavior"),
+        join(sourceRoot, "ui"),
+      ];
       const pending = [{ file: entry, chain: [entry] }];
       const visited = new Set<string>();
       while (pending.length > 0) {
@@ -1253,8 +1262,7 @@ function lintWebSurfaceClosures(
         }
         const forbidden = forbiddenSurfaceDirectory(sourceRoot, current);
         const surfaceId = surfaceIdForPath(sourceRoot, current);
-        const escapedSurface =
-          !isWithin(surfaceRoot, current) && !isWithin(globalModelRoot, current);
+        const escapedSurface = !implementationRoots.some((root) => isWithin(root, current));
         if (forbidden || escapedSurface || (surfaceId !== void 0 && surfaceId !== capability.id)) {
           const dependencyPath = chain
             .map((path) => relative(sourceRoot, path).split(sep).join("/"))
@@ -1266,7 +1274,7 @@ function lintWebSurfaceClosures(
             message: forbidden
               ? `Surface ${JSON.stringify(capability.id)} reaches forbidden local ${JSON.stringify(forbidden)} implementation via ${dependencyPath}.`
               : escapedSurface
-                ? `Surface ${JSON.stringify(capability.id)} escapes its own directory via ${dependencyPath}.`
+                ? `Surface ${JSON.stringify(capability.id)} escapes its package implementation layers via ${dependencyPath}.`
                 : `Surface ${JSON.stringify(capability.id)} reaches another surface ${JSON.stringify(surfaceId)} via ${dependencyPath}.`,
             allowed:
               "A shareable surface may depend only on its own implementation and portable presentation collaborators.",

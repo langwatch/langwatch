@@ -10,7 +10,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { TraceIdPeek } from "@langwatch/trace-web/explorer/components/TraceIdPeek";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { formatMilliseconds } from "@langwatch/trace-web/utils/formatMilliseconds";
+import { formatMilliseconds } from "@langwatch/trace-web/surfaces/format-milliseconds";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
 import {

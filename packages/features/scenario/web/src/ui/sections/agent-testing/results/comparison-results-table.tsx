@@ -5,7 +5,7 @@
  */
 
 import { Box, Text } from "@chakra-ui/react";
-import { RunMetricsSummary } from "@langwatch/suite-web";
+import { RunMetricsSummary } from "@langwatch/suite-web/surfaces/run-cards";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { FG_MUTED, TABLE_HEADER_BG } from "../../../../model/agent-testing/shared/design";
 import { TargetLegend } from "../../../elements/agent-testing/shared/target-dot";

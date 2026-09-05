@@ -5,7 +5,7 @@
  */
 
 import { HStack, Text, VStack } from "@chakra-ui/react";
-import { modelProviderIcons } from "@langwatch/model-provider-web/components/modelProviders/iconsMap";
+import { modelProviderIcons } from "@langwatch/model-provider-web/surfaces/provider-icons";
 import type React from "react";
 import { useMemo } from "react";
 import {

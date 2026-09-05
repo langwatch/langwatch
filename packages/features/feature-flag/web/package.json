@@ -13,6 +13,18 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./surfaces/anonymous-id": {
+      "types": "./src/surfaces/anonymous-id.ts",
+      "default": "./src/surfaces/anonymous-id.ts"
+    },
+    "./surfaces/experiment-catalogue": {
+      "types": "./src/surfaces/experiment-catalogue.ts",
+      "default": "./src/surfaces/experiment-catalogue.ts"
+    },
+    "./surfaces/rule-editing": {
+      "types": "./src/surfaces/rule-editing.ts",
+      "default": "./src/surfaces/rule-editing.ts"
     }
   },
   "scripts": {

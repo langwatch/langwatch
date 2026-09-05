@@ -5,8 +5,11 @@
  */
 import type { PropsWithChildren } from "react";
 
-import { type DatasetTableContextValue, DatasetTableProvider } from "@langwatch/dataset-web";
-import { renderDatasetImage } from "@langwatch/dataset-web/components/datasets/editor/renderDatasetImage";
+import {
+  type DatasetTableContextValue,
+  DatasetTableProvider,
+} from "@langwatch/dataset-web/surfaces/dataset-table";
+import { renderDatasetImage } from "@langwatch/dataset-web/surfaces/render-dataset-image";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store";
 
 export function EvaluationsV3DatasetTableProvider({ children }: PropsWithChildren) {

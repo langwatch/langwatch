@@ -31,7 +31,7 @@ vi.mock("../../../langy/hooks/use-show-langy", () => ({
 vi.mock("../../../../../behavior/langy/use-can-ask-langy", () => ({
   useCanAskLangy: () => langyMock.enabled,
 }));
-vi.mock("@langwatch/langy-web", async (importOriginal) => {
+vi.mock("@langwatch/langy-web/surfaces/langy-store", async (importOriginal) => {
   const actual = (await importOriginal()) as object;
   const state = () => ({
     isOpen: langyMock.panelOpen,

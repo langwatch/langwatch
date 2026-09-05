@@ -3,7 +3,7 @@
  */
 import { Badge, Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../..";
-import { formatRunStatusLabel } from "@langwatch/suite-web";
+import { formatRunStatusLabel } from "@langwatch/suite-web/surfaces/run-formatters";
 import type { ScenarioRunStatus } from "@langwatch/scenario-contract";
 
 export type LastResultCriteria = {

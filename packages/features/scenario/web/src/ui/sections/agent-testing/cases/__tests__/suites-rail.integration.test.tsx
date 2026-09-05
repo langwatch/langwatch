@@ -8,7 +8,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { computeRelativeWindow } from "@langwatch/analytics-web/components/PeriodSelector";
+import { computeRelativeWindow } from "@langwatch/analytics-web/surfaces/period-selector";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { SuiteNameDialog } from "../suite-name-dialog";

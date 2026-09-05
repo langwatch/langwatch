@@ -43,9 +43,9 @@ import { HoverableBigText } from "@langwatch/workflow-web/components/HoverableBi
 import {
   PeriodSelector,
   usePeriodSelector,
-} from "@langwatch/analytics-web/components/PeriodSelector";
+} from "@langwatch/analytics-web/surfaces/period-selector";
 import { InputGroup } from "@langwatch/design-system/input-group";
-import { RedactedField } from "@langwatch/workflow-web/components/ui/RedactedField";
+import { RedactedField } from "@langwatch/workflow-web/surfaces/redacted-field";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { CheckConfigFormData } from "./check-config-form";
 import { evaluationStatusColor } from "@langwatch/evaluator-web";

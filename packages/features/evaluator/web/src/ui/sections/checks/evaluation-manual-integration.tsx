@@ -6,7 +6,7 @@ import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-
 import type { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
-import { RenderCode } from "@langwatch/workflow-web/components/code/RenderCode";
+import { RenderCode } from "@langwatch/workflow-web/surfaces/render-code";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Link } from "@langwatch/ui-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";

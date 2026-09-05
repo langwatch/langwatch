@@ -1,5 +1,5 @@
 import { TraceMediaPart } from "../../../traces/trace-media-part";
-import { TerminalOutput } from "@langwatch/coding-agent-web";
+import { TerminalOutput } from "@langwatch/coding-agent-web/surfaces/agent-traces";
 import {
   BlockStack as TraceWebBlockStack,
   TranscriptRenderProvider,

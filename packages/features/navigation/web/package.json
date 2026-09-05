@@ -12,9 +12,9 @@
       "types": "./src/ui/index.ts",
       "default": "./src/ui/index.ts"
     },
-    "./command-bar": {
-      "types": "./src/command-bar.ts",
-      "default": "./src/command-bar.ts"
+    "./surfaces/command-bar": {
+      "types": "./src/ui/sections/command-bar.surface.ts",
+      "default": "./src/ui/sections/command-bar.surface.ts"
     },
     "./screens/navigation": {
       "types": "./src/screens/navigation/index.ts",

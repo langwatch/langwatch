@@ -5,7 +5,7 @@
  */
 
 import { useMemo } from "react";
-import type { Period } from "@langwatch/analytics-web/components/PeriodSelector";
+import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api, type RouterOutputs } from "../../../../behavior/scenario-api";
 import type { CaseLastResult } from "./cases-table";

@@ -5,10 +5,13 @@
 import { Box, Button, EmptyState, HStack, Text, VStack } from "@chakra-ui/react";
 import { FlaskConical, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import type { Period } from "@langwatch/analytics-web/components/PeriodSelector";
+import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
 import { ShadowDivider } from "../../elements/shadow-divider";
 import { HandledErrorAlert } from "../../../behavior/errors";
-import { LangyContextTarget, scenarioContextChip } from "@langwatch/langy-web";
+import {
+  LangyContextTarget,
+  scenarioContextChip,
+} from "@langwatch/langy-web/surfaces/langy-context";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener";
@@ -17,21 +20,25 @@ import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { api } from "../../../behavior/scenario-api";
 import {
   GroupRow,
-  RunHistoryFilters,
   RunHistorySkeleton,
   RunRow,
-  type RunHistoryFilterValues,
   type ScenarioRunContextRenderer,
+  ScenarioTabConnectedBadge,
+} from "@langwatch/suite-web/surfaces/run-cards";
+import {
+  RunHistoryFilters,
+  type RunHistoryFilterValues,
   availableGroupByOptions,
   computeBatchRunSummary,
   computeGroupSummary,
   groupRunsByBatchId,
   groupRunsByScenarioId,
-  ScenarioTabConnectedBadge,
+} from "@langwatch/suite-web/surfaces/run-formatters";
+import {
   useAutoExpansion,
   useRunHistoryStore,
   useScrollToBatch,
-} from "@langwatch/suite-web";
+} from "@langwatch/suite-web/surfaces/run-history-store";
 import { useSuiteRunFreshness } from "../../../behavior/suites/use-suite-run-freshness";
 import { usePrefetchRunState } from "../../../behavior/suites/use-prefetch-run-state";
 

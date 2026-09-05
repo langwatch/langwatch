@@ -20,7 +20,7 @@ import {
   ASSISTANT_OPTIONS,
   ASSISTANT_PRESETS,
   type AssistantKind,
-} from "@langwatch/coding-agent-web";
+} from "@langwatch/coding-agent-web/surfaces/agent-identity";
 import { type AiToolEntry, type AiToolTileType } from "../../model/ai-tool-tile";
 import {
   isToolPresetAsset,

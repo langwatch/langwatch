@@ -97,7 +97,7 @@ vi.mock("../../../../behavior/use-simulation-streaming-state", () => ({
   }),
 }));
 
-vi.mock("@langwatch/workflow-web/hooks/useDejaViewLink", () => ({
+vi.mock("@langwatch/workflow-web/surfaces/deja-view-link", () => ({
   useDejaViewLink: () => ({ href: null }),
 }));
 

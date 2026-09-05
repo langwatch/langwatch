@@ -11,8 +11,8 @@ import {
   type ScrollbackStatus,
   type TurnDivider,
   type TerminalToolSpan,
-} from "@langwatch/coding-agent-web";
-import { indexToolSpansBySpanId } from "@langwatch/coding-agent-web";
+} from "@langwatch/coding-agent-web/surfaces/agent-traces";
+import { indexToolSpansBySpanId } from "@langwatch/coding-agent-web/surfaces/agent-traces";
 
 /**
  * How many turns `tracesV2.conversationContext` returns. A session longer than

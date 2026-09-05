@@ -12,7 +12,11 @@ import {
   type Variable,
   VariablesSection,
 } from "@langwatch/prompt-web/surfaces/variables";
-import { fromOutputFieldState, resolveOutputField, toOutputFieldState } from "@langwatch/suite-web";
+import {
+  fromOutputFieldState,
+  resolveOutputField,
+  toOutputFieldState,
+} from "@langwatch/suite-web/surfaces/run-formatters";
 
 /** The scenario fields shown as input mapping rows. */
 const SCENARIO_FIELDS: Variable[] = [

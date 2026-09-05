@@ -14,9 +14,33 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./testing": {
+    "./surfaces/test-doubles": {
       "types": "./src/__tests__/test-helpers.ts",
       "default": "./src/__tests__/test-helpers.ts"
+    },
+    "./surfaces/run-cards": {
+      "types": "./src/surfaces/run-cards.ts",
+      "default": "./src/surfaces/run-cards.ts"
+    },
+    "./surfaces/run-dialogs": {
+      "types": "./src/surfaces/run-dialogs.ts",
+      "default": "./src/surfaces/run-dialogs.ts"
+    },
+    "./surfaces/run-formatters": {
+      "types": "./src/surfaces/run-formatters.ts",
+      "default": "./src/surfaces/run-formatters.ts"
+    },
+    "./surfaces/suite-pickers": {
+      "types": "./src/surfaces/suite-pickers.ts",
+      "default": "./src/surfaces/suite-pickers.ts"
+    },
+    "./surfaces/run-history-store": {
+      "types": "./src/surfaces/run-history-store.ts",
+      "default": "./src/surfaces/run-history-store.ts"
+    },
+    "./surfaces/suite-form": {
+      "types": "./src/surfaces/suite-form.ts",
+      "default": "./src/surfaces/suite-form.ts"
     }
   },
   "scripts": {

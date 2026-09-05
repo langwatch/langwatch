@@ -17,9 +17,9 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { IconType } from "react-icons";
 import { LuArrowLeft, LuArrowRight, LuMic, LuZap } from "react-icons/lu";
 import { SERIF } from "@langwatch/langy-web/asaplangy";
-import { getIsMac } from "@langwatch/navigation-web/command-bar";
-import { LangyMark } from "@langwatch/langy-web";
-import { useLangyStore } from "@langwatch/langy-web";
+import { getIsMac } from "@langwatch/navigation-web/surfaces/command-bar";
+import { LangyMark } from "@langwatch/langy-web/surfaces/langy-mark";
+import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import { useProjectHomeHost } from "../../../model/project-home-host";
 

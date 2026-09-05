@@ -1,6 +1,6 @@
 import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { LangyPanelSurface } from "@langwatch/langy-web/asaplangy";
-import { useLangyStore } from "@langwatch/langy-web";
+import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
 import { useLangyBriefing } from "../hooks/use-langy-briefing";
 import type { BriefingReceipt } from "../types";
 import { HomeOverviewCard } from "./home-overview-card";

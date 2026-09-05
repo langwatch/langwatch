@@ -4,13 +4,13 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import numeral from "numeral";
 import React, { useEffect, useMemo, useState } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { FormatMoney } from "@langwatch/workflow-web/optimization_studio/components/FormatMoney";
+import { FormatMoney } from "@langwatch/workflow-web/surfaces/format-money";
 import type {
   WorkflowApiRouter,
   RouterOutputs,
 } from "@langwatch/workflow-web/surfaces/workflow-api";
 import type { ExperimentRun } from "@langwatch/experiment-contract";
-import { formatMilliseconds } from "@langwatch/trace-web/utils/formatMilliseconds";
+import { formatMilliseconds } from "@langwatch/trace-web/surfaces/format-milliseconds";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import { HoverableBigText } from "@langwatch/workflow-web/components/HoverableBigText";
 import { EvaluationProgressBar } from "./evaluation-progress-bar";

@@ -36,10 +36,17 @@ Feature: Frontend feature boundary lint
     And it directs trace-explorer to a declared Prompt surface
 
   @unit @architecture
-  Scenario: A surface cannot pull in its feature's complete implementation
-    Given @langwatch/prompt-web/surfaces/prompt-reference imports a Prompt table through a private module
+  Scenario: A surface is the public door onto its package implementation
+    Given @langwatch/prompt-web/surfaces/prompt-reference re-exports Prompt model, behavior and ui modules
     When architecture lint resolves the surface's production dependency closure
-    Then it reports the full import path to the forbidden screen, internal, store, transport, query or route module
+    Then it accepts the package's own model, behavior and ui layers as the surface implementation
+    And a shareable component needs no copy hoisted into another layer to be exposed
+
+  @unit @architecture
+  Scenario: A surface cannot pull in its feature's complete implementation
+    Given @langwatch/prompt-web/surfaces/prompt-reference imports a Prompt table through a module outside those layers
+    When architecture lint resolves the surface's production dependency closure
+    Then it reports the full import path to the escaping or forbidden screen, internal, store, transport, query or route module
     And the surface is not importable until its closure is narrow
 
   @unit @architecture

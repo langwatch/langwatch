@@ -16,63 +16,63 @@
       "types": "./src/screens/onboarding/index.ts",
       "default": "./src/screens/onboarding/index.ts"
     },
-    "./features/onboarding/components/OnboardingMeshBackground": {
+    "./surfaces/onboarding-mesh-background": {
       "types": "./src/ui/elements/onboarding-mesh-background.tsx",
       "default": "./src/ui/elements/onboarding-mesh-background.tsx"
     },
-    "./features/onboarding/components/sections/ViaClaudeCodeScreen": {
+    "./surfaces/via-claude-code-screen": {
       "types": "./src/ui/sections/via-claude-code-screen.tsx",
       "default": "./src/ui/sections/via-claude-code-screen.tsx"
     },
-    "./features/onboarding/components/sections/ViaClaudeDesktopScreen": {
+    "./surfaces/via-claude-desktop-screen": {
       "types": "./src/ui/sections/via-claude-desktop-screen.tsx",
       "default": "./src/ui/sections/via-claude-desktop-screen.tsx"
     },
-    "./features/onboarding/components/sections/observability/CodePreview": {
+    "./surfaces/code-preview": {
       "types": "./src/ui/sections/observability/code-preview.tsx",
       "default": "./src/ui/sections/observability/code-preview.tsx"
     },
-    "./features/onboarding/components/sections/observability/DocsLinks": {
+    "./surfaces/docs-links": {
       "types": "./src/ui/blocks/observability/docs-links.tsx",
       "default": "./src/ui/blocks/observability/docs-links.tsx"
     },
-    "./features/onboarding/components/sections/observability/FrameworkGrid": {
+    "./surfaces/framework-grid": {
       "types": "./src/ui/sections/observability/framework-grid.tsx",
       "default": "./src/ui/sections/observability/framework-grid.tsx"
     },
-    "./features/onboarding/components/sections/observability/FrameworkIntegrationCode": {
+    "./surfaces/framework-integration-code": {
       "types": "./src/ui/sections/observability/framework-integration-code.tsx",
       "default": "./src/ui/sections/observability/framework-integration-code.tsx"
     },
-    "./features/onboarding/components/sections/observability/InstallPreview": {
+    "./surfaces/install-preview": {
       "types": "./src/ui/sections/observability/install-preview.tsx",
       "default": "./src/ui/sections/observability/install-preview.tsx"
     },
-    "./features/onboarding/components/sections/observability/PlatformGrid": {
+    "./surfaces/platform-grid": {
       "types": "./src/ui/sections/observability/platform-grid.tsx",
       "default": "./src/ui/sections/observability/platform-grid.tsx"
     },
-    "./features/onboarding/components/sections/shared/InlineCopyButton": {
+    "./surfaces/inline-copy-button": {
       "types": "./src/ui/sections/shared/inline-copy-button.tsx",
       "default": "./src/ui/sections/shared/inline-copy-button.tsx"
     },
-    "./features/onboarding/components/sections/shared/build-mcp-config": {
+    "./surfaces/build-mcp-config": {
       "types": "./src/model/shared/build-mcp-config.ts",
       "default": "./src/model/shared/build-mcp-config.ts"
     },
-    "./features/onboarding/contexts/ActiveProjectContext": {
+    "./surfaces/active-project-context": {
       "types": "./src/ui/sections/active-project-context.tsx",
       "default": "./src/ui/sections/active-project-context.tsx"
     },
-    "./features/onboarding/regions/observability/codegen/registry": {
+    "./surfaces/observability-codegen": {
       "types": "./src/ui/sections/observability/codegen/registry.tsx",
       "default": "./src/ui/sections/observability/codegen/registry.tsx"
     },
-    "./features/onboarding/regions/observability/types": {
+    "./surfaces/observability-types": {
       "types": "./src/model/observability/types.ts",
       "default": "./src/model/observability/types.ts"
     },
-    "./features/onboarding/regions/observability/ui-options": {
+    "./surfaces/observability-options": {
       "types": "./src/ui/sections/observability/ui-options.ts",
       "default": "./src/ui/sections/observability/ui-options.ts"
     }

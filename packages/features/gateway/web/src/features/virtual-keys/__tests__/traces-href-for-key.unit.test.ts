@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseFragment } from "@langwatch/trace-web";
+import { parseFragment } from "@langwatch/trace-web/surfaces/trace-filters";
 import { resolveTracesHrefForKey, tracesHrefForKey } from "../model/traces-href-for-key";
 
 /**

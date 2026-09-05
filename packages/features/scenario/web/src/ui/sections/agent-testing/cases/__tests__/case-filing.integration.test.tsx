@@ -132,7 +132,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
 // usePeriodSelector reads through the workflows package's own host
 // abstraction (WorkflowHostProvider); this surface only needs a stable period
 // state, not a real host, so the hook is stubbed directly.
-vi.mock("@langwatch/analytics-web/components/PeriodSelector", async (importOriginal) => {
+vi.mock("@langwatch/analytics-web/surfaces/period-selector", async (importOriginal) => {
   const mod = await importOriginal<object>();
   return {
     ...mod,

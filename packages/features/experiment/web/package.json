@@ -19,7 +19,7 @@
       "types": "./src/ui/elements/experiments/batch-evaluation-v2.tsx",
       "default": "./src/ui/elements/experiments/batch-evaluation-v2.tsx"
     },
-    "./components/experiments/BatchEvaluationV2/EvaluationProgressBar": {
+    "./surfaces/evaluation-progress-bar": {
       "types": "./src/ui/elements/experiments/BatchEvaluationV2/evaluation-progress-bar.tsx",
       "default": "./src/ui/elements/experiments/BatchEvaluationV2/evaluation-progress-bar.tsx"
     },
@@ -35,11 +35,11 @@
       "types": "./src/behavior/experiments-v3/use-evaluation-mappings.ts",
       "default": "./src/behavior/experiments-v3/use-evaluation-mappings.ts"
     },
-    "./experiments-v3/types": {
+    "./surfaces/workbench-types": {
       "types": "./src/model/experiments-v3/types.ts",
       "default": "./src/model/experiments-v3/types.ts"
     },
-    "./experiments-v3/utils/cellFailure": {
+    "./surfaces/cell-failure": {
       "types": "./src/model/experiments-v3/cell-failure.ts",
       "default": "./src/model/experiments-v3/cell-failure.ts"
     },
@@ -47,13 +47,17 @@
       "types": "./src/model/experiments-v3/evaluator-editor-callbacks.ts",
       "default": "./src/model/experiments-v3/evaluator-editor-callbacks.ts"
     },
-    "./experiments-v3/utils/mappingValidation": {
+    "./surfaces/mapping-validation": {
       "types": "./src/model/experiments-v3/mapping-validation.ts",
       "default": "./src/model/experiments-v3/mapping-validation.ts"
     },
     "./screens/experiments": {
       "types": "./src/screens/experiments/index.ts",
       "default": "./src/screens/experiments/index.ts"
+    },
+    "./surfaces/batch-results": {
+      "types": "./src/ui/sections/batch-results.surface.ts",
+      "default": "./src/ui/sections/batch-results.surface.ts"
     }
   },
   "scripts": {

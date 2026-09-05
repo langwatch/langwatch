@@ -7,7 +7,7 @@
 import { chakra, VStack } from "@chakra-ui/react";
 import type { TargetValue } from "../../../../model/scenario-target";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { getRoutePath } from "@langwatch/workflow-web/utils/routes";
+import { getRoutePath } from "@langwatch/workflow-web/surfaces/workflow-routes";
 import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button";

@@ -46,11 +46,11 @@
       "types": "./src/ui/sections/explorer/search-bar/suggestion-dropdown.tsx",
       "default": "./src/ui/sections/explorer/search-bar/suggestion-dropdown.tsx"
     },
-    "./explorer/components/SearchBar/getSuggestionState": {
+    "./surfaces/suggestion-state": {
       "types": "./src/model/get-suggestion-state.ts",
       "default": "./src/model/get-suggestion-state.ts"
     },
-    "./explorer/components/SearchBar/suggestionItems": {
+    "./surfaces/suggestion-items": {
       "types": "./src/model/explorer/search-bar/suggestion-items.ts",
       "default": "./src/model/explorer/search-bar/suggestion-items.ts"
     },
@@ -58,7 +58,7 @@
       "types": "./src/ui/sections/explorer/search-bar/suggestion-ui.ts",
       "default": "./src/ui/sections/explorer/search-bar/suggestion-ui.ts"
     },
-    "./explorer/components/TraceDrawer/Chip": {
+    "./surfaces/trace-drawer-chip": {
       "types": "./src/ui/elements/explorer/trace-drawer/chip.tsx",
       "default": "./src/ui/elements/explorer/trace-drawer/chip.tsx"
     },
@@ -66,7 +66,7 @@
       "types": "./src/ui/sections/explorer/trace-drawer/conversation-view/index.ts",
       "default": "./src/ui/sections/explorer/trace-drawer/conversation-view/index.ts"
     },
-    "./explorer/components/TraceDrawer/conversationView/expandContext": {
+    "./surfaces/conversation-expand-context": {
       "types": "./src/behavior/explorer/trace-drawer/conversation-view/expand-context.ts",
       "default": "./src/behavior/explorer/trace-drawer/conversation-view/expand-context.ts"
     },
@@ -94,7 +94,7 @@
       "types": "./src/ui/sections/explorer/utils/trace-edit-mode.ts",
       "default": "./src/ui/sections/explorer/utils/trace-edit-mode.ts"
     },
-    "./hooks/usePageVisibility": {
+    "./surfaces/page-visibility": {
       "types": "./src/behavior/use-page-visibility.ts",
       "default": "./src/behavior/use-page-visibility.ts"
     },
@@ -106,11 +106,11 @@
       "types": "./src/behavior/use-sse-subscription.ts",
       "default": "./src/behavior/use-sse-subscription.ts"
     },
-    "./model/export-types": {
+    "./surfaces/export-types": {
       "types": "./src/model/export-types.ts",
       "default": "./src/model/export-types.ts"
     },
-    "./scenario-role": {
+    "./surfaces/scenario-role": {
       "types": "./src/ui/elements/scenario-role.tsx",
       "default": "./src/ui/elements/scenario-role.tsx"
     },
@@ -118,13 +118,29 @@
       "types": "./src/screens/traces/index.ts",
       "default": "./src/screens/traces/index.ts"
     },
-    "./utils/formatMilliseconds": {
+    "./surfaces/format-milliseconds": {
       "types": "./src/model/format-milliseconds.ts",
       "default": "./src/model/format-milliseconds.ts"
     },
     "./utils/trpcError": {
       "types": "./src/behavior/trpc-error.ts",
       "default": "./src/behavior/trpc-error.ts"
+    },
+    "./surfaces/trace-selection": {
+      "types": "./src/ui/sections/trace-selection.surface.ts",
+      "default": "./src/ui/sections/trace-selection.surface.ts"
+    },
+    "./surfaces/trace-filters": {
+      "types": "./src/ui/sections/trace-filters.surface.ts",
+      "default": "./src/ui/sections/trace-filters.surface.ts"
+    },
+    "./surfaces/trace-origins": {
+      "types": "./src/ui/sections/trace-origins.surface.ts",
+      "default": "./src/ui/sections/trace-origins.surface.ts"
+    },
+    "./surfaces/annotation-queue-session": {
+      "types": "./src/ui/sections/annotation-queue-session.surface.ts",
+      "default": "./src/ui/sections/annotation-queue-session.surface.ts"
     }
   },
   "scripts": {

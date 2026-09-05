@@ -1,4 +1,4 @@
-import { Kbd } from "@langwatch/ops-web";
+import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
 import { useTraceList } from "../hooks/use-trace-list";
 import { TraceFindBar } from "../../../../index";
 

@@ -6,7 +6,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const askLangy = vi.fn();
-vi.mock("@langwatch/langy-web", () => ({
+vi.mock("@langwatch/langy-web/surfaces/langy-store", () => ({
   useLangyStore: (selector: (s: { askLangy: typeof askLangy }) => unknown) =>
     selector({ askLangy }),
 }));

@@ -9,7 +9,7 @@ import type {
   Period,
   PeriodMode,
   RelativePresetKey,
-} from "@langwatch/analytics-web/components/PeriodSelector";
+} from "@langwatch/analytics-web/surfaces/period-selector";
 import { useAgentTestingStore } from "../use-agent-testing-store";
 import { RunPlanResultsColumn } from "./run-plan-results-column";
 import { RunsSidebar } from "./runs-sidebar";

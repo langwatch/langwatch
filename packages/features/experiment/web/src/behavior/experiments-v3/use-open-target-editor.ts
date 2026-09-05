@@ -8,7 +8,7 @@ import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
 } from "@langwatch/prompt-web/surfaces/variables";
-import { datasetColumnTypeToFieldType } from "@langwatch/workflow-web";
+import { datasetColumnTypeToFieldType } from "@langwatch/workflow-web/surfaces/studio-dataset-columns";
 import { setFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";

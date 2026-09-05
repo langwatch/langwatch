@@ -13,6 +13,14 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./surfaces/presence-indicators": {
+      "types": "./src/surfaces/presence-indicators.ts",
+      "default": "./src/surfaces/presence-indicators.ts"
+    },
+    "./surfaces/presence-state": {
+      "types": "./src/surfaces/presence-state.ts",
+      "default": "./src/surfaces/presence-state.ts"
     }
   },
   "scripts": {

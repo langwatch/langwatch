@@ -6,7 +6,7 @@ import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react"
 import { Eraser, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { IsolatedErrorBoundary } from "@langwatch/workflow-web/components/ui/IsolatedErrorBoundary";
+import { IsolatedErrorBoundary } from "@langwatch/workflow-web/surfaces/isolated-error-boundary";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "../../../../behavior/use-reduced-motion";
 import {

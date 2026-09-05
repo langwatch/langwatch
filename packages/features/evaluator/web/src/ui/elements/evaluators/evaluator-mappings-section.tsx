@@ -6,7 +6,7 @@ import {
   type FieldMapping as UIFieldMapping,
   VariablesSection,
 } from "@langwatch/prompt-web/surfaces/variables";
-import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-web/experiments-v3/utils/mappingValidation";
+import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-web/surfaces/mapping-validation";
 import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { useProjectSpanNames } from "@langwatch/trace-web/hooks/useProjectSpanNames";

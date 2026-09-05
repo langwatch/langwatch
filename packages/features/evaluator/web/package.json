@@ -26,7 +26,7 @@
       "types": "./src/ui/sections/evaluators/evaluator-editor-shared.tsx",
       "default": "./src/ui/sections/evaluators/evaluator-editor-shared.tsx"
     },
-    "./components/shared/EvaluatorResultChip": {
+    "./surfaces/evaluator-result-chip": {
       "types": "./src/ui/elements/shared/evaluator-result-chip.tsx",
       "default": "./src/ui/elements/shared/evaluator-result-chip.tsx"
     },
@@ -54,9 +54,13 @@
       "types": "./src/model/evaluations/types.ts",
       "default": "./src/model/evaluations/types.ts"
     },
-    "./utils/evaluationResults": {
+    "./surfaces/evaluation-results": {
       "types": "./src/model/evaluation-results.ts",
       "default": "./src/model/evaluation-results.ts"
+    },
+    "./surfaces/evaluation-status": {
+      "types": "./src/ui/sections/evaluation-status.surface.ts",
+      "default": "./src/ui/sections/evaluation-status.surface.ts"
     }
   },
   "scripts": {

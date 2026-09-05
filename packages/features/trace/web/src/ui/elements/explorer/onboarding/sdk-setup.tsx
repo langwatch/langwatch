@@ -6,20 +6,20 @@
 import { Box, Grid, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import { DocsLinks } from "@langwatch/onboarding-web/features/onboarding/components/sections/observability/DocsLinks";
-import { FrameworkGrid } from "@langwatch/onboarding-web/features/onboarding/components/sections/observability/FrameworkGrid";
-import { FrameworkIntegrationCode } from "@langwatch/onboarding-web/features/onboarding/components/sections/observability/FrameworkIntegrationCode";
-import { InstallPreview } from "@langwatch/onboarding-web/features/onboarding/components/sections/observability/InstallPreview";
-import { PlatformGrid } from "@langwatch/onboarding-web/features/onboarding/components/sections/observability/PlatformGrid";
-import { getRegistryEntry } from "@langwatch/onboarding-web/features/onboarding/regions/observability/codegen/registry";
+import { DocsLinks } from "@langwatch/onboarding-web/surfaces/docs-links";
+import { FrameworkGrid } from "@langwatch/onboarding-web/surfaces/framework-grid";
+import { FrameworkIntegrationCode } from "@langwatch/onboarding-web/surfaces/framework-integration-code";
+import { InstallPreview } from "@langwatch/onboarding-web/surfaces/install-preview";
+import { PlatformGrid } from "@langwatch/onboarding-web/surfaces/platform-grid";
+import { getRegistryEntry } from "@langwatch/onboarding-web/surfaces/observability-codegen";
 import type {
   FrameworkKey,
   PlatformKey,
-} from "@langwatch/onboarding-web/features/onboarding/regions/observability/types";
+} from "@langwatch/onboarding-web/surfaces/observability-types";
 import {
   FRAMEWORKS_BY_PLATFORM,
   PLATFORM_OPTIONS,
-} from "@langwatch/onboarding-web/features/onboarding/regions/observability/ui-options";
+} from "@langwatch/onboarding-web/surfaces/observability-options";
 
 export function SdkSetup(): React.ReactElement | null {
   const initialPlatform = PLATFORM_OPTIONS[0]?.key ?? null;

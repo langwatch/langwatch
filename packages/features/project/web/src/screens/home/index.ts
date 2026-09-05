@@ -15,7 +15,7 @@
  *
  * THE PAGE IS A COMPOSITION, and it is honest about that. It draws three other
  * families' published surfaces — the search palette and the feature icons from
- * `@langwatch/navigation-web/command-bar`, the assistant from
+ * `@langwatch/navigation-web/surfaces/command-bar`, the assistant from
  * `@langwatch/langy-web`, the traces chart and the period selector from
  * `@langwatch/analytics-web` — because the home IS the page where those three
  * meet, and turning each into a host answer would be a redesign of the page

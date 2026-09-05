@@ -17,7 +17,7 @@ import {
 } from "../../../../model/agent-testing/shared/design";
 import { RunCaseButton } from "../../../elements/agent-testing/cases/run-case-button";
 import { type TestCase } from "../../../../model/agent-testing/cases/test-cases";
-import type { Period } from "@langwatch/analytics-web/components/PeriodSelector";
+import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
 import { MenuActionLabel } from "./menu-action-label";
 import { RecentRunsSubmenu } from "./recent-runs-menu";
 

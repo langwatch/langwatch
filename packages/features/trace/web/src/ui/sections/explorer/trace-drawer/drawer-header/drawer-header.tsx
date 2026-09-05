@@ -21,13 +21,13 @@ import {
 } from "react-icons/lu";
 import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog";
 import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate";
-import { Kbd } from "@langwatch/ops-web";
+import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
 import { MenuContent, MenuContextTrigger, MenuItem, MenuRoot } from "@langwatch/design-system/menu";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "../../../errors";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { TracePresenceAvatars } from "@langwatch/presence-web";
+import { TracePresenceAvatars } from "@langwatch/presence-web/surfaces/presence-indicators";
 import { useDejaViewLink } from "../../../use-deja-view-link";
 import { useDrawer } from "../../../../../behavior/use-drawer";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";

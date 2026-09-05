@@ -6,7 +6,7 @@
 
 import { Box, EmptyState, Skeleton, Spinner, Text, VStack } from "@chakra-ui/react";
 import { RefreshCw } from "lucide-react";
-import type { Period, RelativePresetKey } from "@langwatch/analytics-web/components/PeriodSelector";
+import type { Period, RelativePresetKey } from "@langwatch/analytics-web/surfaces/period-selector";
 import { HandledErrorAlert } from "../../../../behavior/errors";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button";

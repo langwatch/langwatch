@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
 import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
-import type { LlmConfigOutputType } from "@langwatch/workflow-web/types";
+import type { LlmConfigOutputType } from "@langwatch/workflow-web/surfaces/component-types";
 import { type Output, OutputsSection, type OutputType } from "./outputs-section";
 
 // Type for the json_schema as expected by the form schema

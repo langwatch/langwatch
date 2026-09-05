@@ -15,7 +15,7 @@ import { useDrawerParams } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { isTerminalStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { api } from "../../../../behavior/scenario-api";
-import { buildDisplayTitle } from "@langwatch/suite-web";
+import { buildDisplayTitle } from "@langwatch/suite-web/surfaces/run-formatters";
 import { useTargetNameMap } from "../../../../behavior/use-target-name-map";
 
 /** Everything one open drawer knows about the run it is showing. */

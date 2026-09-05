@@ -15,7 +15,7 @@ import {
 import {
   type ProjectFormData,
   TechStackSelector,
-} from "@langwatch/project-web/ui/blocks/tech-stack";
+} from "@langwatch/project-web/surfaces/tech-stack";
 import { useEffect } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import { useRouter } from "@langwatch/ui-host/use-router";

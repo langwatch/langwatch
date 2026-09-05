@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import {
   DatasetPreviewTable as DatasetPreviewTableView,
   type DatasetPreviewTableProps,
-} from "@langwatch/dataset-web";
+} from "../../dataset-preview-table";
 import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
 
 const renderImage = (value: string): ReactNode | null => {

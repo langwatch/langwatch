@@ -1,7 +1,7 @@
 import type { Row } from "@tanstack/react-table";
 import React, { useMemo } from "react";
-import { useLangyContextTarget } from "@langwatch/langy-web";
-import type { LangyContextTargetDescriptor } from "@langwatch/langy-web";
+import { useLangyContextTarget } from "@langwatch/langy-web/surfaces/langy-context";
+import type { LangyContextTargetDescriptor } from "@langwatch/langy-web/surfaces/langy-context";
 import { useDensityTokens } from "../../hooks/use-density-tokens";
 import { useDensityStore, useRowPulseStore } from "../../../../../index";
 import type { TraceStatus } from "../../types/trace";

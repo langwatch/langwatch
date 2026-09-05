@@ -2,7 +2,7 @@ import { Box, IconButton } from "@chakra-ui/react";
 import { CopyIcon } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { codeToHtml, codeToHtmlDark } from "@langwatch/trace-web";
+import { codeToHtml, codeToHtmlDark } from "@langwatch/design-system/shiki";
 import { toaster } from "@langwatch/ui-host/toaster";
 
 /** A resolved highlight, tagged with the inputs it was produced from. */

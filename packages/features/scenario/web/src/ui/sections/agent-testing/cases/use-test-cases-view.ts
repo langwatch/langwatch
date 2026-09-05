@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useMemo, useState } from "react";
-import type { Period } from "@langwatch/analytics-web/components/PeriodSelector";
+import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
 import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing";
 import type { ExternalCaseRow } from "./cases-panel";
 import {

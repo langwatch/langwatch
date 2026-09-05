@@ -1,14 +1,14 @@
 import { Accordion, Box, Button, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { ChevronsDownUp, ChevronsUpDown, Inbox } from "lucide-react";
 import { lazy, Suspense, useCallback, useState } from "react";
-import { CopyButton } from "@langwatch/workflow-web/components/CopyButton";
+import { CopyButton } from "@langwatch/workflow-web/surfaces/copy-button";
 import { RunScenarioModal } from "../scenarios/run-scenario-modal";
 import { ScenarioFormDrawer } from "../scenarios/scenario-form-drawer";
 import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
 import { HandledErrorAlert } from "../../../behavior/errors";
-import { Chip } from "@langwatch/trace-web/explorer/components/TraceDrawer/Chip";
-import { ConversationExpandContext } from "@langwatch/trace-web/explorer/components/TraceDrawer/conversationView/expandContext";
-import { useDejaViewLink } from "@langwatch/workflow-web/hooks/useDejaViewLink";
+import { Chip } from "@langwatch/trace-web/surfaces/trace-drawer-chip";
+import { ConversationExpandContext } from "@langwatch/trace-web/surfaces/conversation-expand-context";
+import { useDejaViewLink } from "@langwatch/workflow-web/surfaces/deja-view-link";
 import { useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { api } from "../../../behavior/scenario-api";

@@ -13,14 +13,18 @@ import {
   LuPanelRightOpen,
 } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
-import { Kbd } from "@langwatch/ops-web";
+import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 // PeerCursorOverlay used to wrap just the viz pane (scoped to the
 // active viz tab). It was lifted to the drawer level (TraceDrawerShell)
 // so cursors render anywhere a peer's cursor lands in the drawer — the
 // previous scope hid peers as soon as they hovered out of the
 // viz pane.
-import { PresenceMarker, selectPeersMatching, usePresenceStore } from "@langwatch/presence-web";
+import { PresenceMarker } from "@langwatch/presence-web/surfaces/presence-indicators";
+import {
+  selectPeersMatching,
+  usePresenceStore,
+} from "@langwatch/presence-web/surfaces/presence-state";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility";
 import type { VizTab } from "../../../../index";

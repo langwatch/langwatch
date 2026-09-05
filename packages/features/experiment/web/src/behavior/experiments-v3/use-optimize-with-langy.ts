@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 
-import { absorbContextTarget } from "@langwatch/langy-web";
-import { useLangyStore } from "@langwatch/langy-web";
-import { useFeatureFlag } from "@langwatch/workflow-web/hooks/useFeatureFlag";
+import { absorbContextTarget } from "@langwatch/langy-web/surfaces/langy-context";
+import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
+import { useFeatureFlag } from "@langwatch/workflow-web/surfaces/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { TargetConfig } from "../../model/experiments-v3/types";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store";

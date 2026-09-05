@@ -8,7 +8,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "../../../model/prisma-types";
-import { SuiteRunConfirmationDialog } from "@langwatch/suite-web";
+import { SuiteRunConfirmationDialog } from "@langwatch/suite-web/surfaces/run-dialogs";
 import { useRunSuite } from "../use-run-suite";
 
 const mocks = vi.hoisted(() => ({

@@ -5,7 +5,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { PromptEditorDrawer } from "@langwatch/prompt-web/components/prompts/PromptEditorDrawer";
 import type { FieldMapping } from "@langwatch/prompt-web/surfaces/variables";
-import type { LocalPromptConfig } from "@langwatch/experiment-web/experiments-v3/types";
+import type { LocalPromptConfig } from "@langwatch/experiment-web/surfaces/workbench-types";
 import { nodeDataToLocalPromptConfig } from "@langwatch/prompt-web/prompts/utils/llmPromptConfigUtils";
 import { useSmartSetNode } from "@langwatch/workflow-web";
 import { useWorkflowStore } from "@langwatch/workflow-web";

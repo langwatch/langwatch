@@ -13,7 +13,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect, useState } from "react";
 import { LuChevronRight } from "react-icons/lu";
-import { HistoryIcon } from "@langwatch/model-provider-web/components/icons/History";
+import { HistoryIcon } from "@langwatch/model-provider-web/surfaces/history-icon";
 import { Avatar } from "@langwatch/design-system/avatar";
 import { Popover } from "@langwatch/design-system/popover";
 import { toaster } from "@langwatch/ui-host/toaster";

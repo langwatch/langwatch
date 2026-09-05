@@ -18,10 +18,30 @@
       "types": "./src/features/asaplangy/index.ts",
       "default": "./src/features/asaplangy/index.ts"
     },
-    "./langy-theme.css": "./src/ui/elements/langy-theme.css",
+    "./surfaces/langy-theme.css": "./src/ui/elements/langy-theme.css",
     "./screens/langy": {
       "types": "./src/screens/langy/index.ts",
       "default": "./src/screens/langy/index.ts"
+    },
+    "./surfaces/langy-store": {
+      "types": "./src/ui/sections/langy-store.surface.ts",
+      "default": "./src/ui/sections/langy-store.surface.ts"
+    },
+    "./surfaces/langy-context": {
+      "types": "./src/ui/sections/langy-context.surface.ts",
+      "default": "./src/ui/sections/langy-context.surface.ts"
+    },
+    "./surfaces/langy-mark": {
+      "types": "./src/ui/sections/langy-mark.surface.ts",
+      "default": "./src/ui/sections/langy-mark.surface.ts"
+    },
+    "./surfaces/langy-panel-layout": {
+      "types": "./src/ui/sections/langy-panel-layout.surface.ts",
+      "default": "./src/ui/sections/langy-panel-layout.surface.ts"
+    },
+    "./surfaces/langy-ui-actions": {
+      "types": "./src/ui/sections/langy-ui-actions.surface.ts",
+      "default": "./src/ui/sections/langy-ui-actions.surface.ts"
     }
   },
   "scripts": {

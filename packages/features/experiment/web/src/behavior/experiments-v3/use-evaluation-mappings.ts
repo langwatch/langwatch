@@ -8,7 +8,7 @@ import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
 } from "@langwatch/prompt-web/surfaces/variables";
-import { datasetColumnTypeToFieldType } from "@langwatch/workflow-web";
+import { datasetColumnTypeToFieldType } from "@langwatch/workflow-web/surfaces/studio-dataset-columns";
 import { convertToUIMapping } from "../../model/experiments-v3/field-mapping-converters";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
 

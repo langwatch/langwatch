@@ -29,12 +29,8 @@ import { SimulationModelSelect } from "../scenarios/simulation-model-select";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/design-system/toaster";
 import { PromptTargetMappingSection } from "../../elements/suites/prompt-target-mapping-section";
-import {
-  ScenarioPicker,
-  type SuiteFormData,
-  TargetPicker,
-  useSuiteForm,
-} from "@langwatch/suite-web";
+import { type SuiteFormData, useSuiteForm } from "@langwatch/suite-web/surfaces/suite-form";
+import { ScenarioPicker, TargetPicker } from "@langwatch/suite-web/surfaces/suite-pickers";
 import { useArchivedItemsResolution } from "../../../behavior/suites/use-archived-items-resolution";
 import { useSuiteRunMutation } from "../../../behavior/suites/use-suite-run-mutation";
 

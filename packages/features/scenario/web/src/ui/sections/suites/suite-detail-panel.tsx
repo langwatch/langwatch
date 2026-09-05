@@ -17,7 +17,7 @@ import {
   Target,
 } from "lucide-react";
 import { useState } from "react";
-import type { Period } from "@langwatch/analytics-web/components/PeriodSelector";
+import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
 import { SetupWithAgentButton } from "@langwatch/trace-web/components/SetupWithAgentButton";
 import type { SimulationSuite } from "../../../model/prisma-types";
 import { useNow } from "../../../behavior/use-now";

@@ -2,18 +2,18 @@ import { Box, HStack, Tabs, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
-import { Kbd } from "@langwatch/ops-web";
+import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
 import { Drawer } from "../../drawer";
 import {
   PromptList,
   SkillList,
   TRACING_SKILL_ID,
-} from "@langwatch/onboarding-web/features/onboarding/components/sections/ViaClaudeCodeScreen";
-import { ViaMcpClientScreen } from "@langwatch/onboarding-web/features/onboarding/components/sections/ViaClaudeDesktopScreen";
+} from "@langwatch/onboarding-web/surfaces/via-claude-code-screen";
+import { ViaMcpClientScreen } from "@langwatch/onboarding-web/surfaces/via-claude-desktop-screen";
 import {
   type ActiveProjectContextValue,
   ActiveProjectProvider,
-} from "@langwatch/onboarding-web/features/onboarding/contexts/ActiveProjectContext";
+} from "@langwatch/onboarding-web/surfaces/active-project-context";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { ApiKeyIntegrationInfoCard } from "./api-key-integration-info-card";
 import { SdkSetup } from "../../../elements/explorer/onboarding/sdk-setup";

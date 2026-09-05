@@ -5,13 +5,13 @@
  */
 
 import { useMemo } from "react";
-import type { Period } from "@langwatch/analytics-web/components/PeriodSelector";
+import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
 import {
   type BatchRun,
   computeBatchRunSummary,
   computeIterationMap,
   groupRunsByBatchId,
-} from "@langwatch/suite-web";
+} from "@langwatch/suite-web/surfaces/run-formatters";
 import { useRunHistoryPagination } from "../../suites/use-run-history-pagination";
 import { useOrganizationTeamProject } from "../../use-organization-team-project";
 import { api } from "../../scenario-api";

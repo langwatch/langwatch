@@ -22,7 +22,7 @@ const state = vi.hoisted(() => ({
   pullRequestsProps: [] as unknown[],
 }));
 
-vi.mock("@langwatch/coding-agent-web/activity", () => ({
+vi.mock("@langwatch/coding-agent-web/surfaces/activity", () => ({
   SessionsTable: (props: unknown) => {
     state.sessionsProps.push(props);
     return <div data-testid="sessions-table" />;

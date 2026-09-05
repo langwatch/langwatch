@@ -9,8 +9,8 @@ import type {
   Period,
   PeriodMode,
   RelativePresetKey,
-} from "@langwatch/analytics-web/components/PeriodSelector";
-import { usePeriodSelector } from "@langwatch/analytics-web/components/PeriodSelector";
+} from "@langwatch/analytics-web/surfaces/period-selector";
+import { usePeriodSelector } from "@langwatch/analytics-web/surfaces/period-selector";
 import { useCan } from "../../../../behavior/use-can";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";

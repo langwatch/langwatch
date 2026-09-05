@@ -66,7 +66,7 @@ export {
   providerDisplayName,
 } from "../../model/sign-in-methods";
 export { personalWorkspaceApi } from "../../behavior/personal-workspace-api";
-export { codingAgentApi } from "@langwatch/coding-agent-web/activity";
+export { codingAgentApi } from "@langwatch/coding-agent-web/surfaces/activity";
 export {
   PersonalWorkspaceHostPort,
   PersonalWorkspaceHostProvider,

@@ -9,7 +9,7 @@ import {
   type ExecutionScope,
   UNNAMED_FAILURE,
 } from "@langwatch/experiment-contract";
-import { fetchSSE } from "@langwatch/workflow-web/utils/sse/fetchSSE";
+import { fetchSSE } from "@langwatch/workflow-web/surfaces/fetch-sse";
 import { buildExecutionRequest } from "@langwatch/experiment-contract";
 import {
   applyEvaluatorResult,

@@ -15,7 +15,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { DatasetPreviewTable } from "@langwatch/dataset-web/components/datasets/editor/DatasetPreviewTable";
+import { DatasetPreviewTable } from "@langwatch/dataset-web/surfaces/dataset-image-preview-table";
 import type { Dataset, DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import type { MappingState, Trace } from "@langwatch/trace-contract";
 import { useCallback, useEffect, useMemo, useState } from "react";

@@ -6,7 +6,7 @@ import {
 import type { SimulationMessage } from "@langwatch/scenario-contract";
 import type { NextSpeaker } from "../../elements/next-speaker";
 import { Bubble } from "@langwatch/trace-web/explorer/components/TraceTable/registry/addons/conversation/Bubble";
-import { getDisplayRoleVisuals } from "@langwatch/trace-web/scenario-role";
+import { getDisplayRoleVisuals } from "@langwatch/trace-web/surfaces/scenario-role";
 import { RenderInputOutput } from "@langwatch/trace-web/components/traces/RenderInputOutput";
 import { RunTurnSeparator } from "./run-turn-separator";
 import { MediaPart } from "../media-part";

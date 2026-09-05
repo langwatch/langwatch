@@ -9,7 +9,7 @@ import {
 } from "../../behavior/use-all-model-providers-list";
 import { useCredentialProbeGate } from "../../behavior/use-credential-probe-gate";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { useFeatureFlag } from "@langwatch/workflow-web/hooks/useFeatureFlag";
+import { useFeatureFlag } from "@langwatch/workflow-web/surfaces/feature-flag";
 import { useModelProviderApiKeyValidation } from "../../behavior/use-model-provider-api-key-validation";
 import { useModelProviderForm } from "../../behavior/use-model-provider-form";
 import { useModelProvidersSettings } from "../../behavior/use-model-providers-settings";

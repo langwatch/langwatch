@@ -6,7 +6,7 @@
 import { Box, Button, HStack, Tabs, Text, VStack } from "@chakra-ui/react";
 import { LuArrowLeft } from "react-icons/lu";
 
-import { CopyButton } from "@langwatch/workflow-web/components/CopyButton";
+import { CopyButton } from "@langwatch/workflow-web/surfaces/copy-button";
 import { SetupWithAgentButton } from "@langwatch/trace-web/components/SetupWithAgentButton";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { useDrawer } from "@langwatch/ui-drawer";

@@ -1,7 +1,7 @@
 import { Box, type BoxProps, Field, HStack, Text, VStack } from "@chakra-ui/react";
 import { useCallback } from "react";
 import { SlugChangeWarningAlert, SlugConflictAlert } from "@langwatch/dataset-web";
-import { CopyButton } from "@langwatch/workflow-web/components/CopyButton";
+import { CopyButton } from "@langwatch/workflow-web/surfaces/copy-button";
 import type { SlugValidationResult } from "../../../behavior/datasets/use-dataset-slug-validation";
 
 /**

@@ -1,5 +1,6 @@
 import type { ShareLink } from "@langwatch/share-contract";
-import { expiryToDate, type CreateShareLinkDraft } from "@langwatch/share-web";
+import { type CreateShareLinkDraft } from "@langwatch/share-web/surfaces/share-link-views";
+import { expiryToDate } from "@langwatch/share-web/surfaces/share-links";
 import { useCallback } from "react";
 import { showErrorToast } from "../../errors";
 import { api } from "../../../../behavior/trace-api";

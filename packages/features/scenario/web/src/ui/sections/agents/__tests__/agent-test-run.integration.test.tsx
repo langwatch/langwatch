@@ -51,7 +51,7 @@ vi.mock("../../../../behavior/scenario-api", () => ({
   },
 }));
 
-vi.mock("@langwatch/langy-web", () => ({
+vi.mock("@langwatch/langy-web/surfaces/langy-store", () => ({
   LangyContextTarget: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
