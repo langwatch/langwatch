@@ -1351,7 +1351,9 @@ A group synced from your identity provider through SCIM keeps its name and membe
 
 ## How a request is authorized
 
-LangWatch first checks that the caller is an active member of the organization; a disabled member is refused, and API keys skip this check. It then collects every binding on the scope chain of the request, the project, its team and the organization, including bindings held through groups. Any binding that grants the permission allows the request; a narrower binding never cancels a wider one. An organization-scoped Admin binding grants every permission. At organization scope, every active member holds the Member organization permissions. Organization-only resources need an organization-scoped binding.
+LangWatch first checks that the caller is an active member of the organization; a disabled member is refused, and API keys skip this check. It then collects every binding on the scope chain of the request, the project, its team and the organization, including bindings held through groups.
+
+Any binding that grants the permission allows the request; a narrower binding never cancels a wider one. An organization-scoped Admin binding grants every permission. At organization scope, every active member holds the Member organization permissions. Organization-only resources need an organization-scoped binding.
 
 ---
 
