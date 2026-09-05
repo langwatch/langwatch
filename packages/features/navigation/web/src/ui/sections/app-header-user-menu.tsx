@@ -14,9 +14,9 @@
  *   `@langwatch/feature-flag-web` and `platform/app`'s ops components. Both are
  *   handed in by the host as nodes, the shape `waiting()` established, so this
  *   package takes no dependency on either half.
- * - The presence toggle did not travel. It reads a presence store and a
- *   platform-only feature hook, it was mounted on one lens, and the
- *   application that mounted it is the half being deleted.
+ * - The presence toggle reads a presence store and a presence feature gate
+ *   that belong to `@langwatch/trace-web`, and it is offered on one lens only,
+ *   so it arrives as `accountMenu.presence` — a node, gated by the host.
  *
  * Spec: specs/navigation/navigation-modes.feature
  */
@@ -29,7 +29,8 @@ import {
   type NavigationMode,
   useNavigationModeStore,
 } from "../../behavior/navigation-mode.store";
-import { useNavigationHost } from "../../model/navigation-host";
+import { usePersonalWorkspaceEntries } from "../../behavior/use-personal-workspace-entries";
+import { useNavigationHost, type NavigationHostPort } from "../../model/navigation-host";
 import { NavigationLink } from "../elements/navigation-link";
 import { UserAvatar } from "../elements/user-avatar";
 
@@ -46,11 +47,9 @@ export function AppHeaderUserMenu() {
   const plan = host.plan();
   const accountMenu = host.accountMenu();
 
-  // The "My Workspace" entry is part of the governance preview surface,
-  // distinct from the AI Gateway menu, which keeps shipping under its own
-  // flag. The flag is organization-targeted, and the landing destination is
-  // decided at the organization, so the entry and the page it opens agree.
-  const governancePreviewEnabled = host.featureFlag("release_ui_ai_governance_enabled").enabled;
+  // "My Workspace": one entry per governance-enabled organization, or the
+  // reader's own single entry when they belong to none.
+  const { entries: personalWorkspaceEntries } = usePersonalWorkspaceEntries(host);
 
   // The navigation-mode preference lives on the device (see
   // navigation-mode.store).
@@ -88,11 +87,7 @@ export function AppHeaderUserMenu() {
           <Menu.Content>
             {accountMenu?.leading}
             <Menu.ItemGroup title={`${user.name ?? ""} (${user.email ?? ""})`}>
-              {governancePreviewEnabled && (
-                <Menu.Item value="my-workspace" asChild>
-                  <NavigationLink href="/me">My Workspace</NavigationLink>
-                </Menu.Item>
-              )}
+              <PersonalWorkspaceEntries entries={personalWorkspaceEntries} host={host} />
               {!plan.isLiteMember && (
                 <Menu.Item value="api-keys" asChild>
                   <NavigationLink href="/settings/api-keys">API Keys</NavigationLink>
@@ -101,6 +96,7 @@ export function AppHeaderUserMenu() {
               <Menu.Item value="settings" asChild>
                 <NavigationLink href="/settings">Settings</NavigationLink>
               </Menu.Item>
+              {accountMenu?.presence}
               {accountMenu?.experiments && (
                 <Menu.Item value="experiments" onSelect={accountMenu.experiments.open}>
                   <HStack gap={2}>
@@ -168,5 +164,49 @@ export function AppHeaderUserMenu() {
       )}
       {accountMenu?.dialogs}
     </Menu.Root>
+  );
+}
+
+/**
+ * A plain link for the org-less reader, else one item per governance org.
+ * Picking one writes that org into scope, then opens `/me`.
+ */
+function PersonalWorkspaceEntries({
+  entries,
+  host,
+}: {
+  entries: ReturnType<typeof usePersonalWorkspaceEntries>["entries"];
+  host: NavigationHostPort;
+}) {
+  if (entries.length === 0) return null;
+
+  const orgLess = entries.find((entry) => entry.organizationId === null);
+  if (orgLess) {
+    return (
+      <Menu.Item value="my-workspace" asChild>
+        <NavigationLink href="/me">My Workspace</NavigationLink>
+      </Menu.Item>
+    );
+  }
+
+  return (
+    <>
+      {entries.map((entry) => (
+        <Menu.ItemGroup key={entry.organizationId} title={entry.organizationName ?? undefined}>
+          <Menu.Item
+            value={`my-workspace:${entry.organizationId}`}
+            onSelect={() => {
+              host.rememberScope({
+                organizationId: entry.organizationId ?? undefined,
+                projectSlug: "",
+              });
+              host.navigate("/me");
+            }}
+          >
+            My Workspace
+          </Menu.Item>
+        </Menu.ItemGroup>
+      ))}
+    </>
   );
 }

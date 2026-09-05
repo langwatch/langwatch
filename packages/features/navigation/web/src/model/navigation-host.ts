@@ -215,6 +215,15 @@ export type NavigationAccountMenu = {
   leading?: ReactNode;
   /** Entries drawn below the application's own controls. */
   trailing?: ReactNode;
+  /**
+   * The presence-broadcast toggle, on the surfaces where presence is live.
+   *
+   * It reads a presence store and a presence feature gate that belong to
+   * `@langwatch/trace-web`, so it arrives as a node like the rest. Absent is a
+   * real answer and the only one off the Trace Explorer: the menu then carries
+   * no presence row at all rather than one that toggles nothing.
+   */
+  presence?: ReactNode;
   /** Overlays those entries open, rendered inside the menu root. */
   dialogs?: ReactNode;
   experiments?: { open: () => void; hasUnseen: boolean };

@@ -58,9 +58,13 @@ const commandBarOpenMock = vi.fn();
 function renderSidebar({
   surface,
   pathname = "/demo",
+  isCompact = false,
+  billedCostEnabled = true,
 }: {
   surface: "me" | "llm-ops" | "gateway" | "governance";
   pathname?: string;
+  isCompact?: boolean;
+  billedCostEnabled?: boolean;
 }) {
   return render(
     <ChakraProvider value={defaultSystem}>
@@ -72,11 +76,16 @@ function renderSidebar({
           openableTeams: [team, personalTeam],
           pathname,
           permissions: ["triggers:view", "organization:view"],
-          flags: { release_ui_governance_billed_cost_enabled: { enabled: true, isLoading: false } },
+          flags: {
+            release_ui_governance_billed_cost_enabled: {
+              enabled: billedCostEnabled,
+              isLoading: false,
+            },
+          },
           commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
         }}
       >
-        <ProductSidebar surface={surface} isCompact={false} />
+        <ProductSidebar surface={surface} isCompact={isCompact} />
       </WithStubNavigationHost>
     </ChakraProvider>,
   );
@@ -262,6 +271,23 @@ describe("the product sidebar", () => {
       expect(screen.getByText("Cache Rules")).toBeInTheDocument();
       expect(screen.getByText("Routing Policies")).toBeInTheDocument();
     });
+
+    /** @scenario "Every gateway entry opens in the tab the reader is in" */
+    it("opens every gateway destination in the same tab, with no new-tab marker", () => {
+      renderSidebar({ surface: "gateway", pathname: "/gateway/virtual-keys" });
+
+      const gatewayLinks = screen
+        .getAllByRole("link")
+        .filter((link) =>
+          /^(\/gateway|\/settings\/model-providers)/.test(link.getAttribute("href") ?? ""),
+        );
+      expect(gatewayLinks.length).toBeGreaterThan(0);
+      expect(
+        gatewayLinks.filter(
+          (link) => link.getAttribute("target") !== null || link.getAttribute("rel") !== null,
+        ),
+      ).toEqual([]);
+    });
   });
 
   describe("when on a Governance page", () => {
@@ -276,6 +302,29 @@ describe("the product sidebar", () => {
       // The stub flags report the billed-cost placeholders on.
       expect(screen.getByText("Costs")).toBeInTheDocument();
       expect(screen.getByText("Billed")).toBeInTheDocument();
+    });
+
+    /** @scenario With the billed-cost flag off, Costs and Billed do not exist */
+    it("hides Costs and Billed while the billed-cost flag is off", () => {
+      renderSidebar({ surface: "governance", pathname: "/governance", billedCostEnabled: false });
+
+      expect(screen.getByText("Overview")).toBeInTheDocument();
+      expect(screen.getByText("Inventory")).toBeInTheDocument();
+      expect(screen.queryByText("Costs")).not.toBeInTheDocument();
+      expect(screen.queryByText("Billed")).not.toBeInTheDocument();
+    });
+
+    /** @scenario With the billed-cost flag on, Costs and Billed appear as placeholders */
+    it("shows Costs and Billed between Overview and Inventory while the flag is on", () => {
+      renderSidebar({ surface: "governance", pathname: "/governance", billedCostEnabled: true });
+
+      const labels = screen
+        .getAllByRole("link")
+        .map((link) => link.textContent)
+        .filter((label): label is string =>
+          ["Overview", "Costs", "Billed", "Inventory"].includes(label ?? ""),
+        );
+      expect(labels).toEqual(["Overview", "Costs", "Billed", "Inventory"]);
     });
   });
 
@@ -518,6 +567,25 @@ describe("the product sidebar", () => {
       // which jsdom can read where a CSS variable it cannot resolve is
       // out of reach: quiet-chip-style.unit.test.ts.
       expect(cap).toHaveStyle({ color: "var(--chakra-colors-gray-400)" });
+    });
+  });
+
+  describe("when the experiments workbench renders its column", () => {
+    /** @scenario The workbench lays out beside the full navigation menu, not under the compact overlay rail */
+    it("keeps the menu in flow instead of the hover-expanded overlay rail", () => {
+      // `isCompact` has no per-page override any more (viewport-only), so the
+      // workbench cannot ask for the compact rail that used to cover its
+      // grid's leftmost columns — desktop width always resolves in-flow.
+      renderSidebar({
+        surface: "llm-ops",
+        pathname: "/[project]/experiments/exp-1",
+        isCompact: false,
+      });
+
+      const sidebar = screen.getByTestId("product-sidebar");
+      const menuColumn = sidebar.firstElementChild as HTMLElement;
+      expect(menuColumn).toHaveStyle({ position: "relative" });
+      expect(menuColumn).not.toHaveStyle({ position: "absolute" });
     });
   });
 });

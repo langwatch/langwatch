@@ -522,6 +522,29 @@ describe("the product-switcher top bar", () => {
 
       expect(screen.getByText("ACME")).toBeInTheDocument();
     });
+
+    /** @scenario A multi-org user switches organization in place from the org-scoped switcher */
+    it("switches organization in place and lands somewhere valid in the new organization", async () => {
+      // The settings detour carries no product (`activeProductId` is null
+      // there), so the shared `resolveOrgSwitchDestination` resolver falls
+      // through to the target organization's own project home rather than a
+      // product home — the same fallback every other in-place org switch
+      // uses, kept in lockstep with `resolve-org-switch-destination.unit.test.ts`
+      // rather than special-cased for settings.
+      const user = userEvent.setup();
+      renderShell({ readings: { pathname: "/settings", organizations: [orgA, orgB] } });
+
+      await user.click(screen.getByRole("button", { name: "Switch organization" }));
+      await user.click(await screen.findByText("Beta Corp"));
+
+      expect(rememberScopeMock).toHaveBeenCalledWith({
+        organizationId: "org_2",
+        projectSlug: "",
+      });
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/beta-app");
+      });
+    });
   });
 
   describe("when the viewport is desktop-width", () => {

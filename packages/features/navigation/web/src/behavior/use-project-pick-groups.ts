@@ -15,10 +15,12 @@
  * not travel and no longer exists; this gives the same answer for every
  * `/:project/...` page, which is every page a switcher is rendered above.
  *
- * WHAT IT DOES NOT OFFER is the per-team "New Project" entry. That opened
- * `platform/app`'s create-project drawer, which is a component of the
- * application being deleted. An entry that cannot do what it says is worse
- * than no entry, so `canCreateProject` stays false and the row is not built.
+ * THE PER-TEAM "New Project" ENTRY is offered to whoever holds `project:create`
+ * (the same ambient permission `@langwatch/organization-web`'s Teams page
+ * gates its own "Add project" button on — the host's team shape carries no
+ * per-team role to restate main's admin check). An empty team still gets a
+ * row when that holds, so a coding-usage signup's first team has one.
+ * Spec: specs/navigation/workspace-switcher.feature
  */
 
 import { useMemo } from "react";
@@ -101,17 +103,19 @@ export function useProjectPickGroups(): ProjectPickGroup[] {
   const pathname = host?.pathname() ?? "/";
   const routePattern = host?.routePattern();
 
+  const canCreateProject = host?.hasPermission("project:create") ?? false;
+
   return useMemo(() => {
     if (!host || !organization) return [];
     return host
       .openableTeams()
-      .filter((team) => team.projects.length > 0)
+      .filter((team) => team.projects.length > 0 || canCreateProject)
       .map((team) => ({
         team: {
           teamId: team.id,
           orgId: organization.id,
           label: team.name,
-          canCreateProject: false,
+          canCreateProject,
         },
         projects: team.projects.map((candidate) => ({
           projectId: candidate.id,
@@ -124,5 +128,5 @@ export function useProjectPickGroups(): ProjectPickGroup[] {
           }),
         })),
       }));
-  }, [host, organization, pathname, routePattern, project?.slug]);
+  }, [host, organization, pathname, routePattern, project?.slug, canCreateProject]);
 }
