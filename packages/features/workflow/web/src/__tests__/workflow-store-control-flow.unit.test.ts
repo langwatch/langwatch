@@ -1,10 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Store-level tests for if/else branch-to-gate connections: dropping a branch
- * on a node's temporary gate materializes a real bool "gate" input wired to
- * the branch, and the branch-drag flag (plus its source id) drives the
- * temporary gate rows the nodes render.
+ * If/else branch-to-gate connections: dropping a branch on a node's temporary gate materializes a real bool "gate" input; the branch-drag flag (plus source id) drives the temporary gate rows nodes render.
  */
 import type { Node } from "@xyflow/react";
 import { beforeEach, describe, expect, it } from "vitest";

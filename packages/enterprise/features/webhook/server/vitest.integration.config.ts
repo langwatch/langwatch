@@ -2,12 +2,9 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 /**
- * This package's integration lane: every `*.integration.test.ts` under `src/`,
- * which `vitest.config.ts` excludes by the same suffix. The two configs are
- * complements, so a file cannot be in neither. The alias table is the unit
- * lane's, spelled out for the same reason it is spelled out there.
- *
- * WHAT IT NEEDS: Postgres, at `LANGWATCH_TEST_DATABASE_URL` or `DATABASE_URL`.
+ * Every `*.integration.test.ts` under `src/`; `vitest.config.ts` excludes
+ * the same suffix, so a file cannot be in neither. Needs Postgres at
+ * `LANGWATCH_TEST_DATABASE_URL` or `DATABASE_URL`.
  */
 export default defineConfig({
   resolve: {

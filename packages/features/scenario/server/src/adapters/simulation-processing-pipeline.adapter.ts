@@ -36,12 +36,8 @@ export interface SimulationProcessingPipelineDeps {
   simulationRunStore: FoldProjectionStore<SimulationRunStateData>;
   /**
    * The metrics map projection's own append seat, named as the PORT it is.
-   *
-   * The consumer supplies `SimulationRunMetricsStoreAdapter` over ClickHouse
-   * and satisfies this unchanged; a process that only PRODUCES commands on
-   * this pipeline folds nothing and has no such adapter to hand, and naming
-   * the concrete class here was what stopped it registering the definition at
-   * all.
+   * A process that only PRODUCES commands folds nothing and has no such
+   * adapter to hand — naming the concrete class here blocked it registering at all.
    */
   simulationRunMetricsStore: AppendStore<SimulationRunMetricsProjectionRecord>;
   finishRunCommand: FinishRunCommand;

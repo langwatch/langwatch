@@ -1,10 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The version description in the Evaluate dialog is required, but the red
- * "required" ring must not appear until the user actually attempts to
- * submit - a customer disliked opening the dialog to an already-red field
- * they had not touched.
+ * The Evaluate dialog's version description is required, but the red ring must not appear until submit is attempted — a customer disliked an already-red field on open.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

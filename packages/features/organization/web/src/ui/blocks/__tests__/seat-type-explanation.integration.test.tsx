@@ -1,11 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * See specs/licensing/seat-type-explained.feature.
- *
- * "Does this person need a full seat?" is a billing question, and admins were
- * answering it by asking their account manager. Both surfaces where the choice
- * is made have to carry the answer, and carry the same one.
+ * Both surfaces where the seat-type choice is made must carry the same answer. See specs/licensing/seat-type-explained.feature.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -3,12 +3,9 @@ import type { EmojiClickData, EmojiStyle, SkinTonePickerLocation } from "emoji-p
 import { WorkflowConfigPopover } from "../../../../elements/workflow-config-popover";
 import dynamic from "@langwatch/ui-host/compat/next-dynamic";
 
-// Use string literals matching the enum values rather than importing the
-// runtime enums. A value-import of even a single enum from
-// `emoji-picker-react` collapses the entire library into whatever chunk
-// this module ends up in, defeating the `dynamic()` lazy load below and
-// crashing app boot ("n is not a function") when the eager bundle of
-// emoji-picker-react fails to initialise.
+// Use string literals matching the enum values, not the runtime enums — a
+// value-import from `emoji-picker-react` collapses the whole library into
+// this chunk, defeating `dynamic()` lazy load and crashing boot.
 const EMOJI_STYLE_NATIVE = "native" as EmojiStyle;
 const SKIN_TONE_PREVIEW = "PREVIEW" as SkinTonePickerLocation;
 

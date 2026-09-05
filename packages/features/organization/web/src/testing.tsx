@@ -1,13 +1,6 @@
 /**
- * What this package's suites mount the screen inside.
- *
- * The host port is an abstract class, so a test constructs one rather than
- * mocking a module: the fake below RECORDS what the screen asked the
- * application to do — the query it wrote, the file it handed over, the failure
- * it reported — which is exactly the surface the real adapter answers.
- *
- * Not exported from the package. A test imports it relatively; nothing outside
- * this package has any business constructing a host.
+ * What this package's suites mount the screen inside: a test constructs
+ * the abstract host port rather than mocking a module. Not exported.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -98,10 +91,8 @@ export class FakeOrganizationHost extends OrganizationHostPort {
   }
 
   /**
-   * The settings addresses are all the organization's own, so the fake answers
-   * both questions the same way — which is exactly what the browser adapter
-   * does, and what makes the port's split a statement about the future rather
-   * than about today.
+   * The settings addresses are all the organization's own, so the fake
+   * answers both questions the same way, like the real browser adapter.
    */
   hasOrganizationPermission(permission: string): boolean {
     return this.hasPermission(permission);

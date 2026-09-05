@@ -27,34 +27,9 @@ import { WelcomeHeader } from "./components/welcome-header";
 import { useProjectHomeHost } from "../../model/project-home-host";
 
 /**
- * THE APPLICATION SHELL IS NOT THIS PAGE'S ANY MORE. It used to open with a
- * `DashboardLayout` of its own — the sidebar, the top bar and the content card
- * around everything below. The chrome layout route draws all of that now, over
- * every page this application serves, so the home renders its own content and
- * nothing else. A page that brought a second shell would show two of
- * everything.
- *
- * The project home: a briefing for the returning user, not a lobby. Live
- * signal (the sheet, recent items) over navigation — the sidebar already
- * lists the feature areas, so home never repeats it as cards. Onboarding
- * shows only while incomplete; resources are a quiet footer.
- *
- * Three compositions, resolved in strict order by `useHomeComposition`:
- *
- *   - SIGNAL-FOCUSED: the generated briefing sheet leads — LangWatch's read
- *     of the project's agentic signals, with the status figures folded in —
- *     then the announcement note, recent work, and setup as a hairline.
- *   - LANGY: the lit block leads, announcement compressed into a line of its
- *     chrome and a real composer set into its lower edge, then the same spine
- *     the classic home has, with the overview reduced to a compact strip.
- *   - CLASSIC: announcements, the traces overview, recent work, and the
- *     onboarding checklist.
- *
- * The ORDER matters more than the branches: signal-focused wins outright, and
- * Langy access alone still switches nothing (the Langy home needs its own
- * rollout too). Within any composition, Langy access decides only the Langy
- * affordances: the sheet's hand-to-Langy controls gate themselves
- * (HomeBriefingSection / QuietHeadline), and the classic traces overview
+ * The application shell is not this page's — chrome layout draws it. A
+ * briefing for the returning user, not a lobby. Three compositions resolve
+ * in strict order (SIGNAL-FOCUSED, LANGY, CLASSIC); signal-focused wins outright.
  */
 export function HomePage() {
   const composition = useHomeComposition();
@@ -156,23 +131,9 @@ export function HomePage() {
 }
 
 /**
- * The home page's one sales-y ask, and who is spared it.
- *
- * A customer who already pays for LangWatch should not be pitched LangWatch on
- * their own home page every morning. So the ask is for people who might still
- * buy: it renders only once we KNOW the organization is on the free plan.
- *
- * "Only once we know" is doing real work there. While the plan is still
- * resolving the answer is unknown, and the two ways of being wrong are not
- * equally bad: a free user meeting the ask a beat late costs nothing, while a
- * paying customer watching a "considering LangWatch?" pitch flash up and
- * disappear is the product forgetting who they are. So unknown hides it.
- *
- * Lives here, above the composition branch, because the greeting row is shared
- * chrome: fixing it once is what stops it coming back on whichever home a
- * future rollout happens to render.
- *
- * Spec: specs/home/home-views.feature
+ * The home page's one sales-y ask, spared for anyone not KNOWN to be on
+ * the free plan — while resolving, unknown hides it, since a false
+ * positive reads as the product forgetting who a paying customer is.
  */
 function ConsideringLangWatch() {
   const organization = useProjectHomeHost().organization();
@@ -227,19 +188,9 @@ function ConsideringLangWatch() {
 }
 
 /**
- * What the page shows before it knows which home it is.
- *
- * The three compositions hang off feature flags, and every gate reports
- * "off" while its flag is in the air — so the page used to resolve to the
- * classic home, paint it, and swap to the real one a beat later. The reader
- * watched their home page change shape under them on every cold load, which
- * reads as a bug in the product rather than as loading.
- *
- * So it commits to nothing. This is deliberately NOT a mock of any one
- * composition — the three lead with different things and guessing wrong just
- * moves the flicker into the skeleton. It is the shape they share: a lead
- * block, then a wide row, then the spine. Neutral, unlabelled, and gone by
- * the time the answer lands.
+ * What the page shows before it knows which home it is. Flags used to
+ * resolve to classic, paint it, then swap, so the home visibly changed
+ * shape on cold load. This commits to nothing: just the shape all three share.
  */
 function HomeCompositionSkeleton() {
   return (
@@ -255,16 +206,9 @@ function HomeCompositionSkeleton() {
 }
 
 /**
- * The Langy home's spine.
- *
- * The lit block leads, then the page continues in the order it already has.
- * The one thing that moves is the setup checklist: on a project with no data
- * it takes the figures' place directly under the block, because there are no
- * figures worth showing yet and the next thing that reader needs is a first
- * trace, not an empty chart. On a project with data it stays where it always
- * was, below recent work, and only shows while it is incomplete.
- *
- * Spec: specs/home/langy-home.feature
+ * The Langy home's spine: lit block leads, page continues as before. The
+ * setup checklist moves — on a no-data project it takes the figures' place
+ * under the block, since there's nothing to show yet. Spec: specs/home/langy-home.feature
  */
 function LangyHome() {
   const { isNewProject } = useProjectReach();
@@ -300,9 +244,7 @@ function LangyHome() {
 }
 
 /**
- * The default export the page loader resolves.
- *
- * `HomePage` stays named for the suite that has always driven it by name; the
- * loader registry takes a default, which is what this is.
+ * The default export the page loader resolves. `HomePage` stays named for
+ * the suite that has always driven it by name.
  */
 export default HomePage;

@@ -1,13 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The node drawer header exposes a "..." action menu (Duplicate / Delete) for
- * regular component nodes, giving users a discoverable way to manage a node
- * without keyboard shortcuts. Choosing Duplicate copies the node; choosing
- * Delete removes it and closes the drawer. Structural entry/end nodes cannot be
- * duplicated or deleted, so the menu is not shown for them.
- *
- * Specs: specs/optimization-studio/node-duplicate-delete-menu.feature
+ * The node drawer header's "..." menu (Duplicate/Delete) for regular component nodes; structural entry/end nodes cannot be duplicated or deleted, so it's hidden for them. See specs/optimization-studio/node-duplicate-delete-menu.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

@@ -1,12 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for commit-message autogen gating in the
- * save-version fields: with no Fast model resolved, generation never
- * auto-fires (no doomed request, no unprompted missing-model toast)
- * and the description field degrades to an explicit sparkles button.
- *
- * UX contract: specs/model-providers/missing-model-popup.feature.
+ * Commit-message autogen gating in save-version fields: with no Fast model resolved, generation never auto-fires and the description field degrades to an explicit sparkles button. See specs/model-providers/missing-model-popup.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

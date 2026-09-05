@@ -1,16 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for EditModelProviderForm section rendering rules.
- *
- * Covers @integration scenarios from specs/model-providers/azure-safety-provider.feature:
- * - "Azure Safety form only shows credentials and extra headers"
- *   (no Custom Models, no Default Model, no API Gateway toggle)
- *
- * The form is parent-gated: sections that only apply to LLM providers
- * (CustomModelInputSection, DefaultProviderSection, Azure API Gateway toggle)
- * must be hidden when the provider's registry `type` is not "llm" (e.g.
- * `azure_safety`, whose registry entry says "safety").
+ * EditModelProviderForm is parent-gated: LLM-only sections hide when the registry `type` isn't "llm" — e.g. `azure_safety`.
  */
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

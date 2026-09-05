@@ -1,10 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Store-level unit tests for the entry-point dataset semantics: a
- * dataset attach MERGES its columns into the entry's fields instead of
- * overwriting them (user-defined inputs survive), and legacy "Entry"
- * names normalize to "Entry point" on workflow load.
+ * Entry-point dataset semantics: attach MERGES columns into the entry's fields (user-defined inputs survive); legacy "Entry" names normalize to "Entry point" on load.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";

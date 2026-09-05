@@ -13,11 +13,8 @@ import {
 
 /**
  * All pure simulation-processing commands defined from event data schemas.
- *
- * computeRunMetrics and finishRun are not DEFINED here — they carry DI
- * (TraceSummaryStore/scheduleRetry and loadPriorEvents respectively) and stay
- * as manual classes under ./commands/. FinishRunCommand is surfaced from this
- * module so callers have one import site for the pipeline's commands.
+ * computeRunMetrics and finishRun carry DI and stay as manual classes under
+ * ./commands/; FinishRunCommand is re-surfaced here for one import site.
  */
 
 export { FinishRunCommand } from "./finish-run.adapter";
@@ -145,16 +142,9 @@ export const DeleteRunCommand = defineCommand({
 });
 
 /**
- * Archive a whole scenario set in one shot. One user intent → one event,
- * instead of N `lw.simulation_run.deleted` events for the same action.
- *
- * The aggregate is `simulation_set` (set-scoped); the payload carries the
- * `scenarioRunIds` that were attached to the set at archive time so replay
- * is deterministic.
- *
- * Wiring this event into the per-run fold projection (so each run's
- * `ArchivedAt` flips in one pass) is tracked in lw#3636 follow-up — the
- * dispatcher needs a fanout step from one set event to many run aggregates.
+ * Archive a whole scenario set in one shot — one event, not N per-run
+ * deletes. Aggregate is `simulation_set`; payload carries `scenarioRunIds`
+ * so replay is deterministic. Per-run fold wiring tracked in lw#3636.
  */
 export const ArchiveSetCommand = defineCommand({
   commandType: "lw.simulation_set.archive",

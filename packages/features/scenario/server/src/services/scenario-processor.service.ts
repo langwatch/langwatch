@@ -296,10 +296,9 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
   }
 
   /**
-   * What a job that ran to the end records: the connected agent instance the
-   * child named, when one did. A run served by no connected agent names none
-   * and records nothing, and a record that cannot be written never fails the
-   * job that already succeeded.
+   * What a job that ran to the end records: the connected agent instance
+   * the child named, when one did. A record that cannot be written never
+   * fails a job that already succeeded.
    */
   async handleSucceeded(input: {
     jobData: ExecutionJobData;

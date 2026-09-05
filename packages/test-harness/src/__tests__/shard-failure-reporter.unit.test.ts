@@ -1,11 +1,7 @@
 /**
- * The accounting behind the unit shard's hard floor.
- *
- * The reporter runs in vitest's main process and this test runs in a worker,
- * so driving the reporter here cannot disturb the reporter watching this run.
- *
- * @see ../unit-shard-hard-floor.ts
- * @see specs/ci/unit-shard-hard-floor.feature
+ * The accounting behind the unit shard's hard floor. Runs in a worker, so
+ * this cannot disturb the reporter watching this run.
+ * @see ../unit-shard-hard-floor.ts and specs/ci/unit-shard-hard-floor.feature
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 

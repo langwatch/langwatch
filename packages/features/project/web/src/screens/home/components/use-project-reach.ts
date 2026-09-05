@@ -10,14 +10,9 @@ export interface ProjectReachResult extends ProjectReach {
 }
 
 /**
- * How far into the product this project has got.
- *
- * Reads the SAME query the onboarding checklist does, deliberately: React
- * Query dedupes it, so asking here costs nothing, and the checklist and the
- * home page's asks can never disagree about whether the project has data.
- *
- * `simulations` counts as experiments alongside datasets, because both are
- * things a "compare my last two runs" ask can actually land on.
+ * How far into the product this project has got. Reads the SAME query the
+ * onboarding checklist does, deliberately: React Query dedupes it, so the
+ * checklist and the home page's asks can never disagree.
  */
 export function useProjectReach(): ProjectReachResult {
   const project = useProjectHomeHost().project();

@@ -6,14 +6,9 @@ import { api } from "../model/workflow-api-client";
 const OPS_SCOPE_STALE_TIME_MS = 5 * 60_000;
 
 /**
- * Reports the calling user's ops access. The underlying `api.ops.getScope`
- * is now a status probe — it always succeeds with `scope.kind === "none"`
- * for non-ops users instead of throwing FORBIDDEN, so this hook no longer
- * spams the console on every page load (lw#3584).
- *
- * Consumers should keep using `hasAccess` to gate ops UI; the discriminator
- * is exposed via `scope.kind` for callers that want to branch on tier
- * later (e.g. ops:view vs ops:manage if that ever lands).
+ * Reports the calling user's ops access. `api.ops.getScope` is a status
+ * probe — succeeds with `scope.kind === "none"` for non-ops users instead
+ * of throwing FORBIDDEN (lw#3584). Use `hasAccess` to gate UI.
  */
 export function useOpsPermission({
   enabled = true,

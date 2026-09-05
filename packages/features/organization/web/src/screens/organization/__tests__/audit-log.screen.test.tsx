@@ -1,20 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Settings > Audit Log: what a reader sees, what the plan gate says, and what a
- * downloaded report is taken over.
- *
- * THE PLATFORM PAGE HAD NO RENDER SUITE AT ALL. Every page-level scenario in
- * `specs/audit-log/audit-log.feature` was tagged `@unimplemented` and the
- * feature file said so in a comment: "the page is implemented in
- * `src/pages/settings/audit-log.tsx` but no JSDOM render integration test
- * exists for it yet". These are those scenarios.
- *
- * THE EXPORT IS THE PROPERTY THIS SURFACE ACTUALLY TURNS ON: a report taken
- * from a pre-filtered deep-link that quietly widened to the whole
- * organization's history would be a disclosure dressed up as a convenience.
- *
- * Spec: specs/audit-log/audit-log.feature
+ * Settings > Audit Log. Guards one property: a pre-filtered deep-link's report must not quietly widen to the whole organization's history. Spec: specs/audit-log/audit-log.feature
  */
 
 import { cleanup, screen, waitFor, within } from "@testing-library/react";

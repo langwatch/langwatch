@@ -33,11 +33,9 @@ export const LLM_CONFIG_KEYS = [
 ] as const;
 
 /**
- * Bridging component that connects react-hook-form's flat structure
- * with LLMConfigPopover's object-based API.
- *
- * Reads all LLM config parameters from form context, constructs an
- * LLMConfig object, and writes all changed parameters back on change.
+ * Bridges react-hook-form's flat structure with LLMConfigPopover's
+ * object-based API: reads params from form context, builds an LLMConfig
+ * object, writes changed params back on change.
  */
 export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
   const { setValue, control } = useFormContext();

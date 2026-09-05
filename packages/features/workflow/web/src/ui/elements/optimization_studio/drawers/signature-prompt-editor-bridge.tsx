@@ -72,10 +72,9 @@ function mergeFields({
 }
 
 /**
- * When input identifiers change positionally (e.g. prompt renamed "question"
- * to "input"), remap edges to point at the new identifier. Only remaps when
- * the old identifier has an edge and the new identifier is genuinely new
- * (not a reordered existing identifier).
+ * When input identifiers change positionally (e.g. renamed "question" to
+ * "input"), remap edges to the new identifier — only when the old one had
+ * an edge and the new one is genuinely new, not reordered.
  */
 function remapEdges({
   nodeId,
@@ -115,19 +114,9 @@ function remapEdges({
 }
 
 /**
- * Bridge component that connects the PromptEditorDrawer (headless) to the
- * optimization studio's workflow store.
- *
- * Renders as a panel component inside StudioDrawerWrapper — accepts the
- * standard `{ node }` props interface used by all panel components.
- *
- * Responsibilities:
- * - Passes promptId, promptVersionId, and localPromptConfig from node data
- * - Builds availableSources and inputMappings from the workflow graph edges
- * - Handles onLocalConfigChange by updating node.data.localPromptConfig + syncing inputs/outputs
- * - Handles onSave by storing promptId/promptVersionId and clearing localPromptConfig
- * - Handles onVersionChange by updating promptVersionId and I/O on the node
- * - Handles onInputMappingsChange by creating/removing edges in the workflow
+ * Bridges the headless PromptEditorDrawer to the studio's workflow store,
+ * as a panel inside StudioDrawerWrapper. Builds sources/mappings from
+ * graph edges and syncs save/version/mapping changes back onto the node.
  */
 export function SignaturePromptEditorBridge({ node }: { node: Node<Component> }) {
   const signatureNode = node as Node<Signature>;

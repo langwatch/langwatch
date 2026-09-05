@@ -12,39 +12,17 @@ import { useProjectHomeHost } from "../../../model/project-home-host";
 
 /**
  * The Langy home's opening: a greeting, one field, and the asks worth
- * borrowing.
- *
- * It is a CENTRED COLUMN, not a card. The page's question is "what do you want
- * to do", and the honest shape for that is the shape a search field has always
- * had: one field on the centre line with room around it. The block this
- * replaced put a text input inside a bordered panel with an announcement bar
- * across its top and a control shoved to the far right, which made the field
- * read as one widget on a dashboard rather than the thing the page is for.
- *
- * THE FIELD IS THE COMMAND PALETTE. Not a copy of it, not a second box that
- * happens to look similar: the same component the Cmd+K bar renders, mounted
- * inline at hero size. So it navigates, it jumps to a trace by id, it searches
- * — and Tab, or the last row of its results, hands what you typed to Langy.
- * One field, one grammar, two doors. Pressing Cmd+K on this page puts the
- * caret here instead of raising a second identical bar over the top.
- *
- * NOTHING HERE CHANGES HEIGHT as the field is used. Its results are an overlay,
- * so opening them never pushes the figures and recent work down the page, and
- * the row of asks beneath keeps its footprint in every state.
- *
- * Spec: specs/home/langy-home.feature
+ * borrowing. A CENTRED COLUMN, not a card. THE FIELD IS THE COMMAND
+ * PALETTE, mounted inline. NOTHING CHANGES HEIGHT as it's used.
  */
 
 /** The field's reading measure. Wider and it stops reading as one question. */
 const ASK_MEASURE = "680px";
 
 /**
- * The height the ask row holds in every state.
- *
- * One chip: its line box plus its padding and border. Pinned because the row
- * has to keep this height while it has nothing to show — during the read of
- * what the project holds — and a row that sized itself to its contents would
- * grow under the reader as that answer arrived.
+ * The height the ask row holds in every state — one chip's line box plus
+ * padding/border, pinned so the row doesn't grow under the reader once
+ * the read of what the project holds arrives.
  */
 const ASK_ROW_MIN_HEIGHT = "26px";
 
@@ -227,11 +205,9 @@ export function LangyHomeHero() {
 }
 
 /**
- * One borrowable ask.
- *
- * Its surface is deliberately near-opaque. These sit over a moving gradient,
- * and a translucent chip on a moving ground is legible only for as long as the
- * ground happens to be dark behind it.
+ * One borrowable ask. Deliberately near-opaque, since these sit over a
+ * moving gradient — a translucent chip is legible only while the ground
+ * happens to be dark behind it.
  */
 function AskChip({
   icon,

@@ -1,43 +1,5 @@
 /**
- * The personal workspace, as the browser application mounts it.
- *
- * ADR-004 makes a screen an owner-only export named after the frontend feature
- * that composes it, so the whole family is one entry. What it exposes is a
- * loader per page rather than eight components: two of these screens carry a
- * table of their own and a third carries the whole tools portal, and a barrel of
- * components would put all of it in one chunk the moment any of the seven
- * addresses is opened. A loader keeps the split the application already had.
- *
- * The keys are this package's names for its own pages. Which URL each answers
- * is `apps/ui`'s to decide — the route table names a page key, the frontend
- * feature maps that key onto one of these, and neither half learns the other's
- * vocabulary. `/me/devices` is not here: it is a redirect row in the route
- * table, which is what a path that only ever went somewhere else should be.
- *
- * THE EIGHTH IS A SETTINGS PAGE, and it is here for the reason the entry is
- * named after an OWNER rather than an address: `/settings/authentication` is
- * the reader's own credentials, every tRPC call on it is `user.*`, and this
- * package is the user family's. A second `screens/authentication` export was
- * the obvious shape and is the wrong one — `ui-screen-owner` requires the entry
- * id to match the frontend feature that composes it, and one frontend feature
- * mounting two entries is exactly what that rule refuses. The alternative, a
- * second apps/ui feature root, would duplicate the host provider to gain a
- * directory name.
- *
- * TWO OF THE EIGHT ARE PROJECT-SCOPED, not personal, and that is deliberate.
- * `/:project/sessions` and `/:project/pull-requests` had 52- and 63-line page
- * files whose entire bodies were this family's own tables; taking the two keys
- * with the family was the alternative to leaving two pages behind that import a
- * package this move just created. They keep their place under the project
- * layout route in the table.
- *
- * WHAT THE OWNING FRONTEND FEATURE HAS TO MOUNT is three things rather than the
- * usual two: the port that answers for the session, the address, the deployment
- * and the toasts, and TWO tRPC Providers — this package's own, and
- * `@langwatch/coding-agent-web`'s, which the sessions and pull-request tables
- * run on. `apps/ui` may not import that package (it is not a governed web
- * package), so its api is named here on the shell's behalf, next to the one
- * this package owns.
+ * The personal workspace (ADR-004: one owner-only export per composing feature). A loader per page, not a barrel, so no chunk pulls in all seven addresses. Two are project-scoped (`/:project/sessions`, `/:project/pull-requests`) but kept here since their bodies were this family's own tables; the owning feature mounts TWO tRPC Providers — this package's and `@langwatch/coding-agent-web`'s.
  */
 
 import type { ComponentType } from "react";

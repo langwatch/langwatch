@@ -3,10 +3,8 @@ import type { SpanDetail } from "@langwatch/trace-contract";
 import { indexToolSpansBySpanId, parsePatchHunks } from "../trace/terminal-tool-spans";
 
 /**
- * Claude Code's real tool spans, and the `tool.output` span event they carry
- * under `OTEL_LOG_TOOL_CONTENT=1`. Attribute names verified against the CLI
- * bundle: Bash → bash_command/output, Read+Write → file_path/content,
- * Edit → file_path/diff.
+ * Claude Code's real tool spans, and the `tool.output` event they carry under
+ * `OTEL_LOG_TOOL_CONTENT=1`, verified against the CLI bundle's attribute names.
  */
 function span(over: Partial<SpanDetail>): SpanDetail {
   return {

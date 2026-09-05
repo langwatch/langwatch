@@ -1,22 +1,7 @@
 /**
- * The trace host, answered from the annotation host.
- *
- * THE WALKER MOUNTS A TRACE SURFACE, and that surface asks its own family for a
- * host: `ConversationView` and `useConversationTurns` read
- * `@langwatch/trace-web`'s `TraceHostPort` for the project the turns belong to,
- * and throw without one. Rather than make the composing application mount two
- * hosts around one page — which would put a cross-feature import in `apps/ui`
- * and give the reader's grants two answers — the bridge lives here, where the
- * coupling actually is, and reads every answer off the annotation host that is
- * already above it.
- *
- * WHAT IS NOT ANSWERED, and why each absence is safe on this page: the
- * organization, the team and the organization ROLE are read by the explorer's
- * Langy gate, its presence dots and its personal-workspace checks — none of
- * which the conversation view renders. `firstMessage` and `apiKey` belong to
- * the explorer's empty state and its Integrate pane. The walker never reaches
- * any of them, so answering `undefined` is honest rather than lossy; the day it
- * does, the annotation host is where the answer gets added.
+ * The trace host, answered from the annotation host already above this
+ * page, since `ConversationView` requires `trace-web`'s `TraceHostPort`.
+ * Fields the walker never reaches answer `undefined` here.
  */
 
 import {

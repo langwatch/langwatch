@@ -1,24 +1,7 @@
 /**
- * Running a published workflow by typing into it.
- *
- * A MOVE of the `ChatBox` and `MultipleInput` halves of
- * `platform/app/src/optimization_studio/components/ChatWindow.tsx`. The
- * standalone chat address was its only consumer, and that address always ran
- * the workflow over the published-workflow endpoint.
- *
- * WHICH IS WHY THE SOCKET RUNNER DID NOT TRAVEL, and it is the one thing this
- * move narrowed. `ChatBox` took a `useApi` flag: false ran the graph over the
- * studio's own SSE connection through `useWorkflowExecution`, true called
- * `optimization.chat`. The chat page passed `true`, unconditionally, and it was
- * the only caller — so the false branch was unreachable from this address and
- * is gone with the flag. Carrying it would have meant a family-local copy of
- * `usePostEvent`, `fetchSSE` and the studio's PostHog error capture, about 900
- * lines of transport whose only purpose here would be to be constructed and
- * never called, while the studio keeps the originals it still runs on.
- *
- * `executionStatus` and the store's execution result went the same way: both
- * were the socket run reporting itself, and neither is ever set on this
- * address. The pending state is the mutation's own.
+ * Running a published workflow by typing into it. A MOVE of `ChatBox`/
+ * `MultipleInput` from the studio's ChatWindow. THE SOCKET RUNNER DID NOT
+ * TRAVEL: ~900 lines of SSE transport stayed with the studio.
  */
 
 import { Box, Button, Flex, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
@@ -35,12 +18,9 @@ import { workflowApi } from "../../model/workflow-api";
 import { useWorkflowHost } from "../../model/workflow-host";
 
 /**
- * What the public workflow-run endpoint answers with.
- *
- * The chat panel runs the workflow over that endpoint rather than through a
- * typed procedure, so the body reaches the client as another service's JSON.
- * `result` is keyed by the workflow's own output field names, which differ per
- * workflow and so stay open.
+ * What the public workflow-run endpoint answers with. Run over that
+ * endpoint rather than a typed procedure, so the body arrives as another
+ * service's JSON; `result` stays open, keyed by workflow-specific field names.
  */
 const workflowRunResultSchema = z.object({
   status: z.string(),

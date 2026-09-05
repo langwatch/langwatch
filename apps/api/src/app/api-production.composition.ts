@@ -2066,7 +2066,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             apiKeys: () => tenancy.apiKeys,
             permissions: () => authz,
             audit: this.composeManagementAudit(),
-          }).hono,
+          }),
         )
         // The gateway's public family, mounted AFTER the process-owned
         // families because one of those owns a literal path inside

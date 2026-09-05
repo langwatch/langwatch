@@ -1,15 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The traces-overview card labels its figures with the window they cover —
- * an unlabelled delta is noise — and never draws a curve through too few
- * daily readings to show real shape.
- *
- * Ported from platform/app/src/components/home/__tests__/TracesOverview.unit.test.tsx
- * (origin/main), adapted from the deleted `~/hooks/useOrganizationTeamProject`
- * + `~/components/PeriodSelector` + `~/components/analytics/CustomGraph` mocks
- * to `ProjectHomeHostProvider` and the `@langwatch/analytics-web` subpath
- * exports the component now imports. See specs/home/langy-home.feature.
+ * The traces-overview card labels figures with the window they cover, and never draws a curve through too few daily readings. See specs/home/langy-home.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

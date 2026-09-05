@@ -384,34 +384,7 @@ function forbiddenBrowserCapabilityImport(specifier: string): string | undefined
 const commentFreeSources = new Map<string, string>();
 
 /**
- * The source with its comments blanked out, positions intact.
- *
- * The capability checks below are regex searches over the raw file, so a
- * docblock that NAMES a capability in order to explain why the module avoids
- * it was reported as a use of it. `apps/ui/src/behavior/public-config.ts` is
- * the case that found this: its header explains that the browser has no
- * `process.env`, and saying so was the violation.
- *
- * The PARSER decides what a comment is, not a bare scanner. A template literal
- * with a substitution needs `rescanTemplateToken` to be continued correctly,
- * and a plain `scan()` loop does not call it: the backtick pairing falls out of
- * phase at the first `${...}` and stays there, so every backtick after it —
- * including the ones docblocks put around inline code — flips a span the
- * scanner then reports as template text rather than as the comment it is.
- * `packages/redaction/src/secrets.ts` is the case that found this. Its
- * docblock quotes `process.env.OPENAI_API_KEY` to say the matcher treats that
- * as code rather than as key material, the quote was read as a use of it, and
- * the package stopped counting as portable. Everything after the first such
- * template leaked, which is why this could not be fixed by excusing one
- * pattern.
- *
- * Walking the parsed tree costs one parse per distinct source and is exact,
- * which is why the answer is memoised by source text rather than recomputed
- * for each of the closure walks that ask.
- *
- * Comments are replaced by spaces rather than removed, so every offset a
- * later check reports still lines up with the file on disk. Newlines survive
- * for the same reason.
+ * The source with comments blanked to spaces (not removed, so offsets stay lined up). Capability checks are regex over raw text, so a docblock that only NAMES a capability read as a use of it; the PARSER, not a bare scanner, avoids the same trap with template literals.
  */
 function withoutComments(source: string): string {
   const known = commentFreeSources.get(source);
@@ -461,19 +434,9 @@ function browserCapabilitySourceViolations(source: string): string[] {
 }
 
 /**
- * The two roles that are portable because of what they ARE, whatever they
- * import.
- *
- * The Design System is React by construction — it is the one presentation
- * dependency browser UI is meant to share — so no framework check can admit
- * it. A feature contract is the declared shape of a feature's data, and ADR-004
- * names it portable in that role.
- *
- * Everything else first-party has to prove it.
- *
- * `ui-drawer` and `ui-host` join the Design System here for the same reason:
- * both are UI platform packages, not features, and neither can prove
- * portable by scanning its imports (they are React by construction).
+ * The two roles portable because of what they ARE: the Design System
+ * (plus `ui-drawer`/`ui-host`) is React by construction; a feature
+ * contract is portable by ADR-004. Everything else has to prove it.
  */
 const PORTABLE_BY_ROLE =
   /^@langwatch\/(?:design-system(?:\/|$)|ui-drawer(?:\/|$)|ui-host(?:\/|$)|[^/]+-contract(?:\/|$))/;
@@ -484,31 +447,7 @@ export type PortableModuleOracle = {
 };
 
 /**
- * Whether a first-party module is portable into browser UI, decided by reading
- * it rather than by reading its package name.
- *
- * The name test this replaces admitted the Design System and `*-contract` and
- * refused every other `@langwatch/*` specifier as "a first-party implementation
- * package". That verdict was wrong for the framework-free platform modules the
- * browser genuinely shares: `@langwatch/config/docs-url` is a URL builder over
- * a type-only import, and `@langwatch/handled-error`'s subpaths are the error
- * codes, the customer-facing presentation table and the reader that turns a
- * wire payload into them. Refusing those pushed every web package toward a
- * private copy of the codes — which is the drift the presentation registry
- * exists to prevent.
- *
- * Portable means the module's whole VALUE closure stays clear of React and the
- * other browser-only toolkits, of the transport, router, session and storage
- * capabilities a screen must receive rather than reach for, of server, Prisma
- * and environment implementation, and of Node builtins. `import type` is
- * erased, so a portable module may still name any type it likes. A module that
- * renders JSX is framework-bound whether or not it names React, so the walk
- * counts the compiler-emitted `react/jsx-runtime` edge too.
- *
- * A specifier that resolves to no workspace package is left to the caller's own
- * rule: this oracle answers about code it can read, and an unresolvable
- * `@langwatch/*` specifier is either a package outside the workspace or a
- * subpath its manifest does not export.
+ * Whether a first-party module is portable into browser UI, decided by reading it, not its package name (the prior name test wrongly refused framework-free modules like `@langwatch/handled-error`'s subpaths). Portable means the VALUE closure stays clear of React/JSX, transport/router/session/storage, server, Prisma, env and Node builtins (`import type` is erased). An unresolvable specifier is left to the caller's own rule.
  */
 function createPortableModuleOracle({ root }: { root: string }): PortableModuleOracle {
   let resolver: WorkspaceModuleResolver | undefined;
@@ -572,11 +511,9 @@ function isPortableFirstPartyImport({
 }
 
 /**
- * Surfaces compose. A surface is a feature's declared door, so another
- * feature's door is a legitimate collaborator inside a surface closure — the
- * bare package entry, a screen and every private subpath stay refused, and so
- * does a second door of the surface's own package, which would be the package
- * talking to itself through the front step.
+ * Surfaces compose: another feature's door is a legitimate collaborator
+ * inside a surface closure. The bare package entry, a screen, any private
+ * subpath, and a second door of the surface's own package all stay refused.
  */
 function collaboratingSurfaceImport({
   specifier,

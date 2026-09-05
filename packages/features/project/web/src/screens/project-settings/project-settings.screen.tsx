@@ -1,22 +1,5 @@
 /**
- * The organization and its project, at `/settings`.
- *
- * TWO FORMS BEHIND ONE ADDRESS: the organization's own settings — name, object
- * storage, the two switches, the support contact and the primary use — and, when
- * the organization has a shared project, that project's settings underneath.
- *
- * A PERSONAL WORKSPACE IS NOT THE ORGANIZATION'S PROJECT. `isPersonal` is
- * checked before the second form renders at all: offering somebody's personal
- * workspace here — or offering to "set it up" — would put a private surface
- * inside an organization's settings.
- *
- * THE PRIMARY USE MOVES WHERE `/` LANDS (ADR-038). Switching to LLMOps is saved
- * first and only then checked for what is missing: no project at all offers to
- * create one, and a project that has never received data offers its setup. The
- * save never waits on either.
- *
- * The screen carries no chrome: the settings frame is applied by whichever
- * application serves the address.
+ * The organization and its project, at `/settings`. `isPersonal` gates the project form — a personal workspace is never the organization's project. Primary-use switch saves first, then checks what's missing (ADR-038).
  */
 
 import {

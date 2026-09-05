@@ -30,12 +30,9 @@ export type WorkerExecutableOptions = Readonly<{
 }>;
 
 /**
- * Physical Worker executable boundary.
- *
- * Hosts inject only the application graph they still need to compose. This
- * class owns Worker configuration, structured logging, tracing, signal policy,
- * fatal-error reporting, and lifecycle finalization without importing the
- * legacy platform application.
+ * Physical Worker executable boundary. Owns configuration, structured
+ * logging, tracing, signal policy, fatal-error reporting, and lifecycle
+ * finalization — hosts inject only the application graph they still need.
  */
 export class WorkerExecutable {
   static async boot(options: WorkerExecutableOptions): Promise<WorkerExecutable> {

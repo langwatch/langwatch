@@ -4,14 +4,9 @@ import { availableFilters } from "./registry";
 import type { FilterField } from "./types";
 
 /**
- * Which precondition RULES a field accepts, and what to call it on screen.
- *
- * The field-resolution half of this module moved to
- * `@langwatch/analytics-contract`, where a background process can reach it.
- * What stays here is the half that only a browser asks: the rule set an
- * editor offers per field, and the label it shows, which is read out of the
- * filter registry so the precondition editor and the filter sidebar name the
- * same field the same way.
+ * Which precondition RULES a field accepts, and its screen label. The
+ * field-resolution half moved to `@langwatch/analytics-contract`; this
+ * half is browser-only, read from the filter registry.
  */
 
 // ---------------------------------------------------------------------------

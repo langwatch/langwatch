@@ -7,13 +7,9 @@ import { formatBudgetUsd } from "@langwatch/gateway-web/surfaces/budget-overview
 import { api } from "../../behavior/personal-workspace-api";
 
 /**
- * The personal coding-agent usage figures (ADR-056, personal-usage.feature):
- * cost, tokens, active time and session count over the trailing window, with
- * what those sessions produced beneath. Reads the session aggregate, so a
- * session that sent only metrics is counted here too.
- *
- * A pure content component — the page wraps it in a titled card. It owns its
- * own load / empty / data states so the page doesn't branch on the query.
+ * Personal coding-agent usage figures (ADR-056): cost, tokens, active time
+ * and session count over the trailing window. A pure content component —
+ * the page wraps it in a titled card; it owns its own load/empty/data states.
  */
 export function CodingAgentUsageContent({ projectId }: { projectId: string }) {
   const query = api.codingAgents.usageTotals.useQuery(

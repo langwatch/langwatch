@@ -1,14 +1,7 @@
 /**
- * What this package's screen suites mount a screen inside.
- *
- * The host port is an abstract class, so a test constructs one rather than
- * mocking a module: the fake below RECORDS what a screen asked the application
- * to do — what it reported as done, what it reported as failed — which is
- * exactly the surface the real adapter answers. The same shape
- * `@langwatch/gateway-web`'s `testing.tsx` introduced.
- *
- * Not exported from the package. A test imports it relatively; nothing outside
- * this package has any business constructing a host.
+ * What this package's screen suites mount a screen inside. A test
+ * constructs the abstract host port rather than mocking a module: the
+ * fake RECORDS what a screen asked and reported. Not exported.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -63,9 +56,8 @@ export class FakeAuthzHost extends AuthzHostPort {
 
 /** Renders a screen inside the Design System's provider and a host. */
 /**
- * A composition that filled the sales slot, the way the browser application
- * does. The screens under test only ask for the block by name; what an
- * application without an enterprise half renders is `ui-host`'s own suite.
+ * Fills the sales slot the way the browser app does; screens under test
+ * only ask for the block by name.
  */
 const filledSlots = {
   ...createUiCapabilitiesFromHost({ route: () => ({ params: {}, query: {} }), navigate: () => {} }),

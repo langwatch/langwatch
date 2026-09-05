@@ -1,23 +1,5 @@
 /**
- * `@langwatch/test-harness` — the test harness every LangWatch process shares.
- *
- * These modules were `platform/app/src/test-utils`, and they moved as a unit
- * because they answer questions ABOUT a test run rather than about any one
- * feature: which lane a file belongs in, how a shard is weighted, what a
- * static scan is allowed to reach the TypeScript compiler through, and which
- * datastores an integration suite is handed.
- *
- * The lane rule is the reason this is a package rather than three copies. A
- * file lands in the COMPONENT lane when it declares `@vitest-environment
- * jsdom` and names no datastore, and in the DATASTORE lane otherwise; the two
- * configs that select tests both call {@link laneForSource}, which is what
- * makes the lanes exact complements and stops a file dropping out of CI.
- * Three processes each deciding that for themselves is three chances for a
- * file to be in neither.
- *
- * `@langwatch/prisma-client/generated` replaced the application's
- * `~/generated/prisma/client` at the one seam that named it: the row cleanup
- * takes a typed client rather than reaching for a singleton.
+ * `@langwatch/test-harness` — the harness every process shares: lane assignment, shard weighting, static-scan compiler access, and datastore wiring. A file lands in COMPONENT when it declares `@vitest-environment jsdom` and names no datastore, DATASTORE otherwise; both configs call {@link laneForSource} so the lanes stay exact complements.
  */
 export { cleanupTestRows, requireAssigned, type CleanupEntry } from "./cleanup-test-rows";
 export {

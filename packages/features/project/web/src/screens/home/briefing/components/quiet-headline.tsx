@@ -7,17 +7,9 @@ import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
 import { useProjectHomeHost } from "../../../../model/project-home-host";
 
 /**
- * The sheet's empty-state invitation. Sending a trace is THE first step: until
- * data flows in, nothing else has anything to watch, so it leads as a prominent
- * primary button (the "send your first trace" call every new project needs),
- * with a one-click "walk me through it" hand-off to Langy beside it.
- *
- * Below the primary, the OTHER first steps rotate as a phrase that TYPES AND
- * DELETES itself (generate a dataset, run an experiment, create a simulation)
- * so the blank page demonstrates motion instead of apologising for stillness.
- * Each rotating step keeps its two ways in: open the surface behind it (learn
- * more), or hand it to Langy. Reduced motion pins the first phrase, fully
- * typed, no caret blink.
+ * The sheet's empty-state invitation: a prominent "send your first trace"
+ * button with a Langy hand-off beside it. Other steps rotate below as a
+ * typing/deleting phrase; reduced motion pins the first, fully typed.
  */
 
 const SERIF = 'var(--langy-font-serif, "Sentient", "Charter", "Source Serif Pro", Georgia, serif)';
@@ -68,12 +60,10 @@ export function QuietHeadline() {
   const navigate = useProjectHomeHost().navigate.bind(useProjectHomeHost());
   const project = useProjectHomeHost().project();
   const askLangy = useLangyStore((s) => s.askLangy);
-  // The invitation renders wherever the signal-focused home does, which no
-  // longer implies Langy (spec: specs/home/signal-focused-home-rollout.feature).
-  // Without Langy, the typed phrase opens the feature surface instead of a
-  // conversation, and the hand-to-Langy actions disappear.
-  // The hand-off AUTO-SENDS, so it needs the grant that starts a turn, not the
-  // one that opens the panel. See `useCanAskLangy`.
+  // The invitation renders on the signal-focused home even without Langy —
+  // the typed phrase opens the feature surface instead of a conversation.
+  // The hand-off AUTO-SENDS, so it needs the grant that starts a turn, not
+  // the one that opens the panel. See `useCanAskLangy`.
   const canAsk = useProjectHomeHost().canAskLangy();
 
   // One tiny state machine: grow to the full phrase, hold, shrink to zero,

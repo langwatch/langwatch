@@ -1,28 +1,7 @@
 /**
- * The procedures the Workflows screens call, and the hooks that call them.
- *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED, exactly as every other feature
- * family's map says of itself: the procedures are mounted by the process out of
- * `@langwatch/workflow-server`, which a web package may not import even for a
- * type, and the router type does not exist until a process instantiates one.
- *
- * THE SEGMENT NAMES ARE LOAD-BEARING. `workflow`, `optimization` and
- * `organization` are mount points on the root router and tRPC hashes that path
- * into the React Query cache key; spell one differently and these hooks quietly
- * stop sharing a cache with the `api.workflow.*` call sites that have NOT moved
- * — the optimization studio's, which is every one of them.
- *
- * THE ROW SHAPES ARE RESTATED RATHER THAN IMPORTED, and it is worth saying why.
- * `WorkflowListRow`, `WorkflowCopyRow` and `WorkflowCascadeArchiveResult` are
- * declared in `@langwatch/workflow-server`'s transport, not in the contract, and
- * a browser package may not name a server package even for a type. So these are
- * narrowed to the fields the two screens render, with the same names, and they
- * stop being restatements the day the contract declares them — the same promise
- * `@langwatch/data-retention-contract`'s snapshot makes about its own copy.
- *
- * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/platform-api-client`, and the
- * import below is the only one in the package.
+ * The procedures the Workflows screens call. HAND-WRITTEN, MEANT TO BE
+ * GENERATED. SEGMENT NAMES ARE LOAD-BEARING — tRPC hashes the path into
+ * the cache key. ADR-004's one governed-closure exception here.
  */
 
 import type { AgentApiUpdateOutput, UpdateAgentCommand } from "@langwatch/agent-contract";
@@ -115,12 +94,9 @@ export type WorkflowListRow = {
 };
 
 /**
- * One replica of a workflow, as the push dialog lists it.
- *
- * `fullPath` is composed by the TRANSPORT rather than here — the same
- * "Organization / Team / Project" string the replication picker builds — and
- * the list only ever contains replicas the caller may update, so there is no
- * permission flag to render.
+ * One replica of a workflow, as the push dialog lists it. `fullPath` is
+ * composed by the TRANSPORT, same string the replication picker builds;
+ * the list only ever contains replicas the caller may update.
  */
 export type WorkflowCopyRow = {
   id: string;
@@ -137,12 +113,9 @@ export type WorkflowCopyRow = {
 export type WorkflowRelatedEntity = { id: string; name: string };
 
 /**
- * What deleting a workflow would take with it.
- *
- * The confirmation names all three lists BEFORE the reader types "delete",
- * which is the whole reason the read exists: linked evaluators and agents are
- * ARCHIVED and every online evaluation built on those evaluators is DELETED,
- * and none of it is recoverable from this screen.
+ * What deleting a workflow would take with it, named BEFORE the reader
+ * types "delete": linked evaluators/agents are ARCHIVED, every online
+ * evaluation built on them is DELETED, none recoverable from this screen.
  */
 export type WorkflowRelatedEntities = {
   evaluators: WorkflowRelatedEntity[];
@@ -170,26 +143,8 @@ export type WorkflowOrganizationGraph = {
 };
 
 /**
- * A procedure the OPTIMIZATION STUDIO calls whose row shape no contract package
- * publishes yet.
- *
- * The studio reaches eleven other features' transports — datasets, prompts,
- * evaluators, experiments, model providers, saved views, traces — and every one
- * of those rows is declared in a `*-server` package's transport rather than in
- * a contract a browser package may name. Restating fifty row shapes by hand
- * would be fifty restatements to keep in step with a server nobody would notice
- * drifting.
- *
- * So the borrowed procedures are declared by PATH ONLY, which is the part that
- * is actually load-bearing: the segment names are what tRPC hashes into the
- * React Query cache key, and getting one wrong is what silently splits a cache.
- * The row shapes stay where the call sites already had them — inferred from the
- * data the procedure returns — until the owning feature's contract publishes
- * them.
- *
- * THIS IS THE OWED WORK, named rather than hidden: every `Unpublished` below is
- * one shape a contract package should declare, and the day it does, the entry
- * stops being a placeholder without any call site changing.
+ * A procedure the STUDIO calls whose row shape no contract publishes yet.
+ * Declared by PATH ONLY; every `Unpublished` below is OWED WORK, named not hidden.
  */
 // oxlint-disable-next-line no-explicit-any
 type Unpublished = any;
@@ -262,16 +217,9 @@ export type WorkflowApiMap = {
     };
 
     /**
-     * The studio's own eight, and they are the family's own transport rather
-     * than borrowed vocabulary — the graph it loads, autosaves, commits,
-     * publishes and restores.
-     *
-     * All eight are the ones `@langwatch/workflow-contract` declares, so they
-     * are stated rather than left `Unpublished`: a row shape the contract
-     * publishes is a row shape this map has no business widening to `any`.
-     * Without them `getVersions.data` was `any` and every `.find` callback over
-     * it was an implicit any; the five writes answered `any` to every
-     * `onSuccess` that reads the version they wrote.
+     * The studio's own eight — this family's own transport, not borrowed
+     * vocabulary. Stated since `@langwatch/workflow-contract` already
+     * declares them; without them `getVersions.data` was `any`.
      */
     getById: { query: { input: WorkflowApiGetByIdInput; output: WorkflowApiGetByIdOutput } };
     getVersions: {
@@ -307,10 +255,9 @@ export type WorkflowApiMap = {
       query: {
         input: { workflowId: string; projectId: string };
         /**
-         * Null when nothing is published yet. The row itself is the workflow
-         * version — `dsl`, `version`, `isComponent`, `isEvaluator` — and the
-         * studio's publish menu reads all four, so it is `Unpublished` rather
-         * than the one field the chat address needed.
+         * Null when nothing is published yet. Left `Unpublished` since the
+         * studio's publish menu reads all four workflow-version fields, not
+         * just the one the chat address needed.
          */
         output: Unpublished;
       };
@@ -342,10 +289,8 @@ export type WorkflowApiMap = {
 
   /**
    * THE BORROWED VOCABULARY, one segment per feature the studio reaches.
-   *
-   * Every path here is the path the call site already wrote as `api.x.y`, kept
-   * letter for letter so a studio query and the same query fired from a page
-   * this application still serves land on ONE React Query cache entry.
+   * Kept letter for letter with the call sites' `api.x.y` so a studio
+   * query and the same query fired elsewhere share ONE cache entry.
    */
   agents: {
     getAll: UnpublishedQuery;
@@ -393,20 +338,9 @@ export type WorkflowApiMap = {
     update: { mutation: { input: EvaluatorApiUpdateInput; output: EvaluatorApiUpdateOutput } };
   };
   /**
-   * THE EXPERIMENTS FAMILY'S OWN, and the reason this block is the longest.
-   * `@langwatch/experiment-web` serves five addresses out of this transport —
-   * the list, the read-only result view, the two workbench pages and the
-   * retired wizard's forward — and its screens answer to THIS host, because the
-   * studio slice moved `experiments-v3` into that package with
-   * `studio-host/*` already wired through it. Declaring the paths here is what
-   * keeps a workbench query and the same query fired from the studio on ONE
-   * React Query cache entry.
-   *
-   * `onExperimentUpdate` is a SUBSCRIPTION, and it is the first one this map
-   * declares: the workbench listens for a save that landed elsewhere (Langy's
-   * backend fallback, the API, another tab) and reloads a clean workbench
-   * silently. `ProcedureShape` carries the lane, so it is declared like any
-   * other procedure.
+   * THE EXPERIMENTS FAMILY'S OWN, longest since `experiment-web` serves
+   * five addresses here. `onExperimentUpdate` is the first SUBSCRIPTION
+   * declared: the workbench reloads silently on a save landing elsewhere.
    */
   experiments: {
     copy: UnpublishedMutation;

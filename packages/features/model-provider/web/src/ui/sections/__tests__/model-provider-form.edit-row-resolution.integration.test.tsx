@@ -124,11 +124,9 @@ const rowB: ModelProviderListEntry = {
 };
 
 /**
- * Minimal but *realistic* TanStack Query result. `useAllModelProvidersList`
- * gates on `isSuccess`/`isError` (not just `isLoading`) to tell "the list
- * definitively arrived" apart from "not loaded yet". A mock that returns
- * only `{ data, isLoading }` leaves those gates `undefined` — silently
- * falsy — so every `isReady`-derived branch would be untested by accident.
+ * Minimal but *realistic* TanStack Query result: gates on
+ * `isSuccess`/`isError`, not just `isLoading` — `{ data, isLoading }`
+ * alone leaves those `undefined`, silently untesting `isReady` branches.
  */
 function readyQueryResult<T>(data: T) {
   return {
@@ -153,10 +151,9 @@ function notReadyQueryResult() {
 }
 
 /**
- * Primes the collapsed-record hook and BOTH flat-list queries (org and
- * project variants). `flatList` drives the uncollapsed list the row-by-id
- * resolution reads: an explicit row array (ready), `[]` (ready but empty),
- * or "not-ready" (query still disabled/in-flight, no definitive answer).
+ * Primes the collapsed-record hook and BOTH flat-list queries. `flatList`
+ * drives the row-by-id resolution: an explicit array (ready), `[]` (ready
+ * but empty), or "not-ready" (still disabled/in-flight).
  */
 function primeQueries({
   flatList = [rowA, rowB],
@@ -178,11 +175,9 @@ function primeQueries({
 }
 
 /**
- * `CredentialsSection` labels each credential input with a plain `Text`
- * (no `htmlFor`/`id` association), so `getByLabelText` can't find it.
- * Instead, walk up from the label text node to the first ancestor that
- * contains an `<input>` descendant (the field's own wrapper) and return
- * that input.
+ * `CredentialsSection` labels each input with a plain `Text` (no
+ * `htmlFor`/`id`), so `getByLabelText` can't find it — walk up from the
+ * label to the nearest ancestor with an `<input>` descendant instead.
  */
 function getInputNearLabel(labelText: string): HTMLInputElement {
   const label = screen.getByText(labelText);
@@ -268,12 +263,9 @@ describe("Feature: editing a model-provider row resolves the correct row by id",
       });
 
       /**
-       * @regression #5380 P2 empty-org hole: a stale deep-link into an org
-       * with zero providers must STILL block Save. The pre-fix guard proxied
-       * "list loaded" as `allProviders.length > 0`, which reads a legitimately
-       * empty org as "not loaded" — the miss never fired and the phantom
-       * duplicate slipped through. This is the exact hole: it fails against
-       * the pre-fix draft (empty list → no error copy).
+       * @regression #5380 empty-org hole: a stale deep-link into a
+       * zero-provider org must STILL block Save (the pre-fix guard read
+       * an empty org as "not loaded").
        */
       it("shows the provider-no-longer-exists error copy", async () => {
         expect(await screen.findByText(/no longer exists/i)).toBeInTheDocument();

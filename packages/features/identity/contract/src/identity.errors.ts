@@ -1,11 +1,8 @@
 import { HandledError } from "@langwatch/handled-error";
 
 /**
- * Every identity refusal in one place. Handled (ADR-045): the cause is
- * known and the caller can act on it, so each refusal is a literal-code
- * subclass, and the app's client presentation registry carries the copy for
- * each code. Assert on `code`, never the message; the detail string is
- * logged, never shown.
+ * Every identity refusal in one place (ADR-045: handled since the cause is
+ * known and the caller can act). Assert on `code`, never the message.
  */
 
 /**
@@ -49,18 +46,9 @@ export class IdentityPrimaryMustDemoteFirstError extends IdentityCommandRefusedE
 }
 
 /**
- * The cross-population uniqueness refusal (ADR-116 §6): the normalized
- * address is already somebody else's.
- *
- * Refused at VERIFY and at PRIMARY, never at attach — an unverified
- * (`ATTACHED`) identifier blocks nobody, so there is no squatting, and
- * verify is the choke point in both directions. "Somebody else" spans both
- * populations, which is the point: a latched user's verified identifier and
- * a legacy user's `User.email` are the same claim on the same mailbox, and
- * only one of them can hold it. Without this, a PRIMARY switch onto a taken
- * address reaches the fold and dies on `User.email @unique` — a write
- * failure with no name, in a projection, long after the user could have
- * been told.
+ * Cross-population uniqueness refusal (ADR-116 §6): the address already
+ * belongs to somebody else, in either population. Refused at VERIFY and
+ * PRIMARY only, or a PRIMARY switch dies unfriendly deep in the fold.
  */
 export class IdentityEmailInUseError extends IdentityCommandRefusedError {
   constructor(detail: string) {
@@ -86,12 +74,9 @@ export class IdentityPrimaryRequiresVerifiedError extends IdentityCommandRefused
 }
 
 /**
- * A verification ceremony refusal. Two customer-visible codes only, on
- * purpose: every pin/proof/consumption failure answers
- * `identity_verification_invalid` so the completion endpoint is not an
- * oracle for which check failed — the precise reason goes to the log line,
- * keyed by verificationId. Expiry is separable because its remediation
- * differs (request a new link).
+ * A verification ceremony refusal. Two codes only: every pin/proof failure
+ * answers `identity_verification_invalid` (reason logged, keyed by
+ * verificationId); expiry is separate since its remedy differs.
  */
 export class IdentityVerificationInvalidError extends HandledError {
   constructor() {
@@ -118,10 +103,8 @@ export class IdentityVerificationExpiredError extends HandledError {
 }
 
 /**
- * An SSO connection guard's refusal (ADR-117 §5, D04). Handled for the same
- * reason the identifier refusals are: each names a cause an operator can act
- * on, and the words they read live in the app's presentation registry keyed
- * by code. The detail string is logged, never shown.
+ * An SSO connection guard's refusal (ADR-117 §5, D04): each names a cause an
+ * operator can act on; the detail string is logged, never shown.
  */
 export abstract class SsoConnectionCommandRefusedError extends HandledError {}
 
@@ -182,15 +165,9 @@ export class SsoConnectionTeardownStrandsUsersError extends SsoConnectionCommand
 }
 
 /**
- * Somebody other than a LangWatch platform operator tried to take an
- * operator's act — attesting a domain, or deciding a domain claim.
- *
- * Refused in the guard rather than only at the surface, so the rule holds for
- * every caller the aggregate will ever have: an organization administrator
- * cannot attest their own domain on any deployment, however they reach the
- * command. The copy points at the way their domain IS proved, which is
- * publishing the record — a refusal that only says "no" would leave a
- * customer administrator with nothing to do next.
+ * Somebody other than a platform operator tried to attest or decide a
+ * domain claim. Refused in the guard so it holds for every caller; the
+ * copy names how the domain IS proved rather than only saying no.
  */
 export class SsoConnectionOperatorActRequiredError extends SsoConnectionCommandRefusedError {
   constructor(detail: string) {
@@ -205,10 +182,8 @@ export class SsoConnectionOperatorActRequiredError extends SsoConnectionCommandR
 
 /**
  * A SAML connection registered through a self-serve surface. Refused by name
- * rather than accepted and left dark: D05 is OIDC only, the aggregate is
- * protocol-agnostic on purpose, and which engine terminates SAML is a
- * decision D09 makes against a named customer's connection. The words say to
- * talk to LangWatch and name no engine, library or release.
+ * rather than accepted and left dark: D05 is OIDC only, and which engine
+ * terminates SAML is a D09 decision made per named customer connection.
  */
 export class SsoSamlNotSelfServeError extends SsoConnectionCommandRefusedError {
   constructor(detail: string) {
@@ -222,10 +197,9 @@ export class SsoSamlNotSelfServeError extends SsoConnectionCommandRefusedError {
 }
 
 /**
- * A legacy `ssoDomain` / `ssoProvider` edit after the routing flip. Refused
- * rather than ignored: once the connection projection decides sign-in, a
- * string edit changes nothing a person would experience, and silently
- * accepting one leaves a staff member believing they fixed something.
+ * A legacy `ssoDomain`/`ssoProvider` edit after the routing flip. Refused,
+ * not silently ignored: once the projection decides sign-in, the edit
+ * changes nothing, and accepting it fools a staff member into thinking so.
  */
 export class SsoConnectionStringEditRetiredError extends SsoConnectionCommandRefusedError {
   constructor(detail: string) {
@@ -239,24 +213,14 @@ export class SsoConnectionStringEditRetiredError extends SsoConnectionCommandRef
 }
 
 /**
- * A join-request refusal (D12).
- *
- * One of these is deliberately INDISTINGUISHABLE across several causes, and
- * that is the security property rather than an accident: `join_not_available`
- * answers an organization that does not exist, one that turned joining off,
- * one whose identity provider already admits people, and an address nobody
- * has verified — with the same code, the same status and the same words. A
- * refusal that said which would be an oracle for which organizations exist
- * and who works at them, which is the one thing this deliverable must not
- * build.
+ * A join-request refusal (D12). `join_not_available` is deliberately
+ * INDISTINGUISHABLE across causes — naming which would be an oracle for
+ * which organizations exist.
  */
 export abstract class JoinRequestRefusedError extends HandledError {}
 
-/**
- * Nothing here is open to you — and we will not say which of the several
- * possible reasons applies. Also the answer to naming an organization
- * directly that was never offered.
- */
+/** Nothing here is open to you — we will not say which of the several
+ *  possible reasons applies, including naming an org never offered. */
 export class JoinNotAvailableError extends JoinRequestRefusedError {
   constructor(detail: string) {
     super("join_not_available", "join_not_available", {
@@ -308,14 +272,9 @@ export class JoinRequestAlreadyPendingError extends JoinRequestRefusedError {
 }
 
 /**
- * Asking, or looking organizations up, faster than the installation allows —
- * and the cool-down after a rejection, which is the same refusal on purpose:
- * a rejected person who could tell "you were rejected" from "you are going
- * too fast" has been told the rejection the silent-ish ending exists to keep
- * quiet.
- *
- * `retryAfterSeconds` comes off the limiter's own answer, so the screen says
- * how long is left rather than guessing.
+ * Asking too fast and the cool-down after a rejection share this refusal —
+ * telling them apart would reveal the rejection. `retryAfterSeconds` comes
+ * off the limiter's own answer, never a guess.
  */
 export class JoinRequestThrottledError extends JoinRequestRefusedError {
   constructor(retryAfterSeconds: number) {
@@ -329,10 +288,9 @@ export class JoinRequestThrottledError extends JoinRequestRefusedError {
 }
 
 /**
- * Automatic joining was turned on for a domain nobody has proved: a consumer
- * mail provider, or a company domain only one member holds a verified address
- * on. The copy says company domains only and does not list the deny-list —
- * publishing it turns the refusal into a way to enumerate it.
+ * Automatic joining turned on for an unproven domain: a consumer mail
+ * provider, or a company domain only one member has verified. The copy
+ * omits the deny-list — publishing it would let it be enumerated.
  */
 export class JoinAutoDomainUnprovenError extends JoinRequestRefusedError {
   constructor(detail: string) {
@@ -359,10 +317,9 @@ export class JoinAutoConnectionAdmitsError extends JoinRequestRefusedError {
 }
 
 /**
- * The licence asymmetry, refused. Automatic joining is federation — the
- * deployment decides who counts as a colleague and admits them with nobody in
- * the loop — so the gate that has always held single sign-on holds this too.
- * Asking to join is NOT gated and never reaches here.
+ * The licence asymmetry, refused: automatic joining is federation (nobody
+ * in the loop), so the gate that has always held single sign-on holds
+ * this too. Asking to join is NOT gated and never reaches here.
  */
 export class JoinAutoNotLicensedError extends JoinRequestRefusedError {
   constructor(detail: string) {
@@ -376,15 +333,9 @@ export class JoinAutoNotLicensedError extends JoinRequestRefusedError {
 }
 
 /**
- * A two-step verification refusal (D06). Handled for the usual reason: each
- * names a cause the person can act on, and the words they read live in the
- * app's presentation registry keyed by code.
- *
- * The one deliberate silence is `IdentityMfaCodeInvalidError`. A wrong code
- * and a code for an enrollment nobody holds answer identically, because
- * anything else turns the challenge endpoint into an oracle for whether an
- * account has two-step verification set up. Which of the two it was goes to
- * the log line, keyed by userId, and never to the response.
+ * A two-step verification refusal (D06). `IdentityMfaCodeInvalidError` is
+ * deliberately silent: a wrong code and one for an enrollment nobody holds
+ * answer identically, or the endpoint becomes an MFA-existence oracle.
  */
 export abstract class MfaCommandRefusedError extends HandledError {}
 
@@ -400,10 +351,9 @@ export class IdentityMfaCodeInvalidError extends MfaCommandRefusedError {
 }
 
 /**
- * The setup was started and never finished inside its window. Separable from
- * an invalid code because the remediation differs — start again, rather than
- * read the code more carefully — and because leaking that an UNCONFIRMED
- * setup expired tells an attacker nothing they could not already provoke.
+ * Setup started and never finished inside its window. Separable from an
+ * invalid code since the remedy differs (start again, not retype), and
+ * leaking an expired UNCONFIRMED setup tells an attacker nothing new.
  */
 export class IdentityMfaEnrollmentExpiredError extends MfaCommandRefusedError {
   constructor(detail: string) {
@@ -417,11 +367,9 @@ export class IdentityMfaEnrollmentExpiredError extends MfaCommandRefusedError {
 }
 
 /**
- * The plugin's lockout, surfaced under a code of ours. Counting failures and
- * deciding when to stop is the two-factor plugin's job and we do not rebuild
- * it; what we own is that the person is told what happened in words, rather
- * than being handed a bare "invalid code" that makes it look like they are
- * still typing it wrong.
+ * The plugin's lockout, surfaced under a code of ours — counting failures is
+ * the two-factor plugin's job, not ours; we own telling the person what
+ * happened instead of a bare "invalid code".
  */
 export class IdentityMfaLockedOutError extends MfaCommandRefusedError {
   constructor(detail: string) {
@@ -447,10 +395,9 @@ export class IdentityMfaBackupCodesExhaustedError extends MfaCommandRefusedError
 }
 
 /**
- * Turning it off is refused while an organization the person belongs to
- * requires it. The detail names which organizations for the log; the copy
- * tells the person to leave the organization or ask an administrator, which
- * is the only thing that actually unblocks them.
+ * Turning it off is refused while a member organization requires it. The
+ * detail names which organizations, for the log; the copy tells the person
+ * to leave it or ask an administrator — the only thing that unblocks them.
  */
 export class IdentityMfaRequiredByOrganizationError extends MfaCommandRefusedError {
   constructor(detail: string) {
@@ -464,10 +411,9 @@ export class IdentityMfaRequiredByOrganizationError extends MfaCommandRefusedErr
 }
 
 /**
- * The enrollment gate: this organization requires a second factor and this
- * person cannot yet prove one. NOT an authentication failure — the session
- * is untouched and every other organization stays reachable — so it is 403
- * rather than 401, and the copy says "set one up", never "sign in again".
+ * The enrollment gate: this org requires a second factor the person cannot
+ * yet prove. NOT an authentication failure — the session is untouched — so
+ * it is 403 not 401, and the copy says "set one up", not "sign in again".
  */
 export class IdentityMfaEnrollmentRequiredError extends MfaCommandRefusedError {
   constructor(detail: string) {
@@ -481,18 +427,15 @@ export class IdentityMfaEnrollmentRequiredError extends MfaCommandRefusedError {
 }
 
 /**
- * A passkey refusal (D07). The ceremony ones stay vague for the same reason
- * the code refusal does: a browser ceremony that fails and a credential we
- * do not recognize must not be distinguishable, or the endpoint answers
- * "does this passkey exist here" for anybody who asks.
+ * A passkey refusal (D07): a failed browser ceremony and an unrecognized
+ * credential stay indistinguishable, or the endpoint answers "does this
+ * passkey exist here" for anybody who asks.
  */
 export abstract class PasskeyCommandRefusedError extends HandledError {}
 
-/**
- * The browser ceremony did not complete — cancelled, timed out, or refused
- * by the authenticator. Ordinary and recoverable: the person tries again or
- * picks another way in, and nothing about their account changed.
- */
+/** The browser ceremony did not complete — cancelled, timed out, or refused
+ *  by the authenticator. Ordinary and recoverable: nothing about the
+ *  account changed. */
 export class IdentityPasskeyCeremonyFailedError extends PasskeyCommandRefusedError {
   constructor(detail: string) {
     super("identity_passkey_ceremony_failed", "identity_passkey_ceremony_failed", {
@@ -518,10 +461,9 @@ export class IdentityPasskeyNotRecognizedError extends PasskeyCommandRefusedErro
 }
 
 /**
- * Removing this sign-in method would leave the person unable to get back in
- * — either with nothing verified at all, or with only passkeys and no
- * address anyone could recover them through. The same refusal covers both
- * because the remedy is the same shape: add another way in FIRST.
+ * Removing this sign-in method would leave the person unable to get back
+ * in. Covers both "nothing verified" and "only passkeys, no recoverable
+ * address" — same remedy shape: add another way in FIRST.
  */
 export class IdentityDetachStrandsUserError extends IdentityCommandRefusedError {
   constructor(detail: string) {

@@ -1,21 +1,7 @@
 /**
  * @vitest-environment node
- * @unit
  *
- * The enqueue-time map-projection contract (payload-cost doctrine invariant 4
- * — ADR-069), proven at the fan-out seam through the real ProjectionRouter.
- *
- * Guarantees under test:
- *   - a `filter` returning false mints no queue job at all, so the cost of an
- *     irrelevant event is a predicate call rather than a job, a payload
- *     deserialization and a worker slot;
- *   - the same gate applies on the inline (queue-less) path, so a test that
- *     drives the router inline sees production's set of mapped records;
- *   - a filter that raises admits the event rather than dropping the record,
- *     because a map projection's fan-out is never replayed; and
- *   - both outcomes are counted on `es_map_projection_enqueue_total`.
- *
- * @see specs/coding-agent/context-economics.feature
+ * The enqueue-time map-projection contract (ADR-069 invariant 4): `filter` returning false mints no job; one that raises ADMITS the event, since fan-out is never replayed.
  */
 import { register } from "prom-client";
 import { describe, expect, it, vi } from "vitest";
@@ -211,11 +197,9 @@ describe("map projection enqueue-time contract", () => {
 
     describe("when the filter raises", () => {
       /**
-       * The opposite call from the subscriber seam, and deliberately so: a
-       * subscriber's job is the only carrier of its side effect, while this
-       * filter is a restatement of what `map()` already decides. Admitting on a
-       * throw costs one job that writes nothing; declining would drop a fact
-       * row that is never replayed.
+       * The opposite call from the subscriber seam, deliberately: admitting
+       * on a throw costs one job that writes nothing, but declining would
+       * drop a fact row that is never replayed.
        */
       it("admits the event rather than dropping the record", async () => {
         const appended: SeamRecord[] = [];

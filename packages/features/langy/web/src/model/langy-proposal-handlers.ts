@@ -1,9 +1,7 @@
 /**
- * What a page hands Langy so the agent can apply a proposal on it.
- *
- * Declared here rather than beside the message component that renders a
- * proposal, because the registration hook a page calls and the panel that
- * shows the result are different layers and only the shape is shared.
+ * What a page hands Langy so the agent can apply a proposal on it. Declared
+ * here, not beside the message component, since only the shape is shared
+ * between the page's registration hook and the panel that shows the result.
  */
 
 /** What the page offers the reader once a proposal has been applied. */

@@ -1,28 +1,5 @@
 /**
- * Pushing a workflow's latest graph onto its replicas.
- *
- * A NARROWED FAMILY-LOCAL MOVE of
- * `platform/app/src/components/ui/PushToCopiesDialog.tsx` and the
- * `optimization_studio/components/workflow/PushToCopiesDialog` that wrapped it.
- * Both were exclusive to this family. The generic seam — `entityLabel`,
- * `bodyIntro`, `emptyMessage`, an `onPush` callback and a selection held by the
- * caller — is gone: the subject IS a workflow, so the words are written down
- * and the selection lives where it is used.
- *
- * EVERY REPLICA STARTS SELECTED, which is the platform behaviour and the one
- * worth stating: the reader opened this to push, and a dialog that opens with
- * nothing chosen makes the common case two steps.
- *
- * THE RESET IS KEYED ON THE REPLICA IDS AS A VALUE, not on the query result's
- * identity. `platform/app` depended on the result object, so a refetch — a
- * window refocus, an invalidation from a push — reset a reader's choices under
- * them while the dialog was open. The evaluator family found and fixed the same
- * defect in the same component; this is the other half of it.
- *
- * The failing branch reports the load error through the host's failure notice
- * rather than rendering `platform/app`'s `HandledErrorAlert`: the words a
- * customer reads come from the code-keyed presentation registry, which is the
- * application's and not a screen's to restate.
+ * Pushing a workflow's latest graph onto its replicas. Every replica starts selected, since the reader opened this to push. Reset is keyed on the replica IDs AS A VALUE, not the query result's identity, or a refetch resets choices mid-dialog. Load errors go through the host's failure notice, not a local alert.
  */
 
 import { Button, Text, VStack } from "@chakra-ui/react";

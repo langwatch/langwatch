@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Store-level tests for branch convergence in onConnect: two mutually
- * exclusive If/Else branches may feed the same input, while two sources
- * that can run at the same time are rejected.
+ * Branch convergence in onConnect: mutually exclusive If/Else branches may feed the same input; sources that can run at the same time are rejected.
  */
 import type { Edge, Node } from "@xyflow/react";
 import { beforeEach, describe, expect, it } from "vitest";

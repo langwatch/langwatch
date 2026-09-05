@@ -14,20 +14,9 @@ const LANGY_WALKTHROUGH_PROMPT =
   "Walk me through sending my first trace to this project. Ask me what my agent is built with, then give me the exact steps.";
 
 /**
- * The route into agent onboarding on the home page: friendly copy, tool
- * glyphs in their own small tiles.
- *
- * It offers the two ways people actually onboard an agent: take the tracing
- * skill away to the coding agent already open in their editor, or hand the
- * job to Langy. The docs are third, for the reader who wanted them all along.
- *
- * The menu itself is `AgentActionsMenu`, the same one every empty state
- * carries, so the routes stay in one order and the copied text stays the one
- * text. Only the trigger and the wording are this surface's own.
- *
- * `onAskLangy` is optional, and its absence is meaningful: on a page where
- * Langy is not available that item must not appear, rather than appear and
- * fail. Spec: specs/home/langy-home.feature
+ * The route into agent onboarding on the home page: skill to an open coding
+ * agent, or hand it to Langy, docs third. `onAskLangy` absent means that
+ * item must not appear. Spec: specs/home/langy-home.feature
  */
 export function OnboardAgentPill({
   onAskLangy,
@@ -36,10 +25,9 @@ export function OnboardAgentPill({
   /** Start the onboarding conversation. Omitted where Langy is unavailable. */
   onAskLangy?: (prompt: string) => void;
   /**
-   * Lead with it rather than tuck it away. For a project with no data, this is
-   * not one option among several: it is the only thing that makes the rest of
-   * the page mean anything, so it stops being a quiet outline at the end of a
-   * row and becomes the filled control the eye lands on.
+   * Lead with it: for a project with no data, this is the only thing that
+   * makes the rest of the page mean anything, so it's the filled control
+   * the eye lands on, not a quiet outline at the end of a row.
    */
   prominent?: boolean;
 } = {}) {
@@ -85,23 +73,9 @@ export function OnboardAgentPill({
 }
 
 /**
- * The pill itself. A different shade from the asks beside it on purpose, and
- * the tiles read left to right in the order the menu offers its routes.
- *
- * The menu opens it through `asChild`, which clones this element with the
- * handlers and the ref it needs, so everything but `prominent` goes straight
- * through to the button. Swallow them and the pill stops opening anything.
- */
-/**
- * The two presentations, side by side.
- *
- * `lead` is the filled control a project with no data needs; `quiet` is the
- * outline one that sits at the end of a row once there is data. A DIFFERENT
- * SHADE from the asks around it in both cases: those are borrowable
- * questions on the panel's translucent chip surface, and this is the one
- * control that goes and does something. The solid raised surface, a step
- * darker than the chips, is what says "not one of those" before the caret
- * confirms it.
+ * The pill: `asChild` clones this element with handlers/ref, so all but
+ * `prominent` passes to the button. `lead` (no-data, filled) and `quiet`
+ * (has data, outline) are a step darker than the asks' translucent chips.
  */
 const PILL_STYLES = {
   lead: {

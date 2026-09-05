@@ -1,12 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for the evaluate-time autosave: when no Fast model
- * resolves, the auto-committed version keeps the "autosaved" fallback
- * description without ever firing the commit-message generation call,
- * so no missing-model toast interrupts the run.
- *
- * UX contract: specs/model-providers/missing-model-popup.feature.
+ * Evaluate-time autosave: with no Fast model resolved, the auto-committed version keeps the "autosaved" fallback and never fires commit-message generation, so no missing-model toast interrupts the run. See specs/model-providers/missing-model-popup.feature.
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

@@ -12,17 +12,9 @@ const DEFAULT_DRAIN_GRACE_MS = 5_000;
 const CLOSE_PHASE_SLACK_MS = 2_000;
 
 /**
- * A surface served straight off the Node server, ahead of the Hono
- * application.
- *
- * One surface needs this and it is not a preference: the hosted Model Context
- * Protocol endpoint is Streamable HTTP and Server-Sent Events over the raw
- * request and response objects, and its transports hold the socket for the
- * life of a session. Re-expressing it as fetch-style handlers would mean
- * rewriting the transports the MCP SDK owns.
- *
- * `handles` is asked first, with the pathname alone, so a surface that says no
- * costs one string comparison and everything else reaches Hono untouched.
+ * A surface served straight off the Node server, ahead of the Hono app —
+ * needed for the hosted MCP endpoint (SSE holds the socket for the
+ * session's life). `handles` is asked first so a "no" costs one compare.
  */
 export abstract class ApiRawRequestSurfacePort {
   abstract handles(pathname: string): boolean;
@@ -57,11 +49,8 @@ export type ApiHttpListenerOptions = Readonly<{
 }>;
 
 /**
- * Owns the Node HTTP intake for the standalone API process.
- *
- * Closing first stops new connections, then gives live requests a bounded
- * grace before reaping the remaining sockets. Process resources are closed by
- * ApiProcess only after this listener resolves.
+ * Owns the Node HTTP intake for the standalone API process. Closing stops
+ * new connections, gives live requests a bounded grace, then reaps sockets.
  */
 export class ApiHttpListener {
   static create(options: ApiHttpListenerOptions): ApiHttpListener {

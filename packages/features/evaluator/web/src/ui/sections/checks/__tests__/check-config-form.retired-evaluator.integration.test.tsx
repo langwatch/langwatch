@@ -1,18 +1,8 @@
 // @vitest-environment jsdom
 
 /**
- * A monitor can carry a `checkType` that is no longer in the catalog. Migration
- * `20250105132258_migrate_legacy_ragas` rewrote saved rows onto the
- * `legacy/ragas_*` slugs, and those evaluators are gone, so the edit page has to
- * survive a definition it cannot resolve.
- *
- * This drives the real `CheckConfigForm` with a retired `checkType` and observes
- * whether it renders, because the failure mode is a runtime `TypeError` at the
- * first dereference of `availableEvaluators[checkType]` rather than a wrong
- * string. The control renders the same form with a live slug, so a mock that
- * broke rendering outright would fail both cases rather than look like a fix.
- *
- * @see specs/npx-installer/07-lean-install.feature
+ * A monitor can carry a retired `checkType`; the edit page must survive it.
+ * Drives the real `CheckConfigForm`, since the failure mode is a runtime `TypeError`.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

@@ -137,10 +137,9 @@ export function applyHandledErrorToForm({
 }
 
 /**
- * Failures a global interceptor has already surfaced — as a modal, or as its own
- * bespoke toast. The registry lives in the host rather than in each feature so
- * that a mark made by one feature's interceptor is seen by every other feature's
- * `onError`; a per-package copy silently reports the same refusal twice.
+ * Failures a global interceptor already surfaced (modal or bespoke toast).
+ * Lives in the host, not each feature, so one feature's mark is seen by
+ * every other's `onError` — a per-package copy would double-report.
  */
 const globallyHandled = new WeakSet<Error>();
 

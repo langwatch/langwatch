@@ -1,13 +1,7 @@
 /**
- * @langwatch/identity-contract — the isomorphic identity core (ADR-101, ADR-115).
- *
- * The frontend and the backend import this package verbatim, so it reads
- * nothing and writes nothing: no Prisma, no env, no node built-ins. What
- * lives here is what both sides must agree on — the identifier vocabulary,
- * value normalization, the fact and command shapes, the pure reducer, the
- * refusal errors, and the backfill's parity policy. Everything that derives
- * an id (node:crypto), reads a head, or appends a fact is
- * `@langwatch/identity-server`.
+ * @langwatch/identity-contract — the isomorphic identity core (ADR-101,
+ * ADR-115). Both sides import it verbatim, so it reads and writes nothing —
+ * just the vocabulary, shapes, reducer and refusal errors both must agree on.
  */
 export {
   type BackfillDiff,
@@ -490,12 +484,9 @@ export {
   verificationMethodSchema,
 } from "./vocabulary";
 /**
- * The four pipelines' framework identity — folded in from the identity
- * server's event-sourcing layer (ADR-101, ADR-115, ADR-117): the pipeline
- * name and aggregate type every event stamps. The wire schemas that extend
- * these payloads with the `@langwatch/eventing` envelope stay in
- * `@langwatch/identity-server`, next to the pipeline definitions — this
- * package stays framework-free so the frontend can import it verbatim.
+ * The four pipelines' framework identity (ADR-101, ADR-115, ADR-117): the
+ * pipeline name and aggregate type every event stamps. Wire schemas that
+ * extend these with the eventing envelope stay in `@langwatch/identity-server`.
  */
 export { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "./identity-events";
 export { JOIN_REQUEST_AGGREGATE_TYPE, JOIN_REQUEST_PIPELINE_NAME } from "./join-request-events";

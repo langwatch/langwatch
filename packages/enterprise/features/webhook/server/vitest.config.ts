@@ -2,23 +2,9 @@ import { fileURLToPath } from "node:url";
 import { configDefaults, defineConfig } from "vitest/config";
 
 /**
- * Anchored aliases, not the object form.
- *
- * Vite's object alias is a PREFIX replacement, so mapping
- * `"@langwatch/observability"` to a file turns a subpath import
- * (`@langwatch/observability/metrics`, which `@langwatch/eventing`'s
- * process-manager gauges use) into `…/observability/src/index.ts/metrics` and
- * the suite dies on `ENOTDIR` before its first test. `find` as an anchored
- * regex matches the bare specifier only, and every subpath resolves through
- * the package's own `exports` map the way it does outside tests.
- *
- * The four entries are spelled out rather than built by a helper because this
- * table is read statically as well as run: `@langwatch/test-harness`'s
- * `parseVitestConfigAliases` resolves every `vi.mock` specifier in the package
- * against it, and it reads literals, not the result of calling a local
- * function. A table it cannot read is one it refuses rather than skips, since
- * a dropped alias makes the mock check go quiet about exactly the files it
- * exists to check.
+ * Anchored aliases, not object form: Vite's object alias is a PREFIX
+ * replacement, so a subpath import would resolve to `…/index.ts/metrics`
+ * and die on `ENOTDIR`. Spelled out since `test-harness` reads this table statically too.
  */
 export default defineConfig({
   test: {

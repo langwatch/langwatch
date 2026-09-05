@@ -1,7 +1,6 @@
 /**
  * The API process's own rate limiter: a consumer that receives its Redis by
  * injection and degrades to memory when the process composed none.
- *
  * @see specs/server/redis-client-ownership.feature
  */
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -12,9 +11,8 @@ const START = new Date("2026-09-01T10:00:00.000Z");
 
 /**
  * The three commands the limiter issues, over a counter this test can read.
- * Cast because `RedisConnection` is the whole ioredis surface and the limiter
- * uses three of it; narrowing the port instead would state a dependency the
- * composed connection does not have.
+ * Cast since `RedisConnection` is the whole ioredis surface but the limiter
+ * uses three of it.
  */
 function fakeRedis(options: { ttl?: number } = {}) {
   const counts = new Map<string, number>();

@@ -1,10 +1,6 @@
 /**
  * What a job that ran to the end records: the connected agent instance that
  * answered it, when one did.
- *
- * Ported from
- * platform/app/src/server/scenarios/__tests__/scenario-processor-agent-instance.unit.test.ts.
- *
  * @see specs/scenarios/served-agent-instance-on-runs.feature
  */
 import { ScenarioExecutionService } from "@langwatch/scenario-contract";

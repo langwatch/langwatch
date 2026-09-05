@@ -98,10 +98,9 @@ export class ScenarioService extends ScenarioServiceContract {
   }
 
   /**
-   * The id of the project's Default test suite, creating it when the project has
-   * none. Resolved before the caller's transaction opens: the create can lose a
-   * race with a concurrent one, and Postgres aborts a transaction on the unique
-   * violation that reports it, so the retry cannot happen inside that transaction.
+   * The id of the project's Default test suite, creating it if needed.
+   * Resolved before the caller's transaction opens: the create can lose a
+   * race, and Postgres aborts the transaction on that violation.
    */
   private async ensureDefaultTestSuiteId(projectId: string): Promise<string> {
     const existing = await this.options.repository.tryFindDefaultTestSuite({ projectId });
@@ -114,11 +113,9 @@ export class ScenarioService extends ScenarioServiceContract {
   }
 
   /**
-   * Turns "no suite" into the project's Default suite.
-   *
-   * A caller that clears `testSuiteId` is asking to take the scenario out of the
-   * suite it is in, not to make it loose. An update that names no `testSuiteId`
-   * at all is left alone, since it is not a move.
+   * Turns "no suite" into the project's Default suite. Clearing
+   * `testSuiteId` asks to leave the current suite, not go loose; an
+   * update naming no `testSuiteId` at all is left alone.
    */
   private async withResolvedTestSuite(parsed: ScenarioUpdateInput): Promise<ScenarioUpdateInput> {
     if (parsed.testSuiteId !== null) return parsed;

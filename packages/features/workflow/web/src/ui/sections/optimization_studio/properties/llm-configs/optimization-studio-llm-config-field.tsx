@@ -23,11 +23,8 @@ type OptimizationStudioLLMConfigFieldProps = {
 };
 
 /**
- * LLM Config field for the Optimization Studio
- * Specific to the optimization studio store
- *
- * Ensures all LLM configs are normalized to snake_case format (max_tokens)
- * as required by the optimization studio DSL schema.
+ * LLM Config field for the Optimization Studio, specific to its store.
+ * Normalizes all LLM configs to snake_case (max_tokens) per the DSL schema.
  */
 export function OptimizationStudioLLMConfigField({
   llmConfig,

@@ -294,12 +294,8 @@ export class ApiRestSecurity {
       const resolved = context.get("resolvedToken") as ResolvedApiKeyToken | undefined;
       if (!resolved) {
         // A permission gate running with nobody authenticated is a mis-wired
-        // route: the authentication middleware must be mounted before this
-        // one. Refuse rather than wave the request through — the old
-        // pass-through meant a route that forgot its authentication silently
-        // lost its permission check too. The plain Error degrades to the
-        // generic unknown response with a trace id (ADR-045) and logs the
-        // misconfiguration loudly.
+        // route: refuse rather than wave the request through. Plain Error
+        // degrades to the generic unknown response (ADR-045) and logs loudly.
         throw new Error(
           "The project permission gate ran with no resolved credential — mount the project authentication middleware before it",
         );

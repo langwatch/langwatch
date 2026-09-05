@@ -739,12 +739,9 @@ function CodingAssistantFields({
 }
 
 /**
- * Cost attribution for traces this tool sends through the direct OTLP
- * ingestion path. Most coding assistants run on a bundled subscription
- * (e.g. Claude Max), so their list-price token cost is theoretical rather
- * than real spend. When this is on, the receiver tags those traces
- * non-billable, and the trace summary / analytics split billed vs non-billed
- * cost. Gateway / virtual-key usage is always billed and ignores this flag.
+ * Cost attribution for traces sent through the direct OTLP path — a
+ * bundled subscription's list-price token cost is theoretical. When on,
+ * the receiver tags those traces non-billable.
  */
 function CostAttributionSection({
   form,
@@ -777,10 +774,8 @@ function CostAttributionSection({
 
 /**
  * CLI path policy for the `langwatch <tool>` wrapper, folded into the
- * coding-assistant tile (replaces the standalone PlatformToolPolicy table).
- * The CLI caches this at login (cliBootstrap's `toolPolicies` map) and only
- * offers the paths enabled here. Cursor is GUI-only, so its direct-OTLP
- * toggle is forced off and disabled.
+ * coding-assistant tile. Cached at login (cliBootstrap's `toolPolicies`
+ * map); Cursor is GUI-only, so its direct-OTLP toggle is forced off.
  */
 function CliPathsSection({
   form,

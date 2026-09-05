@@ -1,23 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Settings → General: one address that edits TWO things, and the four times it
- * decides not to show something.
- *
- * THE PLATFORM PAGE HAD NO SUITE, so every one of those decisions was a comment
- * rather than a guarantee. They are all about not putting a setting in front of
- * somebody who cannot act on it, or a control in front of somebody it would
- * mislead:
- *
- *   - a PERSONAL workspace is never offered as the organization's project. It
- *     is one person's, and organization settings must never surface it, nor
- *     offer to "set up" somebody else's;
- *   - an organization with no project at all is a governance-intent org by
- *     design (ADR-038 v6), and still needs its organization settings;
- *   - a reader who may only VIEW the organization reads the values instead of
- *     editing them, and never sees the object-storage credentials;
- *   - a LITE MEMBER gets no Save button, because their seat does not carry the
- *     change.
+ * Settings → General: one address, two things it edits. A PERSONAL workspace is never offered as the org's project; a project-less org (ADR-038 v6) still gets settings; a VIEW-only reader gets read-only fields and no storage credentials; a LITE MEMBER gets no Save button.
  */
 
 import { cleanup, screen } from "@testing-library/react";
@@ -141,10 +125,8 @@ describe("when the reader may only view the organization", () => {
 
 describe("when the reader holds the lite membership seat", () => {
   /**
-   * The ORGANIZATION half only. A lite seat does not carry an organization
-   * change, and the project form keeps its own save — the two halves of this
-   * address are two forms with two submits, exactly as the platform page had
-   * them.
+   * The ORGANIZATION half only — a lite seat carries no organization
+   * change, and the project form keeps its own save.
    */
   it("takes the organization form's save away and leaves the project's", () => {
     renderWithProjectHost(<ProjectSettingsScreen />, new FakeProjectHost({ isLiteMember: true }));

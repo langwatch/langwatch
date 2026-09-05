@@ -1,16 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The two project-scope coding-agent screens: they hand the table the project
- * the address is on rather than a personal workspace, and they say nothing
- * about a project they have not resolved yet.
- *
- * THE RELEASE FLAG IS NOT ASSERTED HERE ANY MORE. It moved out of the page body
- * and into the route map that mounts these screens, where `apps/ui`'s own
- * page-policy suite covers it; a screen that guarded itself would be stating
- * the policy twice.
- *
- * @see specs/coding-agent/project-menu-links.feature
+ * The two project-scope coding-agent screens hand the table the address's project, saying nothing about one not yet resolved. The release flag moved out to the route map, so this doesn't guard it too. @see specs/coding-agent/project-menu-links.feature
  */
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

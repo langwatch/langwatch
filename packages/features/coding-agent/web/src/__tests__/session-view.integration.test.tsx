@@ -1,14 +1,7 @@
 /**
  * @vitest-environment jsdom
- */
-/**
- * The session overview, rendered against a REAL folded session.
  *
- * The fixture below is lifted verbatim out of `coding_agent_sessions` — it is an
- * actual Claude Code session (114 model calls, 115 tools, $10.62, 14M tokens
- * served from cache). Inventing a tidy fixture would have hidden the two things
- * this file exists to pin: that the numbers a real session produces are big
- * enough to need compacting, and that an MCP tool shows up at all.
+ * The session overview against a REAL folded session — a tidy fixture would hide that real numbers need compacting and that an MCP tool shows up at all.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";

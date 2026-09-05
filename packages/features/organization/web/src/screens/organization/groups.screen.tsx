@@ -1,18 +1,7 @@
 /**
- * The groups an organization grants access through, at `/settings/groups`.
- *
- * A GROUP IS A BAG OF PEOPLE WITH ACCESS RULES ON IT, so the table shows both:
- * who is in it, and what each of its bindings grants where. A SCIM-synced group
- * is owned by the customer's identity provider — deleting one here only holds
- * until the next sync, which is what the delete dialog says out loud.
- *
- * ENTERPRISE GATES THE FEATURE AND NOT THE PAGE. A reader below the plan gets
- * the page and a straight answer about what groups would do, because hiding a
- * paid capability makes it look missing rather than purchasable — the
- * audit-log family's ruling, applied again.
- *
- * The screen carries no chrome: the settings frame is applied by whichever
- * application serves the address.
+ * Groups an organization grants access through, at `/settings/groups`. A
+ * SCIM-synced group's deletion here only holds until the next sync.
+ * Enterprise gates the FEATURE, not the PAGE — never a missing page.
  */
 
 import {

@@ -219,12 +219,9 @@ export function NewVersionFields({
               generateCommitMessage.isPending ? (
                 <AISparklesLoader />
               ) : canSave && resolvedDefault.isFetched && previousVersionDsl ? (
-                // Always offer an explicit generate affordance: a manual retry
-                // after a failed autogen, a re-roll of a description the user
-                // does not like, or (with no model configured) the trigger that
-                // surfaces the missing-model toast on purpose. force:true
-                // bypasses the auto-gen gate; clearing the edited flag lets the
-                // result land even if the user typed something first.
+                // Always offer an explicit generate affordance: manual retry,
+                // re-roll, or (no model configured) the missing-model toast
+                // trigger. force:true bypasses the auto-gen gate.
                 <IconButton
                   size="xs"
                   variant="ghost"

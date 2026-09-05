@@ -1,22 +1,7 @@
 /**
  * @vitest-environment node
  *
- * @see specs/server/redis-client-ownership.feature
- * @see dev/docs/adr/093-redis-is-an-owned-client.md
- * @see packages/redis-client/README.md — "Guardrails"
- *
- * The ownership half of ADR-093: `packages/redis-client` is the only place an
- * ioredis client gets constructed; every other package or app takes a
- * connection as a dependency instead of building its own.
- *
- * This is the rebuild of
- * `platform/app/src/server/app-layer/__tests__/redis-ownership.unit.test.ts`,
- * which went with the platform application (commit `faaa9ec333`). The
- * App-specific behavioural scenarios in that file (App hands back its
- * connection, closes it, degrades without one) belonged to the deleted `App`
- * class and are not reinstated here; the two SOURCE GUARDS are, because they
- * are what keeps the ownership decision true over time — everything else was
- * a one-off migration check.
+ * ADR-093: `packages/redis-client` is the only place an ioredis client gets constructed. Only the two SOURCE GUARDS survived the platform app's deletion.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
@@ -32,23 +17,14 @@ const PACKAGES_ROOT = join(REPO_ROOT, "packages");
 const CLIENT_PACKAGE = join(PACKAGES_ROOT, "redis-client") + sep;
 
 /**
- * Every tree the repository writes modules into, not the two the first version
- * of this guard named.
- *
- * Naming trees to walk fails OPEN: fewer files scanned, nothing found, green.
- * That is how two scripts came to construct ioredis directly with CI passing.
- * The end-to-end specs, the build tooling and the development scripts run in
- * the same processes and against the same Redis as everything else, so a
- * connection opened in one of them is the very thing ADR-093 retired.
+ * Every tree the repository writes modules into, not just the original two.
+ * Naming trees fails OPEN — fewer files scanned, green — which is how two
+ * scripts came to construct ioredis directly with CI passing.
  */
 const SCANNED_ROOTS = ["apps", "packages", "dev", "tools", "mcp", "sdks", "plugins"] as const;
 
 /**
- * Every extension a module can be written in, not just the TypeScript ones.
- *
- * Reading only the TypeScript spellings made the guard's answer depend on a
- * file's extension rather than on what it does: `dev/scripts` holds `.mjs` and
- * `.cjs` modules today, and a `new IORedis(...)` in any of them scanned clean.
+ * Every extension a module can be written in, not just TypeScript: `dev/scripts` holds `.mjs`/`.cjs` modules, and a `new IORedis(...)` in any of them used to scan clean.
  */
 const isSourceFile = (file: string): boolean =>
   /\.(?:mts|cts|tsx?|jsx?|mjs|cjs)$/.test(file) && !/\.d\.(?:mts|cts|ts)$/.test(file);
@@ -59,24 +35,14 @@ const isTestFile = (file: string): boolean =>
   file.includes(`${sep}test-utils${sep}`);
 
 /**
- * Every way an ioredis client gets constructed.
- *
- * The trailing member access is what catches `new IORedis.Cluster(nodes)`,
- * which a default import reaches without ever naming `Cluster` — the one
- * spelling a bare `new (IORedis|Redis|Cluster)(` misses. Kept as a named
- * constant so the self-test below can check the pattern itself: a gap here
- * does not fail loudly, it just scans and finds nothing.
+ * Every way an ioredis client gets constructed. The trailing member access
+ * catches `new IORedis.Cluster(nodes)`, missed by a bare `new
+ * (IORedis|Redis|Cluster)(`. Named so the self-test can check the pattern.
  */
 const IOREDIS_CONSTRUCTION = /\bnew\s+(?:IORedis|Redis|Cluster)(?:\s*\.\s*\w+)*\s*\(/;
 
 /**
- * Any reference to a retired module-scope singleton, by whatever relative
- * name it was imported under.
- *
- * Anchored on the quoted specifier rather than on a leading `from`, because
- * the reference that outlived the original singleton's removal was a
- * `vi.mock("~/server/redis")` merged from a stale branch — an import-only
- * pattern reads straight past a bare mock call.
+ * Any reference to a retired module-scope singleton, whatever relative name it was imported under. Anchored on the quoted specifier, not a leading `from`, since the reference that outlived the removal was a `vi.mock("~/server/redis")` merged from a stale branch — an import-only pattern misses a bare mock call.
  */
 const RETIRED_REDIS_MODULE = /["'][^"']*(?:~\/server\/redis|\.\.\/redis|\.\/redis)["']/;
 

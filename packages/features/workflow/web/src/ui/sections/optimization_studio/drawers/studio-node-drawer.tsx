@@ -144,11 +144,9 @@ const ComponentPropertiesPanelMap: Partial<
 };
 
 /**
- * StudioNodeDrawer subscribes to the workflow store's selected node and
- * renders the appropriate properties panel inside a StudioDrawerWrapper.
- *
- * All node types (including signature/LLM) go through StudioDrawerWrapper
- * for unified play/expand/close controls.
+ * Subscribes to the workflow store's selected node and renders the right
+ * properties panel inside StudioDrawerWrapper — every node type goes
+ * through it for unified play/expand/close controls.
  */
 export function StudioNodeDrawer() {
   const { selectedNode, deselectAllNodes, isDraggingNode, clickedNodeId } = useWorkflowStore(

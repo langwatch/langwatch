@@ -61,11 +61,9 @@ class UnusedScenarioExecutionService extends ScenarioExecutionService {
 }
 
 /**
- * The EXACT definition the runtime mounts — built through the pipeline's own
- * `simulationRunExecutionPM` applier and the runtime's `buildProcessDefinition`,
- * so these tests cover the generated evolve (intent-key prefixing, omitted
- * nextWakeAt clearing the wake, undeclared-event guard) rather than a
- * re-implementation. The executors are stubs: evolve never dispatches.
+ * The EXACT definition the runtime mounts, built through the pipeline's own
+ * applier and `buildProcessDefinition`, so these cover the generated evolve
+ * rather than a re-implementation. Executors are stubs: evolve never dispatches.
  */
 const definition = buildProcessDefinition(
   buildProcessManager<SimulationProcessingEvent>({

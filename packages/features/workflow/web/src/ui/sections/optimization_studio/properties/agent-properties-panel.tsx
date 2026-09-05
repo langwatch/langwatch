@@ -223,12 +223,10 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
     [form],
   );
 
-  // Outer updates: apply the library record into the editor and the
-  // node's DSL snapshot only when the record content actually changed
-  // (edited elsewhere) and there are no unsaved local edits. A Save
-  // records its own submitted signature, so the post-save state never
-  // re-applies; node writes only happen on a real content difference,
-  // so this cannot loop with the node-to-editor derivation above.
+  // Outer updates: apply the library record into the editor/DSL only when
+  // content actually changed (edited elsewhere) with no unsaved local
+  // edits. Node writes need a real content difference, so this cannot
+  // loop with the node-to-editor derivation above.
   const appliedAgentSignature = useRef<string | null>(null);
   const agentSignature = agentData
     ? JSON.stringify({ name: agentData.name, config: agentData.config })

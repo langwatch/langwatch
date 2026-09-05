@@ -8,22 +8,9 @@ import { QuietHeadline } from "./quiet-headline";
 import { useProjectHomeHost } from "../../../../model/project-home-host";
 
 /**
- * Langy's briefing — the first thing the returning user's eye lands on.
- *
- * The logged-in home is Langy's read on the project, not an ad for Langy. This
- * card leads with what changed since the reader was last here: a plain-language
- * headline, then the run behind it — plan chips, the scenarios that passed or
- * regressed, and the drafted fix — each a link straight to the traces / runs
- * that prove it. A stat you can click is a starting point; one you can't is a
- * report.
- *
- * It wears Langy's own skin (`langy-root`): the warm paper (light) / ink (dark)
- * palette the marketing site uses, a serif display voice, and one amber accent
- * spent only on Langy, status, and the primary action. That is the brand
- * carried across the login line, where the app used to reset to a template.
- *
- * Every section is optional: the card renders only what the project actually
- * has, so a project with no scenario run shows a shorter read, never a fake one.
+ * Langy's briefing: what changed since last visit (headline, plan chips,
+ * scenarios, drafted fix), each linked to the trace/run that proves it.
+ * Every section is optional — no scenario run shows a shorter read.
  */
 
 /** The serif display voice, self-hosted with the panel's fallbacks. */
@@ -372,15 +359,9 @@ export function LangyBriefing({
 }
 
 /**
- * One attention-inbox row, with exactly two NAMED ways out:
- *
- *   1. VIEW the signal ("View errors →") — the row IS this action: a
- *      full-bleed anchor sits under the text so clicking anywhere opens the
- *      exact Trace Explorer search behind the claim (⌘/middle-click still
- *      opens a new tab — real link). The label just says so out loud.
- *   2. INVESTIGATE in Langy — the one control floating above that anchor:
- *      hands the row's evidence to Langy and asks in one click, so the reader
- *      lands in a conversation that is already answering.
+ * One attention-inbox row, two NAMED ways out: VIEW the signal (a
+ * full-bleed anchor opens the exact Trace Explorer search behind it, real
+ * link), or INVESTIGATE in Langy (hands the row's evidence to Langy in one click).
  */
 function ReceiptRow({
   receipt,

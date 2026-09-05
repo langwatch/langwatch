@@ -9,11 +9,9 @@ import { usePersonalContext } from "../../behavior/use-personal-context";
 import { PersonalWorkspaceLayout } from "../../ui/sections/personal-workspace-layout";
 
 /**
- * The personal Sessions page: every coding-agent session of the last quarter
- * and what it cost in context. Routing and the layout only, the table owns its
- * own reads.
- *
- * Spec: specs/coding-agent/sessions-screen.feature.
+ * The personal Sessions page: every coding-agent session of the last
+ * quarter and its context cost. Routing and layout only, the table owns
+ * its own reads. Spec: specs/coding-agent/sessions-screen.feature.
  */
 export function PersonalSessionsScreen() {
   const { ready, isPersonalProjectResolved, personalProjectId, personalProjectSlug } =
@@ -52,9 +50,7 @@ export function PersonalSessionsScreen() {
 }
 
 /**
- * The activity tables answer a port of their own, and this screen is what
- * mounts it: `@langwatch/coding-agent-web` is not a governed web package, so
- * `apps/ui` may not import it, and the screen family that renders its tables
- * is where the bridge belongs.
+ * The activity tables answer a port of their own, mounted here since
+ * `@langwatch/coding-agent-web` is ungoverned and `apps/ui` may not import it.
  */
 export default withCodingAgentHost(PersonalSessionsScreen);

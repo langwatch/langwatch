@@ -1,17 +1,7 @@
 /**
- * Pure generator for the "Run via API" snippets.
- *
- * One source of truth for both surfaces (the optimization-studio workflow
- * results panel and the evaluations-v3 workbench). Given a target (workflow or
- * experiment), a data source, and a language, it returns ready-to-run code that
- * triggers an evaluation through the unified evaluations-v3 backend AND reads
- * the per-row results back.
- *
- * The snippets mirror the just-shipped SDK public APIs exactly:
- *   - python: langwatch.experiment.run(...) / langwatch.workflow.run(...)
- *   - typescript: langwatch.experiments.runWithResults(...) /
- *     langwatch.workflows.run(...)
- *   - shell: curl POST to start, then poll + GET results
+ * Pure generator for "Run via API" snippets — one source of truth for the
+ * studio results panel and evaluations-v3 workbench, mirroring the SDK's
+ * public run APIs exactly.
  */
 import {
   buildEvaluateParameters,
@@ -52,10 +42,9 @@ export interface BuildRunSnippetInput {
 const DATASET_ID_PLACEHOLDER = "dataset_xxxxxxxxxxxx";
 
 /**
- * Build a single example row for inline-data snippets: every entry field the
- * dataset does not already provide, mapped to an example value of its type.
- * Image fields get a base64 data-url example. When the dataset covers every
- * field we still emit one illustrative field so the shape is obvious.
+ * Builds one example row for inline-data snippets: entry fields the
+ * dataset lacks, mapped to an example value per type (images get a base64
+ * data-url). If the dataset covers everything, one field still emits for clarity.
  */
 function buildInlineExampleRow(
   entryFields: WorkflowField[],

@@ -1,13 +1,7 @@
 // @vitest-environment jsdom
 /**
- * The workbench's version history, in the popover its header button anchors.
- *
- * Renders the real button and the real list against mocked tRPC boundaries:
- * the list it paints, the two-step restore, the permission that decides
- * whether the restore is offered at all, and the popover closing once a
- * restore lands.
- *
- * @see specs/experiments-v3/workbench-versioning.feature
+ * The workbench's version history popover: real button and list against
+ * mocked tRPC — the two-step restore, permission gate, popover closing.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -92,10 +86,9 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
 import { VersionHistoryButton } from "../version-history-button";
 
 /**
- * A history as the seam writes one: two deliberate versions numbered without
- * gaps, and one autosave row that a long session of typing left behind. The
- * autosave carries a number of its own, but it is a handle for a restore and
- * not a place in the list, which is why the rows below run 2, autosave, 1.
+ * A history as the seam writes one: two deliberate versions numbered
+ * without gaps, plus one autosave row left by a long typing session — a
+ * restore handle, not a list place, so the rows run 2, autosave, 1.
  */
 const versions = [
   {

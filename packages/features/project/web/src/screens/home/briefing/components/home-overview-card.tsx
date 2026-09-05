@@ -6,15 +6,9 @@ import type { StatusCell } from "../types";
 import { useProjectHomeHost } from "../../../../model/project-home-host";
 
 /**
- * The project's numbers, reframed as status, on the SAME Langy surface as the
- * briefing so the home reads as one material instead of a warm card floating
- * over a flat one.
- *
- * It leads with what LangWatch is uniquely built to surface — pass rate,
- * regressions, failing evals — coloured by whether they need the reader, then
- * demotes the table-stakes metrics (latency, cost, trace counts) to a quieter
- * second row. Serif title, mono tabular figures: the marketing brand, carried
- * across the login line.
+ * The project's numbers, reframed as status, on the SAME Langy surface as
+ * the briefing. Leads with pass rate/regressions/failing evals, demoting
+ * table-stakes metrics to a quieter second row.
  */
 
 const SERIF = 'var(--langy-font-serif, "Sentient", "Charter", "Source Serif Pro", Georgia, serif)';

@@ -1,9 +1,7 @@
 /**
- * The HTTP agent editor, as another feature mounts it.
- *
- * The scenario editor and the workflow HTTP block compose the same editor the
- * Agents screen does. They take it through this door rather than through the
- * screen, which stays owner-only.
+ * The HTTP agent editor, as another feature mounts it: the scenario editor
+ * and the workflow HTTP block compose the same editor the Agents screen
+ * does, through this door rather than the owner-only screen.
  */
 
 export {

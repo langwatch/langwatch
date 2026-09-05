@@ -1,17 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Store-level unit tests for `clickedNodeId` — the field that gates the
- * StudioNodeDrawer behind a real click (mousedown + mouseup without drag),
- * fixing https://github.com/langwatch/langwatch/issues/2269.
- *
- * These tests pin the store contract that StudioNodeDrawer relies on:
- *   - `clickedNodeId` is set by `setClickedNodeId` / `setSelectedNode`
- *   - `clickedNodeId` is cleared on deselect, drag start, deselectAll,
- *     and when the workflow itself becomes selected.
- *
- * The drawer's render-time predicate is exercised separately by the
- * StudioNodeDrawer component tests; this file does not duplicate it.
+ * `clickedNodeId` gates the StudioNodeDrawer behind a real click (mousedown + mouseup, no drag; fixes issue #2269). Pins the store contract only — the drawer's render-time predicate has its own component tests.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";

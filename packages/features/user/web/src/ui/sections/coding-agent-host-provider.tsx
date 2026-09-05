@@ -1,16 +1,7 @@
 /**
- * What the coding-agent activity tables are mounted inside.
- *
- * `@langwatch/coding-agent-web` owns the sessions and pull-request tables and
- * states what it needs as its own narrow port — one permission question, the
- * address, and the two notices. Everything on that port is already on the
- * personal-workspace host, so this is the adapter between them, mounted once
- * around any screen that renders a table.
- *
- * It lives here rather than in `apps/ui` for a boundary reason worth keeping:
- * `@langwatch/coding-agent-web` is not a governed web package, so a frontend
- * feature may not import it. The screen family that renders its tables can, so
- * the screen family answers its port.
+ * What the coding-agent activity tables mount inside: the adapter between
+ * `@langwatch/coding-agent-web`'s narrow port and the personal-workspace
+ * host. Lives here, not `apps/ui`, since that package is ungoverned.
  */
 
 import {

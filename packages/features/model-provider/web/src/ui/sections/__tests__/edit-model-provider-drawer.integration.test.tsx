@@ -1,22 +1,7 @@
 // @vitest-environment jsdom
 /**
- * The one place in the product a model-provider credential is typed.
- *
- * NEW WITH THE RECOVERY. `platform/app` shipped this drawer with no test that
- * rendered it — the whole `provider-configuration.feature` UI block is a run of
- * `@unimplemented` scenarios saying "need a JSDOM render of ModelProviderForm"
- * — and when the component was deleted in `cc91631cd8` nothing failed. The
- * Model Providers screen kept writing `?drawer.open=editModelProvider` from its
- * Add menu and from every row's Edit, and the census recorded the result
- * plainly: a customer could not add or edit a credential at all.
- *
- * SO THIS TEST'S JOB IS THE HEADLINE ONE: the drawer opens on the provider the
- * address names, the field the customer types into reaches
- * `modelProvider.update`, and the key travels as the customer typed it.
- * Anything narrower would pass just as well against the empty drawer that
- * caused the outage.
- *
- * @see specs/model-providers/provider-configuration.feature
+ * The one place a model-provider credential is typed. This test's job is
+ * the headline: it opens, the typed key reaches `modelProvider.update`.
  */
 
 import "@testing-library/jest-dom/vitest";

@@ -1,10 +1,7 @@
 /**
- * The connected-agent row, as another feature renders it.
- *
- * The Agents screen owns the page; the row, its card and the vocabulary that
- * names a connection are what the scenario editor and the agent-testing dialog
- * put in front of the reader, so they are a door of their own rather than a
- * reach into the screen.
+ * The connected-agent row, as another feature renders it: the Agents screen
+ * owns the page, but the scenario editor and agent-testing dialog also put
+ * the row and its vocabulary in front of the reader, through this door.
  */
 
 export {

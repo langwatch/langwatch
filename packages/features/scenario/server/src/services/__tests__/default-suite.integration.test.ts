@@ -1,11 +1,7 @@
 /**
  * Auto-filing into the project's Default test suite, against real Postgres.
- *
- * Every scenario belongs to exactly one suite: a create that names none files
- * into Default, and clearing a scenario's suite files it back into Default
- * rather than leaving it loose.
- *
- * Ported from platform/app/src/server/suites/__tests__/test-suite-membership.integration.test.ts.
+ * Every scenario belongs to exactly one suite: clearing a scenario's suite
+ * files it back into Default rather than leaving it loose.
  */
 import type { ScenarioService as ScenarioServiceContract } from "@langwatch/scenario-contract";
 import { SimulationService } from "@langwatch/scenario-contract";

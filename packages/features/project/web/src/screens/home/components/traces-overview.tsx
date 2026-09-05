@@ -82,39 +82,16 @@ function NewProjectQuickView({ projectSlug }: { projectSlug: string }) {
 }
 
 /**
- * TracesOverview
- * Shows a summary of traces performance metrics on the home page, labelled
- * with the time window the numbers cover — an unlabelled delta is noise.
- */
-/**
- * How the overview presents itself.
- *
- * `full` is the page-wide card the classic home has always had. The other two
- * are the Langy home's, and they answer the same question differently:
- *
- *   - `strip`   the figures alone, with the chart one labelled click away. The
- *               lit block above wants the fold, and a reader glancing at
- *               "how is my project doing" is answered by the figures and their
- *               deltas without a curve.
- *   - `trend`   the figures with a short curve under them, always visible. For
- *               the reader whose question is really "and which way is it
- *               going", where making them click is making them ask twice.
- *
- * Both are offered rather than one being declared correct, because which is
- * right depends on how the reader uses the page. The dev state switcher flips
- * between them.
+ * TracesOverview: trace metrics labelled by time window (unlabelled delta
+ * is noise). `full` is the classic home's card; `strip`/`trend` are the
+ * Langy home's two answers, both offered since which is right depends on usage.
  */
 export type TracesOverviewVariant = "full" | "strip" | "trend";
 
 /**
- * How many daily readings a curve needs before it is telling the truth.
- *
- * One point is a dot. Two is a slope with no evidence behind it, and a slope
- * is exactly what a reader takes away from a chart, so a two-point line is
- * worse than no line: it manufactures a direction out of a single change that
- * might be a weekday. Four readings is the first window where a curve shows
- * shape rather than noise, so below that the figures carry it alone and the
- * card offers the thing that would actually help, which is a wider window.
+ * How many daily readings a curve needs before it's telling the truth: two
+ * points is a slope with no evidence, worse than no line. Four is the
+ * first window that shows shape, not noise.
  */
 const MIN_POINTS_FOR_A_TREND = 4;
 
@@ -122,15 +99,9 @@ const MIN_POINTS_FOR_A_TREND = 4;
 const WIDER_WINDOW = { key: "30d", label: "Last 30 days" } as const;
 
 /**
- * How tall the curve under the figures is drawn, in pixels.
- *
- * Not the chart default. That default is sized for a dashboard, where the
- * chart IS the page and a reader is measuring values off it. Here the curve
- * answers one question the figures cannot — which way it is going — and at the
- * dashboard height a handful of daily readings become a thin line adrift in
- * white space, with the sections below it pushed off the fold. Sized to the
- * figures it belongs to instead: tall enough to show shape, short enough that
- * the row of numbers stays the thing being read.
+ * How tall the curve is, in pixels — not the chart default (sized for a
+ * dashboard). This curve only answers "which way is it going", so it's
+ * sized to stay secondary: tall enough for shape, short enough not to dominate.
  */
 const TREND_HEIGHT = 160;
 

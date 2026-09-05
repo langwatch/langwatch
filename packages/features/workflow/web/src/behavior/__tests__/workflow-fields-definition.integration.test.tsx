@@ -1,11 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The shared studio field editor (Results / Inputs / Outputs on every node
- * panel) picks a field's type through the same outline FieldTypeSelect used
- * across the app - an icon plus the type NAME (Text, Number, ...) that reads
- * as clickable - rather than a bare decorative type label over a hidden
- * native select. Picking a type writes it back through the node.
+ * The shared studio field editor picks a field's type through the same outline FieldTypeSelect used app-wide, not a bare decorative label over a hidden native select. Picking a type writes it back through the node.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";

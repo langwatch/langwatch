@@ -9,12 +9,9 @@ import { usePersonalContext } from "../../behavior/use-personal-context";
 import { PersonalWorkspaceLayout } from "../../ui/sections/personal-workspace-layout";
 
 /**
- * The personal Pull Requests page: what each pull request cost in assistant
- * usage. Which pull requests are listed is personal; what each one cost spans
- * every project the viewer may read. Routing and the layout only, the table
- * owns its own reads.
- *
- * Spec: specs/coding-agent/pull-request-linkage.feature.
+ * The personal Pull Requests page: what each cost in assistant usage.
+ * Which are listed is personal; the cost spans every project the viewer
+ * may read. Routing and layout only, the table owns its own reads.
  */
 export function PersonalPullRequestsScreen() {
   const { personalProjectId } = usePersonalContext();
@@ -44,9 +41,7 @@ export function PersonalPullRequestsScreen() {
 }
 
 /**
- * The activity tables answer a port of their own, and this screen is what
- * mounts it: `@langwatch/coding-agent-web` is not a governed web package, so
- * `apps/ui` may not import it, and the screen family that renders its tables
- * is where the bridge belongs.
+ * The activity tables answer a port of their own, mounted here since
+ * `@langwatch/coding-agent-web` is ungoverned and `apps/ui` may not import it.
  */
 export default withCodingAgentHost(PersonalPullRequestsScreen);

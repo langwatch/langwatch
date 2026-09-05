@@ -1,13 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for the agent node's three-way sync: the drawer
- * editor, the workflow DSL node (what executes), and the agent library
- * record. Pins the customer-reported regressions: Save visually
- * reverting the code, the starter template overwriting loaded code,
- * and saves never reaching the node's executed parameters.
- *
- * UX contract: specs/workflows/agent-node-sync.feature.
+ * The agent node's three-way sync (drawer editor, DSL node, library record). Pins regressions: Save reverting the code, template overwriting loaded code, saves not reaching executed params. See specs/workflows/agent-node-sync.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

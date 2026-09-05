@@ -1,25 +1,7 @@
 /**
- * Every workflow in the project, and the way to make another one.
- *
- * A MOVE of `platform/app/src/pages/[project]/workflows.tsx`. What changed is
- * everything a screen may not own and nothing else:
- *
- * - `DashboardLayout` does not travel. Chrome belongs to the route tree, and
- *   this page is a child of a layout route the composing application serves.
- * - `withPermissionGuard("workflows:view")` is stated by the frontend feature
- *   in front of the loader rather than wrapped around the module here.
- * - THE CARD LINK IS A NAVIGATION, not an anchor. `~/components/ui/link` is the
- *   application's router-aware Link and a feature package may not import a
- *   router; the card asks the host to go to `/:project/studio/:id`, which is the
- *   same address the anchor pointed at and an address `platform/app` still
- *   serves. The `js-inner-menu` guard travels with it — a click inside the row
- *   menu must not also open the studio behind the menu.
- * - `LangyContextTarget` and `workflowContextChip` do NOT travel.
- *   `@langwatch/langy-web` is ungoverned and every consumer compiles its
- *   source, which needs an `es2023` library and a stylesheet declaration this
- *   package would have had to adopt globally. The same loss the me,
- *   automations, agents, analytics and evaluations families each recorded, and
- *   this is the sixth.
+ * Every workflow in the project, and the way to make another. A MOVE of
+ * `platform/app`'s page: chrome/guard no longer travel. `LangyContextTarget`
+ * does NOT travel since `@langwatch/langy-web` is ungoverned.
  */
 
 import { Grid, Skeleton, Spacer, useDisclosure, VStack } from "@chakra-ui/react";
@@ -37,11 +19,9 @@ import { WorkflowListCard } from "../../ui/sections/workflow-list-card";
 export const WORKFLOWS_PAGE_PERMISSION = "workflows:view";
 
 /**
- * Whether this click landed inside the card's own overflow menu.
- *
- * The menu is rendered INSIDE the card, so a click on "Delete" is also a click
- * on the card. Walking up to the marker class is what tells the two apart, and
- * it is the platform page's own guard, kept.
+ * Whether this click landed inside the card's own overflow menu. The menu
+ * renders INSIDE the card, so "Delete" is also a card click; walking up to
+ * the marker class tells them apart (the platform page's guard, kept).
  */
 function isInnerMenuClick(event: MouseEvent<HTMLElement>): boolean {
   let target = event.target as HTMLElement | null;

@@ -1,24 +1,7 @@
 /**
- * The standalone chat address for a published workflow.
- *
- * A MOVE of `platform/app/src/pages/[project]/chat/[workflow].tsx` together with
- * the `ChatBox` half of
- * `platform/app/src/optimization_studio/components/ChatWindow.tsx`, whose only
- * consumer this address was.
- *
- * THIS PAGE HAS NO CHROME AND NEVER HAD ANY. It paints the product mark and one
- * card on a full-height panel, which is why the loading screen and the logo
- * travelled with it as family-local copies: there is nothing else on the page
- * to look at while the published version loads.
- *
- * THE `ChatWindow` DIALOG DID NOT TRAVEL, and it is a deletion rather than a
- * loss: it wrapped `ChatBox` in a Test Message dialog and NOTHING in the
- * repository rendered it. The studio's own test-message affordance is its own.
- *
- * `dynamic(..., { ssr: false })` did not travel either. It was a Next.js
- * artefact — the compat shim's own comment on the page said so — and the chat
- * box is imported directly here. The `isClient` gate it guarded goes with it:
- * this application does not render on a server.
+ * The standalone chat address for a published workflow. Has no chrome —
+ * paints the product mark and one card full-height. No `isClient`/SSR
+ * gate, since this app never renders on a server.
  */
 
 import { Box, Card as ChakraCard } from "@chakra-ui/react";

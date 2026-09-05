@@ -3,11 +3,9 @@ import { parseFragment } from "@langwatch/trace-web/surfaces/trace-filters";
 import { resolveTracesHrefForKey, tracesHrefForKey } from "../model/traces-href-for-key";
 
 /**
- * The link is only as good as the Trace Explorer's fragment format, which is
- * exercised for real here rather than asserted as a string, so a change to it
- * breaks this test instead of the feature. The query-language attribute
- * syntax the fragment carries is trace-server's own contract, covered there —
- * a gateway web package cannot depend on it directly (package-boundaries).
+ * Exercises the Trace Explorer's real fragment format rather than asserting
+ * a string, so a format change breaks this test, not the feature. The
+ * query-language syntax it carries is trace-server's own contract.
  */
 describe("tracesHrefForKey", () => {
   const href = tracesHrefForKey({

@@ -1,34 +1,7 @@
 /**
- * "Choose Evaluator": the picker every flow that needs one opens.
- *
- * Moved from `platform/app/src/components/evaluators/EvaluatorListDrawer.tsx`.
- * It is a REGISTERED drawer — `?drawer.open=evaluatorList` — opened by flows
- * that are not this family's (an evaluation choosing its judge, a workflow node),
- * which is why it belongs to the family that owns evaluators rather than to any
- * one of its callers.
- *
- * Four substitutions, none of them behavioural:
- *
- *   - `Drawer` and `ConfirmDialog` come from the Design System rather than from
- *     `~/components/ui/drawer` and `components/gateway/ConfirmDialog`. The
- *     confirm dialog's props are the same four words either way.
- *   - The two comparison evaluator ids come from `@langwatch/experiment-web`,
- *     which is where `experiments-v3/types` went; this package already depends
- *     on it.
- *   - The transport is this package's own map. tRPC keys its cache on the
- *     procedure PATH, so `evaluators.getAll` fired here and the same call from
- *     a page `platform/app` still serves are one cache entry, and the
- *     invalidation after a delete still reaches both.
- *   - The project comes off the host port rather than from
- *     `useOrganizationTeamProject`.
- *
- * WHAT THE PICKER'S ACTIONS STILL ASK FOR AND DO NOT YET GET: "New Evaluator",
- * "Edit" and the code-evaluator edit all open ANOTHER registered drawer —
- * `evaluatorCategorySelector`, `evaluatorEditor`, `codeEvaluatorEditor` — and
- * those three are still `platform/app` modules behind `EvaluatorEditorShared`,
- * whose own drawer navigation runs through `@langwatch/workflow-web`'s studio
- * host rather than through this one. The address is written and nothing opens,
- * which is the recorded gap one drawer further in.
+ * "Choose Evaluator": the picker every flow opens, a REGISTERED drawer
+ * belonging to the family that owns evaluators. KNOWN GAP: "New
+ * Evaluator"/"Edit" still open drawers in `platform/app`.
  */
 
 import { Button, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
@@ -51,13 +24,9 @@ import { EvaluatorListItem } from "../blocks/evaluator-list-item";
 import { EvaluatorListEmptyState } from "../elements/evaluator-list-empty-state";
 
 /**
- * One row of the picker, as this package's own transport map answers it.
- *
- * `platform/app` typed these against `EvaluatorWithFields`, which is the shape
- * its root router's inference produced. This map answers `getAll` with the
- * contract's `Evaluator`, which the list is exactly wide enough for — it never
- * reads an evaluator's fields — so the row is named from the contract rather
- * than from a router type this package may not see.
+ * One row of the picker, as this package's own transport map answers it:
+ * the contract's `Evaluator`, wide enough since the list never reads an
+ * evaluator's fields — not the router-inferred type this package can't see.
  */
 export type EvaluatorListRow = Evaluator;
 

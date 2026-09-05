@@ -1,12 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The standalone chat address for a published workflow.
- *
- * THE PLATFORM PAGE HAD NO SUITE EITHER, and the two things worth pinning are
- * the two states a reader can land in: a workflow with nothing published says
- * so, and one with a published version renders its entry fields and runs over
- * `optimization.chat` — the only run path this address has ever taken.
+ * The standalone chat address: two states worth pinning. Nothing published says so; a published version renders entry fields and runs over `optimization.chat`.
  */
 
 import { cleanup, screen, waitFor } from "@testing-library/react";
@@ -47,12 +42,9 @@ vi.mock("../../../model/workflow-api", () => ({
 }));
 
 /**
- * A published graph with ONE entry field, which is the single-input layout.
- *
- * Built from the package's own blank template rather than hand-written: the
- * screen calls `parseStudioWorkflow`, which is `studioWorkflowSchema.parse` and
- * THROWS on anything that is not a whole graph, so a hand-rolled fixture pins
- * the schema instead of the screen.
+ * A published graph with ONE entry field, built from the package's own
+ * blank template — a hand-rolled fixture would pin the schema instead of
+ * the screen, since `parseStudioWorkflow` THROWS on a partial graph.
  */
 const publishedWithOneInput = {
   dsl: {

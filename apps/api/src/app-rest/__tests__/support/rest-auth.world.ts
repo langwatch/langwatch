@@ -59,10 +59,9 @@ export type RestAuthKey = Readonly<{
   role?: BuiltinRoleKey;
   grants?: readonly string[];
   /**
-   * What the key's OWNER may still do, live (ADR-092 §9). A decision is the
-   * intersection of the key's own grants with this, so a key minted while its
-   * owner was an organization admin stops reaching what the owner lost. Left
-   * out is a key with no owner ceiling — a service key.
+   * What the key's OWNER may still do, live (ADR-092 §9): a decision is the
+   * intersection of grants with this. Left out for a key with no owner
+   * ceiling — a service key.
    */
   ownerGrants?: readonly string[];
   /**
@@ -178,12 +177,9 @@ export class RestAuthWorld {
   }
 
   /**
-   * Whether this key's ceiling admits the permission at all.
-   *
-   * The key's own grants INTERSECTED with what its owner may still do: a key
-   * can never exceed its owner's live permissions, so demoting the owner
-   * narrows every key they minted without touching the key rows.
-   * @see specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
+   * Whether this key's ceiling admits the permission: grants INTERSECTED
+   * with what its owner may still do, so demoting the owner narrows every
+   * key they minted without touching the key rows.
    */
   private permits(key: ApiKeyRecord, permission: string): boolean {
     const byKey = key.grants

@@ -8,11 +8,9 @@ import { withCodingAgentHost } from "../../ui/sections/coding-agent-host-provide
 import { useOrganizationTeamProject } from "../../behavior/personal-workspace-session";
 
 /**
- * The project's Pull Requests page: what each pull request this project's
- * sessions touched cost in assistant usage. Routing and the layout only, the
- * table owns its own reads.
- *
- * Spec: specs/coding-agent/project-menu-links.feature.
+ * The project's Pull Requests page: what each pull request its sessions
+ * touched cost in assistant usage. Routing and layout only, the table
+ * owns its own reads. Spec: specs/coding-agent/project-menu-links.feature.
  */
 export function ProjectPullRequestsScreen() {
   const { project, isResolved } = useOrganizationTeamProject();
@@ -42,9 +40,7 @@ export function ProjectPullRequestsScreen() {
 }
 
 /**
- * The activity tables answer a port of their own, and this screen is what
- * mounts it: `@langwatch/coding-agent-web` is not a governed web package, so
- * `apps/ui` may not import it, and the screen family that renders its tables
- * is where the bridge belongs.
+ * The activity tables answer a port of their own, mounted here since
+ * `@langwatch/coding-agent-web` is ungoverned and `apps/ui` may not import it.
  */
 export default withCodingAgentHost(ProjectPullRequestsScreen);
