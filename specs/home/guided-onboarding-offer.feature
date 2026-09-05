@@ -35,6 +35,13 @@ Feature: Guided onboarding offer on the home pages
     Then the pill offers the coding path
 
   @unit
+  Scenario: the gateway, governance and personal homes read the organization's guided state
+    Given the governance home renders with some project ambient
+    Then the pill reads the organization's guided state rather than that project's checks
+    And it shows whether or not the ambient project has traces
+    And it is still hidden once governance is done
+
+  @unit
   Scenario: the offer is hidden while Langy is guiding that same space
     Given the current path is llmops
     When the project home renders

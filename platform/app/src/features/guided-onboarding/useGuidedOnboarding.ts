@@ -43,12 +43,15 @@ export interface GuidedOnboardingView {
   isLoading: boolean;
 }
 
-export function useGuidedOnboarding(): GuidedOnboardingView {
+export function useGuidedOnboarding(
+  options: { enabled?: boolean } = {},
+): GuidedOnboardingView {
   const flag = useGuidedOnboardingFlag();
   const { organizationId } = flag;
+  const enabled = options.enabled ?? true;
   const stateQuery = api.onboarding.getGuidedState.useQuery(
     { organizationId: organizationId ?? "" },
-    { enabled: !!organizationId && flag.enabled },
+    { enabled: enabled && !!organizationId && flag.enabled },
   );
   return {
     guided: flag.enabled && !!stateQuery.data,

@@ -91,16 +91,18 @@ export const TOUR_STEPS: Record<GuidedPath, readonly TourStep[]> = {
       onArrive: ({ navigate }) => navigate("/gateway/virtual-keys"),
     },
     {
+      /* the drawer slides over this button, so it stays closed while the
+         caption points at it and opens on the way to the name field */
       target: "gw-new-key",
       text: "Let's create your first one right now.",
       placement: "bottom",
       click: true,
-      onArrive: ({ actions }) => actions.openVirtualKeyCreate?.(),
     },
     {
       target: "vk-name",
       text: "I'll name it for you.",
       placement: "right",
+      before: ({ actions }) => actions.openVirtualKeyCreate?.(),
       onArrive: ({ actions }) =>
         actions.typeVirtualKeyName?.(TOUR_VIRTUAL_KEY_NAME),
     },

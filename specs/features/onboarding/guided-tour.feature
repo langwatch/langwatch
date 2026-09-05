@@ -173,7 +173,10 @@ Feature: Guided onboarding tour
   Scenario: the gateway tour opens the real create drawer, types the name and submits it
     Given the gateway tour is running on the virtual keys page
     When the cursor lands on the New key button
+    Then the caption points at it with the drawer still closed
+    When the tour leaves that step
     Then the create drawer opens through the page's registered action
+    And the name field is measured once the drawer has mounted
     When the cursor lands on the name field
     Then "production-app" is typed into it one character at a time
     When the cursor lands on Create

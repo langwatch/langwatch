@@ -4,6 +4,12 @@
  * governance, /me) offers its own path. Hidden while Langy is guiding that
  * same space, once that space is done, and while any tour is on screen.
  *
+ * On the project home its state comes with the onboarding checks the home
+ * already loads, and a project with traces is past the offer. The gateway,
+ * governance and personal homes are about the organization, not whichever
+ * project happens to be ambient, so there it reads the organization's
+ * guided state the tour host already holds.
+ *
  * Clicking it begins the path on the organization, opens the panel docked,
  * runs the path's tour when it has one, and queues the kickoff that
  * continues the conversation the guided onboarding already attached.
@@ -26,7 +32,10 @@ import type { GuidedPath } from "../paths";
 import { buildKickoff, firstNameOf } from "../tour/GuidedOnboardingHost";
 import { useGuidedTourStore } from "../tour/guidedTourStore";
 import { pathHasTour } from "../tour/tourSteps";
-import { useGuidedOnboardingFlag } from "../useGuidedOnboarding";
+import {
+  useGuidedOnboarding,
+  useGuidedOnboardingFlag,
+} from "../useGuidedOnboarding";
 
 /**
  * The path this space offers, or none when the space is guided or done, or
@@ -56,12 +65,14 @@ export function GuidedOnboardingOffer({ space }: { space: GuidedSpace }) {
 
 function GuidedOnboardingOfferInner({ space }: { space: GuidedSpace }) {
   const { enabled, organizationId } = useGuidedOnboardingFlag();
-  const { isNewProject, guidedOnboarding } = useProjectReach();
-  const touring = useGuidedTourStore((s) => s.running);
   const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
+  const inProject = space === "project";
+  const { isNewProject, guidedOnboarding } = useProjectReach();
+  const orgView = useGuidedOnboarding({ enabled: !inProject });
+  const touring = useGuidedTourStore((s) => s.running);
   const session = useRequiredSession();
   const { emit } = useAnalytics();
   const utils = api.useUtils();
@@ -69,16 +80,24 @@ function GuidedOnboardingOfferInner({ space }: { space: GuidedSpace }) {
   const recordTour = api.onboarding.recordTour.useMutation();
   const [busy, setBusy] = useState(false);
 
+  const check: GuidedOnboardingCheck | null = inProject
+    ? guidedOnboarding
+    : orgView.state && {
+        variant: null,
+        paths: orgView.state.paths,
+        currentPath: orgView.state.currentPath,
+        donePaths: orgView.state.donePaths,
+      };
   if (
     !enabled ||
-    !guidedOnboarding ||
+    !check ||
     !organizationId ||
-    !isNewProject ||
+    (inProject && !isNewProject) ||
     touring
   ) {
     return null;
   }
-  const path = offeredPath({ space, state: guidedOnboarding });
+  const path = offeredPath({ space, state: check });
   if (!path) return null;
 
   const begin = async () => {

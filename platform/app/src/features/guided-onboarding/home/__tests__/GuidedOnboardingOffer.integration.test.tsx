@@ -56,6 +56,7 @@ vi.mock("~/components/home/useProjectReach", () => ({
   useProjectReach: () => ({ isNewProject, guidedOnboarding: guidedState }),
 }));
 
+let orgGuidedState: GuidedOnboardingState = { paths: [], donePaths: [] };
 const beginPathMutateAsync = vi.fn();
 const recordTourMutate = vi.fn();
 const invalidate = vi.fn();
@@ -66,6 +67,12 @@ vi.mock("~/utils/api", () => ({
       integrationsChecks: { getCheckStatus: { invalidate } },
     }),
     onboarding: {
+      getGuidedState: {
+        useQuery: (_input: unknown, opts: { enabled: boolean }) => ({
+          data: opts.enabled ? orgGuidedState : undefined,
+          isLoading: false,
+        }),
+      },
       beginPath: { useMutation: () => ({ mutateAsync: beginPathMutateAsync }) },
       recordTour: { useMutation: () => ({ mutate: recordTourMutate }) },
     },
@@ -101,6 +108,7 @@ const pill = () => screen.queryByTestId("guided-onboarding-offer");
 describe("GuidedOnboardingOffer", () => {
   beforeEach(() => {
     flagEnabled = true;
+    orgGuidedState = { paths: [], donePaths: [] };
     isNewProject = true;
     guidedState = { variant: "guided", paths: [], donePaths: [] };
     beginPathMutateAsync.mockReset();
@@ -151,11 +159,7 @@ describe("GuidedOnboardingOffer", () => {
 
     /** @scenario the offer is hidden once the space is done */
     it("hides once the space's path is done", () => {
-      guidedState = {
-        variant: "guided",
-        paths: ["gateway"],
-        donePaths: ["gateway"],
-      };
+      orgGuidedState = { paths: ["gateway"], donePaths: ["gateway"] };
       renderOffer("gateway");
       expect(pill()).toBeNull();
     });
@@ -169,8 +173,7 @@ describe("GuidedOnboardingOffer", () => {
 
     /** @scenario a path picked on the value screen but not started yet is offered in its space */
     it("offers a picked path that has not started", () => {
-      guidedState = {
-        variant: "guided",
+      orgGuidedState = {
         paths: ["llmops", "gateway"],
         currentPath: "llmops",
         donePaths: [],
@@ -181,14 +184,32 @@ describe("GuidedOnboardingOffer", () => {
 
     /** @scenario a space the user never picked is offered too */
     it("offers a space that was never picked", () => {
-      guidedState = {
-        variant: "guided",
+      orgGuidedState = {
         paths: ["llmops"],
         currentPath: "llmops",
         donePaths: [],
       };
       renderOffer("governance");
       expect(pill()).toBeInTheDocument();
+    });
+  });
+
+  describe("given a space that is about the organization", () => {
+    /** @scenario the gateway, governance and personal homes read the organization's guided state */
+    it("reads the organization's guided state and ignores the ambient project's traces", () => {
+      isNewProject = false;
+      guidedState = null as unknown as GuidedOnboardingCheck;
+      orgGuidedState = {
+        paths: ["llmops"],
+        currentPath: "llmops",
+        donePaths: [],
+      };
+      renderOffer("governance");
+      expect(pill()).toBeInTheDocument();
+      cleanup();
+      orgGuidedState = { paths: ["governance"], donePaths: ["governance"] };
+      renderOffer("governance");
+      expect(pill()).toBeNull();
     });
   });
 

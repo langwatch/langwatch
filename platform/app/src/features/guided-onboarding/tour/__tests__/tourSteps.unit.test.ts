@@ -92,6 +92,8 @@ describe("tour step tables", () => {
       TOUR_STEPS.gateway[0]!.onArrive?.(c);
       expect(c.navigate).toHaveBeenCalledWith("/gateway/virtual-keys");
       TOUR_STEPS.gateway[1]!.onArrive?.(c);
+      expect(c.actions.openVirtualKeyCreate).not.toHaveBeenCalled();
+      TOUR_STEPS.gateway[2]!.before?.(c);
       expect(c.actions.openVirtualKeyCreate).toHaveBeenCalled();
       TOUR_STEPS.gateway[2]!.onArrive?.(c);
       expect(c.actions.typeVirtualKeyName).toHaveBeenCalledWith(

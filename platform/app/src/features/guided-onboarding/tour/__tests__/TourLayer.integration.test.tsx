@@ -329,6 +329,8 @@ describe("TourLayer", () => {
       expect(screen.getByTestId("tour-caption")).toHaveTextContent(
         "Let's create your first one right now.",
       );
+      expect(openVirtualKeyCreate).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByText("Next"));
       expect(openVirtualKeyCreate).toHaveBeenCalled();
     });
   });
