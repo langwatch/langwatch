@@ -2439,8 +2439,13 @@ Body (only `name` is required):
 ```
 
 - `scopes` defaults to the calling project. Team- and org-scoped keys need a scoped API key holding `virtualKeys:manage` at each requested scope; legacy project keys can only mint keys for their own project.
-- An org- or team-scoped key also needs a place for its traces and spend to land, and has to say where: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key). Without it, and without exactly one project scope naming a live project to take it from, creation refuses with `gateway_trace_project_ambiguous`. The same refusal covers a key scoped to several projects at once. An organization with no other live projects is exempt and the key gets its oldest live governance project, because no other project can be named; one with no governance project either refuses with `trace_project_required`. A `trace_project_id` that names a project this organization does not have refuses with `gateway_trace_project_unknown` rather than quietly resolving to somewhere else.
-- `trace_project_id` is decided once, when the key is written, and stored on it. Changing what the key is scoped to therefore never moves where its traces and spend land; send `trace_project_id` on the update to move it, validated the same way create validates it. Sending it as explicit `null` does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses, so it lands on the key's single project scope when exactly one names a live project, falls back to the organization's oldest live governance project when there are no other live projects to choose from, and is refused with `gateway_trace_project_ambiguous` when no scope selects a destination and the organization has live projects that could have been named. A key written before this was stored, in an organization that had no governance project to give it, can carry `null`: its traces are dropped and no budget counts its spend, so give it a `trace_project_id`.
+- An org- or team-scoped key also needs a place for its traces and spend to land, and has to say where. Pass `trace_project_id`, which requires `virtualKeys:manage` on that project. It is a destination, not a scope, and grants no access to the key.
+- Without `trace_project_id`, and without exactly one project scope naming a live project to take it from, creation refuses with `gateway_trace_project_ambiguous`. The same refusal covers a key scoped to several projects at once.
+- An organization with no other live projects is exempt, because no other project can be named, and the key gets its oldest live governance project. One with no governance project either refuses with `trace_project_required`. A `trace_project_id` that names a project this organization does not have refuses with `gateway_trace_project_unknown` rather than quietly resolving to somewhere else.
+- `trace_project_id` is decided once, when the key is written, and stored on it. Changing what the key is scoped to therefore never moves where its traces and spend land. Send `trace_project_id` on the update to move it, validated the same way create validates it.
+- Sending `trace_project_id` as explicit `null` does not clear it. It asks for the destination to be worked out again from what the key is now, under the same rules create uses.
+- That second pass lands on the key's single project scope when exactly one names a live project, and falls back to the organization's oldest live governance project when there are no other live projects to choose from. It is refused with `gateway_trace_project_ambiguous` when no scope selects a destination and the organization has live projects that could have been named.
+- A key written before this was stored, in an organization that had no governance project to give it, can carry `null`. Its traces are dropped and no budget counts its spend, so give it a `trace_project_id`.
 - `trace_project_archived` says the project the key traces into has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Point the key somewhere else if that is not what you want.
 - `budget` creates a budget atomically with the key and manages exactly that row on later updates: the key can never exist without the cap you asked for. Windows: `day`, `week`, `month`.
 - `routing_mode` is one of `none` (default: no silent failover), `fallback_all`, or `policy` (requires `routing_policy_id`).
@@ -2495,7 +2500,9 @@ Body (all fields optional):
 }
 ```
 
-`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope, and does not move where the key's traces and spend land. `trace_project_id` does: omitting it leaves the destination alone, a value moves it, and explicit `null` re-resolves it under the create-time rules rather than clearing it. `budget: null` archives the key's own cap (spend history is retained); omitting `budget` leaves it alone. `expires_at` follows the same three-way rule: omitted leaves the date alone, `null` clears it, and a date moves it. An expired key accepts this patch like any other, which is how it goes back into service without a new secret.
+`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope. It does not move where the key's traces and spend land. `trace_project_id` does: omitting it leaves the destination alone, a value moves it, and explicit `null` re-resolves it under the create-time rules rather than clearing it.
+
+`budget: null` archives the key's own cap and retains its spend history; omitting `budget` leaves it alone. `expires_at` follows the same three-way rule: omitted leaves the date alone, `null` clears it, and a date moves it. An expired key accepts this patch like any other, which is how it goes back into service without a new secret.
 
 ### Rotate, disable, enable, revoke
 
@@ -2625,7 +2632,9 @@ POST /budgets/:id/reset
 POST /budgets/:id/reset?end_user_id=u_123      // one end-user bucket of a template
 ```
 
-Moves the budget's period boundary to now and recomputes the next reset (`gatewayBudgets:update`; optional JSON body `{"reason": "..."}` for the audit log). Recorded spend is **never** mutated: the ledger and every emitted billing event are immutable, so reconciliation is unaffected. On calendar windows this truncates the running period and the next boundary stays calendar; on `manual` windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets one end-user bucket's boundary and leaves the template period untouched. Returns the updated budget row.
+Moves the budget's period boundary to now and recomputes the next reset (`gatewayBudgets:update`; optional JSON body `{"reason": "..."}` for the audit log). Recorded spend is **never** mutated: the ledger and every emitted billing event are immutable, so reconciliation is unaffected.
+
+On calendar windows this truncates the running period and the next boundary stays calendar; on `manual` windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets one end-user bucket's boundary and leaves the template period untouched. Returns the updated budget row.
 
 ### End-user spend
 
@@ -3421,7 +3430,9 @@ for event in langwatch.spend_events.iterate(from_ms=from_ms, to_ms=to_ms, virtua
   <img src="/images/ai-gateway/billing-events.png" alt="The Billing Events page over the last 7 days with the Time, Request, Virtual key, End user, Model, Tokens, Cost and Status columns" />
 </Frame>
 
-The list labels a `success` event **confirmed**, an `error` event **failed** and a `settled` event **settled**. A realtime session mint stays **admitted** until its outcome arrives, with zero tokens and zero cost, because the call it opened has not started yet. The **Request** column shows the start of the `X-LangWatch-Gateway-Request-Id` value. A served request shows the model the gateway resolved and the provider credential that answered; a refused request keeps the model name as the client sent it. The **Tokens** column shows input, output, cache read (`cr`), cache write (`cw`) and reasoning (`rsn`) counts. It omits every counter whose value is zero.
+The list labels a `success` event **confirmed**, an `error` event **failed** and a `settled` event **settled**. A realtime session mint stays **admitted** until its outcome arrives, with zero tokens and zero cost, because the call it opened has not started yet.
+
+The **Request** column shows the start of the `X-LangWatch-Gateway-Request-Id` value. A served request shows the model the gateway resolved and the provider credential that answered; a refused request keeps the model name as the client sent it. The **Tokens** column shows input, output, cache read (`cr`), cache write (`cw`) and reasoning (`rsn`) counts. It omits every counter whose value is zero.
 
 <Note>
 **Also check:** [Budgets](/ai-gateway/budgets) for per-end-user caps that use the same attribution, [Webhooks](/features/webhooks) for endpoint management, and the [Metering and rebilling cookbook](/ai-gateway/cookbooks/metering-and-rebilling) for a complete rebilling flow.
@@ -6533,7 +6544,9 @@ langwatch gateway-budgets list --scope-type virtual-key -f json | \
 
 `spend_available: false` in that output means spend could not be totalled server-side; hold billing until it recovers rather than invoicing a zero.
 
-For **invoicing**, do not poll aggregates: ingest the per-request [spend event stream](/ai-gateway/billing-events) through a signed [webhook endpoint](/features/webhooks) into your own billing ledger, and reconcile against `spend-summaries` checksums at period close. Every event carries exact integer quantities per token class, integer nano-USD cost, the tenant key, the end-user id, and your echoed metadata, which is what a rebilling invoice needs and what an aggregate cannot give you. The full billing loop (receive, verify, dedup, settled supersession, reconcile, period close) is its own cookbook: [Metering and rebilling your customers](/ai-gateway/cookbooks/metering-and-rebilling), with a runnable reference implementation in TypeScript and Python.
+For **invoicing**, do not poll aggregates: ingest the per-request [spend event stream](/ai-gateway/billing-events) through a signed [webhook endpoint](/features/webhooks) into your own billing ledger, and reconcile against `spend-summaries` checksums at period close.
+
+Every event carries exact integer quantities per token class, integer nano-USD cost, the tenant key, the end-user id, and your echoed metadata, which is what a rebilling invoice needs and what an aggregate cannot give you. The full billing loop (receive, verify, dedup, settled supersession, reconcile, period close) is its own cookbook: [Metering and rebilling your customers](/ai-gateway/cookbooks/metering-and-rebilling), with a runnable reference implementation in TypeScript and Python.
 
 Rating stays in your billing system: you define the markup over the gateway-reported cost (or bill passthrough plus a management fee), and events carry `rate_version` so cost is re-derivable.
 
@@ -6570,7 +6583,23 @@ Because the response is standard OpenAI-compatible, your error handler only need
 
 Every write through your backend credential is audited with action, target, and before/after metadata. Scoped API keys attribute the write to the key's owning user; legacy project keys carry no user, so their writes record the machine principal `svc_<your_project_id>`. Filter the audit log on target `virtual_key` to get a per-customer provisioning history, under **/settings/audit-log** in the LangWatch UI.
 
-If you need SIEM export: query ONLY the gateway-shape `AuditLog` rows with a read-only role scoped to that table, and ship the filtered result set, never a whole-database dump (which would carry unrelated, sensitive application data). For example, a daily job running `COPY (SELECT id, "organizationId", "userId", action, "targetKind", "targetId", "createdAt" FROM "AuditLog" WHERE "organizationId" = '<your-org-id>' AND "targetKind" IN ('virtual_key', 'budget', 'model_provider', 'routing_policy', 'cache_rule') AND "createdAt" >= now() - interval '1 day') TO STDOUT WITH CSV` into your SIEM's ingestion path: an explicit column list pinned to your organization, leaving the before/after payloads out unless your SIEM genuinely needs them. There is no public REST audit-export endpoint in v1, see [Audit log → Querying programmatically](/ai-gateway/audit#querying-programmatically) for the supported paths (UI CSV download, direct SQL).
+If you need SIEM export: query ONLY the gateway-shape `AuditLog` rows with a read-only role scoped to that table, and ship the filtered result set, never a whole-database dump (which would carry unrelated, sensitive application data).
+
+For example, a daily job piping this into your SIEM's ingestion path:
+
+```sql
+COPY (
+  SELECT id, "organizationId", "userId", action, "targetKind", "targetId", "createdAt"
+  FROM "AuditLog"
+  WHERE "organizationId" = '<your-org-id>'
+    AND "targetKind" IN ('virtual_key', 'budget', 'model_provider', 'routing_policy', 'cache_rule')
+    AND "createdAt" >= now() - interval '1 day'
+) TO STDOUT WITH CSV
+```
+
+That is an explicit column list pinned to your organization, and it leaves the before/after payloads out unless your SIEM genuinely needs them.
+
+There is no public REST audit-export endpoint in v1. See [Audit log → Querying programmatically](/ai-gateway/audit#querying-programmatically) for the supported paths (UI CSV download, direct SQL).
 
 ## Gotchas
 
@@ -7842,7 +7871,9 @@ Enterprises run AI through many surfaces simultaneously: developer
 CLIs (Claude Code, Codex, Cursor, Gemini CLI), packaged SaaS that
 embed AI (Cowork, Copilot Studio, Workato Genies, ChatGPT Enterprise),
 and bespoke agents written in-house. Each comes with its own auth
-plane, its own admin console, its own audit trail. There's no single
+plane, its own admin console, its own audit trail.
+
+There's no single
 view of what every AI in the org is doing right now, no consistent
 budget enforcement across them, and no single point of control for
 the security team when an agent misbehaves.
