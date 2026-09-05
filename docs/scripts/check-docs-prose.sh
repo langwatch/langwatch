@@ -150,7 +150,9 @@ for file in "${FILES[@]}"; do
   # blank lines end a paragraph and are not counted; everything else is prose.
   # A heading may carry up to three leading spaces, and a table may be written
   # without its outer pipes, in which case the separator row is what identifies
-  # it and the header row above it has to be taken back out of the count.
+  # it and the header row above it has to be taken back out of the count. That
+  # row also ends the paragraph that ran into it, so prose written on either
+  # side of such a table without a blank line is two paragraphs, not one.
   long=$(echo "$cleaned" | awk -v max="$MAX_PARAGRAPH_WORDS" '
     function flush() {
       if (words > max) printf "%d\t%d\n", start, words
@@ -166,7 +168,7 @@ for file in "${FILES[@]}"; do
     /^[[:space:]]*:?-+[-:|[:space:]]*\|[-:|[:space:]]*$/ {
       words -= last
       if (words <= 0) { words = 0; start = 0 }
-      last = 0
+      flush()
       in_table = 1
       next
     }
