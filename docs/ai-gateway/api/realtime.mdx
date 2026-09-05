@@ -3,23 +3,16 @@ title: "Realtime voice"
 description: "Mint a vendor session credential on a virtual key, so voice spend lands under a budget while the media socket runs client to vendor."
 ---
 
-The gateway brokers realtime voice sessions. Your client asks the gateway for
-a session, the gateway checks the budget, resolves your stored provider key,
-calls the vendor's own mint endpoint and hands back what the vendor answered,
-plus a LangWatch session id.
+## How the broker works
 
-The media socket then runs from your client straight to the vendor. The
-gateway is not in the audio path, so it adds nothing to turn latency.
+The gateway mints the vendor's own session credential. Your client asks the gateway for a session, the gateway admits it against the key's budgets and caps, calls the vendor's mint endpoint with your stored provider key, and hands back what the vendor answered plus a LangWatch session id.
 
-What you get: the session is billed against the virtual key like every other
-request, it is admitted against the key's budgets, and one key can be limited
-in how many calls it runs at once.
+The audio never passes through the gateway. The media socket runs from your client straight to the vendor, so the gateway does not add to turn latency and cannot see, record or end a call in progress.
+
+One session is one spend record: admitted at the mint, settled when the call's usage arrives.
 
 <Note>
-The gateway does not carry the voice socket, so it cannot end a call that is
-already running. A voice budget admits at session start and reconciles when
-the call ends. Overshoot for voice is bounded by the length of a call, not by
-the size of one request.
+Because the gateway is not in the audio path, a voice budget admits at session start and reconciles when the call ends. Overshoot on voice is bounded by the length of a call.
 </Note>
 
 ## ElevenLabs Conversational AI
@@ -27,95 +20,55 @@ the size of one request.
 Mint a signed URL for one hosted agent.
 
 ```bash
-curl "$LANGWATCH_GATEWAY_URL/v1/convai/conversation/get-signed-url?agent_id=agent_123" \
+curl "https://gateway.langwatch.ai/v1/convai/conversation/get-signed-url?agent_id=agent_123" \
   -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY"
 ```
 
-The path and the header are ElevenLabs' own, so a client that already speaks
-to ElevenLabs changes its base URL and its key, and nothing else. The answer
-is the vendor's, with one added key:
+The path and the header are ElevenLabs' own, so a client that already talks to ElevenLabs changes only its base URL and its key. `agent_id` is required: a signed URL is bound to one agent, and a request without it answers `400 bad_request`.
+
+The answer is the vendor's own body with one added key:
 
 ```json
 {
-  "signed_url": "wss://api.elevenlabs.io/v1/convai/conversation?agent_id=…&conversation_signature=…&conversation_id=…",
-  "langwatch": { "session_id": "req_…" }
+  "signed_url": "wss://api.elevenlabs.io/v1/convai/conversation?agent_id=agent_123&conversation_signature=...&conversation_id=conv_456",
+  "langwatch": { "session_id": "req_01K6Y3M8QF7W2VZ4N9DXTB5C0A" }
 }
 ```
 
-The same id is on the `X-LangWatch-Session-Id` response header, so a client
-that parses the vendor shape strictly can read it there instead.
+The same id is on the `X-LangWatch-Session-Id` response header, so a client that parses the vendor shape strictly reads it there instead.
 
-Open the socket with `signed_url` exactly as returned. The gateway asks
-ElevenLabs for the conversation id at mint time, so the call is already joined
-to its spend record before the socket exists.
+Open the socket with `signed_url` exactly as returned. The gateway asks ElevenLabs for the conversation id at mint time, so the call is joined to its spend record before the socket exists.
 
-### Closing the session
+### Closing an ElevenLabs session
 
-ElevenLabs reports cost and duration after the call, not over the socket. The
-gateway reads that report in two ways, and either one is enough:
+ElevenLabs reports cost and duration after the call, not over the socket. LangWatch reads that report two ways, and either one settles the session:
 
-1. **The post-call webhook.** Point your workspace webhook at
-   `$LANGWATCH_GATEWAY_URL/v1/convai/webhook/<model-provider-id>`
-   and store the webhook secret on the ElevenLabs provider in Settings ->
-   Model Providers, under `ELEVENLABS_WEBHOOK_SECRET`. The model provider id
-   is the row id shown on that provider. Deliveries are verified against that
-   secret; a provider with no secret stored answers 404.
+1. **The post-call webhook.** Point your ElevenLabs workspace webhook at `https://gateway.langwatch.ai/v1/convai/webhook/<model-provider-id>` and store the webhook secret on that provider row. See [ElevenLabs](/ai-gateway/api/elevenlabs#post-call-webhook) for the route, the signature check and the status codes.
+2. **The poller.** Two minutes after a mint, LangWatch reads the conversation back from ElevenLabs by its own id.
 
-   The URL is on the gateway, the same host as the two mints and the usage
-   report. The gateway is built to be public, so a delivery reaches it in any
-   topology where voice already works. Verification stays on the LangWatch
-   app, which holds the secret; the gateway passes the raw bytes through
-   untouched, because the signature covers them.
-2. **The reconciler.** If no webhook arrives, LangWatch reads the conversation
-   back from ElevenLabs by its own id, a couple of minutes after the mint. The
-   webhook is faster; it is not required.
+A session neither of them closes settles as cost unknown, and a report arriving later replaces that record.
 
-A session neither of them closes settles as cost unknown and is flagged for
-reconciliation, and a report arriving later still replaces that record.
-
-<Note>
-The reconciler exists because webhook delivery cannot be relied on as the only
-path. A retry is not guaranteed: ElevenLabs does not retry every failed
-delivery, and retries are off for HIPAA workflows. On top of that, a webhook
-is disabled once it has 10 or more consecutive failures **and** its last
-success is either older than 7 days or has never happened, which would stop
-delivery for every session on it.
-
-So if the webhook were the only path, one rejected delivery would lose that
-call's billing data. It is not the only path. The reconciler asks the vendor
-for the same numbers on its own schedule, so a lost delivery costs a couple of
-minutes rather than a charge, and a workspace whose single webhook slot is
-already used for something else still bills correctly.
-</Note>
-
-Only the `post_call_transcription` event is acted on. If you enable
-`post_call_audio` or `call_initiation_failure` on the same webhook, LangWatch
-acknowledges them and does nothing: they name the conversation but carry no
-duration, and a call confirmed at zero cannot be corrected afterwards.
+Only the `post_call_transcription` event is applied. `post_call_audio` and `call_initiation_failure` are acknowledged and not applied: they name the conversation and carry no duration.
 
 ## OpenAI Realtime
 
 Mint an ephemeral client secret.
 
 ```bash
-curl -X POST "$LANGWATCH_GATEWAY_URL/v1/realtime/client_secrets" \
+curl -X POST "https://gateway.langwatch.ai/v1/realtime/client_secrets" \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
   -d '{"session":{"type":"realtime","model":"gpt-realtime"},
        "expires_after":{"anchor":"created_at","seconds":600}}'
 ```
 
-This is OpenAI's own path and its own body. Your session declaration reaches
-OpenAI as you wrote it, with two edits: the model is resolved through the
-key's aliases and allowlist, and `expires_after.seconds` is held inside the
-range OpenAI accepts, 10 seconds to 2 hours.
+This is OpenAI's own path and its own body. The gateway reads `session.model` as the model and forwards your declaration as you wrote it, with two edits: the resolved model is written back into `session.model`, and `expires_after.seconds` is held between 10 and 7200. A body that names no expiry is forwarded untouched, so OpenAI's own default applies. The voice, the tools, the turn detection and the audio formats reach OpenAI unchanged. The request body is capped at 256 KiB.
 
-Open the socket with the returned secret. Which form you use depends on where
-the code runs, because a browser `WebSocket` takes only a URL and a
-subprotocol list and cannot set request headers.
+The answer is OpenAI's own body plus `langwatch.session_id`, and the same id is on `X-LangWatch-Session-Id`.
 
-From a server, with the `ws` package (or any Node websocket client that
-accepts headers):
+Open the socket with the returned secret. Which form you use depends on where the code runs, because a browser `WebSocket` takes only a URL and a subprotocol list and cannot set request headers.
+
+From a server, with the `ws` package or any Node websocket client that accepts headers:
 
 ```js
 import WebSocket from "ws";
@@ -134,73 +87,53 @@ const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime", 
 ]);
 ```
 
-Both were run against the live API on 2026-08-16 and both reached
-`session.created`. The older `openai-beta.realtime-v1` subprotocol is refused
-by OpenAI itself with "The Realtime Beta API is no longer supported".
+### Closing an OpenAI session
 
-### Closing the session
-
-OpenAI reports usage over the socket, in `response.done`, and that socket does
-not pass through the gateway. Post what you read back:
+OpenAI reports usage over the socket, in `response.done`, and that socket does not pass through the gateway. Post what you read back:
 
 ```bash
-curl -X POST "$LANGWATCH_GATEWAY_URL/v1/realtime/sessions/$SESSION_ID/usage" \
+curl -X POST "https://gateway.langwatch.ai/v1/realtime/sessions/$SESSION_ID/usage" \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"usage": { … the usage object from response.done … }}'
+  -d '{"usage":{"input_tokens":1204,"output_tokens":318,
+       "input_token_details":{"cached_tokens":900,"text_tokens":104,"audio_tokens":1100},
+       "output_token_details":{"text_tokens":18,"audio_tokens":300}}}'
 ```
 
-`SESSION_ID` is the `X-LangWatch-Session-Id` from the mint. The whole
-`response.done` event is accepted too, so you can forward the frame unchanged.
+```json
+{"received":true}
+```
 
-Audio tokens are taken out of the text totals before pricing, because audio
-tokens cost several times what text tokens cost and charging both the total
-and the audio on top would bill the audio portion twice.
+The status is `202`. `SESSION_ID` is the `X-LangWatch-Session-Id` from the mint. Three body shapes are accepted, so you can forward the frame unchanged: the bare usage object, an object with a `usage` key, and the whole `response.done` event. The rest of the event is not read, and no transcript content is looked at. The body is capped at 64 KiB.
 
-A session that never reports settles as cost unknown when the settlement grace
-expires, and a report arriving after that replaces the settled record.
+Audio tokens are taken out of the text totals before pricing, because audio tokens cost several times what text tokens cost.
+
+A session that never reports settles as cost unknown when the settlement grace expires, and a report arriving after that replaces the settled record.
 
 ## Limiting how many calls a key runs at once
 
-Set **max open sessions** on the virtual key. The request-rate limits do not
-bound voice: one mint is a single request that opens a call billing for as
-long as it runs, so a key at 60 requests per minute can hold sixty ten-minute
-calls without tripping anything.
+Set **max open sessions** on the virtual key. The request-rate limits do not bound voice: one mint is a single request that opens a call billing for as long as it runs, so a key at 60 requests per minute can hold sixty ten-minute calls without tripping anything.
 
-A mint over the cap is refused with `429 realtime_session_limit`, and the
-refusal is recorded in the spend surface so it is visible rather than silent.
-A slot frees when the call's report arrives. A session older than the longest
-call a vendor allows stops holding a slot, which matters for OpenAI, whose
-socket never signals that it closed.
+A mint over the cap answers `429 realtime_session_limit`, and the refusal is recorded in the spend surface. A slot frees when the call's report arrives. A session older than the longest call a vendor allows stops holding a slot, which matters for OpenAI, whose socket never signals that it closed.
 
 ## What the broker does not do
 
-- **It does not proxy the voice socket.** No frame-level tracing, and no way
-  to end a call in progress.
-- **It does not enforce the session's tools.** A hosted agent's tools live at
-  the vendor, and an OpenAI session declares its own.
-- **Guardrails do not run on a mint.** The body is a session declaration, not
-  a prompt, and the conversation never reaches the gateway. The response says
-  so on `X-LangWatch-Guardrails-Not-Applied: realtime_session` rather than
-  reporting a check that could not mean anything.
+- **It does not proxy the voice socket.** There is no frame-level tracing, and no way to end a call in progress.
+- **It does not enforce the session's tools.** A hosted agent's tools live at the vendor, and an OpenAI session declares its own.
+- **Guardrails do not run on a mint.** The body is a session declaration, not a prompt, and the conversation never reaches the gateway. The response says so on `X-LangWatch-Guardrails-Not-Applied: realtime_session` instead of reporting a check that could not mean anything.
 
-Turn-level transcripts and latency reach LangWatch through the SDK in your own
-application, which is where voice tracing lives.
+Turn-level transcripts and latency reach LangWatch through the SDK in your own application.
 
 ## Errors
 
-| Code | Status | Meaning |
+| Code | Status | Cause |
 |---|---|---|
-| `realtime_session_limit` | 429 | The key holds its maximum open voice sessions. Retry when a call ends. |
-| `realtime_registry_unavailable` | 503 | LangWatch could not record the session, so nothing was minted. Retry. |
+| `bad_request` | 400 | `agent_id` is missing on the ElevenLabs mint, a session id is missing on the usage report, or the usage body does not parse. |
 | `model_provider_not_bound` | 400 | The key has no credential for the vendor this route serves. |
-| `budget_exceeded` | 402 | A budget the key is under is out of money. |
+| `budget_exceeded` | 402 | A budget that applies to the key is over its limit. |
+| `realtime_session_limit` | 429 | The key holds its maximum of open voice sessions. Retry when a call ends. |
+| `realtime_registry_unavailable` | 503 | LangWatch could not record the session, so no session was minted. Retry. |
 
-Both mint routes serve one vendor each: `/v1/realtime/client_secrets` needs an
-OpenAI credential and `/v1/convai/conversation/get-signed-url` needs an
-ElevenLabs one. A mint never falls back to another credential, because a
-session credential is bound to one account and a fallback would sign for an
-agent that does not exist there.
+Each mint route serves one vendor: `/v1/realtime/client_secrets` needs an OpenAI credential, and `/v1/convai/conversation/get-signed-url` needs an ElevenLabs one. A mint never falls back to a second credential, because a session credential is bound to one account and a fallback would sign for an agent that does not exist there.
 
-The decision behind this design is
-[ADR-097](https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/097-realtime-voice-session-broker.md).
+**Also check:** [ElevenLabs](/ai-gateway/api/elevenlabs), [Budgets](/ai-gateway/budgets), [Errors](/ai-gateway/api/errors).

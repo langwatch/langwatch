@@ -43,7 +43,7 @@ LangWatch remembers the answer, so later runs do not ask again. Everything else 
   A virtual key is created the first time you choose the gateway, not at login. If you always keep your own providers, LangWatch never creates one for you.
 </Note>
 
-To route the model calls themselves through the gateway with a service key, and to read the provider and model options, see [opencode on the AI Gateway](/ai-gateway/cli/opencode).
+To route the model calls themselves through the gateway with a service key, see [Route through the LangWatch AI Gateway](#route-through-the-langwatch-ai-gateway) below.
 
 ## Set up a machine without starting opencode
 
@@ -104,7 +104,19 @@ OpenCode's telemetry carries the arguments of each tool call and the result it r
 
 ## Route through the LangWatch AI Gateway
 
-Everything above is telemetry: opencode keeps your own provider logins. The wrapper can instead route the model calls through the LangWatch AI Gateway with a virtual key, which adds budgets and model policies on top of the same telemetry. [opencode through the gateway](/ai-gateway/cli/opencode) covers that setup.
+Everything above is telemetry: opencode keeps your own provider logins. Choosing **Using an API key** on the first wrapper run instead routes the model calls through the LangWatch AI Gateway with a virtual key, which adds budgets and model policies on top of the same telemetry.
+
+The wrapper starts opencode with `OPENAI_BASE_URL` and `ANTHROPIC_BASE_URL` set to the gateway URL followed by `/v1`, and `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` set to your virtual key. opencode appends `/chat/completions` and `/messages` to the base URL without `/v1`, so the base URL must end in `/v1`. It detects the Anthropic provider from `ANTHROPIC_API_KEY` only, which is why that variable is set as well. To route a plain `opencode` run with a service virtual key, set the same variables:
+
+```bash
+export OPENAI_BASE_URL="https://gateway.langwatch.ai/v1"
+export OPENAI_API_KEY="vk-lw-..."
+export ANTHROPIC_BASE_URL="https://gateway.langwatch.ai/v1"
+export ANTHROPIC_API_KEY="vk-lw-..."
+opencode
+```
+
+Name the model in opencode's own `provider/model` form, for example `--model anthropic/claude-sonnet-4-6` or `--model openai/gpt-5-mini`.
 
 ## Troubleshooting
 

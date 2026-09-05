@@ -41,11 +41,11 @@ keywords:
     ```
   </Tab>
   <Tab title="Cursor">
-    Cursor connects through the LangWatch AI Gateway. See [Cursor on the gateway](/ai-gateway/cli/cursor).
+    Set Cursor's OpenAI base URL to `https://gateway.langwatch.ai/v1` and its OpenAI API key to a LangWatch AI Gateway virtual key. See the [gateway quickstart](/ai-gateway/quickstart).
   </Tab>
 </Tabs>
 
-This will open LangWatch for you to sign in, then start your agent with all telemetry already set up, tracking your token cost per PR, cache hit ratio, and much more.
+Each `npx langwatch` command will open LangWatch for you to sign in, then start your agent with all telemetry already set up, tracking your token cost per PR, cache hit ratio, and much more. Cursor has no wrapper command: point it at the LangWatch AI Gateway as above, and its telemetry comes from the gateway.
 
 Check out the [quickstart](/coding-agents/quickstart) for next steps.
 
@@ -57,8 +57,8 @@ Check out the [quickstart](/coding-agents/quickstart) for next steps.
   <Card title="GitHub Copilot" icon="/images/logos/github-copilot.svg" href="/coding-agents/github-copilot-cli" />
   <Card title="Gemini CLI" icon="/images/logos/gemini.svg" href="/coding-agents/gemini-cli" />
   <Card title="OpenCode" icon="/images/logos/opencode.svg" href="/coding-agents/opencode" />
-  <Card title="Cursor and Aider" icon="/images/logos/cursor.svg" href="/ai-gateway/cli/overview">
-    Through the LangWatch AI Gateway.
+  <Card title="Cursor and Aider" icon="/images/logos/cursor.svg" href="/ai-gateway/quickstart">
+    Through the LangWatch AI Gateway: point their OpenAI base URL at `https://gateway.langwatch.ai/v1` with a virtual key.
   </Card>
 </CardGroup>
 

@@ -23,7 +23,7 @@ An endpoint belongs to your **organization** and carries:
 | `url` | Where batches are POSTed, on an `http` endpoint. Null on the others. See [what a receiver URL must look like](#what-a-receiver-url-must-look-like). |
 | `sqs` | The queue, on an `sqs` endpoint. Null on the others. |
 | `enabled_events` | The subscription: exact types (`gateway.request.completed`), a family wildcard (`gateway.*`), or `*` for everything. An endpoint receives only what it subscribed to. |
-| `status` | `active` or `disabled`. Disabled endpoints receive nothing; sources keep accruing. |
+| `status` | `active` or `disabled`. Disabled endpoints receive no deliveries; sources keep accruing. |
 | Signing secret | Shown **once** at creation. Roll it to get a new one. Every delivery is signed with it. |
 | Delivery controls | `max_batch_size`, `max_batch_delay_ms`, `max_in_flight` (bounds below). |
 
@@ -56,7 +56,17 @@ curl -sS https://app.langwatch.ai/api/webhooks/v1/endpoints \
   }'
 ```
 
-The `201` response carries the endpoint plus `secret`, returned only this once. Store it where your receiver can verify signatures. Send an [`Idempotency-Key`](/ai-gateway/api/management#retrying-a-create-safely) and a retry that lost its response returns the original secret instead of stranding it.
+The `201` response carries the endpoint plus `secret`, returned only this once. Store it where your receiver can verify signatures. Send an [`Idempotency-Key`](/api-reference/webhooks/create-a-webhook-endpoint) and a retry that lost its response returns the original secret instead of stranding it.
+
+To create the same endpoint from the UI, click **New endpoint** on the Webhooks page and pick the destination, the URL and the events.
+
+<Frame caption="The New webhook endpoint drawer: the destination, the URL, the nine gateway event types, and the delivery controls at their defaults.">
+  <img src="/images/ai-gateway/webhook-drawer.png" alt="The New webhook endpoint drawer with Destination, Endpoint URL, the Events checkboxes and the Delivery fields" />
+</Frame>
+
+<Frame caption="The signing secret dialog after Create endpoint. It is shown once. Roll secret in the row menu issues a new one.">
+  <img src="/images/ai-gateway/webhook-signing-secret.png" alt="The Signing secret dialog with the whsec_ value and a Copy button" />
+</Frame>
 
 ### What a receiver URL must look like
 
@@ -80,7 +90,7 @@ Anything else is refused at create and update time with `400` and `error.code = 
 The port and credential rules apply to endpoints you already have. If an existing endpoint uses a non-default port or embeds credentials in its URL, deliveries keep flowing, but the next update to that endpoint is refused until the URL is fixed. Move the port behind a proxy on 443, and move credentials into a custom header.
 </Warning>
 
-Self-hosted installs whose receivers live on internal hosts can relax the scheme, port, and private-address rules with a single operator setting; see [self-hosted egress](/self-hosting/webhooks). Nothing relaxes the credential rule, and redirects are never followed on any deployment.
+Self-hosted installs whose receivers live on internal hosts can relax the scheme, port, and private-address rules with a single operator setting; see [self-hosted egress](/self-hosting/webhooks). The credential rule stays in force on every deployment, and redirects are never followed on any deployment.
 
 <Warning>
 The `webhookEndpoints` and `gatewaySpend` permissions are **organization-exclusive**: only an ORGANIZATION-scoped role binding can grant them, never a team- or project-scoped one. Endpoints carry signing secrets and stream org-wide events out of the platform, so by default only org admins hold them. See [RBAC](/ai-gateway/rbac).
@@ -181,6 +191,8 @@ X-LangWatch-Delivery-Id: <delivery id, stable across retries of this batch>
 X-LangWatch-Signature: t=<unix seconds>,v1=<hex hmac-sha256(secret, "<t>.<raw body>")>
 X-LangWatch-Delivery-Attempt: <n, 1-based>
 ```
+
+The digest is the HMAC-SHA256 of the string `<t>.<raw body>` with the endpoint secret, as lower-case hex. During a secret roll the header carries one `v1` per valid secret, newest first, and the delivery is authentic when any of them matches.
 
 Both SDKs ship a verifier, so you do not have to get the digest, the timestamp tolerance, the constant-time compare, and the rotation window right yourself. Pass the **raw bytes** you received: parsing and re-serializing the JSON first breaks the digest.
 
@@ -319,7 +331,7 @@ An endpoint can put each batch on your own Amazon SQS queue instead of POSTing i
 **`ReceiveMessage` returns no message attributes unless you ask for them by name.** Pass `MessageAttributeNames: ["All"]`. Without it your consumer sees a body with no signature beside it and rejects every delivery, even though the body itself is correct. Check this first when a receiver that worked over HTTPS rejects everything on the queue.
 </Warning>
 
-**The body is byte-identical to the HTTP body.** `MessageBody` is the exact same `{"batch": [...]}` JSON an HTTPS receiver would be POSTed. There is no outer wrapper. The signature, the delivery id and the attempt ride as **message attributes** under the same names they use as HTTP headers:
+**The body is byte-identical to the HTTP body.** `MessageBody` is the exact same `{"batch": [...]}` JSON an HTTPS receiver would be POSTed. There is no outer wrapper. The signature, the delivery id and the attempt are **message attributes** under the same names they use as HTTP headers:
 
 | Message attribute | Same as the HTTP header |
 |---|---|
@@ -348,7 +360,7 @@ curl -X POST https://app.langwatch.ai/api/webhooks/v1/endpoints \
 
 | Mode | How | When |
 |---|---|---|
-| `assume_role` | Give `sqs.role_arn`. The response carries a generated `external_id`; put it in that role's trust policy as `sts:ExternalId`, and allow `sqs:SendMessage` on the queue. | The recommended mode. Nothing long-lived is stored, and you revoke us by editing your own trust policy. |
+| `assume_role` | Give `sqs.role_arn`. The response carries a generated `external_id`; put it in that role's trust policy as `sts:ExternalId`, and allow `sqs:SendMessage` on the queue. | The recommended mode. No long-lived credential is stored, and you revoke us by editing your own trust policy. |
 | `static` | Give `sqs.access_key_id` and `sqs.secret_access_key`. The secret is encrypted at rest and never returned by any read. | When you cannot create a cross-account role. |
 | `ambient` | Give neither, so LangWatch's own AWS identity writes to the queue. Refused unless the operator set `WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS=1`. | Self-hosted, single-tenant installs only. |
 
@@ -376,7 +388,7 @@ On LangWatch Cloud, ask support for the principal to trust; it is a property of 
 - **A canonical Amazon SQS queue URL**, `https://sqs.<region>.amazonaws.com/<account id>/<queue name>`. The region and the owning account are read from it, so they can never disagree with the queue. Anything else is refused.
 - **One batch is one message, and LangWatch caps it at 256 KiB** including the attributes. Amazon SQS itself accepts up to 1 MiB; the lower cap is ours, and it keeps one slow consumer from having to hold a megabyte in memory per message. A batch over the cap fails terminally and says so; lower `max_batch_size` so each delivery carries fewer events.
 
-**Deduplicate on the envelope `id`.** A standard queue is at-least-once and can redeliver a message on its own, and it has no queue-level deduplication of its own to lean on. `X-LangWatch-Delivery-Id` names the batch delivery, not an event, so deduplicating on it would drop every envelope in the batch but one. The `id` inside each envelope is the idempotency key.
+**Deduplicate on the envelope `id`.** A standard queue is at-least-once and can redeliver a message on its own, and it has no queue-level deduplication of its own. `X-LangWatch-Delivery-Id` names the batch delivery, not an event, so deduplicating on it would drop every envelope in the batch but one. The `id` inside each envelope is the idempotency key.
 
 **Asking for a retry.** Delete the message only after the batch is durably ingested. Leaving it alone is the retry: it reappears after the visibility timeout, and after your queue's `maxReceiveCount` it lands in your dead letter queue. Set a redrive policy, so a message your consumer can never accept lands somewhere you can inspect it.
 
@@ -419,9 +431,13 @@ The headline is **`oldest_undelivered_age_ms`**: the age of the oldest envelope 
 
 `GET /endpoints/:id/deliveries` lists recent attempts, newest first: the attempt number, envelope count, outcome, **your endpoint's HTTP status**, latency, and the error text when transport failed. Your receiver's responses are recorded, so debugging a rejecting endpoint starts here rather than in your own logs.
 
+<Frame caption="The Deliveries drawer, from the endpoint's row menu: the health numbers on top, then one row per attempt with your receiver's status.">
+  <img src="/images/ai-gateway/webhook-deliveries.png" alt="The Deliveries drawer with lag, dead-lettered count, sends per minute, success rate and p95 latency above a table of attempts" />
+</Frame>
+
 The list is cursor-paginated on `(fired_at, id)` at 25 rows by default (max 200), and the response carries `next_cursor` when more remain. Cursors rather than offsets because a busy endpoint writes new attempts while you page: an offset walk would show you the same row twice and skip another. Delivery log rows are retained for 30 days.
 
-Endpoint deliveries and the [webhooks fired by your automation triggers](#signing-automation-webhooks) share one log, each row tagged with which of the two sent it. This endpoint's list shows only its own rows; the trigger drawer shows a trigger's. Nothing about our request is stored, only the outcome: no URL, no headers, no body, plus your receiver's status, the latency, and a truncated copy of a failure response.
+Endpoint deliveries and the [webhooks fired by your automation triggers](#signing-automation-webhooks) share one log, each row tagged with which of the two sent it. This endpoint's list shows only its own rows; the trigger drawer shows a trigger's. The request itself is not stored, only the outcome: no URL, no headers, no body, plus your receiver's status, the latency, and a truncated copy of a failure response.
 
 ## Test fire
 
@@ -435,7 +451,9 @@ Endpoint deliveries and the [webhooks fired by your automation triggers](#signin
 
 `GET /api/webhooks/v1/events?from=&to=&type=&cursor=&limit=` is the organization's emitted-events log: cursor-paged, newest first, filterable by type. Webhooks are push over this log, never the only copy of it, so a consumer that missed deliveries can list what was emitted and recover.
 
-`from` and `to` bound the `created` range in unix milliseconds and are **required**, and `from` must be less than or equal to `to`. The log reads the same 13-month spend table the reconciliation pull reads, so an unbounded listing sorts every month the organization has, cold storage included, to serve one page. A read with no range, with only one of the two bounds, or with a range that ends before it starts is rejected with the canonical `400` this surface answers every validation failure with, naming the offending parameter.
+`from` and `to` bound the `created` range in unix milliseconds and are **required**, and `from` must be less than or equal to `to`. The log reads the same 13-month spend table the reconciliation pull reads, so an unbounded listing sorts every month the organization has, cold storage included, to serve one page.
+
+A read with no range, with only one of the two bounds, or with a range that ends before it starts is rejected with the canonical `400` this surface answers every validation failure with, naming the offending parameter.
 
 `GET /api/webhooks/v1/events/{id}` reads one event back by the `id` its envelope carried. A `404` means the log cannot answer for that id, and deliberately does not say which reason applies.
 

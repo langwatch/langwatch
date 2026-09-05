@@ -38,7 +38,7 @@ Now an OpenAI-SDK client that sends `model: "gpt-4o"` reaches the correct Azure 
 
 Identical to OpenAI direct:
 
-- `/v1/chat/completions`, `/v1/responses`, `/v1/embeddings`, `/v1/images/generations`, `/v1/audio/*`, `/v1/moderations`.
+- `/v1/chat/completions`, `/v1/responses`, `/v1/embeddings`, `/v1/images/generations`, `/v1/images/edits`, `/v1/audio/*`.
 
 The gateway translates the outgoing path + query string to Azure's format (`/openai/deployments/{deployment}/chat/completions?api-version=...`).
 
