@@ -39,9 +39,9 @@ describe("MigrationS3StorageDriverAdapter", () => {
     describe("when it reaches the driver's read", () => {
       /** @scenario "The migration driver refuses an Azure address" */
       it("refuses it as an unsupported scheme", async () => {
-        const error = await driver()
+        const error = (await driver()
           .get(AZURE_URI)
-          .catch((thrown: unknown) => thrown as UnsupportedStorageSchemeError);
+          .catch((thrown: unknown) => thrown)) as UnsupportedStorageSchemeError;
 
         expect(error).toBeInstanceOf(UnsupportedStorageSchemeError);
         expect(error.expectedScheme).toBe("s3");

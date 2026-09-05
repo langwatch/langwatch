@@ -41,7 +41,12 @@ describe("StoredObjectsPublicApi", () => {
       .build();
 
     const routes = mounted.filter((route) => !route.isNamespaceGuard);
-    const latest = routes.filter((route) => route.version === "latest");
+    // `version === "latest"` also matches the bare-path alias every family
+    // now serves alongside its versioned mount (decision 20); narrow to the
+    // `/latest/`-prefixed path so this asserts on the versioned mount once.
+    const latest = routes.filter(
+      (route) => route.version === "latest" && route.path.includes("/latest/"),
+    );
     expect(
       latest.map((route) => ({
         path: route.path,

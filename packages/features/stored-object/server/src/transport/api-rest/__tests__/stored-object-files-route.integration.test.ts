@@ -22,6 +22,18 @@ const OWNER_PROJECT = "project-owner";
 const OBJECT_ID = "stored-object-1";
 const BYTES = Buffer.from("audio bytes");
 
+class ProjectPermissionDeniedTestError extends HandledError {
+  constructor() {
+    super("project_permission_denied", "denied", { httpStatus: 403, fault: "customer" });
+  }
+}
+
+class ApiKeyPermissionDeniedTestError extends HandledError {
+  constructor() {
+    super("api_key_permission_denied", "denied", { httpStatus: 403, fault: "customer" });
+  }
+}
+
 function availableRead(): StoredObjectFileRead {
   return {
     row: {
@@ -134,7 +146,7 @@ describe("given the /api/files family", () => {
       const read = vi.fn(async () => availableRead());
       const permissionCheck = vi.fn<FilesProjectPermissionCheck>(async ({ projectId }) => {
         if (projectId !== "project-of-the-caller") {
-          throw new HandledError("project_permission_denied", "denied");
+          throw new ProjectPermissionDeniedTestError();
         }
       });
       const api = mount({
@@ -197,7 +209,7 @@ describe("given the /api/files family", () => {
         read,
         caller: { apiKeyProjectId: OWNER_PROJECT },
         apiKeyCeiling: async () => {
-          throw new HandledError("api_key_permission_denied", "denied", { httpStatus: 403 });
+          throw new ApiKeyPermissionDeniedTestError();
         },
       });
 
@@ -219,7 +231,7 @@ describe("given the /api/files family", () => {
         apiKeyCeiling: async (permission) => {
           asked.push(permission);
           if (permission === "traces:view") {
-            throw new HandledError("api_key_permission_denied", "denied", { httpStatus: 403 });
+            throw new ApiKeyPermissionDeniedTestError();
           }
         },
       });

@@ -201,7 +201,7 @@ describe("S3StoredObjectDriverAdapter", () => {
     describe("when it reaches the driver's read", () => {
       /** @scenario "The S3 driver refuses an Azure address" */
       it("refuses it as an unsupported scheme rather than inventing a bucket", async () => {
-        const error = await driver.get(AZURE_URI).catch((thrown: unknown) => thrown as Error);
+        const error = (await driver.get(AZURE_URI).catch((thrown: unknown) => thrown)) as Error;
 
         expect(error).toBeInstanceOf(UnsupportedStorageSchemeError);
         expect(error.name).toBe("UnsupportedStorageSchemeError");
@@ -209,9 +209,9 @@ describe("S3StoredObjectDriverAdapter", () => {
 
       /** @scenario "The S3 driver refuses an Azure address" */
       it("names s3 as the scheme it expected and azure-blob as the one it got", async () => {
-        const error = await driver
+        const error = (await driver
           .get(AZURE_URI)
-          .catch((thrown: unknown) => thrown as UnsupportedStorageSchemeError);
+          .catch((thrown: unknown) => thrown)) as UnsupportedStorageSchemeError;
 
         expect(error.expectedScheme).toBe("s3");
         expect(error.scheme).toBe("azure-blob");

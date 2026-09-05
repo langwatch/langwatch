@@ -49,7 +49,7 @@ function installBlobAccount(): Map<string, Buffer> {
     const stored = blobs.get(url);
     if (!stored) return new Response(null, { status: 404 });
     if (method === "HEAD") return new Response(null, { status: 200 });
-    return new Response(stored, { status: 200 });
+    return new Response(new Uint8Array(stored), { status: 200 });
   }) as typeof fetch);
   return blobs;
 }

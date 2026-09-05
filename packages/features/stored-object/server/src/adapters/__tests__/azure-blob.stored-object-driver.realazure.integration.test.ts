@@ -151,6 +151,7 @@ describeTokenAzure(
       return AzureBlobStoredObjectDriverAdapter.create({
         mode: "azureCli",
         accountName: TOKEN_MODE_ACCOUNT!,
+        identity: {},
       });
     }
 

@@ -145,7 +145,11 @@ describe("given an expired invitation", () => {
   };
 
   let prisma: any;
-  let throttle: { assertInviteSendAllowed: ReturnType<typeof vi.fn> };
+  let throttle: {
+    assertInviteSendAllowed: ReturnType<
+      typeof vi.fn<(input: { inviteId: string }) => Promise<void>>
+    >;
+  };
   let mail: OrganizationInviteMailPort;
 
   beforeEach(() => {
