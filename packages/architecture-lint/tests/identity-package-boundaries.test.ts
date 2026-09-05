@@ -102,7 +102,7 @@ describe("identity package boundaries", () => {
     it("construct IdentityService only in the identity composition", () => {
       const constructors: string[] = [];
       for (const file of sourceFiles(APP_SRC)) {
-        if (/new IdentityService\(/.test(readFileSync(file, "utf8"))) {
+        if (/(?:new IdentityService\(|IdentityService\.create\()/.test(readFileSync(file, "utf8"))) {
           constructors.push(relative(APP_SRC, file));
         }
       }
