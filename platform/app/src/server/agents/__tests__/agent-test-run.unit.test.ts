@@ -255,59 +255,63 @@ describe("scheduleAgentTestRun", () => {
   });
 
   describe("given a connected agent with no process connected", () => {
-    /** @scenario "An offline connected agent is refused before a run exists" */
-    it("refuses as offline and queues nothing", async () => {
-      const deps = depsFor(
-        agentRow({
-          id: "agent_connected",
-          type: "connected",
-          environment: "production",
-          config: { name: "support-agent", description: "" },
-        }),
-        { isOnline: false },
-      );
+    describe("when scheduling the test run", () => {
+      /** @scenario "An offline connected agent is refused before a run exists" */
+      it("refuses as offline and queues nothing", async () => {
+        const deps = depsFor(
+          agentRow({
+            id: "agent_connected",
+            type: "connected",
+            environment: "production",
+            config: { name: "support-agent", description: "" },
+          }),
+          { isOnline: false },
+        );
 
-      await expect(
-        scheduleAgentTestRun({
+        await expect(
+          scheduleAgentTestRun({
+            projectId: "proj_1",
+            agentId: "agent_connected",
+            actor,
+            deps,
+          }),
+        ).rejects.toMatchObject({
+          code: "agent_offline",
+          meta: { agentName: "ACME Support Agent", environment: "production" },
+        });
+        expect(deps.presence.listLive).toHaveBeenCalledWith({
           projectId: "proj_1",
           agentId: "agent_connected",
-          actor,
-          deps,
-        }),
-      ).rejects.toMatchObject({
-        code: "agent_offline",
-        meta: { agentName: "ACME Support Agent", environment: "production" },
+        });
+        expect(deps.queueRun).not.toHaveBeenCalled();
       });
-      expect(deps.presence.listLive).toHaveBeenCalledWith({
-        projectId: "proj_1",
-        agentId: "agent_connected",
-      });
-      expect(deps.queueRun).not.toHaveBeenCalled();
     });
   });
 
   describe("given a connected agent with a process connected", () => {
-    /** @scenario "An online connected agent is scheduled" */
-    it("queues one run against it", async () => {
-      const deps = depsFor(
-        agentRow({
-          id: "agent_connected",
-          type: "connected",
-          environment: "production",
-          config: { name: "support-agent", description: "" },
-        }),
-      );
+    describe("when scheduling the test run", () => {
+      /** @scenario "An online connected agent is scheduled" */
+      it("queues one run against it", async () => {
+        const deps = depsFor(
+          agentRow({
+            id: "agent_connected",
+            type: "connected",
+            environment: "production",
+            config: { name: "support-agent", description: "" },
+          }),
+        );
 
-      await scheduleAgentTestRun({
-        projectId: "proj_1",
-        agentId: "agent_connected",
-        actor,
-        deps,
-      });
+        await scheduleAgentTestRun({
+          projectId: "proj_1",
+          agentId: "agent_connected",
+          actor,
+          deps,
+        });
 
-      expect(deps.queueRun).toHaveBeenCalledTimes(1);
-      expect(deps.queueRun.mock.calls[0]?.[0]).toMatchObject({
-        target: { type: "connected", referenceId: "agent_connected" },
+        expect(deps.queueRun).toHaveBeenCalledTimes(1);
+        expect(deps.queueRun.mock.calls[0]?.[0]).toMatchObject({
+          target: { type: "connected", referenceId: "agent_connected" },
+        });
       });
     });
   });

@@ -79,7 +79,13 @@ describe("<ConnectFromCodeDrawer />", () => {
 
       // The plain-text fallback shows the same code until the highlight
       // lands, so the highlighted <pre> is awaited before its text is read.
-      const highlightedIn = async (block: HTMLElement, lang: string) => {
+      const highlightedIn = async ({
+        block,
+        lang,
+      }: {
+        block: HTMLElement;
+        lang: string;
+      }) => {
         await waitFor(() =>
           expect(
             block.querySelector("[data-highlighted-lang]"),
@@ -88,25 +94,35 @@ describe("<ConnectFromCodeDrawer />", () => {
         return within(block);
       };
 
-      const python = await highlightedIn(
-        screen.getByTestId("connect-code-python"),
-        "python",
-      );
+      const pythonBlock = screen.getByTestId("connect-code-python");
+      const python = await highlightedIn({
+        block: pythonBlock,
+        lang: "python",
+      });
       expect(python.getByText(/@langwatch\.connect_agent/)).toBeInTheDocument();
 
-      const typescript = await highlightedIn(
-        screen.getByTestId("connect-code-typescript"),
-        "typescript",
-      );
+      const typescript = await highlightedIn({
+        block: screen.getByTestId("connect-code-typescript"),
+        lang: "typescript",
+      });
       expect(typescript.getByText(/connectAgent\(/)).toBeInTheDocument();
 
       const installs = screen.getAllByTestId("connect-code-bash");
       expect(installs).toHaveLength(2);
-      const install = await highlightedIn(installs[0]!, "bash");
+      const install = await highlightedIn({
+        block: installs[0]!,
+        lang: "bash",
+      });
       expect(install.getByText("pip install langwatch")).toBeInTheDocument();
 
       expect(highlighter.light).toHaveBeenCalled();
       expect(highlighter.dark).not.toHaveBeenCalled();
+
+      // A snippet line is as long as the agent name makes it, so the block
+      // scrolls sideways rather than wrapping or clipping what it cannot fit.
+      const pre = pythonBlock.querySelector("pre");
+      expect(pre).not.toBeNull();
+      expect(pre!).toHaveStyle({ whiteSpace: "pre", overflowX: "auto" });
     });
 
     /** @scenario "The connect snippets are syntax highlighted" */

@@ -143,8 +143,6 @@ function ScopeChip({ agent }: { agent: ConnectedAgentView }) {
 }
 
 /**
- * The "Test agent" entry of the card menu.
- *
  * An agent no process is holding cannot answer, so the entry is disabled and
  * the reason reads on hover rather than after a refused run.
  */

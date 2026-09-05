@@ -51,7 +51,7 @@ vi.mock("~/utils/api", () => ({
 import { OFFLINE_AGENT_SELECT_COPY } from "~/components/agents/offlineAgentCopy";
 import { TargetSelector, type TargetValue } from "../TargetSelector";
 
-describe("<TargetSelector/> with an offline connected agent", () => {
+describe("given an offline connected agent", () => {
   afterEach(cleanup);
 
   describe("when the list is open", () => {
