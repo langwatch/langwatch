@@ -7,7 +7,7 @@ description: Make your agent faster, cheaper and shorter without making it worse
 
 ## What the improvement loop is
 
-The agent improvement loop is how you change your agent and prove that the change made it better. Change one small thing in the harness, the prompt, a tool description or the model, and something that worked before can break five turns down the line. So you need a loop to keep improving the agent, in cost, in latency or in what it can handle, without dropping the quality.
+The agent improvement loop is how you change your agent and prove that the change made it better. When you change anything in the harness, the prompt, a tool description or the model, something that worked before can break five turns down the line. So you need a loop to keep improving the agent, in cost, in latency or in what it can handle, without dropping the quality.
 
 The loop starts with a definition of quality that you can run. That definition is a test suite of [scenarios](/agent-testing/scenarios): simulated conversations with the criteria the agent has to meet, all of which pass on the agent you trust today. The judge in each scenario reads the whole conversation together with the agent's traces, passes or fails every criterion you wrote, and explains the verdict.
 

@@ -31,7 +31,7 @@ the error messages so the first call succeeds. Tell me what you found before you
 
 The agent comes back with a change to the tool contract. When you review it, these are the properties of a good contract, the most effective first:
 
-1. **The accepted values are in the parameter description, or better, in the schema.** Put an enum in the schema and the model stops guessing; a description that lists the values is the next best thing.
+1. **The accepted values are in the parameter description, or better, in the schema.** With an enum in the schema the model does not guess at all; a description that lists the values is the next best thing.
 2. **The error message spells out the parameter and the accepted values**, so the model can act on it.
 3. **The tool validates the call at its boundary** and rejects it with that same message before the call reaches your service.
 4. **One tool per job.** Merge a tool that needs three calls to return one answer into one call, or add a second tool next to it that returns the answer in one step.
