@@ -12,7 +12,6 @@ import {
   type User,
 } from "@langwatch/organization-contract";
 import type { AuthzBindingForSynthesis } from "@langwatch/authz-contract";
-import { HandledError } from "@langwatch/handled-error";
 import slugify from "slugify";
 import { OrganizationMemberRoleService } from "./organization-member-role.service";
 import { CannotRemoveSelfError, MemberNotFoundError } from "@langwatch/organization-contract";
