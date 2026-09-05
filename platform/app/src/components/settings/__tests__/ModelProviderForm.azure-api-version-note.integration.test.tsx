@@ -101,10 +101,10 @@ vi.mock("../../../hooks/useFeatureFlag", () => ({
 vi.mock("../../ui/toaster", () => ({ toaster: { create: vi.fn() } }));
 
 import { modelProviderRegistry } from "../../../features/onboarding/regions/model-providers/registry";
+import type { MaybeStoredModelProvider } from "../../../server/modelProviders/registry";
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { EditModelProviderForm } from "../ModelProviderForm";
 import { makePrimeQueries, Wrapper } from "./modelProviderDrawerHarness";
-import type { MaybeStoredModelProvider } from "../../../server/modelProviders/registry";
 
 const primeQueries = makePrimeQueries({
   collapsedQuery: mockGetAllForProjectForFrontendQuery,
@@ -112,7 +112,7 @@ const primeQueries = makePrimeQueries({
   projectListQuery: mockListAllForProjectForFrontendQuery,
 });
 
-const renderDrawer = (providerKey: string) =>
+const renderDrawer = ({ providerKey }: { providerKey: string }) =>
   render(
     <Wrapper>
       <EditModelProviderForm
@@ -199,7 +199,7 @@ describe("Feature: the Azure drawer says the api-version override is ignored on 
       /** @scenario "The Azure provider drawer tells the customer the api-version is ignored on AI Gateway routing" */
       it("shows the direct-mode api-version note saying the value is ignored on Gateway routing", () => {
         primeQueries([azureDirectRow()]);
-        renderDrawer("azure");
+        renderDrawer({ providerKey: "azure" });
 
         const description =
           azureEntry?.fieldMetadata?.AZURE_OPENAI_API_VERSION?.description;
@@ -216,7 +216,7 @@ describe("Feature: the Azure drawer says the api-version override is ignored on 
       /** @scenario "The Azure provider drawer tells the customer the api-version is ignored on AI Gateway routing" */
       it("shows the gateway-mode api-version note saying the value is ignored on Gateway routing", () => {
         primeQueries([azureGatewayRow()]);
-        renderDrawer("azure");
+        renderDrawer({ providerKey: "azure" });
 
         const description =
           azureEntry?.fieldMetadata?.AZURE_API_GATEWAY_VERSION?.description;
@@ -233,7 +233,7 @@ describe("Feature: the Azure drawer says the api-version override is ignored on 
       /** @scenario "A non-Azure provider drawer shows no api-version note" */
       it("shows no ignored api-version note", () => {
         primeQueries([openaiRow()]);
-        renderDrawer("openai");
+        renderDrawer({ providerKey: "openai" });
 
         expect(screen.queryByText(/ignored/i)).toBeNull();
       });

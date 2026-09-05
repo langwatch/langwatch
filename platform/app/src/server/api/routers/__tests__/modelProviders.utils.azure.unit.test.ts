@@ -18,9 +18,11 @@ import { describe, expect, it } from "vitest";
 import type { MaybeStoredModelProvider } from "../../../modelProviders/registry";
 import { prepareLitellmParams } from "../modelProviders.utils";
 
-function azureProvider(
-  customKeys: Record<string, string>,
-): MaybeStoredModelProvider {
+function azureProvider({
+  customKeys,
+}: {
+  customKeys: Record<string, string>;
+}): MaybeStoredModelProvider {
   return {
     name: "azure",
     provider: "azure",
@@ -45,9 +47,11 @@ describe("Feature: Azure api-version is honored on the direct dispatch path", ()
       /** @scenario "Direct-mode Azure dispatch uses the customer's configured api-version" */
       it("uses the customer's configured AZURE_OPENAI_API_VERSION", async () => {
         const modelProvider = azureProvider({
-          AZURE_OPENAI_API_KEY: "az-key",
-          AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
-          AZURE_OPENAI_API_VERSION: "2024-10-21",
+          customKeys: {
+            AZURE_OPENAI_API_KEY: "az-key",
+            AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+            AZURE_OPENAI_API_VERSION: "2024-10-21",
+          },
         });
 
         const params = await prepareLitellmParams({
@@ -66,8 +70,10 @@ describe("Feature: Azure api-version is honored on the direct dispatch path", ()
       /** @scenario "Azure API Management gateway mode defaults its own api-version" */
       it("falls back to the gateway-mode default api-version", async () => {
         const modelProvider = azureProvider({
-          AZURE_OPENAI_API_KEY: "az-key",
-          AZURE_API_GATEWAY_BASE_URL: "https://gateway.example.com",
+          customKeys: {
+            AZURE_OPENAI_API_KEY: "az-key",
+            AZURE_API_GATEWAY_BASE_URL: "https://gateway.example.com",
+          },
         });
 
         const params = await prepareLitellmParams({
@@ -82,8 +88,10 @@ describe("Feature: Azure api-version is honored on the direct dispatch path", ()
       /** @scenario "Azure API Management gateway mode defaults its own api-version" */
       it("marks the request as using the Azure gateway", async () => {
         const modelProvider = azureProvider({
-          AZURE_OPENAI_API_KEY: "az-key",
-          AZURE_API_GATEWAY_BASE_URL: "https://gateway.example.com",
+          customKeys: {
+            AZURE_OPENAI_API_KEY: "az-key",
+            AZURE_API_GATEWAY_BASE_URL: "https://gateway.example.com",
+          },
         });
 
         const params = await prepareLitellmParams({
