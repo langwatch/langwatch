@@ -146,6 +146,45 @@ export function LangyChoicesCard({
 
           const { primary, secondary } = optionRowText({ option, refRow });
 
+          // A quiet option is the way out, not the way forward: it reads as a
+          // link so the bordered rows keep the weight, and it answers exactly
+          // like one of them.
+          if (option.quiet === true) {
+            return (
+              <chakra.button
+                key={option.id}
+                type="button"
+                data-testid="langy-choice-option"
+                data-option-id={option.id}
+                data-quiet="true"
+                disabled={!selectable}
+                onClick={() => toggle(option.id)}
+                alignSelf="flex-start"
+                paddingX={2}
+                paddingTop={0.5}
+                textAlign="left"
+                textStyle="xs"
+                textDecoration="underline"
+                textUnderlineOffset="2px"
+                background="transparent"
+                color={
+                  isChosen || isPicked
+                    ? "purple.fg"
+                    : selectable
+                      ? "fg.muted"
+                      : "fg.subtle"
+                }
+                cursor={selectable ? "pointer" : "default"}
+                aria-disabled={!selectable}
+                aria-pressed={isChosen || isPicked}
+                _hover={selectable ? { color: "fg" } : undefined}
+                transition="color 120ms ease"
+              >
+                {primary}
+              </chakra.button>
+            );
+          }
+
           return (
             <chakra.button
               key={option.id}

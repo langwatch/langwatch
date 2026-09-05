@@ -135,6 +135,65 @@ describe("given no folder and nothing remembered", () => {
     expect(screen.getByText("Installed on acme")).toBeDefined();
   });
 
+  /** @scenario "The code access card shows the folder and GitHub actions" */
+  it("draws a folder icon on the local action and the GitHub mark on the other", () => {
+    renderCard();
+
+    const options = screen.getAllByTestId("langy-code-access-option");
+    expect(options).toHaveLength(2);
+    expect(options[0]!.querySelector("svg.lucide-folder-open")).not.toBeNull();
+    expect(options[1]!.querySelector("svg[viewBox='0 0 98 96']")).not.toBeNull();
+  });
+
+  /** @scenario "A code access call without the offer shows no describe option" */
+  it("offers no describe link unless the tool asked for it", () => {
+    renderCard();
+    expect(screen.queryByText("I'd rather describe it")).toBeNull();
+  });
+
+  /** @scenario "The describe option shows only when the tool offered it" */
+  it("draws the quiet describe link under the two actions when offered", () => {
+    renderCard({ offerDescribe: true });
+
+    const describe = screen.getByTestId("langy-code-access-describe");
+    expect(describe.textContent).toBe("I'd rather describe it");
+    // The link sits below the two bordered actions, and is not one of them.
+    const options = screen.getAllByTestId("langy-code-access-option");
+    expect(options).toHaveLength(2);
+    expect(
+      options[1]!.compareDocumentPosition(describe) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  /** @scenario "Picking describe answers as my own message" */
+  it("answers the describe pick through the choices path, requesting no folder", () => {
+    const onChoiceSelect = vi.fn();
+    renderCard({ offerDescribe: true, onChoiceSelect });
+
+    fireEvent.click(screen.getByTestId("langy-code-access-describe"));
+
+    expect(onChoiceSelect).toHaveBeenCalledTimes(1);
+    const [{ selection, card }] = onChoiceSelect.mock.calls[0]!;
+    expect(selection).toEqual({
+      blockId: "code-access:call-1",
+      optionIds: ["describe"],
+    });
+    expect(card.options.map((option: { id: string }) => option.id)).toEqual([
+      "local",
+      "github",
+      "describe",
+    ]);
+    expect(card.options[2]).toMatchObject({
+      label: "I'd rather describe it",
+      quiet: true,
+    });
+    // No folder was picked, so the card is not waiting on the terminal.
+    expect(
+      screen.queryByText("Run this in the folder you want me to work in:"),
+    ).toBeNull();
+  });
+
   /** @scenario "The local folder is never remembered" */
   it("stores nothing when the folder is shared with the box ticked", () => {
     const onChoiceSelect = vi.fn();

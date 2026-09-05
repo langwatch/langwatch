@@ -12,6 +12,7 @@ import { ArrowRight, Check, Sparkles } from "lucide-react";
 import type React from "react";
 import { memo, useMemo } from "react";
 import { isInternalHref, Markdown } from "~/components/Markdown";
+import { guidedKickoffPartOf } from "~/features/guided-onboarding/kickoff";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { githubProgressFromToolParts } from "~/server/app-layer/langy/execution/githubCommand";
 import { githubPrsFromToolParts } from "~/shared/langy/githubPrCard";
@@ -22,7 +23,10 @@ import {
   langyAnswerSegments,
   langyAnswerSegmentsFromText,
 } from "../logic/langyAnswerSegments";
-import { codeAccessCallId } from "../logic/langyCodeAccessTool";
+import {
+  codeAccessCallId,
+  codeAccessOffersDescribe,
+} from "../logic/langyCodeAccessTool";
 import {
   isSubstantiveLangyAnswer,
   parseLangyFeedbackDirective,
@@ -46,6 +50,7 @@ import { stripToolNarration } from "../logic/langyToolNarration";
 import { langyRunText, langyTranscriptRuns } from "../logic/langyTranscript";
 import { useSpaLinkClick } from "../logic/spaLink";
 import { useLangyStore } from "../stores/langyStore";
+import { GuidedTourCard } from "./derived-cards/GuidedTourCard";
 import { LangyCodeAccessCard } from "./derived-cards/LangyCodeAccessCard";
 import { LangyDerivedCardView } from "./derived-cards/LangyDerivedCardView";
 import { LangyFailedCard } from "./derived-cards/LangyFailedCard";
@@ -400,6 +405,17 @@ function MessageContentImpl({
   }
 
   if (isUser) {
+    // The guided onboarding kickoff is a user message on the wire and the tour
+    // card on screen: the brief it carries is for the model, never a bubble.
+    const kickoff = guidedKickoffPartOf(message.parts);
+    if (kickoff) {
+      return (
+        <GuidedTourCard
+          kickoff={kickoff}
+          organizationId={organizationId ?? null}
+        />
+      );
+    }
     return (
       <Box alignSelf="flex-end" maxWidth="85%">
         <Box
@@ -548,6 +564,7 @@ function MessageContentImpl({
               conversationId={conversationId}
               callId={codeAccessCall}
               organizationId={organizationId ?? null}
+              offerDescribe={codeAccessOffersDescribe(message.parts)}
               superseded={
                 liveCodeAccessCallId != null &&
                 liveCodeAccessCallId !== codeAccessCall

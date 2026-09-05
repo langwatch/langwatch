@@ -19,6 +19,7 @@ import {
 } from "@langwatch/langy";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { GuidedKickoffInput } from "~/features/guided-onboarding/kickoff";
 import type { LangyResourceKind } from "~/shared/langy/langyResourceKinds";
 
 /**
@@ -49,6 +50,14 @@ import type { LangyResourceKind } from "~/shared/langy/langyResourceKinds";
  * it (a shared machine, an impersonation session), where the project id alone
  * says nothing has moved.
  */
+/**
+ * What the tour hands the panel: everything the takeover collected, plus the
+ * conversation to continue when the organization already attached one.
+ */
+export type GuidedKickoffQueue = GuidedKickoffInput & {
+  conversationId?: string | null;
+};
+
 export interface LangyScope {
   userId: string | null;
   organizationId: string | null;
@@ -212,6 +221,22 @@ interface LangyState extends TurnPhaseState {
   askLangy: (prompt: string) => void;
   /** The panel has taken the queued prompt — clear it so it fires once. */
   consumePendingPrompt: () => void;
+
+  /**
+   * The guided onboarding handing over to Langy: the tour ended (or was
+   * skipped, or the path has no tour) and the panel sends the kickoff message
+   * on the next idle render. Ephemeral like `pendingPrompt`; the message
+   * itself is what lasts (specs/langy/langy-guided-onboarding.feature).
+   */
+  pendingKickoff: GuidedKickoffQueue | null;
+  /**
+   * Open Langy and queue the kickoff. With `conversationId` (the conversation
+   * the organization already attached) the panel continues that conversation;
+   * without one it starts fresh and attaches what the transport creates.
+   */
+  queueGuidedKickoff: (kickoff: GuidedKickoffQueue) => void;
+  /** The panel has taken the queued kickoff — clear it so it sends once. */
+  consumePendingKickoff: () => void;
 
   /**
    * The panel's composer is asked to take focus. Three producers: an
@@ -670,6 +695,7 @@ const emptyConversationState = () => ({
   turnPlan: null as Array<{ content: string; status: string }> | null,
   // A fresh conversation drops any question still queued for the previous one.
   pendingPrompt: null as string | null,
+  pendingKickoff: null as GuidedKickoffQueue | null,
   // A conversation change also drops the id a panel-open warm minted: the
   // pending id belongs to the fresh chat the warm was fired for, and the warm
   // hook re-warms (and re-mints) for whatever the panel points at next.
@@ -777,6 +803,26 @@ export const useLangyStore = create<LangyState>()(
           composerFocusRequested: true,
         })),
       consumePendingPrompt: () => set({ pendingPrompt: null }),
+
+      pendingKickoff: null,
+      queueGuidedKickoff: (kickoff) =>
+        set(() => ({
+          isOpen: true,
+          // The kickoff lands where the organization's conversation is: the
+          // attached one when there is one (its history loads, and the
+          // kickoff continues it), a fresh one otherwise.
+          activeConversationId: kickoff.conversationId ?? null,
+          historyLoadConversationId: kickoff.conversationId ?? null,
+          draft: "",
+          modelOverride: "",
+          isModelPickedByUser: false,
+          modelSeededForConversationId: null,
+          ...emptyConversationState(),
+          // AFTER the spread, like `pendingPrompt`: emptyConversationState()
+          // nulls the kickoff.
+          pendingKickoff: kickoff,
+        })),
+      consumePendingKickoff: () => set({ pendingKickoff: null }),
 
       composerFocusRequested: false,
       requestComposerFocus: () => set({ composerFocusRequested: true }),

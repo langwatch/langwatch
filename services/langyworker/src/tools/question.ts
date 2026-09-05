@@ -159,6 +159,12 @@ const questionParams = Type.Object({
           description: Type.Optional(
             Type.String({ description: "One line about what this answer means." }),
           ),
+          quiet: Type.Optional(
+            Type.Boolean({
+              description:
+                "Show this answer as a quiet link under the main options, for the way out rather than the way forward. It is still a real answer.",
+            }),
+          ),
         }),
         { description: "One to eight options. The options are the answers." },
       ),

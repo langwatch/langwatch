@@ -167,6 +167,7 @@ import { buildTimeTravelView } from "../logic/langyTimeTravel";
 import { isLangyTranscriptMessage } from "../logic/langyTranscript";
 import { deriveWaveActivity } from "../logic/langyWaveMotion";
 import { isInternalHref } from "../logic/spaLink";
+import { planGuidedKickoffSend } from "~/features/guided-onboarding/kickoff";
 import { tapeForConversation, useLangyDevLog } from "../stores/langyDevLog";
 import { useLangyLocalControlStore } from "../stores/langyLocalControlStore";
 import {
@@ -671,6 +672,8 @@ function LangyPanel({
   // The command bar's "Ask Langy" hands a question over via the store; the panel
   // opens itself and auto-sends it (see the pendingPrompt effect below).
   const pendingPrompt = useLangyStore((s) => s.pendingPrompt);
+  const pendingKickoff = useLangyStore((s) => s.pendingKickoff);
+  const consumePendingKickoff = useLangyStore((s) => s.consumePendingKickoff);
   const consumePendingPrompt = useLangyStore((s) => s.consumePendingPrompt);
   const appliedOutcomes = useLangyStore((s) => s.appliedOutcomes);
   const discardedProposalIds = useLangyStore((s) => s.discardedProposalIds);
@@ -889,6 +892,17 @@ function LangyPanel({
   // same per-turn reset, as the navigate dedup above.
   const uiActionSeenRef = useRef<Set<string>>(new Set());
 
+  // The organization a fresh guided onboarding kickoff belongs to. Set when
+  // the kickoff is sent into a new conversation, read once the transport
+  // names that conversation (`onIds`), so the organization records the id
+  // the Home offer continues later. A kickoff into an attached conversation
+  // sets nothing: the id is already recorded.
+  const kickoffAttachOrganizationRef = useRef<string | null>(null);
+  const attachGuidedConversation =
+    api.onboarding.attachConversation.useMutation();
+  const attachGuidedConversationRef = useRef(attachGuidedConversation);
+  attachGuidedConversationRef.current = attachGuidedConversation;
+
   // The rollback lever for agent-driven page control: with the flag off this
   // page ignores `ui` stream entries, so switching it off during a live turn
   // stops the page changing under the user. Read through a ref because the
@@ -937,6 +951,14 @@ function LangyPanel({
           // A fresh turn — clear the previous turn's navigate dedup too.
           navigatedInstructionsRef.current = new Set();
           uiActionSeenRef.current = new Set();
+          const attachToOrganizationId = kickoffAttachOrganizationRef.current;
+          if (attachToOrganizationId) {
+            kickoffAttachOrganizationRef.current = null;
+            attachGuidedConversationRef.current.mutate({
+              organizationId: attachToOrganizationId,
+              conversationId,
+            });
+          }
         },
         onNavigate: (entry) => {
           // Internal-target guard, mirroring MessageContent's isInternalHref:
@@ -1990,6 +2012,38 @@ function LangyPanel({
     // deps (matching this file's other one-shot effects).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingPrompt, projectId, isBusy]);
+
+  // The guided onboarding kickoff, drained like `pendingPrompt`: consumed
+  // first so it sends once, gated on an idle panel and, for an attached
+  // conversation, on its history having loaded. The message carries the typed
+  // kickoff part beside the model brief (see `buildGuidedKickoffParts`).
+  useEffect(() => {
+    if (!pendingKickoff || !projectId || isBusy || isRestoringConversation)
+      return;
+    const kickoff = pendingKickoff;
+    consumePendingKickoff();
+    const plan = planGuidedKickoffSend({
+      kickoff,
+      organizationId: organizationId ?? null,
+    });
+    if (!plan.continuing) resetChatEngine({ clearMessages: true });
+    kickoffAttachOrganizationRef.current = plan.attachToOrganizationId;
+    recovery.reset();
+    useLangyStore.getState().beginSend();
+    useLangyDevLog
+      .getState()
+      .recordOutbound("send", `guided onboarding kickoff: ${kickoff.path}`, {
+        text: plan.brief,
+        conversationId: useLangyStore.getState().activeConversationId,
+      });
+    void sendMessage({
+      role: "user",
+      // The kickoff part rides beside its brief; the engine's part union has
+      // no custom members, the same cast the choice selection send makes.
+      parts: plan.parts as unknown as UIMessage["parts"],
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingKickoff, projectId, isBusy, isRestoringConversation]);
 
   const handleSelectConversation = (id: string) => {
     // Messages are replaced by the selected conversation's history, so don't

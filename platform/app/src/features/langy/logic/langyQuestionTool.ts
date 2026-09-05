@@ -55,6 +55,7 @@ export function isQuestionToolPart(part: unknown): boolean {
 interface RawQuestionOption {
   label?: unknown;
   description?: unknown;
+  quiet?: unknown;
 }
 
 interface RawQuestion {
@@ -103,7 +104,9 @@ export function questionToolCardParts(part: unknown): LangyCardPart[] {
       : [];
     const options = rawOptions
       .filter(
-        (option): option is { label: string; description?: string } =>
+        (
+          option,
+        ): option is { label: string; description?: string; quiet?: unknown } =>
           typeof option?.label === "string" && option.label.trim() !== "",
       )
       .map((option, optionIndex) => ({
@@ -113,6 +116,9 @@ export function questionToolCardParts(part: unknown): LangyCardPart[] {
         option.description.trim() !== ""
           ? { description: option.description }
           : {}),
+        // The quiet mark rides through untouched: the tool said which answer
+        // is the way out, and the card draws it as a link.
+        ...(option.quiet === true ? { quiet: true } : {}),
       }));
     if (options.length === 0) return;
 

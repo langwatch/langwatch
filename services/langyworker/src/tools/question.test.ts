@@ -96,7 +96,11 @@ describe("the question tool", () => {
       const options = questions.items.properties.options as {
         items: { properties: Record<string, unknown> };
       };
-      expect(Object.keys(options.items.properties).sort()).toEqual(["description", "label"]);
+      expect(Object.keys(options.items.properties).sort()).toEqual([
+        "description",
+        "label",
+        "quiet",
+      ]);
       expect(tool.description).toContain("Decide routine things alone");
       expect(tool.description).toContain("differ for the user");
     });

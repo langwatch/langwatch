@@ -186,6 +186,12 @@ export const choicesCardFields = {
         id: z.string().min(1),
         label: z.string().min(1),
         description: z.string().optional(),
+        /**
+         * A quiet option is the way out, not the way forward: it renders as
+         * an underlined link under the bordered rows and answers like any
+         * other option ("I'd rather describe it", "Chat about this").
+         */
+        quiet: z.boolean().optional(),
         ref: z
           .object({
             type: z.string().min(1),

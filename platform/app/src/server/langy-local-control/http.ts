@@ -115,6 +115,8 @@ export type PollCallResponse = z.infer<typeof pollCallResponseSchema>;
 export const questionOptionSchema = z.object({
   label: z.string().min(1).max(200),
   description: z.string().max(1000).optional(),
+  /** Rendered as a quiet link under the bordered options; still an answer. */
+  quiet: z.boolean().optional(),
 });
 
 export const questionSchema = z.object({

@@ -115,6 +115,12 @@ describe("the local workspace tools", () => {
       ]);
       expect(parameterNames("local_find")).toEqual(["limit", "path", "pattern"]);
       expect(parameterNames("local_ls")).toEqual(["limit", "path"]);
+      // The quiet third way out is opt-in: a skill with a fallback for it
+      // passes `offer_describe`, an ordinary ask leaves it off.
+      expect(parameterNames(CODE_ACCESS_TOOL_NAME)).toEqual([
+        "offer_describe",
+        "reason",
+      ]);
 
       for (const name of LOCAL_TOOL_NAMES) {
         expect(tools.get(name)!.description).toContain("on the user's machine");

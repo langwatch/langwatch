@@ -427,6 +427,12 @@ const codeAccessParams = Type.Object({
   reason: Type.Optional(
     Type.String({ description: "One short line about the change you want to make." }),
   ),
+  offer_describe: Type.Optional(
+    Type.Boolean({
+      description:
+        "Also offer a quiet third way out, \"I'd rather describe it\". The pick arrives as the next message. Off unless a skill asks for it.",
+    }),
+  ),
 });
 
 const localReadParams = Type.Object({
