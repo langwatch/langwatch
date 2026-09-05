@@ -101,6 +101,30 @@ else
   check "the annotation points at the first line of the long paragraph" no
 fi
 
+# A page that shows markdown inside markdown wraps a ``` block in a ````
+# one. The inner fence must not close the outer block, or every line after it
+# reads as prose and the code inside is counted against the paragraph limit.
+NESTED_PAGE="$WORK/docs/nested.mdx"
+{
+  printf -- '---\ntitle: Nested\n---\n\n'
+  printf -- '````markdown\n'
+  printf -- '```python\n'
+  printf 'one two three four five six seven eight nine ten eleven twelve\n'
+  printf -- '```\n'
+  printf -- '````\n\n'
+  printf 'one two three\n'
+} > "$NESTED_PAGE"
+rm -f "$WORK/docs/long.mdx"
+
+NESTED_OUTPUT="$(DOCS_PROSE_MAX_PARAGRAPH_WORDS=10 bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
+
+if printf '%s\n' "$NESTED_OUTPUT" | grep -q 'words, the limit is 10'; then
+  check "a fence nested in a longer fence stays code" no
+  echo "Output: $NESTED_OUTPUT"
+else
+  check "a fence nested in a longer fence stays code" yes
+fi
+
 if [[ $FAILURES -gt 0 ]]; then
   echo ""
   echo "Annotation: $ANNOTATION"

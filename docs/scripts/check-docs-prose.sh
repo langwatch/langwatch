@@ -100,8 +100,23 @@ for file in "${FILES[@]}"; do
   # Blank out code fences (including indented ones, up to 3 spaces per the
   # CommonMark spec) and founder-decision exemptions. Print blank lines for
   # skipped records so grep -n reports the real source line number.
+  #
+  # A fence closes only on the same character, repeated at least as many
+  # times as the fence that opened it. Pages that show markdown inside
+  # markdown wrap a ``` block in a ```` one, and a toggle on every run of
+  # three would read the inner fence as a close and treat the code that
+  # follows as prose.
   cleaned=$(awk '
-    /^ {0,3}(`{3,}|~{3,})/ { in_code = !in_code; print ""; next }
+    match($0, /^ {0,3}(`{3,}|~{3,})/) {
+      run = substr($0, RSTART, RLENGTH)
+      sub(/^ +/, "", run)
+      ch = substr(run, 1, 1)
+      len = length(run)
+      if (!in_code) { in_code = 1; fence_ch = ch; fence_len = len }
+      else if (ch == fence_ch && len >= fence_len) { in_code = 0 }
+      print ""
+      next
+    }
     in_code                 { print ""; next }
     /\{\/\* Founder decision:/  { print ""; next }
     { print }
