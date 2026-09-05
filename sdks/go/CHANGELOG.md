@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/langwatch/langwatch/compare/sdks/go/v0.3.0...sdks/go/v0.4.0) (2026-09-05)
+
+
+### Features
+
+* **agents:** connected agents, a decorated function is a simulation target ([#7655](https://github.com/langwatch/langwatch/issues/7655)) ([56922c0](https://github.com/langwatch/langwatch/commit/56922c0ee429bd5a38717960c09ede0d1905c0c3))
+
+
+### Code Refactoring
+
+* **event-sourcing:** retire the reactor vocabulary — post-event work is subscribers and process managers (ADR-098) ([#6956](https://github.com/langwatch/langwatch/issues/6956)) ([8609798](https://github.com/langwatch/langwatch/commit/8609798ba36387596a62f8c513fd76660bd500dc))
+
 ## [0.3.0](https://github.com/langwatch/langwatch/compare/sdk-go@v0.2.0...sdk-go@v0.3.0) (2026-05-13)
 
 
