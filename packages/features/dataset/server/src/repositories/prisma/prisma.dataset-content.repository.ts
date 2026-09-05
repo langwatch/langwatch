@@ -1,9 +1,12 @@
 import type { DatasetRow } from "../../ports/dataset.port";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import {
+  DatasetContentRepository,
+  type CreateDatasetInput,
+  type DatasetContentUpdate,
+  type UpdateDatasetInput,
+} from "../dataset-content.repository";
 
-/**
- * Input types derived from Prisma for type safety
- */
 /**
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
@@ -13,42 +16,6 @@ export type DatasetContentDatabase = Pick<
   "dataset" | "datasetRecord" | "$transaction" | "$queryRaw" | "$executeRaw"
 >;
 
-export type CreateDatasetInput = Omit<
-  Prisma.DatasetCreateInput,
-  "project" | "datasetRecords" | "batchEvaluations"
-> & {
-  projectId: string;
-};
-
-export type UpdateDatasetInput = {
-  id: string;
-  projectId: string;
-  data: Prisma.DatasetUpdateInput;
-};
-
-/**
- * The fields a chunk mutation writes back, in the feature's own vocabulary.
- *
- * The chunk service used to build `Prisma.DatasetUpdateInput` itself, which
- * meant seven `as unknown as Prisma.InputJsonValue` casts in a service — the
- * JSON columns are the only reason those existed. Naming the shape here keeps
- * the storage vocabulary on the storage side; the casts happen once, below.
- */
-export type DatasetContentUpdate = {
-  rowCount?: number;
-  sizeBytes?: bigint;
-  chunkCount?: number;
-  chunkOffsets?: unknown;
-  columnTypes?: unknown;
-  name?: string;
-  slug?: string;
-};
-
-/**
- * Repository layer for dataset data access.
- * Single Responsibility: Database operations for datasets.
- * {@link Dataset} represents a collection of data records with associated metadata.
- */
 /**
  * Max wall-clock a dataset-mutation transaction may run before Prisma aborts it
  * with P2028. Sized for the worst case inside the lock: edit, delete and count
@@ -81,15 +48,18 @@ type CountableDataset = {
 const storesRowsInRecordsTable = (dataset: CountableDataset): boolean =>
   dataset.contentLayout !== "s3_jsonl" && !dataset.useS3;
 
-export class DatasetContentRepository {
+/** Private Prisma owner for Dataset rows and their object-storage counters. */
+export class PrismaDatasetContentRepository extends DatasetContentRepository {
   private constructor(
     private readonly prisma: DatasetContentClient,
     /** Absent on a transaction-scoped instance — only the root can open one. */
     private readonly root: DatasetContentDatabase | null,
-  ) {}
+  ) {
+    super();
+  }
 
-  static create(prisma: DatasetContentDatabase): DatasetContentRepository {
-    return new DatasetContentRepository(prisma, prisma);
+  static create(prisma: DatasetContentDatabase): PrismaDatasetContentRepository {
+    return new PrismaDatasetContentRepository(prisma, prisma);
   }
 
   /**
@@ -119,7 +89,7 @@ export class DatasetContentRepository {
         // transaction, which is what serializes the mutation.
         await client.$executeRaw`-- @tenancy: advisory-lock helper, key is dataset-bounded
 SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
-        return await mutate(new DatasetContentRepository(client, null));
+        return await mutate(new PrismaDatasetContentRepository(client, null));
       },
       {
         timeout: DATASET_MUTATION_TXN_TIMEOUT_MS,

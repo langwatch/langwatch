@@ -36,7 +36,9 @@ describe("HttpLangevalsEvaluatorAdapter", () => {
     describe("when the failure reaches the caller", () => {
       /** @scenario "An evaluator timeout names the evaluator, not the address dialled" */
       it("names the evaluator and the timeout, and not the address dialled", async () => {
-        failFetchWith(Object.assign(new Error("The operation was aborted"), { name: "AbortError" }));
+        failFetchWith(
+          Object.assign(new Error("The operation was aborted"), { name: "AbortError" }),
+        );
 
         const error = await adapter()
           .evaluate(params)

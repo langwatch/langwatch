@@ -8,9 +8,11 @@ import { createLogger } from "@langwatch/observability";
 import type {
   GatewayRealtimeSession,
   GatewayRealtimeSessionStatus,
-  Prisma,
 } from "@langwatch/prisma-client/generated";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type {
+  GatewayRealtimeSessionRepository,
+  ReserveResult,
+} from "../repositories/gateway-realtime-session.repository";
 import { EMPTY_SPEND_USAGE, type SpendUsage } from "../processes/gateway-spend-commands.process";
 import type { GatewaySpanIngestionPort } from "../ports/gateway-span-ingestion.port";
 import type { GatewaySpendConfirmationPort } from "../ports/gateway-spend-confirmation.port";
@@ -26,11 +28,14 @@ const logger = createLogger("langwatch:gateway:realtime-session");
  */
 export const REALTIME_OPEN_SESSION_WINDOW_MS = 60 * 60 * 1000;
 
+/** What a session closed by the window rather than by a report says it closed for. */
+const EXPIRY_CLOSE_REASON = "no vendor report arrived within the longest possible call";
+
 /**
  * Everything this service reaches outside itself, named rather than resolved from a process singleton — the voice settlement writes money, and a second process quietly composing a second database or rating table would give two answers to what one call cost.
  */
 export type GatewayRealtimeSessionCollaborators = {
-  database: PrismaClient;
+  sessions: GatewayRealtimeSessionRepository;
   /** Prices the vendor's quantities. The one rating seam for the vertical. */
   spendRating: GatewaySpendRatingPort;
   /** Sends the confirmation into the gateway spend pipeline. */
@@ -41,11 +46,6 @@ export type GatewayRealtimeSessionCollaborators = {
    */
   spanIngestion?: GatewaySpanIngestionPort | undefined;
 };
-
-/** What a reserve attempt answers. */
-export type ReserveResult =
-  | { ok: true }
-  | { ok: false; reason: "session_limit"; open: number; limit: number };
 
 export interface ReserveInput {
   sessionId: string;
@@ -83,62 +83,21 @@ export class GatewayRealtimeSessionService {
   async reserveRealtimeSession(
     input: ReserveInput & { collaborators: GatewayRealtimeSessionCollaborators },
   ): Promise<ReserveResult> {
-    return input.collaborators.database.$transaction(async (tx) => {
-      // An advisory lock names no table and reads no row, so the raw-query
-      // tenancy guard has nothing to check and is opted out of by name. The
-      // lock key carries the tenancy itself: it is the project and the key
-      // together, so two projects never contend and one key's mints serialize
-      // against each other, which is what makes the count below a cap.
-      const lockKey = `${input.projectId}:${input.virtualKeyId}`;
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey})) -- @tenancy: a lock, not a read; the lock key is itself scoped to one project and key`;
-
-      const key = await tx.virtualKey.findUnique({
-        where: { id: input.virtualKeyId },
-        select: { config: true },
-      });
-      const limit = parseVirtualKeyConfig(key?.config).realtime.maxOpenSessions;
-
-      if (limit !== null) {
-        // Expire this key's stale rows first, under the lock we already hold,
-        // so the count and the table agree. A session no report ever closed
-        // would otherwise sit OPEN forever and ratchet the key down one slot
-        // at a time, which is the failure an OpenAI socket makes likely: it
-        // never signals that it closed.
-        await this.expireStaleRealtimeSessions({
-          virtualKeyId: input.virtualKeyId,
-          tx,
-          collaborators: input.collaborators,
-        });
-        const open = await tx.gatewayRealtimeSession.count({
-          where: { virtualKeyId: input.virtualKeyId, status: "OPEN" },
-        });
-        if (open >= limit) {
-          return {
-            ok: false as const,
-            reason: "session_limit" as const,
-            open,
-            limit,
-          };
-        }
-      }
-
-      await tx.gatewayRealtimeSession.create({
-        data: {
-          id: input.sessionId,
-          projectId: input.projectId,
-          organizationId: input.organizationId,
-          virtualKeyId: input.virtualKeyId,
-          modelProviderId: input.modelProviderId,
-          vendor: input.vendor,
-          agentId: input.agentId ?? null,
-          model: input.model,
-          traceId: input.traceId ?? null,
-          requestedModel: input.requestedModel ?? null,
-          status: "OPEN",
-        },
-      });
-
-      return { ok: true as const };
+    return input.collaborators.sessions.reserve({
+      session: {
+        id: input.sessionId,
+        projectId: input.projectId,
+        organizationId: input.organizationId,
+        virtualKeyId: input.virtualKeyId,
+        modelProviderId: input.modelProviderId,
+        vendor: input.vendor,
+        agentId: input.agentId ?? null,
+        model: input.model,
+        traceId: input.traceId ?? null,
+        requestedModel: input.requestedModel ?? null,
+      },
+      staleBefore: new Date(Date.now() - REALTIME_OPEN_SESSION_WINDOW_MS),
+      closeReason: EXPIRY_CLOSE_REASON,
     });
   }
 
@@ -149,12 +108,11 @@ export class GatewayRealtimeSessionService {
     vendorConversationId: string;
     collaborators: GatewayRealtimeSessionCollaborators;
   }): Promise<boolean> {
-    const updated = await params.collaborators.database.gatewayRealtimeSession.updateMany({
-      where: { id: params.sessionId, projectId: params.projectId },
-      data: { vendorConversationId: params.vendorConversationId },
+    return await params.collaborators.sessions.correlate({
+      sessionId: params.sessionId,
+      projectId: params.projectId,
+      vendorConversationId: params.vendorConversationId,
     });
-
-    return updated.count > 0;
   }
 
   /** Closes a session that never opened, so the cap stops counting it. */
@@ -165,20 +123,12 @@ export class GatewayRealtimeSessionService {
     reason: string;
     collaborators: GatewayRealtimeSessionCollaborators;
   }): Promise<boolean> {
-    const updated = await params.collaborators.database.gatewayRealtimeSession.updateMany({
-      where: {
-        id: params.sessionId,
-        projectId: params.projectId,
-        status: "OPEN",
-      },
-      data: {
-        status: params.status,
-        closedAt: new Date(),
-        closeReason: params.reason.slice(0, 256),
-      },
+    return await params.collaborators.sessions.release({
+      sessionId: params.sessionId,
+      projectId: params.projectId,
+      status: params.status,
+      closeReason: params.reason.slice(0, 256),
     });
-
-    return updated.count > 0;
   }
 
   /**
@@ -193,7 +143,7 @@ export class GatewayRealtimeSessionService {
     callStartedAt?: Date;
     collaborators: GatewayRealtimeSessionCollaborators;
   }): Promise<GatewayRealtimeSession | null> {
-    const prisma = params.collaborators.database;
+    const sessions = params.collaborators.sessions;
     // Every branch is scoped to the organization that owns the credential the
     // delivery was signed for. A conversation id is the vendor's, not ours, so
     // without that scope one tenant's delivery could name another's session.
@@ -203,8 +153,9 @@ export class GatewayRealtimeSessionService {
     };
 
     if (params.vendorConversationId) {
-      const exact = await prisma.gatewayRealtimeSession.findFirst({
-        where: { ...tenancy, vendorConversationId: params.vendorConversationId },
+      const exact = await sessions.tryFindByVendorConversationId({
+        ...tenancy,
+        vendorConversationId: params.vendorConversationId,
       });
       if (exact) {
         return exact;
@@ -212,9 +163,7 @@ export class GatewayRealtimeSessionService {
     }
 
     if (params.echoedSessionId) {
-      const echoed = await prisma.gatewayRealtimeSession.findFirst({
-        where: { ...tenancy, id: params.echoedSessionId },
-      });
+      const echoed = await sessions.tryFindById({ ...tenancy, id: params.echoedSessionId });
       if (echoed) {
         return echoed;
       }
@@ -223,14 +172,12 @@ export class GatewayRealtimeSessionService {
     const since = new Date(
       (params.callStartedAt?.getTime() ?? Date.now()) - REALTIME_OPEN_SESSION_WINDOW_MS,
     );
-    const candidates = await prisma.gatewayRealtimeSession.findMany({
-      where: {
-        ...tenancy,
-        modelProviderId: params.modelProviderId,
-        status: "OPEN",
-        mintedAt: { gt: since },
-      },
-      take: 2,
+    // Two candidates is already one too many, so two is all that is read.
+    const candidates = await sessions.findOpenSince({
+      ...tenancy,
+      modelProviderId: params.modelProviderId,
+      since,
+      limit: 2,
     });
     if (candidates.length === 1) {
       return candidates[0] ?? null;
@@ -256,7 +203,6 @@ export class GatewayRealtimeSessionService {
     reason: string;
     collaborators: GatewayRealtimeSessionCollaborators;
   }): Promise<void> {
-    const prisma = params.collaborators.database;
     const occurredAt = params.occurredAt ?? new Date();
     const usage: SpendUsage = { ...EMPTY_SPEND_USAGE, ...params.usage };
 
@@ -299,22 +245,14 @@ export class GatewayRealtimeSessionService {
       metadata: "",
     });
 
-    const closed = await prisma.gatewayRealtimeSession.updateMany({
-      where: {
-        id: params.session.id,
-        projectId: params.session.projectId,
-        status: { in: ["OPEN", "EXPIRED"] },
-      },
-      data: {
-        status: "CLOSED",
-        closedAt: occurredAt,
-        closeReason: params.reason.slice(0, 256),
-        ...(params.vendorCostRaw === undefined
-          ? {}
-          : { vendorCostRaw: params.vendorCostRaw as Prisma.InputJsonValue }),
-      },
+    const closed = await params.collaborators.sessions.close({
+      sessionId: params.session.id,
+      projectId: params.session.projectId,
+      closedAt: occurredAt,
+      closeReason: params.reason.slice(0, 256),
+      ...(params.vendorCostRaw === undefined ? {} : { vendorCostRaw: params.vendorCostRaw }),
     });
-    if (closed.count === 0) {
+    if (closed === 0) {
       logger.info(
         { sessionId: params.session.id },
         "a realtime report arrived for a session that was already closed",
@@ -348,18 +286,15 @@ export class GatewayRealtimeSessionService {
     now?: Date;
     collaborators: GatewayRealtimeSessionCollaborators;
   }): Promise<"closed" | "already_closed" | "not_found"> {
-    const prisma = params.collaborators.database;
     // Matched on the key as well as the project. A trace project is shared by
     // every key scoped to it, so filtering on the project alone would let the
     // holder of one key close a session another key opened and write arbitrary
     // usage onto that key's admitted spend record. A session id is a
     // gateway request id, which the other key's own response header carries.
-    const session = await prisma.gatewayRealtimeSession.findFirst({
-      where: {
-        id: params.sessionId,
-        projectId: params.projectId,
-        virtualKeyId: params.virtualKeyId,
-      },
+    const session = await params.collaborators.sessions.tryFindForReport({
+      sessionId: params.sessionId,
+      projectId: params.projectId,
+      virtualKeyId: params.virtualKeyId,
     });
     if (!session) {
       return "not_found";
@@ -393,27 +328,16 @@ export class GatewayRealtimeSessionService {
   async expireStaleRealtimeSessions(params: {
     virtualKeyId?: string;
     now?: Date;
-    tx?: Pick<PrismaClient, "gatewayRealtimeSession">;
     collaborators: GatewayRealtimeSessionCollaborators;
   }): Promise<number> {
     const now = params.now ?? new Date();
-    const db = params.tx ?? params.collaborators.database;
-    const { count } = await db.gatewayRealtimeSession.updateMany({
-      where: {
-        ...(params.virtualKeyId ? { virtualKeyId: params.virtualKeyId } : {}),
-        status: "OPEN",
-        mintedAt: {
-          lt: new Date(now.getTime() - REALTIME_OPEN_SESSION_WINDOW_MS),
-        },
-      },
-      data: {
-        status: "EXPIRED",
-        closedAt: now,
-        closeReason: "no vendor report arrived within the longest possible call",
-      },
-    });
 
-    return count;
+    return await params.collaborators.sessions.expireStale({
+      ...(params.virtualKeyId ? { virtualKeyId: params.virtualKeyId } : {}),
+      now,
+      staleBefore: new Date(now.getTime() - REALTIME_OPEN_SESSION_WINDOW_MS),
+      closeReason: EXPIRY_CLOSE_REASON,
+    });
   }
 }
 

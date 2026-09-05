@@ -328,9 +328,7 @@ describe("PermissionScopeArg", () => {
     /** @scenario "An imperative check names its scope id to match the permission" */
     it("refuses a projectId argument, admitting only organizationId", () => {
       type Arg = PermissionScopeArg<"governance:view">;
-      type _ProjectIdRefused = Assert<
-        { projectId: string } extends Arg ? false : true
-      >;
+      type _ProjectIdRefused = Assert<{ projectId: string } extends Arg ? false : true>;
       type _OrganizationIdAccepted = Assert<{ organizationId: string } extends Arg ? true : false>;
       expect(true satisfies _ProjectIdRefused).toBe(true);
       expect(true satisfies _OrganizationIdAccepted).toBe(true);

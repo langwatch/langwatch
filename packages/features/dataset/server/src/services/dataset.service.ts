@@ -696,11 +696,9 @@ export class DatasetService extends DatasetServiceContract {
   }
 
   /**
-   * A key the dataset does not define is refused, not dropped. The fill below
-   * writes only defined columns, so an unknown key would vanish and the caller
-   * would read a 201 for data nothing stored. Validation runs before the
-   * storage split so both layouts refuse the same entry. `id` is the record's
-   * own identifier, part of the entry contract rather than a column.
+   * A key the dataset does not define is refused, not dropped. The fill below writes only
+   * defined columns, so an unknown key would vanish and the caller would read a 201 for data
+   * nothing stored.
    */
   private static assertKnownColumns({
     datasetName,

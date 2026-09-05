@@ -1,10 +1,6 @@
 /**
- * The target the journey's HTTP agent talks to.
- *
- * A run has to complete, so the address the agent names must answer. This is
- * one loopback route that replies with a fixed line in both shapes the agent
- * editor can read: the OpenAI chat shape its default output path names, and a
- * plain `output` field.
+ * The target the journey's HTTP agent talks to. A run has to complete, so the address the agent
+ * names must answer.
  */
 import { createServer, type Server } from "node:http";
 

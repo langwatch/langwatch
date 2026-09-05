@@ -1,23 +1,5 @@
 /**
- * The REST collector: `POST /api/collector`.
- *
- * Was `platform/app/src/server/routes/collector.ts`. This is the SDK's own
- * ingest door — the one an SDK posts a whole trace to in one body, spans and
- * custom evaluations together — and it sits beside the OTLP receiver on the
- * same producer registration, the same Redis dedup gate and the same
- * handler-managed credential, so a span that arrives here and a span that
- * arrives on `/api/otel/v1/traces` are recorded by one path.
- *
- * Everything the platform route reached through its global application
- * container is a port now: the credential, the plan allowance, the span
- * ingestion, the evaluation report and the evaluator-id slug rule. The two
- * ingest rules it used to import from a browser module — the RAG context
- * id/normalisation pass and the chunk text extractor — are
- * `@langwatch/trace-contract`'s, where both halves can name them.
- *
- * The nine distinct 400 sentences, the two 429s, the 402 and the 500 are
- * transcribed rather than rewritten: every one of them is what a deployed SDK
- * shows a customer.
+ * The REST collector: `POST /api/collector`. Was `platform/app/src/server/routes/collector.ts`.
  */
 import crypto from "node:crypto";
 
@@ -57,15 +39,8 @@ export type CollectorProject = Readonly<{
 }>;
 
 /**
- * A resolved credential, or why it was refused.
- *
- * The two refusals are told apart rather than passed through as one body,
- * because their copy comes from two different places. `credential` is THIS
- * family's own sentence — `{error:"Unauthorized", message:"Invalid
- * credentials"}`, which every LangWatch SDK's error copy quotes — and it
- * covers both a missing token and one that resolves to nothing. `ceiling` is
- * the AuthZ layer's full handled payload (code, permission, tips), which the
- * family forwards untouched because a caller acts on its fields.
+ * A resolved credential, or why it was refused. The two refusals are told apart rather than
+ * passed through as one body, because their copy comes from two different places.
  */
 export type CollectorCredential =
   | Readonly<{ ok: true; project: CollectorProject; markUsed: () => void }>
@@ -77,13 +52,6 @@ export type CollectorCredentialPort = (input: { request: Request }) => Promise<C
 
 /**
  * The plan allowance, enforced before the body is reshaped.
- *
- * It THROWS to refuse — the refusal is a `HandledError` the process's error
- * boundary renders as a 402, deliberately not a 429: OTel SDKs and most HTTP
- * clients retry a 429, and a plan limit is terminal for that payload, so a
- * retryable status turns one rejection into an unbounded loop. It returns for
- * every other outcome INCLUDING a lookup that failed, which is the behaviour
- * this path has always had.
  */
 export type CollectorUsageLimitPort = (input: { project: CollectorProject }) => Promise<void>;
 
@@ -123,33 +91,21 @@ export type CollectorErrorReportPort = (
 export type CollectorRestPorts = Readonly<{
   credential: CollectorCredentialPort;
   /**
-   * The plan allowance, or none.
-   *
-   * None where the process composed no usage meter, and then no monthly
-   * allowance is enforced. That is the same degradation this path has always
-   * had when the allowance LOOKUP failed — the batch is accepted — because
-   * telemetry a customer already paid to produce must not be dropped by a
-   * meter this process cannot read.
+   * The plan allowance, or none. None where the process composed no usage meter, and then no
+   * monthly allowance is enforced.
    */
   usageLimit?: CollectorUsageLimitPort | undefined;
   /** Where a normalized span goes. Required: it is the whole of this door. */
   ingestSpan: CollectorSpanIngestPort;
   /**
-   * Where a custom SDK evaluation goes, or none.
-   *
-   * None where the process registered no evaluation pipeline. The spans still
-   * land; each evaluation is counted in `partialSuccess.rejectedEvaluations`
-   * with a sentence saying so, rather than dropped silently — a verdict a
-   * customer believes they recorded is worse than one they are told was not.
+   * Where a custom SDK evaluation goes, or none. None where the process registered no
+   * evaluation pipeline.
    */
   reportEvaluation?: CollectorEvaluationReportPort | undefined;
   /**
-   * The evaluator-id slug rule, for an evaluation that names no evaluator.
-   *
-   * A port because the rule is EVALUATION's — the same one its own
-   * `custom-evaluation-sync` subscriber applies — and a feature server package
-   * may not reach into another feature's server package. Two copies would
-   * derive two ids for one evaluation name, and the id IS the key.
+   * The evaluator-id slug rule, for an evaluation that names no evaluator. A port because the
+   * rule is EVALUATION's — the same one its own `custom-evaluation-sync` subscriber applies —
+   * and a feature server package may not reach into another feature's server package.
    */
   deriveEvaluatorId: (name: string) => string;
   reportError?: CollectorErrorReportPort | undefined;
@@ -159,20 +115,17 @@ export type CollectorRestPorts = Readonly<{
 const COLLECTOR_MAX_BODY_BYTES = 10 * 1024 * 1024;
 
 /**
- * What `partialSuccess.errorMessage` says about a span or an evaluation the
- * pipeline refused. The pipeline's own strings name the datastore and its
- * address, and this body reaches any project key, so the count and the action
- * travel and the diagnosis stays on the log line.
+ * What `partialSuccess.errorMessage` says about a span or an evaluation the pipeline refused.
+ * The pipeline's own strings name the datastore and its address, and this body reaches any
+ * project key, so the count and the action travel and the diagnosis stays on the log line.
  */
 const SPAN_INGESTION_FAILED = "span ingestion failed, please retry";
 const EVALUATION_INGESTION_FAILED = "evaluation ingestion failed, please retry";
 
 /**
- * The REST collector, built against one process's security.
- *
- * `/api/collector` is a literal path nothing else claims, but it MUST be
- * registered before the OTLP path-alias re-dispatcher, which claims
- * `/api/collector/*` with a wildcard.
+ * The REST collector, built against one process's security. `/api/collector` is a literal path
+ * nothing else claims, but it MUST be registered before the OTLP path-alias re-dispatcher,
+ * which claims `/api/collector/*` with a wildcard.
  */
 export function createCollectorRestApp(options: {
   security: AppRestSecurity;
@@ -618,13 +571,10 @@ export function createCollectorRestApp(options: {
           ),
         );
 
-        // `ingestNormalizedSpan` catches its own errors and RESOLVES with
-        // `{ status: "failed", error }` (it never rejects), so inspect the
-        // resolved status — checking the allSettled "rejected" wrapper would
-        // count every failure as a success. An unexpected rejection is still
-        // treated as a failure defensively. "deduped" is a success, not an error.
-        // The pipeline's own error strings go to the log below; what the
-        // caller is told is the count and that a retry is the action.
+        // `ingestNormalizedSpan` catches its own errors and RESOLVES with `{ status: "failed",
+        // error }` (it never rejects), so inspect the resolved status — checking the allSettled
+        // "rejected" wrapper would count every failure as a success. An unexpected rejection is
+        // still treated as a failure defensively. "deduped" is a success, not an error.
         const failureDetails = results
           .map((r) => {
             if (r.status === "rejected") {
@@ -659,12 +609,11 @@ export function createCollectorRestApp(options: {
         );
       }
 
-      // Total ingestion failure: every dispatched span failed (e.g. Redis /
-      // group-queue outage). There is no fallback stack, so a 200 here
-      // would tell the SDK the trace landed and it would never retry —
-      // permanent trace loss. Return 500 so clients retry; the dedup gate
-      // releases failed spans via releaseOnFailure, so a retry is safe.
-      // Partial success stays 2xx for SDK back-compat.
+      // Total ingestion failure: every dispatched span failed (e.g. Redis / group-queue
+      // outage). There is no fallback stack, so a 200 here would tell the SDK the trace landed
+      // and it would never retry — permanent trace loss. Return 500 so clients retry; the dedup
+      // gate releases failed spans via releaseOnFailure, so a retry is safe. Partial success
+      // stays 2xx for SDK back-compat.
       if (freshSpans.length > 0 && dispatchFailures === freshSpans.length) {
         return c.json(
           {

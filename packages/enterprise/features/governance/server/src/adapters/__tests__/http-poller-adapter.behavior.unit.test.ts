@@ -1,16 +1,6 @@
 /**
- * Unit coverage for HttpPollingPullerAdapter — exercises:
- *   - validateConfig accepting/rejecting shapes
- *   - happy-path single-page pull (1 mocked HTTP call)
- *   - multi-page pull respecting cursor (3 mocked HTTP calls)
- *   - 4xx fails fast, 5xx retries, all retries exhausted → errorCount=1
- *   - cursor extraction handling missing field
- *   - template substitution for headers + bearer auth injection
- *
- * The integration shape (worker → adapter → trace store) is covered
- * separately. This file documents the adapter's pure-function
- * contract using a stub fetch shimmed via `globalThis.fetch`.
- *
+ * Unit coverage for HttpPollingPullerAdapter's pure-function contract, using a stub fetch
+ * shimmed via `globalThis.fetch`.
  * Spec: specs/ai-governance/puller-framework/http-polling.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

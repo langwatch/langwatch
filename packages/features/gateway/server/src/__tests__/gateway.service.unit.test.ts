@@ -127,6 +127,9 @@ class EmptyGuardrailRepository extends GatewayGuardrailRepository {
   archive(): never {
     throw new Error("not used");
   }
+  findRunnableForCheck(): never {
+    throw new Error("not used");
+  }
 }
 
 class UnusedEvaluatorService extends EvaluatorService {

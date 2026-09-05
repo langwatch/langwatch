@@ -1,9 +1,5 @@
 /**
  * @vitest-environment node
- *
- * Department entity + assignment against real Postgres, no mocks. Binds the
- * entity scenarios of departments.feature.
- *
  * Spec: specs/ai-gateway/governance/departments.feature
  */
 import { nanoid } from "nanoid";

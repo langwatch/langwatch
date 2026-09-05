@@ -234,11 +234,11 @@ then `slugify`, and `prepareDsl` and `runPublishedWorkflow` waiting behind
 them). Each is now a `Pick` of exactly the set the half composes
 UNCONDITIONALLY, which is exactly the set the record asks for:
 
-| Half member | Guaranteed set |
-| --- | --- |
-| `experimentPorts` | `coerceMonitorMappings`, `copyWorkflowWithDatasets`, `saveWorkflowVersion`, `slugify`, `upsertExperimentMonitor`, `workbenchStateSchema` |
-| `workflowPorts.lifecycle` | `captureException`, `generateCommitMessage`, `prepareDsl`, `saveWorkflowVersion`, `workflowCreated` |
-| `workflowPorts.optimization` | `runPublishedWorkflow` |
+| Half member                  | Guaranteed set                                                                                                                           |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `experimentPorts`            | `coerceMonitorMappings`, `copyWorkflowWithDatasets`, `saveWorkflowVersion`, `slugify`, `upsertExperimentMonitor`, `workbenchStateSchema` |
+| `workflowPorts.lifecycle`    | `captureException`, `generateCommitMessage`, `prepareDsl`, `saveWorkflowVersion`, `workflowCreated`                                      |
+| `workflowPorts.optimization` | `runPublishedWorkflow`                                                                                                                   |
 
 The complement in each case is `ApiOwnedExperimentPorts` /
 `ApiOwnedWorkflowPorts` / `ApiOwnedOptimizationPorts` — the row reads, AuthZ

@@ -1,12 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The position window on the flat trace list: a numbered jump lands on
- * `(page - 1) * pageSize` and ClickHouse pays for every skipped row, so
- * position reads stop at {@link TRACE_LIST_MAX_OFFSET_ROWS}. A cursor read is
- * keyset and pays nothing for depth, so it passes at any page number.
- *
- * See specs/components/pagination.feature.
  */
 import { describe, expect, it, vi } from "vitest";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";

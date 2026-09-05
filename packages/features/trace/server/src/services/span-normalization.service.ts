@@ -257,11 +257,8 @@ export class SpanNormalizationPipelineService {
 
   /**
    * The ingest pipeline's own chunk flattening, close to but NOT the same as
-   * `@langwatch/trace-contract`'s `extractChunkTextualContent`: that one
-   * answers `""` for a parsed primitive, this one answers the original
-   * string. The two ids are therefore only equal for object and array
-   * content, and collapsing them would re-key every primitive chunk already
-   * stored.
+   * `@langwatch/trace-contract`'s `extractChunkTextualContent`: that one answers `""` for a
+   * parsed primitive, this one answers the original string.
    */
   private static chunkText(object: unknown): string {
     let content = object;

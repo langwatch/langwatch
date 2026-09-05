@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 import { MAX_FILE_SIZE_BYTES } from "@langwatch/dataset-contract";
 import type { DatasetStorage, DatasetStorageResolver } from "../../ports/dataset-storage.port";
 import type { DatasetRow } from "../../ports/dataset.port";
-import type { DatasetContentRepository } from "../../repositories/prisma/dataset-content.repository";
+import type { DatasetContentRepository } from "../../repositories/dataset-content.repository";
 import type { DatasetRecordContentRepository } from "../../repositories/prisma/dataset-record-content.repository";
 import { DatasetUploadAdapter } from "../dataset-upload.adapter";
 

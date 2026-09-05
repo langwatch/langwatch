@@ -17,13 +17,10 @@ import { z } from "zod";
 import type { ProjectService } from "@langwatch/project-contract";
 import type {
   GatewayBudget,
-  Prisma,
-  PrismaClient,
   VirtualKey,
   VirtualKeyRoutingMode,
 } from "@langwatch/prisma-client/generated";
 import { GatewayAuditPort } from "../ports/gateway-audit.port";
-import { gatewayRoutingPolicySelect } from "../ports/gateway-virtual-key.port";
 import {
   serializeRowForAudit,
   type GatewayAuditJson,
@@ -45,7 +42,13 @@ import {
   translateExternalIdConflict,
   VirtualKeyExpiryInPastError,
 } from "../index";
-import { GatewayScopeResolutionService } from "./gateway-scope-resolution.service";
+import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service";
+import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port";
+import type { GatewayTransactionPort } from "../ports/gateway-transaction.port";
+import type {
+  GatewayKeyBudgetRepository,
+  GatewayKeyBudgetScope,
+} from "../repositories/gateway-key-budget.repository";
 import { GatewayVirtualKeyCryptoPort } from "../ports/gateway-virtual-key-crypto.port";
 import {
   type ScopeInput,
@@ -217,7 +220,12 @@ export type CreatedVirtualKey = {
  */
 export class VirtualKeyService {
   private constructor(
-    private readonly prisma: PrismaClient,
+    /** One durable unit of work per mutation: key, change event and audit row together. */
+    private readonly transactions: GatewayTransactionPort,
+    /** The caps a key's own drawer creates and retires. */
+    private readonly keyBudgets: GatewayKeyBudgetRepository,
+    /** Which providers a key's scope graph reaches, for allowlist validation. */
+    private readonly scopeResolution: GatewayScopeResolutionService,
     private readonly projects: ProjectService,
     private readonly repository: GatewayVirtualKeysPort,
     private readonly changeEvents: GatewayChangeEventsPort,
@@ -233,7 +241,9 @@ export class VirtualKeyService {
   ) {}
 
   static create(input: {
-    prisma: PrismaClient;
+    transactions: GatewayTransactionPort;
+    keyBudgets: GatewayKeyBudgetRepository;
+    scopeResolution: GatewayScopeResolutionService;
     projects: ProjectService;
     repository: GatewayVirtualKeysPort;
     changeEvents: GatewayChangeEventsPort;
@@ -242,7 +252,9 @@ export class VirtualKeyService {
     governanceSignals?: GatewayGovernanceSignalsPort;
   }): VirtualKeyService {
     return new VirtualKeyService(
-      input.prisma,
+      input.transactions,
+      input.keyBudgets,
+      input.scopeResolution,
       input.projects,
       input.repository,
       input.changeEvents,
@@ -362,8 +374,8 @@ export class VirtualKeyService {
       traceProjectId: input.traceProjectId ?? null,
     });
 
-    const created = await this.prisma
-      .$transaction(async (tx) => {
+    const created = await this.transactions
+      .run(async (tx) => {
         const vk = await this.repository.create(
           {
             id,
@@ -373,7 +385,7 @@ export class VirtualKeyService {
             hashedSecret,
             displayPrefix,
             principalUserId: input.principalUserId,
-            config: config as Prisma.InputJsonValue,
+            config,
             externalId: input.externalId ?? null,
             // Metadata REPLACES rather than merges: a merge cannot express
             // deleting a key without a sentinel. Absent leaves the stored map
@@ -485,8 +497,8 @@ export class VirtualKeyService {
 
     const traceProjectId = await this.nextStoredTraceDestination({ existing, input });
 
-    const updated = await this.prisma
-      .$transaction(async (tx) => {
+    const updated = await this.transactions
+      .run(async (tx) => {
         if (input.scopes) {
           if (input.scopes.length === 0) {
             throw new TRPCError({
@@ -498,12 +510,13 @@ export class VirtualKeyService {
           await this.repository.replaceScopes(input.id, input.scopes, tx);
         }
 
-        const vk = await tx.virtualKey.update({
-          where: { id: input.id, organizationId: input.organizationId },
-          data: {
+        const vk = await this.repository.update(
+          {
+            id: input.id,
+            organizationId: input.organizationId,
             name: input.name ?? existing.name,
             description: input.description ?? existing.description,
-            config: config as Prisma.InputJsonValue,
+            config,
             ...identityPatchData(input),
             ...(input.routingPolicyId !== undefined
               ? { routingPolicyId: input.routingPolicyId }
@@ -511,18 +524,9 @@ export class VirtualKeyService {
             ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
             traceProjectId,
             routingMode,
-            revision: { increment: 1n },
           },
-          // The same projection the virtual-key port materialises. Without
-          // the two relations the row is not a `VirtualKeyWithScopes`: the
-          // update would answer a key whose principal and routing policy
-          // read as absent to everything downstream of it.
-          include: {
-            scopes: true,
-            principalUser: { select: { id: true, name: true, email: true } },
-            routingPolicy: { select: gatewayRoutingPolicySelect },
-          },
-        });
+          tx,
+        );
 
         await this.assertProvidersAllowedReachable(vk, config.providersAllowed, tx);
 
@@ -625,7 +629,7 @@ export class VirtualKeyService {
     const newHashedSecret = this.crypto.hashSecret(newSecret);
     const previousSecretValidUntil = new Date(Date.now() + ROTATION_GRACE_MS);
 
-    const rotated = await this.prisma.$transaction(async (tx) => {
+    const rotated = await this.transactions.run(async (tx) => {
       const vk = await this.repository.rotateSecret(
         {
           id: input.id,
@@ -678,8 +682,8 @@ export class VirtualKeyService {
 
     const before = serialiseForAudit(existing);
 
-    return this.prisma
-      .$transaction(async (tx) => {
+    return this.transactions
+      .run(async (tx) => {
         const vk = await this.repository.revoke(
           {
             id: input.id,
@@ -760,8 +764,8 @@ export class VirtualKeyService {
 
     const before = serialiseForAudit(existing);
 
-    return this.prisma
-      .$transaction(async (tx) => {
+    return this.transactions
+      .run(async (tx) => {
         const vk = await this.repository.setDisabled(
           {
             id: input.id,
@@ -826,8 +830,8 @@ export class VirtualKeyService {
 
     const before = serialiseForAudit(existing);
 
-    return this.prisma
-      .$transaction(async (tx) => {
+    return this.transactions
+      .run(async (tx) => {
         const vk = await this.repository.setDisabled(
           {
             id: input.id,
@@ -905,22 +909,19 @@ export class VirtualKeyService {
       budget: VirtualKeyBudgetInput;
       actorUserId: string;
     },
-    tx: Prisma.TransactionClient,
+    tx: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget> {
     const { virtualKey: vk, budget, actorUserId } = args;
     // The drawer manages exactly one budget row, identified by explicit
     // linkage rather than by shape: matching on target/window would also
     // catch caps created independently on the Budgets page, whose
     // lifecycle (and delete permission) is not the drawer's to touch.
-    const existing = await tx.gatewayBudget.findFirst({
-      where: {
-        organizationId: vk.organizationId,
-        managedByVirtualKeyId: vk.id,
-        archivedAt: null,
-      },
-    });
+    const existing = await this.keyBudgets.findDrawerManaged(
+      { organizationId: vk.organizationId, virtualKeyId: vk.id },
+      tx,
+    );
 
-    const data = {
+    const fields = {
       name: budget.name ?? `${vk.name} budget`,
       window: budget.window,
       limitUsd: budget.limitUsd,
@@ -932,28 +933,28 @@ export class VirtualKeyService {
     };
 
     const row = existing
-      ? await tx.gatewayBudget.update({
-          where: { id: existing.id },
-          data: {
-            ...data,
+      ? await this.keyBudgets.updateForKey(
+          {
+            id: existing.id,
+            fields,
             // Changing the window changes what "this period" means, so the
             // reset instant has to be recomputed with it.
             ...(existing.window !== budget.window
               ? { resetsAt: GatewayWindow.nextResetAt(budget.window) }
               : {}),
           },
-        })
-      : await tx.gatewayBudget.create({
-          data: {
-            ...data,
+          tx,
+        )
+      : await this.keyBudgets.createForKey(
+          {
             organizationId: vk.organizationId,
-            scopeType: "VIRTUAL_KEY",
-            scopeId: vk.id,
-            managedByVirtualKeyId: vk.id,
+            virtualKeyId: vk.id,
             createdById: actorUserId,
             resetsAt: GatewayWindow.nextResetAt(budget.window),
+            fields,
           },
-        });
+          tx,
+        );
 
     await this.changeEvents.append(
       {
@@ -1011,37 +1012,15 @@ export class VirtualKeyService {
   }: {
     vk: VirtualKeyWithScopes;
     actorUserId: string;
-    tx: Prisma.TransactionClient;
-    include: "drawerManaged" | "scopedToKey";
+    tx: GatewayPersistenceTransaction;
+    include: GatewayKeyBudgetScope;
   }): Promise<void> {
-    const budgets = await tx.gatewayBudget.findMany({
-      where: {
-        organizationId: vk.organizationId,
-        archivedAt: null,
-        ...(include === "drawerManaged"
-          ? { managedByVirtualKeyId: vk.id }
-          : {
-              OR: [
-                { managedByVirtualKeyId: vk.id },
-                // Scoped to this key and nothing else. ATTRIBUTED_USER counts
-                // when the key is its anchor: the per-end-user allowance hangs
-                // off the key's traffic, so a dead key means a template that
-                // can never open another bucket. The same scope type anchored
-                // on a project is untouched, and so is every PROJECT, TEAM or
-                // ORGANIZATION budget, because those outlive any one key.
-                {
-                  scopeType: { in: ["VIRTUAL_KEY", "ATTRIBUTED_USER"] },
-                  scopeId: vk.id,
-                },
-              ],
-            }),
-      },
-    });
+    const budgets = await this.keyBudgets.findActiveForKey(
+      { organizationId: vk.organizationId, virtualKeyId: vk.id, scope: include },
+      tx,
+    );
     for (const budget of budgets) {
-      const archived = await tx.gatewayBudget.update({
-        where: { id: budget.id },
-        data: { archivedAt: new Date() },
-      });
+      const archived = await this.keyBudgets.archive({ id: budget.id, archivedAt: new Date() }, tx);
       await this.changeEvents.append(
         {
           organizationId: vk.organizationId,
@@ -1161,15 +1140,13 @@ export class VirtualKeyService {
   private async assertProvidersAllowedReachable(
     vk: VirtualKeyWithScopes,
     providersAllowed: string[] | null,
-    tx: Prisma.TransactionClient,
+    tx: GatewayPersistenceTransaction,
   ): Promise<void> {
     if (!providersAllowed) {
       return;
     }
 
-    const reachable = await GatewayScopeResolutionService.create(
-      this.prisma,
-    ).scopeReachableModelProvidersForVk(vk, tx);
+    const reachable = await this.scopeResolution.scopeReachableModelProvidersForVk(vk, tx);
     const reachableIds = new Set(reachable.map((mp) => mp.id));
     const unreachable = providersAllowed.filter((id) => !reachableIds.has(id));
     if (unreachable.length > 0) {
@@ -1184,10 +1161,7 @@ export class VirtualKeyService {
     routingPolicyId: string,
     organizationId: string,
   ): Promise<void> {
-    const policy = await this.prisma.routingPolicy.findUnique({
-      where: { id: routingPolicyId },
-      select: { id: true, organizationId: true },
-    });
+    const policy = await this.repository.tryFindRoutingPolicyOwner({ routingPolicyId });
     if (!policy) {
       throw new TRPCError({
         code: "NOT_FOUND",

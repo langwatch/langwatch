@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MemberSeatLimitReachedError } from "../organization-membership.errors";
 import { InviteService } from "../invite.service";
+import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository";
 
 /**
  * A self-hosted deployment runs uncapped without a license, so an organization can hold more active members than the seats it just bought. Activation itself always succeeds (see `LicensePlanSourceService`, which accepts any signed key regardless of the org's
@@ -17,7 +18,7 @@ function buildService(options: { maxMembers: number; currentFullMembers: number 
   const getMemberCount = vi.fn().mockResolvedValue(options.currentFullMembers);
 
   const service = InviteService.create({
-    prisma,
+    invites: PrismaOrganizationInviteRepository.create({ database: prisma }),
     seats: {
       getMemberCount,
       getMembersLiteCount: vi.fn().mockResolvedValue(0),

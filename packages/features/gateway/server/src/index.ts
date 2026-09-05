@@ -155,6 +155,7 @@ export {
 } from "./services/gateway-applicable-budgets.service";
 export { VirtualKeyDirectBudgetService } from "./services/virtual-key-direct-budget.service";
 export { GatewayConfigMaterialiserService } from "./services/gateway-config-materialisation.service";
+export { GatewayScopeResolutionService } from "./services/gateway-scope-resolution.service";
 export {
   GatewayElevenLabsCredentialService,
   ELEVENLABS_DEFAULT_BASE_URL,
@@ -168,8 +169,11 @@ export {
   REALTIME_OPEN_SESSION_WINDOW_MS,
   type GatewayRealtimeSessionCollaborators,
   type ReserveInput,
-  type ReserveResult,
 } from "./services/gateway-realtime-session.service";
+export {
+  GatewayRealtimeSessionRepository,
+  type ReserveResult,
+} from "./repositories/gateway-realtime-session.repository";
 export { GatewaySpendScopeAdapter } from "./adapters/gateway-spend-scope.adapter";
 export {
   GatewayJwtAdapter,

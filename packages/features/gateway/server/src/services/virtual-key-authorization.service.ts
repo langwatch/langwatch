@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { OrganizationUserRole } from "@langwatch/prisma-client/generated";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   GatewayGuardrailProjectMismatchError,
@@ -9,6 +9,7 @@ import {
 } from "@langwatch/gateway-contract";
 import type { GatewayScopePermissionsPort } from "../ports/gateway-scope-permissions.port";
 import type { GuardrailAttachment } from "@langwatch/gateway-contract";
+import type { VirtualKeyAuthorizationRepository } from "../repositories/virtual-key-authorization.repository";
 import type { VirtualKeyService } from "./virtual-key.service";
 
 /**
@@ -18,7 +19,6 @@ import type { VirtualKeyService } from "./virtual-key.service";
 export type VirtualKeySessionActor = { user: { id: string } } | null;
 
 export type RBACContext = {
-  prisma: PrismaClient;
   session: VirtualKeySessionActor;
   permissions: GatewayScopePermissionsPort;
 };
@@ -42,7 +42,6 @@ export type VirtualKeyActor =
   | { kind: "legacyProjectKey"; projectId: string };
 
 export type ActorContext = {
-  prisma: PrismaClient;
   actor: VirtualKeyActor;
   /** The one authorization seam. See {@link GatewayScopePermissionsPort}. */
   permissions: GatewayScopePermissionsPort;
@@ -50,81 +49,6 @@ export type ActorContext = {
 
 function scopeLabel(scope: Scope): string {
   return `${scope.scopeType}:${scope.scopeId}`;
-}
-
-async function actorHasPermissionAtScope(
-  ctx: ActorContext,
-  scope: Scope,
-  permission: AuthzPermission,
-): Promise<boolean> {
-  const { prisma, actor } = ctx;
-  switch (actor.kind) {
-    case "session": {
-      if (!actor.session) {
-        return false;
-      }
-
-      const scopeRef = await scopeRefFor(prisma, scope);
-      if (!scopeRef) {
-        return false;
-      }
-
-      return ctx.permissions.sessionHolds({
-        userId: actor.session.user.id,
-        permission,
-        scope: scopeRef,
-      });
-    }
-    case "apiKey": {
-      const scopeRef = await scopeRefFor(prisma, scope);
-      if (!scopeRef) {
-        return false;
-      }
-
-      return ctx.permissions.apiKeyHolds({
-        apiKeyId: actor.apiKeyId,
-        userId: actor.userId,
-        organizationId: actor.organizationId,
-        scope: scopeRef,
-        permission,
-      });
-    }
-    case "legacyProjectKey":
-      // Full access at the key's own project (the historical contract for
-      // project keys), nothing at any other scope. Broader provisioning
-      // requires a scoped API key with the bindings to prove it.
-      return scope.scopeType === "PROJECT" && scope.scopeId === actor.projectId;
-  }
-}
-
-/** Map a VK scope row onto the role-binding resolver's scope reference. */
-async function scopeRefFor(
-  prisma: PrismaClient,
-  scope: Scope,
-): Promise<
-  | { type: "org"; id: string }
-  | { type: "team"; id: string }
-  | { type: "project"; id: string; teamId: string }
-  | null
-> {
-  if (scope.scopeType === "ORGANIZATION") {
-    return { type: "org", id: scope.scopeId };
-  }
-
-  if (scope.scopeType === "TEAM") {
-    return { type: "team", id: scope.scopeId };
-  }
-
-  const project = await prisma.project.findUnique({
-    where: { id: scope.scopeId },
-    select: { id: true, teamId: true },
-  });
-  // Fail closed on a dangling project reference.
-  if (!project) {
-    return null;
-  }
-
-  return { type: "project", id: project.id, teamId: project.teamId };
 }
 
 /**
@@ -146,13 +70,13 @@ export type MembershipSet = {
 async function assertAllResolve(
   scopeType: string,
   ids: string[],
-  lookup: (ids: string[]) => Promise<{ id: string }[]>,
+  lookup: (ids: string[]) => Promise<string[]>,
 ): Promise<void> {
   if (ids.length === 0) {
     return;
   }
 
-  const found = new Set((await lookup(ids)).map((row) => row.id));
+  const found = new Set(await lookup(ids));
   if (ids.some((id) => !found.has(id))) {
     throw new GatewayScopeOrgMismatchError(scopeType);
   }
@@ -167,11 +91,84 @@ export type VirtualKeyReader = Pick<VirtualKeyService, "getById">;
  * enforce one vocabulary.
  */
 export class VirtualKeyAuthorizationService {
-  static create(): VirtualKeyAuthorizationService {
-    return new VirtualKeyAuthorizationService();
+  static create(input: {
+    directory: VirtualKeyAuthorizationRepository;
+  }): VirtualKeyAuthorizationService {
+    return new VirtualKeyAuthorizationService(input.directory);
   }
 
-  private constructor() {}
+  private constructor(private readonly directory: VirtualKeyAuthorizationRepository) {}
+
+  private async actorHasPermissionAtScope(
+    ctx: ActorContext,
+    scope: Scope,
+    permission: AuthzPermission,
+  ): Promise<boolean> {
+    const { actor } = ctx;
+    switch (actor.kind) {
+      case "session": {
+        if (!actor.session) {
+          return false;
+        }
+
+        const scopeRef = await this.scopeRefFor(scope);
+        if (!scopeRef) {
+          return false;
+        }
+
+        return ctx.permissions.sessionHolds({
+          userId: actor.session.user.id,
+          permission,
+          scope: scopeRef,
+        });
+      }
+      case "apiKey": {
+        const scopeRef = await this.scopeRefFor(scope);
+        if (!scopeRef) {
+          return false;
+        }
+
+        return ctx.permissions.apiKeyHolds({
+          apiKeyId: actor.apiKeyId,
+          userId: actor.userId,
+          organizationId: actor.organizationId,
+          scope: scopeRef,
+          permission,
+        });
+      }
+      case "legacyProjectKey":
+        // Full access at the key's own project (the historical contract for
+        // project keys), nothing at any other scope. Broader provisioning
+        // requires a scoped API key with the bindings to prove it.
+        return scope.scopeType === "PROJECT" && scope.scopeId === actor.projectId;
+    }
+  }
+
+  /** Map a VK scope row onto the role-binding resolver's scope reference. */
+  private async scopeRefFor(
+    scope: Scope,
+  ): Promise<
+    | { type: "org"; id: string }
+    | { type: "team"; id: string }
+    | { type: "project"; id: string; teamId: string }
+    | null
+  > {
+    if (scope.scopeType === "ORGANIZATION") {
+      return { type: "org", id: scope.scopeId };
+    }
+
+    if (scope.scopeType === "TEAM") {
+      return { type: "team", id: scope.scopeId };
+    }
+
+    const project = await this.directory.tryFindProjectTeam({ projectId: scope.scopeId });
+    // Fail closed on a dangling project reference.
+    if (!project) {
+      return null;
+    }
+
+    return { type: "project", id: project.id, teamId: project.teamId };
+  }
 
   /**
    * Create gate: require `virtualKeys:manage` on every requested scope.
@@ -193,7 +190,7 @@ export class VirtualKeyAuthorizationService {
     }
 
     for (const scope of scopes) {
-      if (!(await actorHasPermissionAtScope(ctx, scope, "virtualKeys:manage"))) {
+      if (!(await this.actorHasPermissionAtScope(ctx, scope, "virtualKeys:manage"))) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: `permission_denied: virtualKeys:manage at ${scopeLabel(scope)}`,
@@ -213,7 +210,7 @@ export class VirtualKeyAuthorizationService {
     permission: AuthzPermission,
   ): Promise<void> {
     for (const scope of scopes) {
-      if (await actorHasPermissionAtScope(ctx, scope, permission)) {
+      if (await this.actorHasPermissionAtScope(ctx, scope, permission)) {
         return;
       }
     }
@@ -227,11 +224,7 @@ export class VirtualKeyAuthorizationService {
   /** Session-shaped wrapper over {@link assertActorCanManageAllScopes}. */
   async assertCanManageAllScopes(ctx: RBACContext, scopes: Scope[]): Promise<void> {
     return this.assertActorCanManageAllScopes(
-      {
-        prisma: ctx.prisma,
-        actor: { kind: "session", session: ctx.session },
-        permissions: ctx.permissions,
-      },
+      { actor: { kind: "session", session: ctx.session }, permissions: ctx.permissions },
       scopes,
     );
   }
@@ -250,60 +243,44 @@ export class VirtualKeyAuthorizationService {
     }
 
     return this.assertActorCanOperateOnAnyScope(
-      {
-        prisma: ctx.prisma,
-        actor: { kind: "session", session: ctx.session },
-        permissions: ctx.permissions,
-      },
+      { actor: { kind: "session", session: ctx.session }, permissions: ctx.permissions },
       scopes,
       permission,
     );
   }
 
-  async loadMembershipSet(
-    prisma: PrismaClient,
-    organizationId: string,
-    userId: string,
-  ): Promise<MembershipSet> {
-    const [orgMembership, teamMemberships] = await Promise.all([
-      // `disabledAt` is part of the lookup, not a detail of it: `isOrgAdmin`
-      // below short-circuits visibility to every virtual key in the
-      // organization, so a membership an admin disabled to reclaim its seat
-      // must not answer here at all. A disabled row reads as no membership.
-      prisma.organizationUser.findFirst({
-        where: { userId, organizationId, disabledAt: null },
-        select: { role: true },
-      }),
-      prisma.teamUser.findMany({
-        where: { userId, team: { organizationId } },
-        select: { teamId: true },
-      }),
+  async loadMembershipSet(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<MembershipSet> {
+    const [organizationRole, memberTeamIds] = await Promise.all([
+      this.directory.tryFindOrganizationRole(input),
+      this.directory.findMemberTeamIds(input),
     ]);
-    const teamIds = new Set(teamMemberships.map((t) => t.teamId));
-    const projects =
+    const teamIds = new Set(memberTeamIds);
+    const projectIds =
       teamIds.size > 0
-        ? await prisma.project.findMany({
-            where: { teamId: { in: [...teamIds] } },
-            select: { id: true },
-          })
+        ? await this.directory.findProjectIdsForTeams({ teamIds: [...teamIds] })
         : [];
 
     return {
-      isOrgMember: orgMembership !== null,
-      isOrgAdmin: orgMembership?.role === OrganizationUserRole.ADMIN,
+      isOrgMember: organizationRole !== null,
+      isOrgAdmin: organizationRole?.role === OrganizationUserRole.ADMIN,
       teamIds,
-      projectIds: new Set(projects.map((p) => p.id)),
+      projectIds: new Set(projectIds),
     };
   }
 
   /**
    * Every requested scope must belong to the VK's own organization. assertActorCanManageAllScopes only proves the caller controls each scope, not that it lives in organizationId — without this, a caller with org-A manage rights could submit organizationId=B plus a scope from A and write a cross-org VK row.
    */
-  async assertScopesBelongToOrg(
-    prisma: PrismaClient,
-    organizationId: string,
-    scopes: { scopeType: string; scopeId: string }[],
-  ): Promise<void> {
+  async assertScopesBelongToOrg({
+    organizationId,
+    scopes,
+  }: {
+    organizationId: string;
+    scopes: { scopeType: string; scopeId: string }[];
+  }): Promise<void> {
     const idsOfType = (scopeType: string) =>
       scopes.filter((s) => s.scopeType === scopeType).map((s) => s.scopeId);
 
@@ -311,46 +288,35 @@ export class VirtualKeyAuthorizationService {
       throw new GatewayScopeOrgMismatchError("organization");
     }
 
-    await assertAllResolve("team", idsOfType("TEAM"), (ids) =>
-      prisma.team.findMany({
-        where: { id: { in: ids }, organizationId },
-        select: { id: true },
-      }),
+    await assertAllResolve("team", idsOfType("TEAM"), (teamIds) =>
+      this.directory.findTeamIdsInOrganization({ organizationId, teamIds }),
     );
 
-    await assertAllResolve("project", idsOfType("PROJECT"), (ids) =>
-      prisma.project.findMany({
-        where: { id: { in: ids }, team: { organizationId } },
-        select: { id: true },
-      }),
+    await assertAllResolve("project", idsOfType("PROJECT"), (projectIds) =>
+      this.directory.findProjectIdsInOrganization({ organizationId, projectIds }),
     );
   }
 
   /**
    * Resolve the single PROJECT scope a VK is reachable from — guardrails are project-scoped, so a VK can only attach guardrails from this one (trace) project. Returns null for zero or multiple PROJECT scopes, neither having a well-defined guardrail surface.
    */
-  async resolveVkProjectId(
-    prisma: PrismaClient,
-    organizationId: string,
-    {
-      vkId,
-      inputScopes,
-      traceProjectId,
-    }: {
-      vkId: string | null;
-      inputScopes: { scopeType: string; scopeId: string }[] | undefined;
-      traceProjectId?: string | null;
-    },
-  ): Promise<string | null> {
+  async resolveVkProjectId({
+    organizationId,
+    vkId,
+    inputScopes,
+    traceProjectId,
+  }: {
+    organizationId: string;
+    vkId: string | null;
+    inputScopes: { scopeType: string; scopeId: string }[] | undefined;
+    traceProjectId?: string | null;
+  }): Promise<string | null> {
     let scopes = inputScopes;
     let storedTraceProjectId: string | null = null;
     if (!scopes && vkId) {
-      const vk = await prisma.virtualKey.findFirst({
-        where: { id: vkId, organizationId },
-        select: {
-          traceProjectId: true,
-          scopes: { select: { scopeType: true, scopeId: true } },
-        },
+      const vk = await this.directory.tryFindVirtualKeyScopes({
+        virtualKeyId: vkId,
+        organizationId,
       });
       scopes = vk?.scopes;
       storedTraceProjectId = vk?.traceProjectId ?? null;
@@ -372,20 +338,22 @@ export class VirtualKeyAuthorizationService {
    * organization: it decides where traces (and therefore budget debits)
    * land, and a stray id would route another tenant's costs.
    */
-  async assertTraceProjectBelongsToOrg(
-    prisma: PrismaClient,
-    organizationId: string,
-    traceProjectId: string | null | undefined,
-  ): Promise<void> {
+  async assertTraceProjectBelongsToOrg({
+    organizationId,
+    traceProjectId,
+  }: {
+    organizationId: string;
+    traceProjectId: string | null | undefined;
+  }): Promise<void> {
     if (!traceProjectId) {
       return;
     }
 
-    const project = await prisma.project.findFirst({
-      where: { id: traceProjectId, team: { organizationId } },
-      select: { id: true },
+    const found = await this.directory.findProjectIdsInOrganization({
+      organizationId,
+      projectIds: [traceProjectId],
     });
-    if (!project) {
+    if (found.length === 0) {
       throw new GatewayScopeOrgMismatchError("project");
     }
   }
@@ -408,21 +376,21 @@ export class VirtualKeyAuthorizationService {
       throw new GatewayGuardrailProjectMismatchError();
     }
 
-    // Scope the lookup to the VK's own project. Any referenced guardrail
-    // that belongs to a different project (or doesn't exist) is simply
-    // absent from the result, so the membership check below rejects it.
-    // Scoping by projectId also satisfies the multitenancy middleware.
-    const rows = await ctx.prisma.gatewayGuardrail.findMany({
-      where: { id: { in: referencedIds }, projectId: vkProjectId },
-      select: { id: true },
-    });
-    const foundIds = new Set(rows.map((r) => r.id));
+    // Any referenced guardrail that belongs to a different project (or does
+    // not exist) is simply absent from the result, so the membership check
+    // below rejects it.
+    const foundIds = new Set(
+      await this.directory.findGuardrailIdsInProject({
+        projectId: vkProjectId,
+        guardrailIds: referencedIds,
+      }),
+    );
 
     if (referencedIds.some((id) => !foundIds.has(id))) {
       throw new GatewayGuardrailProjectMismatchError();
     }
 
-    const allowed = await actorHasPermissionAtScope(
+    const allowed = await this.actorHasPermissionAtScope(
       ctx,
       { scopeType: "PROJECT", scopeId: vkProjectId },
       "gatewayGuardrails:attach",

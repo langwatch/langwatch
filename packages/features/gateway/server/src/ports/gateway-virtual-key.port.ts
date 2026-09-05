@@ -7,6 +7,7 @@ export const gatewayRoutingPolicySelect = {
   policyRules: true,
 } as const;
 
+import type { ResourceMetadata } from "@langwatch/gateway-contract";
 import type { GatewayPersistenceTransaction } from "./gateway-change-events.port";
 
 export type GatewayVirtualKeyScope = {
@@ -77,6 +78,25 @@ export type CreateGatewayVirtualKeyInput = {
   purpose?: "LANGY" | "USER";
 };
 
+/**
+ * The columns an edit writes. `externalId` and `metadata` fold absent and
+ * null apart: an absent key leaves the stored value alone, an explicit null
+ * clears it, so the two cannot be collapsed into one optional.
+ */
+export type UpdateGatewayVirtualKeyInput = {
+  id: string;
+  organizationId: string;
+  name: string;
+  description: string | null;
+  config: unknown;
+  externalId?: string | null;
+  metadata?: ResourceMetadata;
+  routingPolicyId?: string | null;
+  expiresAt?: Date | null;
+  traceProjectId: string;
+  routingMode: "FALLBACK_ALL" | "NONE" | "POLICY";
+};
+
 export type SetGatewayVirtualKeyDisabledInput = {
   id: string;
   organizationId: string;
@@ -122,6 +142,18 @@ export abstract class GatewayVirtualKeysPort {
     input: CreateGatewayVirtualKeyInput,
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayVirtualKeyRecord>;
+  /** Applies an edit and bumps the revision the gateway long-polls on. */
+  abstract update(
+    input: UpdateGatewayVirtualKeyInput,
+    transaction?: GatewayPersistenceTransaction,
+  ): Promise<GatewayVirtualKeyRecord>;
+  /**
+   * The organization a routing policy belongs to, for the check that a key
+   * may only name one of its own. Null when no such policy exists.
+   */
+  abstract tryFindRoutingPolicyOwner(input: {
+    routingPolicyId: string;
+  }): Promise<{ organizationId: string } | null>;
   abstract replaceScopes(
     id: string,
     scopes: GatewayVirtualKeyScope[],

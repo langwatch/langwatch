@@ -48,7 +48,6 @@ import { PrismaVirtualKeyDirectBudgetRepository } from "@langwatch/gateway-serve
 import { PrismaGatewayScopeResolutionRepository } from "@langwatch/gateway-server/composition/gateway-scope-resolution";
 import { PrismaGatewayTransactionAdapter } from "@langwatch/gateway-server/composition/gateway-transactions";
 
-
 const virtualKeyDtos = GatewayVirtualKeyDtoAdapter.create();
 /** A capability this deployment did not compose, refused by name. */
 class ApiCapabilityUnavailableError extends HandledError {

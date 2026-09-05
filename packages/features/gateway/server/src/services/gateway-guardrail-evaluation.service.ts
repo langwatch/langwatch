@@ -4,7 +4,8 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { EnabledGuardrailMonitor, MonitorService } from "@langwatch/monitor-contract";
-import type { GatewayGuardrailDirection, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { GatewayGuardrailDirection } from "@langwatch/gateway-contract";
+import type { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.repository";
 import type { EvaluatorTypes, SingleEvaluationResult } from "@langwatch/evaluator-contract";
 
 const logger = createLogger("langwatch:gateway:guardrail-evaluation");
@@ -64,17 +65,21 @@ export type EvaluatorRunner = (args: EvaluatorRunInput) => Promise<SingleEvaluat
 
 export class GatewayGuardrailEvaluationService {
   private constructor(
-    private readonly prisma: PrismaClient,
+    private readonly repository: GatewayGuardrailRepository,
     private readonly monitors: MonitorService,
     private readonly runEvaluator: EvaluatorRunner,
   ) {}
 
-  static create(
-    prisma: PrismaClient,
-    monitors: MonitorService,
-    runEvaluator: EvaluatorRunner,
-  ): GatewayGuardrailEvaluationService {
-    return new GatewayGuardrailEvaluationService(prisma, monitors, runEvaluator);
+  static create(input: {
+    repository: GatewayGuardrailRepository;
+    monitors: MonitorService;
+    runEvaluator: EvaluatorRunner;
+  }): GatewayGuardrailEvaluationService {
+    return new GatewayGuardrailEvaluationService(
+      input.repository,
+      input.monitors,
+      input.runEvaluator,
+    );
   }
 
   storedDirectionFor(direction: GuardrailWireDirection): GatewayGuardrailDirection {
@@ -139,15 +144,10 @@ export class GatewayGuardrailEvaluationService {
       return ALLOW;
     }
 
-    // Scoping by projectId as well as id is what keeps one project's virtual
-    // key from naming another project's guardrail.
-    const guardrails = await this.prisma.gatewayGuardrail.findMany({
-      where: {
-        id: { in: guardrailIds },
-        projectId,
-        archivedAt: null,
-        direction: this.storedDirectionFor(direction),
-      },
+    const guardrails = await this.repository.findRunnableForCheck({
+      projectId,
+      ids: guardrailIds,
+      direction: this.storedDirectionFor(direction),
     });
     if (guardrails.length === 0) {
       return ALLOW;

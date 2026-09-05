@@ -5,10 +5,14 @@ import {
   type CreateGatewayGuardrailInput,
   type GatewayGuardrailResource,
   type GatewayGuardrailBundleEntry,
+  type GatewayGuardrailDirection,
   type UpdateGatewayGuardrailInput,
 } from "@langwatch/gateway-contract";
 import { type GatewayGuardrail, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { GatewayGuardrailRepository } from "../gateway-guardrail.repository";
+import {
+  GatewayGuardrailRepository,
+  type GatewayGuardrailCheckRow,
+} from "../gateway-guardrail.repository";
 
 /**
  * The client slice the guardrail catalogue binds to.
@@ -27,6 +31,21 @@ export class PrismaGatewayGuardrailRepository extends GatewayGuardrailRepository
 
   private constructor(private readonly database: GatewayGuardrailDatabase) {
     super();
+  }
+
+  async findRunnableForCheck({
+    projectId,
+    ids,
+    direction,
+  }: {
+    projectId: string;
+    ids: string[];
+    direction: GatewayGuardrailDirection;
+  }): Promise<GatewayGuardrailCheckRow[]> {
+    return await this.database.gatewayGuardrail.findMany({
+      where: { id: { in: ids }, projectId, archivedAt: null, direction },
+      select: { id: true, name: true, evaluatorId: true, failureMode: true },
+    });
   }
 
   async list(projectId: string): Promise<GatewayGuardrailResource[]> {

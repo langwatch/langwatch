@@ -6,6 +6,7 @@ import type {
   OrganizationInviteMailPort,
   OrganizationInviteRateLimitPort,
 } from "../../ports/invite.port";
+import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository";
 
 /**
  * D11 — the wrong account, and asking again
@@ -41,7 +42,7 @@ function makeService({
   mail?: OrganizationInviteMailPort;
 }): InviteService {
   return InviteService.create({
-    prisma,
+    invites: PrismaOrganizationInviteRepository.create({ database: prisma }),
     seats: { getMemberCount: vi.fn(), getMembersLiteCount: vi.fn() } as any,
     plans: { getActivePlan: vi.fn() } as any,
     grants: { attachBindings: vi.fn(), revokeBindingsWhere: vi.fn() } as any,

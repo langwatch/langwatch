@@ -3,6 +3,7 @@ import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { InviteNotFoundError } from "../invite.errors";
 import { InviteService } from "../invite.service";
 import { resolveInviteDisplayStatus } from "../invite-rules";
+import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository";
 
 /**
  * D11 — resilient invitations (specs/identity/resilient-invitations.feature).
@@ -65,7 +66,7 @@ describe("InviteService resilience", () => {
     };
 
     service = InviteService.create({
-      prisma: mockPrisma,
+      invites: PrismaOrganizationInviteRepository.create({ database: mockPrisma }),
       seats: { getMemberCount: vi.fn(), getMembersLiteCount: vi.fn() } as any,
       plans: { getActivePlan: vi.fn() } as any,
       grants: ledger as unknown as AuthzGrantsService,

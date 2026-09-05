@@ -1,16 +1,5 @@
 /**
  * The browser product journey.
- *
- * One person, one browser context, one account they create in the first test:
- * sign-up, onboarding, a model provider, an HTTP agent pointed at the echo
- * agent global setup started, a code evaluator, a monitor that runs it on every
- * trace, a suite and a scenario, a run, its verdict, and the evaluator's result
- * on the run's own trace. The two paths worth keeping from the retired
- * apps/ui/e2e suite — create a workflow, create a prompt — follow, then the
- * three error paths.
- *
- * Serial: every test builds on the state the one before it left.
- *
  * Spec: specs/e2e/browser-product-journey.feature
  */
 import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
@@ -179,7 +168,10 @@ test.describe("browser product journey", () => {
   test("adds OpenAI as a model provider", async () => {
     test.skip(!OPENAI_API_KEY, NO_KEY);
 
-    await openPage("/settings/model-providers", page.getByRole("heading", { name: /model providers/i }));
+    await openPage(
+      "/settings/model-providers",
+      page.getByRole("heading", { name: /model providers/i }),
+    );
 
     // The provider list is a menu on the header button, and the editor it opens
     // is a drawer; a click that lands while the menu is still opening is lost,
@@ -347,7 +339,10 @@ test.describe("browser product journey", () => {
       if (seen) break;
       if (
         (await stalled.isVisible().catch(() => false)) ||
-        !(await page.getByTestId("agent-testing-run-drawer").isVisible().catch(() => false))
+        !(await page
+          .getByTestId("agent-testing-run-drawer")
+          .isVisible()
+          .catch(() => false))
       ) {
         await visit(`/${projectSlug}/agent-testing/results`);
         await page
@@ -568,7 +563,12 @@ async function ensureSuiteAndScenario(): Promise<void> {
   // so the click is repeated until the row it creates is on the table.
   const save = page.getByTestId("case-modal-save").last();
   for (let attempt = 0; attempt < 3; attempt++) {
-    if (await scenarioRow().isVisible().catch(() => false)) break;
+    if (
+      await scenarioRow()
+        .isVisible()
+        .catch(() => false)
+    )
+      break;
     if (await save.isVisible().catch(() => false)) {
       await save.click().catch(() => undefined);
     }
@@ -673,7 +673,10 @@ async function openRunDialogForScenario(): Promise<Locator> {
  * action timeout on a page nothing has visited yet.
  */
 async function openProjectPage(path: string, heading: string): Promise<void> {
-  await openPage(`/${projectSlug}/${path}`, page.getByRole("heading", { name: heading, exact: true }));
+  await openPage(
+    `/${projectSlug}/${path}`,
+    page.getByRole("heading", { name: heading, exact: true }),
+  );
 }
 
 /**
@@ -720,7 +723,10 @@ async function createHttpAgent(name: string, url: string): Promise<void> {
   // closed drawer is what says the agent was created.
   for (let attempt = 0; attempt < 4; attempt++) {
     if (!(await nameInput.isVisible().catch(() => false))) break;
-    await page.getByTestId("save-agent-button").click({ force: true }).catch(() => undefined);
+    await page
+      .getByTestId("save-agent-button")
+      .click({ force: true })
+      .catch(() => undefined);
     await nameInput.waitFor({ state: "hidden", timeout: 15000 }).catch(() => undefined);
   }
   await expect(nameInput).not.toBeVisible({ timeout: 20000 });

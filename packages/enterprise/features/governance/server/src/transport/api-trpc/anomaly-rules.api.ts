@@ -1,24 +1,6 @@
 /**
- * AnomalyRule admin CRUD tRPC surface.
- *
- * Reads on `anomalyRules:view`, writes on `anomalyRules:manage`. Every
- * declaration is wrapped by an enterprise plan gate so a non-enterprise
- * caller reads the `ANOMALY_RULES` refusal — MEMBER / EXTERNAL never see
- * the surface, and even ADMIN sees it only on plan. The eval engine plus
- * alert dispatch is Option C: this router ships the configuration entity
- * only, so the admin UI persists real rules instead of MOCK_RULES.
- *
- * `translateConfigValidationError` promotes threshold-config / destination-
- * config Zod failures into a `ValidationError` carrying a human sentence in
- * `meta.formErrors`. The service-side schemas produce ZodError, the tRPC
- * error formatter converts it to `ValidationError.fromZodError`, and
- * fromZodError files each issue under `meta.fieldErrors` keyed by the
- * offending property — the registry then has nothing to name and the admin
- * reads "Some of the values aren't valid." with no detail. Composing the
- * complaint here lets `validation_error` render it verbatim.
- *
- * Transport only: input parsing, delegation, wire shape, DTO mapping.
- *
+ * AnomalyRule admin CRUD tRPC surface. Reads on `anomalyRules:view`, writes on
+ * `anomalyRules:manage`.
  * Spec: specs/ai-gateway/governance/anomaly-rules.feature
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";

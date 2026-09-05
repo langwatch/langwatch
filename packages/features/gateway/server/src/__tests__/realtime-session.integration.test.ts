@@ -23,6 +23,7 @@ import {
   REALTIME_OPEN_SESSION_WINDOW_MS,
   type GatewayRealtimeSessionCollaborators,
 } from "../services/gateway-realtime-session.service";
+import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository";
 
 const realtimeSessions = GatewayRealtimeSessionService.create();
 class AllowTestQueries extends PrismaQueryGuard {
@@ -60,9 +61,11 @@ class RecordingSpanIngestion extends GatewaySpanIngestionPort {
 }
 
 const collaborators: GatewayRealtimeSessionCollaborators = {
-  get database() {
-    return prisma;
-  },
+  sessions: PrismaGatewayRealtimeSessionRepository.create({
+    get database() {
+      return prisma;
+    },
+  }),
   spendRating: ModelCatalogGatewaySpendRatingAdapter.create(),
   spendConfirmation: new RecordingSpendConfirmation(),
   spanIngestion: new RecordingSpanIngestion(),

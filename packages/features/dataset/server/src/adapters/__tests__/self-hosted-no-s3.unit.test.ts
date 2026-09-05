@@ -4,7 +4,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { nanoid } from "nanoid";
 import { describe, expect, it } from "vitest";
-import type { DatasetContentRepository } from "../../repositories/prisma/dataset-content.repository";
+import type { DatasetContentRepository } from "../../repositories/dataset-content.repository";
 import type { DatasetRecordContentRepository } from "../../repositories/prisma/dataset-record-content.repository";
 import type { DatasetStorageResolver } from "../../ports/dataset-storage.port";
 import { DatasetUploadAdapter } from "../dataset-upload.adapter";
@@ -70,8 +70,7 @@ describe("Dataset self-hosted storage", () => {
         let createdRow: Record<string, unknown> | undefined;
         const datasets = {
           tryFindBySlug: async () => null,
-          tryFindOne: async ({ id }: { id: string }) =>
-            createdRow?.id === id ? createdRow : null,
+          tryFindOne: async ({ id }: { id: string }) => (createdRow?.id === id ? createdRow : null),
           create: async (input: Record<string, unknown>) => {
             createdRow = { ...input, createdAt: new Date(), updatedAt: new Date() };
             return createdRow;

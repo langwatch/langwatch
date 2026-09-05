@@ -690,11 +690,8 @@ describe("strict feature source layout", () => {
   });
 
   /**
-   * A test is named for the behaviour it pins, never for an artifact, so the
-   * source grammar has nothing useful to say about it. What the layout does
-   * insist on is WHERE it sits — in a `__tests__` directory beside its
-   * subject, rather than in a mirror tree at the package root that only stays
-   * accurate while someone maintains it by hand.
+   * A test is named for the behaviour it pins, never for an artifact, so the source grammar has
+   * nothing useful to say about it.
    */
   it("accepts tests and their helpers anywhere under a __tests__ directory", () => {
     featurePackage({ feature: "agent", role: "server", layoutVersion: 0 });

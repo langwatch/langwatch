@@ -5,11 +5,6 @@ import { describe, expect, it } from "vitest";
 
 /**
  * ADR-115's boundaries as graph facts (packages/features/identity/specs/package-boundary.feature).
- * A folder cannot fail to resolve; a package can, and this test is where
- * the app states what each package may reach and what only the runtime may
- * construct. Deliberately a plain text scan over the sources: an import is
- * a line, and a `new IdentityService(` is a line, and a test that reads the
- * same lines a reviewer would is the one that keeps saying the same thing.
  */
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -44,12 +39,6 @@ function importSpecifiers(file: string): string[] {
 
 /**
  * The app and the storage engines, for every identity package.
- *
- * `event-sourcing` is the path the framework had while it lived in
- * `platform/app`; `@langwatch/eventing` is its package name, and it is listed
- * separately because the old pattern silently stopped matching when the
- * framework became a package — a guard that reads as enforcing "no framework"
- * while matching nothing at all.
  */
 const FORBIDDEN_FOR_EVERY_IDENTITY_PACKAGE = [
   /^~\//,

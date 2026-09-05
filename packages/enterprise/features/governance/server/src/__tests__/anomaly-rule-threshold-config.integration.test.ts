@@ -1,18 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The structured threshold-config schema on `AnomalyRule.thresholdConfig`,
- * against real Postgres.
- *
- * A valid spend_spike config round-trips through create and persists exactly
- * as supplied; a malformed one, and an unknown ruleType, are rejected before
- * any row lands; the update path re-validates against the effective ruleType;
- * and the evaluator's `safeParseSpendSpikeThresholdConfig` quarantines a stale
- * row (skip + warn) rather than substituting DEFAULT_SPEND_SPIKE_CONFIG and
- * firing on the wrong threshold.
- *
- * Assertions are on `code` and on what persisted, never on message prose.
- *
  * Spec: specs/ai-gateway/governance/anomaly-rule-threshold-schema.feature
  */
 import { nanoid } from "nanoid";

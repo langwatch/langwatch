@@ -1,12 +1,7 @@
 /**
  * Materialise GET /api/internal/gateway/config/:vk_id (bundle shape: contract §4.2). Source of truth post VK-binding-collapse: GatewayProviderCredential is gone, ModelProvider absorbed its gateway fields, and the VK's eligible-provider set computes from the VirtualKeyScope graph + optional RoutingPolicy.modelProviderIds ordering (scopeResolver.ts).
  */
-import type {
-  GatewayBudget,
-  ModelProvider,
-  PrismaClient,
-  VirtualKey,
-} from "@langwatch/prisma-client/generated";
+import type { GatewayBudget, ModelProvider, VirtualKey } from "@langwatch/prisma-client/generated";
 
 import { GatewayConfigAssemblyPort } from "../ports/gateway-config-assembly.port";
 import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port";
@@ -26,7 +21,7 @@ import {
   type GatewayResolvedBudget,
   type GatewayService,
 } from "@langwatch/gateway-contract";
-import { GatewayScopeResolutionService } from "./gateway-scope-resolution.service";
+import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service";
 import { type VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port";
 
 export type GuardrailWire = {
@@ -210,7 +205,8 @@ export type GatewayConfigPayload = {
 
 export class GatewayConfigMaterialiserService {
   private constructor(
-    private readonly prisma: PrismaClient,
+    /** Which providers a key reaches, and in which dispatch order. */
+    private readonly scopeResolution: GatewayScopeResolutionService,
     private readonly projects: ProjectService,
     private readonly chRepo: GatewayBudgetSpendPort | null,
     /**
@@ -238,7 +234,7 @@ export class GatewayConfigMaterialiserService {
   ) {}
 
   static create(input: {
-    prisma: PrismaClient;
+    scopeResolution: GatewayScopeResolutionService;
     projects: ProjectService;
     chRepo: GatewayBudgetSpendPort | null;
     budgetDecisions: GatewayService;
@@ -248,7 +244,7 @@ export class GatewayConfigMaterialiserService {
     langyMirrorProjectId?: string | undefined;
   }): GatewayConfigMaterialiserService {
     return new GatewayConfigMaterialiserService(
-      input.prisma,
+      input.scopeResolution,
       input.projects,
       input.chRepo,
       input.budgetDecisions,
@@ -256,10 +252,6 @@ export class GatewayConfigMaterialiserService {
       input.assembly,
       input.langyMirrorProjectId,
     );
-  }
-
-  private get scopeResolution(): GatewayScopeResolutionService {
-    return GatewayScopeResolutionService.create(this.prisma);
   }
 
   /**

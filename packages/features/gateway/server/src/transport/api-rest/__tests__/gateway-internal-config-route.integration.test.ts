@@ -31,6 +31,8 @@ import { testRestSecurity } from "./support/rest-security.support";
 
 import { createVirtualKeyServiceForTest } from "../../../testing";
 import { GatewayConfigAssemblyAdapter } from "../../../adapters/gateway-config-assembly.adapter";
+import { PrismaGatewayScopeResolutionRepository } from "../../../repositories/prisma/prisma.gateway-scope-resolution.repository";
+import { GatewayScopeResolutionService } from "../../../services/gateway-scope-resolution.service";
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
     return next(context.args);
@@ -109,7 +111,9 @@ function buildApp(): void {
     audit: {} as never,
   }).build();
   const materialiser = GatewayConfigMaterialiserService.create({
-    prisma,
+    scopeResolution: GatewayScopeResolutionService.create({
+      repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
+    }),
     projects: projects,
     chRepo: null,
     budgetDecisions: gateway,

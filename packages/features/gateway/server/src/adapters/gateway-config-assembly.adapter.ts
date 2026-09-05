@@ -9,6 +9,7 @@ import { createLogger } from "@langwatch/observability";
 import { GatewayConfigAssemblyPort } from "../ports/gateway-config-assembly.port";
 import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port";
 import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service";
+import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository";
 
 const logger = createLogger("langwatch:gateway:config-assembly");
 
@@ -48,9 +49,9 @@ export class GatewayConfigAssemblyAdapter extends GatewayConfigAssemblyPort {
   }
 
   async versionToken(virtualKey: VirtualKeyWithScopes): Promise<string> {
-    const providers = await GatewayScopeResolutionService.create(
-      this.prisma,
-    ).eligibleModelProvidersForVk(virtualKey);
+    const providers = await GatewayScopeResolutionService.create({
+      repository: PrismaGatewayScopeResolutionRepository.create({ database: this.prisma }),
+    }).eligibleModelProvidersForVk(virtualKey);
 
     // Order is part of the answer: `providers[]` is the fallback chain, so two
     // identical sets in a different order are two different bundles. The array

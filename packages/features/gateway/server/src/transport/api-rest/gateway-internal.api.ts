@@ -47,6 +47,7 @@ import {
 } from "../../services/gateway-realtime-session.service";
 import type { VirtualKeyService } from "../../services/virtual-key.service";
 import type { GatewayBudget, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { GatewayGuardrailRepository } from "../../repositories/gateway-guardrail.repository";
 
 const realtimeSessionService = GatewayRealtimeSessionService.create();
 const logger = createLogger("langwatch:gateway-internal");
@@ -98,7 +99,7 @@ export type GatewayInternalRestPorts = Readonly<{
    */
   guardrails?:
     | (() => {
-        database: PrismaClient;
+        repository: GatewayGuardrailRepository;
         monitors: MonitorService;
         runEvaluator: EvaluatorRunner;
       })
@@ -1126,11 +1127,11 @@ export function createGatewayInternalRestApp(options: {
         503,
       );
     }
-    const verdict = await GatewayGuardrailEvaluationService.create(
-      guardrails.database,
-      guardrails.monitors,
-      guardrails.runEvaluator,
-    ).check({
+    const verdict = await GatewayGuardrailEvaluationService.create({
+      repository: guardrails.repository,
+      monitors: guardrails.monitors,
+      runEvaluator: guardrails.runEvaluator,
+    }).check({
       projectId: parsed.data.project_id,
       guardrailIds: parsed.data.guardrail_ids,
       direction: parsed.data.direction,

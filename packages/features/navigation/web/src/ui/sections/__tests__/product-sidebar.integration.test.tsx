@@ -47,7 +47,9 @@ const personalTeam = {
   isPersonal: true,
   ownerUserId: "user_1",
   members: [{ userId: "user_1" }],
-  projects: [{ id: "project_p", slug: "personal-ada", name: "Personal Workspace", isPersonal: true }],
+  projects: [
+    { id: "project_p", slug: "personal-ada", name: "Personal Workspace", isPersonal: true },
+  ],
 };
 const organization = { id: "org_1", name: "ACME", teams: [team, personalTeam] };
 
@@ -128,7 +130,8 @@ function stubMenuLayout({
     bottom: top + height,
   });
   window.HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
-    if (this.dataset.testid === "sidebar-scroll-region") return rectAt({ top: 0, height: menuHeight });
+    if (this.dataset.testid === "sidebar-scroll-region")
+      return rectAt({ top: 0, height: menuHeight });
     const label = this.getAttribute("aria-label");
     const scrolled =
       document.querySelector<HTMLElement>('[data-testid="sidebar-scroll-region"]')?.scrollTop ?? 0;
@@ -364,7 +367,10 @@ describe("the product sidebar", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByRole("link", { name: "Budgets" })).toHaveAttribute("aria-current", "page");
+        expect(screen.getByRole("link", { name: "Budgets" })).toHaveAttribute(
+          "aria-current",
+          "page",
+        );
       });
       expect(region.scrollTop).toBe(300);
     });
@@ -400,7 +406,10 @@ describe("the product sidebar", () => {
 
       const rebuilt = screen.getByTestId("sidebar-scroll-region");
       await waitFor(() => {
-        expect(screen.getByRole("link", { name: "Budgets" })).toHaveAttribute("aria-current", "page");
+        expect(screen.getByRole("link", { name: "Budgets" })).toHaveAttribute(
+          "aria-current",
+          "page",
+        );
       });
       expect(rebuilt.scrollTop).toBe(reachedFurtherDown);
     });

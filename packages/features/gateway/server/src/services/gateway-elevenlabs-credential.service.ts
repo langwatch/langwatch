@@ -3,7 +3,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { GatewayElevenLabsCredentialRepository } from "../repositories/gateway-elevenlabs-credential.repository";
 import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port";
 import { isElevenLabsHost } from "@langwatch/model-provider-contract";
 
@@ -26,11 +26,11 @@ export interface ElevenLabsApiCredential {
 }
 
 /**
- * What the two reads reach outside themselves: the deployment's database and
- * the Model Provider feature's own credential reader, which owns the cipher.
+ * What the two reads reach outside themselves: the provider rows, and the
+ * Model Provider feature's own credential reader, which owns the cipher.
  */
 export type ElevenLabsCredentialCollaborators = {
-  database: PrismaClient;
+  providers: GatewayElevenLabsCredentialRepository;
   credentials: GatewayModelProviderCredentialsPort;
 };
 
@@ -49,10 +49,7 @@ export class GatewayElevenLabsCredentialService {
     organizationId: string;
   } | null> {
     const collaborators = this.collaborators;
-    const provider = await collaborators.database.modelProvider.findUnique({
-      where: { id: modelProviderId },
-      select: { provider: true, organizationId: true, customKeys: true },
-    });
+    const provider = await collaborators.providers.findProviderRow({ modelProviderId });
     if (provider?.provider !== "elevenlabs") {
       return null;
     }

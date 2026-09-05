@@ -37,6 +37,38 @@
       "types": "./src/repositories/prisma/prisma.virtual-key.repository.ts",
       "default": "./src/repositories/prisma/prisma.virtual-key.repository.ts"
     },
+    "./composition/gateway-elevenlabs-credentials": {
+      "types": "./src/repositories/prisma/prisma.gateway-elevenlabs-credential.repository.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-elevenlabs-credential.repository.ts"
+    },
+    "./composition/gateway-guardrails": {
+      "types": "./src/repositories/prisma/prisma.gateway-guardrail.repository.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-guardrail.repository.ts"
+    },
+    "./composition/gateway-scope-resolution": {
+      "types": "./src/repositories/prisma/prisma.gateway-scope-resolution.repository.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-scope-resolution.repository.ts"
+    },
+    "./composition/gateway-key-budgets": {
+      "types": "./src/repositories/prisma/prisma.gateway-key-budget.repository.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-key-budget.repository.ts"
+    },
+    "./composition/gateway-transactions": {
+      "types": "./src/adapters/prisma.gateway-transaction.adapter.ts",
+      "default": "./src/adapters/prisma.gateway-transaction.adapter.ts"
+    },
+    "./composition/gateway-virtual-key-direct-budgets": {
+      "types": "./src/repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts"
+    },
+    "./composition/gateway-realtime-sessions": {
+      "types": "./src/repositories/prisma/prisma.gateway-realtime-session.repository.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-realtime-session.repository.ts"
+    },
+    "./composition/gateway-virtual-key-authorization": {
+      "types": "./src/repositories/prisma/prisma.virtual-key-authorization.repository.ts",
+      "default": "./src/repositories/prisma/prisma.virtual-key-authorization.repository.ts"
+    },
     "./composition/gateway-provider-labels": {
       "types": "./src/repositories/prisma/prisma.gateway-provider-label.repository.ts",
       "default": "./src/repositories/prisma/prisma.gateway-provider-label.repository.ts"

@@ -2,8 +2,9 @@ import type IORedis from "ioredis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   BUDGET_CHANGE_EVENT_WINDOW_SECONDS,
-  RedisBudgetChangeEventDedupeService,
+  GatewayBudgetChangeDedupeService,
 } from "../services/gateway-budget-change-dedupe.service";
+import { RedisGatewayBudgetChangeDedupeRepository } from "../repositories/redis/redis.gateway-budget-change-dedupe.repository";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -25,14 +26,18 @@ describe("budget change-event dedupe", () => {
     describe("when a debit asks whether to emit", () => {
       it("allows the emission", async () => {
         const set = vi.fn().mockResolvedValue("OK");
-        const service = RedisBudgetChangeEventDedupeService.create(redisStub(set));
+        const service = GatewayBudgetChangeDedupeService.create(
+          RedisGatewayBudgetChangeDedupeRepository.create(redisStub(set)),
+        );
 
         await expect(service.shouldEmit({ projectId: "project-1" })).resolves.toBe(true);
       });
 
       it("claims the window with a fixed expiry, not a sliding one", async () => {
         const set = vi.fn().mockResolvedValue("OK");
-        const service = RedisBudgetChangeEventDedupeService.create(redisStub(set));
+        const service = GatewayBudgetChangeDedupeService.create(
+          RedisGatewayBudgetChangeDedupeRepository.create(redisStub(set)),
+        );
 
         await service.shouldEmit({ projectId: "project-1" });
 
@@ -53,7 +58,9 @@ describe("budget change-event dedupe", () => {
     describe("when a later debit asks whether to emit", () => {
       it("declines the redundant emission", async () => {
         const set = vi.fn().mockResolvedValue(null);
-        const service = RedisBudgetChangeEventDedupeService.create(redisStub(set));
+        const service = GatewayBudgetChangeDedupeService.create(
+          RedisGatewayBudgetChangeDedupeRepository.create(redisStub(set)),
+        );
 
         await expect(service.shouldEmit({ projectId: "project-1" })).resolves.toBe(false);
       });
@@ -62,7 +69,9 @@ describe("budget change-event dedupe", () => {
     describe("when a different project asks in the same window", () => {
       it("keys them apart", async () => {
         const set = vi.fn().mockResolvedValue("OK");
-        const service = RedisBudgetChangeEventDedupeService.create(redisStub(set));
+        const service = GatewayBudgetChangeDedupeService.create(
+          RedisGatewayBudgetChangeDedupeRepository.create(redisStub(set)),
+        );
 
         await service.shouldEmit({ projectId: "project-1" });
         await service.shouldEmit({ projectId: "project-2" });
@@ -77,7 +86,9 @@ describe("budget change-event dedupe", () => {
     describe("when a debit asks whether to emit", () => {
       it("fails toward emitting rather than withholding an invalidation", async () => {
         const set = vi.fn().mockRejectedValue(new Error("connection refused"));
-        const service = RedisBudgetChangeEventDedupeService.create(redisStub(set));
+        const service = GatewayBudgetChangeDedupeService.create(
+          RedisGatewayBudgetChangeDedupeRepository.create(redisStub(set)),
+        );
 
         await expect(service.shouldEmit({ projectId: "project-1" })).resolves.toBe(true);
       });
@@ -87,7 +98,7 @@ describe("budget change-event dedupe", () => {
   describe("given no Redis connection at all", () => {
     describe("when a debit asks whether to emit", () => {
       it("emits every time, matching the pre-dedupe behavior", async () => {
-        const service = RedisBudgetChangeEventDedupeService.create(null);
+        const service = GatewayBudgetChangeDedupeService.create(null);
 
         await expect(service.shouldEmit({ projectId: "project-1" })).resolves.toBe(true);
         await expect(service.shouldEmit({ projectId: "project-1" })).resolves.toBe(true);

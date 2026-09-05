@@ -1,16 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The SOC2 / ISO27001 invariant on `AdminWorkspaceViewAuditService`, against
- * real Postgres: every admin drill-in into another user's Personal Workspace
- * (or another team's Team Workspace) writes an AuditLog row, and the dedup
- * window collapses bursts to one row per (admin, target, kind, 5-min).
- *
- * The OCSF mirror is verified through a spy port: standing up ClickHouse for
- * the mirror insert is heavier than what the mirror assertion is worth.
- *
  * Spec: specs/ai-gateway/governance/admin-trace-access.feature
- *       specs/ai-gateway/governance/ingestion-attribution.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";

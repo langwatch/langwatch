@@ -54,6 +54,62 @@ must outlive the `?drawer.open=` parameter; `dashboardName`, `seriesFilters`
 and `opsGroupDetail` stay local overlays on their own screens' query keys,
 kept because nothing outside those screens links to them.
 
+## The feature `index.ts` composition shape (2026-09-03)
+
+Every `apps/ui/src/features/<name>/index.ts` composes one family the same
+way: the screen(s) and host-port types live in the family's own `-web`
+package; the application owns the page key(s), the permission/release
+policy, the transport (`uiFeatureApi`), and — where the family serves
+overlays — the drawer registry (`lazyDrawer`, keyed by the address name).
+Each file's docblock now states only what is not this shared shape: which
+package, and any genuinely unusual fact (an enterprise-package edge, a
+guard placed somewhere non-default). `billing`, `licensing` and `scim` all carry the same "enterprise edge"
+finding — `apps/ui` is core, its screen package is enterprise, and the
+`enterprise-direction` architecture-lint policy clears once
+`packages/enterprise/composition/ui` exists; recorded once here rather
+than at every family that carries it.
+
+## Scope resolution: organization / team / project (2026-09-03)
+
+`ui-scope-resolution.ts`'s `resolveUiScope` is a pure-function harvest of
+the application's `useOrganizationTeamProject` (770 lines) — same
+precedence, same reserved slugs, same stickiness rules, same demo
+handling, moved rather than rewritten, since a second answer to "what
+project is this page about" is a tenancy bug.
+
+Order of preference, top to bottom:
+
+1. the demo project, when the address names the deployment's demo slug
+2. a `?team=` slug that matches a team the caller can see
+3. a `:project` slug in the address bar, reserved slugs excluded
+4. the same slug carried over from storage, unless it is stale
+5. the caller's own personal workspace, on the personal-workspace pages
+6. the remembered team, when the caller can still be shown it
+7. the ambient team — a shared team the caller is on, project first
+
+Rules worth keeping in mind while touching this file:
+
+- **Stale is dropped, not preferred.** A slug resolved off the persisted
+  selection (not the URL) is stickiness, not intent — it must not survive
+  onto a personal workspace, a team the chrome now refuses, or any
+  project on the personal-workspace pages; the ambient pick below
+  re-resolves and re-persists, so the stale selection heals itself. An
+  organization admin passes the team-visibility test on their role alone,
+  so a project they picked in a team with no membership row stays picked.
+  A slug typed into the URL keeps resolving even into a team the caller
+  cannot open — the refusal that follows is the honest answer to that.
+- **Personal workspace wins before the remembered team, not after** —
+  checked first so a stale shared-team id persisted from an earlier
+  organization-scoped page never wins on a personal-workspace page.
+- **Ambient team ordering**: within the caller's own teams, prefer a
+  shared team that already holds a project, then any shared team, then
+  whatever is left; personal workspaces sort last, since a solo user's
+  only team is personal and would otherwise always win.
+- **Writes are guarded**: `uiScopeSelectionWrites` only emits a write when
+  the value differs from storage — unguarded, each write's storage event
+  re-renders every reader and can wedge a route transition's effect
+  cascade against React's nested-update limit.
+
 ## Residuals the moves left behind
 
 Small, named, and none of them blocking:

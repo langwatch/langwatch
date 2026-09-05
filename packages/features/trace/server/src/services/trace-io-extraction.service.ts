@@ -1,18 +1,6 @@
 /**
- * FROZEN TWIN of
- * `platform/app/src/server/app-layer/traces/trace-io-extraction.service.ts`.
- * The application keeps its copy while both graphs ingest; edit neither
- * without editing the other.
- *
- * This is what the trace summary fold COMPUTES its headline input and output
- * from — the span-tree walk, the exclusion rules, the semantic-attribute
- * priority and the stringified-payload fallback. Steps (c)-(f) harvested what
- * the projections STORE; nothing had harvested what they compute, which is why
- * a standalone worker could not build the pipeline definition at all.
- *
- * It needs nothing this package did not already have: the OpenTelemetry API,
- * the LangWatch tracer this package already opens spans with, and the
- * canonicalisation service and normalized-span shape from the contract.
+ * FROZEN TWIN of `platform/app/src/server/app-layer/traces/trace-io-extraction.service.ts`. The
+ * application keeps its copy while both graphs ingest; edit neither without editing the other.
  */
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
@@ -20,19 +8,9 @@ import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { ATTR_KEYS, type TraceCanonicalisationService } from "@langwatch/trace-contract";
 
 /**
- * Service for extracting input/output text from spans using tree traversal
- * and framework-specific heuristics.
- *
- * Priority for I/O extraction (highest to lowest):
- * 1. gen_ai.input.messages / gen_ai.output.messages (GenAI semantic convention)
- * 2. langwatch.input / langwatch.output (LangWatch canonical attributes)
- *
+ * Service for extracting input/output text from spans using tree traversal and
+ * framework-specific heuristics. Priority for I/O extraction (highest to lowest): 1.
  * @example
- * ```typescript
- * const service = new TraceIOExtractionService();
- * const input = service.extractFirstInput(spans);
- * const output = service.extractLastOutput(spans);
- * ```
  */
 export class TraceIOExtractionService {
   static create(traceCanonicalisation: TraceCanonicalisationService): TraceIOExtractionService {
@@ -43,10 +21,8 @@ export class TraceIOExtractionService {
   private readonly tracer = getLangWatchTracer("langwatch.trace-processing.io-extraction");
 
   /**
-   * Extracts the first meaningful input from the trace with rich JSON data.
-   * Uses span tree traversal to find the topmost input, filtering out
-   * evaluation and guardrail spans.
-   *
+   * Extracts the first meaningful input from the trace with rich JSON data. Uses span tree
+   * traversal to find the topmost input, filtering out evaluation and guardrail spans.
    * @returns ExtractedIO with both raw JSON and text representation, or null if not found
    */
   extractFirstInput(spans: NormalizedSpan[]): ExtractedIO | null {
@@ -130,9 +106,8 @@ export class TraceIOExtractionService {
   }
 
   /**
-   * Extracts the last meaningful output from the trace with rich JSON data.
-   * Prioritizes single top-level node output, then falls back to last-finishing span.
-   *
+   * Extracts the last meaningful output from the trace with rich JSON data. Prioritizes single
+   * top-level node output, then falls back to last-finishing span.
    * @returns ExtractedIO with both raw JSON and text representation, or null if not found
    */
   extractLastOutput(spans: NormalizedSpan[]): ExtractedIO | null {
@@ -238,10 +213,8 @@ export class TraceIOExtractionService {
   }
 
   /**
-   * Extracts rich I/O from span attributes using priority order:
-   * 1. gen_ai.input/output.messages (GenAI semantic convention)
-   * 2. langwatch.input/output (LangWatch canonical attributes)
-   *
+   * Extracts rich I/O from span attributes using priority order: 1.
+   * gen_ai.input/output.messages (GenAI semantic convention) 2.
    * @returns ExtractedIO with both raw JSON and text representation
    */
   private static readonly IO_ATTR_KEYS = {
@@ -269,12 +242,11 @@ export class TraceIOExtractionService {
       }
     }
 
-    // Priority 2: LangWatch attribute — semantic matches only.
-    // Returns non-null ONLY when the payload yields a meaningful text
-    // (direct string or heuristic hit on a recognized wrapper key).
-    // If the payload is an unknown shape, callers should fall back to
-    // `extractFallbackIOFromSpan` as a last-resort rather than letting
-    // a stringified mystery object shadow a real match on another span.
+    // Priority 2: LangWatch attribute — semantic matches only. Returns non-null ONLY when the
+    // payload yields a meaningful text (direct string or heuristic hit on a recognized wrapper
+    // key). If the payload is an unknown shape, callers should fall back to
+    // `extractFallbackIOFromSpan` as a last-resort rather than letting a stringified mystery
+    // object shadow a real match on another span.
     const langwatchValue = attrs[keys.langwatch];
     if (langwatchValue !== undefined && langwatchValue !== null) {
       const normalized = normalizeChatPayload(langwatchValue);
@@ -288,12 +260,8 @@ export class TraceIOExtractionService {
   }
 
   /**
-   * Last-resort stringified fallback for spans that HAVE a langwatch.input/output
-   * attribute but whose shape defeats every semantic heuristic. Returning a
-   * stringified payload here is strictly better than leaving `ComputedInput` /
-   * `ComputedOutput` NULL (renders as `<empty>` in the UI), but callers must
-   * prefer `extractRichIOFromSpan` so a fallback match never shadows a real
-   * semantic match on another span in the same trace.
+   * Last-resort stringified fallback for spans that HAVE a langwatch.input/output attribute but
+   * whose shape defeats every semantic heuristic.
    */
   extractFallbackIOFromSpan(span: NormalizedSpan, type: "input" | "output"): ExtractedIO | null {
     const attrs = span.spanAttributes;
@@ -469,11 +437,9 @@ const COMMON_TEXT_KEYS = [
 const MAX_PLAIN_JSON_RECURSION_DEPTH = 32;
 
 /**
- * Extracts a human-readable text representation from a plain JSON object
- * that is NOT message-shaped (no role/content structure).
- *
- * Handles common wrapper patterns like `{ input: "hello" }` or
- * `{ question: "what is 2+2?" }` that are used by various frameworks.
+ * Extracts a human-readable text representation from a plain JSON object that is NOT
+ * message-shaped (no role/content structure). Handles common wrapper patterns like `{ input:
+ * "hello" }` or `{ question: "what is 2+2?" }` that are used by various frameworks.
  */
 function extractTextFromPlainJson(obj: Record<string, unknown>, depth = 0): string | null {
   if (depth >= MAX_PLAIN_JSON_RECURSION_DEPTH) {
@@ -531,11 +497,8 @@ function extractTextFromPlainJson(obj: Record<string, unknown>, depth = 0): stri
 }
 
 /**
- * Recursively checks whether a value carries at least one meaningful leaf
- * (non-empty string, number, or boolean). Empty strings, null/undefined, empty
- * arrays/objects, and wrappers whose leaves are all of the above (e.g. `{ data:
- * {} }`, `{ result: [] }`, `{ a: { b: "" } }`) are treated as empty. Uses a
- * WeakSet to guard against circular references.
+ * Recursively checks whether a value carries at least one meaningful leaf (non-empty string,
+ * number, or boolean).
  */
 function hasMeaningfulLeaf(value: unknown, seen: WeakSet<object> = new WeakSet()): boolean {
   if (value === null || value === undefined) {
@@ -567,15 +530,8 @@ function hasMeaningfulLeaf(value: unknown, seen: WeakSet<object> = new WeakSet()
 }
 
 /**
- * Produces a short-enough, non-empty text representation of an already-parsed
- * JSON-serializable value. Used as the last-resort fallback when heuristic text
- * extraction fails — storing `JSON.stringify(value)` in `ComputedOutput` is
- * strictly better than storing `NULL` (which renders as `<empty>` in the UI).
- *
- * Callers guarantee `value` is not null/undefined and not a string (those are
- * handled earlier via semantic extraction), so only number/boolean/array/object
- * cases matter here. Wrappers with no meaningful leaf (e.g. `{ data: {} }`) are
- * rejected so they don't end up as non-null-but-useless computed I/O.
+ * Produces a short-enough, non-empty text representation of an already-parsed JSON-serializable
+ * value.
  */
 function stringifyForText(value: unknown): string | null {
   if (typeof value === "number" || typeof value === "boolean") {
@@ -594,27 +550,8 @@ function stringifyForText(value: unknown): string | null {
 }
 
 /**
- * Some agent runtimes (Claude Code, certain Anthropic instrumentations)
- * emit chat content with each typed block (`thinking` / `tool_use` /
- * `tool_result`) wrapped *inside* a generic `{type:"text", text:"<JSON
- * of the real block>"}` envelope. That double-wrap means downstream
- * renderers have to peek into the `text` field and re-parse to recover
- * the actual block kind — and every consumer ends up implementing that
- * defensively. Normalize once at ingest so we store the proper Anthropic
- * content-block array end-to-end.
- *
- * Walks the input shape (string / object / array) and unwraps any
- * `{type:"text", text:"<JSON typed block>"}` it finds. Returns the
- * normalized value in the same outer shape (object stays object, array
- * stays array; a JSON string is parsed-and-renormalized when possible,
- * otherwise returned unchanged).
- */
-/**
- * Attempts to unwrap a "text" content block's `text`, when it is itself a
- * JSON-encoded typed block with a non-"text" inner `type`, into that inner
- * block (recursively normalized). Reports no unwrap on a parse failure or an
- * object that isn't itself a differently-typed block, so the caller keeps
- * the text wrapper as-is.
+ * Attempts to unwrap a "text" content block's `text`, when it is itself a JSON-encoded typed
+ * block with a non-"text" inner `type`, into that inner block (recursively normalized).
  */
 function tryUnwrapJsonTextBlock(
   t: string,

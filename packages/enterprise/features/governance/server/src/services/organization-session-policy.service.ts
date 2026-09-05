@@ -5,11 +5,9 @@ import {
 } from "../ports/session-policy.port";
 
 /**
- * The maximum lifetime an organization admin may enforce on CLI/device
- * sessions. Zero means unbounded; the hard cap of 365 keeps a silent typo of
- * "9999" from making the field effectively meaningless. Values above the
- * refresh-token's natural life (~30d) still no-op at `/exchange`, so the cap
- * is a UX guardrail rather than a security invariant.
+ * The maximum lifetime an organization admin may enforce on CLI/device sessions. Zero means
+ * unbounded; the hard cap of 365 keeps a silent typo of "9999" from making the field
+ * effectively meaningless.
  */
 export const SESSION_POLICY_MAX_DAYS = 365;
 

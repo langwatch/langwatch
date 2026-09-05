@@ -1,21 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The credentials a pull-mode Genie source carries, as they actually land in
- * Postgres.
- *
- * This drives the REAL save path — `IngestionSourceService.createSource`
- * against the real `PrismaIngestionSourceRepository` — on purpose. Encrypting
- * the config in the test itself and writing the row directly would pass
- * whether or not `IngestionCredentialsService` still encrypts anything, since
- * the only encryption exercised would be the test's own. Only the crypto
- * boundary (`GovernanceEncryptionPort`) and the non-persistence collaborators
- * (projects, entitlements, secrets, destinations, diagnostics) are
- * substituted — none of them are what this test is protecting.
- *
- * The assertion that bites: it is on the SERIALISED row read back through
- * Prisma, not on the `credentials` key alone. A secret that leaked into some
- * other key would still be caught.
  */
 import { Buffer } from "node:buffer";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";

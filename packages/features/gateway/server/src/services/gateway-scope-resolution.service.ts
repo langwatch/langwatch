@@ -1,20 +1,24 @@
 /**
  * Resolve the eligible-ModelProvider set + order for a VirtualKey, two passes. (1) Eligibility: every ModelProvider reachable from the VK's VirtualKeyScope entries via the upward cascade PROJECT->TEAM->ORGANIZATION (mirrors findAllAccessibleForProject's predicate/tenancy shape), skipping disabled/soft-deleted MPs so the dispatcher never sees a credential an admin pulled. (2) Ordering: routingPolicyId's modelProviderIds dictates order (filtering out entries no longer eligible); with no policy, fallbackPriorityGlobal ASC then createdAt ASC. Used by the config materialiser to assemble the flat providers[] array the Go dispatcher reads.
  */
-import type { ModelProvider, Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { isDispatchableProvider } from "@langwatch/model-provider-contract";
+import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port";
 import { type VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port";
-
-export type EligibleModelProvider = ModelProvider;
+import type {
+  EligibleModelProvider,
+  GatewayScopeResolutionRepository,
+} from "../repositories/gateway-scope-resolution.repository";
 
 /**
  * Which model providers a virtual key reaches, and in which dispatch order.
  */
 export class GatewayScopeResolutionService {
-  private constructor(private readonly prisma: PrismaClient) {}
+  private constructor(private readonly repository: GatewayScopeResolutionRepository) {}
 
-  static create(prisma: PrismaClient): GatewayScopeResolutionService {
-    return new GatewayScopeResolutionService(prisma);
+  static create(input: {
+    repository: GatewayScopeResolutionRepository;
+  }): GatewayScopeResolutionService {
+    return new GatewayScopeResolutionService(input.repository);
   }
 
   /**
@@ -22,21 +26,12 @@ export class GatewayScopeResolutionService {
    */
   async scopeReachableModelProvidersForVk(
     vk: VirtualKeyWithScopes,
-    tx?: Prisma.TransactionClient,
+    transaction?: GatewayPersistenceTransaction,
   ): Promise<EligibleModelProvider[]> {
-    const client = tx ?? this.prisma;
-
-    const scopePredicates = await buildScopePredicates(client, vk);
-    if (scopePredicates.length === 0) {
-      return [];
-    }
-
-    const reachable = await client.modelProvider.findMany({
-      where: {
-        enabled: true,
-        disabledAt: null,
-        scopes: { some: { OR: scopePredicates } },
-      },
+    const scopes = await this.reachableScopes(vk, transaction);
+    const reachable = await this.repository.findProvidersReachableFromScopes({
+      ...scopes,
+      transaction,
     });
 
     return reachable.filter((mp) => isDispatchableProvider(mp.provider));
@@ -47,19 +42,17 @@ export class GatewayScopeResolutionService {
    */
   async eligibleModelProvidersForVk(
     vk: VirtualKeyWithScopes,
-    tx?: Prisma.TransactionClient,
+    transaction?: GatewayPersistenceTransaction,
   ): Promise<EligibleModelProvider[]> {
-    const client = tx ?? this.prisma;
-
-    const candidates = await this.scopeReachableModelProvidersForVk(vk, tx);
+    const candidates = await this.scopeReachableModelProvidersForVk(vk, transaction);
     if (candidates.length === 0) {
       return [];
     }
 
     if (vk.routingPolicyId) {
-      const policy = await client.routingPolicy.findUnique({
-        where: { id: vk.routingPolicyId },
-        select: { modelProviderIds: true, organizationId: true },
+      const policy = await this.repository.findRoutingPolicyOrder({
+        routingPolicyId: vk.routingPolicyId,
+        transaction,
       });
       if (!policy || policy.organizationId !== vk.organizationId) {
         return [];
@@ -72,14 +65,60 @@ export class GatewayScopeResolutionService {
 
       const byId = new Map(candidates.map((mp) => [mp.id, mp]));
 
-      return orderedIds.map((id) => byId.get(id)).filter((mp): mp is ModelProvider => Boolean(mp));
+      return orderedIds
+        .map((id) => byId.get(id))
+        .filter((mp): mp is EligibleModelProvider => Boolean(mp));
     }
 
     return candidates.sort(deterministicMpOrder);
   }
+
+  /**
+   * The organization, team and project ids a key's scope entries reach. A
+   * PROJECT scope also reaches its own team, so a provider shared with the
+   * team is visible to a key scoped only at the project.
+   */
+  private async reachableScopes(
+    vk: VirtualKeyWithScopes,
+    transaction?: GatewayPersistenceTransaction,
+  ): Promise<{ organizationIds: string[]; teamIds: string[]; projectIds: string[] }> {
+    const organizationIds = new Set<string>([vk.organizationId]);
+    const teamIds = new Set<string>();
+    const projectIds = new Set<string>();
+
+    for (const entry of vk.scopes) {
+      switch (entry.scopeType) {
+        case "ORGANIZATION":
+          organizationIds.add(entry.scopeId);
+          break;
+        case "TEAM":
+          teamIds.add(entry.scopeId);
+          break;
+        case "PROJECT":
+          projectIds.add(entry.scopeId);
+          break;
+      }
+    }
+
+    if (projectIds.size > 0) {
+      const inheritedTeamIds = await this.repository.findTeamIdsForProjects({
+        projectIds: [...projectIds],
+        transaction,
+      });
+      for (const teamId of inheritedTeamIds) {
+        teamIds.add(teamId);
+      }
+    }
+
+    return {
+      organizationIds: [...organizationIds],
+      teamIds: [...teamIds],
+      projectIds: [...projectIds],
+    };
+  }
 }
 
-function deterministicMpOrder(a: ModelProvider, b: ModelProvider): number {
+function deterministicMpOrder(a: EligibleModelProvider, b: EligibleModelProvider): number {
   const pa = a.fallbackPriorityGlobal;
   const pb = b.fallbackPriorityGlobal;
   if (pa !== null && pb !== null && pa !== pb) {
@@ -95,70 +134,6 @@ function deterministicMpOrder(a: ModelProvider, b: ModelProvider): number {
   }
 
   return a.createdAt.getTime() - b.createdAt.getTime();
-}
-
-type ScopePredicate =
-  | { scopeType: "ORGANIZATION"; scopeId: string }
-  | { scopeType: "TEAM"; scopeId: string | { in: string[] } }
-  | { scopeType: "PROJECT"; scopeId: string | { in: string[] } };
-
-async function buildScopePredicates(
-  client: PrismaClient | Prisma.TransactionClient,
-  vk: VirtualKeyWithScopes,
-): Promise<ScopePredicate[]> {
-  const orgIds = new Set<string>([vk.organizationId]);
-  const teamIds = new Set<string>();
-  const projectIds = new Set<string>();
-
-  // Track the project IDs whose team we still need to resolve so a VK
-  // scoped at PROJECT:P inherits TEAM:P.teamId visibility on MPs.
-  const projectIdsNeedingTeam = new Set<string>();
-
-  for (const entry of vk.scopes) {
-    switch (entry.scopeType) {
-      case "ORGANIZATION":
-        orgIds.add(entry.scopeId);
-        break;
-      case "TEAM":
-        teamIds.add(entry.scopeId);
-        break;
-      case "PROJECT":
-        projectIds.add(entry.scopeId);
-        projectIdsNeedingTeam.add(entry.scopeId);
-        break;
-    }
-  }
-
-  if (projectIdsNeedingTeam.size > 0) {
-    const projects = await client.project.findMany({
-      where: { id: { in: [...projectIdsNeedingTeam] } },
-      select: { id: true, teamId: true },
-    });
-    for (const p of projects) {
-      teamIds.add(p.teamId);
-    }
-  }
-
-  const predicates: ScopePredicate[] = [];
-  for (const id of orgIds) {
-    predicates.push({ scopeType: "ORGANIZATION", scopeId: id });
-  }
-
-  if (teamIds.size > 0) {
-    predicates.push({
-      scopeType: "TEAM",
-      scopeId: { in: [...teamIds] },
-    });
-  }
-
-  if (projectIds.size > 0) {
-    predicates.push({
-      scopeType: "PROJECT",
-      scopeId: { in: [...projectIds] },
-    });
-  }
-
-  return predicates;
 }
 
 function parseModelProviderIds(raw: unknown): string[] {

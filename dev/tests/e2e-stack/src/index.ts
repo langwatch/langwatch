@@ -1,21 +1,16 @@
 /**
- * One local stack for an end-to-end suite, resolved in this order:
- *
- *   1. `LANGWATCH_E2E_BASE_URL` — CI sets it, and then nothing is started.
- *   2. This worktree's haven stack, when one is up.
- *   3. A stack already answering at the caller's address.
- *   4. Otherwise `dev/scripts/dev-stack.sh` on the port slot the suite asks for,
- *      stopped again when the suite is done.
+ * One local stack for an end-to-end suite, resolved in this order: 1. `LANGWATCH_E2E_BASE_URL`
+ * — CI sets it, and then nothing is started. 2. This worktree's haven stack, when one is up. 3.
+ * A stack already answering at the caller's address. 4.
  */
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 
 /**
- * The workspace root, found by walking up from the working directory to the
- * one lockfile. Read at load time rather than from `import.meta.url`, because
- * a Playwright suite loads this module as CommonJS and the other suites load
- * it as an ES module.
+ * The workspace root, found by walking up from the working directory to the one lockfile. Read
+ * at load time rather than from `import.meta.url`, because a Playwright suite loads this module
+ * as CommonJS and the other suites load it as an ES module.
  */
 function findRepoRoot(): string {
   let here = process.cwd();

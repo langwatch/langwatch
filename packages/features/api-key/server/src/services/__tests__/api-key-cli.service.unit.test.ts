@@ -22,7 +22,10 @@ function serviceWith(options: {
   revoke?: (input: { id: string }) => Promise<unknown>;
 }) {
   const revoke = vi.fn(options.revoke ?? (() => Promise.resolve()));
-  const created = options.createdKey ?? { id: "apikey-new", createdAt: new Date("2026-01-02T00:00:00Z") };
+  const created = options.createdKey ?? {
+    id: "apikey-new",
+    createdAt: new Date("2026-01-02T00:00:00Z"),
+  };
 
   const repository = {
     listForUser: options.listForUser ?? (() => Promise.resolve([])),
@@ -131,7 +134,10 @@ describe("given a CLI login key mint", () => {
           userId: "user-1",
           organizationId: "org-1",
           deviceLabel: "laptop",
-          selection: { bindings: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }], permissions: [] },
+          selection: {
+            bindings: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+            permissions: [],
+          },
         }),
       ).rejects.toThrow(deviceRevokeError);
 

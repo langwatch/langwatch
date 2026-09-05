@@ -6,7 +6,7 @@ import {
   type DatasetNormalizationSender,
 } from "@langwatch/dataset-contract";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
-import { DatasetContentRepository } from "../repositories/prisma/dataset-content.repository";
+import { DatasetContentRepository } from "../repositories/dataset-content.repository";
 import { createDatasetNormalizeHandler } from "../jobs/dataset-normalize.job";
 import { UploadNotPendingError } from "./errors";
 

@@ -14,6 +14,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository";
 import { VirtualKeyDirectBudgetService } from "../services/virtual-key-direct-budget.service";
+import { PrismaVirtualKeyDirectBudgetRepository } from "../repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -56,7 +57,9 @@ const prisma = connection?.client as PrismaClient;
 let chRepo: GatewayBudgetClickHouseRepository;
 
 const load = () =>
-  VirtualKeyDirectBudgetService.create(prisma).loadDirectBudgetsForKeys({
+  VirtualKeyDirectBudgetService.create({
+    repository: PrismaVirtualKeyDirectBudgetRepository.create({ database: prisma }),
+  }).loadDirectBudgetsForKeys({
     organizationId: ORG_ID,
     virtualKeyIds: ALL_KEY_IDS,
     chRepo,
@@ -195,7 +198,9 @@ describe.skipIf(!databaseUrl || !chUrl)("direct budget per virtual key (real PG 
   describe("when the rollup cannot be read", () => {
     /** @scenario "A budget whose spend cannot be totalled says so instead of showing zero" */
     it("reports an unknown spend rather than zero", async () => {
-      const budgets = await VirtualKeyDirectBudgetService.create(prisma).loadDirectBudgetsForKeys({
+      const budgets = await VirtualKeyDirectBudgetService.create({
+        repository: PrismaVirtualKeyDirectBudgetRepository.create({ database: prisma }),
+      }).loadDirectBudgetsForKeys({
         organizationId: ORG_ID,
         virtualKeyIds: ALL_KEY_IDS,
         chRepo: undefined,

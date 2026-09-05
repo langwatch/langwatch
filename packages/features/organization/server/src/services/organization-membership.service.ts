@@ -96,9 +96,7 @@ async function collectCustomRolePermissions({
     // type: read it defensively the way every other permission reader does.
     if (Array.isArray(permissions)) {
       allPermissions.push(
-        ...permissions.filter(
-          (permission): permission is string => typeof permission === "string",
-        ),
+        ...permissions.filter((permission): permission is string => typeof permission === "string"),
       );
     }
   }

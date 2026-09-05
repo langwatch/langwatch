@@ -158,3 +158,4 @@ export {
   OrganizationInviteRateLimitPort,
   OrganizationInviteSeatCensusPort,
 } from "./ports/invite.port";
+export { PrismaOrganizationInviteRepository } from "./repositories/prisma/prisma.organization-invite.repository";

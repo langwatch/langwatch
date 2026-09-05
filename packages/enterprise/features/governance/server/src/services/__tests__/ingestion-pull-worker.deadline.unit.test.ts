@@ -1,13 +1,6 @@
 /**
- * The per-run deadline has to be enforceable, not advisory.
- *
- * The scheduler abandons a run it considers stale
- * (INGESTION_PULL_STALE_RUN_MS) and starts a fresh one from the same cursor.
- * That is only safe if the abandoned run is provably finished. If a hung
- * adapter could keep executing, two pulls would read the same window
- * concurrently, both could write the same events, and whichever settled last
- * would decide the durable cursor.
- *
+ * The per-run deadline has to be enforceable, not advisory. The scheduler abandons a run it
+ * considers stale (INGESTION_PULL_STALE_RUN_MS) and starts a fresh one from the same cursor.
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

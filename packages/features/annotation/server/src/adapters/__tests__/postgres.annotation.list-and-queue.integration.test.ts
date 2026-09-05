@@ -45,12 +45,7 @@ describe.skipIf(!databaseUrl)("annotations list, export and queueing", () => {
   }).build();
 
   const spanIds = ["span-1", "span-2", "span-3"];
-  const everyComment = [
-    "about span-1",
-    "about span-2",
-    "about span-3",
-    "the whole trace is off",
-  ];
+  const everyComment = ["about span-1", "about span-2", "about span-3", "the whole trace is off"];
 
   beforeAll(async () => {
     await prisma.user.create({ data: { id: userId } });
@@ -98,9 +93,7 @@ describe.skipIf(!databaseUrl)("annotations list, export and queueing", () => {
 
     /** @scenario "A comment on one part of a trace never becomes a queue item" */
     it("creates no queue item merely from commenting on the trace's spans", async () => {
-      expect(
-        await prisma.annotationQueueItem.count({ where: { projectId, traceId } }),
-      ).toBe(0);
+      expect(await prisma.annotationQueueItem.count({ where: { projectId, traceId } })).toBe(0);
     });
 
     /** @scenario "Sending a commented trace to a queue sends the trace once" */
@@ -113,9 +106,7 @@ describe.skipIf(!databaseUrl)("annotations list, export and queueing", () => {
         createdByUserId: userId,
       });
 
-      expect(
-        await prisma.annotationQueueItem.count({ where: { projectId, traceId } }),
-      ).toBe(1);
+      expect(await prisma.annotationQueueItem.count({ where: { projectId, traceId } })).toBe(1);
     });
   });
 });

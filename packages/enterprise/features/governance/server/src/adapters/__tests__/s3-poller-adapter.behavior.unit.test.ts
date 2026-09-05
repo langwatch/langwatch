@@ -1,15 +1,6 @@
 /**
- * Unit coverage for S3PollingPullerAdapter — exercises:
- *   - validateConfig accepting/rejecting shapes
- *   - parser modes (ndjson / json-array / csv)
- *   - cursor advance to lexicographic-max key
- *   - StartAfter respected on cursor resume
- *   - empty list returns drained cursor unchanged
- *   - malformed ndjson lines skipped + errorCount increments
- *
- * Hits a stubbed S3 client (no real AWS) so the test can exercise
- * the parser/cursor/error paths without testcontainers.
- *
+ * Unit coverage for S3PollingPullerAdapter, hitting a stubbed S3 client (no real AWS) so
+ * the test can exercise the parser/cursor/error paths without testcontainers.
  * Spec: specs/ai-governance/puller-framework/s3-polling.feature
  */
 import { beforeEach, describe, expect, it } from "vitest";
@@ -225,12 +216,11 @@ describe("S3PollingPullerAdapter", () => {
       const result = await adapter.runOnce({ cursor: null }, adapter.validateConfig(VALID_CONFIG));
       expect(result.events).toHaveLength(2);
       expect(result.cursor).toBe("anthropic/compliance/bad.ndjson");
-      // This assertion used to read `toBe(0)`, with a comment explaining that
-      // the parser absorbed malformed lines without surfacing them. That was
-      // the defect, written down as the expectation: a bad line was dropped in
-      // silence while the cursor advanced past the file, so nothing was ever
-      // alerted about corrupt input. The spec says errorCount reflects the
-      // number of bad lines seen, and now it does.
+      // This assertion used to read `toBe(0)`, with a comment explaining that the parser
+      // absorbed malformed lines without surfacing them. That was the defect, written down as
+      // the expectation: a bad line was dropped in silence while the cursor advanced past the
+      // file, so nothing was ever alerted about corrupt input. The spec says errorCount
+      // reflects the number of bad lines seen, and now it does.
       expect(result.errorCount).toBe(1);
     });
 

@@ -9,14 +9,9 @@ import { TraceSpanNormalizationPort } from "../ports/trace-span-normalization.po
 import { SpanNormalizationPipelineService } from "../services/span-normalization.service";
 
 /**
- * Span normalization for the projections, over this package's own pipeline
- * service.
- *
- * Frozen twin of the application's `AppTraceSpanNormalizationAdapter`
- * (`platform/app/src/runtime/app/trace-record-span.adapter.ts`). The service it
- * wraps was already packaged; only the port rename sat in the application, and
- * a rename is the last thing that should keep a process from building its own
- * pipeline.
+ * Span normalization for the projections, over this package's own pipeline service. Frozen twin
+ * of the application's `AppTraceSpanNormalizationAdapter`
+ * (`platform/app/src/runtime/app/trace-record-span.adapter.ts`).
  */
 export class TraceSpanNormalizationAdapter extends TraceSpanNormalizationPort {
   private readonly service: SpanNormalizationPipelineService;

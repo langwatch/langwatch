@@ -64,6 +64,7 @@ import type { Context } from "hono";
 import { z } from "zod";
 
 import { OrganizationSupportContactService } from "../../services/organization-support-contact.service";
+import { PrismaOrganizationSupportContactRepository } from "../../repositories/prisma/prisma.organization-support-contact.repository";
 
 const logger = createLogger("langwatch:governance-cli");
 
@@ -477,7 +478,7 @@ export function createGovernanceCliRestApp(options: {
     // the first entry is the binding one.
     const blocker = decision.blockedBy[0]!;
     const adminEmail = await OrganizationSupportContactService.create({
-      prisma: ports.database(),
+      repository: PrismaOrganizationSupportContactRepository.create({ prisma: ports.database() }),
     }).resolveSupportContact({ organizationId: caller.organization_id });
     const params = new URLSearchParams({
       scope: blocker.scope.toLowerCase(),

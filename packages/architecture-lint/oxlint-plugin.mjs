@@ -143,12 +143,11 @@ function packageSubpath(specifier, packageName) {
 }
 
 function isFeatureServerCompositionRoot(workspacePath) {
-  // `tests` alongside `src`, because a composition root's own test suite has
-  // to import exactly what the root imports in order to test that it wires it.
-  // Without this the rule fires on the one place the import is unavoidable,
-  // and the only ways out are to stop testing the wiring or to record a rule
-  // gap as if it were debt. A test elsewhere is still held: this is scoped to
-  // the composition workspaces, not to test files in general.
+  // `tests` alongside `src`, because a composition root's own test suite has to import exactly
+  // what the root imports in order to test that it wires it. Without this the rule fires on the
+  // one place the import is unavoidable, and the only ways out are to stop testing the wiring
+  // or to record a rule gap as if it were debt. A test elsewhere is still held: this is scoped
+  // to the composition workspaces, not to test files in general.
   return /^(apps\/(api|worker|tasks)|packages\/enterprise\/composition\/(api|worker))\/(?:src|tests)\//.test(
     workspacePath,
   );
@@ -431,11 +430,7 @@ const environmentBoundariesRule = {
 };
 
 /**
- * The process apps whose features must receive configuration rather than read
- * it. Named rather than globbed as `apps/*`: `apps/server` is the npx CLI that
- * installs and supervises the other processes, so spawning with an environment
- * IS its subject matter, and holding it to this rule would be wrong rather than
- * merely inconvenient.
+ * The process apps whose features must receive configuration rather than read it.
  */
 function isEnvironmentGovernedApp(workspacePath) {
   return /^apps\/(?:api|worker|ui)\/src\//.test(workspacePath);
@@ -1381,12 +1376,8 @@ const serviceDependenciesRule = {
 
 /**
  * A door in a strict feature package: `src/transport/<surface>/<name>.api.ts`.
- *
- * `src/api/<surface>/` is the name that directory used to have, and four
- * packages still publish a family from it, so both are matched. Matching only
- * the new one silently stopped checking those four; matching only the old one
- * silently stopped checking everything else, which is what happened when the
- * rename landed.
+ * `src/api/<surface>/` is the name that directory used to have, and four packages still publish
+ * a family from it, so both are matched.
  */
 function isFeatureApi(classification) {
   return (

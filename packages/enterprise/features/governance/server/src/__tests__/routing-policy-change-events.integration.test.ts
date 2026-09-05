@@ -1,18 +1,6 @@
 /**
  * @vitest-environment node
- *
- * A routing-policy edit has to reach a running gateway, and the change feed
- * is how it gets there.
- *
- * Real Postgres, no mocks: what is under test is which rows a mutation leaves
- * behind and whether they land together, so a stubbed client would only assert
- * that the stub agrees with itself. The interesting cases are the ones where
- * the row written is not the row edited: a policy edit has to bump keys that
- * merely point at the policy, and a policy delete has to release them without
- * leaving one naming a policy that is gone.
- *
  * Spec: specs/ai-gateway/auth-cache.feature, Rule "A routing-policy or
- * cache-rule edit propagates through the change feed".
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";

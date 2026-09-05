@@ -128,8 +128,7 @@ describe("given the annotations REST family", () => {
      * @scenario "An annotation read failure returns no driver diagnostic"
      */
     it("answers a generic 500 and keeps the cause on the log line", async () => {
-      const driverMessage =
-        "Can't reach database server at `db.internal.langwatch:5432` (P1001)";
+      const driverMessage = "Can't reach database server at `db.internal.langwatch:5432` (P1001)";
       const api = mount({
         app: annotationApp({
           list: vi.fn(async () => {

@@ -1,10 +1,6 @@
 import * as os from "node:os";
 import { createLogger } from "@langwatch/observability";
-import {
-  SNAPSHOT_VERSION,
-  mergeHistogramCounts,
-  windowPercentiles,
-} from "@langwatch/ops-contract";
+import { SNAPSHOT_VERSION, mergeHistogramCounts, windowPercentiles } from "@langwatch/ops-contract";
 import type {
   DashboardData,
   DetailSnapshot,

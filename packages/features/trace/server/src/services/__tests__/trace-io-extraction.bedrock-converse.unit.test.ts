@@ -1,9 +1,6 @@
 /**
- * AWS Bedrock **Converse** content blocks are a union discriminated by which
- * key is present ({text}, {toolUse}, {toolResult}) rather than by a `type`
- * field. These tests run the real canonicaliser + trace-I/O extraction pair
- * and assert each Converse shape reaches `trace_summaries` as non-empty
- * ComputedInput / ComputedOutput.
+ * AWS Bedrock **Converse** content blocks are a union discriminated by which key is present
+ * ({text}, {toolUse}, {toolResult}) rather than by a `type` field.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -30,10 +27,9 @@ const canonicaliser = TraceCanonicalisationService.create();
 const ioService = TraceIOExtractionService.create(canonicaliser);
 
 /**
- * Only ever used to CONSTRUCT the span. The assertions below hardcode the
- * literal instead of reusing this, so renaming the span turns them red — if
- * both sides shared one constant the falsification would move together and
- * prove nothing.
+ * Only ever used to CONSTRUCT the span. The assertions below hardcode the literal instead of
+ * reusing this, so renaming the span turns them red — if both sides shared one constant the
+ * falsification would move together and prove nothing.
  */
 const SPAN_NAME = "bedrock.converse";
 
@@ -73,10 +69,9 @@ function makeSpan(
 }
 
 /**
- * Runs the real production pair: canonicalise the span's attributes, then
- * extract trace-level I/O from the canonicalised span — which is the order the
- * ingestion pipeline uses. Returns the two `ComputedInput` / `ComputedOutput`
- * texts as they would be written to `trace_summaries`.
+ * Runs the real production pair: canonicalise the span's attributes, then extract trace-level
+ * I/O from the canonicalised span — which is the order the ingestion pipeline uses. Returns the
+ * two `ComputedInput` / `ComputedOutput` texts as they would be written to `trace_summaries`.
  */
 function computeTraceIO(span: NormalizedSpan) {
   const canonicalised = canonicaliser.canonicalizeSpanAttributes({

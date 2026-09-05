@@ -63,10 +63,12 @@ function fakeAnnotationService(): AnnotationService {
 function harness({ canUpdate = true }: { canUpdate?: boolean } = {}) {
   const probeProjectPermission = vi.fn(async () => canUpdate);
   const overlays = new Map<string, string>();
-  const writeTraceSuggestion = vi.fn(async (_ctx: unknown, input: { traceId: string; text: string }) => {
-    if (input.text === "") overlays.delete(input.traceId);
-    else overlays.set(input.traceId, input.text);
-  });
+  const writeTraceSuggestion = vi.fn(
+    async (_ctx: unknown, input: { traceId: string; text: string }) => {
+      if (input.text === "") overlays.delete(input.traceId);
+      else overlays.set(input.traceId, input.text);
+    },
+  );
 
   const ports: AnnotationTrpcPorts = {
     queues: () => ({}) as never,

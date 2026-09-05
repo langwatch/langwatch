@@ -1,25 +1,6 @@
 /**
- * IngestionSource admin CRUD tRPC surface.
- *
- * Reads gate on `ingestionSources:view`, writes on `ingestionSources:manage` —
- * MEMBER and EXTERNAL roles never see the surface. The actual ingest
- * receivers (push-mode for OTel / webhook, pull-mode for compliance APIs)
- * live under `/api/ingest/*` Hono routes; this is the admin-side
- * configuration surface that powers /settings/ingestion-sources.
- *
- * `toIngestionSourceDto` scrubs the parser config's private slots and the
- * sealed credentials envelope before serialising — the UI never needs them,
- * and the sealed envelope is not inert: re-encryption is idempotent, so a
- * client that could send it back beside a changed destination host would
- * have us decrypt a secret it never knew and post it there. The wire never
- * carries either.
- *
- * `validateOttl` deliberately re-throws the underlying network error rather
- * than wrapping it into a HandledError — the caller cannot act on a gateway
- * outage, so the boundary correctly degrades to "unknown" with a trace id.
- *
- * Transport only: input parsing, delegation, wire shape, DTO scrubbing.
- *
+ * IngestionSource admin CRUD tRPC surface. Reads gate on `ingestionSources:view`, writes on
+ * `ingestionSources:manage` — MEMBER and EXTERNAL roles never see the surface.
  * Spec: specs/ai-gateway/governance/ingestion-sources.feature
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -110,12 +91,9 @@ type IngestionSourceRow = Readonly<{
 }>;
 
 /**
- * Strip the secret hash, private rotation slot and sealed credentials
- * envelope before serialising over the wire. See file docblock for why the
- * envelope in particular must not travel.
- *
- * Exported for the very few places that need to shape a row for tests or a
- * REST equivalent — everything on the wire goes through it.
+ * Strip the secret hash, private rotation slot and sealed credentials envelope before
+ * serialising over the wire. See file docblock for why the envelope in particular must not
+ * travel.
  */
 export function toIngestionSourceDto({
   row,
@@ -267,11 +245,8 @@ export class IngestionSourcesTrpcApi {
       }),
 
       /**
-       * Canonical OTTL starter statements for a source type, plus whether
-       * OTTL editing is enabled for it. Pure function over a constant, but
-       * exposed via tRPC so the catalog stays a single source of truth and
-       * an admin-curated set can replace the starter map without a client
-       * redeploy.
+       * Canonical OTTL starter statements for a source type, plus whether OTTL editing is
+       * enabled for it.
        */
       ottlStarter: view(ottlStarterSchema).query(({ input }) => ({
         enabled: isOttlEnabledSourceType(input.sourceType),
@@ -280,18 +255,9 @@ export class IngestionSourcesTrpcApi {
       })),
 
       /**
-       * Validate a list of OTTL statements via the aigateway. The gateway
-       * embeds `pkg/ottl` from the OpenTelemetry Collector and parses each
-       * statement; on parse / type errors, returns per-statement coordinates
-       * so the editor can surface line/column error markers.
-       *
-       * When `LW_GATEWAY_BASE_URL` is unset (dev fast-path) or the gateway is
-       * up but does not yet ship the endpoint, the client returns
-       * `{ status: "deferred" }` — the composer never blocks on infra, and
-       * the editor renders neutral dots plus a note rather than claiming a
-       * pass for statements nothing looked at. A hard network failure
-       * degrades to "unknown" with a trace id via the plain re-throw here,
-       * because a gateway outage is not something the caller can act on.
+       * Validate a list of OTTL statements via the aigateway. The gateway embeds `pkg/ottl`
+       * from the OpenTelemetry Collector and parses each statement; on parse / type errors,
+       * returns per-statement coordinates so the editor can surface line/column error markers.
        */
       validateOttl: manage(validateOttlSchema).mutation(async ({ ctx, input }) =>
         ctx.app.governance.ottlValidate(input.statements),

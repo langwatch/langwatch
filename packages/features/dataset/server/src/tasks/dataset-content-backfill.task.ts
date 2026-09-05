@@ -8,22 +8,6 @@ const logger = createLogger("langwatch:tasks:backfill-dataset-content-to-object-
 
 /**
  * Moves dataset content out of Postgres and into object storage.
- *
- * The migration itself belongs to `@langwatch/dataset-server`; what lives here
- * is the sweep's own decisions — whether the operator asked to skip it, whether
- * this is a dry run, and what a pending schema means — so they can be exercised
- * without an S3 account.
- *
- * `SKIP_DATASET_S3_MIGRATE` and `DATASET_S3_MIGRATE_DRY_RUN` arrive as parsed
- * values rather than being read here: a task that reached for the environment
- * would be the one place in this process that did.
- *
- * The composed entrypoint is still absent, and the reason is named:
- * `DatasetStorageResolver` is built inside
- * `app/worker-dataset-normalization.composition.ts` from the process's stored
- * object runtime, its AWS runtime and its per-project S3 sources, and none of
- * that is reachable from outside that composition yet. The sweep takes the
- * resolver as a parameter, so a runner is a few lines the moment it is.
  */
 export class DatasetContentBackfillSweep {
   private constructor(
@@ -77,18 +61,9 @@ type DatasetBackfillOutcome = Awaited<
 >;
 
 /**
- * The task-launcher entry — `pnpm --filter @langwatch/tasks task
- * dataset-content-backfill`. Registered in `apps/tasks`' catalogue via
- * `dataset-content-backfill.composition.ts`, which builds a
- * `DatasetStorageResolver` from `TasksHost.objectStorage`.
- * `SKIP_DATASET_S3_MIGRATE` and `DATASET_S3_MIGRATE_DRY_RUN` are read by the
- * task launcher and arrive here as parsed values, which is also what
- * `DatasetContentBackfillSweep.execute` above takes.
- *
- * `database` and `storage` are FACTORIES, not values: resolving the real
- * `storage` needs `TasksHost.objectStorage`, and a missing/misconfigured
- * environment should fail only THIS task at run time, not every task at
- * catalogue construction.
+ * The task-launcher entry — `pnpm --filter @langwatch/tasks task dataset-content-backfill`.
+ * Registered in `apps/tasks`' catalogue via `dataset-content-backfill.composition.ts`, which
+ * builds a `DatasetStorageResolver` from `TasksHost.objectStorage`.
  */
 export class DatasetContentBackfillTask extends Task {
   readonly name = "dataset-content-backfill";

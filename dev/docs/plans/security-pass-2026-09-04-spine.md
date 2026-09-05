@@ -11,38 +11,38 @@ dressed up as an exploit.
 
 ## Summary
 
-| ID | Sev | Finding | Where |
-|----|-----|---------|-------|
-| [C1](#c1--critical-sql-injection-into-clickhouse-through-seriesmetric) | **Critical** | Free-string `series[].metric` reaches the ClickHouse SELECT list unsanitised — arbitrary cross-tenant read with an ordinary project API key | `packages/features/analytics/server/src/clickhouse/metric-translator.ts:227, 291-296` |
-| [C2](#c2--critical-get-apisse-executes-any-trpc-procedure-mutations-included-on-a-lax-session-cookie) | **Critical** | `GET /api/sse/*` invokes any tRPC procedure — all 308 mutations included — on a `SameSite=Lax` cookie, with no origin check and no procedure-type filter | `apps/api/src/app-trpc/app-trpc.sse.ts:113-122, 184-200, 263` |
-| [H1](#h1--high-the-clickhouse-tenantguard-is-fully-implemented-and-wired-to-nothing) | High | The ClickHouse `TenantGuard` is complete, optional, and constructed only in tests | `packages/clickhouse-client/src/client.ts:41`; `apps/api/src/platform/infrastructure/api-clickhouse.infrastructure.ts:108` |
-| [H2](#h2--high-x-project-id-re-points-a-scoped-key-at-any-sibling-project-and-two-doors-behind-it-have-no-ceiling) | High | `X-Project-Id` re-points a scoped API key at any sibling project, and two families behind it enforce no ceiling | `packages/features/api-key/server/src/services/api-key-token-resolution.service.ts:134-176` |
-| [H3](#h3--high-a-licensed-self-hosted-sso-install-refuses-sso-and-leaves-the-password-door-open) | High | The API process hard-codes `federationLicensed: false`, so a licensed SSO install refuses SSO and leaves `/api/auth/sign-up/email` open | `apps/api/src/app/api-better-auth.composition.ts:132` |
-| [H4](#h4--high-every-ip-keyed-throttle-is-keyed-on-a-header-the-caller-chooses) | High | Every IP-keyed throttle, better-auth's sign-in limit included, is keyed on an unvalidated caller-supplied header | `apps/api/src/app/api-client-address.ts:31-59`; `packages/features/auth/server/src/transport/better-auth/better-auth.api.ts:256-260` |
-| [H5](#h5--high-the-public-rest-json-reader-buffers-the-whole-body-before-measuring-it) | High | The public REST JSON reader buffers the whole body before measuring it, and skips its pre-check on chunked or non-integer `Content-Length` | `packages/api/src/rest/public-rest-input.ts:91-105` |
-| [H6](#h6--high-an-api-key-writes-model-defaults-with-its-owners-permissions) | High | An API key writes model defaults with its **owner's** permissions; the key's ceiling is never consulted | `packages/features/model-provider/server/src/transport/api-rest/model-defaults.routes.ts:120-131` |
-| [H7](#h7--high-the-metadata-refusal-is-a-hostname-string-match-and-the-address-check-is-switched-off-by-default) | High | The "always refused" metadata check is a hostname string match, and the address check is `blockLocal`-gated with a default of false | `packages/egress/src/ssrf/url-validator.ts:136-144, 176`; `packages/config/src/egress.config.ts:22-24` |
-| [H8](#h8--high-a-bracketed-ipv6-host-walks-past-every-literal-check-on-an-unauthenticated-door) | High | A bracketed IPv6 host defeats every literal check and is fetched unpinned, on the unauthenticated image proxy | `packages/egress/src/ssrf/url-validator.ts:250, 276, 311-317` |
-| [H9](#h9--high-the-organization-audit-log-returns-other-organizations-project-rows) | High | The organization audit log matches `projectId: { not: null }` — it returns other organizations' project rows, payloads included | `packages/features/organization/server/src/repositories/prisma/prisma.organization-membership.repository.ts:1516-1523` |
-| [H10](#h10--high-customer-authored-liquid-templates-can-read-files-under-the-process-working-directory) | High | Customer-authored Liquid templates keep file inclusion, so `{% render %}` reads files under the process cwd | `packages/features/scenario/contract/src/http-template-engine.ts:44, 49, 55` (+2 sites) |
-| [H11](#h11--high-the-image-proxy-serves-attacker-controlled-svg-from-the-app-origin-with-no-nosniff-and-no-csp) | High | The image proxy passes `image/svg+xml` through from the app origin with no `nosniff`, no CSP and no `Content-Disposition` — script execution on the product's own origin | `apps/api/src/features/image-proxy/image-proxy-rest.ts:74-81` |
-| [M1](#m1--medium-rate-limiting-runs-after-the-body-is-read-parsed-and-validated) | Medium | Rate limiting runs after the body is read, parsed and validated — the opposite of its own stated contract | `packages/api/src/rest/pipeline.ts:90-127` |
-| [M2](#m2--medium-projectauthorization-calls-next-when-nothing-resolved) | Medium | `projectAuthorization` calls `next()` when no credential resolved — fail-open shape, reachability unproven | `apps/api/src/api-rest.security.ts:349-354` |
-| [M3](#m3--medium-an-empty-x-project-id-header-is-an-unauthenticated-500) | Medium | An empty `X-Project-Id` raises an unhandled `ZodError` — an unauthenticated 500 on every project REST route | `apps/api/src/app/api-key-request-credentials.ts:25, 29` |
-| [M4](#m4--medium-framework-guards-that-are-declared-but-inert) | Medium | Three framework guards that record and do not enforce: `permissionScope`, the `projectIdInput`-gated tenant check, and an empty chain under `internalSecret` | `packages/api/src/rest/pipeline.ts:681-689, 728-747`; `rest-api-service.ts:686-701` |
-| [M5](#m5--medium-timing-unsafe-comparison-of-the-scim-webhook-shared-secret) | Medium | Timing-unsafe `!==` on the SCIM webhook shared secret, and no replay window | `packages/enterprise/features/scim/server/src/transport/api-rest/scim-webhook-intake.api.ts:47-50` |
-| [M6](#m6--medium-legacy-project-keys-are-plaintext-permanent-unrevocable-and-ceiling-exempt) | Medium | Legacy project keys are stored in plaintext, never expire, cannot be revoked, and are exempt from every ceiling | `packages/features/api-key/server/src/repositories/prisma/prisma.api-key.repository.ts:133-146` |
-| [M7](#m7--medium-share-links-default-to-permanent-public-and-unlimited-and-minting-is-uncapped) | Medium | Share links default to permanent, public and unlimited views; minting is neither capped nor throttled | `packages/features/share/server/src/transport/api-trpc/share.api.ts:62-113` |
-| [M8](#m8--medium-post-apiauthvalidate-is-an-unauthenticated-unthrottled-key-oracle) | Medium | `POST /api/auth/validate` is an unauthenticated, unthrottled key-validity and project oracle | `packages/features/auth/server/src/transport/api-rest/auth.api.ts:114-132` |
-| [M9](#m9--medium-the-origin-gate-exists-but-is-mounted-only-on-apiauth) | Medium | The origin gate is correct but mounted only on `/api/auth/*`; admin, CLI-approve and logout carry none | `packages/features/auth/server/src/transport/api-rest/auth.api.ts:218-241` |
-| [M10](#m10--medium-two-more-declared-but-unenforced-claims) | Medium | `/approve` declares a permission one branch never checks; the version guard registers `public` while dispatching the full stack; the route registry overwrites on collision | `auth-cli-device-flow.api.ts:254-258`; `packages/api/src/rest/route-mounting.ts:91-107`; `route-registry.ts:26-38` |
-| [M11](#m11--medium-two-egress-hardening-gaps-beside-the-fence) | Medium | Image proxy has no size cap or timeout; outbound webhook TLS verification is off on self-hosted; allowlisted hostnames are not pinned | `apps/api/src/features/image-proxy/image-proxy-rest.ts:62-80`; `apps/worker/src/app/worker-webhook-egress.composition.ts:76` |
-| [M12](#m12--medium-an-unencoded-path-segment-in-a-server-side-fetch-that-carries-the-project-api-key) | Medium | An unencoded `workflowId` path segment in a server-side fetch that attaches the project API key | `apps/api/src/app/api-trpc-collaborators.execution.composition.ts:571-580` |
-| [M13](#m13--medium-the-ops-explain-system-guard-is-bypassable-with-quoted-identifiers) | Medium | The ops EXPLAIN `system.*` guard is bypassable with quoted identifiers, and misses `gcs` / `dictGet` / `mergeTreeIndex` | `packages/features/ops/server/src/services/ops-clickhouse-explain.core.ts:30, 124-143` |
-| [M14](#m14--medium-two-prisma-tenancy-defects-one-broken-feature-and-one-hardening-gap) | Medium | `GatewayGuardrail` update/archive omit `projectId` (broken, fails closed); the guard's `projectId` check is a truthiness test | `prisma.gateway-guardrail.repository.ts:89-90, 104-105`; `packages/prisma-client/src/multi-tenancy-guard.ts:928-940` |
-| [M15](#m15--medium-five-genuinely-project-scoped-models-are-exempt-from-the-prisma-tenancy-guard) | Medium | Five project-scoped models — `Workflow`, `Evaluator`, `Scenario`, `BatchEvaluation`, `Agent` — are exempt from the Prisma tenancy guard so license rollups do not throw | `packages/prisma-client/src/multi-tenancy-guard.ts:111-123` |
-| [M16](#m16--medium-eleven-project-list-endpoints-have-no-page-size-at-all) | Medium | Eleven project list endpoints have no page size; three read tables that grow with usage and take no pagination parameters at all | `packages/features/prompt/server/src/transport/api-rest/prompt.api.ts:335-337, 678-680` (+9) |
-| [Low](#low--the-remaining-smaller-defects) | Low | 17 smaller items: `/metrics` open outside exactly-`production`, two `===` secret compares, a divergent 5xx error renderer, one shared anonymous rate-limit bucket, impersonation outliving staff status, `'unsafe-eval'` in the CSP, and more | see section |
+| ID                                                                                                                 | Sev          | Finding                                                                                                                                                                                                                                       | Where                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| [C1](#c1--critical-sql-injection-into-clickhouse-through-seriesmetric)                                             | **Critical** | Free-string `series[].metric` reaches the ClickHouse SELECT list unsanitised — arbitrary cross-tenant read with an ordinary project API key                                                                                                   | `packages/features/analytics/server/src/clickhouse/metric-translator.ts:227, 291-296`                                                |
+| [C2](#c2--critical-get-apisse-executes-any-trpc-procedure-mutations-included-on-a-lax-session-cookie)              | **Critical** | `GET /api/sse/*` invokes any tRPC procedure — all 308 mutations included — on a `SameSite=Lax` cookie, with no origin check and no procedure-type filter                                                                                      | `apps/api/src/app-trpc/app-trpc.sse.ts:113-122, 184-200, 263`                                                                        |
+| [H1](#h1--high-the-clickhouse-tenantguard-is-fully-implemented-and-wired-to-nothing)                               | High         | The ClickHouse `TenantGuard` is complete, optional, and constructed only in tests                                                                                                                                                             | `packages/clickhouse-client/src/client.ts:41`; `apps/api/src/platform/infrastructure/api-clickhouse.infrastructure.ts:108`           |
+| [H2](#h2--high-x-project-id-re-points-a-scoped-key-at-any-sibling-project-and-two-doors-behind-it-have-no-ceiling) | High         | `X-Project-Id` re-points a scoped API key at any sibling project, and two families behind it enforce no ceiling                                                                                                                               | `packages/features/api-key/server/src/services/api-key-token-resolution.service.ts:134-176`                                          |
+| [H3](#h3--high-a-licensed-self-hosted-sso-install-refuses-sso-and-leaves-the-password-door-open)                   | High         | The API process hard-codes `federationLicensed: false`, so a licensed SSO install refuses SSO and leaves `/api/auth/sign-up/email` open                                                                                                       | `apps/api/src/app/api-better-auth.composition.ts:132`                                                                                |
+| [H4](#h4--high-every-ip-keyed-throttle-is-keyed-on-a-header-the-caller-chooses)                                    | High         | Every IP-keyed throttle, better-auth's sign-in limit included, is keyed on an unvalidated caller-supplied header                                                                                                                              | `apps/api/src/app/api-client-address.ts:31-59`; `packages/features/auth/server/src/transport/better-auth/better-auth.api.ts:256-260` |
+| [H5](#h5--high-the-public-rest-json-reader-buffers-the-whole-body-before-measuring-it)                             | High         | The public REST JSON reader buffers the whole body before measuring it, and skips its pre-check on chunked or non-integer `Content-Length`                                                                                                    | `packages/api/src/rest/public-rest-input.ts:91-105`                                                                                  |
+| [H6](#h6--high-an-api-key-writes-model-defaults-with-its-owners-permissions)                                       | High         | An API key writes model defaults with its **owner's** permissions; the key's ceiling is never consulted                                                                                                                                       | `packages/features/model-provider/server/src/transport/api-rest/model-defaults.routes.ts:120-131`                                    |
+| [H7](#h7--high-the-metadata-refusal-is-a-hostname-string-match-and-the-address-check-is-switched-off-by-default)   | High         | The "always refused" metadata check is a hostname string match, and the address check is `blockLocal`-gated with a default of false                                                                                                           | `packages/egress/src/ssrf/url-validator.ts:136-144, 176`; `packages/config/src/egress.config.ts:22-24`                               |
+| [H8](#h8--high-a-bracketed-ipv6-host-walks-past-every-literal-check-on-an-unauthenticated-door)                    | High         | A bracketed IPv6 host defeats every literal check and is fetched unpinned, on the unauthenticated image proxy                                                                                                                                 | `packages/egress/src/ssrf/url-validator.ts:250, 276, 311-317`                                                                        |
+| [H9](#h9--high-the-organization-audit-log-returns-other-organizations-project-rows)                                | High         | The organization audit log matches `projectId: { not: null }` — it returns other organizations' project rows, payloads included                                                                                                               | `packages/features/organization/server/src/repositories/prisma/prisma.organization-membership.repository.ts:1516-1523`               |
+| [H10](#h10--high-customer-authored-liquid-templates-can-read-files-under-the-process-working-directory)            | High         | Customer-authored Liquid templates keep file inclusion, so `{% render %}` reads files under the process cwd                                                                                                                                   | `packages/features/scenario/contract/src/http-template-engine.ts:44, 49, 55` (+2 sites)                                              |
+| [H11](#h11--high-the-image-proxy-serves-attacker-controlled-svg-from-the-app-origin-with-no-nosniff-and-no-csp)    | High         | The image proxy passes `image/svg+xml` through from the app origin with no `nosniff`, no CSP and no `Content-Disposition` — script execution on the product's own origin                                                                      | `apps/api/src/features/image-proxy/image-proxy-rest.ts:74-81`                                                                        |
+| [M1](#m1--medium-rate-limiting-runs-after-the-body-is-read-parsed-and-validated)                                   | Medium       | Rate limiting runs after the body is read, parsed and validated — the opposite of its own stated contract                                                                                                                                     | `packages/api/src/rest/pipeline.ts:90-127`                                                                                           |
+| [M2](#m2--medium-projectauthorization-calls-next-when-nothing-resolved)                                            | Medium       | `projectAuthorization` calls `next()` when no credential resolved — fail-open shape, reachability unproven                                                                                                                                    | `apps/api/src/api-rest.security.ts:349-354`                                                                                          |
+| [M3](#m3--medium-an-empty-x-project-id-header-is-an-unauthenticated-500)                                           | Medium       | An empty `X-Project-Id` raises an unhandled `ZodError` — an unauthenticated 500 on every project REST route                                                                                                                                   | `apps/api/src/app/api-key-request-credentials.ts:25, 29`                                                                             |
+| [M4](#m4--medium-framework-guards-that-are-declared-but-inert)                                                     | Medium       | Three framework guards that record and do not enforce: `permissionScope`, the `projectIdInput`-gated tenant check, and an empty chain under `internalSecret`                                                                                  | `packages/api/src/rest/pipeline.ts:681-689, 728-747`; `rest-api-service.ts:686-701`                                                  |
+| [M5](#m5--medium-timing-unsafe-comparison-of-the-scim-webhook-shared-secret)                                       | Medium       | Timing-unsafe `!==` on the SCIM webhook shared secret, and no replay window                                                                                                                                                                   | `packages/enterprise/features/scim/server/src/transport/api-rest/scim-webhook-intake.api.ts:47-50`                                   |
+| [M6](#m6--medium-legacy-project-keys-are-plaintext-permanent-unrevocable-and-ceiling-exempt)                       | Medium       | Legacy project keys are stored in plaintext, never expire, cannot be revoked, and are exempt from every ceiling                                                                                                                               | `packages/features/api-key/server/src/repositories/prisma/prisma.api-key.repository.ts:133-146`                                      |
+| [M7](#m7--medium-share-links-default-to-permanent-public-and-unlimited-and-minting-is-uncapped)                    | Medium       | Share links default to permanent, public and unlimited views; minting is neither capped nor throttled                                                                                                                                         | `packages/features/share/server/src/transport/api-trpc/share.api.ts:62-113`                                                          |
+| [M8](#m8--medium-post-apiauthvalidate-is-an-unauthenticated-unthrottled-key-oracle)                                | Medium       | `POST /api/auth/validate` is an unauthenticated, unthrottled key-validity and project oracle                                                                                                                                                  | `packages/features/auth/server/src/transport/api-rest/auth.api.ts:114-132`                                                           |
+| [M9](#m9--medium-the-origin-gate-exists-but-is-mounted-only-on-apiauth)                                            | Medium       | The origin gate is correct but mounted only on `/api/auth/*`; admin, CLI-approve and logout carry none                                                                                                                                        | `packages/features/auth/server/src/transport/api-rest/auth.api.ts:218-241`                                                           |
+| [M10](#m10--medium-two-more-declared-but-unenforced-claims)                                                        | Medium       | `/approve` declares a permission one branch never checks; the version guard registers `public` while dispatching the full stack; the route registry overwrites on collision                                                                   | `auth-cli-device-flow.api.ts:254-258`; `packages/api/src/rest/route-mounting.ts:91-107`; `route-registry.ts:26-38`                   |
+| [M11](#m11--medium-two-egress-hardening-gaps-beside-the-fence)                                                     | Medium       | Image proxy has no size cap or timeout; outbound webhook TLS verification is off on self-hosted; allowlisted hostnames are not pinned                                                                                                         | `apps/api/src/features/image-proxy/image-proxy-rest.ts:62-80`; `apps/worker/src/app/worker-webhook-egress.composition.ts:76`         |
+| [M12](#m12--medium-an-unencoded-path-segment-in-a-server-side-fetch-that-carries-the-project-api-key)              | Medium       | An unencoded `workflowId` path segment in a server-side fetch that attaches the project API key                                                                                                                                               | `apps/api/src/app/api-trpc-collaborators.execution.composition.ts:571-580`                                                           |
+| [M13](#m13--medium-the-ops-explain-system-guard-is-bypassable-with-quoted-identifiers)                             | Medium       | The ops EXPLAIN `system.*` guard is bypassable with quoted identifiers, and misses `gcs` / `dictGet` / `mergeTreeIndex`                                                                                                                       | `packages/features/ops/server/src/services/ops-clickhouse-explain.core.ts:30, 124-143`                                               |
+| [M14](#m14--medium-two-prisma-tenancy-defects-one-broken-feature-and-one-hardening-gap)                            | Medium       | `GatewayGuardrail` update/archive omit `projectId` (broken, fails closed); the guard's `projectId` check is a truthiness test                                                                                                                 | `prisma.gateway-guardrail.repository.ts:89-90, 104-105`; `packages/prisma-client/src/multi-tenancy-guard.ts:928-940`                 |
+| [M15](#m15--medium-five-genuinely-project-scoped-models-are-exempt-from-the-prisma-tenancy-guard)                  | Medium       | Five project-scoped models — `Workflow`, `Evaluator`, `Scenario`, `BatchEvaluation`, `Agent` — are exempt from the Prisma tenancy guard so license rollups do not throw                                                                       | `packages/prisma-client/src/multi-tenancy-guard.ts:111-123`                                                                          |
+| [M16](#m16--medium-eleven-project-list-endpoints-have-no-page-size-at-all)                                         | Medium       | Eleven project list endpoints have no page size; three read tables that grow with usage and take no pagination parameters at all                                                                                                              | `packages/features/prompt/server/src/transport/api-rest/prompt.api.ts:335-337, 678-680` (+9)                                         |
+| [Low](#low--the-remaining-smaller-defects)                                                                         | Low          | 17 smaller items: `/metrics` open outside exactly-`production`, two `===` secret compares, a divergent 5xx error renderer, one shared anonymous rate-limit bucket, impersonation outliving staff status, `'unsafe-eval'` in the CSP, and more | see section                                                                                                                          |
 
 **Coverage note.** The admin, metrics, health, static, OTLP, collector, image-proxy, stored-object,
 user-avatar, model-defaults, SCIM-webhook, analytics-REST, prompt, annotation and secret-REST doors
@@ -98,7 +98,7 @@ list at `aggregation-builder.ts:963-965` (`selectExprs.push(metric.selectExpress
 and executes at
 `packages/features/analytics/server/src/repositories/clickhouse/clickhouse.analytics.repository.ts:100-102`
 via `client.query({ query: built.sql, query_params: built.params })` — the SQL is a built string, and
-only the *other* values are bound.
+only the _other_ values are bound.
 
 **Two doors, both confirmed reachable.** tRPC `analytics.getTimeseries`
 (`packages/features/analytics/server/src/transport/api-trpc/analytics.api.ts:145`, permission
@@ -110,9 +110,17 @@ an ordinary **project API key**.
 **Exploit.** Any project member, or any holder of a project API key:
 
 ```json
-{ "startDate": 1, "endDate": 2, "timeZone": "UTC",
-  "series": [{ "metric": "x, (SELECT groupArray(TenantId) FROM trace_summaries) AS leak, 1",
-               "aggregation": "sum" }] }
+{
+  "startDate": 1,
+  "endDate": 2,
+  "timeZone": "UTC",
+  "series": [
+    {
+      "metric": "x, (SELECT groupArray(TenantId) FROM trace_summaries) AS leak, 1",
+      "aggregation": "sum"
+    }
+  ]
+}
 ```
 
 The injected scalar subquery carries no `TenantId` predicate and its result comes back in the `leak`
@@ -182,8 +190,10 @@ auth origin gate exists but is bound to the `/api/auth/*` catch-all only
 
 ```html
 <script>
-location = "https://app.langwatch.ai/api/sse/project/regenerateApiKey"
-  + "?input=" + encodeURIComponent(JSON.stringify({ json: { projectId: "proj_victim" } }));
+  location =
+    "https://app.langwatch.ai/api/sse/project/regenerateApiKey" +
+    "?input=" +
+    encodeURIComponent(JSON.stringify({ json: { projectId: "proj_victim" } }));
 </script>
 ```
 
@@ -224,7 +234,7 @@ production code, which is exactly what you would see if the guard had never run.
 This is the "optional dependency nobody wires" class. It is also the backstop that would have made C1
 noisy in review instead of silent.
 
-*Fix:* invoke `checkTenantScope` inside `ClickHouseManagedClientService`'s query path, or route
+_Fix:_ invoke `checkTenantScope` inside `ClickHouseManagedClientService`'s query path, or route
 repositories through `ClickHouseQueryClient`, then declare the genuinely cross-tenant reads with
 `unscoped: { reason }`.
 
@@ -235,11 +245,13 @@ repositories through `ClickHouseQueryClient`, then declare the genuinely cross-t
 **File** `packages/features/api-key/server/src/services/api-key-token-resolution.service.ts:134-176`.
 
 ```ts
-let effectiveProjectId = projectId;                 // <- the X-Project-Id header
-if (!effectiveProjectId) { /* infer from a single PROJECT binding */ }
+let effectiveProjectId = projectId; // <- the X-Project-Id header
+if (!effectiveProjectId) {
+  /* infer from a single PROJECT binding */
+}
 if (!effectiveProjectId) return null;
 const project = await this.options.projects.tryGetIdentity(effectiveProjectId);
-if (!project || project.organizationId !== apiKey.organizationId) return null;   // the only fence
+if (!project || project.organizationId !== apiKey.organizationId) return null; // the only fence
 ```
 
 `apiKey.roleBindings` is consulted **only when the header is absent**. With the header present, the
@@ -249,7 +261,7 @@ routes this way — and the design puts the real fence in the RBAC ceiling. The 
 families that authenticate with no ceiling.
 
 **Where the ceiling does run** (so the boundary is clear): the framework's project chain calls
-`hasApiKeyPermission` at the *resolved* project's scope
+`hasApiKeyPermission` at the _resolved_ project's scope
 (`apps/api/src/api-rest.security.ts:349-376`), and OTLP ingest goes through
 `ApiHandlerManagedCredentials.authenticate({ permission: "traces:create" })`
 (`apps/api/src/app/api-trace-ingest.composition.ts:242`), which checks the ceiling at the named
@@ -272,7 +284,7 @@ if (apiKeyProjectId) {
 `apiKeyProjectId` is exactly what the caller put in `X-Project-Id`, so the comparison always succeeds.
 The `else if (userId)` branch beneath it runs real permission checks; the API-key branch does not.
 
-**Exploit.** A member of organization *O* holds a `restricted` key bound `PROJECT:A` with only
+**Exploit.** A member of organization _O_ holds a `restricted` key bound `PROJECT:A` with only
 `traces:view`:
 
 ```
@@ -287,7 +299,7 @@ Project B's stored bytes — uploaded datasets, attachments — are served. The 
 **Path B — model defaults.** See finding 6; the same header decides `resolved.project`, and the route
 authorizes on the key **owner's** user permissions rather than the key's.
 
-**Boundary, stated precisely.** This crosses a *project* boundary inside one organization, not a
+**Boundary, stated precisely.** This crosses a _project_ boundary inside one organization, not a
 tenant boundary — `project.organizationId !== apiKey.organizationId` holds. It defeats the entire
 point of a scoped key.
 
@@ -312,7 +324,7 @@ documented behaviour; the ceiling-less doors close without being touched.
 2. `federation.federationCapable()` is `true` (`api-better-auth.composition.ts:124-127`), so the hook
    does not early-return at `better-auth.api.ts:605`.
 3. `isCredentialMutationPath` blocks `/change-password`, `/set-password`, `/change-email`,
-   `/verify-email` (`:610-618`). `/sign-up/email` is on a *different* list (`EMAIL_AUTH_SUFFIXES`) and
+   `/verify-email` (`:610-618`). `/sign-up/email` is on a _different_ list (`EMAIL_AUTH_SUFFIXES`) and
    is not blocked here.
 4. `policy.federationLicensed` is **hard-coded false** in this process:
    `federationLicensed: () => Promise.resolve(false)` (`api-better-auth.composition.ts:132`). So the
@@ -354,10 +366,11 @@ durable fix is composing `federationLicensed` so it answers for real.
 `packages/features/auth/server/src/transport/better-auth/better-auth.api.ts:256-260`.
 
 `apiClientAddress` walks ten caller-supplied headers, `cf-connecting-ip` first, and returns the first
-that *parses* as an address:
+that _parses_ as an address:
 
 ```ts
-for (const header of ADDRESS_HEADERS) {          // :32-37
+for (const header of ADDRESS_HEADERS) {
+  // :32-37
   const value = c.req.header(header);
   if (!value) continue;
   const address = parseAddress(value);
@@ -438,9 +451,9 @@ const userId = c.get("apiKeyUserId");
 if (!userId) throw new ModelDefaultUserKeyRequiredError();
 const saved = await modelProviders().saveDefaultConfig({
   config: body.config,
-  scopes: body.scopes,          // scopes come from the REQUEST BODY
+  scopes: body.scopes, // scopes come from the REQUEST BODY
   authorId: userId ?? null,
-  actorId: userId,              // the key's OWNING USER
+  actorId: userId, // the key's OWNING USER
 });
 ```
 
@@ -592,7 +605,7 @@ Every downstream check then sees the bare literal, and `webhook/url-policy.ts:87
 orgIdConditions.push({
   organizationId: null,
   userId: { in: orgUserIdsList },
-  projectId: { not: null },        // "any project, anywhere"
+  projectId: { not: null }, // "any project, anywhere"
 });
 ```
 
@@ -611,7 +624,7 @@ optionals are unconstrained (`organization.trpc-schemas.ts:166-180`). The respon
 B's project audit rows — action names, target ids, joined project names, and the full mutation
 `args` / `before` / `after` payloads (`:1608-1636`).
 
-*Fix:* resolve the organization's own project ids (the repository already does this elsewhere) and use
+_Fix:_ resolve the organization's own project ids (the repository already does this elsewhere) and use
 `projectId: { in: orgProjectIds }` rather than `{ not: null }`; validate the `projectId` filter at
 `:1541` against the same list.
 
@@ -639,7 +652,7 @@ is `/app/apps/worker`, so the root `/app/.env` is **outside** it — production 
 and config disclosure rather than credentials. In local development, where cwd is the repository root,
 `{% render '.env' %}` reads the workspace `.env`.
 
-*Fix:* pass an `fs` whose `exists` / `contains` always return false and whose `readFile` throws, plus
+_Fix:_ pass an `fs` whose `exists` / `contains` always return false and whose `readFile` throws, plus
 `relativeReference: false`, at all three sites — one shared `createSandboxedLiquid()`.
 
 ---
@@ -712,7 +725,7 @@ pays a `text()`, a `JSON.parse` and a full zod pass on every request. Combined w
 ```ts
 const resolved = context.get("resolvedToken") as ResolvedApiKeyToken | undefined;
 if (!resolved || resolved.type !== "apiKey") {
-  return next();                     // no credential => permission granted
+  return next(); // no credential => permission granted
 }
 ```
 
@@ -725,13 +738,13 @@ at `apps/api/src/app/api-production.composition.ts:1886`.
 
 **Reachability: not proven.** Every call site traced (`api-secret-rest.feature.ts:77-78`, the
 framework's own `createProjectApp` chain) installs authentication first. This is reported as a
-fail-open *shape*, not a demonstrated bypass.
+fail-open _shape_, not a demonstrated bypass.
 
 **Smallest correct fix.**
 
 ```ts
 if (!resolved) return this.refuse(context, new ApiRestMissingCredentialsError(), envelope);
-if (resolved.type !== "apiKey") return next();   // legacy project key: full access, by design
+if (resolved.type !== "apiKey") return next(); // legacy project key: full access, by design
 ```
 
 ---
@@ -773,7 +786,7 @@ two kinds the handler middleware calls `assertAuthorizedProjectInput` and never 
 class. Its only call site outside the framework is a test
 (`packages/api/src/rest/__tests__/public-rest.unit.test.ts:425`), so **no reachable exploit** — the
 defect is that the first `registerRoute` author to reach for it gets a check that compiles, records,
-and does nothing. *Fix:* consult `config.permissionScope` in the `:681-689` branch too.
+and does nothing. _Fix:_ consult `config.permissionScope` in the `:681-689` branch too.
 
 **The cross-tenant input check is off by default.** `assertAuthorizedProjectInput`
 (`pipeline.ts:728-747`) opens `if (!required) return;`, where `required` is
@@ -787,8 +800,8 @@ the comment at `pipeline.ts:710-714` acknowledges this. Sampling the four live v
 (`organization`, `role`, `role-binding`, `scim`), each derives the tenant from the credential —
 `role-binding.api.ts:219, 239, 245, 258, 286, 294, 315` all read `organizationOf(c).id` — so **no
 currently-exploitable endpoint was found**. Correctness rests entirely on each handler author
-remembering. *Fix:* make the check unconditional when validated input carries any `ScopeIdKey` (the
-list is already at `definition.ts:184`) and keep `projectIdInput` as an explicit opt-*out* with a
+remembering. _Fix:_ make the check unconditional when validated input carries any `ScopeIdKey` (the
+list is already at `definition.ts:184`) and keep `projectIdInput` as an explicit opt-_out_ with a
 reason.
 
 **`createServiceApp` installs an empty chain when `verifySecret` is omitted.**
@@ -799,7 +812,7 @@ or `anyAuthenticated` policy, while `route-registry.ts:33` still records
 `packages/enterprise/features/billing/server/src/transport/api-rest/stripe-webhook.api.ts:53-56`. Both
 verify in-handler today, so this is not a live bypass; it is a bug the type system cannot catch —
 delete the in-handler `if` and the route becomes fully public while still registering as protected.
-*Fix:* require `verifySecret` when any route declares `internalSecret`, or add a distinct
+_Fix:_ require `verifySecret` when any route declares `internalSecret`, or add a distinct
 `handlerVerifiedSecret(reason)` policy so "empty on purpose" reads differently from "a secret is
 enforced here".
 
@@ -824,7 +837,7 @@ network-side JS timing oracle is hard, which is why this is medium; it is a devi
 pattern the rest of the codebase already follows. Note the unconfigured case fails **closed** (404),
 which is correct. There is also no timestamp or replay window on this receiver.
 
-*Fix:* route it through the same length-guarded `timingSafeEqual` helper, or move it to
+_Fix:_ route it through the same length-guarded `timingSafeEqual` helper, or move it to
 `createServiceApp({ verifySecret })`.
 
 ---
@@ -834,7 +847,9 @@ which is correct. There is also no timestamp or replay window on this receiver.
 **File** `packages/features/api-key/server/src/repositories/prisma/prisma.api-key.repository.ts:133-146`.
 
 ```ts
-const row = await this.database.project.findUnique({ where: { apiKey: input.token, archivedAt: null } });
+const row = await this.database.project.findUnique({
+  where: { apiKey: input.token, archivedAt: null },
+});
 ```
 
 The raw token **is** the `Project.apiKey` column. No hash, no `expiresAt`, no `revokedAt`; the only
@@ -845,10 +860,10 @@ design: `api-rest.security.ts:351-354` and `api-handler-managed-credential.ts:76
 early for `resolved.type !== "apiKey"`. A leaked legacy key is therefore unrestricted full project
 access, valid forever, invisible to the revoke path.
 
-*Timing:* **not a timing finding.** The comparison is a Postgres unique-index lookup, not a byte loop
+_Timing:_ **not a timing finding.** The comparison is a Postgres unique-index lookup, not a byte loop
 in Node; I do not believe a practical oracle exists there.
 
-*Fix (bounded):* give the fallback at `api-key-token-resolution.service.ts:76-78, 114` a kill switch
+_Fix (bounded):_ give the fallback at `api-key-token-resolution.service.ts:76-78, 114` a kill switch
 so a deployment can refuse the class outright. Migrating to hashed storage is a larger change than
 this audit should propose.
 
@@ -874,7 +889,7 @@ produces an unbounded set of permanent public URLs for the project's whole trace
 is per-link or per-project; nothing bounds creation. This matches the previously recorded production
 figure of roughly 428k permanent share tokens.
 
-*Fix:* a per-project live-link ceiling plus a per-actor mint rate limit in `ShareService.createShare`,
+_Fix:_ a per-project live-link ceiling plus a per-actor mint rate limit in `ShareService.createShare`,
 using the same `rateLimit` port the anonymous read already takes
 (`packages/features/trace/server/src/transport/api-trpc/shared-trace.api.ts:110-114`).
 
@@ -890,7 +905,7 @@ confirms a leaked or guessed key's validity and discloses the project behind it 
 data path that would be logged as access. Key entropy (≈286 bits of secret) makes blind guessing
 impractical, so this is confirmation-of-a-held-token rather than brute force.
 
-*Fix:* a per-token and per-address fixed-window limit, matching `shared-trace.api.ts:147-177`.
+_Fix:_ a per-token and per-address fixed-window limit, matching `shared-trace.api.ts:147-177`.
 
 ---
 
@@ -916,7 +931,7 @@ accepts both `baseUrl` and `publicBaseUrl`
 proxy where the two differ every state-changing auth request is rejected — it fails **closed**, an
 availability bug rather than a security one.
 
-*Fix:* apply the gate as shared middleware over every cookie-authenticated state-changing route, not
+_Fix:_ apply the gate as shared middleware over every cookie-authenticated state-changing route, not
 just the auth catch-all. The same middleware closes finding 1's defence-in-depth gap.
 
 ---
@@ -930,7 +945,7 @@ just the auth catch-all. The same middleware closes finding 1's defence-in-depth
 does not. That branch does check active organization membership (`:824-836`) and bounds the minted key
 against the approver's own ceiling through `validateCliSelection` (`:964-974`), so the key cannot
 exceed what the approver holds — but a route audit reading the registry is told a permission is
-enforced that this branch never asks for. *Fix:* enforce on both branches, or split the declaration so
+enforced that this branch never asks for. _Fix:_ enforce on both branches, or split the declaration so
 the device-session route declares `[]`.
 
 **The version-namespace guard registers as `public` but dispatches the family's full stack.**
@@ -940,7 +955,7 @@ endpoint stack (`:245-254`). It is then classified as
 `publicEndpoint("version-namespace guard: … reads no data and takes no credential")`
 (`packages/api/src/rest/security/rest-api-service.ts:469-484`). Enforcement itself is intact — the
 dispatched stack contains auth and the permission check — so this is a registry entry that lies to
-every downstream audit, not a bypass. *Fix:* register as public only when `buildDateFallback` returned
+every downstream audit, not a bypass. _Fix:_ register as public only when `buildDateFallback` returned
 `null`.
 
 **The route-policy registry overwrites on collision.**
@@ -948,7 +963,7 @@ every downstream audit, not a bypass. *Fix:* register as public only when `build
 duplicate; Hono dispatches to the **first** matching registration. Twenty-one families share the
 `/api` base path (`rest-api-service.ts:293-297`), so a collision would have the registry describing a
 policy belonging to a route that never answers. No live collision was found in the current
-composition, so this is audit-integrity rather than a demonstrated hole. *Fix:* throw on a duplicate
+composition, so this is audit-integrity rather than a demonstrated hole. _Fix:_ throw on a duplicate
 key whose recorded policy differs.
 
 ---
@@ -963,7 +978,7 @@ no `signal`, no `headersTimeoutMs` and no `bodyTimeoutMs`, then reads the body w
 `GET /api/image-proxy?url=<attacker host streaming an endless image/png>`, repeated. The webhook sender
 gets all three right — `packages/egress/src/webhook/http-destination.ts:29, 34, 165-169` plus the
 capped reader at `:102-135` — so the image proxy is the one fenced caller that takes none of them.
-*Fix:* pass `signal: AbortSignal.timeout(…)`, `headersTimeoutMs` and `bodyTimeoutMs`, and read through
+_Fix:_ pass `signal: AbortSignal.timeout(…)`, `headersTimeoutMs` and `bodyTimeoutMs`, and read through
 a capped reader rather than `arrayBuffer()`.
 
 **Outbound webhook TLS verification is off on self-hosted.**
@@ -972,15 +987,15 @@ a capped reader rather than `arrayBuffer()`.
 unverified for **every** outbound webhook, public `https://` destinations included, so an attacker in
 a network position can intercept payloads carrying customer trace data along with the signing header.
 The rationale — on-prem receivers with self-signed certificates — is documented and reasonable, but
-the switch is all-or-nothing and derived from an unrelated flag. *Fix:* make it its own opt-in leaf
+the switch is all-or-nothing and derived from an unrelated flag. _Fix:_ make it its own opt-in leaf
 (`WEBHOOK_ALLOW_INSECURE_TLS`) so an operator relaxes it deliberately rather than by default.
 
 **Allowlisted non-IP hosts are not pinned.** `packages/egress/src/ssrf/url-validator.ts:264-273`
 returns `allowlisted` with `resolvedIp` set only when the hostname is itself an IP literal; otherwise
 `fenced-fetch.ts:190-193` falls back to a plain Agent that re-resolves at connect time. Bounded — the
 name is operator-allowlisted and already exempt from the address block — so the exposure is DNS-level
-redirection of a host the operator already trusts. *Fix:* resolve and pin allowlisted hostnames too,
-exempting them from the address *policy* but not from the *pinning*.
+redirection of a host the operator already trusts. _Fix:_ resolve and pin allowlisted hostnames too,
+exempting them from the address _policy_ but not from the _pinning_.
 
 ---
 
@@ -1003,7 +1018,7 @@ server POSTs the caller's `inputMessages[0]` to an arbitrary path on its own pub
 project API key attached** — a credential their permission does not entitle them to. `?` and `#`
 inject a query and fragment the same way.
 
-*Fix:* `encodeURIComponent(input.workflowId)`. A format constraint on `workflowScopeSchema` is a
+_Fix:_ `encodeURIComponent(input.workflowId)`. A format constraint on `workflowScopeSchema` is a
 reasonable second step, not a substitute.
 
 ---
@@ -1014,14 +1029,14 @@ reasonable second step, not a substitute.
 `SYSTEM_SCHEMA_RE = /\bsystem\s*\./i` runs on the output of `stripCommentsAndStrings`, which rewrites
 `"…"` to `""` (`:124-143`) and never lexes backticks. Running the shipped lexer and regexes directly:
 
-| input | verdict |
-|---|---|
-| `SELECT * FROM system.users` | blocked |
-| `SELECT * FROM "system"."users"` | **allowed** |
-| `SELECT * FROM "system".query_log` | **allowed** |
-| ``SELECT * FROM `system`.`users` `` | blocked (by the `SYSTEM` keyword rule) |
-| `SELECT * FROM gcs('http://evil/x')` | **allowed** — absent from the deny-list |
-| `SELECT * FROM mergeTreeIndex(db, tbl)` | **allowed** |
+| input                                   | verdict                                 |
+| --------------------------------------- | --------------------------------------- |
+| `SELECT * FROM system.users`            | blocked                                 |
+| `SELECT * FROM "system"."users"`        | **allowed**                             |
+| `SELECT * FROM "system".query_log`      | **allowed**                             |
+| ``SELECT * FROM `system`.`users` ``     | blocked (by the `SYSTEM` keyword rule)  |
+| `SELECT * FROM gcs('http://evil/x')`    | **allowed** — absent from the deny-list |
+| `SELECT * FROM mergeTreeIndex(db, tbl)` | **allowed**                             |
 
 Only the unquoted form is tested
 (`packages/features/ops/server/src/services/__tests__/ops-clickhouse-explain.core.unit.test.ts:116-119`).
@@ -1031,7 +1046,7 @@ is `readonly=1` with no SOURCES grant. Data extraction was **not** demonstrated 
 stated defence layer does not hold, and that `gcs` / `dictGet` / `mergeTreeIndex` are missing from the
 table-function deny-list.
 
-*Fix:* lex backticks alongside quotes and emit the *unquoted inner text* rather than `""`, so quoted
+_Fix:_ lex backticks alongside quotes and emit the _unquoted inner text_ rather than `""`, so quoted
 names stay visible to the regex pass; add the missing table functions.
 
 ---
@@ -1044,7 +1059,7 @@ and `:104-105` use `where: { id: input.id }`. `GatewayGuardrail` carries `projec
 the exempt buckets, so `guardProjectId` throws a plain `Error` — a generic "unknown error" plus a trace
 id for the customer — on every guardrail edit and delete. Not a leak; a broken feature that ships green
 because the tests substitute a permissive guard (`prompt-service.test-fixture.ts:19`,
-`gateway-platform-rest.harness.ts:40`). Both inputs already carry `projectId`. *Fix:*
+`gateway-platform-rest.harness.ts:40`). Both inputs already carry `projectId`. _Fix:_
 `where: { id: input.id, projectId: input.projectId }`.
 
 **The guard's `projectId` check is a truthiness test.**
@@ -1053,7 +1068,7 @@ because the tests substitute a permissive guard (`prompt-service.test-fixture.ts
 while satisfying the guard; `projectId: ""` is falsy and correctly throws, which is why the roughly 60
 `z.string()`-without-`.min(1)` id fields in the tRPC contracts are not currently exploitable. The only
 live `{ not: … }` today is H9's already-exempt `AuditLog`, so this is **unproven as a live leak on a
-guarded model** — it is one edit from becoming one. *Fix:* require
+guarded model** — it is one edit from becoming one. _Fix:_ require
 `typeof where.projectId === "string" && where.projectId.length > 0`, mirroring the existing
 `isScopeIdValue`. Related limits in the same file, deliberate per its own comments and worth knowing:
 `extractRawSql` returns `null` for an unrecognised argument shape and the guard then **fail-opens**
@@ -1068,7 +1083,11 @@ the statement, a comment included.
 
 ```ts
 const LICENSE_COUNTED_PROJECT_MODELS = [
-  "Workflow", "Evaluator", "Scenario", "BatchEvaluation", "Agent",
+  "Workflow",
+  "Evaluator",
+  "Scenario",
+  "BatchEvaluation",
+  "Agent",
 ] as const;
 ```
 
@@ -1083,7 +1102,7 @@ on five of the highest-value project-scoped tables. A live instance:
 `projectId`, so **no cross-tenant read is asserted here**. The finding is that the exemption is far
 broader than its reason: the rollups are a handful of known queries, not a class of model.
 
-*Fix:* move the five into `SCOPED_MODELS` with a `validateWhere` accepting a row id, `projectId`,
+_Fix:_ move the five into `SCOPED_MODELS` with a `validateWhere` accepting a row id, `projectId`,
 `projectId.in`, or the organization anchor the count uses — the shape `CustomLLMModelCost` already has
 at `:578-611`.
 
@@ -1105,7 +1124,7 @@ Three have no pagination parameters whatsoever and read tables that grow with us
   select its sibling repository uses.
 - `GET /api/annotations` —
   `packages/features/annotation/server/src/transport/api-rest/annotation.api.ts:141, 150-153`;
-  `prisma.annotation.repository.ts:206-220`, no `take`. The repository input schema *supports*
+  `prisma.annotation.repository.ts:206-220`, no `take`. The repository input schema _supports_
   `startDate` / `endDate` / `traceIds` and the route passes none of them, so it is the widest possible
   call into a method built to be narrowed.
 
@@ -1120,7 +1139,7 @@ and a `page` above ~21.5 million overflows the `UInt32` into a parse error rathe
 
 All of these read the caller's own project — `project` comes from the credential — so this is
 noisy-neighbour and self-inflicted denial of service, not a tenancy break. One
-`curl -H "X-Auth-Token: $KEY" https://…/api/prompts` each. *Fix:* the `paginationQuerySchema` this
+`curl -H "X-Auth-Token: $KEY" https://…/api/prompts` each. _Fix:_ the `paginationQuerySchema` this
 repository already repeats verbatim four times (`dataset.api.ts:99-102`, `team.api.ts:21-24`,
 `group.api.ts:33-36`, `project.api.ts:50-53` — `limit: z.coerce.number().int().positive().max(1000)
 .default(50)`).
@@ -1134,7 +1153,7 @@ repository already repeats verbatim four times (`dataset.api.ts:99-102`, `team.a
 no key in `production` means the route is not mounted at all; **no key anywhere else means
 `{ gate: "open" }`**. The comparison is `options.nodeEnvironment === "production"`, so a deployment
 running `NODE_ENV=prod` or `staging` without `METRICS_API_KEY` serves the full Prometheus registry —
-queue depths, per-tenant counters, process internals — to anyone who asks for `GET /metrics`. *Fix:*
+queue depths, per-tenant counters, process internals — to anyone who asks for `GET /metrics`. _Fix:_
 invert the default so `open` requires an explicit opt-in rather than the absence of a key.
 
 **The metrics bearer key is compared with `===`.**
@@ -1149,12 +1168,12 @@ lower stakes. *Fix:* length-guarded `timingSafeEqual`.
 calls — publishes the handled error's own `code`, `message` and `meta` at every status including 5xx.
 Handled messages are customer-safe by rule (ADR-045), so this is a defence-in-depth divergence rather
 than a proven leak, but two mappings for one boundary is exactly the drift the second file's docblock
-says it exists to prevent. *Fix:* have `renderCanonical` call the collapsing mapping.
+says it exists to prevent. _Fix:_ have `renderCanonical` call the collapsing mapping.
 
 **Unauthenticated callers share one rate-limit bucket.**
 `packages/api/src/rest/capabilities.ts:64-77` resolves a principal from five context keys and
 otherwise returns the literal `"anonymous"` — there is no per-address fallback. One client can spend
-the whole budget for every anonymous caller on that route. *Fix:* fall back to the resolved client
+the whole budget for every anonymous caller on that route. _Fix:_ fall back to the resolved client
 address before `"anonymous"`.
 
 **Impersonation survives the impersonator losing staff status.**
@@ -1162,7 +1181,7 @@ address before `"anonymous"`.
 checks the window's `expires` and that the **target** is still active (`:78-81`), but never re-checks
 that the impersonator is still on the allow-list. Removing an operator from `ADMIN_EMAILS` leaves
 their in-flight impersonation valid for up to the full 1 h TTL
-(`packages/features/ops/server/src/services/impersonation.service.ts:11`). *Fix:* re-assert
+(`packages/features/ops/server/src/services/impersonation.service.ts:11`). _Fix:_ re-assert
 `access.isAdmin` on the impersonator inside `tryResolveBrowserSession`.
 
 **`assertCanWriteDefault` is skipped when no actor is supplied.**
@@ -1170,7 +1189,7 @@ their in-flight impersonation valid for up to the full 1 h TTL
 111, 134` all wrap the authorization call in `if (actorId)`. An absent actor writes **unauthorized**.
 I traced every caller of `saveDefaultConfig` — the three REST routes (each guarded by
 `ModelDefaultUserKeyRequiredError`) and `model-provider.api.ts:707` (which passes `ctx.actor()`) — so
-this is **latent, not reachable today**. It is still fail-open by construction. *Fix:* throw when
+this is **latent, not reachable today**. It is still fail-open by construction. _Fix:_ throw when
 `actorId` is undefined.
 
 **CSP allows `'unsafe-eval' 'unsafe-inline'`, and security headers cover static responses only.**
@@ -1178,7 +1197,7 @@ this is **latent, not reachable today**. It is still fail-open by construction. 
 'unsafe-inline' …` gives the policy no XSS value. The headers are also applied only by the static
 surface (`apps/api/src/app-static/app-static.surface.ts:78-81`), which by construction handles only
 paths the API did not claim, so API JSON responses carry no `nosniff`. `frame-ancestors 'none'`,
-`object-src 'none'`, `base-uri 'self'` and HSTS are all correct. *Fix:* nonce or hash the inline
+`object-src 'none'`, `base-uri 'self'` and HSTS are all correct. _Fix:_ nonce or hash the inline
 scripts and drop `'unsafe-inline'`; emit `X-Content-Type-Options` on API responses too.
 
 **`hasApiKeyPermission` takes a `userId` it never reads.**
@@ -1187,19 +1206,19 @@ scripts and drop `'unsafe-inline'`; emit `X-Content-Type-Options` on API respons
 (`apps/api/src/api-rest.security.ts:358, 472`; `api-handler-managed-credential.ts:146`). Not a
 vulnerability — the owner ceiling is fetched independently from the key row via `tryOwnerGrantsFor`
 (`authz-grant-snapshot.service.ts:84-99`) — but an unused authorization parameter reads like a wired
-check and invites someone to "fix" the ceiling by passing a different id. *Fix:* delete the field.
+check and invites someone to "fix" the ceiling by passing a different id. _Fix:_ delete the field.
 
 **SSE output-validation failures write the full issue list to the client.**
 `packages/api/src/rest/sse.ts:27-33` sends `issues: result.error.issues` for a **server-produced**
 payload that failed our own schema. The REST path deliberately does the opposite
-(`packages/api/src/rest/response.ts:41-53`). *Fix:* emit the code and trace id; log the issues.
+(`packages/api/src/rest/response.ts:41-53`). _Fix:_ emit the code and trace id; log the issues.
 
 **`auth: "none"` plus a declared permission is not refused at build.**
 `packages/api/src/rest/pipeline.ts:346-355` skips auth entirely for `authSetting === "none"` while
 `:358-375` still pushes the permission enforcer. `_validateConfiguration`
 (`packages/api/src/rest/builder.ts:523-546`) never checks the pair, so whether the request fails open
 depends on how the process's enforcer behaves with no principal — which the framework cannot see.
-*Fix:* refuse the combination at build.
+_Fix:_ refuse the combination at build.
 
 **A pre-cutover key with no bindings is minted organization ADMIN.**
 `packages/features/api-key/server/src/services/legacy-api-key-grant.service.ts:36-60` returns
@@ -1244,12 +1263,12 @@ uses conditional spreads, so with neither `organizationId` nor `projectScopes` t
 `POST /codex/refresh` under `internalSecret` — an HMAC gateway-to-control-plane credential, not a
 customer one — and it returns a decrypted Codex OAuth token for any named row id. By design per the
 `VirtualKey` warm-cache precedent, but it makes the internal secret a cross-tenant credential oracle.
-*Hardening:* have the gateway send the virtual key's `organization_id` as the anchor.
+_Hardening:_ have the gateway send the virtual key's `organization_id` as the anchor.
 
 **`expireStaleRealtimeSessions` drops its only tenancy predicate on a falsy id.**
 `packages/features/gateway/server/src/services/gateway-realtime-session.service.ts:445` — an
 `updateMany` over a guard-exempt model. Both live callers are safe and the internal route validates
-`.min(1)`. *Fix:* split into `expireStaleForKey({ virtualKeyId })` and `expireStaleFleetWide()` so a
+`.min(1)`. _Fix:_ split into `expireStaleForKey({ virtualKeyId })` and `expireStaleFleetWide()` so a
 missing id is a type error.
 
 **Prototype-chain lookups on request-controlled keys.**
@@ -1257,7 +1276,7 @@ missing id is a type error.
 (`SORT_COLUMN_MAP[params.sort.columnId]`, where `columnId` is `z.string()` at `traces-v2.api.ts:358`)
 and `packages/features/analytics/server/src/clickhouse/aggregation-builder.ts:698`. `columnId:
 "toString"` yields a function whose fixed native-code text gets interpolated into `ORDER BY` — a 500,
-not injection. *Fix:* `Object.hasOwn` guards, or a `Map`.
+not injection. _Fix:_ `Object.hasOwn` guards, or a `Map`.
 
 **The scenario Liquid engines lack their sibling's DoS guards.**
 `packages/features/scenario/contract/src/http-template-engine.ts` has no `renderLimit`,
@@ -1276,7 +1295,7 @@ verifier does the check (`stored-object.api.ts:216-219`). Low because the caller
 project id **and** a content-addressed object id, which is not enumerable, and the purpose/owner gate
 (`:199-208`) confines the response to avatars — so the disclosure is a profile picture for an id
 already known. It is one URL edit away from being H2's `/api/files` hole, and it is the only byte door
-on that app with no owner check. *Fix:* the four-line comparison beside it, or drop `:projectId` and
+on that app with no owner check. _Fix:_ the four-line comparison beside it, or drop `:projectId` and
 resolve the owner from the row.
 
 ---
@@ -1315,7 +1334,7 @@ discarded (`:262-273`). `renderLegacy`
 generic 500. The SSE error frame sends the handled **code**, never the message
 (`apps/api/src/app-trpc/app-trpc.sse.ts:80-96`), and logs at `warn` for customer fault and `error`
 otherwise (`:136-151`). `securityForCredentialClass`
-(`packages/api/src/rest/openapi-security.ts:78-92`) *throws* rather than publishing an empty security
+(`packages/api/src/rest/openapi-security.ts:78-92`) _throws_ rather than publishing an empty security
 requirement for `session` or `internal`, so a generated client cannot be told a route is
 unauthenticated. Preview mounts are never documented and have their OpenAPI metadata stripped
 (`pipeline.ts:238-248, 491-498`).

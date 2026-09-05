@@ -1,26 +1,6 @@
 /**
- * Personal virtual keys over the process's tRPC transport.
- *
- * Distinct from the organization-wide virtual-key admin surface, which gates on
- * `virtualKeys:manage` / `:rotate` / `:delete`. A personal key is authorised by
- * the caller BEING its principal user, not by RBAC: every member may mint, list
- * and revoke their OWN keys in any organization they belong to. Membership is
- * proved by the application so a caller cannot operate against an organization
- * they are not in.
- *
- * The one place a permission genuinely applies is auditing someone else's keys:
- * `virtualKeys:viewOtherPersonal` is what widens `list` past the caller's own,
- * and the declaration on `list` names it.
- *
- * ## Credentials
- *
- * `issuePersonal` returns the plaintext key once, at the moment of minting, and
- * the caller must persist it immediately. `list` never returns secret material.
- *
- * Transport only: input parsing, the wire shape of the mint response, and
- * delegation. The membership gate, the duplicate-label refusal and the typed
- * refusals all belong to {@link GovernanceApp}, which both of this feature's
- * transports reach.
+ * Personal virtual keys over the process's tRPC transport. Distinct from the organization-wide
+ * virtual-key admin surface, which gates on `virtualKeys:manage` / `:rotate` / `:delete`.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
@@ -29,10 +9,6 @@ import type { GovernanceApp } from "#app/governance.app";
 
 /**
  * The process supplies authentication; authorization arrives as the policies.
- *
- * `app` is the slice of the process's application this feature reaches, not
- * the feature's application itself, because a tRPC root is shared by every
- * feature mounted on it and so carries all of them.
  */
 export type PersonalVirtualKeyTrpcContext = Readonly<{
   app: Readonly<{ governanceApp: GovernanceApp }>;
@@ -95,12 +71,8 @@ export class PersonalVirtualKeyTrpcApi {
 
     return trpc.router({
       /**
-       * Personal keys in an organization. Never returns the secret.
-       *
-       * The default surface lists the caller's OWN keys, and the principal-user
-       * match is what authorises it. An administrator holding
-       * `virtualKeys:viewOtherPersonal` can audit one other member's keys via
-       * `targetUserId`, or sweep every member's by omitting it.
+       * Personal keys in an organization. Never returns the secret. The default surface lists
+       * the caller's OWN keys, and the principal-user match is what authorises it.
        */
       list: resolverAuthorizedPolicy({
         reason:
@@ -121,11 +93,9 @@ export class PersonalVirtualKeyTrpcApi {
       ),
 
       /**
-       * Issue a new personal key under the given label. Returns the secret
-       * exactly once — the caller must persist it immediately.
-       *
-       * Used by the "Add a new key" drawer, and by the CLI device-flow approval
-       * handler for the first personal key on first login.
+       * Issue a new personal key under the given label. Returns the secret exactly once — the
+       * caller must persist it immediately. Used by the "Add a new key" drawer, and by the CLI
+       * device-flow approval handler for the first personal key on first login.
        */
       issuePersonal: policy("organization:view")(
         procedure.input(

@@ -12,13 +12,17 @@
  * a budget refusal tells a person who to go to, and an organization that has
  * configured nobody gets no name rather than a guess.
  */
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { OrganizationSupportContactRepository } from "../repositories/organization-support-contact.repository";
 
 export class OrganizationSupportContactService {
-  private constructor(private readonly prisma: PrismaClient) {}
+  private constructor(private readonly repository: OrganizationSupportContactRepository) {}
 
-  static create({ prisma }: { prisma: PrismaClient }): OrganizationSupportContactService {
-    return new OrganizationSupportContactService(prisma);
+  static create({
+    repository,
+  }: {
+    repository: OrganizationSupportContactRepository;
+  }): OrganizationSupportContactService {
+    return new OrganizationSupportContactService(repository);
   }
 
   /**
@@ -41,23 +45,15 @@ export class OrganizationSupportContactService {
   }: {
     organizationId: string;
   }): Promise<string | null> {
-    const admins = await this.prisma.organizationUser.findMany({
-      where: { organizationId, role: "ADMIN" },
-      select: { userId: true },
-      orderBy: { createdAt: "asc" },
-    });
-    if (admins.length === 0) {
+    const adminUserIds = await this.repository.findAdminUserIds({ organizationId });
+    if (adminUserIds.length === 0) {
       return null;
     }
 
-    const users = await this.prisma.user.findMany({
-      where: { id: { in: admins.map((admin) => admin.userId) } },
-      select: { id: true, email: true },
-    });
-    const emailByUserId = new Map(users.map((user) => [user.id, user.email]));
+    const emailByUserId = await this.repository.findEmailsByUserIds({ userIds: adminUserIds });
 
-    for (const admin of admins) {
-      const email = emailByUserId.get(admin.userId);
+    for (const userId of adminUserIds) {
+      const email = emailByUserId.get(userId);
       if (email) {
         return email;
       }
@@ -83,11 +79,8 @@ export class OrganizationSupportContactService {
   }: {
     organizationId: string;
   }): Promise<string | null> {
-    const org = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { supportContact: true },
-    });
-    const trimmed = org?.supportContact?.trim();
+    const configured = await this.repository.findConfiguredSupportContact({ organizationId });
+    const trimmed = configured?.trim();
     if (trimmed) {
       return trimmed;
     }

@@ -1,10 +1,7 @@
 import { createLogger } from "@langwatch/observability";
-import type IORedis from "ioredis";
-import type { Cluster } from "ioredis";
+import type { GatewayBudgetChangeDedupeRepository } from "../repositories/gateway-budget-change-dedupe.repository";
 
 const logger = createLogger("langwatch:gateway:budget-change-event-dedupe");
-
-const BUDGET_CHANGE_EVENT_KEY_PREFIX = "gateway_budget_change:";
 
 /**
  * How long one advisory BUDGET_UPDATED emission stands in for the ones that follow. Matched to the /changes long-poll hold (timeout_s, default 10s) so continuous traffic causes at most one project-wide eviction per poll cycle. Fixed window from the first emission, not sliding, so a busy project refreshes on a fixed cadence rather than having refresh pushed back by its own traffic.
@@ -18,7 +15,7 @@ export interface BudgetChangeEventDedupeService {
   shouldEmit(params: { projectId: string }): Promise<boolean>;
 }
 
-/** No Redis (tests, SKIP_REDIS, dev without Redis): emit every time. */
+/** No dedupe store (tests, SKIP_REDIS, dev without Redis): emit every time. */
 class NullBudgetChangeEventDedupeService implements BudgetChangeEventDedupeService {
   async shouldEmit(): Promise<boolean> {
     return true;
@@ -26,27 +23,29 @@ class NullBudgetChangeEventDedupeService implements BudgetChangeEventDedupeServi
 }
 
 /**
- * Redis SET NX with a TTL, mirroring the span/share-view dedupe services. The change event is an invalidation signal, not a data carrier — spend itself is read from ClickHouse on re-materialise, so emissions inside one window are redundant with each other. Gates only *advisory* emissions: suppressing one that carries a budget into breach would leave an over-limit key served from a cached bundle, a different cost the caller owns separately.
+ * Gates only *advisory* emissions: the change event is an invalidation signal, not a data carrier — spend itself is read from ClickHouse on re-materialise, so emissions inside one window are redundant with each other. Suppressing one that carries a budget into breach would leave an over-limit key served from a cached bundle, a different cost the caller owns separately.
  */
-export class RedisBudgetChangeEventDedupeService implements BudgetChangeEventDedupeService {
+export class GatewayBudgetChangeDedupeService implements BudgetChangeEventDedupeService {
   /**
-   * A deployment with no Redis gets the always-emit stand-in, which is what
-   * this path did before the dedupe existed.
+   * A deployment with no dedupe store gets the always-emit stand-in, which is
+   * what this path did before the dedupe existed.
    */
-  static create(redis: IORedis | Cluster | null): BudgetChangeEventDedupeService {
-    return redis
-      ? new RedisBudgetChangeEventDedupeService(redis)
+  static create(
+    repository: GatewayBudgetChangeDedupeRepository | null,
+  ): BudgetChangeEventDedupeService {
+    return repository
+      ? new GatewayBudgetChangeDedupeService(repository)
       : new NullBudgetChangeEventDedupeService();
   }
 
-  private constructor(private readonly redis: IORedis | Cluster) {}
+  private constructor(private readonly repository: GatewayBudgetChangeDedupeRepository) {}
 
   async shouldEmit({ projectId }: { projectId: string }): Promise<boolean> {
-    const key = `${BUDGET_CHANGE_EVENT_KEY_PREFIX}${projectId}`;
     try {
-      const result = await this.redis.set(key, "1", "EX", BUDGET_CHANGE_EVENT_WINDOW_SECONDS, "NX");
-
-      return result === "OK";
+      return await this.repository.claimWindow({
+        projectId,
+        windowSeconds: BUDGET_CHANGE_EVENT_WINDOW_SECONDS,
+      });
     } catch (error) {
       // Fail toward emitting. Emitting is what this path did before the
       // dedupe existed and is always correct, only noisier; suppressing is

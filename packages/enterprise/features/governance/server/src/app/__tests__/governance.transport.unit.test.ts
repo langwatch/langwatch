@@ -1,23 +1,7 @@
 /**
- * The governance REST door: who may reach each route, what the wire body looks
- * like, and which application operation each verb dispatches to.
- *
- * Ported from
- * `platform/app/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`,
- * which drove the same family against real Postgres. What that suite proved
- * about the DOOR is here. What it proved about the domain — that the member
- * list suppresses OTTL, that a row outside the organization is not disclosed —
- * belongs to the service that decides it, so what is asserted here is that the
- * door dispatches to the operation which asks that question and renders the
- * answer it gets.
- *
- * The family renders its refusals as a NESTED `{ error: { type, code, message } }`
- * body rather than the flat handled-error envelope. That is deliberate and
- * preserved on the move: the shape is this API's published contract, so
- * changing it would be a wire change.
- *
+ * The governance REST door: who may reach each route, what the wire body looks like, and which
+ * application operation each verb dispatches to.
  * Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
- *       specs/ai-gateway/governance/ingestion-templates-catalog.feature
  */
 import { createRestApiService, type RestApiServicePorts } from "@langwatch/api/rest";
 import type { AppRestOrganizationVariables, AppRestProjectVariables } from "@langwatch/api/rest";
@@ -88,19 +72,8 @@ function template(overrides: Partial<IngestionTemplate> = {}): IngestionTemplate
 }
 
 /**
- * The two things the process supplies and this package does not own: who the
- * caller is, and how a refusal is rendered.
- *
- * The authenticator reads the same two headers production reads and resolves
- * ONE of two credential classes — a user-bound key, which sets `apiKeyUserId`,
- * and a legacy project key, which does not. That distinction is the entire
- * subject of the `user_token_required` guard, so it has to be real here rather
- * than assumed.
- *
- * The boundary renders a handled error the way the application's own taxonomy
- * does — the code as the discriminant — because the door hands anything it has
- * not claimed straight to it, and rendering it differently here would assert a
- * body no customer receives.
+ * The two things the process supplies and this package does not own: who the caller is, and how
+ * a refusal is rendered.
  */
 function spine(grants: readonly string[]) {
   const granted = new Set(grants);
@@ -617,18 +590,9 @@ describe("createGovernanceRestApp", () => {
     });
 
     /**
-     * A row belonging to another organization is not "forbidden" — answering
-     * that would confirm the id names something real, which is the enumeration
-     * vector the scoped read exists to close.
-     *
-     * This one route is the family's exception to the nested body: it runs the
-     * read with no try/catch and installs no `onError`, so the handled error
-     * reaches the process boundary and is rendered FLAT, as
-     * `{ error: "template_not_found" }` — while its own OpenAPI block declares
-     * the nested `{ error: { type, code, message } }` for 404. The status is
-     * what the old suite pinned and the status is what is pinned here; the
-     * body is asserted as it actually is rather than as documented, so the
-     * disagreement is visible instead of assumed away.
+     * A row belonging to another organization is not "forbidden" — answering that would confirm
+     * the id names something real, which is the enumeration vector the scoped read exists to
+     * close.
      */
     it("reports a row outside the organization as not found", async () => {
       const templateGetByIdForOrg = vi.fn(async (): Promise<IngestionTemplate> => {

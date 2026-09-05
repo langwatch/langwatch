@@ -19,7 +19,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
-import { DatasetContentRepository } from "../repositories/prisma/dataset-content.repository";
+import { DatasetContentRepository } from "../repositories/dataset-content.repository";
 import {
   type ChunkedDatasetMeta,
   type ChunkOffset,

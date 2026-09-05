@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MemberSeatLimitReachedError } from "../organization-membership.errors";
 import { InviteService } from "../invite.service";
+import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository";
 
 /**
  * A lapsed license keeps binding the seat count it sold (ADR/spec specs/licensing/expired-license-enforcement.feature): once
@@ -15,7 +16,7 @@ function buildService(options: { maxMembers: number; currentFullMembers: number 
   } as never;
 
   const service = InviteService.create({
-    prisma,
+    invites: PrismaOrganizationInviteRepository.create({ database: prisma }),
     seats: {
       getMemberCount: vi.fn().mockResolvedValue(options.currentFullMembers),
       getMembersLiteCount: vi.fn().mockResolvedValue(0),

@@ -100,7 +100,11 @@ describe("given a project that recorded coding-agent sessions and pull requests 
   /** @scenario "Recent activity alone does not open the destinations" */
   it("offers neither destination when the coding-agent pages are not released", () => {
     renderMenu(
-      { ...PROJECT, lastCodingAgentSessionAt: daysAgo(0), lastCodingAgentPullRequestAt: daysAgo(0) },
+      {
+        ...PROJECT,
+        lastCodingAgentSessionAt: daysAgo(0),
+        lastCodingAgentPullRequestAt: daysAgo(0),
+      },
       { codingAgentEnabled: false },
     );
 
@@ -111,7 +115,11 @@ describe("given a project that recorded coding-agent sessions and pull requests 
   /** @scenario "Recent activity alone does not open the destinations" */
   it("offers neither destination when the viewer may not read the project's traces", () => {
     renderMenu(
-      { ...PROJECT, lastCodingAgentSessionAt: daysAgo(0), lastCodingAgentPullRequestAt: daysAgo(0) },
+      {
+        ...PROJECT,
+        lastCodingAgentSessionAt: daysAgo(0),
+        lastCodingAgentPullRequestAt: daysAgo(0),
+      },
       { permissions: [] },
     );
 
@@ -124,7 +132,11 @@ describe("given a member reading the project's Sessions page", () => {
   /** @scenario "The rail marks the Sessions destination while the Sessions page is open" */
   it("marks the Sessions destination as open, and not the Pull requests destination", () => {
     renderMenu(
-      { ...PROJECT, lastCodingAgentSessionAt: daysAgo(1), lastCodingAgentPullRequestAt: daysAgo(1) },
+      {
+        ...PROJECT,
+        lastCodingAgentSessionAt: daysAgo(1),
+        lastCodingAgentPullRequestAt: daysAgo(1),
+      },
       { pathname: "/[project]/sessions" },
     );
 
@@ -137,7 +149,11 @@ describe("given a member reading the project's Pull requests page", () => {
   /** @scenario "The rail marks the Pull requests destination while the Pull requests page is open" */
   it("marks the Pull requests destination as open, and not the Sessions destination", () => {
     renderMenu(
-      { ...PROJECT, lastCodingAgentSessionAt: daysAgo(1), lastCodingAgentPullRequestAt: daysAgo(1) },
+      {
+        ...PROJECT,
+        lastCodingAgentSessionAt: daysAgo(1),
+        lastCodingAgentPullRequestAt: daysAgo(1),
+      },
       { pathname: "/[project]/pull-requests" },
     );
 

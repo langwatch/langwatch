@@ -323,18 +323,9 @@ export class IngestionSourceService {
   }
 
   /**
-   * Of the trace destinations these sources point at, the ones that are still
-   * live projects of this organization — archived, deleted and never-ours all
-   * collapse to "absent", and all three mean the puller has stopped routing.
-   *
-   * The presentation layer needs the complement: a destination missing from
-   * this set has stopped routing, and an admin has to be told that rather than
-   * shown an empty picker. It cannot work that out from the project list it
-   * already has, because a project outside the reader's own teams is also
-   * absent from that list and is not archived at all.
-   *
-   * One query for the whole page, keyed on the ids actually in use, so listing
-   * sources never becomes a per-row lookup.
+   * Of the trace destinations these sources point at, the ones that are still live projects of
+   * this organization — archived, deleted and never-ours all collapse to "absent", and all
+   * three mean the puller has stopped routing.
    */
   async liveTraceProjectIds(
     sources: ReadonlyArray<{ traceProjectId?: string | null }>,
@@ -397,35 +388,9 @@ export class IngestionSourceService {
   }
 
   /**
-   * Whether `pollerCursor` holds a real cursor.
-   *
-   * `pollerCursor` is `Json?`, and the write path stores either `Prisma.JsonNull`
-   * or a string — see ingestion-pull-run-projection.prisma.repository.ts. Both
-   * SQL NULL and JSON null read back as JS `null`, so `!= null` would be correct
-   * for everything that writer produces.
-   *
-   * It is not the only thing that has produced values here: `cursorOf` in
-   * ingestionPullLifecycle.ts still stringifies an object-shaped cursor, which
-   * only makes sense if object-shaped rows exist. So the question asked is
-   * whether there is any content, which answers correctly for the string and
-   * JSON-null cases the writer produces *and* for the object case it does not.
-   *
-   * The two shapes have to agree, because `cursorOf` turns one into the other:
-   * an empty object read straight from the column answers "no cursor", and the
-   * same empty object after a round trip through `cursorOf` arrives as the
-   * string "{}". Reading content out of the serialized form rather than out of
-   * its length is what keeps those two answers the same, while leaving an opaque
-   * page token — a string and nothing more — answering "yes".
-   *
-   * Getting this wrong is quiet in both directions: answer "yes" for a source
-   * that never pulled and an editable backfill start disappears; answer "no" for
-   * one that did and the form accepts a start the usage cursor will ignore,
-   * because that cursor deliberately never rewinds.
-   *
-   * It lives here rather than beside its first caller because it now has two:
-   * the DTO that decides what the form offers, and the update path that refuses
-   * a report change once a cursor exists. A second copy of this predicate is how
-   * those two would come to disagree about what "has pulled" means.
+   * Whether `pollerCursor` holds a real cursor. `pollerCursor` is `Json?`, and the write path
+   * stores either `Prisma.JsonNull` or a string — see
+   * ingestion-pull-run-projection.prisma.repository.ts.
    */
   static hasPollerCursor(value: unknown): boolean {
     if (value == null) {

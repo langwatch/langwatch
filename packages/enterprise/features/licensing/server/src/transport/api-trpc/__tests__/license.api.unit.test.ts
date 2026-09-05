@@ -33,8 +33,7 @@ function makeCaller(overrides: {
   const licensing = LicensingApp.create({
     licenses: () =>
       ({
-        getLicenseStatus:
-          overrides.getLicenseStatus ?? (refuses("getLicenseStatus") as never),
+        getLicenseStatus: overrides.getLicenseStatus ?? (refuses("getLicenseStatus") as never),
         validateAndStoreLicense:
           overrides.validateAndStoreLicense ?? (refuses("validateAndStoreLicense") as never),
       }) as never,

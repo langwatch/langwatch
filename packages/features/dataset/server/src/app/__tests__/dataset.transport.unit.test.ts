@@ -1,20 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The `/api/dataset` door: the permission each route declares, the request
- * schemas it refuses a body against, the statuses it makes out of the
- * application's domain errors, and the wire shapes it answers with.
- *
- * Ported from `platform/app/src/app/api/dataset/__tests__/dataset-rest-api.integration.test.ts`
- * and `dataset-upload-api.integration.test.ts`, both of which drove this family
- * against Postgres. Everything those files proved about the SERVICE — slug
- * generation, archive semantics, CSV/JSONL parsing, column inference, type
- * coercion, real record counts — needs a datastore and stays where the service
- * is exercised; see the port report for the list. What was proved about the
- * DOOR and about nothing else is here.
- *
- * The application is stubbed. This file asserts what the transport does, never
- * what the domain decides.
  */
 import {
   createAppRestSecurity,

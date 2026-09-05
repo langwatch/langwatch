@@ -8,44 +8,44 @@ Branch `feat/strict-feature-layout-v0`. Nothing was modified, staged or run beyo
 
 ## Summary
 
-| # | Sev | Finding | Where |
-|---|-----|---------|-------|
-| C1 | **Critical** | `project:view` mints a full-access legacy project API key through the MCP OAuth flow | `apps/api/src/app/api-production.composition.ts:1839` |
-| H1 | High | SCIM webhook intake: non-constant-time secret compare, no replay protection, organization chosen from the payload | `enterprise/scim/.../api-rest/scim-webhook-intake.api.ts:49` |
-| H2 | High | License signing **private key** written verbatim into the audit table | `packages/api/src/trpc/trpc-audit-redaction.ts:44` |
-| H3 | High | Every per-IP rate limit on the unauthenticated tRPC surface keys on the literal string `"unknown"` | `apps/api/src/api.application.ts:602` |
-| H4 | High | Organization REST apps resolve sub-org-tier permissions at **organization** scope (11 routes) | `packages/features/project/.../project.api.ts:251,263,344,353` |
-| H5 | High | MCP access token outlives the grant it was minted from (30 days, no re-check) | `hosted-mcp/.../api-mcp/hosted-mcp.api.ts:66,505` |
-| H6 | High | Legacy project key reads any organization's OTTL rules by id | `enterprise/governance/.../api-rest/governance.api.ts:299` |
-| H7 | High | Prompt tag assignment writes into the prompt's owning project, not the authorized one | `prompt/.../api-rest/prompt.api.ts:455` |
-| H8 | High | Org-wide prompt tag rename/delete gated on one project's permission | `prompt/.../api-trpc/prompt-tag.api.ts:53,72` |
-| H9 | High | `workflows:view` escalates to a full workflow run via a legacy-key self-fetch | `workflow/.../api-trpc/workflow-optimization.api.ts:148` |
-| H10 | High | `PATCH /api/triggers/:id` mass-assigns `actionParams`, skipping the webhook flag and anti-spoof stamp | `automation/.../api-rest/automation.api.ts:66,297` |
-| H11 | High | Connected-agent instance keys are not tenant-namespaced; `ack`/`result` never check the project | `agent/.../adapters/connected-agent-state.adapter.ts:28` |
-| H12 | High | Gateway budget/cache-rule REST mutations check at project scope but act organization-wide | `gateway/.../api-rest/gateway-platform.api.ts:1443…2010` |
-| H13 | High | GitHub installation takeover (installation-id confusion) | `github/.../api-rest/github.api.ts:248` |
-| H14 | High | A license key carries no organization binding; any valid key activates on any organization | `enterprise/licensing/.../services/license.service.ts:139` |
-| M1 | Medium | `requires()` on a project REST app is not enforced for legacy project keys, and the registry does not say so | `apps/api/src/api-rest.security.ts:349` |
-| M2 | Medium | Model-defaults REST writes bypass the API-key ceiling (user principal, not key ∩ owner) | `model-provider/.../api-rest/model-defaults.routes.ts:101,146,185` |
-| M3 | Medium | Model-defaults snapshot fails **open** when the credential carries no user | `model-provider/.../services/model-provider-defaults.service.ts:160` |
-| M4 | Medium | REST provider upsert skips the per-scope write authorization entirely | `model-provider/.../services/model-provider-command.service.ts:238` |
-| M5 | Medium | Anomaly-rule `destinationConfig` returns the plaintext SIEM `sharedSecret` to any viewer | `enterprise/governance/.../api-trpc/anomaly-rules.api.ts:111` |
-| M6 | Medium | `graphs.getById` bypasses the alert redaction port and returns a Slack webhook URL | `dashboard/.../api-trpc/graph.api.ts:247` |
-| M7 | Medium | Shared saved views can be deleted or renamed under a read permission | `dashboard/.../api-trpc/saved-view.api.ts:188,228,241,255` |
-| M8 | Medium | Dataset read materializes the whole dataset; the declared export ceiling is never thrown | `dataset/.../adapters/dataset-content.adapter.ts:117` |
-| M9 | Medium | Shared-trace per-IP limit and view-dedup key are derived from a spoofable `X-Forwarded-For` | `apps/api/src/app/api-trpc-collaborators.trace-group.composition.ts:796` |
-| M10 | Medium | `apiClientAddress` prefers ten client-settable headers over the socket peer | `apps/api/src/app/api-client-address.ts:47` |
-| M11 | Medium | Raw `error.message` / `error.stack` reaching 500 response bodies (14 sites) | see F-M11 |
-| M12 | Medium | Internal evaluator-service URL shipped to customers in `HandledError.meta` | `evaluation/.../adapters/http.langevals-evaluator.adapter.ts:103,110` |
-| M13 | Medium | `ops:manage` enforces nothing that `ops:view` does not | `apps/api/src/features/ops/ops.composition.ts:395` |
-| M14 | Medium | Custom roles have no creator ceiling, and the scope fence lets an org binding grant platform-tier permissions | `authz/contract/src/registry.ts:337` |
-| M15 | Medium | api-key mint-time ceiling under-approximates built-in role bags | `api-key/.../services/api-key-grant-policy.service.ts:205` |
-| M16 | Medium | Governance CLI `status` and `ingestion-templates` declare `permissions: []` and check none | `enterprise/governance/.../api-rest/governance-cli.api.ts:825,844` |
-| M17 | Medium | `routingPolicy.create` persists caller-supplied `scopeId` with no ownership validation | `enterprise/governance/.../services/governance-routing.service.ts:53` |
-| M18 | Medium | `subscription.*` interpolates a bare `baseUrl` into Stripe return URLs — authenticated open redirect | `enterprise/billing/.../api-trpc/subscription.api.ts:196,221,261` |
-| M19 | Medium | `POST /api/dataset/generate` is a cookie-authed spend endpoint with no CSRF guard its sibling has | `dataset/.../api-rest/dataset-generate.api.ts:85` |
-| M20 | Medium | hosted-mcp is 33 route verbs outside the AccessPolicy registry | `hosted-mcp/.../api-mcp/hosted-mcp.api.ts` |
-| L1–L20 | Low | see "Low findings" | — |
+| #      | Sev          | Finding                                                                                                           | Where                                                                    |
+| ------ | ------------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| C1     | **Critical** | `project:view` mints a full-access legacy project API key through the MCP OAuth flow                              | `apps/api/src/app/api-production.composition.ts:1839`                    |
+| H1     | High         | SCIM webhook intake: non-constant-time secret compare, no replay protection, organization chosen from the payload | `enterprise/scim/.../api-rest/scim-webhook-intake.api.ts:49`             |
+| H2     | High         | License signing **private key** written verbatim into the audit table                                             | `packages/api/src/trpc/trpc-audit-redaction.ts:44`                       |
+| H3     | High         | Every per-IP rate limit on the unauthenticated tRPC surface keys on the literal string `"unknown"`                | `apps/api/src/api.application.ts:602`                                    |
+| H4     | High         | Organization REST apps resolve sub-org-tier permissions at **organization** scope (11 routes)                     | `packages/features/project/.../project.api.ts:251,263,344,353`           |
+| H5     | High         | MCP access token outlives the grant it was minted from (30 days, no re-check)                                     | `hosted-mcp/.../api-mcp/hosted-mcp.api.ts:66,505`                        |
+| H6     | High         | Legacy project key reads any organization's OTTL rules by id                                                      | `enterprise/governance/.../api-rest/governance.api.ts:299`               |
+| H7     | High         | Prompt tag assignment writes into the prompt's owning project, not the authorized one                             | `prompt/.../api-rest/prompt.api.ts:455`                                  |
+| H8     | High         | Org-wide prompt tag rename/delete gated on one project's permission                                               | `prompt/.../api-trpc/prompt-tag.api.ts:53,72`                            |
+| H9     | High         | `workflows:view` escalates to a full workflow run via a legacy-key self-fetch                                     | `workflow/.../api-trpc/workflow-optimization.api.ts:148`                 |
+| H10    | High         | `PATCH /api/triggers/:id` mass-assigns `actionParams`, skipping the webhook flag and anti-spoof stamp             | `automation/.../api-rest/automation.api.ts:66,297`                       |
+| H11    | High         | Connected-agent instance keys are not tenant-namespaced; `ack`/`result` never check the project                   | `agent/.../adapters/connected-agent-state.adapter.ts:28`                 |
+| H12    | High         | Gateway budget/cache-rule REST mutations check at project scope but act organization-wide                         | `gateway/.../api-rest/gateway-platform.api.ts:1443…2010`                 |
+| H13    | High         | GitHub installation takeover (installation-id confusion)                                                          | `github/.../api-rest/github.api.ts:248`                                  |
+| H14    | High         | A license key carries no organization binding; any valid key activates on any organization                        | `enterprise/licensing/.../services/license.service.ts:139`               |
+| M1     | Medium       | `requires()` on a project REST app is not enforced for legacy project keys, and the registry does not say so      | `apps/api/src/api-rest.security.ts:349`                                  |
+| M2     | Medium       | Model-defaults REST writes bypass the API-key ceiling (user principal, not key ∩ owner)                           | `model-provider/.../api-rest/model-defaults.routes.ts:101,146,185`       |
+| M3     | Medium       | Model-defaults snapshot fails **open** when the credential carries no user                                        | `model-provider/.../services/model-provider-defaults.service.ts:160`     |
+| M4     | Medium       | REST provider upsert skips the per-scope write authorization entirely                                             | `model-provider/.../services/model-provider-command.service.ts:238`      |
+| M5     | Medium       | Anomaly-rule `destinationConfig` returns the plaintext SIEM `sharedSecret` to any viewer                          | `enterprise/governance/.../api-trpc/anomaly-rules.api.ts:111`            |
+| M6     | Medium       | `graphs.getById` bypasses the alert redaction port and returns a Slack webhook URL                                | `dashboard/.../api-trpc/graph.api.ts:247`                                |
+| M7     | Medium       | Shared saved views can be deleted or renamed under a read permission                                              | `dashboard/.../api-trpc/saved-view.api.ts:188,228,241,255`               |
+| M8     | Medium       | Dataset read materializes the whole dataset; the declared export ceiling is never thrown                          | `dataset/.../adapters/dataset-content.adapter.ts:117`                    |
+| M9     | Medium       | Shared-trace per-IP limit and view-dedup key are derived from a spoofable `X-Forwarded-For`                       | `apps/api/src/app/api-trpc-collaborators.trace-group.composition.ts:796` |
+| M10    | Medium       | `apiClientAddress` prefers ten client-settable headers over the socket peer                                       | `apps/api/src/app/api-client-address.ts:47`                              |
+| M11    | Medium       | Raw `error.message` / `error.stack` reaching 500 response bodies (14 sites)                                       | see F-M11                                                                |
+| M12    | Medium       | Internal evaluator-service URL shipped to customers in `HandledError.meta`                                        | `evaluation/.../adapters/http.langevals-evaluator.adapter.ts:103,110`    |
+| M13    | Medium       | `ops:manage` enforces nothing that `ops:view` does not                                                            | `apps/api/src/features/ops/ops.composition.ts:395`                       |
+| M14    | Medium       | Custom roles have no creator ceiling, and the scope fence lets an org binding grant platform-tier permissions     | `authz/contract/src/registry.ts:337`                                     |
+| M15    | Medium       | api-key mint-time ceiling under-approximates built-in role bags                                                   | `api-key/.../services/api-key-grant-policy.service.ts:205`               |
+| M16    | Medium       | Governance CLI `status` and `ingestion-templates` declare `permissions: []` and check none                        | `enterprise/governance/.../api-rest/governance-cli.api.ts:825,844`       |
+| M17    | Medium       | `routingPolicy.create` persists caller-supplied `scopeId` with no ownership validation                            | `enterprise/governance/.../services/governance-routing.service.ts:53`    |
+| M18    | Medium       | `subscription.*` interpolates a bare `baseUrl` into Stripe return URLs — authenticated open redirect              | `enterprise/billing/.../api-trpc/subscription.api.ts:196,221,261`        |
+| M19    | Medium       | `POST /api/dataset/generate` is a cookie-authed spend endpoint with no CSRF guard its sibling has                 | `dataset/.../api-rest/dataset-generate.api.ts:85`                        |
+| M20    | Medium       | hosted-mcp is 33 route verbs outside the AccessPolicy registry                                                    | `hosted-mcp/.../api-mcp/hosted-mcp.api.ts`                               |
+| L1–L20 | Low          | see "Low findings"                                                                                                | —                                                                        |
 
 Latent (defective code on an unmounted surface — fix before re-mount): the Stripe webhook's
 missing `payment_status` check, tenant-free `linkStripeId` and absent event de-duplication; the
@@ -53,15 +53,15 @@ missing `payment_status` check, tenant-free `linkStripeId` and absent event de-d
 
 ## Coverage
 
-| Family | tRPC procedures | REST / MCP / WS routes | Declared check present | Flagged |
-|---|---|---|---|---|
-| trace, analytics, share | 60 | 30 | 90 / 90 | 2 |
-| ops, langy, coding-agent, feature-flag, presence, hosted-mcp, stored-object, data-privacy, data-retention | 145 | 24 | 169 / 169 | 9 |
-| api-key, auth, authz, user, identity, role, organization, project | 92 | 96 | 188 / 188 | 6 |
-| gateway, model-provider, secret, entitlement, topic, github | 76 | 54 | 130 / 130 | 16 |
-| experiment, evaluation, evaluator, dataset, suite, scenario, workflow, monitor, dashboard, agent, annotation, automation, prompt | 232 | 158 | 390 / 390 | 39 |
-| enterprise (governance, billing, licensing, scim, sso, webhook) | 118 | 66 | 184 / 184 | 26 |
-| **Total** | **723** | **428** | **1151 / 1151** | **98** |
+| Family                                                                                                                           | tRPC procedures | REST / MCP / WS routes | Declared check present | Flagged |
+| -------------------------------------------------------------------------------------------------------------------------------- | --------------- | ---------------------- | ---------------------- | ------- |
+| trace, analytics, share                                                                                                          | 60              | 30                     | 90 / 90                | 2       |
+| ops, langy, coding-agent, feature-flag, presence, hosted-mcp, stored-object, data-privacy, data-retention                        | 145             | 24                     | 169 / 169              | 9       |
+| api-key, auth, authz, user, identity, role, organization, project                                                                | 92              | 96                     | 188 / 188              | 6       |
+| gateway, model-provider, secret, entitlement, topic, github                                                                      | 76              | 54                     | 130 / 130              | 16      |
+| experiment, evaluation, evaluator, dataset, suite, scenario, workflow, monitor, dashboard, agent, annotation, automation, prompt | 232             | 158                    | 390 / 390              | 39      |
+| enterprise (governance, billing, licensing, scim, sso, webhook)                                                                  | 118             | 66                     | 184 / 184              | 26      |
+| **Total**                                                                                                                        | **723**         | **428**                | **1151 / 1151**        | **98**  |
 
 - 106 tRPC api files, 757 `.query`/`.mutation`/`.subscription` call sites (the 723 above excludes
   re-exported/mount-only files); 85 REST api files.
@@ -115,7 +115,7 @@ REST RBAC middleware then skips every check for it:
 // apps/api/src/api-rest.security.ts:349-354
 const resolved = context.get("resolvedToken") as ResolvedApiKeyToken | undefined;
 if (!resolved || resolved.type !== "apiKey") {
-  return next();                       // ← legacy key: no permission is evaluated
+  return next(); // ← legacy key: no permission is evaluated
 }
 ```
 
@@ -149,7 +149,7 @@ docblock saying the gate must "match the access it grants", and the CLI device f
 
 **Smallest correct fix.** Raise `api-production.composition.ts:1839` to the permission that matches
 what the code confers — `project:update`, the same grain `GET /:id/api-key` uses. If MCP is meant to
-be viewer-reachable, mint a *scoped* key bound to the caller's own grants instead of embedding
+be viewer-reachable, mint a _scoped_ key bound to the caller's own grants instead of embedding
 `project.apiKey`.
 
 ### H1 — SCIM webhook intake: weak compare, no replay protection, payload-chosen organization
@@ -171,7 +171,7 @@ captured request replays forever; and the tenant is chosen from the payload —
 `emailDomain(email)` → `tryFindOrganizationBySsoDomain({ domain })`
 (`api/scim-webhook/scim-webhook.api.ts:56-66`) — then a member is created or deleted in that org
 (`:70-91`). The secret is one global deployment value
-(`apps/api/src/app/api-scim.composition.ts:215`), so it is authority to provision into *every*
+(`apps/api/src/app/api-scim.composition.ts:215`), so it is authority to provision into _every_
 organization with a matching `ssoDomain`. Mounted live at
 `apps/api/src/app-rest/app-rest.process-features.ts:798`.
 
@@ -229,16 +229,16 @@ A repository-wide grep for a producer finds none. So every key below is a consta
 lines above `:1039` says the opposite — "this process reads it from the request the transport
 already resolved rather than from a header a client controls" — which is why this was not noticed.
 
-| procedure | key | budget |
-|---|---|---|
-| `frontDoor.route` (`front-door.api.ts:162`) | `frontDoor.route:unknown` | 200 / hour |
-| `frontDoor.requestSignUpVerification` (`:190`) | `…:unknown` | 20 / hour |
-| `frontDoor.completeSignUpVerification` (`:261`) | `…:unknown` | 60 / hour |
-| `frontDoor.inviteLanding` (`:288`) | `…:unknown` | 60 / hour |
-| `frontDoor.requestFreshInvite` (`:320`) | `…:unknown` | 20 / hour |
-| `user.register` (`user.api.ts:477`) | `user.register:unknown` | 20 / hour |
-| `emailSuppression.resolveUnsubscribeToken` (`:147`) | `unsubscribe:resolve:unknown` | 30 / min |
-| `emailSuppression.confirmUnsubscribe` (`:169`) | `unsubscribe:confirm:unknown` | 10 / min |
+| procedure                                           | key                           | budget     |
+| --------------------------------------------------- | ----------------------------- | ---------- |
+| `frontDoor.route` (`front-door.api.ts:162`)         | `frontDoor.route:unknown`     | 200 / hour |
+| `frontDoor.requestSignUpVerification` (`:190`)      | `…:unknown`                   | 20 / hour  |
+| `frontDoor.completeSignUpVerification` (`:261`)     | `…:unknown`                   | 60 / hour  |
+| `frontDoor.inviteLanding` (`:288`)                  | `…:unknown`                   | 60 / hour  |
+| `frontDoor.requestFreshInvite` (`:320`)             | `…:unknown`                   | 20 / hour  |
+| `user.register` (`user.api.ts:477`)                 | `user.register:unknown`       | 20 / hour  |
+| `emailSuppression.resolveUnsubscribeToken` (`:147`) | `unsubscribe:resolve:unknown` | 30 / min   |
+| `emailSuppression.confirmUnsubscribe` (`:169`)      | `unsubscribe:confirm:unknown` | 10 / min   |
 
 The limiter is Redis-backed and deployment-wide
 (`apps/api/src/platform/infrastructure/api-rate-limit.infrastructure.ts:29`), so these are single
@@ -259,19 +259,19 @@ the three casts so a future omission is a compile error.
 
 On an org app, `requires(p)` resolves `p` at `{ type: "org", id: organizationId }`
 (`apps/api/src/api-rest.security.ts:464-479`). `requiresOnProject` exists for routes that name one
-project, and `packages/api/src/access-policy.ts:180-184` states the reason: *"`requires(...)` would
+project, and `packages/api/src/access-policy.ts:180-184` states the reason: _"`requires(...)` would
 resolve at organization scope there, so a single org-wide grant would reach every project in the
-org."* It is used **once in the entire repository**, and there is no team equivalent at all.
+org."_ It is used **once in the entire repository**, and there is no team equivalent at all.
 
 Affected — 11 resource-addressed routes whose permission is grantable below org scope:
 
-| route | declared | acts on |
-|---|---|---|
-| `GET /api/projects/:id` (`project.api.ts:251`) | `requires("project:view")` | one project |
-| `PATCH /api/projects/:id` (`:263`) | `requires("project:update")` | one project |
-| `DELETE /api/projects/:id` (`:353`) | `requires("project:delete")` | one project |
-| `POST /api/projects/:id/regenerate-api-key` (`:344`) | `requires("project:manage")` | one project |
-| `GET/PATCH/DELETE /api/teams/:id`, `…/:id/members`, `…/:id/projects` (`team.api.ts:91,141,160,182,208,236,260,283`) | `requires("team:view"/"team:manage")` | one team |
+| route                                                                                                               | declared                              | acts on     |
+| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------- |
+| `GET /api/projects/:id` (`project.api.ts:251`)                                                                      | `requires("project:view")`            | one project |
+| `PATCH /api/projects/:id` (`:263`)                                                                                  | `requires("project:update")`          | one project |
+| `DELETE /api/projects/:id` (`:353`)                                                                                 | `requires("project:delete")`          | one project |
+| `POST /api/projects/:id/regenerate-api-key` (`:344`)                                                                | `requires("project:manage")`          | one project |
+| `GET/PATCH/DELETE /api/teams/:id`, `…/:id/members`, `…/:id/projects` (`team.api.ts:91,141,160,182,208,236,260,283`) | `requires("team:view"/"team:manage")` | one team    |
 
 The sibling route `GET /api/projects/:id/api-key` (`project.api.ts:331`) does it correctly and
 carries a docblock explaining why — the very next route, `regenerate-api-key`, does not, for a
@@ -302,7 +302,7 @@ org admin cannot pass these either, so the routes are also broken for their inte
 
 `resolveSessionContext` resolves a token from the in-memory map or Redis and returns the decrypted
 `apiKey`, checking **only** `Date.now() < …expiresAt`. Nothing re-checks the minting user's
-membership or permission; `authenticateRequest` (`:579-601`) validates the *project key*, not the
+membership or permission; `authenticateRequest` (`:579-601`) validates the _project key_, not the
 person. Removing someone from the project, or downgrading their role, does not invalidate a token
 they already hold — only rotating the project's own API key does, and nothing on the offboarding
 path does that. This defeats ADR-092 §10 ("offboarding as one proven verb").
@@ -339,7 +339,7 @@ obtainable by any member holding `project:update` via `POST /api/auth/cli/projec
 `packages/features/prompt/server/src/transport/api-rest/prompt.api.ts:455`
 
 `requires("prompts:manage")` is checked on the API key's project. The lookup at `:437` deliberately
-also matches org-scoped prompts owned by *sibling* projects
+also matches org-scoped prompts owned by _sibling_ projects
 (`prisma.prompt.repository.ts:294-306`, the `{ organizationId, scope: "ORGANIZATION" }` OR-branch).
 The write then uses the row's own id:
 
@@ -350,8 +350,7 @@ projectId: config.projectId,   // ← not project.id, the id that was authorized
 **Exploit.** Attacker holds `prompts:manage` in project A of org O; project B owns the org-scoped
 prompt `checkout-agent`. `GET /api/prompts/checkout-agent` with the project-A key returns 200 and a
 `versionId` (`?version=N` enumerates older ones); then
-`PUT /api/prompts/checkout-agent/tags/production` with `{"versionId":"prompt_version_<old>"}` returns
-200. Project B's `production` release pointer now resolves to a version the attacker chose, and
+`PUT /api/prompts/checkout-agent/tags/production` with `{"versionId":"prompt_version_<old>"}` returns 200. Project B's `production` release pointer now resolves to a version the attacker chose, and
 `prompts:manage` on B was never checked. The tRPC twin is safe (`api-trpc/prompt.api.ts:429` passes
 `input.projectId`).
 
@@ -378,13 +377,17 @@ cascade touches.
 
 `workflow-optimization.api.ts:148` → `apps/api/src/app/api-trpc-collaborators.execution.composition.ts:561-583`
 
-`optimization.chat` is declared `policy("workflows:view")`, then re-enters the *public* REST door
+`optimization.chat` is declared `policy("workflows:view")`, then re-enters the _public_ REST door
 carrying the project's legacy key:
 
 ```ts
-const project = await options.prisma.project.findFirst({ where: { id: input.projectId }, select: { apiKey: true } });
-const response = await fetch(`${publicBaseUrl}/api/workflows/${input.workflowId}/run`,
-  { headers: { "x-auth-token": project.apiKey } });
+const project = await options.prisma.project.findFirst({
+  where: { id: input.projectId },
+  select: { apiKey: true },
+});
+const response = await fetch(`${publicBaseUrl}/api/workflows/${input.workflowId}/run`, {
+  headers: { "x-auth-token": project.apiKey },
+});
 ```
 
 That route declares `workflows:manage` (`workflow-run.api.ts:154-158`), but the ceiling branch runs
@@ -562,7 +565,7 @@ ORGANIZATION scope. The route should also be `handlerManagedAuth({ permissions: 
 **M3 — Model-defaults snapshot fails open with no user.**
 `model-provider/.../services/model-provider-defaults.service.ts:160-166` —
 `if (!actorId) { return configs; }` returns every organization config unfiltered, while its sibling
-`writableScopes` (`:373-377`) fails *closed* on the identical condition. `getSnapshot:47` loads
+`writableScopes` (`:373-377`) fails _closed_ on the identical condition. `getSnapshot:47` loads
 org-wide. Reached from `model-defaults.routes.ts:64-68` with `apiKeyUserId`, which is null for a
 legacy project key. **Exploit:** `GET /api/model-defaults` with a legacy key for project P returns the
 default-model configs of every team and project in the organization. **Fix:** invert to `return []`.
@@ -601,7 +604,7 @@ ownership guard only protects personal views (`saved-view.service.ts:141,179` �
 passes straight through. **Fix:** rename/reorder → `traces:update`, delete → `traces:delete`.
 
 **M8 — Dataset read materializes the whole dataset; the export ceiling is never thrown.**
-`dataset/.../adapters/dataset-content.adapter.ts:117-127` loads *every* chunk before any limit is
+`dataset/.../adapters/dataset-content.adapter.ts:117-127` loads _every_ chunk before any limit is
 consulted, and the budget filter is per-record rather than cumulative, so a million 1 KB rows all pass
 `length <= 25*1024*1024` and `truncated` stays false. The Postgres path is cumulative and correct
 (`dataset.service.ts:682-699`), so the two layouts answer the same request differently.
@@ -623,7 +626,7 @@ unauthenticated holder of a share token burns the link's view cap arbitrarily fa
 customer's own share link.
 
 **M10 — `apiClientAddress` prefers ten client-settable headers over the socket.**
-`apps/api/src/app/api-client-address.ts:47-58`. `parseAddress` validates only the *shape*, and its own
+`apps/api/src/app/api-client-address.ts:47-58`. `parseAddress` validates only the _shape_, and its own
 comment says the function exists to prevent "a rate-limit key an attacker chooses". Behind an ELB
 (which appends to `x-forwarded-for` and does not strip `cf-connecting-ip`), a client sending
 `CF-Connecting-IP: 1.2.3.4` wins outright. This is the only DoS control on the unauthenticated
@@ -636,17 +639,17 @@ costs an unindexed JSON-path `findMany`, `prisma.ingestion-source.repository.ts:
 **M11 — Raw `error.message` / `error.stack` reaching response bodies.** ADR-045 and CLAUDE.md forbid
 this outright: an unhandled cause must degrade to a generic message plus a trace id.
 
-| file:line | surface |
-|---|---|
-| `workflow/.../api-rest/workflow-studio.api.ts:168, 207, 212` | `/code-completion`, `/post_event` (`:207` also returns `error.cause` verbatim) |
-| `annotation/.../api-rest/annotation.api.ts:162,194,219,279,313,396` | every annotation REST route |
-| `evaluation/.../api-rest/evaluations-legacy.api.ts:551` | `POST /api/evaluations/batch/log_results` |
-| `experiment/.../api-rest/experiment-dspy-steps.api.ts:218` | `POST /api/dspy/log_steps` |
-| `scenario/.../api-rest/scenario-generate.api.ts:204-208` | `POST /api/scenario/generate` |
-| `evaluation/.../adapters/workflow-evaluation.adapter.ts:50` | `traceback: [error.stack]` → `evaluation.api.ts:288` returns the Node stack with absolute server paths |
-| `trace/.../api-rest/collector.api.ts:659-666, 736-741` | ingestion-pipeline error strings in `partialSuccess.errorMessage` |
-| `gateway/.../api-rest/gateway-internal.api.ts:313` | response body names `LW_GATEWAY_INTERNAL_SECRET` |
-| `ops/.../api-rest/ops-clickhouse-explain.api.ts:124` | raw ClickHouse engine prose |
+| file:line                                                           | surface                                                                                                |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `workflow/.../api-rest/workflow-studio.api.ts:168, 207, 212`        | `/code-completion`, `/post_event` (`:207` also returns `error.cause` verbatim)                         |
+| `annotation/.../api-rest/annotation.api.ts:162,194,219,279,313,396` | every annotation REST route                                                                            |
+| `evaluation/.../api-rest/evaluations-legacy.api.ts:551`             | `POST /api/evaluations/batch/log_results`                                                              |
+| `experiment/.../api-rest/experiment-dspy-steps.api.ts:218`          | `POST /api/dspy/log_steps`                                                                             |
+| `scenario/.../api-rest/scenario-generate.api.ts:204-208`            | `POST /api/scenario/generate`                                                                          |
+| `evaluation/.../adapters/workflow-evaluation.adapter.ts:50`         | `traceback: [error.stack]` → `evaluation.api.ts:288` returns the Node stack with absolute server paths |
+| `trace/.../api-rest/collector.api.ts:659-666, 736-741`              | ingestion-pipeline error strings in `partialSuccess.errorMessage`                                      |
+| `gateway/.../api-rest/gateway-internal.api.ts:313`                  | response body names `LW_GATEWAY_INTERNAL_SECRET`                                                       |
+| `ops/.../api-rest/ops-clickhouse-explain.api.ts:124`                | raw ClickHouse engine prose                                                                            |
 
 The sharpest are `log_results` and `log_steps`: a ClickHouse or Prisma failure surfaces the driver's
 message — host, port, database name — to any project key. **Fix:** re-throw and let
@@ -682,7 +685,7 @@ which `bindingScopeCanGrantPermission` permits unconditionally:
 
 ```ts
 // packages/features/authz/contract/src/registry.ts:334-338
-if (scopes.includes("platform")) return true;   // LEGACY-QUIRK(C)
+if (scopes.includes("platform")) return true; // LEGACY-QUIRK(C)
 if (scopeType === "ORGANIZATION") return true;
 ```
 
@@ -799,7 +802,7 @@ even if the handler keeps managing its own credential.
 - **L17** Blank-string-tolerant scope ids (`z.string()` without `.min(1)`) at
   `workflow.trpc-schemas.ts:20-95`, `dashboard.api.ts:60`, `saved-workbench-chart.api.ts:134-135`,
   `saved-view.api.ts:144,229,242,256`, `monitor.schemas.ts:45`. Denied by `requireDeclaredScope`
-  today; the dashboard *contract* schemas already use `.min(1)` and are the pattern to copy.
+  today; the dashboard _contract_ schemas already use `.min(1)` and are the pattern to copy.
 - **L18** `where` spread from the input object rather than an explicit predicate:
   `scenario.repository.ts:217`, `prisma.experiment.repository.ts:43,54,110,502`, plus eight sites in
   automation/monitor/dataset. Safe today; the tenant filter survives only while the schema keeps
@@ -927,13 +930,13 @@ Fix these **before** the surface is re-mounted, not after.
 
 ## Unproven — say so rather than guess
 
-1. **SSRF on the model execution path.** The credential *probe* is fenced
+1. **SSRF on the model execution path.** The credential _probe_ is fenced
    (`ssrf.model-provider-egress.adapter.ts` → `packages/egress`, IP pinning, redirects refused) and is
    wired in both compositions. Execution is not: `model-provider-execution-handle.service.ts:130-136`
    and `playground.api.ts:126-130` post to the deployment's own `executionProxyBaseUrl` and pass the
    customer's `api_base`/`api_key` onward as `x-litellm-*` headers. Whether the customer-chosen URL is
    validated is a property of **`services/nlpgo` (Go)**, outside this scope. The same applies to
-   workflow HTTP nodes. The sibling `httpProxy` path *is* fenced (`services/nlpgo/cmd/root.go:60-76`).
+   workflow HTTP nodes. The sibling `httpProxy` path _is_ fenced (`services/nlpgo/cmd/root.go:60-76`).
 2. **LangWatchQL execution tenancy.** Isolation for `langWatchQL.query` and
    `SavedWorkbenchChartService.run` is not a WHERE predicate — it is the restricted ClickHouse
    identity hashed from `project.lwqlKey` (`query.api.ts:150-159`) plus row policies and approved views
@@ -962,7 +965,7 @@ Fix these **before** the surface is re-mounted, not after.
 10. **`ctx.can` on `MonitorTrpcContext`** (used by `monitors.copy`, `monitor.api.ts:228`) is
     process-supplied and not filled in `monitor-trpc.mount.ts`. If it ever resolves to a constant
     `true`, the source-project gate at `:231-236` is inert.
-11. **Whether OTLP *resource* attributes reach `trace_summaries.Attributes`** under
+11. **Whether OTLP _resource_ attributes reach `trace_summaries.Attributes`** under
     `langwatch.ingestion_source.*`. `withOriginAttrs` scrubs span and log-record attributes but not
     the resource. Cross-tenant forgery is impossible either way; intra-org attribution forgery depends
     on this hoist.

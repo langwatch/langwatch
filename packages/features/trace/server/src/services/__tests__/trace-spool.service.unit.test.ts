@@ -15,10 +15,8 @@ import {
 } from "../trace-spool.service";
 
 /**
- * The object path, the reference marker and the read cap are a wire format
- * between two processes. Every one of them is pinned as a literal here rather
- * than read off the application's source, which would die the moment either
- * file moves and would only ever prove the two files are the same file.
+ * The object path, the reference marker and the read cap are a wire format between two
+ * processes.
  */
 const S3: StoredObjectStorageDestination = { kind: "s3", bucket: "objects" };
 const FILE: StoredObjectStorageDestination = { kind: "file", root: "/var/objects" };

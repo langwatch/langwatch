@@ -112,7 +112,9 @@ describe("the icon-rail shell", () => {
       renderShell();
 
       expect(railTile("LLM Ops")).toHaveStyle({ backgroundColor: "var(--chakra-colors-bg-panel)" });
-      expect(railTile("Gateway")).not.toHaveStyle({ backgroundColor: "var(--chakra-colors-bg-panel)" });
+      expect(railTile("Gateway")).not.toHaveStyle({
+        backgroundColor: "var(--chakra-colors-bg-panel)",
+      });
     });
   });
 

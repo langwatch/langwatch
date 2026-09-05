@@ -68,10 +68,11 @@ export {
 } from "./adapters/postgres.dataset-migration.adapter";
 export { createDatasetNormalizeHandler } from "./jobs/dataset-normalize.job";
 export { DatasetNormalizationService } from "./services/dataset-normalization.service";
+export { DatasetContentRepository } from "./repositories/dataset-content.repository";
 export {
-  DatasetContentRepository,
+  PrismaDatasetContentRepository,
   type DatasetContentDatabase,
-} from "./repositories/prisma/dataset-content.repository";
+} from "./repositories/prisma/prisma.dataset-content.repository";
 export * from "./services/dataset-chunking";
 export { DatasetChunkService } from "./services/dataset-chunk.service";
 export type {

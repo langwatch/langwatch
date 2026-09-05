@@ -6,6 +6,7 @@
 import {
   buildInviteAcceptUrl,
   InviteService,
+  PrismaOrganizationInviteRepository,
   InviteSendThrottleService,
   OrganizationInviteRateLimitPort,
   OrganizationInviteSeatCensusPort,
@@ -146,7 +147,7 @@ export function composeApiOrganizationInvites(
 ): ApiOrganizationInvites {
   const throttle = InviteSendThrottleService.create(new ApiInviteRateLimit(options.rateLimit));
   const invites = InviteService.create({
-    prisma: options.prisma,
+    invites: PrismaOrganizationInviteRepository.create({ database: options.prisma }),
     seats: new ApiInviteSeatCensus(PrismaUsageMembershipRepository.create(options.prisma)),
     plans: options.plans,
     grants: options.grants,

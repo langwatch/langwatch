@@ -21,9 +21,9 @@ import type {
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
 import { DatasetUploadAdapter } from "./dataset-upload.adapter";
 import {
-  DatasetContentRepository,
+  PrismaDatasetContentRepository,
   type DatasetContentDatabase,
-} from "../repositories/prisma/dataset-content.repository";
+} from "../repositories/prisma/prisma.dataset-content.repository";
 import {
   DatasetRecordContentRepository,
   type DatasetRecordContentDatabase,
@@ -50,7 +50,7 @@ export class PostgresDatasetAdapter {
   private constructor(options: PostgresDatasetAdapterOptions) {
     const repository: DatasetRepository = PrismaDatasetRepository.create(options.database);
     const records: DatasetRecordRepository = PrismaDatasetRecordRepository.create(options.database);
-    const contentRepository = DatasetContentRepository.create(options.database);
+    const contentRepository = PrismaDatasetContentRepository.create(options.database);
     const recordContentRepository = DatasetRecordContentRepository.create(options.database);
     this.normalization = options.storageResolver
       ? DatasetNormalizationService.create({

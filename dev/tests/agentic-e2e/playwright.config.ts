@@ -2,20 +2,13 @@ import { defineConfig, devices } from "@playwright/test";
 import path from "path";
 
 /**
- * Playwright Config for E2E Tests
- *
- * Self-contained in dev/tests/agentic-e2e/ with its own dependencies.
- *
- * Usage:
- *   pnpm test
- *   pnpm test:ui
+ * Playwright Config for E2E Tests Self-contained in dev/tests/agentic-e2e/ with its own
+ * dependencies. Usage: pnpm test pnpm test:ui
  */
 
 /**
- * The workspace `.env`, resolved from the repository root the way every
- * application resolves it. Node's loader leaves a variable that is already set
- * alone, so the shell — and `LANGWATCH_E2E_BASE_URL` with it — still wins, and
- * a worktree without the file is not an error.
+ * The workspace `.env`, resolved from the repository root the way every application resolves
+ * it.
  */
 function loadWorkspaceEnv(): void {
   if (typeof process.loadEnvFile !== "function") return;

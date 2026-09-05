@@ -32,6 +32,8 @@ import { TestProjectService } from "./support/test-project-service";
 
 import { createVirtualKeyServiceForTest } from "../testing";
 import { GatewayConfigAssemblyAdapter } from "../adapters/gateway-config-assembly.adapter";
+import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository";
+import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service";
 /**
  * The tenancy guard names a project on every query. This suite writes the
  * organizations and projects it then reads, so it composes the client without
@@ -122,7 +124,9 @@ const keysPort = () => PrismaGatewayVirtualKeyRepository.create(prisma);
 
 const materialiser = (spend: GatewayBudgetClickHouseRepository | null) =>
   GatewayConfigMaterialiserService.create({
-    prisma,
+    scopeResolution: GatewayScopeResolutionService.create({
+      repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
+    }),
     projects: new SuiteProjectService(),
     chRepo: spend,
     budgetDecisions: gateway,

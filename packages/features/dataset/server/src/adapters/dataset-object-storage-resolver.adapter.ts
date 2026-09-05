@@ -1,17 +1,7 @@
 /**
- * One backend per project, decided by a caller-supplied destination policy —
- * BYOC first, then this deployment's own backend choice — and an S3 client
- * built from the composing process's own AWS transport.
- *
- * This module owns none of the destination POLICY itself: any process
- * composing object storage (the worker's normalize job, a task's one-off
- * backfill) hands it the same decision its own general storage policy
- * already makes, through {@link DatasetStorageDestinationPort}, so a
- * dataset's chunks land where the rest of that project's objects do. Only the
- * backend KIND crosses that seam — bucket, endpoint and credentials stay this
- * module's own concern, resolved per project by {@link
- * DatasetObjectStorageS3ClientResolverAdapter} and (for Azure) the caller's own
- * `DatasetAzureConfigResolver`.
+ * One backend per project, decided by a caller-supplied destination policy — BYOC first, then
+ * this deployment's own backend choice — and an S3 client built from the composing process's
+ * own AWS transport.
  */
 import { S3Client } from "@aws-sdk/client-s3";
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
@@ -49,11 +39,8 @@ export abstract class DatasetStorageDestinationPort {
 }
 
 /**
- * An S3 client for one project's dataset objects, built fresh per operation
- * from the process's own AWS transport. No client is retained across calls —
- * one normalize/backfill operation per dataset already serializes this, and a
- * per-operation client removes the lifecycle where a superseded client is
- * destroyed under an in-flight read.
+ * An S3 client for one project's dataset objects, built fresh per operation from the process's
+ * own AWS transport.
  */
 export class DatasetObjectStorageS3ClientResolverAdapter extends DatasetS3ClientResolver {
   static create(options: {
@@ -97,11 +84,8 @@ export class DatasetObjectStorageS3ClientResolverAdapter extends DatasetS3Client
 }
 
 /**
- * Resolves one project's `DatasetStorage` from a destination decision this
- * module does not make itself. `azureConfig` is optional: a process that
- * composes no Azure driver still builds successfully, and only refuses (by
- * name, from its own resolver) the moment a project's destination actually
- * decides `azure`.
+ * Resolves one project's `DatasetStorage` from a destination decision this module does not make
+ * itself.
  */
 export class DatasetObjectStorageResolverAdapter extends DatasetStorageResolver {
   private azure: AzureDatasetStorageAdapter | undefined;

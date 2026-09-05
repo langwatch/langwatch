@@ -2,6 +2,7 @@
  * Data-access for VirtualKey. Post-collapse model: organization-scoped + reachable from N (scopeType, scopeId) entries in VirtualKeyScope. dbMultiTenancyProtection enforces every where-clause carries organizationId, a row id, a hashedSecret, or a scopes:{some:{...}} predicate.
  */
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { identityPatchData } from "@langwatch/gateway-contract";
 import { z } from "zod";
 import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter";
 import { gatewayRoutingPolicySelect } from "../../ports/gateway-virtual-key.port";
@@ -11,6 +12,7 @@ import {
   type GatewayVirtualKeyRecord,
   type GatewayVirtualKeyScope,
   type SetGatewayVirtualKeyDisabledInput,
+  type UpdateGatewayVirtualKeyInput,
 } from "../../ports/gateway-virtual-key.port";
 import type { GatewayPersistenceTransaction } from "../../ports/gateway-change-events.port";
 
@@ -234,6 +236,48 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
           select: gatewayRoutingPolicySelect,
         },
       },
+    });
+  }
+
+  async update(
+    input: UpdateGatewayVirtualKeyInput,
+    tx?: GatewayPersistenceTransaction,
+  ): Promise<VirtualKeyWithScopes> {
+    const client = this.client(tx);
+
+    return client.virtualKey.update({
+      where: { id: input.id, organizationId: input.organizationId },
+      data: {
+        name: input.name,
+        description: input.description,
+        config: jsonInput(input.config),
+        ...identityPatchData(input),
+        ...(input.routingPolicyId !== undefined ? { routingPolicyId: input.routingPolicyId } : {}),
+        ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
+        traceProjectId: input.traceProjectId,
+        routingMode: input.routingMode,
+        revision: { increment: 1n },
+      },
+      // The same projection every other read materialises. Without the two
+      // relations the row is not a `VirtualKeyWithScopes`: the update would
+      // answer a key whose principal and routing policy read as absent to
+      // everything downstream of it.
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+        routingPolicy: { select: gatewayRoutingPolicySelect },
+      },
+    });
+  }
+
+  async tryFindRoutingPolicyOwner({
+    routingPolicyId,
+  }: {
+    routingPolicyId: string;
+  }): Promise<{ organizationId: string } | null> {
+    return await this.prisma.routingPolicy.findUnique({
+      where: { id: routingPolicyId },
+      select: { organizationId: true },
     });
   }
 

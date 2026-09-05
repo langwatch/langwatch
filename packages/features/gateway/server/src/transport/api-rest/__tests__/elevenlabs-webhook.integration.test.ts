@@ -18,6 +18,7 @@ import {
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
+import { PrismaGatewayElevenLabsCredentialRepository } from "../../../repositories/prisma/prisma.gateway-elevenlabs-credential.repository";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 
@@ -31,6 +32,7 @@ import {
   type GatewayRealtimeSessionCollaborators,
 } from "../../../services/gateway-realtime-session.service";
 import { createElevenLabsWebhookRestApp } from "../elevenlabs-webhook.api";
+import { PrismaGatewayRealtimeSessionRepository } from "../../../repositories/prisma/prisma.gateway-realtime-session.repository";
 
 const realtimeSessions = GatewayRealtimeSessionService.create();
 class AllowTestQueries extends PrismaQueryGuard {
@@ -68,9 +70,11 @@ class PlainCustomKeys extends GatewayModelProviderCredentialsPort {
 }
 
 const sessions: GatewayRealtimeSessionCollaborators = {
-  get database() {
-    return prisma;
-  },
+  sessions: PrismaGatewayRealtimeSessionRepository.create({
+    get database() {
+      return prisma;
+    },
+  }),
   spendRating: ModelCatalogGatewaySpendRatingAdapter.create(),
   spendConfirmation: new RecordingSpendConfirmation(),
 };
@@ -110,9 +114,11 @@ const webhookApp = createElevenLabsWebhookRestApp({
   security: testSecurity(),
   ports: {
     credentials: {
-      get database() {
-        return prisma;
-      },
+      providers: PrismaGatewayElevenLabsCredentialRepository.create({
+        get database() {
+          return prisma;
+        },
+      }),
       credentials: new PlainCustomKeys(),
     },
     sessions,

@@ -56,9 +56,9 @@ describe("ApiKeyLifecycleService system-managed guard", () => {
     /** @scenario "The ephemeral Langy session key cannot be renamed or revoked" */
     it("refuses a rename as not-found", async () => {
       const sut = makeService(LANGY_SESSION_API_KEY_NAME);
-      await expect(
-        sut.update({ id: KEY_ID, ...caller, name: "stolen" }),
-      ).rejects.toBeInstanceOf(ApiKeyNotFoundError);
+      await expect(sut.update({ id: KEY_ID, ...caller, name: "stolen" })).rejects.toBeInstanceOf(
+        ApiKeyNotFoundError,
+      );
     });
 
     /** @scenario "The ephemeral Langy session key cannot be renamed or revoked" */

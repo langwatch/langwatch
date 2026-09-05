@@ -44,8 +44,7 @@ describe("SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS half)", () => {
     it.each(["127.0.0.1", "10.0.5.3", "192.168.1.1", "0.0.0.0", "::1"])(
       "refuses private IP literal %s",
       async (hostname) => {
-        const url =
-          hostname === "::1" ? `http://[${hostname}]/` : `http://${hostname}/`;
+        const url = hostname === "::1" ? `http://[${hostname}]/` : `http://${hostname}/`;
         await expect(validate(url)).rejects.toThrow();
       },
     );

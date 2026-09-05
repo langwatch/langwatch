@@ -1,16 +1,5 @@
 /**
  * The create-only branch of the ingestion-key mint, `issueForProject`.
- *
- * Its rotating sibling, `ensureForProject`, revokes whatever key already
- * covers the (project, source type) pair before minting its replacement. Two
- * developers on the same repository would then take each other's telemetry
- * down in turn, so the named-project mint the CLI drives is deliberately
- * additive: it looks nothing up and revokes nothing, and every machine keeps
- * the token it was given.
- *
- * The issuer fake models liveness rather than counting calls, so "neither key
- * is revoked by the other" is observed on the keys themselves.
- *
  * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
  */
 import { describe, expect, it } from "vitest";

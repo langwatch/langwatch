@@ -1,8 +1,5 @@
 /**
- * What the resolver does with a destination this process composed no driver
- * for. The failure it guards is silent: falling through to the S3 adapter
- * would build a client from whatever bucket happened to be configured and
- * write a tenant's chunks into an account nothing reads them back from.
+ * What the resolver does with a destination this process composed no driver for.
  */
 import { describe, expect, it, vi } from "vitest";
 

@@ -55,7 +55,12 @@ const personalTeam = {
   ownerUserId: "user_1",
   members: [{ userId: "user_1" }],
   projects: [
-    { id: "project_personal", slug: "personal-ada-abc123", name: "Personal Workspace", isPersonal: true },
+    {
+      id: "project_personal",
+      slug: "personal-ada-abc123",
+      name: "Personal Workspace",
+      isPersonal: true,
+    },
   ],
 };
 const orgA = { id: "org_1", name: "ACME", teams: [teamA, personalTeam] };
@@ -208,7 +213,9 @@ describe("the product-switcher top bar", () => {
       await openProductSwitcher();
 
       expect(screen.queryByText("Governance")).not.toBeInTheDocument();
-      expect(screen.queryByText("Every AI tool, license, agent and dollar")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Every AI tool, license, agent and dollar"),
+      ).not.toBeInTheDocument();
     });
 
     /** @scenario Switching product opens that product's home */
@@ -527,7 +534,9 @@ describe("the product-switcher top bar", () => {
       renderShell();
 
       expect(screen.getByTestId("product-sidebar")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Open navigation menu" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Open navigation menu" }),
+      ).not.toBeInTheDocument();
     });
   });
 

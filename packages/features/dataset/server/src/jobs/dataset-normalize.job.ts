@@ -39,7 +39,7 @@ import {
   type FileFormat,
 } from "@langwatch/dataset-contract";
 import type { DatasetNormalizePayload } from "@langwatch/dataset-contract";
-import type { DatasetContentRepository as DatasetRepository } from "../repositories/prisma/dataset-content.repository";
+import type { DatasetContentRepository as DatasetRepository } from "../repositories/dataset-content.repository";
 import { StreamingChunkWriter } from "../services/dataset-chunk-writer";
 import type { DatasetStorage } from "../ports/dataset-storage.port";
 import { UPLOAD_MAX_BYTES } from "../services/presigned-upload";

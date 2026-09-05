@@ -29,7 +29,13 @@ import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout";
 import { StubNavigationHost } from "../../../testing";
 import { MobileShell } from "../mobile-shell";
 
-const teamA = { id: "team_1", name: "Core", isPersonal: false, ownerUserId: null, projects: [{ id: "project_1", slug: "demo", name: "Demo", isPersonal: false }] };
+const teamA = {
+  id: "team_1",
+  name: "Core",
+  isPersonal: false,
+  ownerUserId: null,
+  projects: [{ id: "project_1", slug: "demo", name: "Demo", isPersonal: false }],
+};
 const orgA = { id: "org_1", name: "ACME", teams: [teamA] };
 const orgB = { id: "org_2", name: "Beta Corp", teams: [] };
 
@@ -54,7 +60,7 @@ function renderShell({
   pathname = "/demo",
   state = {},
 }: {
-  organizations?: typeof orgA[];
+  organizations?: (typeof orgA)[];
   pathname?: string;
   state?: Partial<NavigationShellReadyState>;
 } = {}) {

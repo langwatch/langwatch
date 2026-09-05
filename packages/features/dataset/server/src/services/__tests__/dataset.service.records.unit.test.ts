@@ -1,14 +1,5 @@
 /**
  * @vitest-environment node
- *
- * What the service decides on the way to the record table, which no door test
- * can see: the slug a rename produces, the columns a partial entry is filled
- * out to, and the U+0000 scrub that keeps a customer-supplied string out of
- * Postgres jsonb (error 22P05).
- *
- * Ported from the parts of `platform/app/src/app/api/dataset/__tests__/`
- * that proved service behaviour through Postgres. The repositories are fakes,
- * so the assertions are on what the service asked them to write.
  */
 import { describe, expect, it, vi } from "vitest";
 import { InvalidColumnError } from "../errors";

@@ -7,6 +7,10 @@ import { VirtualKeyCryptoAdapter } from "./adapters/virtual-key-crypto.adapter";
 import { PrismaGatewayAuditRepository } from "./repositories/prisma/prisma.gateway-audit.repository";
 import { PrismaGatewayChangeEventsRepository } from "./repositories/prisma/prisma.gateway-change-event.repository";
 import { PrismaGatewayVirtualKeyRepository } from "./repositories/prisma/prisma.virtual-key.repository";
+import { PrismaGatewayKeyBudgetRepository } from "./repositories/prisma/prisma.gateway-key-budget.repository";
+import { PrismaGatewayScopeResolutionRepository } from "./repositories/prisma/prisma.gateway-scope-resolution.repository";
+import { PrismaGatewayTransactionAdapter } from "./adapters/prisma.gateway-transaction.adapter";
+import { GatewayScopeResolutionService } from "./services/gateway-scope-resolution.service";
 import { VirtualKeyService } from "./services/virtual-key.service";
 
 export { GatewayUsageService } from "./services/gateway-usage.service";
@@ -21,7 +25,11 @@ export function createVirtualKeyServiceForTest(
   projects: ProjectService,
 ): VirtualKeyService {
   return VirtualKeyService.create({
-    prisma,
+    transactions: PrismaGatewayTransactionAdapter.create({ database: prisma }),
+    keyBudgets: PrismaGatewayKeyBudgetRepository.create({ database: prisma }),
+    scopeResolution: GatewayScopeResolutionService.create({
+      repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
+    }),
     projects,
     repository: PrismaGatewayVirtualKeyRepository.create(prisma),
     changeEvents: PrismaGatewayChangeEventsRepository.create(prisma),

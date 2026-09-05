@@ -49,7 +49,9 @@ const GUARDED_WRITERS: Record<string, string> = {
  * Serializers whose output is never handed to a person. `parse-tabular-file` converts an
  * uploaded JSON file into the CSV text the import parser reads back moments later.
  */
-const INTERNAL_SERIALIZERS = new Set(["packages/features/dataset/web/src/model/parse-tabular-file.ts"]);
+const INTERNAL_SERIALIZERS = new Set([
+  "packages/features/dataset/web/src/model/parse-tabular-file.ts",
+]);
 
 /**
  * Below this many scanned files, assume the walk broke rather than that the

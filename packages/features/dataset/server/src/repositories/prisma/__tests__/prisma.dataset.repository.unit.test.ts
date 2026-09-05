@@ -1,13 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The query the dataset list issues. Boundary mock: `dataset.findMany` is a
- * spy, so the `where`, the page window and the record-count include are
- * assertable without a database.
- *
- * The archived predicate is the load-bearing part — an archived dataset keeps
- * its row and a mangled slug, so a list that forgot `archivedAt: null` would
- * hand deleted datasets back to every API consumer.
  */
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";

@@ -5,17 +5,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 /**
- * The static half of the ClickHouse tenant-scope rule.
- *
- * The enforcing half is the guard on the wrapped vendor client, which sees the
- * final SQL and refuses at runtime. This test reads the source instead, so a
- * statement that would only fail on the one code path nobody exercises is
- * caught in review rather than in production. Where the two disagree the guard
- * wins: it is the one with the real statement in its hand.
- *
- * What it cannot see, and does not pretend to: SQL built in another module and
- * handed over as a string. Those calls are reported as unresolvable and left to
- * the runtime guard rather than being failed on a guess.
+ * The static half of the ClickHouse tenant-scope rule. The enforcing half is the guard on the
+ * wrapped vendor client, which sees the final SQL and refuses at runtime.
  */
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
@@ -32,10 +23,9 @@ const SCANNED_DIRECTORIES = [
 ];
 
 /**
- * Files that build their own driver client with `createClient(` are outside the
- * managed client entirely - the schema migration runner, the TTL reconciler and
- * the LangWatchQL executor, each of which connects as a different identity - so
- * the guard never sees their statements and neither does this rule.
+ * Files that build their own driver client with `createClient(` are outside the managed
+ * client entirely - the schema migration runner, the TTL reconciler and the LangWatchQL
+ * executor - so the guard never sees their statements.
  */
 const BUILDS_ITS_OWN_CLIENT = /\bcreateClient\s*\(/;
 
@@ -192,12 +182,6 @@ function literalsIn(source: string, from: number, to: number): string {
 
 /**
  * The body of the function whose signature starts at `from`.
- *
- * The first brace after the parameter list is often the return type - these
- * repositories return `{ sql, baseSql, params }` shapes - and reading that
- * instead of the body is how a rule like this silently stops seeing the WHERE
- * clause it exists to find. So: take a brace, measure it, and if another brace
- * follows immediately, the one that follows is the body.
  */
 function bodyAfterSignature(source: string, from: number): string | null {
   let cursor = source.indexOf(")", from);
@@ -217,12 +201,6 @@ function bodyAfterSignature(source: string, from: number): string | null {
 
 /**
  * Every name in the file, mapped to the source of what it was declared as.
- *
- * The source rather than the SQL, because resolution has to be transitive: a
- * read writes `WHERE ${baseWhereClause}`, that name came out of a destructured
- * call to a `whereClause` helper, and the tenant predicate is a string inside
- * that helper's body. Following names to their declarations and on to the names
- * those declarations mention is how the rule reaches it.
  */
 function declarationsOf(source: string): Map<string, string> {
   const declarations = new Map<string, string>();
@@ -375,9 +353,9 @@ describe("ClickHouse repositories", () => {
       (callSitesIn("fixture.ts", source)[0] as CallSite).verdict;
 
     it("fails a literal statement with no tenant predicate", () => {
-      expect(
-        classify('await client.query({ query: "SELECT 1 FROM trace_summaries" });'),
-      ).toBe("unscoped");
+      expect(classify('await client.query({ query: "SELECT 1 FROM trace_summaries" });')).toBe(
+        "unscoped",
+      );
     });
 
     it("passes the same statement once it declares why it spans tenants", () => {

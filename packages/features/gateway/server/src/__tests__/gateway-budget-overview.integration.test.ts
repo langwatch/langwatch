@@ -22,6 +22,7 @@ import {
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support";
 import { BudgetOverviewService } from "../services/gateway-budget-overview.service";
+import { PrismaGatewayBudgetOverviewRepository } from "../repositories/prisma/prisma.gateway-budget-overview.repository";
 import type { GatewayService } from "../services/gateway.service";
 import { TestFeatureFlagService } from "./support/test-feature-flag-service";
 import { TestOrganizationService } from "./support/test-organization-service";
@@ -129,7 +130,7 @@ const featureFlags = new TestFeatureFlagService();
 
 const overviewService = (): BudgetOverviewService =>
   BudgetOverviewService.create({
-    database: prisma,
+    repository: PrismaGatewayBudgetOverviewRepository.create({ database: prisma }),
     organizations: new SuiteOrganizationService(),
     featureFlags,
     personalVirtualKeys: {

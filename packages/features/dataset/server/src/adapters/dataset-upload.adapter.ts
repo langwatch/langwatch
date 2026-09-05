@@ -21,7 +21,7 @@ import type {
   DatasetColumns,
 } from "@langwatch/dataset-contract";
 import type { Readable } from "node:stream";
-import { DatasetContentRepository } from "../repositories/prisma/dataset-content.repository";
+import { DatasetContentRepository } from "../repositories/dataset-content.repository";
 import { DatasetRecordContentRepository } from "../repositories/prisma/dataset-record-content.repository";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
 import type { DatasetRow, DatasetUploadPort } from "../ports/dataset.port";

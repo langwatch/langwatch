@@ -131,8 +131,12 @@ describe("PrismaEvaluatorRepository slug generation", () => {
       const { database, created } = fakeDatabase();
       const repository = PrismaEvaluatorRepository.create(database);
 
-      await repository.create(persistInput({ id: "eval_1", projectId: "proj1", name: "Exact Match" }));
-      await repository.create(persistInput({ id: "eval_2", projectId: "proj2", name: "Exact Match" }));
+      await repository.create(
+        persistInput({ id: "eval_1", projectId: "proj1", name: "Exact Match" }),
+      );
+      await repository.create(
+        persistInput({ id: "eval_2", projectId: "proj2", name: "Exact Match" }),
+      );
 
       expect(created[0]?.slug).toBe("exact-match");
       expect(created[1]?.slug).toBe("exact-match");

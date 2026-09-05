@@ -73,14 +73,9 @@ export abstract class OrganizationInviteRepository {
   abstract createPaymentPendingInvite(
     input: WriteInviteInput & { subscriptionId: string },
   ): Promise<OrganizationInvite>;
-  abstract findListableInvites(input: {
-    organizationId: string;
-  }): Promise<InviteWithRequester[]>;
+  abstract findListableInvites(input: { organizationId: string }): Promise<InviteWithRequester[]>;
   /** Answers how many rows moved; zero means the invite was not open. */
-  abstract revokeOpenInvite(input: {
-    inviteId: string;
-    organizationId: string;
-  }): Promise<number>;
+  abstract revokeOpenInvite(input: { inviteId: string; organizationId: string }): Promise<number>;
   abstract tryFindInviteWithOrganization(input: {
     inviteId: string;
     organizationId: string;

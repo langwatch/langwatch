@@ -1,11 +1,6 @@
 /**
- * The `document_id` a RAG chunk is given when the SDK sent none.
- *
- * It is derived from the chunk's own text, so the same chunk seen in two
- * traces is recognised as the same document. That makes the derivation load
- * bearing in two directions: a chunk that already carries an id must keep it
- * (the customer's own id is the one their systems know), and the enrichment
- * must write back under the canonical key even when it read the legacy one.
+ * The `document_id` a RAG chunk is given when the SDK sent none. It is derived from the chunk's
+ * own text, so the same chunk seen in two traces is recognised as the same document.
  */
 
 import crypto from "crypto";

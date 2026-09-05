@@ -4,11 +4,7 @@
 
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type {
-  GatewayBudget,
-  GatewayBudgetScopeType,
-  PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import type { GatewayBudget, GatewayBudgetScopeType } from "@langwatch/prisma-client/generated";
 
 import {
   type ApplicableBudget,
@@ -17,6 +13,7 @@ import {
 import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
 import { scopeTargetKey, type GatewayService, GatewayWindow } from "@langwatch/gateway-contract";
 import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository";
+import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository";
 
 /**
  * How binding a scope is to the reader, most binding first (personal > key > shared pools) — the truncation order for surfaces with only a few lines. `satisfies` over the Prisma enum keeps the map exhaustive: a new scope kind fails to compile rather than silently sorting last.
@@ -104,7 +101,7 @@ type PersonalUsageReader = {
 
 export class BudgetOverviewService {
   private constructor(
-    private readonly prisma: PrismaClient,
+    private readonly repository: GatewayBudgetOverviewRepository,
     private readonly organizations: OrganizationService,
     private readonly featureFlags: FeatureFlagService,
     private readonly personalVirtualKeys: PersonalVirtualKeyReader,
@@ -122,7 +119,7 @@ export class BudgetOverviewService {
   }
 
   static create(options: {
-    database: PrismaClient;
+    repository: GatewayBudgetOverviewRepository;
     organizations: OrganizationService;
     featureFlags: FeatureFlagService;
     personalVirtualKeys: PersonalVirtualKeyReader;
@@ -132,7 +129,7 @@ export class BudgetOverviewService {
     budgetRepository?: GatewayBudgetSpendPort;
   }): BudgetOverviewService {
     return new BudgetOverviewService(
-      options.database,
+      options.repository,
       options.organizations,
       options.featureFlags,
       options.personalVirtualKeys,
@@ -237,8 +234,9 @@ export class BudgetOverviewService {
     organizationId: string;
     budgetId: string;
   }): Promise<BudgetOverviewItem | null> {
-    const budget = await this.prisma.gatewayBudget.findFirst({
-      where: { id: input.budgetId, organizationId: input.organizationId },
+    const budget = await this.repository.tryFindBudget({
+      organizationId: input.organizationId,
+      budgetId: input.budgetId,
     });
     if (!budget) {
       return null;

@@ -1,13 +1,6 @@
 /**
- * Global Setup for E2E Tests
- *
- * Resolves the stack the suite runs against and validates it before any test.
- * The helper decides which one: `LANGWATCH_E2E_BASE_URL` (CI), else this
- * worktree's haven stack, else one already answering at BASE_URL, else it boots
- * one on `E2E_STACK_PORT` and this file puts that back down afterwards.
- *
- * The journey's target agent starts here too: a run has to complete, so the
- * address the HTTP agent names must answer.
+ * Global Setup for E2E Tests Resolves the stack the suite runs against and validates it before
+ * any test.
  */
 import { startStack, type RunningStack } from "@langwatch/e2e-stack";
 

@@ -15,7 +15,7 @@
 import { describe, expect, it } from "vitest";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import type { DatasetStorage } from "../../ports/dataset-storage.port";
-import type { DatasetContentRepository } from "../../repositories/prisma/dataset-content.repository";
+import type { DatasetContentRepository } from "../../repositories/dataset-content.repository";
 import { DatasetChunkService, type DatasetMutationRecord } from "../dataset-chunk.service";
 
 type Update = { id: string; content: Record<string, unknown>; transactional: boolean };
@@ -317,9 +317,7 @@ describe("DatasetChunkService", () => {
       const asImage: DatasetColumns = [{ name: "photo", type: "image" }];
       const dataset = readyDataset({ ...oneChunk, columnTypes: asText });
       const { chunks } = fakeRepository(dataset);
-      const { storage, chunks: stored } = fakeStorage([
-        [{ id: "r1", entry: { photo: dataUrl } }],
-      ]);
+      const { storage, chunks: stored } = fakeStorage([[{ id: "r1", entry: { photo: dataUrl } }]]);
 
       const result = await chunks.migrateColumns({
         dataset,

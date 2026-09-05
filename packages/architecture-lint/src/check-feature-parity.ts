@@ -36,11 +36,9 @@ const __dirname = dirname(__filename);
 const REPO_ROOT = resolve(__dirname, "../../..");
 
 /**
- * Every tree that holds `.feature` files.
- *
- * Package-owned specifications are listed explicitly for the same reason as
- * the SDK tree: a package boundary must not make its behavioural contracts
- * invisible to the repository-wide parity gate.
+ * Every tree that holds `.feature` files. Package-owned specifications are listed explicitly
+ * for the same reason as the SDK tree: a package boundary must not make its behavioural
+ * contracts invisible to the repository-wide parity gate.
  */
 function discoverPackageSpecRoots(packagesRoot: string): string[] {
   if (!existsSync(packagesRoot)) return [];
@@ -79,12 +77,11 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // conversational behavior. Without this root those specs could only be
   // @unimplemented. It is reached through the "apps" root below.
   "packages",
-  // The process compositions (apps/api, apps/ui, apps/worker, apps/server).
-  // Code moving out of the platform application took its tests with it — the worker's
-  // liveness/metrics server is the first — and without this root every
-  // scenario those tests bind would silently become unbound the moment the
-  // code left, which reads as "the spec was never enforced" rather than as a
-  // move.
+  // The process compositions (apps/api, apps/ui, apps/worker, apps/server). Code moving out of
+  // the platform application took its tests with it — the worker's liveness/metrics server is
+  // the first — and without this root every scenario those tests bind would silently become
+  // unbound the moment the code left, which reads as "the spec was never enforced" rather than
+  // as a move.
   "apps",
   // Langy's pi-harness wrapper: the process that turns the manager's config
   // into pi's model registry and speaks the stdio protocol. Scenarios about
@@ -201,20 +198,9 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
 const DEFAULT_PYTHON_TEST_ROOTS: string[] = ["services/langevals", "sdks/python"];
 
 /**
- * Feature files whose unbound `@unit` / `@integration` scenarios are
- * tolerated (non-fatal) during migration. These files still parse; their
- * counts surface in the `legacy` block of `--json` output and in the
- * human-readable summary so shrinkage is visible.
- *
- * Direction: drive this list to empty. Adding a new file here should
- * require justification — prefer to bind, flag @unimplemented, or remove
- * the scenario.
- *
- * Invariants (enforced below):
- *   - Every path must resolve to an existing `.feature` file.
- *   - Every entry must actually contain at least one unbound `@unit` /
- *     `@integration` scenario. Fully-bound files must be removed — this
- *     prevents the list from rotting.
+ * Feature files whose unbound `@unit` / `@integration` scenarios are tolerated (non-fatal)
+ * during migration. These files still parse; their counts surface in the `legacy` block of
+ * `--json` output and in the human-readable summary so shrinkage is visible.
  */
 const LEGACY_UNBOUND: string[] = [
   // sdks/typescript/specs is absent from THIS list, but do not read that as
@@ -249,30 +235,9 @@ const LEGACY_UNBOUND: string[] = [
 ];
 
 /**
- * Feature files that contain scenarios but yield ZERO enforced ones, because
- * nothing in them is tagged `@unit` / `@integration` / `@e2e` / `@regression`.
- *
- * This is the gate's oldest blind spot. An untagged file is not "passing" — it
- * is unmeasured, and it reports itself as `0/0 scenarios bound · ✓ all bound`,
- * which reads exactly like a fully-covered file. Adding a fresh `.feature` with
- * twenty untagged scenarios used to be a silent no-op.
- *
- * The list turns that silence into a ratchet: the files below are the ones
- * already in that state when the floor was introduced, and they are tolerated.
- * Any OTHER file that yields no enforced scenario fails the check.
- *
- * A file whose scenarios are all `@unimplemented` also lands here — tags say
- * "tracked gap", and that is a claim worth making explicitly rather than by
- * omission.
- *
- * Direction: drive this list to empty by tagging the scenarios that describe
- * behaviour we actually test, marking @unimplemented the ones we do not, and
- * deleting the ones that no longer describe anything.
- *
- * Invariants (enforced below):
- *   - Every path must resolve to a discovered `.feature` file.
- *   - Every entry must still be inert. A file that has since gained an
- *     enforced scenario must be removed — that is the ratchet clicking.
+ * Feature files that contain scenarios but yield ZERO enforced ones, because nothing in them is
+ * tagged `@unit` / `@integration` / `@e2e` / `@regression`. This is the gate's oldest blind
+ * spot.
  */
 const LEGACY_INERT: string[] = [
   "specs/agents/create-workflow-agent.feature",
@@ -791,11 +756,9 @@ function walkFiles(root: string, predicate: (name: string) => boolean): string[]
 }
 
 /**
- * A configured root that is missing is a CONFIGURATION failure, not an empty
- * tree. Skipping it silently is how a renamed or moved spec directory reports
- * every scenario in it as bound: the files simply stop being discovered, and
- * the check goes green having measured nothing. Fail closed instead — the tree
- * is either there or the check refuses to run.
+ * A configured root that is missing is a CONFIGURATION failure, not an empty tree. Skipping it
+ * silently is how a renamed or moved spec directory reports every scenario in it as bound: the
+ * files simply stop being discovered, and the check goes green having measured nothing.
  */
 export function discoverFeatureFiles(roots: readonly string[] = SPECS_ROOTS): string[] {
   const files = roots.flatMap((root) => {
@@ -842,30 +805,8 @@ const ANNOTATION_RE =
   /^[ \t]*(?:(?:\/\/|\/\*|\*|#)[ \t]*)*@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|$)/gm;
 
 /**
- * The spans of `src` that a MARKER-LESS annotation is allowed to live in: block
- * comments, and the triple-quoted strings Python writes its docstrings as.
- *
- * WHY THIS EXISTS. The annotation prefix above accepts zero comment markers,
- * because the marker-less form is real: five live bindings in the Python SDK
- * sit on their own line inside a `"""` docstring, and requiring a marker would
- * un-bind all five without a word, which is the vacuous green this gate exists
- * to remove. But zero markers also matches a bare source line, and a line regex
- * cannot tell an unmarked line inside a block comment from one outside it: the
- * deciding context is on an earlier line. Only reading the file in order
- * answers that.
- *
- * WHY IT IS NOT CONSULTED FOR A MARKED ANNOTATION. It was, in the first
- * version, and it dropped 9 live bindings out of 7133. A template literal on an
- * earlier line desynchronised the string tracking, and the phantom string then
- * swallowed the `/**` of a real annotation six lines later. Marked annotations
- * are 7128 of the 7133; putting a hand-written scanner in front of all of them
- * risks far more than it can win. So a marker is still proof on its own, and
- * this only decides the marker-less case, where the worst a mistake can do is
- * accept one annotation the old code accepted too.
- *
- * That is also why strings are not tracked here. A stray `/*` inside a string
- * can open a span that is not really a comment, and the cost of that is bounded
- * by the paragraph above.
+ * The spans of `src` that a MARKER-LESS annotation is allowed to live in: block comments, and
+ * the triple-quoted strings Python writes its docstrings as. WHY THIS EXISTS.
  */
 /** The offset just past `close` after `from`, or the end of `src`. */
 function spanEnd(src: string, from: number, close: string): number {
@@ -943,11 +884,9 @@ export function findScenarioAnnotations(
 }
 
 /**
- * Whether a test call follows `start` — the proximity half of a binding.
- *
- * Oxlint's `RuleTester` (`tests/*.test.mjs`) registers its cases through
- * `tester.run(name, rule, { valid, invalid })`, with `RuleTester.it = it`
- * underneath, so that call is the test call for a fixture suite.
+ * Whether a test call follows `start` — the proximity half of a binding. Oxlint's `RuleTester`
+ * (`tests/*.test.mjs`) registers its cases through `tester.run(name, rule, { valid, invalid
+ * })`, with `RuleTester.it = it` underneath, so that call is the test call for a fixture suite.
  */
 export function isFollowedByTestCall(src: string, start: number): boolean {
   const len = src.length;
@@ -1095,10 +1034,9 @@ const GO_SUBTEST_HEAD_RE = /^[A-Za-z_][A-Za-z0-9_]*\.Run\(/;
 const GO_SUBTEST_CLOSURE_RE = /^func\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s+\*testing\.T\s*\)\s*\{/;
 
 /**
- * Longest prefix of a `.Run(` call the scan will read before giving up. The
- * first argument plus its comma is a few dozen characters even when the call
- * is spread over several lines; the cap exists only so a truncated or
- * malformed file cannot turn the scan into a walk to EOF.
+ * Longest prefix of a `.Run(` call the scan will read before giving up. The first argument plus
+ * its comma is a few dozen characters even when the call is spread over several lines; the cap
+ * exists only so a truncated or malformed file cannot turn the scan into a walk to EOF.
  */
 const GO_SUBTEST_SCAN_BUDGET = 4096;
 
@@ -1133,26 +1071,7 @@ function skipGoSpaceAndComments(src: string, start: number, limit: number): numb
 }
 
 /**
- * Is `rest` the start of a `t.Run("name", func(t *testing.T) { … }` subtest
- * declaration?
- *
- * The subtest name may be a quoted literal, a raw (backtick) literal, or an
- * arbitrary expression (`tc.name`, `fmt.Sprintf("%s/%s", a, b)`), and gofmt
- * does NOT collapse the call onto one line — it preserves whatever the author
- * wrote, so the very common
- *
- *   t.Run(
- *     "a long subtest name",
- *     func(t *testing.T) {
- *
- * has to bind too. A regex that spans the newline would either backtrack
- * across the rest of the file on every non-match (`[\s\S]*?`) or, bounded to
- * one line (`[^\n]*?`), silently reject the form above. So the first argument
- * is walked forward instead, character by character and once each: string,
- * raw-string and rune literals are skipped whole so a comma inside them is not
- * read as the argument separator, bracket depth is tracked for the same reason,
- * and the walk stops at the first top-level comma. What follows that comma must
- * be the `*testing.T` closure.
+ * Is `rest` the start of a `t.Run("name", func(t *testing.T) { … }` subtest declaration?
  */
 function isGoSubtestDeclaration(rest: string): boolean {
   const head = rest.match(GO_SUBTEST_HEAD_RE);
@@ -1568,12 +1487,6 @@ function printNewInert(reports: InertReport[]): void {
 
 /**
  * The verdict, above the per-file sections as well as below them.
- *
- * Every `✓ all bound` under a `▸` heading is scoped to one feature file, and a
- * run can fail on something belonging to no heading at all, so reading the tick
- * next to your own change and stopping there is the obvious mistake. Takes the
- * same reasons the exit code is built from, so the banner and the trailing FAIL
- * line cannot disagree.
  */
 export function formatFailureBanner(reasons: string[]): string[] {
   if (reasons.length === 0) return [];
@@ -1584,11 +1497,9 @@ export function formatFailureBanner(reasons: string[]): string[] {
 }
 
 /**
- * Unknown annotations, grouped under the file they were written in.
- *
- * They belong to no `▸` feature section, because the scenario they name is in
- * no feature file at all, so a flat trailing list leaves them unattributed and
- * far from the change that introduced them.
+ * Unknown annotations, grouped under the file they were written in. They belong to no `▸`
+ * feature section, because the scenario they name is in no feature file at all, so a flat
+ * trailing list leaves them unattributed and far from the change that introduced them.
  */
 export function formatUnknownAnnotations(unknown: UnknownAnnotation[]): string[] {
   if (unknown.length === 0) return [];
@@ -1743,12 +1654,11 @@ function printParityReport(a: ParityAnalysis): void {
     `Enforced: ${a.enforced.length} file(s) · Legacy: ${a.legacy.length} file(s) · Inert: ${a.inert.length} file(s)`,
   );
 
-  // The verdict goes above the per-file sections as well as below them. Every
-  // `✓ all bound` under a `▸` heading is scoped to that one feature file, and a
-  // run can fail on something that belongs to no heading at all, so reading the
-  // tick next to your own change and stopping there is the obvious mistake. The
-  // reasons come from the same function the exit code does, so this banner and
-  // the trailing FAIL line cannot disagree.
+  // The verdict goes above the per-file sections as well as below them. Every `✓ all bound`
+  // under a `▸` heading is scoped to that one feature file, and a run can fail on something
+  // that belongs to no heading at all, so reading the tick next to your own change and stopping
+  // there is the obvious mistake. The reasons come from the same function the exit code does,
+  // so this banner and the trailing FAIL line cannot disagree.
   for (const line of formatFailureBanner(fatalReasons(a))) console.log(line);
 
   for (const r of a.enforced) printEnforcedReport(r);
@@ -1864,17 +1774,6 @@ function main(): void {
 
 /**
  * Is this module the one node was asked to run?
- *
- * A plain string compare of `process.argv[1]` against `import.meta.url` is
- * fail-OPEN: invoke the check through a symlink — a `node_modules/.bin` shim, a
- * pnpm store link, a worktree symlinked into place — and the two paths differ,
- * the guard declines to run `main()`, and the process exits 0 having checked
- * nothing. A parity gate that silently no-ops is worse than no gate. So both
- * sides are resolved through `realpathSync` before comparing.
- *
- * `realpathSync` throws if the path does not exist (argv[1] can be anything);
- * falling back to the lexically-resolved path keeps that case a mismatch rather
- * than a crash.
  */
 export function isEntryModule({
   invokedPath,

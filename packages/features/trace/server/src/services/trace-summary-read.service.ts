@@ -1,7 +1,10 @@
 import { VisibilityWindowService } from "./trace-visibility-window.service";
 import { TraceOffloadResolutionService } from "./trace-offload-resolution.service";
 import { createLogger } from "@langwatch/observability";
-import type { FindByTraceIdOptions, TraceSummaryRepository } from "@langwatch/trace-server";
+import type {
+  FindByTraceIdOptions,
+  TraceSummaryRepository,
+} from "../repositories/trace-summary.repository";
 
 import type { TraceBlobStoreService } from "./trace-blob-store.service";
 import { TraceNotFoundError } from "./trace-read.errors";

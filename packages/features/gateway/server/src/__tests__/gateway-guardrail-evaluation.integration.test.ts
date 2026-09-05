@@ -20,6 +20,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { GatewayGuardrailEvaluationService } from "../services/gateway-guardrail-evaluation.service";
+import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.gateway-guardrail.repository";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -129,12 +130,22 @@ const skipped: SingleEvaluationResult = {
 
 const monitors = new MonitorRowsFromDatabase();
 
-const guardrailWire = GatewayGuardrailEvaluationService.create(prisma, monitors, async () => {
-  throw new Error("the wire mapping tests never run an evaluator");
+const guardrails = PrismaGatewayGuardrailRepository.create(prisma);
+
+const guardrailWire = GatewayGuardrailEvaluationService.create({
+  repository: guardrails,
+  monitors,
+  runEvaluator: async () => {
+    throw new Error("the wire mapping tests never run an evaluator");
+  },
 });
 
 const serviceReturning = (result: SingleEvaluationResult) =>
-  GatewayGuardrailEvaluationService.create(prisma, monitors, async () => result);
+  GatewayGuardrailEvaluationService.create({
+    repository: guardrails,
+    monitors,
+    runEvaluator: async () => result,
+  });
 
 async function createGuardrail({
   id,
@@ -398,12 +409,12 @@ describe.skipIf(!databaseUrl)("GatewayGuardrailEvaluationService against real PG
       // Both guardrails are in the request and only one fails. The runner
       // routes on the monitor parameters, which differ per evaluator, so the
       // two guardrails genuinely behave differently in a single check.
-      const routed = GatewayGuardrailEvaluationService.create(
-        prisma,
+      const routed = GatewayGuardrailEvaluationService.create({
+        repository: guardrails,
         monitors,
-        async ({ settings }) =>
+        runEvaluator: async ({ settings }) =>
           (settings as { verdict?: string })?.verdict === "fail" ? failing : passing,
-      );
+      });
       const blocked = await routed.check({
         projectId: PROJECT_ID,
         guardrailIds: [passId, failId],

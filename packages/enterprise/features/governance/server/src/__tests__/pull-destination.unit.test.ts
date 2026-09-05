@@ -76,12 +76,9 @@ describe("given a Genie config pointed somewhere the token must never go", () =>
     });
 
     /**
-     * The two copies of this rule disagreed here, and nothing pinned it: the
-     * regex on the write path refused anything past the host, while the URL
-     * parse beside the reasoning allowed a path. Now that one calls the other,
-     * the answer has to be written down — a matching host reached at a path or
-     * a port is not the workspace API, and it is the shape a real workspace
-     * host gets pointed somewhere else with.
+     * The two copies of this rule disagreed here, and nothing pinned it: the regex on the write
+     * path refused anything past the host, while the URL parse beside the reasoning allowed a
+     * path.
      */
     it.each([
       "https://adb-1.7.azuredatabricks.net/redirect",

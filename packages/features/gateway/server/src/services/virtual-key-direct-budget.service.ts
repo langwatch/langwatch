@@ -1,9 +1,10 @@
 /**
  * The budget a key carries on itself, with spend in its own current period — distinct from calendar-month spend (a daily cap measures against today, so $2.50/month spent can still be $0.50 of a $1.00 day, both true, neither substituting). Spend comes from the same rollup read the drawer's "already applies" list and Budgets page use, so a limit and its "spent so far" agree everywhere.
  */
-import type { GatewayBudget, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { GatewayBudget } from "@langwatch/prisma-client/generated";
 import { createLogger } from "@langwatch/observability";
 import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
+import type { VirtualKeyDirectBudgetRepository } from "../repositories/gateway-virtual-key-direct-budget.repository";
 import { GatewayWindow } from "@langwatch/gateway-contract";
 
 const logger = createLogger("langwatch:gateway:virtual-key-direct-budget");
@@ -69,26 +70,21 @@ function winsOver(candidate: GatewayBudget, incumbent: GatewayBudget | undefined
  * rather than as a confident zero.
  */
 async function loadPeriodSpend(args: {
-  prisma: PrismaClient;
+  repository: VirtualKeyDirectBudgetRepository;
   organizationId: string;
   budgets: GatewayBudget[];
   chRepo: GatewayBudgetSpendPort | undefined;
   now: Date;
 }): Promise<Map<string, string> | null> {
-  const { prisma, organizationId, budgets, chRepo, now } = args;
+  const { repository, organizationId, budgets, chRepo, now } = args;
   if (!chRepo) {
     return null;
   }
 
-  // ORG/TEAM/PRINCIPAL rows accrue under whichever project emitted the
-  // trace, so every project in the organization is a tenant to sum over.
-  const projects = await prisma.project.findMany({
-    where: { team: { organizationId } },
-    select: { id: true },
-  });
+  const projectIds = await repository.findProjectIdsInOrganization({ organizationId });
   try {
     const spends = await chRepo.getSpendForTargetsAcrossTenants(
-      projects.map((p) => p.id),
+      projectIds,
       GatewayBudgetSpendPort.targetsForBudgets({ budgets, now }),
       now,
     );
@@ -112,10 +108,12 @@ async function loadPeriodSpend(args: {
 
 /** The budget a key carries on itself, with its current-period spend. */
 export class VirtualKeyDirectBudgetService {
-  private constructor(private readonly prisma: PrismaClient) {}
+  private constructor(private readonly repository: VirtualKeyDirectBudgetRepository) {}
 
-  static create(prisma: PrismaClient): VirtualKeyDirectBudgetService {
-    return new VirtualKeyDirectBudgetService(prisma);
+  static create(input: {
+    repository: VirtualKeyDirectBudgetRepository;
+  }): VirtualKeyDirectBudgetService {
+    return new VirtualKeyDirectBudgetService(input.repository);
   }
 
   /**
@@ -133,22 +131,14 @@ export class VirtualKeyDirectBudgetService {
     now?: Date;
   }): Promise<Map<string, VirtualKeyDirectBudget>> {
     const { chRepo, now = new Date() } = args;
-    const prisma = this.prisma;
     const out = new Map<string, VirtualKeyDirectBudget>();
     if (args.virtualKeyIds.length === 0) {
       return out;
     }
 
-    const budgets = await prisma.gatewayBudget.findMany({
-      where: {
-        organizationId: args.organizationId,
-        archivedAt: null,
-        OR: [
-          { scopeType: "VIRTUAL_KEY", scopeId: { in: args.virtualKeyIds } },
-          { managedByVirtualKeyId: { in: args.virtualKeyIds } },
-        ],
-      },
-      orderBy: { createdAt: "asc" },
+    const budgets = await this.repository.findBudgetsTargetingKeys({
+      organizationId: args.organizationId,
+      virtualKeyIds: args.virtualKeyIds,
     });
 
     const chosen = chooseOnePerKey(budgets, new Set(args.virtualKeyIds));
@@ -157,7 +147,7 @@ export class VirtualKeyDirectBudgetService {
     }
 
     const spentByBudgetId = await loadPeriodSpend({
-      prisma,
+      repository: this.repository,
       organizationId: args.organizationId,
       budgets: [...chosen.values()],
       chRepo,

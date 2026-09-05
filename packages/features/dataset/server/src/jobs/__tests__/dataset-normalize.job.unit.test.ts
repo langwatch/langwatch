@@ -4,10 +4,9 @@ import { toJsonlChunks } from "../../services/dataset-chunking";
 import { createDatasetNormalizeHandler } from "../dataset-normalize.job";
 
 /**
- * Unit test the normalize handler at its boundaries: a fake `DatasetStorage`
- * (streamStaged → Readable.from(...), writeChunks / deleteStaged /
- * deleteChunksFrom spies) and a stub `DatasetRepository`. The streaming parse +
- * chunk-writer logic under test stays real.
+ * Unit test the normalize handler at its boundaries: a fake `DatasetStorage` (streamStaged →
+ * Readable.from(...), writeChunks / deleteStaged / deleteChunksFrom spies) and a stub
+ * `DatasetRepository`. The streaming parse + chunk-writer logic under test stays real.
  */
 
 const makeStorage = (overrides: Record<string, unknown> = {}) => {
