@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { CodingAgentClickHousePort } from "../coding-agent-clickhouse.port";
 import { CodingAgentSessionEventsClickHouseRepository } from "../../repositories/coding-agent-session-event/clickhouse.repository";
-import { TestClickHouseEndpoint } from "../../repositories/__tests__/fixtures/coding-agent.fixture";
+import { TestClickHouseEndpoint } from "../../__tests__/fixtures/coding-agent.fixture";
 
 const endpoints: TestClickHouseEndpoint[] = [];
 
@@ -42,15 +42,15 @@ describe("Coding Agent session-event ClickHouse repository", () => {
     endpoints.push(first, second);
     first.queryRows.push([modelTotal("tenant-a", "session-a", 3)]);
     second.queryRows.push([modelTotal("tenant-b", "session-b", 4)]);
-    const repository = new CodingAgentSessionEventsClickHouseRepository(
-      new RoutedClickHouse(
+    const repository = CodingAgentSessionEventsClickHouseRepository.create({
+      clickHouse: new RoutedClickHouse(
         new Map([
           ["tenant-a", first],
           ["tenant-b", second],
         ]),
       ),
-      30,
-    );
+      defaultTraceRetentionDays: 30,
+    });
 
     const totals = await repository.sumTokensByModelPerSession({
       tenantIds: ["tenant-a", "tenant-b"],
@@ -68,15 +68,15 @@ describe("Coding Agent session-event ClickHouse repository", () => {
     const endpoint = await TestClickHouseEndpoint.create();
     endpoints.push(endpoint);
     endpoint.queryRows.push([]);
-    const repository = new CodingAgentSessionEventsClickHouseRepository(
-      new RoutedClickHouse(
+    const repository = CodingAgentSessionEventsClickHouseRepository.create({
+      clickHouse: new RoutedClickHouse(
         new Map([
           ["tenant-a", endpoint],
           ["tenant-b", endpoint],
         ]),
       ),
-      30,
-    );
+      defaultTraceRetentionDays: 30,
+    });
 
     await repository.sumTokensByModelPerSession({
       tenantIds: ["tenant-a", "tenant-b"],
@@ -137,10 +137,10 @@ async function repositoryReading(rows: Record<string, unknown>[]) {
   endpoints.push(endpoint);
   endpoint.queryRows.push(rows);
 
-  return new CodingAgentSessionEventsClickHouseRepository(
-    new RoutedClickHouse(new Map([["tenant-a", endpoint]])),
-    30,
-  );
+  return CodingAgentSessionEventsClickHouseRepository.create({
+    clickHouse: new RoutedClickHouse(new Map([["tenant-a", endpoint]])),
+    defaultTraceRetentionDays: 30,
+  });
 }
 
 const page = async (rows: Record<string, unknown>[], limit = 10) =>

@@ -16,7 +16,7 @@ import type {
 } from "@langwatch/evaluation-contract";
 import {
   ClickHouseEvaluationRepository,
-  DirectEvaluationExecutionReceipt,
+  DirectEvaluationExecutionReceiptAdapter,
   EvaluationEventingAdapter,
   EvaluationExecutionIntentPort,
   EvaluationExecutionIntentService,
@@ -225,7 +225,7 @@ function createEvaluationExecutionIntent(
     azureSafetyCredentials: collaborators.azureSafetyCredentials,
     settingsRecovery: collaborators.settingsRecovery,
     inputsOffload: collaborators.inputsOffload,
-    executionReceipt: DirectEvaluationExecutionReceipt.create({
+    executionReceipt: DirectEvaluationExecutionReceiptAdapter.create({
       execution: new WorkerEvaluationEngine(engine),
       costs: collaborators.costs,
     }),

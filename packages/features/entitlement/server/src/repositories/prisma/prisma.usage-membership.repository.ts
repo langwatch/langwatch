@@ -15,7 +15,7 @@ import {
   RoleBindingScopeType,
 } from "@langwatch/prisma-client/generated";
 import { UsageMembershipPort } from "../../ports/usage-membership.port";
-import { isFullMember, isLiteMember } from "../../services/member-classification.service";
+import { MemberClassificationService } from "../../services/member-classification.service";
 
 /** The first instant of the current calendar month, in the process's zone. */
 function getCurrentMonthStart(): Date {
@@ -68,7 +68,7 @@ export class PrismaUsageMembershipRepository extends UsageMembershipPort {
    */
   async getMemberCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
-    return this.countMembersByType(context, isFullMember);
+    return this.countMembersByType(context, MemberClassificationService.isFullMember);
   }
 
   /**
@@ -78,7 +78,7 @@ export class PrismaUsageMembershipRepository extends UsageMembershipPort {
    */
   async getMembersLiteCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
-    return this.countMembersByType(context, isLiteMember);
+    return this.countMembersByType(context, MemberClassificationService.isLiteMember);
   }
 
   /**

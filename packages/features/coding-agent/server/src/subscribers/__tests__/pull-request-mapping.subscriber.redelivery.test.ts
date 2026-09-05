@@ -16,7 +16,7 @@ import {
   shouldMapPullRequests,
 } from "../pull-request-mapping.subscriber";
 import { buildTestCodingAgentProcessingPipeline } from "../../adapters/__tests__/fixtures/coding-agent-processing.fixture";
-import { TestGithubService } from "../../repositories/__tests__/fixtures/coding-agent.fixture";
+import { TestGithubService } from "../../__tests__/fixtures/coding-agent.fixture";
 
 function foldState(over: Partial<CodingAgentSessionState> = {}): CodingAgentSessionState {
   return {

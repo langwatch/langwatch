@@ -11,9 +11,12 @@
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-import { TraceCanonicalisationService } from "@langwatch/trace-server/testing";
-import { mapChRowToNormalized, serializeAttributes } from "@langwatch/trace-server";
-import { SpanNormalizationPipelineService } from "@langwatch/trace-server";
+import {
+  mapChRowToNormalized,
+  serializeAttributes,
+  SpanNormalizationPipelineService,
+  TraceCanonicalisationService,
+} from "@langwatch/trace-server/testing";
 import {
   makeSpanReferencedPayload,
   type SpanReferencedPayload,

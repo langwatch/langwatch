@@ -9,8 +9,8 @@ import {
   type UsageOrganizationPort,
   type UsageVolumeCounterPort,
 } from "../ports/usage-enforcement.ports";
-import { resolveUsageMeter } from "./usage-meter-policy.service";
-import { buildLimitMessage, type UsageDeployment } from "./usage-limit-message.service";
+import { UsageMeterPolicyService } from "./usage-meter-policy.service";
+import { UsageLimitMessageService, type UsageDeployment } from "./usage-limit-message.service";
 
 const logger = createLogger("langwatch:usage");
 
@@ -51,6 +51,18 @@ export type UsageLimitResult =
       usageUnit: UsageUnit;
     };
 
+/** What enforcement is composed from: the counters, the plan, and the install. */
+export interface UsageServiceDependencies {
+  organizations: UsageOrganizationPort;
+  traceCounter: UsageVolumeCounterPort;
+  eventCounter: UsageVolumeCounterPort;
+  planResolver: PlanResolver;
+  deployment: UsageDeployment;
+  /** Both caches are 30-second windows in production; absent means uncached. */
+  countCache?: UsageCachePort;
+  decisionCache?: UsageCachePort;
+}
+
 /**
  * App-layer usage service.
  *
@@ -68,16 +80,11 @@ export class UsageService {
   private readonly countCache: UsageCachePort;
   private readonly decisionCache: UsageCachePort;
 
-  constructor(deps: {
-    organizations: UsageOrganizationPort;
-    traceCounter: UsageVolumeCounterPort;
-    eventCounter: UsageVolumeCounterPort;
-    planResolver: PlanResolver;
-    deployment: UsageDeployment;
-    /** Both caches are 30-second windows in production; absent means uncached. */
-    countCache?: UsageCachePort;
-    decisionCache?: UsageCachePort;
-  }) {
+  static create(deps: UsageServiceDependencies): UsageService {
+    return new UsageService(deps);
+  }
+
+  private constructor(deps: UsageServiceDependencies) {
     this.organizations = deps.organizations;
     this.traceUsageService = deps.traceCounter;
     this.eventUsageService = deps.eventCounter;
@@ -125,7 +132,7 @@ export class UsageService {
 
       return {
         exceeded: true,
-        message: buildLimitMessage({
+        message: UsageLimitMessageService.buildLimitMessage({
           isFree: plan.free,
           limit: plan.maxMessagesPerMonth,
           usageUnit: decision.usageUnit,
@@ -290,7 +297,7 @@ export class UsageService {
     const plan = resolvedPlan ?? (await this.planResolver(organizationId));
     const hasValidLicenseOverride = plan.planSource === "license";
 
-    const decision = resolveUsageMeter({
+    const decision = UsageMeterPolicyService.resolveUsageMeter({
       pricingModel,
       licenseUsageUnit: plan.usageUnit,
       hasValidLicenseOverride,

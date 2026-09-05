@@ -4,7 +4,7 @@
  * A pure decision with no I/O, because the two callers that need it disagree
  * about everything else: the usage panel resolves it per request off a plan it
  * already has, and the metering path resolves it on a cached organization row.
- * One function keeps the panel and the meter from measuring different things.
+ * One decision keeps the panel and the meter from measuring different things.
  */
 import { PricingModel } from "@langwatch/prisma-client/generated";
 import type { UsageUnit } from "@langwatch/entitlement-contract";
@@ -24,107 +24,113 @@ export interface MeterDecision {
   reason: string;
 }
 
-/**
- * Resolves which counting unit to use for usage metering.
- *
- * Precedence:
- *   1. License override with explicit usageUnit → use that unit
- *   2. PricingModel SEAT_EVENT → always events
- *   3. Free tier (isFree=true) → events regardless of pricing model
- *   4. Paid non-SEAT_EVENT → traces
- *
- * This is a pure decision function — no side effects, no I/O.
- */
-export function resolveUsageMeter({
-  pricingModel,
-  licenseUsageUnit,
-  hasValidLicenseOverride,
-  isFree,
-}: {
-  pricingModel: PricingModel | null;
-  licenseUsageUnit?: string;
-  hasValidLicenseOverride: boolean;
-  isFree: boolean;
-}): MeterDecision {
-  const usageUnit = resolveUsageUnit({
+export class UsageMeterPolicyService {
+  static create(): UsageMeterPolicyService {
+    return new UsageMeterPolicyService();
+  }
+
+  /**
+   * Resolves which counting unit to use for usage metering.
+   *
+   * Precedence:
+   *   1. License override with explicit usageUnit → use that unit
+   *   2. PricingModel SEAT_EVENT → always events
+   *   3. Free tier (isFree=true) → events regardless of pricing model
+   *   4. Paid non-SEAT_EVENT → traces
+   *
+   * This is a pure decision — no side effects, no I/O.
+   */
+  static resolveUsageMeter({
     pricingModel,
     licenseUsageUnit,
     hasValidLicenseOverride,
     isFree,
-  });
+  }: {
+    pricingModel: PricingModel | null;
+    licenseUsageUnit?: string;
+    hasValidLicenseOverride: boolean;
+    isFree: boolean;
+  }): MeterDecision {
+    const usageUnit = UsageMeterPolicyService.resolveUsageUnit({
+      pricingModel,
+      licenseUsageUnit,
+      hasValidLicenseOverride,
+      isFree,
+    });
 
-  const reason = buildReason({
+    const reason = UsageMeterPolicyService.buildReason({
+      usageUnit,
+      hasValidLicenseOverride,
+      licenseUsageUnit,
+      pricingModel,
+      isFree,
+    });
+
+    return { usageUnit, reason };
+  }
+
+  /**
+   * Normalizes arbitrary string to a valid UsageUnit.
+   * Defensive boundary — licenses may contain unexpected values.
+   */
+  static normalizeUsageUnit(raw: string): UsageUnit {
+    const normalized = raw.toLowerCase().trim();
+    if (normalized === "events" || normalized === "event") {
+      return "events";
+    }
+
+    return "traces";
+  }
+
+  private static resolveUsageUnit({
+    pricingModel,
+    licenseUsageUnit,
+    hasValidLicenseOverride,
+    isFree,
+  }: {
+    pricingModel: PricingModel | null;
+    licenseUsageUnit?: string;
+    hasValidLicenseOverride: boolean;
+    isFree: boolean;
+  }): UsageUnit {
+    // License override with explicit usageUnit takes precedence
+    if (hasValidLicenseOverride && licenseUsageUnit) {
+      return UsageMeterPolicyService.normalizeUsageUnit(licenseUsageUnit);
+    }
+
+    // PricingModel-derived: SEAT_EVENT → events, else → traces
+    if (pricingModel === PricingModel.SEAT_EVENT) {
+      return "events";
+    }
+
+    // Free-tier always counts events regardless of pricing model
+    if (isFree) {
+      return "events";
+    }
+
+    return "traces";
+  }
+
+  private static buildReason({
     usageUnit,
     hasValidLicenseOverride,
     licenseUsageUnit,
     pricingModel,
     isFree,
-  });
+  }: {
+    usageUnit: UsageUnit;
+    hasValidLicenseOverride: boolean;
+    licenseUsageUnit?: string;
+    pricingModel: PricingModel | null;
+    isFree: boolean;
+  }): string {
+    const unitSource =
+      hasValidLicenseOverride && licenseUsageUnit
+        ? `license(${licenseUsageUnit})`
+        : isFree && pricingModel !== PricingModel.SEAT_EVENT
+          ? "freeTier"
+          : `pricingModel(${pricingModel ?? "null"})`;
 
-  return { usageUnit, reason };
-}
-
-function resolveUsageUnit({
-  pricingModel,
-  licenseUsageUnit,
-  hasValidLicenseOverride,
-  isFree,
-}: {
-  pricingModel: PricingModel | null;
-  licenseUsageUnit?: string;
-  hasValidLicenseOverride: boolean;
-  isFree: boolean;
-}): UsageUnit {
-  // License override with explicit usageUnit takes precedence
-  if (hasValidLicenseOverride && licenseUsageUnit) {
-    return normalizeUsageUnit(licenseUsageUnit);
+    return `unit=${usageUnit} from ${unitSource}, isFree=${isFree}`;
   }
-
-  // PricingModel-derived: SEAT_EVENT → events, else → traces
-  if (pricingModel === PricingModel.SEAT_EVENT) {
-    return "events";
-  }
-
-  // Free-tier always counts events regardless of pricing model
-  if (isFree) {
-    return "events";
-  }
-
-  return "traces";
-}
-
-/**
- * Normalizes arbitrary string to a valid UsageUnit.
- * Defensive boundary — licenses may contain unexpected values.
- */
-export function normalizeUsageUnit(raw: string): UsageUnit {
-  const normalized = raw.toLowerCase().trim();
-  if (normalized === "events" || normalized === "event") {
-    return "events";
-  }
-
-  return "traces";
-}
-
-function buildReason({
-  usageUnit,
-  hasValidLicenseOverride,
-  licenseUsageUnit,
-  pricingModel,
-  isFree,
-}: {
-  usageUnit: UsageUnit;
-  hasValidLicenseOverride: boolean;
-  licenseUsageUnit?: string;
-  pricingModel: PricingModel | null;
-  isFree: boolean;
-}): string {
-  const unitSource =
-    hasValidLicenseOverride && licenseUsageUnit
-      ? `license(${licenseUsageUnit})`
-      : isFree && pricingModel !== PricingModel.SEAT_EVENT
-        ? "freeTier"
-        : `pricingModel(${pricingModel ?? "null"})`;
-
-  return `unit=${usageUnit} from ${unitSource}, isFree=${isFree}`;
 }

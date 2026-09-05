@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { NoopCodingAgentReadMetricsPort } from "../../../adapters/coding-agent-read-metrics.adapter";
 import { CodingAgentReadMetricsPort } from "../../../adapters/coding-agent-read-metrics.adapter";
 import { CodingAgentClickHousePort } from "../../../ports/coding-agent-clickhouse.port";
-import { TestClock } from "../../__tests__/fixtures/coding-agent.fixture";
+import { TestClock } from "../../../__tests__/fixtures/coding-agent.fixture";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse.repository";
 
 const WINDOW_FROM = new Date("2026-07-24T00:00:00.000Z").getTime();

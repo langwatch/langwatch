@@ -82,7 +82,7 @@ import type { PlanProvider, UsageUnit } from "@langwatch/entitlement-contract";
 import {
   EntitlementService,
   PrismaUsageMembershipRepository,
-  resolveUsageMeter,
+  UsageMeterPolicyService,
   USAGE_UNKNOWN,
   UsageCounterPort,
   UsageOrganizationPort,
@@ -298,7 +298,7 @@ export function composeApiUsageEnforcement(
     ClickHouseBillingAdapter.create(options.clickhouse).build(),
   );
 
-  return new UsageService({
+  return UsageService.create({
     organizations: ApiUsageOrganizationDirectory.create(options.prisma),
     traceCounter: ApiTraceVolumeCounter.create(billing),
     eventCounter: ApiEventVolumeCounter.create(billing),
@@ -660,7 +660,7 @@ class ApiUsageCounterAdapter extends UsageCounterPort {
       this.plans.getActivePlan({ organizationId: input.organizationId }),
     ]);
 
-    return resolveUsageMeter({
+    return UsageMeterPolicyService.resolveUsageMeter({
       pricingModel: (organization?.pricingModel ?? null) as PricingModel | null,
       ...(plan.usageUnit !== undefined ? { licenseUsageUnit: plan.usageUnit } : {}),
       hasValidLicenseOverride: plan.planSource === "license",

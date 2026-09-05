@@ -15,6 +15,11 @@ import type { SessionWorkingContext } from "@langwatch/coding-agent-contract";
  * whole-session rule — degraded attribution, never lost tokens.
  */
 export abstract class CodingAgentSessionContextMemoPort {
+  /** The one key shape both memo adapters store a session's context under. */
+  static memoKey({ tenantId, sessionId }: { tenantId: string; sessionId: string }): string {
+    return `coding-agent:session-context:${tenantId}:${sessionId}`;
+  }
+
   abstract get(params: {
     tenantId: string;
     sessionId: string;
@@ -31,11 +36,3 @@ export abstract class CodingAgentSessionContextMemoPort {
  * window prices nothing, so its memo has nothing left to stamp for.
  */
 export const SESSION_CONTEXT_MEMO_TTL_SECONDS = 180 * 24 * 60 * 60;
-
-export const sessionContextMemoKey = ({
-  tenantId,
-  sessionId,
-}: {
-  tenantId: string;
-  sessionId: string;
-}): string => `coding-agent:session-context:${tenantId}:${sessionId}`;

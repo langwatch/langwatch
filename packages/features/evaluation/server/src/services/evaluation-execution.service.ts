@@ -40,14 +40,10 @@ import {
   type EvaluationWorkflowExecutorPort,
 } from "../ports/evaluation-execution.port";
 import {
-  evaluatorUnavailability,
+  EvaluatorAvailabilityService,
   type EvaluatorInstallEnvironment,
-  unavailableEvaluatorMessage,
 } from "./evaluator-availability.service";
-import {
-  hasThreadMappings,
-  resolveThreadMappingsIntoData,
-} from "./evaluation-thread-mapping.service";
+import { EvaluationThreadMappingService } from "./evaluation-thread-mapping.service";
 
 // Evaluations need full access to trace data — no user-facing redaction.
 const INTERNAL_PROTECTIONS: EvaluationTraceProtections = {
@@ -80,100 +76,6 @@ export interface EvaluationExecutionDeps {
 
 const TRACE_ID_HEX = /^[0-9a-fA-F]{32}$/;
 const SPAN_ID_HEX = /^[0-9a-fA-F]{16}$/;
-
-/**
- * Extract the W3C `traceparent` context for the eval workflow from the
- * parent trace. nlpgo needs both pieces (32-hex trace_id + 16-hex root
- * span_id) so its emitted spans land as children of the parent trace
- * in Studio's waterfall rather than as a separate orphan trace.
- *
- * Returns `undefined` when the parent trace doesn't have OTel-standard
- * IDs (legacy `trace_<nanoid>` shape, missing root span) — in that
- * case nlpgo falls back to body-supplied req.TraceID and emits without
- * a parent linkage. Callers should NOT default-emit a synthesized
- * parent: a synth parent_span_id would render under a non-existent
- * span in the waterfall, which is worse UX than a separate trace.
- */
-export function extractParentTraceForNlpgo(
-  trace: Trace | undefined,
-): { traceId: string; parentSpanId: string } | undefined {
-  if (!trace?.trace_id || !TRACE_ID_HEX.test(trace.trace_id)) {
-    return undefined;
-  }
-
-  // Broken / multi-source instrumentation can leave a trace with more
-  // than one parent-less span. `find()` would then pick whichever span
-  // happened to be ingested first — non-deterministic across re-runs.
-  // Sort by started_at (earliest is the true root in any sane trace)
-  // with span_id as the tie-breaker to keep two consecutive eval runs
-  // pinned to the same parent_span_id.
-  const rootCandidates = (trace.spans ?? []).filter((s) => !s.parent_id);
-  if (rootCandidates.length === 0) {
-    return undefined;
-  }
-
-  rootCandidates.sort((a, b) => {
-    const aStart = a.timestamps?.started_at ?? Number.MAX_SAFE_INTEGER;
-    const bStart = b.timestamps?.started_at ?? Number.MAX_SAFE_INTEGER;
-    if (aStart !== bStart) {
-      return aStart - bStart;
-    }
-
-    return (a.span_id ?? "").localeCompare(b.span_id ?? "");
-  });
-  const rootSpan = rootCandidates[0];
-  if (!rootSpan?.span_id || !SPAN_ID_HEX.test(rootSpan.span_id)) {
-    return undefined;
-  }
-
-  return {
-    traceId: trace.trace_id.toLowerCase(),
-    parentSpanId: rootSpan.span_id.toLowerCase(),
-  };
-}
-
-/**
- * Returns the max `langwatch.causality_depth` across the supplied spans
- * (0 if absent on all). The dispatcher uses this to pass the parent
- * depth to nlpgo, which increments and stamps on every span it emits.
- * Loop-prevention design lives in
- * specs/monitors/online-evaluator-loop-prevention.feature.
- *
- * Real-world spans come from `mapNormalizedSpanToSpan` which unflattens
- * OTLP dot-notation attributes into nested objects under `span.params`,
- * so `langwatch.causality_depth` lives at `params.langwatch.causality_depth`.
- * We also probe a few legacy / synthetic shapes used by tests and older
- * span sources so the helper is robust to both.
- */
-export function maxCausalityDepthOfSpans(
-  spans:
-    | Array<{
-        params?: Record<string, unknown> | null;
-        attributes?: Record<string, unknown> | null;
-      }>
-    | undefined
-    | null,
-): number {
-  if (!spans || spans.length === 0) {
-    return 0;
-  }
-
-  let max = 0;
-  for (const span of spans) {
-    const raw = pickCausalityDepth(span);
-    if (raw === undefined || raw === null) {
-      continue;
-    }
-
-    const n =
-      typeof raw === "number" ? raw : typeof raw === "string" ? Number.parseInt(raw, 10) : NaN;
-    if (Number.isFinite(n) && n > max) {
-      max = n;
-    }
-  }
-
-  return max;
-}
 
 function pickCausalityDepth(span: {
   params?: Record<string, unknown> | null;
@@ -222,6 +124,100 @@ export type DataForEvaluation =
 // ---------------------------------------------------------------------------
 
 export class EvaluationExecutionService {
+  /**
+   * Extract the W3C `traceparent` context for the eval workflow from the
+   * parent trace. nlpgo needs both pieces (32-hex trace_id + 16-hex root
+   * span_id) so its emitted spans land as children of the parent trace
+   * in Studio's waterfall rather than as a separate orphan trace.
+   *
+   * Returns `undefined` when the parent trace doesn't have OTel-standard
+   * IDs (legacy `trace_<nanoid>` shape, missing root span) — in that
+   * case nlpgo falls back to body-supplied req.TraceID and emits without
+   * a parent linkage. Callers should NOT default-emit a synthesized
+   * parent: a synth parent_span_id would render under a non-existent
+   * span in the waterfall, which is worse UX than a separate trace.
+   */
+  static extractParentTraceForNlpgo(
+    trace: Trace | undefined,
+  ): { traceId: string; parentSpanId: string } | undefined {
+    if (!trace?.trace_id || !TRACE_ID_HEX.test(trace.trace_id)) {
+      return undefined;
+    }
+
+    // Broken / multi-source instrumentation can leave a trace with more
+    // than one parent-less span. `find()` would then pick whichever span
+    // happened to be ingested first — non-deterministic across re-runs.
+    // Sort by started_at (earliest is the true root in any sane trace)
+    // with span_id as the tie-breaker to keep two consecutive eval runs
+    // pinned to the same parent_span_id.
+    const rootCandidates = (trace.spans ?? []).filter((s) => !s.parent_id);
+    if (rootCandidates.length === 0) {
+      return undefined;
+    }
+
+    rootCandidates.sort((a, b) => {
+      const aStart = a.timestamps?.started_at ?? Number.MAX_SAFE_INTEGER;
+      const bStart = b.timestamps?.started_at ?? Number.MAX_SAFE_INTEGER;
+      if (aStart !== bStart) {
+        return aStart - bStart;
+      }
+
+      return (a.span_id ?? "").localeCompare(b.span_id ?? "");
+    });
+    const rootSpan = rootCandidates[0];
+    if (!rootSpan?.span_id || !SPAN_ID_HEX.test(rootSpan.span_id)) {
+      return undefined;
+    }
+
+    return {
+      traceId: trace.trace_id.toLowerCase(),
+      parentSpanId: rootSpan.span_id.toLowerCase(),
+    };
+  }
+
+  /**
+   * Returns the max `langwatch.causality_depth` across the supplied spans
+   * (0 if absent on all). The dispatcher uses this to pass the parent
+   * depth to nlpgo, which increments and stamps on every span it emits.
+   * Loop-prevention design lives in
+   * specs/monitors/online-evaluator-loop-prevention.feature.
+   *
+   * Real-world spans come from `mapNormalizedSpanToSpan` which unflattens
+   * OTLP dot-notation attributes into nested objects under `span.params`,
+   * so `langwatch.causality_depth` lives at `params.langwatch.causality_depth`.
+   * We also probe a few legacy / synthetic shapes used by tests and older
+   * span sources so the helper is robust to both.
+   */
+  static maxCausalityDepthOfSpans(
+    spans:
+      | Array<{
+          params?: Record<string, unknown> | null;
+          attributes?: Record<string, unknown> | null;
+        }>
+      | undefined
+      | null,
+  ): number {
+    if (!spans || spans.length === 0) {
+      return 0;
+    }
+
+    let max = 0;
+    for (const span of spans) {
+      const raw = pickCausalityDepth(span);
+      if (raw === undefined || raw === null) {
+        continue;
+      }
+
+      const n =
+        typeof raw === "number" ? raw : typeof raw === "string" ? Number.parseInt(raw, 10) : NaN;
+      if (Number.isFinite(n) && n > max) {
+        max = n;
+      }
+    }
+
+    return max;
+  }
+
   static create(deps: EvaluationExecutionDeps): EvaluationExecutionService {
     return new EvaluationExecutionService(deps);
   }
@@ -275,7 +271,9 @@ export class EvaluationExecutionService {
     }
 
     // 3. Determine evaluation level
-    const isThreadLevel = level ? level === "thread" : hasThreadMappings(mappings);
+    const isThreadLevel = level
+      ? level === "thread"
+      : EvaluationThreadMappingService.hasThreadMappings(mappings);
 
     const evaluationThreadId =
       isThreadLevel && trace.metadata?.thread_id ? trace.metadata.thread_id : undefined;
@@ -324,7 +322,7 @@ export class EvaluationExecutionService {
 
     // Compute parent causality depth from the trace's spans; nlpgo
     // increments and stamps the result on every span it emits.
-    const parentCausalityDepth = maxCausalityDepthOfSpans(
+    const parentCausalityDepth = EvaluationExecutionService.maxCausalityDepthOfSpans(
       trace.spans as unknown as Array<{
         attributes?: Record<string, unknown> | null;
       }>,
@@ -432,8 +430,8 @@ export class EvaluationExecutionService {
       data = mappedData as Record<string, unknown>;
 
       // Resolve any thread-typed mappings mixed into trace-level evaluations
-      if (mappings && hasThreadMappings(mappings)) {
-        await resolveThreadMappingsIntoData({
+      if (mappings && EvaluationThreadMappingService.hasThreadMappings(mappings)) {
+        await EvaluationThreadMappingService.resolveThreadMappingsIntoData({
           data,
           trace,
           mappings,
@@ -466,14 +464,17 @@ export class EvaluationExecutionService {
     // An evaluator this install skipped is not a broken one. Say which it is,
     // and how to get it, rather than letting the request reach an evaluator
     // service with no route for it and come back as a bare 404.
-    const unavailable = evaluatorUnavailability({
+    const unavailable = EvaluatorAvailabilityService.evaluatorUnavailability({
       evaluatorType,
       environment: this.deps.installEnvironment,
     });
     if (unavailable) {
-      throw new EvaluatorConfigError(unavailableEvaluatorMessage({ unavailability: unavailable }), {
-        meta: { evaluatorType },
-      });
+      throw new EvaluatorConfigError(
+        EvaluatorAvailabilityService.unavailableEvaluatorMessage({ unavailability: unavailable }),
+        {
+          meta: { evaluatorType },
+        },
+      );
     }
 
     const fields = [...evaluator.requiredFields, ...evaluator.optionalFields];
@@ -599,7 +600,7 @@ export class EvaluationExecutionService {
           data: data.data,
           traceId: trace?.trace_id,
           parentCausalityDepth,
-          parentTrace: extractParentTraceForNlpgo(trace),
+          parentTrace: EvaluationExecutionService.extractParentTraceForNlpgo(trace),
         });
       }
 
@@ -694,7 +695,7 @@ export class EvaluationExecutionService {
     // trace's root span so Studio's waterfall renders them as a child
     // sub-tree (not a separate orphan trace, which is the 2026-05-14
     // bug rchaves caught in prod).
-    const parentTrace = extractParentTraceForNlpgo(trace);
+    const parentTrace = EvaluationExecutionService.extractParentTraceForNlpgo(trace);
 
     const response = await this.deps.workflowExecutor.runEvaluationWorkflow(
       resolvedWorkflowId,

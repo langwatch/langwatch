@@ -53,7 +53,6 @@ export {
   EvaluationInputsOffloadService,
   EVALUATION_INPUTS_STORED_OBJECT_MARKER_KEY,
   STORED_OBJECT_MARKER_KEY,
-  isStoredObjectMarker,
   type EvaluationInputOffloadConfig,
   type StoredObjectInputsMarker,
 } from "./services/evaluation-inputs-offload.service";
@@ -73,10 +72,9 @@ export {
   createEvaluationProcessingPipeline,
   type EvaluationProcessingPipelineDeps,
 } from "./adapters/evaluation-processing.adapter";
-export { createEvaluationProcessingProducerPipeline } from "./adapters/evaluation-processing-producer.adapter";
+export { EvaluationProcessingProducerAdapter } from "./adapters/evaluation-processing-producer.adapter";
 export {
-  evaluatorUnavailability,
-  unavailableEvaluatorMessage,
+  EvaluatorAvailabilityService,
   LINGUA_ENABLE_ENV_VAR,
   PRESIDIO_ENABLE_ENV_VAR,
   type EvaluatorInstallEnvironment,
@@ -97,7 +95,7 @@ export {
 
 /** The Postgres cost ledger an evaluation run writes into. Was
  * `platform/app/src/server/app-layer/evaluations/evaluation-cost.recorder.ts`. */
-export { PrismaEvaluationCostRecorder } from "./adapters/prisma.evaluation-cost-recorder.adapter";
+export { PrismaEvaluationCostRecorderAdapter } from "./adapters/prisma.evaluation-cost-recorder.adapter";
 
 /**
  * The ONLINE execution path: rendering a stored trace through its evaluator
@@ -107,12 +105,9 @@ export { PrismaEvaluationCostRecorder } from "./adapters/prisma.evaluation-cost-
 export {
   EvaluationExecutionService,
   type EvaluationExecutionDeps,
-  extractParentTraceForNlpgo,
-  maxCausalityDepthOfSpans,
 } from "./services/evaluation-execution.service";
 export {
-  hasThreadMappings,
-  resolveThreadMappingsIntoData,
+  EvaluationThreadMappingService,
   type GetThreadTraces,
 } from "./services/evaluation-thread-mapping.service";
 export {
@@ -137,7 +132,7 @@ export {
   EVALUATION_STATUS_METRIC_NAME,
   OtelEvaluationExecutionMetricsAdapter,
 } from "./adapters/otel.evaluation-execution-metrics.adapter";
-export { DirectEvaluationExecutionReceipt } from "./adapters/direct.evaluation-execution-receipt.adapter";
+export { DirectEvaluationExecutionReceiptAdapter } from "./adapters/direct.evaluation-execution-receipt.adapter";
 
 // ---------------------------------------------------------------------------
 // The legacy evaluation REST doors

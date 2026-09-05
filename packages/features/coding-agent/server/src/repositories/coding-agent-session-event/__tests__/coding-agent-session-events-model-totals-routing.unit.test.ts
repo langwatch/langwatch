@@ -74,12 +74,12 @@ describe("CodingAgentSessionEventsClickHouseRepository per-model totals routing"
         const second = endpointClient([
           modelTotals({ tenantId: "tenant-b", sessionId: "session-b", costUsd: 4 }),
         ]);
-        const repository = new CodingAgentSessionEventsClickHouseRepository(
-          new RoutedClickHousePort((tenantId) =>
+        const repository = CodingAgentSessionEventsClickHouseRepository.create({
+          clickHouse: new RoutedClickHousePort((tenantId) =>
             tenantId === "tenant-a" ? first.client : second.client,
           ),
-          30,
-        );
+          defaultTraceRetentionDays: 30,
+        });
 
         const totals = await repository.sumTokensByModelPerSession({
           tenantIds: ["tenant-a", "tenant-b"],
@@ -99,10 +99,10 @@ describe("CodingAgentSessionEventsClickHouseRepository per-model totals routing"
     describe("when their sessions' per-model totals are read", () => {
       it("asks for all of them in a single query", async () => {
         const only = endpointClient([]);
-        const repository = new CodingAgentSessionEventsClickHouseRepository(
-          new RoutedClickHousePort(() => only.client),
-          30,
-        );
+        const repository = CodingAgentSessionEventsClickHouseRepository.create({
+          clickHouse: new RoutedClickHousePort(() => only.client),
+          defaultTraceRetentionDays: 30,
+        });
 
         await repository.sumTokensByModelPerSession({
           tenantIds: ["tenant-a", "tenant-b"],

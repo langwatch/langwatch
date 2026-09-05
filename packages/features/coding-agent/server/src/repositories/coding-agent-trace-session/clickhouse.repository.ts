@@ -18,7 +18,17 @@ interface ClickHouseWriteRecord {
 }
 
 export class CodingAgentTraceSessionClickHouseRepository implements TraceSessionRepository {
-  constructor(
+  static create({
+    clickHouse,
+    defaultTraceRetentionDays,
+  }: {
+    clickHouse: CodingAgentClickHousePort;
+    defaultTraceRetentionDays: number;
+  }): CodingAgentTraceSessionClickHouseRepository {
+    return new CodingAgentTraceSessionClickHouseRepository(clickHouse, defaultTraceRetentionDays);
+  }
+
+  private constructor(
     private readonly clickHouse: CodingAgentClickHousePort,
     private readonly defaultTraceRetentionDays: number,
   ) {}

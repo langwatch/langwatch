@@ -14,7 +14,7 @@ import {
   TestSessions,
   TestTraceSessions,
   session,
-} from "../../repositories/__tests__/fixtures/coding-agent.fixture";
+} from "../../__tests__/fixtures/coding-agent.fixture";
 
 const PROJECT = "project-1";
 const SESSION = "session-1";

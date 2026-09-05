@@ -9,7 +9,7 @@ import {
 import type { GithubService } from "@langwatch/github-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { CodingAgentClickHousePort } from "../ports/coding-agent-clickhouse.port";
-import { SystemCodingAgentClock } from "./coding-agent-clock.adapter";
+import { SystemCodingAgentClockAdapter } from "./coding-agent-clock.adapter";
 import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port";
 import {
   CodingAgentReadMetricsPort,
@@ -65,7 +65,7 @@ export class CodingAgentProjectionPersistenceAdapter extends CodingAgentProjecti
   static create(
     options: CodingAgentProjectionPersistenceOptions,
   ): CodingAgentProjectionPersistenceAdapter {
-    const clock = options.clock ?? SystemCodingAgentClock.create();
+    const clock = options.clock ?? SystemCodingAgentClockAdapter.create();
     const persistence = new CodingAgentProjectionPersistenceAdapter(
       createRepositories({ ...options, clock }),
     );
@@ -187,17 +187,17 @@ function createRepositories(
       metrics,
       clock: options.clock,
     }),
-    traceSessions: new CodingAgentTraceSessionClickHouseRepository(
-      options.clickHouse,
-      options.retention.defaultTraceRetentionDays,
-    ),
-    metricSeries: new SessionMetricSeriesClickHouseRepository(
-      options.clickHouse,
-      options.retention.defaultTraceRetentionDays,
-    ),
-    sessionEvents: new CodingAgentSessionEventsClickHouseRepository(
-      options.clickHouse,
-      options.retention.defaultTraceRetentionDays,
-    ),
+    traceSessions: CodingAgentTraceSessionClickHouseRepository.create({
+      clickHouse: options.clickHouse,
+      defaultTraceRetentionDays: options.retention.defaultTraceRetentionDays,
+    }),
+    metricSeries: SessionMetricSeriesClickHouseRepository.create({
+      clickHouse: options.clickHouse,
+      defaultTraceRetentionDays: options.retention.defaultTraceRetentionDays,
+    }),
+    sessionEvents: CodingAgentSessionEventsClickHouseRepository.create({
+      clickHouse: options.clickHouse,
+      defaultTraceRetentionDays: options.retention.defaultTraceRetentionDays,
+    }),
   };
 }

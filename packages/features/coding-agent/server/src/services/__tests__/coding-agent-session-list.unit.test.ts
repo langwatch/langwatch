@@ -16,7 +16,7 @@ import {
   TestTraceSessions,
   pullRequest,
   session,
-} from "../../repositories/__tests__/fixtures/coding-agent.fixture";
+} from "../../__tests__/fixtures/coding-agent.fixture";
 
 const PROJECT = "project-1";
 const HOUR_MS = 60 * 60 * 1000;

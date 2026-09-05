@@ -49,8 +49,8 @@ import {
   type OrganizationTrpcPorts,
 } from "@langwatch/organization-server";
 import {
+  MemberClassificationService,
   PrismaUsageMembershipRepository,
-  isViewOnlyCustomRole,
 } from "@langwatch/entitlement-server";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -81,7 +81,7 @@ class ApiInviteSeatCensus extends OrganizationInviteSeatCensusPort {
   }
 
   isViewOnlyCustomRole(permissions: string[]): boolean {
-    return isViewOnlyCustomRole(permissions);
+    return MemberClassificationService.isViewOnlyCustomRole(permissions);
   }
 }
 

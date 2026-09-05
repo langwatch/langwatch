@@ -17,7 +17,7 @@ import { CodingAgentClockPort } from "../../ports/coding-agent-clock.port";
 import { CodingAgentSessionClickHouseRepository } from "../coding-agent-session/clickhouse.repository";
 import { CodingAgentTraceSessionClickHouseRepository } from "../coding-agent-trace-session/clickhouse.repository";
 import { SessionMetricSeriesClickHouseRepository } from "../session-metric-series/clickhouse.repository";
-import { session } from "./fixtures/coding-agent.fixture";
+import { session } from "../../__tests__/fixtures/coding-agent.fixture";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -60,8 +60,14 @@ beforeAll(() => {
     metrics: NoopCodingAgentReadMetricsPort.create(),
     clock: new FixedClock(),
   });
-  traceSessions = new CodingAgentTraceSessionClickHouseRepository(new SingleClickHousePort(ch), 30);
-  metricSeries = new SessionMetricSeriesClickHouseRepository(new SingleClickHousePort(ch), 30);
+  traceSessions = CodingAgentTraceSessionClickHouseRepository.create({
+    clickHouse: new SingleClickHousePort(ch),
+    defaultTraceRetentionDays: 30,
+  });
+  metricSeries = SessionMetricSeriesClickHouseRepository.create({
+    clickHouse: new SingleClickHousePort(ch),
+    defaultTraceRetentionDays: 30,
+  });
 });
 
 afterAll(async () => {

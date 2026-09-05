@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLimitMessage, type UsageDeployment } from "../usage-limit-message.service";
+import { UsageLimitMessageService, type UsageDeployment } from "../usage-limit-message.service";
 
 const saas: UsageDeployment = { isSaas: true, baseHost: undefined };
 const selfHosted: UsageDeployment = {
@@ -10,7 +10,7 @@ const selfHosted: UsageDeployment = {
 describe("buildLimitMessage", () => {
   /** @scenario Free-tier org on SaaS told to upgrade with correct unit */
   it("tells a free-tier SaaS org to upgrade with the events unit", () => {
-    const message = buildLimitMessage({
+    const message = UsageLimitMessageService.buildLimitMessage({
       isFree: true,
       limit: 50000,
       usageUnit: "events",
@@ -24,7 +24,7 @@ describe("buildLimitMessage", () => {
 
   /** @scenario Free-tier org on self-hosted told to buy a license */
   it("tells a free-tier self-hosted org to buy a license at the configured base host", () => {
-    const message = buildLimitMessage({
+    const message = UsageLimitMessageService.buildLimitMessage({
       isFree: true,
       limit: 50000,
       usageUnit: "events",
@@ -36,7 +36,7 @@ describe("buildLimitMessage", () => {
 
   /** @scenario Paid TIERED org on SaaS told to upgrade with traces unit */
   it("tells a paid SaaS org to upgrade with the traces unit", () => {
-    const message = buildLimitMessage({
+    const message = UsageLimitMessageService.buildLimitMessage({
       isFree: false,
       limit: 10000,
       usageUnit: "traces",
@@ -50,7 +50,7 @@ describe("buildLimitMessage", () => {
 
   /** @scenario Paid TIERED org on self-hosted told to buy a license */
   it("tells a paid self-hosted org to buy a license at the configured base host", () => {
-    const message = buildLimitMessage({
+    const message = UsageLimitMessageService.buildLimitMessage({
       isFree: false,
       limit: 10000,
       usageUnit: "traces",

@@ -23,10 +23,6 @@ const storedObjectMarkerSchema = z
   })
   .passthrough();
 
-export function isStoredObjectMarker(value: unknown): value is StoredObjectInputsMarker {
-  return storedObjectMarkerSchema.safeParse(value).success;
-}
-
 const logger = createLogger("langwatch:evaluation:inputs-offload");
 
 export const EVAL_INPUTS_INLINE_MAX_BYTES = 1024 * 1024;
@@ -50,6 +46,11 @@ export class EvaluationInputsOffloadService {
     return new EvaluationInputsOffloadService(input.storage, input.config);
   }
 
+  /** Whether a stored inputs payload is the marker standing in for an offload. */
+  static isStoredObjectMarker(value: unknown): value is StoredObjectInputsMarker {
+    return storedObjectMarkerSchema.safeParse(value).success;
+  }
+
   private constructor(
     private readonly storage: EvaluationInputStoragePort,
     private readonly config: EvaluationInputOffloadConfig,
@@ -60,7 +61,7 @@ export class EvaluationInputsOffloadService {
     evaluationId: string;
     inputs: Record<string, unknown>;
   }): Promise<Record<string, unknown>> {
-    if (isStoredObjectMarker(input.inputs)) {
+    if (EvaluationInputsOffloadService.isStoredObjectMarker(input.inputs)) {
       return input.inputs;
     }
 
@@ -125,7 +126,10 @@ export class EvaluationInputsOffloadService {
     tenantId: string;
     inputs: Record<string, unknown> | null;
   }): Promise<Record<string, unknown> | null> {
-    if (input.inputs === null || !isStoredObjectMarker(input.inputs)) {
+    if (
+      input.inputs === null ||
+      !EvaluationInputsOffloadService.isStoredObjectMarker(input.inputs)
+    ) {
       return input.inputs;
     }
 

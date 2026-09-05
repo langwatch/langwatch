@@ -22,8 +22,8 @@
  *     permissive parse, and the narrowing it would have done is named here.
  */
 import {
-  createEvaluationProcessingProducerPipeline,
-  evaluatorUnavailability,
+  EvaluationProcessingProducerAdapter,
+  EvaluatorAvailabilityService,
   type EvaluationRunOutcome,
 } from "@langwatch/evaluation-server";
 import {
@@ -93,8 +93,10 @@ export function composeEvaluationFeature(options: {
   });
 
   const ports: EvaluationMountPorts<unknown, unknown> = {
-    mappingsSchema: (options.mappingsSchema ??
-      permissiveMappingsSchema) as EvaluationMountPorts<unknown, unknown>["mappingsSchema"],
+    mappingsSchema: (options.mappingsSchema ?? permissiveMappingsSchema) as EvaluationMountPorts<
+      unknown,
+      unknown
+    >["mappingsSchema"],
 
     /**
      * Azure Content Safety credentials come solely from the project's
@@ -124,7 +126,10 @@ export function composeEvaluationFeature(options: {
     },
 
     evaluatorUnavailability: (input) =>
-      evaluatorUnavailability({ evaluatorType: input.evaluatorType, environment }),
+      EvaluatorAvailabilityService.evaluatorUnavailability({
+        evaluatorType: input.evaluatorType,
+        environment,
+      }),
 
     missingEnvironmentVariables: (envVars) => [...envVars].filter((name) => !environment[name]),
 
@@ -215,7 +220,7 @@ function composeReportEvaluation(input: {
   }
 
   const registered = input.eventing.register(
-    createEvaluationProcessingProducerPipeline({ processName: input.processName }),
+    EvaluationProcessingProducerAdapter.createPipeline({ processName: input.processName }),
   );
   const sender = (registered.commands as Record<string, unknown>).reportEvaluation;
   if (!isSender(sender)) {

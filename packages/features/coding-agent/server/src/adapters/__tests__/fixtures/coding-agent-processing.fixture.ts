@@ -10,7 +10,7 @@ import Redis from "ioredis";
 import { EventingCodingAgentProcessingAdapter } from "../../eventing.coding-agent-processing.adapter";
 import { InMemorySessionContextMemoAdapter } from "../../in-memory.session-context-memo.adapter";
 import { CodingAgentCostMetricsPort } from "../../../ports/coding-agent-cost-metrics.port";
-import { TestClock, TestProjectService } from "../../../repositories/__tests__/fixtures/coding-agent.fixture";
+import { TestClock, TestProjectService } from "../../../__tests__/fixtures/coding-agent.fixture";
 
 class NoopCostMetrics extends CodingAgentCostMetricsPort {
   recordComputed(): void {}

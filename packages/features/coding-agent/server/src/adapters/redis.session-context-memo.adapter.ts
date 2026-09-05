@@ -3,7 +3,6 @@ import type { SessionWorkingContext } from "@langwatch/coding-agent-contract";
 import {
   CodingAgentSessionContextMemoPort,
   SESSION_CONTEXT_MEMO_TTL_SECONDS,
-  sessionContextMemoKey,
 } from "../ports/coding-agent-session-context.port";
 
 /** The session-context memo over Redis, which owns the expiry. */
@@ -23,7 +22,9 @@ export class RedisSessionContextMemoAdapter extends CodingAgentSessionContextMem
     tenantId: string;
     sessionId: string;
   }): Promise<SessionWorkingContext | null> {
-    const raw = await this.redis.get(sessionContextMemoKey({ tenantId, sessionId }));
+    const raw = await this.redis.get(
+      CodingAgentSessionContextMemoPort.memoKey({ tenantId, sessionId }),
+    );
     if (raw === null) return null;
     try {
       const parsed = JSON.parse(raw) as Partial<SessionWorkingContext>;
@@ -48,7 +49,7 @@ export class RedisSessionContextMemoAdapter extends CodingAgentSessionContextMem
     context: SessionWorkingContext;
   }): Promise<void> {
     await this.redis.set(
-      sessionContextMemoKey({ tenantId, sessionId }),
+      CodingAgentSessionContextMemoPort.memoKey({ tenantId, sessionId }),
       JSON.stringify(context),
       "EX",
       SESSION_CONTEXT_MEMO_TTL_SECONDS,

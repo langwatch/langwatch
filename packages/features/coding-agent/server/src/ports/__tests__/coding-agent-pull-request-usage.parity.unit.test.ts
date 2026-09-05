@@ -27,7 +27,7 @@ import {
   branchSession,
   pullRequest,
   session,
-} from "../../repositories/__tests__/fixtures/coding-agent.fixture";
+} from "../../__tests__/fixtures/coding-agent.fixture";
 
 const HOUR = 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 5, 1);

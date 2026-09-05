@@ -8,29 +8,6 @@ const TABLE_NAME = "session_metric_series" as const;
 
 const logger = createLogger("langwatch:app-layer:coding-agent:session-metric-series-repository");
 
-/**
- * Persistence for a session's converged metric units (ADR-056 §5, migration
- * 00052). ReplacingMergeTree versioned by AsOf: a re-observed cumulative
- * total writes a newer version of its (TenantId, SessionId, SeriesId) row.
- * Reads dedup by the IN-tuple pattern and SUM per metric — never FINAL,
- * never an increment on insert.
- */
-export interface SessionMetricSeriesRepository {
-  ensure(records: CodingAgentSessionMetricSeriesRecord[], retentionDays?: number): Promise<void>;
-
-  /**
-   * Converged totals per (session, metric, bucket) across the deduplicated
-   * units — the `SUM ... GROUP BY` read ADR-056 §5 promises. The time range
-   * prunes partitions; pass the sessions' era.
-   */
-  findTotalsBySessionIds(params: {
-    tenantId: string;
-    sessionIds: string[];
-    fromMs: number;
-    toMs: number;
-  }): Promise<SessionMetricTotal[]>;
-}
-
 /** One converged total: a metric's bucket (`type` attribute) per session. */
 export interface SessionMetricTotal {
   sessionId: string;
@@ -38,17 +15,6 @@ export interface SessionMetricTotal {
   /** The `type` point attribute (`input`, `added`, `user`, …), or "". */
   bucket: string;
   total: number;
-}
-
-/** No-op store for deployments without ClickHouse. */
-export class NullSessionMetricSeriesRepository implements SessionMetricSeriesRepository {
-  async ensure(): Promise<void> {
-    // no-op
-  }
-
-  async findTotalsBySessionIds(): Promise<SessionMetricTotal[]> {
-    return [];
-  }
 }
 
 interface ClickHouseWriteRecord {
@@ -67,7 +33,17 @@ interface ClickHouseWriteRecord {
 }
 
 export class SessionMetricSeriesClickHouseRepository implements MetricSeriesRepository {
-  constructor(
+  static create({
+    clickHouse,
+    defaultTraceRetentionDays,
+  }: {
+    clickHouse: CodingAgentClickHousePort;
+    defaultTraceRetentionDays: number;
+  }): SessionMetricSeriesClickHouseRepository {
+    return new SessionMetricSeriesClickHouseRepository(clickHouse, defaultTraceRetentionDays);
+  }
+
+  private constructor(
     private readonly clickHouse: CodingAgentClickHousePort,
     private readonly defaultTraceRetentionDays: number,
   ) {}

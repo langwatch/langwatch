@@ -24,12 +24,12 @@ const logger = createLogger("langwatch:evaluation:execution-receipt");
  * docblock — it finalises after the provider has answered — so what is lost is
  * the narrower window, not the guarantee, and the money is unaffected.
  */
-export class DirectEvaluationExecutionReceipt extends EvaluationExecutionReceiptPort {
+export class DirectEvaluationExecutionReceiptAdapter extends EvaluationExecutionReceiptPort {
   static create(input: {
     execution: EvaluationExecutionPort;
     costs: EvaluationCostRecorderPort;
-  }): DirectEvaluationExecutionReceipt {
-    return new DirectEvaluationExecutionReceipt(input.execution, input.costs);
+  }): DirectEvaluationExecutionReceiptAdapter {
+    return new DirectEvaluationExecutionReceiptAdapter(input.execution, input.costs);
   }
 
   private constructor(

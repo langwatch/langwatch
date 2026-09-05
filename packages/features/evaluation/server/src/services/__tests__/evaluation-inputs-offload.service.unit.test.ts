@@ -5,7 +5,6 @@ import {
   EVAL_INPUTS_HARD_CEILING_BYTES,
   EVAL_INPUTS_INLINE_MAX_BYTES,
   EVAL_INPUTS_PREVIEW_BYTES,
-  isStoredObjectMarker,
   STORED_OBJECT_MARKER_KEY,
 } from "../evaluation-inputs-offload.service";
 
@@ -51,7 +50,8 @@ function inputsOfSize(bytes: number): Record<string, unknown> {
 }
 
 function markerOf(value: Record<string, unknown> | null) {
-  if (!isStoredObjectMarker(value)) throw new Error("expected stored object marker");
+  if (!EvaluationInputsOffloadService.isStoredObjectMarker(value))
+    throw new Error("expected stored object marker");
   return value[STORED_OBJECT_MARKER_KEY];
 }
 
@@ -108,7 +108,7 @@ describe("EvaluationInputsOffloadService", () => {
       inputs,
     });
 
-    expect(isStoredObjectMarker(result)).toBe(true);
+    expect(EvaluationInputsOffloadService.isStoredObjectMarker(result)).toBe(true);
   });
 
   it("returns a preview-only marker beyond the hard ceiling", async () => {

@@ -9,73 +9,11 @@ import type {
   CodingAgentClickHousePort,
 } from "../../ports/coding-agent-clickhouse.port";
 import { CodingAgentSessionEventRepository as SessionEventsRepository } from "../coding-agent-session-event.repository";
-import { groupTenantsByClient } from "../coding-agent-clickhouse/clickhouse.repository";
+import { groupTenantsByClient } from "../coding-agent-clickhouse/clickhouse.mapper";
 
 const TABLE_NAME = "coding_agent_session_events" as const;
 
 const logger = createLogger("langwatch:app-layer:coding-agent:session-events-repository");
-
-/**
- * Persistence for the per-call fact table (migration 00073). One row per
- * session event, identity = the canonical log record's content hash, so
- * re-delivery and replay collapse under the ReplacingMergeTree instead of
- * double-counting. Reads dedup with `LIMIT 1 BY` on the row identity, which is
- * acceptable here, unlike the heavy-payload tables the ClickHouse best
- * practices warn about, because every column is a small scalar.
- */
-export interface CodingAgentSessionEventsRepository {
-  ensure(records: CodingAgentSessionEventRecord[], retentionDays?: number): Promise<void>;
-
-  /**
-   * One session's events in time order, keyset-paginated on
-   * (TimeUnixMs, RecordId). `occurredAt` bounds enable partition pruning;
-   * pass the session's era whenever the caller knows it.
-   */
-  findBySessionId(params: {
-    tenantId: string;
-    sessionId: string;
-    kinds?: string[];
-    occurredAt?: { fromMs: number; toMs: number };
-    cursor?: SessionEventsCursor;
-    limit: number;
-  }): Promise<{
-    events: CodingAgentSessionEventRow[];
-    nextCursor: SessionEventsCursor | null;
-  }>;
-
-  /**
-   * What each model consumed, per session and per stamped working context,
-   * across several tenants: the read behind a pull request's per-model
-   * breakdown AND the ratio that splits a session's cumulative totals across
-   * the pull requests it drove.
-   *
-   * Restricted to `model_call` rows, the one event kind that carries tokens and
-   * cost; every other kind would contribute zeros under a model name of `""`.
-   *
-   * `fromMs` is required, because `TimeUnixMs` is the partition key and without
-   * a bound this read opens every partition the retention holds.
-   */
-  sumTokensByModelPerSession(params: {
-    tenantIds: string[];
-    sessionIds: string[];
-    fromMs: number;
-  }): Promise<SessionModelTotalsRow[]>;
-
-  /**
-   * The sessions whose stamped fact rows name one repository's branches: the
-   * discovery read that finds a session for a pull request even after the
-   * session's own row moved on to another repository. Returns distinct
-   * (tenantId, sessionId) pairs only; the caller fetches the session rows.
-   */
-  listSessionsByStampedBranch(params: {
-    tenantIds: string[];
-    repositoryHost: string;
-    repositoryOwner: string;
-    repositoryName: string;
-    branches: string[];
-    fromMs: number;
-  }): Promise<Array<{ tenantId: string; sessionId: string }>>;
-}
 
 /**
  * One (session, model, working context) group's totals. The context fields are
@@ -112,28 +50,6 @@ export interface SessionEventsCursor {
  * the column back and the type must not claim a value the row does not hold.
  */
 export type CodingAgentSessionEventRow = CodingAgentSessionEvent;
-
-/** No-op store for deployments without ClickHouse. */
-export class NullCodingAgentSessionEventsRepository implements CodingAgentSessionEventsRepository {
-  async ensure(): Promise<void> {
-    // no-op
-  }
-
-  async findBySessionId(): Promise<{
-    events: CodingAgentSessionEventRow[];
-    nextCursor: SessionEventsCursor | null;
-  }> {
-    return { events: [], nextCursor: null };
-  }
-
-  async sumTokensByModelPerSession(): Promise<SessionModelTotalsRow[]> {
-    return [];
-  }
-
-  async listSessionsByStampedBranch(): Promise<Array<{ tenantId: string; sessionId: string }>> {
-    return [];
-  }
-}
 
 interface ClickHouseWriteRecord {
   TenantId: string;
@@ -244,7 +160,17 @@ interface ClickHouseReadRow {
 }
 
 export class CodingAgentSessionEventsClickHouseRepository implements SessionEventsRepository {
-  constructor(
+  static create({
+    clickHouse,
+    defaultTraceRetentionDays,
+  }: {
+    clickHouse: CodingAgentClickHousePort;
+    defaultTraceRetentionDays: number;
+  }): CodingAgentSessionEventsClickHouseRepository {
+    return new CodingAgentSessionEventsClickHouseRepository(clickHouse, defaultTraceRetentionDays);
+  }
+
+  private constructor(
     private readonly clickHouse: CodingAgentClickHousePort,
     private readonly defaultTraceRetentionDays: number,
   ) {}

@@ -22,16 +22,16 @@ import {
   projectWithTeamSchema,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
-import { CodingAgentBillingPolicyPort } from "../../../ports/coding-agent-billing.port";
-import { CodingAgentClockPort } from "../../../ports/coding-agent-clock.port";
-import { CodingAgentClickHousePort } from "../../../ports/coding-agent-clickhouse.port";
-import { CodingAgentSessionEventRepository } from "../../coding-agent-session-event.repository";
-import { CodingAgentSessionRepository } from "../../coding-agent-session.repository";
-import { CodingAgentTraceSessionRepository } from "../../coding-agent-trace-session.repository";
+import { CodingAgentBillingPolicyPort } from "../../ports/coding-agent-billing.port";
+import { CodingAgentClockPort } from "../../ports/coding-agent-clock.port";
+import { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port";
+import { CodingAgentSessionEventRepository } from "../../repositories/coding-agent-session-event.repository";
+import { CodingAgentSessionRepository } from "../../repositories/coding-agent-session.repository";
+import { CodingAgentTraceSessionRepository } from "../../repositories/coding-agent-trace-session.repository";
 import {
   SessionMetricSeriesRepository,
   type SessionMetricTotal,
-} from "../../session-metric-series.repository";
+} from "../../repositories/session-metric-series.repository";
 
 export const TEST_NOW_MS = CODING_AGENT_TEST_NOW_MS;
 

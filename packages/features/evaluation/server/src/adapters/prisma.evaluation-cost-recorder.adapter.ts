@@ -61,15 +61,15 @@ class PrismaEvaluationCostPersistence extends EvaluationCostPersistence {
 /**
  * Records evaluation costs in the database via Prisma.
  */
-export class PrismaEvaluationCostRecorder extends EvaluationCostRecorderPort {
-  static create(prisma: PrismaClient): PrismaEvaluationCostRecorder {
-    return new PrismaEvaluationCostRecorder(PrismaEvaluationCostPersistence.create(prisma));
+export class PrismaEvaluationCostRecorderAdapter extends EvaluationCostRecorderPort {
+  static create(prisma: PrismaClient): PrismaEvaluationCostRecorderAdapter {
+    return new PrismaEvaluationCostRecorderAdapter(PrismaEvaluationCostPersistence.create(prisma));
   }
 
   static createWithPersistence(
     persistence: EvaluationCostPersistence,
-  ): PrismaEvaluationCostRecorder {
-    return new PrismaEvaluationCostRecorder(persistence);
+  ): PrismaEvaluationCostRecorderAdapter {
+    return new PrismaEvaluationCostRecorderAdapter(persistence);
   }
 
   private constructor(private readonly persistence: EvaluationCostPersistence) {

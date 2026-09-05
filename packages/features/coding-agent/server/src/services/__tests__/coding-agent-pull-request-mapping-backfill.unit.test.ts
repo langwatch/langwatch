@@ -16,7 +16,7 @@ import {
   TestSessions,
   TestTraceSessions,
   session,
-} from "../../repositories/__tests__/fixtures/coding-agent.fixture";
+} from "../../__tests__/fixtures/coding-agent.fixture";
 
 function serviceWith(input: {
   sessions: TestSessions;

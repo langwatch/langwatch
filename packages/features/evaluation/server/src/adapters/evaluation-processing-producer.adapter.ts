@@ -86,28 +86,36 @@ function producerOnlyAutomations(processName: string): AutomationEvaluationSubsc
   } as unknown as AutomationEvaluationSubscriberService;
 }
 
-/**
- * Builds the evaluation-processing definition for a process that only sends
- * commands on it.
- *
- * `processName` names the refusal, so a stand-in reached by accident says
- * which process reached it rather than reporting an anonymous failure.
- */
-export function createEvaluationProcessingProducerPipeline(input: { processName: string }) {
-  const { processName } = input;
-  return EvaluationProcessingAdapter.createPipeline({
-    evalRunStore: new ProducerOnlyFoldStore<EvaluationRunData>(processName, "evaluation run"),
-    evaluationAnalyticsStore: new ProducerOnlyFoldStore<EvaluationAnalyticsData>(
-      processName,
-      "evaluation analytics",
-    ),
-    evaluationAnalyticsRollupAppendStore: new ProducerOnlyAppendStore<EvaluationAnalyticsRollupRow>(
-      processName,
-      "evaluation analytics rollup",
-    ),
-    executeEvaluationCommand: ExecuteEvaluationCommand.create(
-      new ProducerOnlyExecutionIntent(processName),
-    ),
-    automations: producerOnlyAutomations(processName),
-  });
+export class EvaluationProcessingProducerAdapter {
+  static create(): EvaluationProcessingProducerAdapter {
+    return new EvaluationProcessingProducerAdapter();
+  }
+
+  /**
+   * Builds the evaluation-processing definition for a process that only sends
+   * commands on it.
+   *
+   * `processName` names the refusal, so a stand-in reached by accident says
+   * which process reached it rather than reporting an anonymous failure.
+   */
+  static createPipeline(input: { processName: string }) {
+    const { processName } = input;
+
+    return EvaluationProcessingAdapter.createPipeline({
+      evalRunStore: new ProducerOnlyFoldStore<EvaluationRunData>(processName, "evaluation run"),
+      evaluationAnalyticsStore: new ProducerOnlyFoldStore<EvaluationAnalyticsData>(
+        processName,
+        "evaluation analytics",
+      ),
+      evaluationAnalyticsRollupAppendStore:
+        new ProducerOnlyAppendStore<EvaluationAnalyticsRollupRow>(
+          processName,
+          "evaluation analytics rollup",
+        ),
+      executeEvaluationCommand: ExecuteEvaluationCommand.create(
+        new ProducerOnlyExecutionIntent(processName),
+      ),
+      automations: producerOnlyAutomations(processName),
+    });
+  }
 }

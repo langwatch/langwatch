@@ -14,26 +14,18 @@ export { USAGE_UNKNOWN, UsageCounterPort, type UsageCount } from "./ports/usage-
 export { UsageMembershipPort } from "./ports/usage-membership.port";
 export { PrismaUsageMembershipRepository } from "./repositories/prisma/prisma.usage-membership.repository";
 export {
-  buildMessageLimitInfo,
-  getMessageLimitStatus,
   MESSAGE_LIMIT_WARNING_THRESHOLD,
   UsageStatsService,
   type UsageStatsCaller,
 } from "./services/usage-stats.service";
 export {
-  classifyMemberType,
-  getRoleChangeType,
-  isFullMember,
-  isLiteMember,
-  isViewOnlyCustomRole,
-  isViewOnlyPermission,
+  MemberClassificationService,
   type MemberType,
   type RoleChangeType,
 } from "./services/member-classification.service";
 export {
-  normalizeUsageUnit,
-  resolveUsageMeter,
   USAGE_UNIT_DISPLAY_LABELS,
+  UsageMeterPolicyService,
   type MeterDecision,
 } from "./services/usage-meter-policy.service";
 
@@ -46,10 +38,10 @@ export {
   UsageService,
   type PlanResolver,
   type UsageLimitResult,
+  type UsageServiceDependencies,
 } from "./services/usage-enforcement.service";
 export {
-  buildLimitMessage,
-  buildUpgradeUrl,
+  UsageLimitMessageService,
   type UsageDeployment,
 } from "./services/usage-limit-message.service";
 export {

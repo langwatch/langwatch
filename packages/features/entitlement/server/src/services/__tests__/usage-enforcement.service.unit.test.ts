@@ -52,11 +52,8 @@ describe("UsageService.checkLimit", () => {
   describe("given a later active plan lookup would allow more usage", () => {
     /** @scenario "Limit checks decide from one active plan snapshot" */
     it("decides from the plan snapshot the check already resolved", async () => {
-      const planResolver = vi
-        .fn()
-        .mockResolvedValueOnce(plan(1000))
-        .mockResolvedValue(plan(2000));
-      const service = new UsageService({
+      const planResolver = vi.fn().mockResolvedValueOnce(plan(1000)).mockResolvedValue(plan(2000));
+      const service = UsageService.create({
         organizations: new TestOrganizations(),
         traceCounter: new TestCounter([{ projectId: "project-1", count: 1000 }]),
         eventCounter: new TestCounter([{ projectId: "project-1", count: 1000 }]),

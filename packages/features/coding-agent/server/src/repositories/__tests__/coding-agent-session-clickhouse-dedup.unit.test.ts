@@ -11,13 +11,13 @@
  */
 import { describe, expect, it } from "vitest";
 import { NoopCodingAgentReadMetricsPort } from "../../adapters/coding-agent-read-metrics.adapter";
-import { TestClock } from "./fixtures/coding-agent.fixture";
+import { TestClock } from "../../__tests__/fixtures/coding-agent.fixture";
 import type {
   CodingAgentClickHouseClient,
   CodingAgentClickHouseQueryResult,
 } from "../../ports/coding-agent-clickhouse.port";
 import { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port";
-import { parseClickHouseDateTimeMs } from "../coding-agent-clickhouse/clickhouse.repository";
+import { parseClickHouseDateTimeMs } from "../coding-agent-clickhouse/clickhouse.mapper";
 import { CodingAgentSessionClickHouseRepository } from "../coding-agent-session/clickhouse.repository";
 
 /**

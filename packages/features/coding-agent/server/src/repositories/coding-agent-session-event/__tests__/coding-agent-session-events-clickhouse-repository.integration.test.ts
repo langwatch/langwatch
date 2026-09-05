@@ -92,7 +92,10 @@ function eventRecord(
 beforeAll(async () => {
   if (!clickHouseUrl) return;
   ch = createTestClickHouseClient(clickHouseUrl);
-  repository = new CodingAgentSessionEventsClickHouseRepository(new SingleClickHousePort(ch), 30);
+  repository = CodingAgentSessionEventsClickHouseRepository.create({
+    clickHouse: new SingleClickHousePort(ch),
+    defaultTraceRetentionDays: 30,
+  });
 }, 120_000);
 
 afterAll(async () => {

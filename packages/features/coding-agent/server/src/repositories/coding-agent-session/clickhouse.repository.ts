@@ -21,7 +21,7 @@ import {
   asNumber,
   asStringArray,
   parseClickHouseDateTimeMs,
-} from "../coding-agent-clickhouse/clickhouse.repository";
+} from "../coding-agent-clickhouse/clickhouse.mapper";
 
 const TABLE_NAME = "coding_agent_sessions" as const;
 type CodingAgentSessionRow = CodingAgentSession;

@@ -11,7 +11,7 @@ export { CodingAgentClockPort } from "./ports/coding-agent-clock.port";
 export { CodingAgentCostEstimatorPort } from "./ports/coding-agent-cost-estimator.port";
 export { CodingAgentProjectActivityPort } from "./ports/coding-agent-project-activity.port";
 export { CodingAgentPullRequestMappingPort } from "./ports/coding-agent-pull-request-mapping.port";
-export { SystemCodingAgentClock } from "./adapters/coding-agent-clock.adapter";
+export { SystemCodingAgentClockAdapter } from "./adapters/coding-agent-clock.adapter";
 export { ModelCatalogCostEstimatorAdapter } from "./adapters/model-catalog.cost-estimator.adapter";
 export {
   ClickHouseCodingAgentProcessingAdapter,

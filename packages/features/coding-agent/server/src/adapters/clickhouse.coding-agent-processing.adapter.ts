@@ -1,7 +1,7 @@
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import type { Cluster, Redis } from "ioredis";
 import { CodingAgentProjectionPersistenceAdapter } from "./coding-agent.adapter";
-import { SystemCodingAgentClock } from "./coding-agent-clock.adapter";
+import { SystemCodingAgentClockAdapter } from "./coding-agent-clock.adapter";
 import {
   EventingCodingAgentProcessingAdapter,
   type CodingAgentProcessingPipeline,
@@ -118,7 +118,7 @@ export class ClickHouseCodingAgentProcessingAdapter {
         retention: { defaultTraceRetentionDays: options.defaultRetentionDays },
       }),
       projects: options.projectActivity,
-      clock: SystemCodingAgentClock.create(),
+      clock: SystemCodingAgentClockAdapter.create(),
       redis: options.redis,
       defaultRetentionDays: options.defaultRetentionDays,
       ...(options.foldCacheTtlSeconds === undefined

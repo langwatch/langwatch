@@ -1,8 +1,8 @@
 import { CodingAgentClockPort } from "../ports/coding-agent-clock.port";
 
-export class SystemCodingAgentClock extends CodingAgentClockPort {
-  static create(): SystemCodingAgentClock {
-    return new SystemCodingAgentClock();
+export class SystemCodingAgentClockAdapter extends CodingAgentClockPort {
+  static create(): SystemCodingAgentClockAdapter {
+    return new SystemCodingAgentClockAdapter();
   }
 
   private constructor() {

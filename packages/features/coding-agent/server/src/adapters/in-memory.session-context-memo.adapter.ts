@@ -2,7 +2,6 @@ import type { SessionWorkingContext } from "@langwatch/coding-agent-contract";
 import {
   CodingAgentSessionContextMemoPort,
   SESSION_CONTEXT_MEMO_TTL_SECONDS,
-  sessionContextMemoKey,
 } from "../ports/coding-agent-session-context.port";
 
 /**
@@ -42,7 +41,7 @@ export class InMemorySessionContextMemoAdapter extends CodingAgentSessionContext
     tenantId: string;
     sessionId: string;
   }): Promise<SessionWorkingContext | null> {
-    const key = sessionContextMemoKey({ tenantId, sessionId });
+    const key = CodingAgentSessionContextMemoPort.memoKey({ tenantId, sessionId });
     const entry = this.entries.get(key);
     if (entry === undefined) return null;
     if (entry.expiresAtMs <= this.now()) {
@@ -61,7 +60,7 @@ export class InMemorySessionContextMemoAdapter extends CodingAgentSessionContext
     sessionId: string;
     context: SessionWorkingContext;
   }): Promise<void> {
-    const key = sessionContextMemoKey({ tenantId, sessionId });
+    const key = CodingAgentSessionContextMemoPort.memoKey({ tenantId, sessionId });
     // Re-inserting moves the key to the end of the Map's insertion order, so
     // the eviction below always drops the least recently written session.
     this.entries.delete(key);

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { createEvaluationProcessingProducerPipeline } from "../evaluation-processing-producer.adapter";
+import { EvaluationProcessingProducerAdapter } from "../evaluation-processing-producer.adapter";
 import { createEvaluationProcessingPipeline } from "../evaluation-processing.adapter";
 
 /** The producer's definition, as a host receives it. */
 const producer = () =>
-  createEvaluationProcessingProducerPipeline({ processName: "langwatch-api" }) as unknown as {
+  EvaluationProcessingProducerAdapter.createPipeline({
+    processName: "langwatch-api",
+  }) as unknown as {
     metadata: { name: string; commands: ReadonlyArray<{ name: string }> };
     foldProjections: Map<
       string,
