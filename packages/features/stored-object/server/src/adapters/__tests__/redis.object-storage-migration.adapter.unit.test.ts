@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { connect, connection } = vi.hoisted(() => {
-  const connection = { disconnect: vi.fn() };
-  return { connect: vi.fn(() => connection), connection };
+  const connectionInstance = { disconnect: vi.fn() };
+  return { connect: vi.fn(() => connectionInstance), connection: connectionInstance };
 });
 
 vi.mock("@langwatch/redis-client", () => ({

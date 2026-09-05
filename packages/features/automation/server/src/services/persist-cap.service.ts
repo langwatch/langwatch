@@ -1,7 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type {
   AutomationPersistCapConfig,
-  AutomationPersistCapCount,
   AutomationPersistCapDecision,
   AutomationPlan,
   AutomationPlanProvider,

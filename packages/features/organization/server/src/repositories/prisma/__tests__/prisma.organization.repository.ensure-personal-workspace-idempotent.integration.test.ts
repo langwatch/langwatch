@@ -24,7 +24,6 @@ import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaTenancyGuardService,
-  type PrismaConnection,
 } from "@langwatch/prisma-client";
 import { type PrismaClient } from "@langwatch/prisma-client/generated";
 import { PersonalWorkspaceIdentityAdapter } from "../../../adapters/resource-identifiers.adapter";
@@ -39,17 +38,14 @@ const passthroughSecrets: OrganizationSettingsSecretPort = {
 };
 
 describe.skipIf(!DB_URL)("PrismaOrganizationRepository.ensurePersonalWorkspace", () => {
-  let connection: PrismaConnection | undefined;
-  let prisma: PrismaClient | undefined;
-  let organizationRepository: PrismaOrganizationRepository;
   const identities = PersonalWorkspaceIdentityAdapter.create();
   const testNamespace = `ensure-idempotent-${nanoid(8)}`;
 
-  connection = PrismaConnectionService.create({
+  const connection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
-  prisma = connection.client as PrismaClient;
-  organizationRepository = PrismaOrganizationRepository.create(prisma, passthroughSecrets);
+  const prisma = connection.client as PrismaClient;
+  const organizationRepository = PrismaOrganizationRepository.create(prisma, passthroughSecrets);
 
   let organizationId: string;
   let userId: string;

@@ -1146,7 +1146,7 @@ describe("PullRequestUsageService", () => {
       expect(detail.totals.sessionsCount).toBe(2);
       expect(detail.contributors[0]?.contributorLabel).toBe("Riley Chase");
       expect(detail.modelBreakdown[0]?.model).toBe("claude-fable-5");
-      expect(detail.sessions.map((session) => session.sessionId)).toEqual(["newer", "older"]);
+      expect(detail.sessions.map((s) => s.sessionId)).toEqual(["newer", "older"]);
     });
 
     /** @scenario "The sessions list names each session by its generated title" */

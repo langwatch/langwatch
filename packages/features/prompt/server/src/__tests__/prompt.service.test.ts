@@ -20,27 +20,6 @@ describe("PromptService", () => {
         updatedAt: new Date(),
       };
 
-      const mockLatestVersion = {
-        id: "version-1",
-        version: 1,
-        schemaVersion: "1.0",
-        projectId: "project-1",
-        configId: "config-1",
-        authorId: null,
-        commitMessage: "Initial",
-        runtimeParameters: {},
-        configData: {
-          prompt: "Original prompt",
-          messages: [],
-          inputs: [{ identifier: "input", type: "str" }],
-          outputs: [{ identifier: "output", type: "str" }],
-          model: "gpt-4",
-          temperature: 0.7,
-          max_tokens: 1000,
-        },
-        createdAt: new Date(),
-      };
-
       const mockUpdatedVersion = {
         id: "version-2",
         version: 2,

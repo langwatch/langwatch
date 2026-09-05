@@ -22,7 +22,6 @@ import {
 import { ApiAuditPort } from "../../../api-request.policy";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
 import {
-  stubApplicationSlices,
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,

@@ -17,7 +17,7 @@
  * than discovered by clicking into it.
  */
 import { EventEmitter } from "node:events";
-import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
+import type { AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -43,7 +43,6 @@ import {
   type ApiTraceReadStackPort,
 } from "../trace.composition";
 import {
-  stubApplicationSlices,
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
@@ -53,8 +52,6 @@ import { resolveDataPrivacy } from "@langwatch/data-privacy-contract";
 import { composeApiTraceReadStack } from "../../../app/api-trace-read-stack.composition";
 import { composeApiPlanProvider, composeApiUsageStats } from "../../../app/api-usage.composition";
 import { composeSavedViewFeature } from "../../dashboard/saved-view.composition";
-import { composeShareFeature } from "../../share/share.composition";
-import { composeTopicFeature } from "../../topic/topic.composition";
 import {
   createSpansTrpcRouter,
   createTraceEditOverlayTrpcRouter,

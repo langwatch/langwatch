@@ -179,7 +179,10 @@ describe("given a connected agent column", () => {
       const events = await run({
         cell: makeCell(),
         dispatch,
-        now: () => (clock += 1200),
+        now: () => {
+          clock += 1200;
+          return clock;
+        },
       });
 
       const call = dispatch.mock.calls[0]![0];
@@ -330,7 +333,10 @@ describe("given a connected agent column", () => {
         workflows,
         // Every read of the clock is a minute later, so the budget is spent
         // on the first retry rather than in real time.
-        now: () => (clock += 60_000),
+        now: () => {
+          clock += 60_000;
+          return clock;
+        },
       })) {
         events.push(event);
       }

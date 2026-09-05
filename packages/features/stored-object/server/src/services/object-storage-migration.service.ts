@@ -164,8 +164,8 @@ export class ObjectStorageMigrationService {
         provider,
         scheme: "s3",
         driver,
-        storedObjectUri: (projectId, sha256) =>
-          mintS3StoredObjectUri({ bucket, projectId, sha256 }),
+        storedObjectUri: (projectId, sha256Hex) =>
+          mintS3StoredObjectUri({ bucket, projectId, sha256: sha256Hex }),
         datasetChunkUri: (projectId, datasetId, index) =>
           `s3://${bucket}/${chunkKey(projectId, datasetId, index)}`,
       };
@@ -179,8 +179,8 @@ export class ObjectStorageMigrationService {
       provider,
       scheme: "azure-blob",
       driver,
-      storedObjectUri: (projectId, sha256) =>
-        mintAzureBlobStoredObjectUri({ accountName, container, projectId, sha256 }),
+      storedObjectUri: (projectId, sha256Hex) =>
+        mintAzureBlobStoredObjectUri({ accountName, container, projectId, sha256: sha256Hex }),
       datasetChunkUri: (projectId, datasetId, index) =>
         `azure-blob://${accountName}/${container}/${chunkKey(projectId, datasetId, index)}`,
     };

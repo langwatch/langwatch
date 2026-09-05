@@ -9,7 +9,6 @@ import {
   isValidEventSelector,
   type SqsDestinationInput,
   type SqsDestinationView,
-  type WebhookDeliveryControls,
   type WebhookDeliveryOutcome,
   type WebhookDestinationKind,
   type WebhookEndpointView,

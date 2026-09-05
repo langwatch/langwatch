@@ -1,7 +1,4 @@
-import {
-  type StoredObjectOwnerClickHouseInstance,
-  StoredObjectOwnerInstanceDirectoryPort,
-} from "../../ports/stored-object-owner-instance-directory.port";
+import { StoredObjectOwnerInstanceDirectoryPort } from "../../ports/stored-object-owner-instance-directory.port";
 import {
   StoredObjectOwnerRepository,
   type StoredObjectOwnerHit,

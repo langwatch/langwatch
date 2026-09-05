@@ -41,7 +41,6 @@ import {
   type GrantPrincipal,
   type GrantRole,
   type GrantableAuthzScopeRef,
-  isRegistryPermission,
   scopeOrganizationId,
 } from "@langwatch/authz-contract";
 import type { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port";

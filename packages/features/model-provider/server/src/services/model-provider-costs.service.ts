@@ -3,7 +3,6 @@ import {
   ModelCostNotFoundError,
   ModelProviderInvalidError,
   modelCostDeleteInputSchema,
-  modelCostListInputSchema,
   modelCostWriteInputSchema,
   type ModelCost,
   type ModelCostDeleteInput,

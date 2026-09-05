@@ -25,7 +25,6 @@
  * its own suites in `@langwatch/analytics-server`.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { AuthApp } from "@langwatch/auth-server";
 import type {
   AuthzGetDecisionInput,
   AuthzScopeLineageResult,
@@ -36,7 +35,6 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it, vi } from "vitest";
-import { z } from "zod";
 import { ApiAuditPort } from "../../../api-request.policy";
 import {
   ApiApplication,
@@ -49,7 +47,6 @@ import { composeFeatureFlagFeature } from "../../feature-flag/feature-flag.compo
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
 import {
   stub,
-  stubApplicationSlices,
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
@@ -146,28 +143,6 @@ function testProjects(): ProjectService {
 
 function testResources(): ResourceScope {
   return { own: () => undefined } as unknown as ResourceScope;
-}
-
-function testAuthApp(): AuthApp {
-  return AuthApp.create({
-    clientIp: () => "127.0.0.1",
-    rateLimit: async () => ({ allowed: true }),
-    route: async () => ({ kind: "password" }) as never,
-    addressIsRegistered: async () => false,
-    requestSignUpVerification: async () => undefined,
-    completeSignUpVerification: async () => ({
-      email: "person@example.com",
-      accountCreated: true,
-      accountExists: false,
-    }),
-    readInviteLanding: async () => ({
-      organizationName: "LangWatch",
-      inviterName: null,
-      alreadyAccepted: false,
-    }),
-    requestFreshInvite: async () => undefined,
-    resolveAuthProvider: async () => "email",
-  });
 }
 
 function composeApplication(options: { clickhouse?: boolean; workbenchEnabled?: boolean } = {}) {

@@ -21,7 +21,6 @@ import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
 
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 
-import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { createTrpcRoot } from "../../api.application";
@@ -63,8 +62,6 @@ import { refusingAutomationFeature } from "../../features/automation/automation.
 import { refusingEnterpriseFeature } from "../../features/enterprise/enterprise.composition";
 import { refusingOpsFeature } from "../../features/ops/ops.composition";
 import { createAppTrpcFeatures } from "../app-trpc.features";
-
-import type { TracesTrpcPorts } from "@langwatch/trace-server";
 
 /** Every member refuses, so reaching one while BUILDING a surface is a failure. */
 const refuseEveryMember = (what: string) =>

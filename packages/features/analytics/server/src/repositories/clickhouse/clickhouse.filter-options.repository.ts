@@ -4,7 +4,6 @@ import { createLogger } from "@langwatch/observability";
 import { clickHouseFilters } from "../../filters/clickhouse/filter-definitions";
 import { buildScopeConditions } from "../../filters/clickhouse/query-helpers";
 import type {
-  ClickHouseFilterQueryParams,
   FilterOption,
   SupportedClickHouseFilterDefinition,
 } from "../../filters/clickhouse/types";

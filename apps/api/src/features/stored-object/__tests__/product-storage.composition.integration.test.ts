@@ -64,17 +64,13 @@ import {
 } from "../../../api.application";
 import type { ApiStoredObjectsConfigResolution } from "../../../platform/config/api.config";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
-import {
-  composeDataRetentionFeature,
-  refusingDataRetentionFeature,
-} from "../../data-retention/data-retention.composition";
-import { composeMonitorFeature, refusingMonitorFeature } from "../../monitor/monitor.composition";
+import { composeDataRetentionFeature } from "../../data-retention/data-retention.composition";
+import { composeMonitorFeature } from "../../monitor/monitor.composition";
 import {
   composeStoredObjectFeature,
   refusingStoredObjectFeature,
 } from "../stored-object.composition";
 import {
-  stubApplicationSlices,
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,

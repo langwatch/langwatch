@@ -42,8 +42,6 @@ import {
   type ConversationRoutingProfile,
   type ConversationSeeds,
   ConversationTraceAssemblyService,
-  KNOWN_AGENT_IDENTITIES,
-  type KnownAgentIdentity,
   type OtlpJsonAttr,
   type OtlpJsonSpan,
   type RoutingOrigin,

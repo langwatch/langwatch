@@ -28,6 +28,17 @@ function pathnameOf(address: string): string {
   return cut === -1 ? address : address.slice(0, cut);
 }
 
+/** Maps one team's projects to the onboarding host's project shape. */
+function toOnboardingProjects<P extends { id: string; name: string; slug: string }>(team: {
+  projects: P[];
+}): Array<{ id: string; name: string; slug: string }> {
+  return team.projects.map((project) => ({
+    id: project.id,
+    name: project.name,
+    slug: project.slug,
+  }));
+}
+
 export function OnboardingHost({ children }: { children: ReactNode }) {
   const { session, route, feedback, navigation } = useUiCapabilities();
   const activeScope = session.activeScope();
@@ -56,11 +67,7 @@ export function OnboardingHost({ children }: { children: ReactNode }) {
           id: team.id,
           name: team.name,
           isPersonal: Boolean(team.isPersonal),
-          projects: team.projects.map((project) => ({
-            id: project.id,
-            name: project.name,
-            slug: project.slug,
-          })),
+          projects: toOnboardingProjects(team),
         })),
       })),
     [graph],

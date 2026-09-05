@@ -87,6 +87,28 @@ function walk({ schema, at, depth = 0 }: { schema: Schema; at: string; depth?: n
  * field from their first day, so no client generated before it exists. Their
  * answers may read it as required.
  */
+/** The merged walk of every 2xx response's media content for one operation. */
+function walkOperationSuccessResponses(
+  operation: (typeof document.paths)[string][string],
+  at: { method: string; path: string },
+): Walk {
+  const requiredLists: Walk["requiredLists"] = [];
+  const propertyPaths: string[] = [];
+  for (const [status, response] of Object.entries(operation.responses ?? {})) {
+    if (!status.startsWith("2")) continue;
+    for (const media of Object.values(response.content ?? {})) {
+      if (!media.schema) continue;
+      const answer = walk({
+        schema: media.schema,
+        at: `${at.method.toUpperCase()} ${at.path} ${status}`,
+      });
+      requiredLists.push(...answer.requiredLists);
+      propertyPaths.push(...answer.propertyPaths);
+    }
+  }
+  return { requiredLists, propertyPaths };
+}
+
 function walkFamily({ family, bornWith = [] }: { family: string; bornWith?: string[] }): Walk {
   const requiredLists: Walk["requiredLists"] = [];
   const propertyPaths: string[] = [];
@@ -95,18 +117,9 @@ function walkFamily({ family, bornWith = [] }: { family: string; bornWith?: stri
     if (bornWith.some((route) => path.startsWith(route))) continue;
     for (const [method, operation] of Object.entries(operations)) {
       if (!METHODS.includes(method)) continue;
-      for (const [status, response] of Object.entries(operation.responses ?? {})) {
-        if (!status.startsWith("2")) continue;
-        for (const media of Object.values(response.content ?? {})) {
-          if (!media.schema) continue;
-          const answer = walk({
-            schema: media.schema,
-            at: `${method.toUpperCase()} ${path} ${status}`,
-          });
-          requiredLists.push(...answer.requiredLists);
-          propertyPaths.push(...answer.propertyPaths);
-        }
-      }
+      const answer = walkOperationSuccessResponses(operation, { method, path });
+      requiredLists.push(...answer.requiredLists);
+      propertyPaths.push(...answer.propertyPaths);
     }
   }
   return { requiredLists, propertyPaths };

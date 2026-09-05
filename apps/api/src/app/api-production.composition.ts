@@ -283,7 +283,6 @@ import { nanoid } from "nanoid";
 import {
   composeHttpProxyFeature,
   LoggedApiStudioAbsence,
-  refusingHttpProxyFeature,
   type ApiStudioHostPort,
   type ComposedHttpProxyFeature,
 } from "../features/agent/http-proxy.composition";

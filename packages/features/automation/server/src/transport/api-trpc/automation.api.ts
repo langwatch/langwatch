@@ -342,6 +342,26 @@ function validateEmailRecipientFormats(recipients: string[]): void {
   }
 }
 
+/**
+ * Resolves the sentinel `WEBHOOK_HEADER_VALUE_KEPT` value on each header to the
+ * saved (decrypted) value, dropping the header when nothing was saved under
+ * that name; every other header passes through unchanged.
+ */
+function resolveKeptWebhookHeaders(
+  headers: Record<string, string>,
+  saved: Record<string, string>,
+): Record<string, string> {
+  const resolved: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    if (value === WEBHOOK_HEADER_VALUE_KEPT) {
+      if (saved[name] !== undefined) resolved[name] = saved[name];
+      continue;
+    }
+    resolved[name] = value;
+  }
+  return resolved;
+}
+
 /** Installs the complete `automation.*` tRPC surface on a process-owned root. */
 export class AutomationTrpcApi {
   static create<
@@ -814,15 +834,10 @@ export class AutomationTrpcApi {
               }
               saved = ports.providers.decryptWebhookHeaders(stored);
             }
-            const headers: Record<string, string> = {};
-            for (const [name, value] of Object.entries(webhookDestination.headers)) {
-              if (value === WEBHOOK_HEADER_VALUE_KEPT) {
-                if (saved[name] !== undefined) headers[name] = saved[name];
-                continue;
-              }
-              headers[name] = value;
-            }
-            webhookDestination = { ...webhookDestination, headers };
+            webhookDestination = {
+              ...webhookDestination,
+              headers: resolveKeptWebhookHeaders(webhookDestination.headers, saved),
+            };
           }
 
           // The signing secret is a stored secret too, so the browser never has

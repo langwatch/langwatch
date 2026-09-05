@@ -12,7 +12,6 @@ import {
 import { DatasetContentPort } from "../ports/dataset.port";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
 import { DatasetContentRepository } from "../repositories/prisma/dataset-content.repository";
-import { DatasetRecordContentRepository } from "../repositories/prisma/dataset-record-content.repository";
 import type { ChunkOffset } from "../services/dataset-chunking";
 import { DatasetChunkService } from "../services/dataset-chunk.service";
 import { DatasetChunkCountMissingError, DatasetNotReadyError } from "../services/errors";

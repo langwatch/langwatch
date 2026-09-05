@@ -90,7 +90,7 @@ class FakeSources extends IngestionPullSourcePort {
 }
 
 class FakeProjects extends TestProjectService {
-  constructor(private readonly traceDestination: ProjectWithTeam | null = null) {
+  constructor(private readonly traceDestinationProject: ProjectWithTeam | null = null) {
     super();
   }
 
@@ -106,7 +106,7 @@ class FakeProjects extends TestProjectService {
     traceSharingEnabled: false,
   });
 
-  tryGetWithTeam = async (): Promise<ProjectWithTeam | null> => this.traceDestination;
+  tryGetWithTeam = async (): Promise<ProjectWithTeam | null> => this.traceDestinationProject;
 }
 
 class FakeSink extends GovernanceOcsfEventSinkPort {

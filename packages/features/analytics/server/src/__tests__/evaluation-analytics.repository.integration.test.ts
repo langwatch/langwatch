@@ -316,11 +316,11 @@ integration("evaluation_analytics ClickHouse contract", () => {
       },
     ]);
 
-    const window = { fromMs, toMs };
+    const window_ = { fromMs, toMs };
     const [before, inside, after] = await Promise.all([
-      repo.tryFind({ tenantId, evaluationId: beforeWindowId, window }),
-      repo.tryFind({ tenantId, evaluationId: insideWindowId, window }),
-      repo.tryFind({ tenantId, evaluationId: afterWindowId, window }),
+      repo.tryFind({ tenantId, evaluationId: beforeWindowId, window: window_ }),
+      repo.tryFind({ tenantId, evaluationId: insideWindowId, window: window_ }),
+      repo.tryFind({ tenantId, evaluationId: afterWindowId, window: window_ }),
     ]);
 
     expect(before).toBeNull();

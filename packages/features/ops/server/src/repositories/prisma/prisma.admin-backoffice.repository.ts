@@ -1,9 +1,5 @@
 import { defaultHandler, getListHandler, getOneHandler } from "ra-data-simple-prisma";
-import {
-  PlanTypes,
-  type PrismaClient,
-  SubscriptionStatus,
-} from "@langwatch/prisma-client/generated";
+import { PlanTypes, SubscriptionStatus } from "@langwatch/prisma-client/generated";
 import type {
   AdminDataResult,
   AdminListResult,

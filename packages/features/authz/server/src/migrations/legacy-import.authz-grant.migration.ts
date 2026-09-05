@@ -74,7 +74,6 @@ import type {
   OrganizationMemberFact,
   ProjectCredentialFact,
   ResourceGrantRow,
-  ResourceGrantUsageSeed,
   RoleHeadRow,
   ShareLinkFactRow,
 } from "../repositories/authz-migration.repository";

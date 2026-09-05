@@ -661,10 +661,10 @@ class Catalog extends ModelProviderCatalog {
     return Promise.resolve({ valid: true });
   }
   testConnection(
-    provider: string,
+    providerId: string,
     customKeys: Record<string, unknown>,
   ): Promise<ModelProviderCredentialVerdict> {
-    this.connectionChecks.push({ provider, customKeys });
+    this.connectionChecks.push({ provider: providerId, customKeys });
     return Promise.resolve({ outcome: "verified", valid: true });
   }
   tryGetExecutionValue(input: {
@@ -1764,7 +1764,7 @@ describe("ModelProviderService", () => {
     ).resolves.toMatchObject({ id: "organization-row" });
   });
   it("returns raw execution providers with registry model metadata", async () => {
-    class ExecutionCatalog extends Catalog {
+    class SingleModelCatalog extends Catalog {
       metadata() {
         return {
           models: ["gpt-4o"],
@@ -1774,7 +1774,7 @@ describe("ModelProviderService", () => {
     }
 
     await expect(
-      service(new Providers(), new ExecutionCatalog()).getExecutionProviders({
+      service(new Providers(), new SingleModelCatalog()).getExecutionProviders({
         projectId: "project_1",
       }),
     ).resolves.toMatchObject({

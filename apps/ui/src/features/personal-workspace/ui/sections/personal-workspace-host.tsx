@@ -8,6 +8,7 @@ import {
   personalWorkspaceApi,
   PersonalWorkspaceHostProvider,
   type PersonalOrganization,
+  type PersonalTeam,
   type PersonalWorkspaceHostPort,
 } from "@langwatch/user-web/screens/personal-workspace";
 import { useMemo, type ReactNode } from "react";
@@ -49,6 +50,21 @@ function readDeployment(): { isSaas: boolean; appBaseUrl: string; passkeysEnable
   }
 }
 
+/** Maps one organization's teams to the personal-workspace host's shape, stamping each project with its team's id. */
+function toPersonalWorkspaceTeams(
+  teams: {
+    id: string;
+    name: string;
+    projects: Array<{ id: string; name: string; slug: string }>;
+  }[],
+): readonly PersonalTeam[] {
+  return teams.map((team) => ({
+    id: team.id,
+    name: team.name,
+    projects: team.projects.map((project) => ({ ...project, teamId: team.id })),
+  }));
+}
+
 export function PersonalWorkspaceHost({ children }: { children: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
   const refreshSession = useRefreshUiSession();
@@ -76,11 +92,7 @@ export function PersonalWorkspaceHost({ children }: { children: ReactNode }) {
         // other personal-workspace screen does: an organization pinned to a
         // single sign-on provider may not link additional methods.
         ssoProvider: organization.ssoProvider ?? null,
-        teams: organization.teams.map((team) => ({
-          id: team.id,
-          name: team.name,
-          projects: team.projects.map((project) => ({ ...project, teamId: team.id })),
-        })),
+        teams: toPersonalWorkspaceTeams(organization.teams),
       })),
     [organizations.data],
   );

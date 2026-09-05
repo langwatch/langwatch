@@ -36,11 +36,6 @@ const VALID_CONFIG = {
   },
 };
 
-interface StubObject {
-  key: string;
-  body: string;
-}
-
 let storage: TestObjectStoragePort;
 
 function makeAdapter(): S3PollingPullerAdapter {

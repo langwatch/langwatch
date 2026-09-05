@@ -32,7 +32,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { createLogger, type Logger } from "@langwatch/observability";
+import { type Logger } from "@langwatch/observability";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -40,7 +40,6 @@ import type { ShareService } from "@langwatch/share-contract";
 import type { TopicService } from "@langwatch/topic-contract";
 import {
   TraceApp,
-  TraceEditOverlayService,
   type Protections,
   type SharedTraceTrpcPorts,
   type SpansTrpcPorts,
@@ -154,9 +153,7 @@ export abstract class ApiTraceReadStackPort {
 
 /** What each absence costs, written where a deployment reads its logs. */
 export abstract class ApiTraceAbsenceReport {
-  abstract absent(
-    capability: "trace-reads" | "plans",
-  ): void;
+  abstract absent(capability: "trace-reads" | "plans"): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -287,9 +284,7 @@ export type ApiTracePorts = Readonly<{
  * Two of either would be two answers to one question, and the one that drifts
  * is the copy.
  */
-export function composeTraceFeature(
-  options: TraceFeatureOptions,
-): ComposedTraceFeature {
+export function composeTraceFeature(options: TraceFeatureOptions): ComposedTraceFeature {
   const refuse = refusalFactory(options.processName);
 
   const traceReads = options.traceReads ?? options.traceReadsFrom?.();
@@ -339,60 +334,57 @@ export function composeTraceFeature(
       : Promise.reject(refuse("the caller's read-time redactions"));
 
   const ports: ApiTracePorts = {
-      traces: {
-        ...(traceReads?.legacyPorts() ??
-          refuseAll<
-            Omit<
-              TracesTrpcPorts<
-                TraceLegacyListInput,
-                unknown,
-                TraceLegacyFilterInput,
-                unknown,
-                unknown
-              >,
-              "getViewerProtections"
-            >
-          >(refuse, "the legacy trace grid")),
-        getViewerProtections: viewerProtections,
-      },
-      tracesV2: {
-        ...(traceReads?.readPorts() ??
-          refuseAll<ReturnType<ApiTraceReadStackPort["readPorts"]>>(
-            refuse,
-            "the trace read passes",
-          )),
-        ...(traceReads?.explorerPorts() ??
-          refuseAll<ReturnType<ApiTraceReadStackPort["explorerPorts"]>>(
-            refuse,
-            "the trace explorer",
-          )),
-        getViewerProtections: viewerProtections,
-      },
-      spans: { getViewerProtections: viewerProtections } satisfies SpansTrpcPorts,
-      traceEditOverlay: {
-        ...(traceReads?.editOverlayRedaction() ??
-          refuseAll<Omit<TraceEditOverlayTrpcPorts<Protections>, "getViewerProtections">>(
-            refuse,
-            "the reviewer-correction redaction",
-          )),
-        getViewerProtections: viewerProtections,
-      },
-      sharedTrace: {
-        mappers: (
-          traceReads?.readPorts() ??
-          refuseAll<ReturnType<ApiTraceReadStackPort["readPorts"]>>(refuse, "the trace read passes")
-        ).mappers,
-        tryGetShareViewerProtections: (input) =>
-          traceReads
-            ? traceReads.tryGetShareViewerProtections(input)
-            : Promise.reject(refuse("the share viewer's redactions")),
-        // The PROCESS's counter, not a second one: the 60 reads a minute per
-        // share token and 120 per client address are Trace's numbers, and this
-        // is only where the process says which counter they are kept in.
-        rateLimit: options.rateLimit,
-        getClientIp: (req) => clientIpOf(req),
-        isTraceNotFound: (error) => traceReads?.isTraceNotFound(error) ?? false,
-      } satisfies SharedTraceTrpcPorts,
+    traces: {
+      ...(traceReads?.legacyPorts() ??
+        refuseAll<
+          Omit<
+            TracesTrpcPorts<
+              TraceLegacyListInput,
+              unknown,
+              TraceLegacyFilterInput,
+              unknown,
+              unknown
+            >,
+            "getViewerProtections"
+          >
+        >(refuse, "the legacy trace grid")),
+      getViewerProtections: viewerProtections,
+    },
+    tracesV2: {
+      ...(traceReads?.readPorts() ??
+        refuseAll<ReturnType<ApiTraceReadStackPort["readPorts"]>>(refuse, "the trace read passes")),
+      ...(traceReads?.explorerPorts() ??
+        refuseAll<ReturnType<ApiTraceReadStackPort["explorerPorts"]>>(
+          refuse,
+          "the trace explorer",
+        )),
+      getViewerProtections: viewerProtections,
+    },
+    spans: { getViewerProtections: viewerProtections } satisfies SpansTrpcPorts,
+    traceEditOverlay: {
+      ...(traceReads?.editOverlayRedaction() ??
+        refuseAll<Omit<TraceEditOverlayTrpcPorts<Protections>, "getViewerProtections">>(
+          refuse,
+          "the reviewer-correction redaction",
+        )),
+      getViewerProtections: viewerProtections,
+    },
+    sharedTrace: {
+      mappers: (
+        traceReads?.readPorts() ??
+        refuseAll<ReturnType<ApiTraceReadStackPort["readPorts"]>>(refuse, "the trace read passes")
+      ).mappers,
+      tryGetShareViewerProtections: (input) =>
+        traceReads
+          ? traceReads.tryGetShareViewerProtections(input)
+          : Promise.reject(refuse("the share viewer's redactions")),
+      // The PROCESS's counter, not a second one: the 60 reads a minute per
+      // share token and 120 per client address are Trace's numbers, and this
+      // is only where the process says which counter they are kept in.
+      rateLimit: options.rateLimit,
+      getClientIp: (req) => clientIpOf(req),
+      isTraceNotFound: (error) => traceReads?.isTraceNotFound(error) ?? false,
+    } satisfies SharedTraceTrpcPorts,
   };
 
   return {
@@ -454,7 +446,6 @@ function mountTraceRouters(mount: ApiTrpcFeatureMount, ports: ApiTracePorts) {
     }),
   };
 }
-
 
 /** Writes each absence to the process log, with what it costs. */
 export class LoggedApiTraceAbsence extends ApiTraceAbsenceReport {

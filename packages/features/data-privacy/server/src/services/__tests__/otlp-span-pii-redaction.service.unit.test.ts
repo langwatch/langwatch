@@ -7,7 +7,7 @@ import {
 import type { TenantId } from "@langwatch/eventing";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { ATTR_KEYS, type OtlpResource, type OtlpSpan } from "@langwatch/trace-contract";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { PiiAnalysisPort } from "../../ports/pii-analysis.port";
 import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service";

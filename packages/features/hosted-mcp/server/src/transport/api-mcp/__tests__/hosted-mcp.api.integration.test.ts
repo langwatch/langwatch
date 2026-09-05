@@ -348,15 +348,15 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       handler.handleRequest(req, res);
     });
 
-    await new Promise<void>((resolve) => {
-      server.listen(0, "127.0.0.1", resolve);
+    await new Promise<void>((done) => {
+      server.listen(0, "127.0.0.1", done);
     });
   });
 
   afterAll(async () => {
     await handler.closeAllSessions();
-    await new Promise<void>((resolve) => {
-      server.close(() => resolve());
+    await new Promise<void>((done) => {
+      server.close(() => done());
     });
   });
 
@@ -1841,7 +1841,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(toolRes.status).toBe(202);
 
       // Wait for the tool to execute (response goes through SSE stream)
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise((done) => setTimeout(done, 2000));
 
       // Verify the server is still healthy (tool didn't crash it)
       const healthRes = await fetch(`${baseUrl}/mcp/health`);

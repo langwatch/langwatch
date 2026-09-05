@@ -22,7 +22,6 @@ import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaTenancyGuardService,
-  type PrismaConnection,
 } from "@langwatch/prisma-client";
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
@@ -36,16 +35,13 @@ const noopGrantsWriter = {
 } as unknown as AuthzGrantsService;
 
 describe.skipIf(!DB_URL)("PrismaOrganizationMembershipRepository.setMemberDisabled", () => {
-  let connection: PrismaConnection | undefined;
-  let prisma: PrismaClient | undefined;
-  let repository: PrismaOrganizationMembershipRepository;
   const testNamespace = `set-member-disabled-${nanoid(8)}`;
 
-  connection = PrismaConnectionService.create({
+  const connection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
-  prisma = connection.client as PrismaClient;
-  repository = PrismaOrganizationMembershipRepository.create({
+  const prisma = connection.client as PrismaClient;
+  const repository = PrismaOrganizationMembershipRepository.create({
     database: prisma,
     grants: noopGrantsWriter,
   });

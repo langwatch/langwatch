@@ -27,23 +27,18 @@
 
 import type { PiiLevel, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
 import type { DataPrivacyResolutionPort } from "../ports/data-privacy.port";
-import { PRIVACY_PII_INCOMPLETE_MARKER_ATTR } from "@langwatch/data-privacy-contract";
 import type { TenantId } from "@langwatch/eventing";
 import { STRICT_ONLY_PII_ENTITIES } from "@langwatch/redaction";
 import {
   compilePolicyPiiExceptions,
   compilePolicySecretPatterns,
   nativePiiEntitiesForPolicy,
-  redactAttributeNative,
-  redactStringNative,
 } from "@langwatch/redaction/pii";
 import { type PIICheckOptions, PiiAnalysisPort } from "../ports/pii-analysis.port";
 
 import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
-import type { OtlpAnyValue, OtlpKeyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
-import { ATTR_KEYS } from "@langwatch/trace-contract";
 
 /**
  * Maximum attribute value length (in characters) for PII redaction.

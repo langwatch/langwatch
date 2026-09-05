@@ -1,13 +1,19 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { GithubBranchInstallationsPort } from "../../ports/github-branch-installations.port";
-import { GithubAppTokenPort, type GithubPullRequestSummary } from "../../ports/github-app-token.port";
+import {
+  GithubAppTokenPort,
+  type GithubPullRequestSummary,
+} from "../../ports/github-app-token.port";
 import { GithubHostPort } from "../../ports/github-host.port";
 import { GithubPullRequestsRepository } from "../../repositories/github-pull-requests.repository";
 import type {
   GithubBranchCheckRow,
   UpsertGithubBranchCheckInput,
 } from "../../repositories/github-pull-requests.repository";
-import { GithubBranchMappingService, type BranchMappingTarget } from "../github-branch-mapping.service";
+import {
+  GithubBranchMappingService,
+  type BranchMappingTarget,
+} from "../github-branch-mapping.service";
 
 const NOW = new Date("2026-01-01T00:00:00Z").getTime();
 
@@ -46,7 +52,10 @@ class FakeInstallations extends GithubBranchInstallationsPort {
   tryGetByInstallationId(): Promise<{ organizationId: string } | null> {
     return Promise.resolve(this.installation);
   }
-  tryResolveInstallationForRepository(): Promise<{ installationId: string; repositoryId: string } | null> {
+  tryResolveInstallationForRepository(): Promise<{
+    installationId: string;
+    repositoryId: string;
+  } | null> {
     return Promise.resolve({ installationId: "install-1", repositoryId: "repo-1" });
   }
 }
@@ -168,9 +177,11 @@ describe("given an announcement carrying an installation with no local record", 
       const installations = new FakeInstallations();
       installations.installation = null;
 
-      const applied = await service(repository, new FakeAppTokens(), installations).applyPullRequestEvent(
-        pullRequestEvent,
-      );
+      const applied = await service(
+        repository,
+        new FakeAppTokens(),
+        installations,
+      ).applyPullRequestEvent(pullRequestEvent);
 
       expect(applied).toBe(false);
       expect(repository.upserts).toHaveLength(0);
@@ -186,7 +197,11 @@ describe("given an announcement that a label was added to a pull request", () =>
       const installations = new FakeInstallations();
       installations.installation = { organizationId: "org-1" };
 
-      const applied = await service(repository, new FakeAppTokens(), installations).applyPullRequestEvent({
+      const applied = await service(
+        repository,
+        new FakeAppTokens(),
+        installations,
+      ).applyPullRequestEvent({
         ...pullRequestEvent,
         action: "labeled",
       });

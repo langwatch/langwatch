@@ -114,14 +114,14 @@ const detail = (over: Partial<DetailSnapshot> = {}): DetailSnapshot => ({
 
 class SnapshotRepositoryStub extends OpsSnapshotRepository {
   constructor(
-    private live: LiveSnapshot | null,
-    private readonly detail: DetailSnapshot | null,
+    private liveSnapshot: LiveSnapshot | null,
+    private readonly detailSnapshot: DetailSnapshot | null,
   ) {
     super();
   }
 
   setLive(snapshot: LiveSnapshot): void {
-    this.live = snapshot;
+    this.liveSnapshot = snapshot;
   }
 
   async acquireOrRenewLease() {
@@ -139,11 +139,11 @@ class SnapshotRepositoryStub extends OpsSnapshotRepository {
   }
 
   async tryReadLive(): Promise<LiveSnapshot | null> {
-    return this.live;
+    return this.liveSnapshot;
   }
 
   async tryReadDetail(): Promise<DetailSnapshot | null> {
-    return this.detail;
+    return this.detailSnapshot;
   }
 }
 

@@ -30,7 +30,6 @@ import {
   evaluatorTargetNoInputsResult,
   noInputsResolvedResult,
 } from "../processes/experiment-cell-error-events.process";
-import type { ExperimentModelCostPort } from "../ports/experiment-model-cost.port";
 import type { ExperimentRunPorts } from "./experiment-run-orchestrator.service";
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service";
 import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service";

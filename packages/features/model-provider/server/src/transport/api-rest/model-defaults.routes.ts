@@ -90,12 +90,12 @@ export function registerModelDefaultsRoutes(
               snapshot.effective[role] ?? null,
             ]),
           ),
-          configs: snapshot.configs.map((c) => ({
-            id: c.id,
-            config: c.config,
-            scopes: c.scopes,
-            createdAt: c.createdAt.toISOString(),
-            updatedAt: c.updatedAt.toISOString(),
+          configs: snapshot.configs.map((config) => ({
+            id: config.id,
+            config: config.config,
+            scopes: config.scopes,
+            createdAt: config.createdAt.toISOString(),
+            updatedAt: config.updatedAt.toISOString(),
           })),
         }),
       );

@@ -32,7 +32,6 @@ import type { EventEmitter } from "node:events";
 import { EventEmitter as NodeEventEmitter } from "node:events";
 import { createTenantId, EventSourcing } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import type { AuthService } from "@langwatch/auth-contract";
 import type {
   AuthzGetDecisionInput,
   AuthzScopeLineageResult,
@@ -42,7 +41,6 @@ import type {
 import { AgentNotFoundError, type AgentService } from "@langwatch/agent-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -68,7 +66,6 @@ import { composeApiAgentPipelines } from "../../../app/api-agent-pipelines.compo
 import { composeLangyFeature } from "../../langy/langy.composition";
 import {
   stub,
-  stubApplicationSlices,
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,

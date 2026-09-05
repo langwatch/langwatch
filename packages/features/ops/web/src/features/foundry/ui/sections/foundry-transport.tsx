@@ -6,6 +6,29 @@ import {
 import { useCallback, useMemo, type ReactNode } from "react";
 import { useOpsHost } from "../../../../model/ops-host";
 import { api } from "../../../../behavior/ops-api";
+import type { OpsOrganizationGraph } from "../../../../behavior/ops-api";
+
+/** Flattens every project across every team of every organization into a flat FoundryProject list. */
+function flattenFoundryProjects(organizations: OpsOrganizationGraph[]): FoundryProject[] {
+  return organizations.flatMap((organization) =>
+    organization.teams.flatMap((team) => mapTeamProjects(organization.name, team)),
+  );
+}
+
+/** Maps one team's projects to FoundryProject rows, carrying the org name through. */
+function mapTeamProjects(
+  orgName: string,
+  team: OpsOrganizationGraph["teams"][number],
+): FoundryProject[] {
+  return team.projects.map((candidate) => ({
+    id: candidate.id,
+    name: candidate.name,
+    slug: candidate.slug,
+    apiKey: candidate.apiKey,
+    orgName,
+    teamName: team.name,
+  }));
+}
 
 export function FoundryTransport({
   children,
@@ -28,18 +51,7 @@ export function FoundryTransport({
       return [];
     }
 
-    return organizations.data.flatMap((organization) =>
-      organization.teams.flatMap((team) =>
-        team.projects.map((candidate) => ({
-          id: candidate.id,
-          name: candidate.name,
-          slug: candidate.slug,
-          apiKey: candidate.apiKey,
-          orgName: organization.name,
-          teamName: team.name,
-        })),
-      ),
-    );
+    return flattenFoundryProjects(organizations.data);
   }, [organizations.data]);
 
   const loadPrompts = useCallback<FoundryTransport["loadPrompts"]>(

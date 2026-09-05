@@ -26,7 +26,6 @@ import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaTenancyGuardService,
-  type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
@@ -50,23 +49,19 @@ const passthroughSecrets: OrganizationSettingsSecretPort = {
 describe.skipIf(!DB_URL)(
   "PrismaOrganizationMembershipRepository.createAndAssign — primaryIntent",
   () => {
-    let connection: PrismaConnection | undefined;
-    let prisma: PrismaClient | undefined;
-    let membershipRepository: PrismaOrganizationMembershipRepository;
-    let organizationRepository: PrismaOrganizationRepository;
     const testNamespace = `intent-${nanoid(8)}`;
     const createdOrgIds: string[] = [];
     const createdUserIds: string[] = [];
 
-    connection = PrismaConnectionService.create({
+    const connection = PrismaConnectionService.create({
       guard: PrismaTenancyGuardService.create(),
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
-    prisma = connection.client as PrismaClient;
-    membershipRepository = PrismaOrganizationMembershipRepository.create({
+    const prisma = connection.client as PrismaClient;
+    const membershipRepository = PrismaOrganizationMembershipRepository.create({
       database: prisma,
       grants: noopGrantsWriter,
     });
-    organizationRepository = PrismaOrganizationRepository.create(prisma, passthroughSecrets);
+    const organizationRepository = PrismaOrganizationRepository.create(prisma, passthroughSecrets);
 
     async function createUser() {
       const user = await prisma!.user.create({

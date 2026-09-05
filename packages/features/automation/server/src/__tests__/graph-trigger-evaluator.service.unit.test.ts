@@ -398,7 +398,7 @@ describe("evaluateGraphTrigger", () => {
     // Before the buildSeriesName fix this lookup missed, read 0, and a `gt`
     // alert never fired.
     it("reads the bucket via the buildSeriesName encoding and fires", async () => {
-      const harness = makeHarness({
+      const localHarness = makeHarness({
         trigger: makeTrigger({
           actionParams: {
             threshold: 10,
@@ -436,7 +436,7 @@ describe("evaluateGraphTrigger", () => {
       });
 
       const result = await evaluateGraphTrigger({
-        deps: harness.deps,
+        deps: localHarness.deps,
         triggerId: TRIGGER_ID,
         projectId: PROJECT_ID,
         reason: "real-time",
@@ -444,7 +444,7 @@ describe("evaluateGraphTrigger", () => {
 
       expect(result.status).toBe("fired");
       expect(result.value).toBe(15);
-      expect(harness.dispatch).toHaveBeenCalledTimes(1);
+      expect(localHarness.dispatch).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -623,7 +623,7 @@ describe("evaluateGraphTrigger", () => {
     // evaluator must read the rewritten `.../cardinality` bucket — otherwise
     // it reads 0 and the alert never fires.
     it("reads the cardinality-keyed bucket and fires", async () => {
-      const harness = makeHarness({
+      const localHarness = makeHarness({
         trigger: makeTrigger({
           actionParams: {
             threshold: 10,
@@ -660,7 +660,7 @@ describe("evaluateGraphTrigger", () => {
       });
 
       const result = await evaluateGraphTrigger({
-        deps: harness.deps,
+        deps: localHarness.deps,
         triggerId: TRIGGER_ID,
         projectId: PROJECT_ID,
         reason: "real-time",
@@ -668,7 +668,7 @@ describe("evaluateGraphTrigger", () => {
 
       expect(result.status).toBe("fired");
       expect(result.value).toBe(42);
-      expect(harness.dispatch).toHaveBeenCalledTimes(1);
+      expect(localHarness.dispatch).toHaveBeenCalledTimes(1);
     });
   });
 

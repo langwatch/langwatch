@@ -89,7 +89,7 @@ describe("PlanProvider wiring patterns", () => {
     it("propagates errors from SaaS adapter unchanged", async () => {
       const error = new Error("stripe timeout");
       const planProvider = PlanProviderService.create({
-        getActivePlan: ({ organizationId, user }) => {
+        getActivePlan: () => {
           throw error;
         },
       });
@@ -100,7 +100,7 @@ describe("PlanProvider wiring patterns", () => {
     it("propagates errors from license adapter unchanged", async () => {
       const error = new Error("license validation failed");
       const planProvider = PlanProviderService.create({
-        getActivePlan: ({ organizationId }) => {
+        getActivePlan: () => {
           throw error;
         },
       });

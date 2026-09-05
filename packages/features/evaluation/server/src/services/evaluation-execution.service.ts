@@ -392,6 +392,34 @@ export class EvaluationExecutionService {
   // Data building (reuses existing mapping functions)
   // ---------------------------------------------------------------------------
 
+  /**
+   * Server-only mapping sources need data this service alone can produce
+   * (e.g. a formatted transcript from the span digest) — fills those fields
+   * into `mappedData` in place.
+   */
+  private async fillServerOnlyTraceSources({
+    mapping,
+    mappedData,
+    trace,
+  }: {
+    mapping: MappingState["mapping"];
+    mappedData: Record<string, unknown>;
+    trace: Trace;
+  }): Promise<void> {
+    for (const [field, config] of Object.entries(mapping)) {
+      if (
+        !("source" in config) ||
+        !(SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(config.source)
+      ) {
+        continue;
+      }
+
+      if (config.source === "formatted_trace") {
+        mappedData[field] = await this.deps.spanDigest.format(trace.spans ?? []);
+      }
+    }
+  }
+
   private async buildDataForEvaluation(params: {
     evaluatorType: string;
     trace: Trace;
@@ -413,18 +441,11 @@ export class EvaluationExecutionService {
 
       // Fill in server-only trace sources
       if (mappings?.mapping) {
-        for (const [field, config] of Object.entries(mappings.mapping)) {
-          if (
-            "source" in config &&
-            (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(config.source)
-          ) {
-            if (config.source === "formatted_trace") {
-              (mappedData as Record<string, unknown>)[field] = await this.deps.spanDigest.format(
-                trace.spans ?? [],
-              );
-            }
-          }
-        }
+        await this.fillServerOnlyTraceSources({
+          mapping: mappings.mapping,
+          mappedData: mappedData as Record<string, unknown>,
+          trace,
+        });
       }
 
       data = mappedData as Record<string, unknown>;

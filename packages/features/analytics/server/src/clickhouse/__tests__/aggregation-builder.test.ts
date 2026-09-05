@@ -463,8 +463,8 @@ describe("aggregation-builder", () => {
         dedupSubstitutions: () => Array<{ source: string }>;
       };
       const registered = new Set(
-        dedupSubstitutions().flatMap(({ source }) =>
-          Array.from(source.matchAll(/ts\.([A-Z][a-zA-Z]+)/g)).map((m) => m[1]!),
+        dedupSubstitutions().flatMap(({ source: substitutionSource }) =>
+          Array.from(substitutionSource.matchAll(/ts\.([A-Z][a-zA-Z]+)/g)).map((m) => m[1]!),
         ),
       );
 

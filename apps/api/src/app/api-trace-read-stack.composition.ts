@@ -60,7 +60,6 @@ import {
   isContentVisible,
   isContentVisibleToPublic,
   describeAudience,
-  PLATFORM_DEFAULT_DATA_PRIVACY,
   PRIVACY_DROPPED_MARKER_ATTR,
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
   type ContentCategory,

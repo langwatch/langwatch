@@ -239,12 +239,12 @@ describe("TeamTrpcApi", () => {
         projects: { listByTeam: async () => [{ id: "p1" }] as never },
       });
 
-      const team = await caller.getTeamWithMembers({
+      const result = await caller.getTeamWithMembers({
         organizationId: "org-1",
         slug: "engineering",
       });
 
-      expect(team).toMatchObject({ id: "team-1", projects: [{ id: "p1" }] });
+      expect(result).toMatchObject({ id: "team-1", projects: [{ id: "p1" }] });
     });
   });
 

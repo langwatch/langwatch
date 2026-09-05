@@ -15,7 +15,7 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { EventEmitter } from "node:events";
 import superjson from "superjson";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
 import { ApiAuditPort } from "../../api-request.policy";
 import { ApiRestSecurity } from "../../api-rest.security";
@@ -202,27 +202,6 @@ function subscriptionSecurity() {
     organizations: stub("organizations"),
     observability: ApiRestObservabilityComposition.create(),
   });
-}
-
-async function callTrpc(
-  application: ApiApplication,
-  path: string,
-  input: Record<string, unknown>,
-  method: "query" | "mutation" = "query",
-): Promise<{ status: number; body: unknown }> {
-  if (!application.hono) throw new Error("HTTP composition was not created.");
-  const url = `http://127.0.0.1/api/trpc/${path}`;
-  const response =
-    method === "mutation"
-      ? await application.hono.request(url, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ json: input }),
-        })
-      : await application.hono.request(
-          `${url}?input=${encodeURIComponent(JSON.stringify({ json: input }))}`,
-        );
-  return { status: response.status, body: await response.json() };
 }
 
 /** Waits for a condition the stream reaches on its own, or gives up loudly. */

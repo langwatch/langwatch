@@ -37,14 +37,13 @@ export function startAndIdentifyRun({
 }): Promise<string | undefined> {
   return new Promise((resolve) => {
     let settled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
     const answer = (runId?: string) => {
       if (settled) return;
       settled = true;
-      if (timer) clearTimeout(timer);
+      clearTimeout(timer);
       resolve(runId);
     };
-    timer = setTimeout(() => answer(undefined), RUN_ID_WAIT_MS);
+    const timer = setTimeout(() => answer(undefined), RUN_ID_WAIT_MS);
     const started = start(answer);
     if (started) {
       void started.finally(() => answer(undefined)).catch(() => undefined);

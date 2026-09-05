@@ -60,7 +60,6 @@ import {
 } from "../../features/workflow/workflow.composition";
 import { ApiTrpcFeaturesComposition } from "../api-trpc-features.composition";
 import {
-  stubApplicationSlices,
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,

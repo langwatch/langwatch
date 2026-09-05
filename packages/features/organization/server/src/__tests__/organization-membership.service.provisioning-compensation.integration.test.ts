@@ -19,7 +19,6 @@ import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaTenancyGuardService,
-  type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
@@ -72,20 +71,17 @@ function buildWorkingPrompts(): OrganizationPromptSeedPort {
 }
 
 describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", () => {
-  let connection: PrismaConnection | undefined;
-  let prisma: PrismaClient | undefined;
-  let repo: PrismaOrganizationMembershipRepository;
   const ns = `prov-comp-${nanoid(8)}`;
   const slug = `--test-org-${ns}`;
   const name = `Provisioning Compensation ${ns}`;
 
   let retriedOrganizationId: string | undefined;
 
-  connection = PrismaConnectionService.create({
+  const connection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
-  prisma = connection.client as PrismaClient;
-  repo = PrismaOrganizationMembershipRepository.create({
+  const prisma = connection.client as PrismaClient;
+  const repo = PrismaOrganizationMembershipRepository.create({
     database: prisma,
     grants: noopGrantsWriter,
   });

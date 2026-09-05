@@ -616,7 +616,7 @@ export class TestGithubService extends GithubService {
   }
 
   async tryFindByNumber(input: { prNumber: number }): Promise<GithubPullRequest | null> {
-    return this.pullRequests.find((pullRequest) => pullRequest.prNumber === input.prNumber) ?? null;
+    return this.pullRequests.find((pr) => pr.prNumber === input.prNumber) ?? null;
   }
 
   async recheckDueBranches(): Promise<never> {

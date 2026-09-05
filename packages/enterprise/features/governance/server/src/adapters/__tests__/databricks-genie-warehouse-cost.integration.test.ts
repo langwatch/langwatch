@@ -181,7 +181,9 @@ beforeEach(async () => {
     }
     if (url.pathname === "/api/2.0/sql/statements" && req.method === "POST") {
       let raw = "";
-      req.on("data", (chunk) => (raw += chunk));
+      req.on("data", (chunk) => {
+        raw += chunk;
+      });
       req.on("end", () => {
         statementBodies.push(JSON.parse(raw || "{}") as Record<string, unknown>);
         // Queued plans answer one call each, then `costPlan` answers the rest.

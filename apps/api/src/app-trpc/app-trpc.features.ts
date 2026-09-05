@@ -30,7 +30,6 @@ import { createEnterpriseBillingTrpcRouters } from "../features/enterprise/enter
 import { createEnterpriseGovernanceTrpcRouters } from "../features/enterprise/enterprise-governance-trpc.mount";
 import { composeGovernanceHomeTrpcRouter } from "../features/enterprise/governance-home.composition";
 import { createPlanTrpcRouter } from "../features/entitlement/entitlement-trpc.mount";
-import { type ModelProviderTrpcChecks } from "../features/model-provider/model-provider-trpc.mount";
 
 /**
  * Builds every tRPC surface this package owns against one process's mount.

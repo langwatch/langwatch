@@ -28,7 +28,6 @@ import {
 } from "../../../api.application";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
 import {
-  stubApplicationSlices,
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,

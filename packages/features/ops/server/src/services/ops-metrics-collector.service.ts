@@ -986,6 +986,39 @@ export class OpsMetricsCollectorService {
     return map;
   }
 
+  /** Flattens a pipeline's per-queue `smembers` results into the set of paused job keys. */
+  private static extractPausedKeys(pausedResults: Array<[Error | null, unknown]>): Set<string> {
+    const pausedKeysSet = new Set<string>();
+    for (const [, result] of pausedResults) {
+      if (Array.isArray(result)) {
+        for (const key of result) {
+          pausedKeysSet.add(key as string);
+        }
+      }
+    }
+
+    return pausedKeysSet;
+  }
+
+  /** Flattens a pipeline's per-queue `lrange` results into finite, non-negative latency samples. */
+  private static extractLatenciesMs(latencyResults: Array<[Error | null, unknown]>): number[] {
+    const latencies: number[] = [];
+    for (const [, result] of latencyResults) {
+      if (!Array.isArray(result)) {
+        continue;
+      }
+
+      for (const raw of result) {
+        const ms = Number(raw);
+        if (Number.isFinite(ms) && ms >= 0) {
+          latencies.push(ms);
+        }
+      }
+    }
+
+    return latencies;
+  }
+
   private async computeJobMetrics({
     queues,
     elapsed,
@@ -1035,18 +1068,7 @@ export class OpsMetricsCollectorService {
       const latencyResults = await latencyPipeline.exec();
 
       if (latencyResults) {
-        for (const [, result] of latencyResults) {
-          if (!Array.isArray(result)) {
-            continue;
-          }
-
-          for (const raw of result) {
-            const ms = Number(raw);
-            if (Number.isFinite(ms) && ms >= 0) {
-              latencies.push(ms);
-            }
-          }
-        }
+        latencies.push(...OpsMetricsCollectorService.extractLatenciesMs(latencyResults));
       }
     }
 
@@ -1345,16 +1367,9 @@ export class OpsMetricsCollectorService {
       }
 
       const pausedResults = await pausedPipeline.exec();
-      const pausedKeysSet = new Set<string>();
-      if (pausedResults) {
-        for (const [, result] of pausedResults) {
-          if (Array.isArray(result)) {
-            for (const key of result) {
-              pausedKeysSet.add(key as string);
-            }
-          }
-        }
-      }
+      const pausedKeysSet = pausedResults
+        ? OpsMetricsCollectorService.extractPausedKeys(pausedResults)
+        : new Set<string>();
 
       this.currentPausedKeys = Array.from(pausedKeysSet);
 

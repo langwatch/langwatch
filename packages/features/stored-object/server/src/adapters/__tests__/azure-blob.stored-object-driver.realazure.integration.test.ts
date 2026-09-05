@@ -202,31 +202,31 @@ describeTokenAzure(
     describe("given an account that refuses shared-key authentication", () => {
       /** @scenario "Blobs round-trip against a real storage account with shared-key access disabled" */
       it("writes, reads, sizes and deletes using a bearer token", async () => {
-        const driver = tokenDriver();
+        const tokenDriverInstance = tokenDriver();
         const bytes = Buffer.from(`entra round-trip ${RUN_ID}`, "utf8");
         const uri = tokenUriFor(bytes);
 
-        await driver.put(uri, bytes, "text/plain");
-        expect(await driver.exists(uri)).toBe(true);
+        await tokenDriverInstance.put(uri, bytes, "text/plain");
+        expect(await tokenDriverInstance.exists(uri)).toBe(true);
 
-        const stream = await driver.get(uri);
+        const stream = await tokenDriverInstance.get(uri);
         const chunks: Buffer[] = [];
         for await (const chunk of stream) chunks.push(chunk as Buffer);
         expect(Buffer.concat(chunks).toString("utf8")).toBe(bytes.toString("utf8"));
 
-        await driver.delete(uri);
-        expect(await driver.exists(uri)).toBe(false);
+        await tokenDriverInstance.delete(uri);
+        expect(await tokenDriverInstance.exists(uri)).toBe(false);
       }, 60_000);
 
       /** @scenario "Blobs round-trip against a real storage account with shared-key access disabled" */
       it("stores a zero-byte blob, the case that broke shared-key signing", async () => {
-        const driver = tokenDriver();
+        const tokenDriverInstance = tokenDriver();
         const bytes = Buffer.alloc(0);
         const uri = tokenUriFor(bytes);
 
-        await driver.put(uri, bytes, "application/octet-stream");
+        await tokenDriverInstance.put(uri, bytes, "application/octet-stream");
 
-        expect(await driver.exists(uri)).toBe(true);
+        expect(await tokenDriverInstance.exists(uri)).toBe(true);
       }, 60_000);
     });
   },

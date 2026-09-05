@@ -166,9 +166,9 @@ function storeReadBackFrom(event: SpanReceivedEvent): NormalizedSpan {
     ScopeVersion: span.instrumentationScope?.version ?? null,
     Cost: span.cost ?? null,
     NonBilledCost: span.nonBilledCost ?? null,
-    Events_Timestamp: span.events.map((event) => event.timeUnixMs),
-    Events_Name: span.events.map((event) => event.name),
-    Events_Attributes: span.events.map((event) => serializeAttributes(event.attributes)),
+    Events_Timestamp: span.events.map((spanEvent) => spanEvent.timeUnixMs),
+    Events_Name: span.events.map((spanEvent) => spanEvent.name),
+    Events_Attributes: span.events.map((spanEvent) => serializeAttributes(spanEvent.attributes)),
     Links_TraceId: span.links.map((link) => link.traceId),
     Links_SpanId: span.links.map((link) => link.spanId),
     Links_Attributes: span.links.map((link) => serializeAttributes(link.attributes)),
@@ -965,10 +965,10 @@ describe("codingAgentSpanFactsDispatch", () => {
         }) as SpanReceivedEvent;
 
         // The legacy reference producer kept id-less spans as full events.
-        const staged = event;
+        const stagedEvent = event;
 
         const { subscriber, dispatched, reads } = makeSubscriber();
-        await subscriber.handle(staged as TraceProcessingEvent, context);
+        await subscriber.handle(stagedEvent as TraceProcessingEvent, context);
         expect(dispatched).toHaveLength(1);
         expect(reads).toHaveLength(0);
       });

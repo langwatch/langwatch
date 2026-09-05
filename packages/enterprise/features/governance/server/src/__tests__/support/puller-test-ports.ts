@@ -8,7 +8,6 @@ import {
   GovernanceObjectStoragePort,
   GovernanceOcsfEventSinkPort,
   GovernanceEncryptionPort,
-  IngestionPullDiagnosticsPort,
   IngestionCredentialsService,
   IngestionPullSourcePort,
   IngestionPullWorkerService,

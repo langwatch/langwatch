@@ -26,10 +26,10 @@ const {
   mockQueryBillableEventsTotal,
   mockLogger,
 } = vi.hoisted(() => {
-  const mockReportUsageDelta = vi.fn();
-  const mockSelfDispatch = vi.fn();
-  const mockCaptureException = vi.fn();
-  const mockQueryBillableEventsTotal = vi.fn();
+  const reportUsageDeltaFn = vi.fn();
+  const selfDispatchFn = vi.fn();
+  const captureExceptionFn = vi.fn();
+  const queryBillableEventsTotalFn = vi.fn();
 
   const createMockLogger = (): Record<string, unknown> => ({
     info: vi.fn(),
@@ -42,13 +42,13 @@ const {
   // One instance, not one per `createLogger` call: the severity a skip is
   // reported at is the whole point of these tests, and it is only observable
   // if the handler's logger is the one they can read.
-  const mockLogger = createMockLogger();
+  const loggerInstance = createMockLogger();
 
-  const mockOrganizations = {
+  const organizationsPort = {
     getOrganizationForBilling: vi.fn(),
   };
 
-  const mockBillingCheckpoints = {
+  const billingCheckpointsPort = {
     tryGetCheckpoint: vi.fn(),
     writeIntent: vi.fn(),
     confirm: vi.fn(),
@@ -57,13 +57,13 @@ const {
   };
 
   return {
-    mockOrganizations,
-    mockBillingCheckpoints,
-    mockReportUsageDelta,
-    mockSelfDispatch,
-    mockCaptureException,
-    mockQueryBillableEventsTotal,
-    mockLogger,
+    mockOrganizations: organizationsPort,
+    mockBillingCheckpoints: billingCheckpointsPort,
+    mockReportUsageDelta: reportUsageDeltaFn,
+    mockSelfDispatch: selfDispatchFn,
+    mockCaptureException: captureExceptionFn,
+    mockQueryBillableEventsTotal: queryBillableEventsTotalFn,
+    mockLogger: loggerInstance,
   };
 });
 

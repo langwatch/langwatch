@@ -33,7 +33,6 @@
  * ClickHouse the spend source says so rather than answering zero.
  */
 // @vitest-environment node
-import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type {
   AuthzBindingForSynthesis,
   AuthzGetDecisionInput,
@@ -92,7 +91,6 @@ import { refusingHomeFeature } from "../../project/home.composition";
 import { refusingRoleFeature } from "../../role/role.composition";
 import {
   stub,
-  stubApplicationSlices,
   stubCollaborators,
   stubInfrastructureEntitlements,
 } from "../../../app/__tests__/api-trpc-record.test-doubles";

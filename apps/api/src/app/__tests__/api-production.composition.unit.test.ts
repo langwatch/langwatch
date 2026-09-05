@@ -1,5 +1,5 @@
 import { AgentService } from "@langwatch/agent-contract";
-import { closeConnectedAgentRuntime } from "@langwatch/agent-server";
+import { ConnectedAgentRuntimeAdapter } from "@langwatch/agent-server";
 import {
   ApiKeyService,
   type OrganizationApiKeyResolution,
@@ -218,7 +218,7 @@ describe("ApiProductionComposition", () => {
   // after each test is what makes every composition resolve its own runtime
   // once, rather than colliding with the previous test's.
   afterEach(async () => {
-    await closeConnectedAgentRuntime();
+    await ConnectedAgentRuntimeAdapter.close();
   });
 
   it("constructs one API-key REST adapter in process composition and propagates its actor and ceiling", async () => {

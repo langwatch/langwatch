@@ -49,7 +49,6 @@ import type {
   AuthzService,
   PermissionDecision,
 } from "@langwatch/authz-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PostgresDatasetAdapter } from "@langwatch/dataset-server";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -68,7 +67,6 @@ import { composePromptFeature } from "../../prompt/prompt.composition";
 import { composeHomeFeature } from "../../project/home.composition";
 import { composeRoleFeature } from "../role.composition";
 import {
-  stubApplicationSlices,
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,

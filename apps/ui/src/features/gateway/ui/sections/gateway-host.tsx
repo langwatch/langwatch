@@ -45,6 +45,25 @@ function readDeployment(): { isSaas: boolean; appBaseUrl: string; gatewayBaseUrl
   }
 }
 
+/** The `organization.getAll` row shape, restated locally since the screen package's public boundary does not export it. */
+type GatewayOrganizationGraphEntry = {
+  id: string;
+  name: string;
+  slug: string;
+  teams: { id: string; name: string; projects: { id: string; name: string; slug: string }[] }[];
+};
+
+/** Stamps every project in one organization's teams with its team's id. */
+function withTeamProjectIds(organization: GatewayOrganizationGraphEntry): GatewayOrganization {
+  return {
+    ...organization,
+    teams: organization.teams.map((team) => ({
+      ...team,
+      projects: team.projects.map((project) => ({ ...project, teamId: team.id })),
+    })),
+  };
+}
+
 export function GatewayHost({ children }: { children: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
   const scope = session.activeScope();
@@ -67,14 +86,7 @@ export function GatewayHost({ children }: { children: ReactNode }) {
 
   /** The graph, with each project stamped with its team id — the screens read a flat project and need it. */
   const organizationsWithTeamIds: readonly GatewayOrganization[] = useMemo(
-    () =>
-      (organizations.data ?? []).map((organization) => ({
-        ...organization,
-        teams: organization.teams.map((team) => ({
-          ...team,
-          projects: team.projects.map((project) => ({ ...project, teamId: team.id })),
-        })),
-      })),
+    () => (organizations.data ?? []).map((organization) => withTeamProjectIds(organization)),
     [organizations.data],
   );
 

@@ -25,7 +25,6 @@ import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaTenancyGuardService,
-  type PrismaConnection,
 } from "@langwatch/prisma-client";
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
@@ -47,10 +46,6 @@ const passthroughSecrets: OrganizationSettingsSecretPort = {
 };
 
 describe.skipIf(!DB_URL)("given a member with a personal workspace in an organization", () => {
-  let connection: PrismaConnection | undefined;
-  let prisma: PrismaClient | undefined;
-  let membershipRepository: PrismaOrganizationMembershipRepository;
-  let organizationRepository: PrismaOrganizationRepository;
   const identities = PersonalWorkspaceIdentityAdapter.create();
   const testNamespace = `pw-lifecycle-${nanoid(8)}`;
 
@@ -59,15 +54,15 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
   let personalTeamId: string;
   let personalProjectId: string;
 
-  connection = PrismaConnectionService.create({
+  const connection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
-  prisma = connection.client as PrismaClient;
-  membershipRepository = PrismaOrganizationMembershipRepository.create({
+  const prisma = connection.client as PrismaClient;
+  const membershipRepository = PrismaOrganizationMembershipRepository.create({
     database: prisma,
     grants: noopGrantsWriter,
   });
-  organizationRepository = PrismaOrganizationRepository.create(prisma, passthroughSecrets);
+  const organizationRepository = PrismaOrganizationRepository.create(prisma, passthroughSecrets);
 
   async function ensureLeaverWorkspace() {
     const resources = identities.create({ userId: leaverUserId, organizationId });

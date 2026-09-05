@@ -58,10 +58,7 @@ import { Buffer } from "node:buffer";
 import { z } from "zod";
 
 import type { GovernanceHttpPort } from "../ports/governance-http.port";
-import {
-  DATABRICKS_GENIE_ADAPTER_ID,
-  PullDestinationService,
-} from "../services/pull-destination.service";
+import { DATABRICKS_GENIE_ADAPTER_ID } from "../services/pull-destination.service";
 import { TERMINAL_MESSAGE_STATUSES } from "../services/genie-trace-mapper.service";
 import {
   DatabricksWarehouseCostService,

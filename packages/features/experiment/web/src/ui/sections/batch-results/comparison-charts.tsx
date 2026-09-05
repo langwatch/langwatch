@@ -419,7 +419,10 @@ function accumulateGroupMetrics(
 }
 
 /** Averages each key's samples, naming the result `${prefix}_${key}`. */
-function prefixedAverages(record: Record<string, number[]>, prefix: string): Record<string, number> {
+function prefixedAverages(
+  record: Record<string, number[]>,
+  prefix: string,
+): Record<string, number> {
   const result: Record<string, number> = {};
   for (const [k, v] of Object.entries(record)) {
     result[`${prefix}_${k}`] = v.reduce((a, b) => a + b, 0) / v.length;

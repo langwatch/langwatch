@@ -342,7 +342,7 @@ export function createFilesRestApp<
     // so a context built from the app's own `E` is not assignable to one
     // written in terms of the default.
     c: Context<E, string, Record<string, never>>,
-    options: { method: "GET" | "HEAD" },
+    readOptions: { method: "GET" | "HEAD" },
   ): Promise<Response> {
     const id = c.req.param("id");
     if (!id) {
@@ -458,7 +458,7 @@ export function createFilesRestApp<
     return streamFileResponse({
       row: result.row,
       stream: result.stream,
-      method: options.method,
+      method: readOptions.method,
       mediaType: result.row.media_type,
       requestedFilename: c.req.query("filename"),
     });

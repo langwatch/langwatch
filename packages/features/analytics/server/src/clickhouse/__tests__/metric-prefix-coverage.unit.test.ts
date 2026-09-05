@@ -23,9 +23,10 @@ describe("memory-safety", () => {
         // Find all metric.startsWith("prefix.") patterns
         const prefixPattern = /metric\.startsWith\("([^"]+)\."\)/g;
         const registeredPrefixes = new Set<string>();
-        let prefixMatch: RegExpExecArray | null;
-        while ((prefixMatch = prefixPattern.exec(translatorSource)) !== null) {
+        let prefixMatch = prefixPattern.exec(translatorSource);
+        while (prefixMatch !== null) {
           registeredPrefixes.add(prefixMatch[1]!);
+          prefixMatch = prefixPattern.exec(translatorSource);
         }
 
         expect(registeredPrefixes.size).toBeGreaterThan(0);
@@ -40,16 +41,18 @@ describe("memory-safety", () => {
 
         // Check metrics: "prefix.something" as FlattenAnalyticsMetricsEnum
         const metricRefPattern = /"([a-z_]+)\.[a-z_]+"\s*as\s*AnalyticsSeries\["metric"\]/g;
-        let metricRef: RegExpExecArray | null;
-        while ((metricRef = metricRefPattern.exec(pruningTestSource)) !== null) {
+        let metricRef = metricRefPattern.exec(pruningTestSource);
+        while (metricRef !== null) {
           coveredPrefixes.add(metricRef[1]!);
+          metricRef = metricRefPattern.exec(pruningTestSource);
         }
 
         // Check groupBy: groupBy: "prefix.something"
         const groupByPattern = /groupBy:\s*"([a-z_]+)\.[a-z_]+"/g;
-        let groupByRef: RegExpExecArray | null;
-        while ((groupByRef = groupByPattern.exec(pruningTestSource)) !== null) {
+        let groupByRef = groupByPattern.exec(pruningTestSource);
+        while (groupByRef !== null) {
           coveredPrefixes.add(groupByRef[1]!);
+          groupByRef = groupByPattern.exec(pruningTestSource);
         }
 
         // Assert every registered prefix has at least one test

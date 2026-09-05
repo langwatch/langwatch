@@ -232,7 +232,7 @@ describe("Coding Agent sessions list", () => {
 
     const [row] = await service.listForProject({ projectId: PROJECT });
 
-    expect(row?.pullRequests.map((pullRequest) => pullRequest.number)).toEqual([9]);
+    expect(row?.pullRequests.map((pr) => pr.number)).toEqual([9]);
   });
 
   /** @scenario "A workspace whose organization has no GitHub connection still lists its sessions" */

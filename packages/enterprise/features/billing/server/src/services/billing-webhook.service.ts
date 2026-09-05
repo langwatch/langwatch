@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { PostHog } from "posthog-node";
 import type Stripe from "stripe";
-import { Currency, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { Currency } from "@langwatch/prisma-client/generated";
 import {
   isGrowthEventsPrice,
   isGrowthSeatEventPlan,

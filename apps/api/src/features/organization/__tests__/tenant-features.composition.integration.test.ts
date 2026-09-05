@@ -58,7 +58,6 @@ import { composeEnterpriseFeature } from "../../enterprise/enterprise.compositio
 import { composeProjectFeature } from "../../project/project.composition";
 import { composeOrganizationFeature } from "../organization.composition";
 import {
-  stubApplicationSlices,
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,

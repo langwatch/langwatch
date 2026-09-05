@@ -308,7 +308,7 @@ function assertSurfaceStepIsClean({
  *   may trade away.
  */
 function resolveAgainstBudget({
-  declaredName,
+  declaredName: _declaredName,
   granularitySeconds,
   timeWindow,
   onBudgetOverflow,

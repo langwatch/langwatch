@@ -6,7 +6,7 @@
  * asserted here, so the pair is what stops the chip picker offering a scope the
  * save then rejects.
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { DataRetentionAdministratorPort } from "../../ports/data-retention-administrator.port";
 import {
   DataRetentionDirectoryPort,

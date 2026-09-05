@@ -12,6 +12,36 @@ export type FilterParam =
   | Record<string, string[]>
   | Record<string, Record<string, string[]>>;
 
+/** Applies a saved view's cached filters onto `filters`, keeping only keys this registry still recognizes. */
+function applyCachedViewFilters(
+  filters: Partial<Record<FilterField, FilterParam>>,
+  viewFilters: Record<string, FilterParam>,
+): void {
+  for (const [key, value] of Object.entries(viewFilters)) {
+    if (key in availableFilters) {
+      filters[key as FilterField] = value;
+    }
+  }
+}
+
+/** Looks up `viewId` in the project's cached saved-views list and applies its filters, if any, onto `filters`. */
+function applyCachedViewById(
+  filters: Partial<Record<FilterField, FilterParam>>,
+  projectId: string,
+  viewId: string,
+): void {
+  const raw = localStorage.getItem(`langwatch-saved-views-cache-${projectId}`);
+  if (!raw) return;
+  const cached = JSON.parse(raw) as Array<{
+    id: string;
+    filters?: Record<string, FilterParam>;
+  }>;
+  const view = cached.find((v) => v.id === viewId);
+  if (view?.filters) {
+    applyCachedViewFilters(filters, view.filters);
+  }
+}
+
 export const useFilterParams = () => {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
@@ -80,21 +110,7 @@ export const useFilterParams = () => {
         localStorage.getItem(`langwatch-selected-view-${project.id}`);
 
       if (viewId && viewId !== "all-traces") {
-        const raw = localStorage.getItem(`langwatch-saved-views-cache-${project.id}`);
-        if (raw) {
-          const cached = JSON.parse(raw) as Array<{
-            id: string;
-            filters?: Record<string, FilterParam>;
-          }>;
-          const view = cached.find((v) => v.id === viewId);
-          if (view?.filters) {
-            for (const [key, value] of Object.entries(view.filters)) {
-              if (key in availableFilters) {
-                filters[key as FilterField] = value;
-              }
-            }
-          }
-        }
+        applyCachedViewById(filters, project.id, viewId);
       }
     } catch {
       // localStorage unavailable or corrupt — ignore

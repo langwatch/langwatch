@@ -2,11 +2,7 @@ import type { z } from "zod";
 import type { messageSchema } from "@langwatch/prompt-contract";
 import type { SchemaVersion } from "@langwatch/prompt-contract";
 import { SystemPromptConflictError } from "@langwatch/prompt-contract";
-import {
-  getVersionValidator,
-  LATEST_SCHEMA_VERSION,
-  type LatestConfigVersionSchema,
-} from "@langwatch/prompt-contract";
+import { getVersionValidator, type LatestConfigVersionSchema } from "@langwatch/prompt-contract";
 
 /**
  * Service for managing prompt version operations.

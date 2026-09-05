@@ -2,7 +2,6 @@ import { AgentService } from "@langwatch/agent-contract";
 import { DatasetService } from "@langwatch/dataset-contract";
 import { EvaluatorService } from "@langwatch/evaluator-contract";
 import {
-  ExperimentNotFoundError,
   type ExperimentService as ExperimentServiceContract,
   type PersistedEvaluationsV3State,
 } from "@langwatch/experiment-contract";

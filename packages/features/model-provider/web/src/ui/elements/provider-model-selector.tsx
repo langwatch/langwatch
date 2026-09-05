@@ -36,7 +36,8 @@ export const INHERIT_SENTINEL = "__inherit__";
 function filterGroupModels(group: GroupedModelOptions[number], search: string): ModelOption[] {
   const needle = search.toLowerCase();
   return group.models.filter(
-    (item) => item.label.toLowerCase().includes(needle) || item.value.toLowerCase().includes(needle),
+    (item) =>
+      item.label.toLowerCase().includes(needle) || item.value.toLowerCase().includes(needle),
   );
 }
 

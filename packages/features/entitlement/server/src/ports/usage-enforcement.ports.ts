@@ -55,7 +55,7 @@ export class NoUsageCache extends UsageCachePort {
   async get<T>(): Promise<T | undefined> {
     return undefined;
   }
-  async set<T>(): Promise<void> {}
+  async set(): Promise<void> {}
 }
 
 /** Which unit an organization is metered in, once resolved. */

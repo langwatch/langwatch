@@ -12,13 +12,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // ---------------------------------------------------------------------------
 
 const { mockInsert, mockQuery, mockQueryResult } = vi.hoisted(() => {
-  const mockQueryResult = {
+  const queryResult = {
     json: vi.fn().mockResolvedValue([]),
   };
   return {
     mockInsert: vi.fn().mockResolvedValue(undefined),
-    mockQuery: vi.fn().mockResolvedValue(mockQueryResult),
-    mockQueryResult,
+    mockQuery: vi.fn().mockResolvedValue(queryResult),
+    mockQueryResult: queryResult,
   };
 });
 

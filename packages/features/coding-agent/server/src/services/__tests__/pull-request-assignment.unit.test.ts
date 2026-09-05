@@ -50,7 +50,7 @@ describe("assignSessionsToPullRequests", () => {
   describe("given a branch whose pull request opened between two sessions", () => {
     /** @scenario "Sessions before and during a pull request both attach to it" */
     it("attaches both the earlier and the later session to it", () => {
-      const assignments = assignSessionsToPullRequests({
+      const result = assignSessionsToPullRequests({
         sessions: [
           session({ sessionId: "before", startedAtMs: base }),
           session({ sessionId: "during", startedAtMs: base + 5 * HOUR }),
@@ -58,8 +58,8 @@ describe("assignSessionsToPullRequests", () => {
         pullRequests: [pullRequest({ prNumber: 41, prCreatedAtMs: base + 2 * HOUR })],
       });
 
-      expect(assignments.get("before")).toBe(41);
-      expect(assignments.get("during")).toBe(41);
+      expect(result.get("before")).toBe(41);
+      expect(result.get("during")).toBe(41);
     });
   });
 
@@ -77,7 +77,7 @@ describe("assignSessionsToPullRequests", () => {
         prCreatedAtMs: base + 20 * HOUR,
       });
 
-      const assignments = assignSessionsToPullRequests({
+      const result = assignSessionsToPullRequests({
         sessions: [
           session({ sessionId: "first-era", startedAtMs: base + 3 * HOUR }),
           session({ sessionId: "second-era", startedAtMs: base + 30 * HOUR }),
@@ -85,12 +85,12 @@ describe("assignSessionsToPullRequests", () => {
         pullRequests: [successor, merged],
       });
 
-      expect(assignments.get("first-era")).toBe(10);
-      expect(assignments.get("second-era")).toBe(11);
+      expect(result.get("first-era")).toBe(10);
+      expect(result.get("second-era")).toBe(11);
     });
 
     it("attaches a session that ran between the two to the successor", () => {
-      const assignments = assignSessionsToPullRequests({
+      const result = assignSessionsToPullRequests({
         sessions: [session({ sessionId: "gap", startedAtMs: base + 15 * HOUR })],
         pullRequests: [
           pullRequest({
@@ -103,7 +103,7 @@ describe("assignSessionsToPullRequests", () => {
         ],
       });
 
-      expect(assignments.get("gap")).toBe(11);
+      expect(result.get("gap")).toBe(11);
     });
   });
 
@@ -115,7 +115,7 @@ describe("assignSessionsToPullRequests", () => {
         session({ sessionId: "b", startedAtMs: base + 12 * HOUR }),
         session({ sessionId: "c", startedAtMs: base + 26 * HOUR }),
       ];
-      const assignments = assignSessionsToPullRequests({
+      const result = assignSessionsToPullRequests({
         sessions,
         pullRequests: [
           pullRequest({
@@ -133,19 +133,19 @@ describe("assignSessionsToPullRequests", () => {
         ],
       });
 
-      expect([...assignments.entries()].sort()).toEqual([
+      expect([...result.entries()].sort()).toEqual([
         ["a", 1],
         ["b", 2],
         ["c", 3],
       ]);
       // One entry per session: the map key IS the "at most one" guarantee.
-      expect(assignments.size).toBe(sessions.length);
+      expect(result.size).toBe(sessions.length);
     });
   });
 
   describe("given a session after the last pull request on its branch closed", () => {
     it("attaches it to nothing", () => {
-      const assignments = assignSessionsToPullRequests({
+      const result = assignSessionsToPullRequests({
         sessions: [session({ sessionId: "orphan", startedAtMs: base + 50 * HOUR })],
         pullRequests: [
           pullRequest({
@@ -156,13 +156,13 @@ describe("assignSessionsToPullRequests", () => {
         ],
       });
 
-      expect(assignments.has("orphan")).toBe(false);
+      expect(result.has("orphan")).toBe(false);
     });
   });
 
   describe("given a pull request that was closed without merging", () => {
     it("ends its tenure at the close", () => {
-      const assignments = assignSessionsToPullRequests({
+      const result = assignSessionsToPullRequests({
         sessions: [
           session({ sessionId: "inside", startedAtMs: base + HOUR }),
           session({ sessionId: "outside", startedAtMs: base + 9 * HOUR }),
@@ -177,12 +177,12 @@ describe("assignSessionsToPullRequests", () => {
         ],
       });
 
-      expect(assignments.get("inside")).toBe(5);
-      expect(assignments.has("outside")).toBe(false);
+      expect(result.get("inside")).toBe(5);
+      expect(result.has("outside")).toBe(false);
     });
 
     it("ends it at the merge time when only that is recorded", () => {
-      const assignments = assignSessionsToPullRequests({
+      const result = assignSessionsToPullRequests({
         sessions: [session({ sessionId: "outside", startedAtMs: base + 9 * HOUR })],
         pullRequests: [
           pullRequest({
@@ -194,13 +194,13 @@ describe("assignSessionsToPullRequests", () => {
         ],
       });
 
-      expect(assignments.has("outside")).toBe(false);
+      expect(result.has("outside")).toBe(false);
     });
   });
 
   describe("given a session starting exactly when a pull request ended", () => {
     it("attaches it to that pull request", () => {
-      const assignments = assignSessionsToPullRequests({
+      const result = assignSessionsToPullRequests({
         sessions: [session({ sessionId: "edge", startedAtMs: base + 4 * HOUR })],
         pullRequests: [
           pullRequest({
@@ -211,18 +211,18 @@ describe("assignSessionsToPullRequests", () => {
         ],
       });
 
-      expect(assignments.get("edge")).toBe(8);
+      expect(result.get("edge")).toBe(8);
     });
   });
 
   describe("given pull requests on other branches", () => {
     it("never attaches a session across branches", () => {
-      const assignments = assignSessionsToPullRequests({
+      const result = assignSessionsToPullRequests({
         sessions: [session({ sessionId: "mine", headBranch: "feat/mine" })],
         pullRequests: [pullRequest({ prNumber: 3, headBranch: "feat/theirs" })],
       });
 
-      expect(assignments.has("mine")).toBe(false);
+      expect(result.has("mine")).toBe(false);
     });
   });
 
@@ -251,12 +251,12 @@ describe("assignSessionsToPullRequests", () => {
 
   describe("given no pull requests at all", () => {
     it("assigns nothing", () => {
-      const assignments = assignSessionsToPullRequests({
+      const result = assignSessionsToPullRequests({
         sessions: [session({ sessionId: "lonely" })],
         pullRequests: [],
       });
 
-      expect(assignments.size).toBe(0);
+      expect(result.size).toBe(0);
     });
   });
 });
@@ -264,7 +264,7 @@ describe("assignSessionsToPullRequests", () => {
 describe("assignDrivingSessionsToPullRequests", () => {
   describe("given a session that landed one branch and moved to another", () => {
     it("counts it toward the pull request of the branch it left", () => {
-      const assignments = assignDrivingSessionsToPullRequests({
+      const result = assignDrivingSessionsToPullRequests({
         sessions: [
           {
             sessionId: "moved",
@@ -275,7 +275,7 @@ describe("assignDrivingSessionsToPullRequests", () => {
         pullRequests: [pullRequest({ prNumber: 7, headBranch: "feat/first" })],
       });
 
-      expect(assignments.get("moved")).toBe(7);
+      expect(result.get("moved")).toBe(7);
     });
   });
 
@@ -283,7 +283,7 @@ describe("assignDrivingSessionsToPullRequests", () => {
     // The single-winner rule now prices only what has no finer record: the
     // unstamped bucket. Stamped tokens split through the per-branch rule below.
     it("counts it toward the one it opened first and toward the other not at all", () => {
-      const assignments = assignDrivingSessionsToPullRequests({
+      const result = assignDrivingSessionsToPullRequests({
         sessions: [
           {
             sessionId: "both",
@@ -305,8 +305,8 @@ describe("assignDrivingSessionsToPullRequests", () => {
         ],
       });
 
-      expect(assignments.get("both")).toBe(9);
-      expect([...assignments.values()]).toEqual([9]);
+      expect(result.get("both")).toBe(9);
+      expect([...result.values()]).toEqual([9]);
     });
 
     it("answers the same however the branches arrived", () => {
@@ -350,7 +350,7 @@ describe("assignDrivingSessionsToPullRequests", () => {
 
   describe("given a session whose earlier branch's pull request closed before it started", () => {
     it("skips that one and takes the branch still live for it", () => {
-      const assignments = assignDrivingSessionsToPullRequests({
+      const result = assignDrivingSessionsToPullRequests({
         sessions: [
           {
             sessionId: "later",
@@ -374,18 +374,18 @@ describe("assignDrivingSessionsToPullRequests", () => {
         ],
       });
 
-      expect(assignments.get("later")).toBe(21);
+      expect(result.get("later")).toBe(21);
     });
   });
 
   describe("given a session with no branches at all", () => {
     it("assigns nothing", () => {
-      const assignments = assignDrivingSessionsToPullRequests({
+      const result = assignDrivingSessionsToPullRequests({
         sessions: [{ sessionId: "bare", startedAtMs: base, headBranches: [] }],
         pullRequests: [pullRequest({ prNumber: 7 })],
       });
 
-      expect(assignments.size).toBe(0);
+      expect(result.size).toBe(0);
     });
   });
 });
@@ -393,7 +393,7 @@ describe("assignDrivingSessionsToPullRequests", () => {
 describe("assignDrivingSessionsToPullRequestsPerBranch", () => {
   describe("given a session driving two branches that each have a live pull request", () => {
     it("answers with each branch's own winner", () => {
-      const assignments = assignDrivingSessionsToPullRequestsPerBranch({
+      const result = assignDrivingSessionsToPullRequestsPerBranch({
         sessions: [
           {
             sessionId: "both",
@@ -407,7 +407,7 @@ describe("assignDrivingSessionsToPullRequestsPerBranch", () => {
         ],
       });
 
-      const perBranch = assignments.get("both");
+      const perBranch = result.get("both");
       expect(perBranch?.get("feat/first")).toBe(9);
       expect(perBranch?.get("feat/second")).toBe(21);
     });
@@ -416,7 +416,7 @@ describe("assignDrivingSessionsToPullRequestsPerBranch", () => {
   describe("given a recycled branch with an old and a new pull request", () => {
     /** @scenario "Two pull requests on one branch split by era, not by double counting" */
     it("answers with the branch's tenure winner alone", () => {
-      const assignments = assignDrivingSessionsToPullRequestsPerBranch({
+      const result = assignDrivingSessionsToPullRequestsPerBranch({
         sessions: [
           {
             sessionId: "later-era",
@@ -435,13 +435,13 @@ describe("assignDrivingSessionsToPullRequestsPerBranch", () => {
         ],
       });
 
-      expect(assignments.get("later-era")?.get("feat/linkage")).toBe(21);
+      expect(result.get("later-era")?.get("feat/linkage")).toBe(21);
     });
   });
 
   describe("given a session whose branches map to no pull request", () => {
     it("leaves the session out of the answer entirely", () => {
-      const assignments = assignDrivingSessionsToPullRequestsPerBranch({
+      const result = assignDrivingSessionsToPullRequestsPerBranch({
         sessions: [
           {
             sessionId: "unlinked",
@@ -452,7 +452,7 @@ describe("assignDrivingSessionsToPullRequestsPerBranch", () => {
         pullRequests: [pullRequest({ prNumber: 7 })],
       });
 
-      expect(assignments.has("unlinked")).toBe(false);
+      expect(result.has("unlinked")).toBe(false);
     });
   });
 });

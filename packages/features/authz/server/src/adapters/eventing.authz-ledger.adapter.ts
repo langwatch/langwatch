@@ -41,16 +41,12 @@ import type { LedgerActor } from "@langwatch/actor";
 import {
   type DefineRoleCommandData,
   type GrantEventSource,
-  type LedgerScopeType,
   type RevokeGrantCommandData,
   type TeamUserRole as AuthzTeamUserRole,
   roleKeyForTeamRole,
 } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
-import {
-  AuthzGrantsCommandDispatcher,
-  type AuthzGrantsCommandSenders,
-} from "../ports/authz-grants-command-dispatcher.port";
+import { AuthzGrantsCommandDispatcher } from "../ports/authz-grants-command-dispatcher.port";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port";
@@ -1496,14 +1492,6 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
  * listed no id at all, the selector IS the whole instruction and is the only
  * entry — which is why a filtered revoke that matched nothing still appends.
  */
-const LEDGER_SCOPE_TYPES: readonly LedgerScopeType[] = [
-  "ORGANIZATION",
-  "TEAM",
-  "PROJECT",
-  "RESOURCE",
-  "PLATFORM",
-];
-
 /** One binding fact as the legacy table's three optional principal columns. */
 export class AuthzLedgerMapper {
   /** Decision 23: user-action paths mint a random command id; retries reuse it. */

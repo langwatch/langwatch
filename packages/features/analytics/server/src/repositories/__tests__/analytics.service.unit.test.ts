@@ -64,13 +64,13 @@ class RecordingRepository extends AnalyticsRepository {
     return result;
   }
 
-  async findFeedbackEvents(input: unknown) {
-    this.lastFeedbackInput = input;
+  async findFeedbackEvents(feedbackInput: unknown) {
+    this.lastFeedbackInput = feedbackInput;
     return { events: [] };
   }
 
-  async findTopDocuments(input: unknown) {
-    this.lastDocumentsInput = input;
+  async findTopDocuments(documentsInput: unknown) {
+    this.lastDocumentsInput = documentsInput;
     return { topDocuments: [], totalUniqueDocuments: 0 };
   }
 }

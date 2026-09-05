@@ -90,7 +90,6 @@ const reconcileSsoAccounts = async ({
  * a pre-seeded deactivated row.
  */
 export const beforeUserCreate = async ({
-  prisma,
   user,
 }: {
   prisma: PrismaClient;
@@ -102,6 +101,7 @@ export const beforeUserCreate = async ({
   }
   // No-op: org auto-assignment happens in the after-create hook so that we
   // have a real user id to link with.
+  return undefined;
 };
 
 /**
@@ -611,6 +611,7 @@ export const beforeSessionCreate = async ({
     logger.warn({ userId: session.userId }, "Blocked session create: user deactivated");
     return false;
   }
+  return undefined;
 };
 
 /**

@@ -10,6 +10,8 @@ import {
   type ApiKeyAvailableScopes,
   type ApiKeyHostPort,
   type ApiKeyOrganization,
+  type ApiKeyOrganizationProject,
+  type ApiKeyOrganizationTeam,
   type ApiKeySessionStatus,
 } from "@langwatch/api-key-web/screens/api-key";
 import { useMemo, type ReactNode } from "react";
@@ -78,6 +80,30 @@ type OrganizationGraphEntry = {
   }>;
 };
 
+/** Maps one team's projects to the CLI project picker's project shape. */
+function toHostProjects(
+  team: OrganizationGraphEntry["teams"][number],
+): ApiKeyOrganizationProject[] {
+  return team.projects.map((project) => ({
+    id: project.id,
+    name: project.name,
+    slug: project.slug,
+    isPersonal: project.isPersonal,
+    ownerUserId: project.ownerUserId,
+    kind: project.kind,
+  }));
+}
+
+/** Maps one organization's teams (and their projects) to the CLI picker's shape. */
+function toHostTeams(entry: OrganizationGraphEntry): ApiKeyOrganizationTeam[] {
+  return entry.teams.map((team) => ({
+    id: team.id,
+    name: team.name,
+    isPersonal: team.isPersonal,
+    projects: toHostProjects(team),
+  }));
+}
+
 export function ApiKeyHost({ children }: { children: ReactNode }) {
   const { session, route, feedback, navigation } = useUiCapabilities();
   const activeScope = session.activeScope();
@@ -136,19 +162,7 @@ export function ApiKeyHost({ children }: { children: ReactNode }) {
       graph?.map((entry) => ({
         id: entry.id,
         name: entry.name,
-        teams: entry.teams.map((team) => ({
-          id: team.id,
-          name: team.name,
-          isPersonal: team.isPersonal,
-          projects: team.projects.map((project) => ({
-            id: project.id,
-            name: project.name,
-            slug: project.slug,
-            isPersonal: project.isPersonal,
-            ownerUserId: project.ownerUserId,
-            kind: project.kind,
-          })),
-        })),
+        teams: toHostTeams(entry),
       })),
     [graph],
   );

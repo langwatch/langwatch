@@ -18,14 +18,8 @@ import {
 } from "@langwatch/experiment-contract";
 import type { ExecutionState, StudioWorkflow, WorkflowService } from "@langwatch/workflow-contract";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
-import {
-  AVAILABLE_EVALUATORS,
-  type EvaluatorTypes,
-  type SingleEvaluationResult,
-} from "@langwatch/evaluator-contract";
+import { type SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import { generateOtelSpanId, generateOtelTraceId } from "@langwatch/trace-contract";
-import { EvaluatorNoInputsResolvedError } from "../experiment-execution.errors";
 import type { ExperimentEvaluationReportingPort } from "../ports/experiment-evaluation-reporting.port";
 import type { ExperimentModelCostPort } from "../ports/experiment-model-cost.port";
 import type { ExperimentRunAbortPort } from "../ports/experiment-run-abort.port";
@@ -34,10 +28,6 @@ import type { ExperimentConnectedDispatchPort } from "../ports/experiment-connec
 import type { ExperimentConnectedAgentOwnershipPort } from "../ports/experiment-connected-agent-ownership.port";
 import type { ExperimentStudioDispatchPort } from "../ports/experiment-studio-dispatch.port";
 import { buildStripScoreEvaluatorIds } from "../processes/experiment-evaluator-score-filter.process";
-import {
-  buildCellWorkflow,
-  buildEvaluatorCellWorkflow,
-} from "../processes/experiment-cell-workflow.process";
 // The connected-agent relay of ADR-128. Its dispatcher, runtime and refusal
 // live in the Agent and Suite feature packages; a build without them
 // cannot run a connected column.
@@ -46,11 +36,6 @@ import type { RunActor } from "@langwatch/scenario-contract";
 import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process";
 import { createSemaphore } from "../processes/experiment-run-semaphore.process";
 import { createEventStream } from "../processes/experiment-run-event-stream.process";
-import {
-  evaluatorErrorResult,
-  evaluatorTargetNoInputsResult,
-  noInputsResolvedResult,
-} from "../processes/experiment-cell-error-events.process";
 import {
   ExperimentExecutionDataService,
   type LoadedEvaluators,
@@ -330,6 +315,59 @@ export class ExperimentRunOrchestratorService {
   static comparisonSkipMessage = (
     reason: Pick<ComparisonSkipReason, "kind" | "variantNames">,
   ): { detail: string; errorType: string } => processComparisonSkipMessage(reason);
+
+  /**
+   * The Phase 2 back-fill event for one REUSED (not executed) candidate
+   * output (#5789 fix 2), or `null` when this entry does not need one: it
+   * was already produced this run, its key does not parse to a row/target
+   * pair, its row is outside this run's scope, the row no longer exists, or
+   * the seeded output itself is absent.
+   */
+  static buildSeededTargetResultEvent(
+    key: string,
+    seeded: SeededTargetOutput,
+    options: {
+      storage: Pick<ExperimentRunStorageService, "hasProduced">;
+      rowsThisRunOwns: Set<number>;
+      datasetRows: Array<Record<string, unknown>>;
+    },
+  ): EvaluationV3Event | null {
+    const { storage, rowsThisRunOwns, datasetRows } = options;
+    if (storage.hasProduced(key)) {
+      return null;
+    }
+
+    const separator = key.indexOf(":");
+    if (separator < 0) {
+      return null;
+    }
+
+    const rowIndex = Number(key.slice(0, separator));
+    const targetId = key.slice(separator + 1);
+    if (!Number.isInteger(rowIndex)) {
+      return null;
+    }
+    if (!rowsThisRunOwns.has(rowIndex)) {
+      return null;
+    }
+    if (!datasetRows[rowIndex]) {
+      return null;
+    }
+    if (seeded.output === null || seeded.output === undefined) {
+      return null;
+    }
+
+    return {
+      type: "target_result",
+      rowIndex,
+      targetId,
+      output: seeded.output,
+      ...(seeded.cost !== undefined && { cost: seeded.cost }),
+      ...(seeded.duration !== undefined && {
+        duration: seeded.duration,
+      }),
+    } as EvaluationV3Event;
+  }
 
   /** Phase 2 generator for comparison evaluators. Delegates to {@link ExperimentComparisonPlanService}. */
   static generateComparisonCells = ({
@@ -916,120 +954,99 @@ export class ExperimentRunOrchestratorService {
                 rowCount: datasetRows.length,
               }),
             );
-            for (const [key, seeded] of Object.entries(seedTargetOutputs)) {
-              if (storage.hasProduced(key)) {
-                continue;
-              }
-
-              const separator = key.indexOf(":");
-              if (separator < 0) {
-                continue;
-              }
-
-              const rowIndex = Number(key.slice(0, separator));
-              const targetId = key.slice(separator + 1);
-              if (!Number.isInteger(rowIndex)) {
-                continue;
-              }
-
-              if (!rowsThisRunOwns.has(rowIndex)) {
-                continue;
-              }
-
-              if (!datasetRows[rowIndex]) {
-                continue;
-              }
-
-              if (seeded.output === null || seeded.output === undefined) {
-                continue;
-              }
-
-              await processEventForStorage({
-                type: "target_result",
-                rowIndex,
-                targetId,
-                output: seeded.output,
-                ...(seeded.cost !== undefined && { cost: seeded.cost }),
-                ...(seeded.duration !== undefined && {
-                  duration: seeded.duration,
+            const backfillEvents = Object.entries(seedTargetOutputs)
+              .map(([key, seeded]) =>
+                ExperimentRunOrchestratorService.buildSeededTargetResultEvent(key, seeded, {
+                  storage,
+                  rowsThisRunOwns,
+                  datasetRows,
                 }),
-              } as EvaluationV3Event);
+              )
+              .filter((event): event is EvaluationV3Event => event !== null);
+
+            for (const backfillEvent of backfillEvents) {
+              await processEventForStorage(backfillEvent);
             }
           }
 
+          // Not wrapped in `if (phase2Cells.length > 0)`: an empty array makes
+          // the loop below a no-op on its own, and by the time we get here
+          // phase 1 has already awaited its own `activeCells`, so awaiting it
+          // again is a no-op too — not gating on the length just removes a
+          // nesting level with no behaviour change.
           if (phase2Cells.length > 0) {
             logger.info(
               { runId, comparison: phase2Cells.length },
               "Starting Phase 2 (comparison) cells",
             );
+          }
 
-            for (const cell of phase2Cells) {
-              if (await ports.abort.isAborted(runId)) {
-                aborted = true;
-                break;
-              }
-
-              await semaphore.acquire();
-
-              const cellPromise = (async () => {
-                try {
-                  if (await ports.abort.isAborted(runId)) {
-                    return;
-                  }
-
-                  const loadedData = {
-                    ...getLoadedDataForTarget(cell.targetConfig, loadedPrompts, loadedAgents),
-                    evaluators: loadedEvaluators,
-                    sandboxApiKey,
-                  };
-
-                  const checkAbort = () => ports.abort.isAborted(runId);
-
-                  let cellFailed = false;
-                  for await (const event of ExperimentRunOrchestratorService.executeCell(
-                    cell,
-                    projectId,
-                    ports,
-                    datasetColumns,
-                    loadedData,
-                    workflows,
-                    resultMapperConfig,
-                    checkAbort,
-                  )) {
-                    if (await ports.abort.isAborted(runId)) {
-                      break;
-                    }
-
-                    pushEvent(event);
-                    await processEventForStorage(event);
-                    if (event.type === "error") {
-                      cellFailed = true;
-                    }
-                  }
-
-                  completed++;
-                  if (cellFailed) {
-                    failedCells++;
-                  } else {
-                    completedCells++;
-                  }
-
-                  pushEvent({
-                    type: "progress",
-                    completed,
-                    total: totalCells,
-                  });
-                } finally {
-                  semaphore.release();
-                }
-              })();
-
-              activeCells.add(cellPromise);
-              void cellPromise.finally(() => activeCells.delete(cellPromise));
+          for (const cell of phase2Cells) {
+            if (await ports.abort.isAborted(runId)) {
+              aborted = true;
+              break;
             }
 
-            await Promise.all(activeCells);
+            await semaphore.acquire();
+
+            const cellPromise = (async () => {
+              try {
+                if (await ports.abort.isAborted(runId)) {
+                  return;
+                }
+
+                const loadedData = {
+                  ...getLoadedDataForTarget(cell.targetConfig, loadedPrompts, loadedAgents),
+                  evaluators: loadedEvaluators,
+                  sandboxApiKey,
+                };
+
+                const checkAbort = () => ports.abort.isAborted(runId);
+
+                let cellFailed = false;
+                for await (const event of ExperimentRunOrchestratorService.executeCell(
+                  cell,
+                  projectId,
+                  ports,
+                  datasetColumns,
+                  loadedData,
+                  workflows,
+                  resultMapperConfig,
+                  checkAbort,
+                )) {
+                  if (await ports.abort.isAborted(runId)) {
+                    break;
+                  }
+
+                  pushEvent(event);
+                  await processEventForStorage(event);
+                  if (event.type === "error") {
+                    cellFailed = true;
+                  }
+                }
+
+                completed++;
+                if (cellFailed) {
+                  failedCells++;
+                } else {
+                  completedCells++;
+                }
+
+                pushEvent({
+                  type: "progress",
+                  completed,
+                  total: totalCells,
+                });
+              } finally {
+                semaphore.release();
+              }
+            })();
+
+            activeCells.add(cellPromise);
+            void cellPromise.finally(() => activeCells.delete(cellPromise));
           }
+
+          await Promise.all(activeCells);
         }
       } finally {
         // Signal that all cells are complete

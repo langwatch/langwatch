@@ -233,7 +233,7 @@ export function createRoleBindingsRestApp(options: {
   ) => {
     const organization = organizationOf(c);
     const authz = c.get("authz");
-    const grants = c.get("grants");
+    const grantsService = c.get("grants");
     const hasLegacyAccessNotice = input.userId
       ? await authz.wouldFirstBindingDisableLegacyAccess({
           organizationId: organization.id,
@@ -241,7 +241,7 @@ export function createRoleBindingsRestApp(options: {
         })
       : false;
 
-    const created = await grants.createBinding({
+    const created = await grantsService.createBinding({
       organizationId: organization.id,
       ...input,
       actor: ledgerActor(c),

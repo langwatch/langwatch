@@ -46,7 +46,6 @@ import {
   type ProcessEventEnvelope,
 } from "@langwatch/eventing";
 import {
-  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_AGGREGATE_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_EVENT_VERSION_LATEST,
@@ -69,7 +68,6 @@ import {
 import {
   WebhookDeliveryService,
   WEBHOOK_DELIVERY_PROCESS_NAME,
-  type ConfirmSpendCommandData as WebhookConfirmSpendCommandData,
   type WebhookDeliveryProcessDeps,
   type WebhookDeliveryState,
   type GatewaySpendProcessingEvent as WebhookGatewaySpendProcessingEvent,

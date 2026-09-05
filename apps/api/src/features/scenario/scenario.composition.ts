@@ -131,9 +131,6 @@ import { ApiAgentTestOwnershipAdapter } from "../agent/agent-test-ownership.adap
 const SCENARIO_KSUID_RESOURCE = "scenario";
 const SCENARIO_RUN_KSUID_RESOURCE = "scenariorun";
 
-/** How far back the operator's event-log explorer searches by default. */
-const OPS_EVENT_LOG_LOOKBACK_DAYS = 365;
-
 /**
  * A capability this deployment did not compose, refused by name.
  *

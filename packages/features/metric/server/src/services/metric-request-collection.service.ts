@@ -150,7 +150,9 @@ export class MetricRequestCollectionService {
           // Correlation is deliberately best-effort and separate from metric
           // acceptance. A valid metric remains accepted if a trace fold is
           // temporarily unavailable.
-          const correlations = preparation.accepted.flatMap(({ correlations }) => correlations);
+          const correlations = preparation.accepted.flatMap(
+            ({ correlations: entryCorrelations }) => entryCorrelations,
+          );
           if (correlations.length > 0) {
             try {
               await this.deps.recordMetricCorrelations(correlations);

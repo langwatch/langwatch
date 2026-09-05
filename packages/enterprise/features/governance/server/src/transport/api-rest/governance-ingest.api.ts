@@ -726,6 +726,56 @@ export function createGovernanceIngestRestApp(options: {
 
   const metricCollection = ports.metricCollection;
   if (metricCollection) {
+    /**
+     * Runs the parsed metrics batch through project resolution, provenance
+     * stamping and collection. A throw here is ours (past parsing), so the
+     * caller answers retryably rather than acknowledging a dropped batch —
+     * the source event is deliberately not recorded in either exit below,
+     * since the collector re-sends this same request.
+     */
+    const collectParsedMetrics = async (
+      parsedRequest: IExportMetricsServiceRequest,
+      source: GovernanceIngestionSource,
+    ): Promise<
+      | { outcome: "unavailable"; errorMessage?: string }
+      | { outcome: "error" }
+      | {
+          outcome: "ok";
+          rejectedDataPoints: number;
+          acceptedDataPoints: number;
+          parseHint?: string;
+        }
+    > => {
+      try {
+        const govProject = await ports.projects().ensureInternal({
+          organizationId: source.organizationId,
+          kind: "internal_governance",
+        });
+        stampMetricOriginAttrs({ request: parsedRequest, source });
+        ports.keyProvenance.dropOnMetricRequest(parsedRequest);
+        const result = await metricCollection({
+          tenantId: govProject.id,
+          organizationId: source.organizationId,
+          metricRequest: parsedRequest,
+        });
+        if (result.outcome === "unavailable") {
+          return { outcome: "unavailable", errorMessage: result.errorMessage };
+        }
+        return {
+          outcome: "ok",
+          rejectedDataPoints: result.rejectedDataPoints,
+          acceptedDataPoints: result.acceptedDataPoints,
+          parseHint: result.errorMessage,
+        };
+      } catch (error) {
+        logger.error(
+          { error, sourceId: source.id },
+          "otel metrics ingest failed after parsing; answering retryably",
+        );
+        return { outcome: "error" };
+      }
+    };
+
     // ---------- POST /api/ingest/otel/:sourceId/v1/metrics ----------
     secured.access(ingestAuth).post("/otel/:sourceId/v1/metrics", async (c) => {
       const resolved = await resolveSource(c);
@@ -758,34 +808,17 @@ export function createGovernanceIngestRestApp(options: {
             // Scoped away from the outer catch, which turns anything it sees
             // into a `hint` on a 202. Past parsing, a throw is no longer the
             // sender's bad payload — it is ours, and acknowledging it drops
-            // the batch for good. In both exits below the source event is
-            // deliberately NOT recorded: the collector re-sends this same
-            // request, so counting it now double-counts it.
-            try {
-              const govProject = await ports.projects().ensureInternal({
-                organizationId: source.organizationId,
-                kind: "internal_governance",
-              });
-              stampMetricOriginAttrs({ request: parsed.request, source });
-              ports.keyProvenance.dropOnMetricRequest(parsed.request);
-              const result = await metricCollection({
-                tenantId: govProject.id,
-                organizationId: source.organizationId,
-                metricRequest: parsed.request,
-              });
-              if (result.outcome === "unavailable") {
-                return c.json({ accepted: false, error: result.errorMessage }, 503);
-              }
-              rejectedDataPoints = result.rejectedDataPoints;
-              acceptedDataPoints = result.acceptedDataPoints;
-              parseHint = result.errorMessage;
-            } catch (error) {
-              logger.error(
-                { error, sourceId: source.id },
-                "otel metrics ingest failed after parsing; answering retryably",
-              );
+            // the batch for good.
+            const collected = await collectParsedMetrics(parsed.request, source);
+            if (collected.outcome === "unavailable") {
+              return c.json({ accepted: false, error: collected.errorMessage }, 503);
+            }
+            if (collected.outcome === "error") {
               return c.json({ accepted: false, error: "failed to record data point" }, 503);
             }
+            rejectedDataPoints = collected.rejectedDataPoints;
+            acceptedDataPoints = collected.acceptedDataPoints;
+            parseHint = collected.parseHint;
           }
         }
       } catch (err) {

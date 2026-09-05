@@ -1,5 +1,5 @@
-import type { SavedViewJson, SavedViewRecord } from "../../ports/dashboard.port";
-import type { Prisma, PrismaClient, SavedView } from "@langwatch/prisma-client/generated";
+import type { SavedViewRecord } from "../../ports/dashboard.port";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   SavedViewRepository,
   type CreateSavedViewInput,

@@ -114,7 +114,7 @@ function isAuthorized(authorizationHeader: string | undefined, expected: string)
 export function verifyInstanceAdminKey(options: {
   instanceAdminKey: () => string | undefined;
   isSaas: () => boolean;
-}): (c: Context, next: Next) => Promise<Response | void> {
+}): (c: Context, next: Next) => Promise<Response | undefined> {
   return async (c, next) => {
     const configured = options.instanceAdminKey();
     if (!configured) return c.notFound();
@@ -127,11 +127,13 @@ export function verifyInstanceAdminKey(options: {
     if (!isAuthorized(authorization, configured)) {
       throw new InstanceAdminRefusedError("invalid_credentials");
     }
-    // Returned rather than awaited so every path of a `Promise<Response | void>`
-    // returns one; `noImplicitReturns` reads the fall-through as a missing
-    // answer, and a middleware that short-circuits on some paths and not
-    // others is exactly where that matters.
-    return next();
+    // Awaited and followed by an explicit return so every path of a
+    // `Promise<Response | undefined>` returns one; `noImplicitReturns` reads
+    // the fall-through as a missing answer, and a middleware that
+    // short-circuits on some paths and not others is exactly where that
+    // matters.
+    await next();
+    return undefined;
   };
 }
 

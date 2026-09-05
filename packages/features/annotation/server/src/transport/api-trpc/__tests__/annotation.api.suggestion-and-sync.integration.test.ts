@@ -13,7 +13,7 @@
  */
 import { initTRPC } from "@trpc/server";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import {
   PrismaConfigService,
@@ -204,7 +204,9 @@ describe.skipIf(!databaseUrl)("annotation.create suggestion carry-over and trace
       const fakeQueues = {
         listQueueItemsPage: async () => ({
           totalCount: 1,
-          items: [{ id: queueItemId, traceId: queueTraceId, annotationQueueId: null, doneAt: null }],
+          items: [
+            { id: queueItemId, traceId: queueTraceId, annotationQueueId: null, doneAt: null },
+          ],
         }),
         listQueuesWithItems: async () => [],
       };

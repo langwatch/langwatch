@@ -29,7 +29,6 @@
  * `@langwatch/evaluation-server`.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { AuthApp } from "@langwatch/auth-server";
 import type {
   AuthzGetDecisionInput,
   AuthzScopeLineageResult,
@@ -60,7 +59,6 @@ import { composeWorkflowFeature, composeWorkflowRuntime } from "../workflow.comp
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
 import {
   stub,
-  stubApplicationSlices,
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
@@ -265,28 +263,6 @@ function testClickHouse() {
       },
     } as unknown as ClickHouseClient);
   return { issued, resolveClient };
-}
-
-function testAuthApp(): AuthApp {
-  return AuthApp.create({
-    clientIp: () => "127.0.0.1",
-    rateLimit: async () => ({ allowed: true }),
-    route: async () => ({ kind: "password" }) as never,
-    addressIsRegistered: async () => false,
-    requestSignUpVerification: async () => undefined,
-    completeSignUpVerification: async () => ({
-      email: "person@example.com",
-      accountCreated: true,
-      accountExists: false,
-    }),
-    readInviteLanding: async () => ({
-      organizationName: "LangWatch",
-      inviterName: null,
-      alreadyAccepted: false,
-    }),
-    requestFreshInvite: async () => undefined,
-    resolveAuthProvider: async () => "email",
-  });
 }
 
 /**

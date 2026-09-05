@@ -12,10 +12,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { governanceIngestionSourceSchema } from "@langwatch/enterprise-governance-contract";
-import {
-  IngestionPullDeadlineExceededError,
-  IngestionPullWorkerService,
-} from "../ingestion-pull-worker.service";
+import { IngestionPullDeadlineExceededError } from "../ingestion-pull-worker.service";
 import { createWorkerService } from "../../__tests__/support/puller-test-ports";
 
 import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
@@ -116,10 +113,12 @@ describe("given an adapter whose pull never settles", () => {
         pollerCursor: "cursor-A",
       });
 
-      const { runIngestionPull, IngestionPullDeadlineExceededError } =
-        await loadWorkerWith(adapter);
+      const {
+        runIngestionPull: pullRun,
+        IngestionPullDeadlineExceededError: DeadlineExceededError,
+      } = await loadWorkerWith(adapter);
 
-      const run = runIngestionPull({
+      const run = pullRun({
         sourceId: "src-hang-1",
         cursor: "cursor-A",
       });
@@ -134,7 +133,7 @@ describe("given an adapter whose pull never settles", () => {
       const outcome = await settled;
       expect(outcome.ok).toBe(false);
       expect(outcome).toMatchObject({
-        error: expect.any(IngestionPullDeadlineExceededError),
+        error: expect.any(DeadlineExceededError),
       });
     });
 
@@ -152,9 +151,9 @@ describe("given an adapter whose pull never settles", () => {
         pollerCursor: "cursor-A",
       });
 
-      const { runIngestionPull } = await loadWorkerWith(adapter);
+      const { runIngestionPull: pullRun } = await loadWorkerWith(adapter);
 
-      const run = runIngestionPull({
+      const run = pullRun({
         sourceId: "src-hang-2",
         cursor: "cursor-A",
       }).catch(() => undefined);
@@ -185,10 +184,10 @@ describe("given an adapter whose pull never settles", () => {
         pollerCursor: "cursor-A",
       });
 
-      const { runIngestionPull } = await loadWorkerWith(adapter);
+      const { runIngestionPull: pullRun } = await loadWorkerWith(adapter);
 
       let resolvedNormally = false;
-      const run = runIngestionPull({
+      const run = pullRun({
         sourceId: "src-hang-3",
         cursor: "cursor-A",
       })

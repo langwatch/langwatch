@@ -21,7 +21,6 @@ import {
 import { composeApiModelProviderHost } from "../../../app/api-model-provider-host.composition";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
 import {
-  stubApplicationSlices,
   stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,

@@ -10,15 +10,10 @@ import type {
 import { NotFoundError, type SchemaVersion } from "@langwatch/prompt-contract";
 import {
   LlmConfigVersionsRepository,
-  type CreateLlmConfigVersionParams,
   type LlmConfigVersionDTO,
 } from "../prompt-version.repository";
 import { PrismaLlmConfigRepository } from "./prisma.prompt.repository";
-import {
-  getVersionValidator,
-  type LatestConfigVersionSchema,
-  parseRuntimeParameters,
-} from "@langwatch/prompt-contract";
+import { getVersionValidator, parseRuntimeParameters } from "@langwatch/prompt-contract";
 
 /**
  * The client slice version persistence binds to, transaction included: a

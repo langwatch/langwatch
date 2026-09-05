@@ -42,8 +42,8 @@ describe("StorageMeterService memory guard", () => {
     });
 
     it("meters Langy analytics into the traces category", async () => {
-      const query = vi.fn(async ({ query }: { query: string }) => ({
-        json: async () => [{ total: query.includes("FROM langy_analytics_events") ? "17" : "0" }],
+      const query = vi.fn(async ({ query: sql }: { query: string }) => ({
+        json: async () => [{ total: sql.includes("FROM langy_analytics_events") ? "17" : "0" }],
       }));
       const service = StorageMeterService.create({
         resolveClickHouseClient: async () => ({ query }) satisfies StorageMeterClickHouseClient,
@@ -148,7 +148,14 @@ describe("StorageMeterService memory guard", () => {
         resolveClickHouseClient: async () => ({ query }) satisfies StorageMeterClickHouseClient,
         now: () => t,
       });
-      return { service, query, advance: (ms: number) => (t += ms) };
+      return {
+        service,
+        query,
+        advance: (ms: number) => {
+          t += ms;
+          return t;
+        },
+      };
     }
 
     describe("when the cached value is still fresh", () => {
