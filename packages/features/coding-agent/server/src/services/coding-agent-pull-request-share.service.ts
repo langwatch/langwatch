@@ -126,34 +126,13 @@ export class CodingAgentPullRequestShareService {
   } | null {
     const { weightOf, totalWeight } = CodingAgentPullRequestShareService.weighing(rows);
 
-    // The stamps may name branches the session row's bounded branch set no
-    // longer holds, so the tenure rule is asked about the union of both.
-    const stampedBranches = rows
-      .filter((row) =>
-        CodingAgentPullRequestShareService.isStampedOnRepository({
-          row,
-          repositoryHost,
-          repositoryFullName,
-        }),
-      )
-      .map((row) => row.branch);
-    const headBranches = [
-      ...new Set([...this.dependencies.assignments.branchesOf(session), ...stampedBranches]),
-    ];
-    const assignable = [
-      {
-        sessionId: session.sessionId,
-        startedAtMs: session.startedAtMs,
-        headBranches,
-      },
-    ];
-    const perBranch =
-      this.dependencies.assignments
-        .assignDrivingSessionsPerBranch({ sessions: assignable, pullRequests })
-        .get(session.sessionId) ?? new Map<string, number>();
-    const legacyWinner = this.dependencies.assignments
-      .assignDrivingSessions({ sessions: assignable, pullRequests })
-      .get(session.sessionId);
+    const { perBranch, legacyWinner } = this.branchTenure({
+      session,
+      rows,
+      pullRequests,
+      repositoryHost,
+      repositoryFullName,
+    });
 
     // No event rows, or rows that report neither tokens nor cost: nothing to
     // divide by, so the legacy whole-session rule stands — and only where the
@@ -171,17 +150,12 @@ export class CodingAgentPullRequestShareService {
     // allocation below the same answer in every read: each pull request takes a
     // disjoint set of whole buckets, so their counters cannot sum past the
     // session's own however many reads ask.
-    const buckets = new Map<string, number>();
-    const bucketOf = new Map<SessionModelTotalsRow, string>();
-    for (const row of rows) {
-      const key = CodingAgentPullRequestShareService.bucketKeyOf({
-        row,
-        repositoryHost,
-        repositoryFullName,
-      });
-      bucketOf.set(row, key);
-      buckets.set(key, (buckets.get(key) ?? 0) + weightOf(row));
-    }
+    const { buckets, bucketOf } = CodingAgentPullRequestShareService.bucketWeights({
+      rows,
+      weightOf,
+      repositoryHost,
+      repositoryFullName,
+    });
 
     const ownsBucket = (key: string): boolean => {
       if (key === ELSEWHERE_BUCKET) {
@@ -219,6 +193,83 @@ export class CodingAgentPullRequestShareService {
       },
       prRows,
     };
+  }
+
+  /**
+   * Which pull request each of the session's branches belongs to, and the legacy whole-session
+   * winner. The stamps may name branches the session row's bounded branch set no longer holds,
+   * so the tenure rule is asked about the union of both.
+   */
+  private branchTenure({
+    session,
+    rows,
+    pullRequests,
+    repositoryHost,
+    repositoryFullName,
+  }: {
+    session: CodingAgentSessionBranchRecord;
+    rows: readonly SessionModelTotalsRow[];
+    pullRequests: readonly AssignablePullRequest[];
+    repositoryHost: string;
+    repositoryFullName: string;
+  }): { perBranch: ReadonlyMap<string, number>; legacyWinner: number | undefined } {
+    const stampedBranches = rows
+      .filter((row) =>
+        CodingAgentPullRequestShareService.isStampedOnRepository({
+          row,
+          repositoryHost,
+          repositoryFullName,
+        }),
+      )
+      .map((row) => row.branch);
+    const headBranches = [
+      ...new Set([...this.dependencies.assignments.branchesOf(session), ...stampedBranches]),
+    ];
+    const assignable = [
+      { sessionId: session.sessionId, startedAtMs: session.startedAtMs, headBranches },
+    ];
+
+    return {
+      perBranch:
+        this.dependencies.assignments
+          .assignDrivingSessionsPerBranch({ sessions: assignable, pullRequests })
+          .get(session.sessionId) ?? new Map<string, number>(),
+      legacyWinner: this.dependencies.assignments
+        .assignDrivingSessions({ sessions: assignable, pullRequests })
+        .get(session.sessionId),
+    };
+  }
+
+  /**
+   * Buckets the rows by a key that depends on the SESSION alone, never on which pull request
+   * is being asked about. That is what makes the integer allocation the same answer in every
+   * read: each pull request takes a disjoint set of whole buckets, so their counters cannot
+   * sum past the session's own however many reads ask.
+   */
+  private static bucketWeights({
+    rows,
+    weightOf,
+    repositoryHost,
+    repositoryFullName,
+  }: {
+    rows: readonly SessionModelTotalsRow[];
+    weightOf: (row: SessionModelTotalsRow) => number;
+    repositoryHost: string;
+    repositoryFullName: string;
+  }): { buckets: Map<string, number>; bucketOf: Map<SessionModelTotalsRow, string> } {
+    const buckets = new Map<string, number>();
+    const bucketOf = new Map<SessionModelTotalsRow, string>();
+    for (const row of rows) {
+      const key = CodingAgentPullRequestShareService.bucketKeyOf({
+        row,
+        repositoryHost,
+        repositoryFullName,
+      });
+      bucketOf.set(row, key);
+      buckets.set(key, (buckets.get(key) ?? 0) + weightOf(row));
+    }
+
+    return { buckets, bucketOf };
   }
 
   private static bucketKeyOf({

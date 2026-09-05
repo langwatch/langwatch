@@ -22,34 +22,12 @@ import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { nanoid } from "nanoid";
 import type { AgentsAuditLogPort, AgentsWorkflowPort } from "../ports/agent.port";
 import type { AgentRepository } from "../repositories/agent.repository";
-
-/**
- * One agent as the REST list and read answer it: the row, plus the identity
- * and the declared parameters of a connected agent, absent on the others.
- */
-export type AgentListRow = {
-  id: string;
-  name: string;
-  type: string;
-  config: Agent["config"];
-  environment: string | null;
-  ownerUserId: string | null;
-  hostLabel: string | null;
-  lastSeenAt: Date | null;
-  parameters: ScenarioParameterDefinition[];
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-/**
- * Whether Prisma refused a write because a unique index already holds the
- * value. The row the caller wanted exists, written by somebody else.
- */
-function isUniqueConstraintViolation(error: unknown): boolean {
-  return (
-    typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002"
-  );
-}
+import { AgentCopyService } from "./agent-copy.service";
+import {
+  agentWithResolvedFields,
+  declaredAgentParameters,
+  isUniqueConstraintViolation,
+} from "../rules/agent-view.rules";
 
 type AgentServiceOptions = {
   repository: AgentRepository;
@@ -59,33 +37,6 @@ type AgentServiceOptions = {
 };
 
 export class AgentService extends AgentServiceContract {
-  /** The parameters a connected agent declares; every other type declares none. */
-  static declaredAgentParameters(
-    agent: Pick<Agent, "type" | "config">,
-  ): ScenarioParameterDefinition[] {
-    if (agent.type !== "connected") {
-      return [];
-    }
-
-    return (agent.config as ConnectedAgentConfig).parameters;
-  }
-
-  static toAgentListRow(agent: Agent): AgentListRow {
-    return {
-      id: agent.id,
-      name: agent.name,
-      type: agent.type,
-      config: agent.config,
-      environment: agent.environment ?? null,
-      ownerUserId: agent.ownerUserId ?? null,
-      hostLabel: agent.hostLabel ?? null,
-      lastSeenAt: agent.lastSeenAt ?? null,
-      parameters: AgentService.declaredAgentParameters(agent),
-      createdAt: agent.createdAt,
-      updatedAt: agent.updatedAt,
-    };
-  }
-
   static create(options: AgentServiceOptions): AgentService {
     return new AgentService(
       options.repository,
@@ -95,6 +46,8 @@ export class AgentService extends AgentServiceContract {
     );
   }
 
+  private readonly copies: AgentCopyService;
+
   private constructor(
     private readonly repository: AgentRepository,
     private readonly workflows: AgentsWorkflowPort,
@@ -102,6 +55,12 @@ export class AgentService extends AgentServiceContract {
     private readonly generateId: () => string = () => `agent_${nanoid()}`,
   ) {
     super();
+    this.copies = AgentCopyService.create({
+      repository,
+      workflows,
+      generateId: this.generateId,
+      getAgent: (input) => this.getAgent(input),
+    });
   }
 
   async getById(input: { id: string; projectId: string }): Promise<AgentWithFields> {
@@ -114,7 +73,7 @@ export class AgentService extends AgentServiceContract {
     const agents = await this.repository.findAll(input);
     const fields = await this.workflowFields(agents, input.projectId);
 
-    return agents.map((agent) => this.withResolvedFields(agent, fields));
+    return agents.map((agent) => agentWithResolvedFields(agent, fields));
   }
 
   getReferenceStates(input: {
@@ -279,120 +238,26 @@ export class AgentService extends AgentServiceContract {
   async copy(
     input: Parameters<AgentServiceContract["copy"]>[0],
   ): ReturnType<AgentServiceContract["copy"]> {
-    const command = copyAgentCommandSchema.parse(input);
-    const source = await this.getAgent({
-      id: command.sourceAgentId,
-      projectId: command.sourceProjectId,
-    });
-    let workflowId: string | undefined;
-    const sourceWorkflowId = linkedWorkflowId(source);
-    if (source.type === "workflow" && sourceWorkflowId) {
-      const copiedWorkflow = await this.workflows.copy({
-        workflowId: sourceWorkflowId,
-        sourceProjectId: command.sourceProjectId,
-        targetProjectId: command.targetProjectId,
-        actorUserId: command.actorUserId,
-      });
-      workflowId = copiedWorkflow.workflowId;
-    }
-
-    try {
-      const copy = await this.repository.create({
-        id: command.newAgentId ?? this.generateId(),
-        projectId: command.targetProjectId,
-        name: source.name,
-        type: source.type,
-        config: source.config,
-        workflowId,
-        copiedFromAgentId: source.id,
-      });
-
-      return {
-        id: copy.id,
-        projectId: copy.projectId,
-        name: copy.name,
-        copiedFromAgentId: source.id,
-      };
-    } catch (error) {
-      if (workflowId) {
-        await this.workflows
-          .remove({ workflowId, projectId: command.targetProjectId })
-          .catch(() => undefined);
-      }
-
-      throw error;
-    }
+    return this.copies.copy(input);
   }
 
   async pushToCopies(
     input: Parameters<AgentServiceContract["pushToCopies"]>[0],
   ): ReturnType<AgentServiceContract["pushToCopies"]> {
-    const source = await this.getAgent({
-      id: input.sourceAgentId,
-      projectId: input.sourceProjectId,
-    });
-    const copies = await this.repository.findCopies(input.sourceAgentId);
-    if (copies.length === 0) {
-      throw new AgentCopiesNotFoundError(input.sourceAgentId);
-    }
-
-    let selected = copies;
-    if (input.copyIds) {
-      selected = copies.filter((copy) => input.copyIds?.includes(copy.id));
-    }
-
-    if (selected.length === 0) {
-      throw new AgentCopySelectionError(input.sourceAgentId);
-    }
-
-    for (const copy of selected) {
-      await this.repository.updateNameAndConfig({
-        id: copy.id,
-        projectId: copy.projectId,
-        name: source.name,
-        config: source.config,
-      });
-    }
-
-    return {
-      pushedTo: selected.length,
-      selectedCopies: input.copyIds?.length ?? copies.length,
-    };
+    return this.copies.pushToCopies(input);
   }
 
   async getSourceOfCopy(input: {
     agentId: string;
     projectId: string;
   }): ReturnType<AgentServiceContract["getSourceOfCopy"]> {
-    const copy = await this.getAgent({
-      id: input.agentId,
-      projectId: input.projectId,
-    });
-    if (!copy.copiedFromAgentId) {
-      throw new AgentIsNotCopyError(input.agentId, input.projectId);
-    }
-
-    const source = await this.getSourceAgent(copy.copiedFromAgentId);
-
-    return source;
+    return this.copies.getSourceOfCopy(input);
   }
 
   async syncFromSource(
     input: Parameters<AgentServiceContract["syncFromSource"]>[0],
   ): ReturnType<AgentServiceContract["syncFromSource"]> {
-    const copy = await this.getById({
-      id: input.agentId,
-      projectId: input.projectId,
-    });
-    const source = await this.getSourceOfCopy(input);
-    await this.repository.updateNameAndConfig({
-      id: copy.id,
-      projectId: copy.projectId,
-      name: source.name,
-      config: source.config,
-    });
-
-    return { ok: true as const };
+    return this.copies.syncFromSource(input);
   }
 
   async getHistory(input: {
@@ -519,19 +384,10 @@ export class AgentService extends AgentServiceContract {
     return agent;
   }
 
-  private async getSourceAgent(id: string): Promise<Agent> {
-    const source = await this.repository.tryFindByIdOnly(id);
-    if (!source) {
-      throw new AgentSourceNotFoundError(id);
-    }
-
-    return source;
-  }
-
   private async withFields(agent: Agent, projectId: string): Promise<AgentWithFields> {
     const fields = await this.workflowFields([agent], projectId);
 
-    return this.withResolvedFields(agent, fields);
+    return agentWithResolvedFields(agent, fields);
   }
 
   private async workflowFields(
@@ -555,28 +411,5 @@ export class AgentService extends AgentServiceContract {
     }
 
     return this.workflows.fields({ projectId, workflowIds });
-  }
-
-  private withResolvedFields(agent: Agent, fields: Record<string, AgentFields>): AgentWithFields {
-    if (agent.type !== "workflow") {
-      return {
-        ...agent,
-        inputFields: agent.config.inputs ?? [],
-        outputFields: agent.config.outputs ?? [],
-        fieldsResolved: true,
-      };
-    }
-
-    const workflowId = linkedWorkflowId(agent);
-    if (workflowId && fields[workflowId]) {
-      return { ...agent, ...fields[workflowId] };
-    }
-
-    return {
-      ...agent,
-      inputFields: [],
-      outputFields: [],
-      fieldsResolved: false,
-    };
   }
 }

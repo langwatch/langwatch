@@ -31,12 +31,12 @@ export type ScimUserProvisioning = ScimUserActivation &
   ScimUserProfileReadWrite &
   Pick<UserService, "tryFindByEmail" | "create">;
 import type { ScimSyncLifecyclePort } from "../ports/scim-sync-lifecycle.port";
-
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002"
-  );
-}
+import {
+  isUniqueViolation,
+  nameFromScimRequest,
+  scimUserOf,
+  tryParseUserNameFilter,
+} from "../rules/scim-user.rules";
 
 export class ScimProvisioningService {
   private readonly prisma: ScimRepositoryPort;
@@ -144,7 +144,7 @@ export class ScimProvisioningService {
     organizationId: string;
   }): Promise<ScimUser> {
     const email = request.userName;
-    const name = this.buildNameFromRequest(request);
+    const name = nameFromScimRequest(request);
 
     const existingUser = await this.userService.tryFindByEmail({ email });
 
@@ -282,7 +282,7 @@ export class ScimProvisioningService {
     startIndex?: number;
     count?: number;
   }): Promise<ScimListResponse<ScimUser>> {
-    const emailFilter = this.parseUserNameFilter(filter);
+    const emailFilter = tryParseUserNameFilter(filter);
 
     const { rows: memberships, total: totalCount } = await this.prisma.listMemberships({
       organizationId,
@@ -320,7 +320,7 @@ export class ScimProvisioningService {
       return this.scimError({ status: "404", detail: "User not found" });
     }
 
-    const name = this.buildNameFromRequest(request);
+    const name = nameFromScimRequest(request);
     const active = request.active !== false;
 
     const updatedUser = await this.profiles.updateProfile({
@@ -436,66 +436,7 @@ export class ScimProvisioningService {
   }
 
   toScimUser(user: UserProfile): ScimUser {
-    const { givenName, familyName } = this.splitName(user.name ?? "");
-
-    return {
-      schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
-      id: user.id,
-      userName: user.email ?? "",
-      name: {
-        givenName,
-        familyName,
-      },
-      emails: [
-        {
-          primary: true,
-          value: user.email ?? "",
-          type: "work",
-        },
-      ],
-      active: user.deactivatedAt === null,
-      meta: {
-        resourceType: "User",
-        created: user.createdAt.toISOString(),
-        lastModified: user.updatedAt.toISOString(),
-      },
-    };
-  }
-
-  private buildNameFromRequest(request: ScimCreateUserRequest): string {
-    if (request.name) {
-      const parts = [request.name.givenName, request.name.familyName].filter(Boolean);
-      if (parts.length > 0) {
-        return parts.join(" ");
-      }
-    }
-
-    return request.userName.split("@")[0] ?? request.userName;
-  }
-
-  private splitName(fullName: string): {
-    givenName: string;
-    familyName: string;
-  } {
-    const spaceIndex = fullName.indexOf(" ");
-    if (spaceIndex === -1) {
-      return { givenName: fullName, familyName: "" };
-    }
-
-    return {
-      givenName: fullName.substring(0, spaceIndex),
-      familyName: fullName.substring(spaceIndex + 1),
-    };
-  }
-
-  private parseUserNameFilter(filter?: string): string | null {
-    if (!filter) {
-      return null;
-    }
-
-    const match = filter.match(/^userName\s+eq\s+"([^"]+)"$/);
-
-    return match?.[1] ?? null;
+    return scimUserOf(user);
   }
 
   private scimError({ status, detail }: { status: string; detail: string }): never {

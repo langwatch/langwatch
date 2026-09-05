@@ -138,11 +138,11 @@ export {
   type TeamRoleUpdate,
   type TeamRoleUpdateOrigin,
 } from "./services/compute-effective-team-role-updates.service";
+export { InviteService } from "./services/invite.service";
 export {
   INVITE_EXPIRATION_MS,
-  InviteService,
   type InviteServiceDependencies,
-} from "./services/invite.service";
+} from "./rules/invite-contracts.rules";
 export {
   INVITE_SENDS_PER_WINDOW,
   INVITE_SEND_WINDOW_SECONDS,

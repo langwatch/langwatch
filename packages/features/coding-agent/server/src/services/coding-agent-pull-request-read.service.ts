@@ -36,6 +36,11 @@ import {
 } from "./coding-agent-pull-request-usage.service";
 import { CodingAgentSessionReadService } from "./coding-agent-session-read.service";
 import { CodingAgentSessionListPullRequestService } from "./coding-agent-session-list-pull-request.service";
+import { CodingAgentSessionCandidatesService } from "./coding-agent-session-candidates.service";
+import {
+  assignablePullRequests,
+  pullRequestIdentity,
+} from "../rules/coding-agent-pull-request.rules";
 
 export const SESSIONS_LIST_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 export const SESSIONS_LIST_LIMIT = 200;
@@ -60,7 +65,15 @@ export class CodingAgentPullRequestReadService {
     personalValues: CodingAgentPersonalPullRequestValuesService;
     sessionListPullRequests: CodingAgentSessionListPullRequestService;
   }): CodingAgentPullRequestReadService {
-    return new CodingAgentPullRequestReadService(options);
+    return new CodingAgentPullRequestReadService({
+      ...options,
+      candidates: CodingAgentSessionCandidatesService.create({
+        sessions: options.sessions,
+        sessionEvents: options.sessionEvents,
+        billing: options.billing,
+        usage: options.usage,
+      }),
+    });
   }
 
   private constructor(
@@ -77,6 +90,7 @@ export class CodingAgentPullRequestReadService {
       usage: CodingAgentPullRequestUsageService;
       personalValues: CodingAgentPersonalPullRequestValuesService;
       sessionListPullRequests: CodingAgentSessionListPullRequestService;
+      candidates: CodingAgentSessionCandidatesService;
     },
   ) {}
 
@@ -131,7 +145,7 @@ export class CodingAgentPullRequestReadService {
     const gathered = await this.gatherPullRequest(query);
 
     return codingAgentPullRequestUsageSchema.parse({
-      pullRequest: this.pullRequestIdentity(gathered.target),
+      pullRequest: pullRequestIdentity(gathered.target),
       rows: gathered.rows,
       totals: this.dependencies.usage.totals(gathered.rows),
       modelBreakdown: gathered.modelBreakdown,
@@ -147,7 +161,7 @@ export class CodingAgentPullRequestReadService {
 
     return codingAgentPullRequestDetailSchema.parse({
       pullRequest: {
-        ...this.pullRequestIdentity(gathered.target),
+        ...pullRequestIdentity(gathered.target),
         title: gathered.target.title,
       },
       totals: this.dependencies.usage.totals(gathered.rows),
@@ -194,69 +208,20 @@ export class CodingAgentPullRequestReadService {
     });
     const rows: unknown[] = [];
     const unlinked: unknown[] = [];
-    const nonBillableAgents = await this.nonBillableAgents(
+    const nonBillableAgents = await this.dependencies.candidates.nonBillableAgents(
       organizationId,
       sessions.map((session) => session.agent),
     );
     for (const group of groups) {
-      const pullRequests = await this.dependencies.github.findAllByBranches({
+      const found = await this.personalGroupRows({
+        group,
+        query,
         organizationId,
-        repositoryHost: group.repositoryHost,
-        repositoryFullName: group.repositoryFullName,
-        headBranches: [...new Set(group.sessions.flatMap((session) => session.headBranches))],
+        toMs,
+        nonBillableAgents,
       });
-      // Discovery is personal: only the pull requests this project's own work
-      // touched become rows. Per branch, so a session that drove two pull
-      // requests surfaces both — each row then prices only its own share of
-      // the session.
-      const assignments = this.dependencies.assignments.assignDrivingSessionsPerBranch({
-        sessions: group.sessions.map((session) => ({
-          sessionId: session.sessionId,
-          startedAtMs: session.startedAtMs,
-          headBranches: session.headBranches,
-        })),
-        pullRequests: this.assignable(pullRequests),
-      });
-      const discovered = pullRequests.filter((pullRequest) =>
-        group.sessions.some((session) => {
-          const branchWinners = assignments.get(session.sessionId);
-          if (branchWinners === undefined) {
-            return false;
-          }
-
-          return [...branchWinners.values()].includes(pullRequest.prNumber);
-        }),
-      );
-      if (discovered.length > 0) {
-        rows.push(
-          ...(await this.personalOrganizationRows({
-            group,
-            discovered,
-            pullRequests,
-            query,
-            organizationId,
-            toMs,
-          })),
-        );
-      }
-
-      const unmatched = group.sessions.filter((session) => !assignments.has(session.sessionId));
-      if (unmatched.length === 0) {
-        continue;
-      }
-
-      const repoCovered = await this.dependencies.github.coversRepository({
-        organizationId,
-        repositoryFullName: group.repositoryFullName,
-      });
-      unlinked.push(
-        ...this.dependencies.personalValues.unlinkedRows({
-          group,
-          sessions: unmatched,
-          repoCovered,
-          nonBillableAgents,
-        }),
-      );
+      rows.push(...found.rows);
+      unlinked.push(...found.unlinked);
     }
 
     return codingAgentPersonalPullRequestUsageSchema.parse({ rows, unlinked });
@@ -297,7 +262,7 @@ export class CodingAgentPullRequestReadService {
     }
 
     const toMs = this.dependencies.clock.nowMs();
-    const candidates = await this.candidateSessionsFor({
+    const candidates = await this.dependencies.candidates.findCandidates({
       tenantIds: query.permittedProjectIds,
       repositoryHost: target.repositoryHost,
       repositoryOwner,
@@ -313,7 +278,7 @@ export class CodingAgentPullRequestReadService {
     const attribution = this.dependencies.shares.attribute({
       sessions: candidates.sessions,
       rowMatchedSessionKeys: candidates.rowMatchedSessionKeys,
-      pullRequests: this.assignable(siblings),
+      pullRequests: assignablePullRequests(siblings),
       prNumber: target.prNumber,
       repositoryHost: target.repositoryHost,
       repositoryFullName: target.repositoryFullName,
@@ -321,7 +286,7 @@ export class CodingAgentPullRequestReadService {
     });
     const attached = attribution.sessions;
     const costProjects = new Set(query.costProjectIds);
-    const nonBillableAgents = await this.nonBillableAgents(
+    const nonBillableAgents = await this.dependencies.candidates.nonBillableAgents(
       query.organizationId,
       attached.map((session) => session.agent),
     );
@@ -364,7 +329,7 @@ export class CodingAgentPullRequestReadService {
       return [];
     }
 
-    const candidates = await this.candidateSessionsFor({
+    const candidates = await this.dependencies.candidates.findCandidates({
       tenantIds: input.query.permittedProjectIds,
       repositoryHost: input.group.repositoryHost,
       repositoryOwner,
@@ -372,7 +337,7 @@ export class CodingAgentPullRequestReadService {
       branches: [...new Set(input.discovered.map((pullRequest) => pullRequest.headBranch))],
       fromMs: input.toMs - USAGE_SESSION_WINDOW_MS,
     });
-    const nonBillableAgents = await this.nonBillableAgents(
+    const nonBillableAgents = await this.dependencies.candidates.nonBillableAgents(
       input.organizationId,
       candidates.sessions.map((session) => session.agent),
     );
@@ -387,7 +352,7 @@ export class CodingAgentPullRequestReadService {
       const attribution = this.dependencies.shares.attribute({
         sessions: candidates.sessions,
         rowMatchedSessionKeys: candidates.rowMatchedSessionKeys,
-        pullRequests: this.assignable(input.pullRequests),
+        pullRequests: assignablePullRequests(input.pullRequests),
         prNumber: pullRequest.prNumber,
         repositoryHost: input.group.repositoryHost,
         repositoryFullName: input.group.repositoryFullName,
@@ -402,7 +367,7 @@ export class CodingAgentPullRequestReadService {
       );
 
       return {
-        ...this.pullRequestIdentity(pullRequest),
+        ...pullRequestIdentity(pullRequest),
         title: pullRequest.title,
         // Discovery runs on this project's own sessions, the share runs on
         // the stamps, so a discovered pull request can end up with no session
@@ -426,126 +391,80 @@ export class CodingAgentPullRequestReadService {
     });
   }
 
-  /**
-   * Every session that may have worked on one repository's branches, found two ways and
-   * merged: sessions whose own row matches (the legacy read), plus sessions whose STAMPED
-   * fact rows name the repository even though their row has since moved to another one — a
-   */
-  private async candidateSessionsFor({
-    tenantIds,
-    repositoryHost,
-    repositoryOwner,
-    repositoryName,
-    branches,
-    fromMs,
-  }: {
-    tenantIds: string[];
-    repositoryHost: string;
-    repositoryOwner: string;
-    repositoryName: string;
-    branches: string[];
-    fromMs: number;
-  }): Promise<{
-    sessions: CodingAgentSessionBranchRecord[];
-    rowMatchedSessionKeys: ReadonlySet<string>;
-  }> {
-    // Independent reads, so they go together: the stamped one needs the
-    // row-matched keys only to subtract them, which happens after both land.
-    const [rowMatched, stamped] = await Promise.all([
-      this.dependencies.sessions.listByRepositoryBranch({
-        tenantIds,
-        repositoryHost,
-        repositoryOwner,
-        repositoryName,
-        branches,
-        startedAtFromMs: fromMs,
-      }),
-      this.dependencies.sessionEvents.listSessionsByStampedBranch({
-        tenantIds,
-        repositoryHost,
-        repositoryOwner,
-        repositoryName,
-        branches,
-        fromMs,
-      }),
-    ]);
-    const rowMatchedSessionKeys = new Set(
-      rowMatched.map(CodingAgentPullRequestShareService.sessionKey),
-    );
+  /** One repository group's discovered pull-request rows, plus its sessions that matched none. */
+  private async personalGroupRows(input: {
+    group: CodingAgentPersonalRepositoryGroup;
+    query: {
+      permittedProjectIds: string[];
+      costProjectIds: string[];
+      projects: Record<string, CodingAgentContributorProject>;
+    };
+    organizationId: string;
+    toMs: number;
+    nonBillableAgents: ReadonlySet<string>;
+  }): Promise<{ rows: unknown[]; unlinked: unknown[] }> {
+    const { group, query, organizationId, toMs, nonBillableAgents } = input;
+    const rows: unknown[] = [];
+    const unlinked: unknown[] = [];
+    const pullRequests = await this.dependencies.github.findAllByBranches({
+      organizationId,
+      repositoryHost: group.repositoryHost,
+      repositoryFullName: group.repositoryFullName,
+      headBranches: [...new Set(group.sessions.flatMap((session) => session.headBranches))],
+    });
+    // Discovery is personal: only the pull requests this project's own work
+    // touched become rows. Per branch, so a session that drove two pull
+    // requests surfaces both — each row then prices only its own share of
+    // the session.
+    const assignments = this.dependencies.assignments.assignDrivingSessionsPerBranch({
+      sessions: group.sessions.map((session) => ({
+        sessionId: session.sessionId,
+        startedAtMs: session.startedAtMs,
+        headBranches: session.headBranches,
+      })),
+      pullRequests: assignablePullRequests(pullRequests),
+    });
+    const discovered = pullRequests.filter((pullRequest) =>
+      group.sessions.some((session) => {
+        const branchWinners = assignments.get(session.sessionId);
+        if (branchWinners === undefined) {
+          return false;
+        }
 
-    const missing = stamped.filter(
-      (pair) => !rowMatchedSessionKeys.has(CodingAgentPullRequestShareService.sessionKey(pair)),
+        return [...branchWinners.values()].includes(pullRequest.prNumber);
+      }),
     );
-    if (missing.length === 0) {
-      return { sessions: rowMatched, rowMatchedSessionKeys };
+    if (discovered.length > 0) {
+      rows.push(
+        ...(await this.personalOrganizationRows({
+          group,
+          discovered,
+          pullRequests,
+          query,
+          organizationId,
+          toMs,
+        })),
+      );
     }
 
-    const fetched = await this.dependencies.sessions.listBySessionIds({
-      tenantIds,
-      sessionIds: [...new Set(missing.map((pair) => pair.sessionId))],
-      startedAtFromMs: fromMs,
+    const unmatched = group.sessions.filter((session) => !assignments.has(session.sessionId));
+    if (unmatched.length === 0) {
+      return { rows, unlinked };
+    }
+
+    const repoCovered = await this.dependencies.github.coversRepository({
+      organizationId,
+      repositoryFullName: group.repositoryFullName,
     });
-    // The id read cannot scope per tenant, so a provider session id shared by
-    // two projects fetches both; keep only the (tenant, session) pairs the
-    // stamps actually named.
-    const missingKeys = new Set(missing.map(CodingAgentPullRequestShareService.sessionKey));
-    const stampedOnly = fetched.filter((session) =>
-      missingKeys.has(CodingAgentPullRequestShareService.sessionKey(session)),
+    unlinked.push(
+      ...this.dependencies.personalValues.unlinkedRows({
+        group,
+        sessions: unmatched,
+        repoCovered,
+        nonBillableAgents,
+      }),
     );
 
-    return {
-      sessions: [...rowMatched, ...stampedOnly],
-      rowMatchedSessionKeys,
-    };
-  }
-
-  private async nonBillableAgents(
-    organizationId: string,
-    agents: string[],
-  ): Promise<ReadonlySet<string>> {
-    const distinct = [...new Set(agents.filter((agent) => agent !== ""))];
-    const answers = await Promise.all(
-      distinct.map(async (agent) => ({
-        agent,
-        nonBillable: await this.dependencies.billing.isSourceNonBillable({
-          organizationId,
-          sourceType: this.dependencies.usage.ingestSourceType(agent),
-        }),
-      })),
-    );
-
-    return new Set(answers.filter((answer) => answer.nonBillable).map((answer) => answer.agent));
-  }
-
-  private assignable(pullRequests: readonly GithubPullRequest[]): Array<{
-    prNumber: number;
-    headBranch: string;
-    prCreatedAtMs: number;
-    prClosedAtMs: number | null;
-    prMergedAtMs: number | null;
-  }> {
-    return pullRequests.map((pullRequest) => ({
-      prNumber: pullRequest.prNumber,
-      headBranch: pullRequest.headBranch,
-      prCreatedAtMs: pullRequest.prCreatedAt.getTime(),
-      prClosedAtMs: pullRequest.prClosedAt?.getTime() ?? null,
-      prMergedAtMs: pullRequest.prMergedAt?.getTime() ?? null,
-    }));
-  }
-
-  private pullRequestIdentity(pullRequest: GithubPullRequest) {
-    return {
-      repositoryHost: pullRequest.repositoryHost,
-      repositoryFullName: pullRequest.repositoryFullName,
-      prNumber: pullRequest.prNumber,
-      headBranch: pullRequest.headBranch,
-      htmlUrl: pullRequest.htmlUrl,
-      state: pullRequest.state,
-      isDraft: pullRequest.isDraft,
-      authorLogin: pullRequest.authorLogin,
-      prCreatedAtMs: pullRequest.prCreatedAt.getTime(),
-      prClosedAtMs: pullRequest.prClosedAt?.getTime() ?? null,
-      prMergedAtMs: pullRequest.prMergedAt?.getTime() ?? null,
-    };
+    return { rows, unlinked };
   }
 }

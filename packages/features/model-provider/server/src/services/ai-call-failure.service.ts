@@ -72,9 +72,9 @@ export class AiCallFailureService {
   private constructor() {}
 
   /**
-   * Wraps a function performing an AI call (generateText, embeddings, stream, etc.) so a failure the caller cannot name rethrows as a typed `AiCallFailedError`
-   * carrying the feature context. `ModelNotConfiguredError` and `ModelProviderDisabledError` pass through untouched — both are raised by model resolution, which now
-   * happens inside the wrapped call, and each has its own remediation copy the generic ai_call_failed message would bury.
+   * Rethrows an unnamed AI-call failure as a typed `AiCallFailedError` carrying the feature
+   * context. `ModelNotConfiguredError` and `ModelProviderDisabledError` pass through with
+   * their own remediation copy, which the generic ai_call_failed message would bury.
    */
   async wrapAiCall<T>(
     feature: { key: string; role: ModelRole; displayName: string },

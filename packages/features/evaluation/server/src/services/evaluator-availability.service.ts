@@ -41,7 +41,9 @@ export class EvaluatorAvailabilityService {
     ) {
       return {
         reason: "PII detection is not installed on this server.",
-        howToEnable: `Set ${PRESIDIO_ENABLE_ENV_VAR}=true and restart LangWatch. It downloads a ~670MB language model the first time, which is why it is left out by default.`,
+        howToEnable:
+          `Set ${PRESIDIO_ENABLE_ENV_VAR}=true and restart LangWatch. It downloads a ~670MB ` +
+          "language model the first time, which is why it is left out by default.",
       };
     }
 
@@ -54,7 +56,9 @@ export class EvaluatorAvailabilityService {
     ) {
       return {
         reason: "Language detection is not installed on this server.",
-        howToEnable: `Set ${LINGUA_ENABLE_ENV_VAR}=true and restart LangWatch. It downloads ~95MB of language models the first time, which is why it is left out by default.`,
+        howToEnable:
+          `Set ${LINGUA_ENABLE_ENV_VAR}=true and restart LangWatch. It downloads ~95MB of ` +
+          "language models the first time, which is why it is left out by default.",
       };
     }
 

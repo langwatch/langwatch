@@ -253,8 +253,8 @@ export {
   ReportChartService,
   REPORT_CHART_QUERY_CONCURRENCY,
   type ReportChartDeps,
-  type ReportGraphInput,
 } from "./services/report-chart.service";
+export type { ReportGraphInput } from "./rules/report-chart.rules";
 export { ReportTraceRowService } from "./services/report-trace-row.service";
 /**
  * The two Postgres reads a scheduled report fires through, published so a background process

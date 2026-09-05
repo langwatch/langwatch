@@ -103,59 +103,13 @@ export class MetricRequestCollectionService {
         const rejectedDataPoints = preparation.rejectedDataPoints;
         const errors = [...preparation.errors];
 
-        if (preparation.accepted.length > 0) {
-          try {
-            await this.deps.recordDataPoints(
-              preparation.accepted.map(({ dataPoint }) => dataPoint),
-            );
-          } catch (error) {
-            // Preparation errors describe the caller's own payload and are
-            // safe to return. A persistence failure is ours: its message can
-            // name internal hosts, tables and queries, so the sender gets a
-            // stable string and the detail goes to the log only.
-            span.setAttribute("metrics.ingestion.unavailable", preparation.accepted.length);
-            this.logger.error(
-              {
-                error,
-                tenantId,
-                pointCount: preparation.accepted.length,
-                pointIds: preparation.accepted
-                  .slice(0, 10)
-                  .map(({ dataPoint }) => dataPoint.pointId),
-              },
-              "Failed to enqueue canonical metric data point batch",
-            );
+        if (!(await this.persistDataPoints({ tenantId, preparation }))) {
+          span.setAttribute("metrics.ingestion.unavailable", preparation.accepted.length);
 
-            return {
-              outcome: "unavailable",
-              errorMessage: PERSISTENCE_ERROR_MESSAGE,
-            };
-          }
+          return { outcome: "unavailable", errorMessage: PERSISTENCE_ERROR_MESSAGE };
         }
 
-        if (acceptedDataPoints > 0) {
-          // Correlation is deliberately best-effort and separate from metric
-          // acceptance. A valid metric remains accepted if a trace fold is
-          // temporarily unavailable.
-          const correlations = preparation.accepted.flatMap(
-            ({ correlations: entryCorrelations }) => entryCorrelations,
-          );
-          if (correlations.length > 0) {
-            try {
-              await this.deps.recordMetricCorrelations(correlations);
-            } catch (error) {
-              this.logger.error(
-                {
-                  error,
-                  tenantId,
-                  correlationCount: correlations.length,
-                  pointIds: correlations.slice(0, 10).map(({ pointId }) => pointId),
-                },
-                "Failed to enqueue metric exemplar correlation batch",
-              );
-            }
-          }
-        }
+        await this.persistCorrelations({ tenantId, preparation });
 
         span.setAttribute("metrics.ingestion.successes", acceptedDataPoints);
         span.setAttribute("metrics.ingestion.failures", rejectedDataPoints);
@@ -170,5 +124,73 @@ export class MetricRequestCollectionService {
         };
       },
     );
+  }
+
+  /**
+   * Enqueues the canonical data points, reporting whether they landed. Preparation errors
+   * describe the caller's own payload and are safe to return; a persistence failure is ours,
+   * so its message — which can name internal hosts, tables and queries — goes to the log only.
+   */
+  private async persistDataPoints({
+    tenantId,
+    preparation,
+  }: {
+    tenantId: string;
+    preparation: MetricDataPointPreparation;
+  }): Promise<boolean> {
+    if (preparation.accepted.length === 0) {
+      return true;
+    }
+
+    try {
+      await this.deps.recordDataPoints(preparation.accepted.map(({ dataPoint }) => dataPoint));
+
+      return true;
+    } catch (error) {
+      this.logger.error(
+        {
+          error,
+          tenantId,
+          pointCount: preparation.accepted.length,
+          pointIds: preparation.accepted.slice(0, 10).map(({ dataPoint }) => dataPoint.pointId),
+        },
+        "Failed to enqueue canonical metric data point batch",
+      );
+
+      return false;
+    }
+  }
+
+  /**
+   * Correlation is deliberately best-effort and separate from metric acceptance. A valid
+   * metric remains accepted if a trace fold is temporarily unavailable.
+   */
+  private async persistCorrelations({
+    tenantId,
+    preparation,
+  }: {
+    tenantId: string;
+    preparation: MetricDataPointPreparation;
+  }): Promise<void> {
+    const correlations = preparation.accepted.flatMap(
+      ({ correlations: entryCorrelations }) => entryCorrelations,
+    );
+    if (correlations.length === 0) {
+      return;
+    }
+
+    try {
+      await this.deps.recordMetricCorrelations(correlations);
+    } catch (error) {
+      this.logger.error(
+        {
+          error,
+          tenantId,
+          correlationCount: correlations.length,
+          pointIds: correlations.slice(0, 10).map(({ pointId }) => pointId),
+        },
+        "Failed to enqueue metric exemplar correlation batch",
+      );
+    }
   }
 }

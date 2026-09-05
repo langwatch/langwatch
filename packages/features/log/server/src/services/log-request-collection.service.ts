@@ -95,90 +95,16 @@ export class LogRequestCollectionService {
         const rejectedLogRecords = preparation.rejectedLogRecords;
         const errors = preparation.errors;
 
-        if (preparation.accepted.length > 0) {
-          try {
-            await this.deps.recordLogRecords(preparation.accepted.map(({ record }) => record));
-          } catch (error) {
-            // Preparation errors describe the caller's own payload and are
-            // safe to return. A persistence failure is ours: its message can
-            // name internal hosts, tables and queries, so the sender gets a
-            // stable string and the detail goes to the log only.
-            this.logger.error(
-              {
-                error,
-                tenantId,
-                recordCount: preparation.accepted.length,
-                recordIds: preparation.accepted.slice(0, 10).map(({ record }) => record.recordId),
-              },
-              "Failed to enqueue canonical log record batch",
-            );
-            span.setAttribute("logs.ingestion.unavailable", preparation.accepted.length);
+        if (!(await this.persistAccepted({ tenantId, preparation }))) {
+          span.setAttribute("logs.ingestion.unavailable", preparation.accepted.length);
 
-            return {
-              outcome: "unavailable",
-              errorMessage: PERSISTENCE_ERROR_MESSAGE,
-            };
-          }
+          return { outcome: "unavailable", errorMessage: PERSISTENCE_ERROR_MESSAGE };
         }
 
-        const contributions: LogTraceContribution[] = [];
-        if (acceptedLogRecords > 0) {
-          for (const prepared of preparation.accepted) {
-            const { record } = prepared;
-            if (
-              record.correlationSource === "none" ||
-              !record.correlationTraceId ||
-              !record.correlationSpanId
-            ) {
-              continue;
-            }
-
-            try {
-              contributions.push(
-                makeTraceContribution({
-                  prepared,
-                  traceCanonicalisation: this.deps.traceCanonicalisation,
-                  traceIo: this.deps.traceIo,
-                }),
-              );
-            } catch (error) {
-              // Best-effort, for the same reason the enqueue failure below is:
-              // the canonical record is already durably enqueued, so failing to
-              // derive its trace contribution must not tell the sender to
-              // discard a log we hold. Log only — do not touch the counters.
-              this.logger.error(
-                {
-                  error,
-                  tenantId,
-                  recordId: record.recordId,
-                  traceId: record.correlationTraceId,
-                },
-                "Failed to build log trace contribution",
-              );
-            }
-          }
-        }
-
-        if (contributions.length > 0) {
-          try {
-            await this.deps.recordLogContributions(contributions);
-          } catch (error) {
-            // Correlation is deliberately best-effort and separate from log acceptance,
-            // matching the metric pipeline: the canonical record is already durably enqueued
-            // above, and it — not the trace contribution — is the source of truth. Counting
-            // these as rejections would tell the sender to discard logs we have in fact
-            // accepted.
-            this.logger.error(
-              {
-                error,
-                tenantId,
-                contributionCount: contributions.length,
-                recordIds: contributions.slice(0, 10).map(({ recordId }) => recordId),
-              },
-              "Failed to enqueue log trace contribution batch",
-            );
-          }
-        }
+        await this.persistContributions({
+          tenantId,
+          contributions: this.buildContributions({ tenantId, preparation }),
+        });
 
         span.setAttribute("logs.ingestion.successes", acceptedLogRecords);
         span.setAttribute("logs.ingestion.failures", rejectedLogRecords);
@@ -192,6 +118,115 @@ export class LogRequestCollectionService {
         };
       },
     );
+  }
+
+  /**
+   * Enqueues the canonical records, reporting whether they landed. Preparation errors describe
+   * the caller's own payload and are safe to return; a persistence failure is ours, so its
+   * message — which can name internal hosts, tables and queries — goes to the log only.
+   */
+  private async persistAccepted({
+    tenantId,
+    preparation,
+  }: {
+    tenantId: string;
+    preparation: LogPreparation;
+  }): Promise<boolean> {
+    if (preparation.accepted.length === 0) {
+      return true;
+    }
+
+    try {
+      await this.deps.recordLogRecords(preparation.accepted.map(({ record }) => record));
+
+      return true;
+    } catch (error) {
+      this.logger.error(
+        {
+          error,
+          tenantId,
+          recordCount: preparation.accepted.length,
+          recordIds: preparation.accepted.slice(0, 10).map(({ record }) => record.recordId),
+        },
+        "Failed to enqueue canonical log record batch",
+      );
+
+      return false;
+    }
+  }
+
+  /**
+   * The trace contributions the accepted records correlate to. Best-effort: the canonical
+   * record is already durably enqueued, so failing to derive its contribution must not tell
+   * the sender to discard a log we hold. Log only — do not touch the counters.
+   */
+  private buildContributions({
+    tenantId,
+    preparation,
+  }: {
+    tenantId: string;
+    preparation: LogPreparation;
+  }): LogTraceContribution[] {
+    const contributions: LogTraceContribution[] = [];
+    for (const prepared of preparation.accepted) {
+      const { record } = prepared;
+      if (
+        record.correlationSource === "none" ||
+        !record.correlationTraceId ||
+        !record.correlationSpanId
+      ) {
+        continue;
+      }
+
+      try {
+        contributions.push(
+          makeTraceContribution({
+            prepared,
+            traceCanonicalisation: this.deps.traceCanonicalisation,
+            traceIo: this.deps.traceIo,
+          }),
+        );
+      } catch (error) {
+        this.logger.error(
+          { error, tenantId, recordId: record.recordId, traceId: record.correlationTraceId },
+          "Failed to build log trace contribution",
+        );
+      }
+    }
+
+    return contributions;
+  }
+
+  /**
+   * Correlation is deliberately best-effort and separate from log acceptance, matching the
+   * metric pipeline: the canonical record is already durably enqueued and it — not the trace
+   * contribution — is the source of truth. Counting these as rejections would tell the sender
+   * to discard logs we have in fact accepted.
+   */
+  private async persistContributions({
+    tenantId,
+    contributions,
+  }: {
+    tenantId: string;
+    contributions: LogTraceContribution[];
+  }): Promise<void> {
+    if (contributions.length === 0) {
+      return;
+    }
+
+    try {
+      await this.deps.recordLogContributions(contributions);
+    } catch (error) {
+      this.logger.error(
+        {
+          error,
+          tenantId,
+          contributionCount: contributions.length,
+          recordIds: contributions.slice(0, 10).map(({ recordId }) => recordId),
+        },
+        "Failed to enqueue log trace contribution batch",
+      );
+    }
   }
 }
 

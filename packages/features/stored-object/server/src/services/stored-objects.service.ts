@@ -147,26 +147,16 @@ export class StoredObjectsService {
         const registry = this.registryFor(projectId);
 
         // PUT first: if storage rejects, never write the CH row
-        try {
-          await registry.put(storageUri, bytes, mediaType);
-        } catch (error) {
-          this.telemetry.recordWriteFailure(purpose);
-          logger.error(
-            {
-              projectId,
-              id,
-              sha256,
-              // Redact bucket / account / install-path segments — for
-              // BYOC tenants, the raw URI would carry their private
-              // bucket name into shared log sinks.
-              storageUri: redactStoredObjectStorageUri(storageUri),
-              error,
-            },
-            "Failed to PUT stored object bytes",
-          );
-
-          throw error;
-        }
+        await this.putBytes({
+          registry,
+          storageUri,
+          bytes,
+          mediaType,
+          projectId,
+          id,
+          sha256,
+          purpose,
+        });
 
         const now = new Date();
         const row: StoredObject = {
@@ -183,37 +173,99 @@ export class StoredObjectsService {
           inserted_at: now,
         };
 
-        // Compensating cleanup: if the CH insert fails after a successful
-        // PUT, the bytes would be orphaned in storage (no row points at
-        // them). Best-effort delete the just-written object so we don't
-        // leak storage. The original insert error is what the caller sees.
-        try {
-          await this.repository.insert({ projectId, row });
-        } catch (insertError) {
-          this.telemetry.recordWriteFailure(purpose);
-          try {
-            await registry.delete(storageUri);
-          } catch (deleteError) {
-            logger.error(
-              {
-                projectId,
-                id,
-                storageUri: redactStoredObjectStorageUri(storageUri),
-                deleteError,
-                insertError,
-              },
-              "compensating delete failed; bytes may be orphaned",
-            );
-          }
-
-          throw insertError;
-        }
+        await this.insertRow({ row, registry, storageUri, projectId, id, purpose });
 
         span.setAttribute("stored_object.dedup_hit", false);
 
         return { id, mediaType, isDuplicate: false };
       },
     );
+  }
+
+  /**
+   * Writes the bytes, reporting a storage refusal before any row exists. The log line redacts
+   * bucket / account / install-path segments: for BYOC tenants the raw URI would carry their
+   * private bucket name into shared log sinks.
+   */
+  private async putBytes({
+    registry,
+    storageUri,
+    bytes,
+    mediaType,
+    projectId,
+    id,
+    sha256,
+    purpose,
+  }: {
+    registry: StoredObjectStoragePort;
+    storageUri: string;
+    bytes: Buffer;
+    mediaType: string;
+    projectId: string;
+    id: string;
+    sha256: string;
+    purpose: string;
+  }): Promise<void> {
+    try {
+      await registry.put(storageUri, bytes, mediaType);
+    } catch (error) {
+      this.telemetry.recordWriteFailure(purpose);
+      logger.error(
+        {
+          projectId,
+          id,
+          sha256,
+          storageUri: redactStoredObjectStorageUri(storageUri),
+          error,
+        },
+        "Failed to PUT stored object bytes",
+      );
+
+      throw error;
+    }
+  }
+
+  /**
+   * Compensating cleanup: if the insert fails after a successful PUT the bytes would be
+   * orphaned in storage, with no row pointing at them. Best-effort delete the just-written
+   * object so we do not leak storage; the original insert error is what the caller sees.
+   */
+  private async insertRow({
+    row,
+    registry,
+    storageUri,
+    projectId,
+    id,
+    purpose,
+  }: {
+    row: StoredObject;
+    registry: StoredObjectStoragePort;
+    storageUri: string;
+    projectId: string;
+    id: string;
+    purpose: string;
+  }): Promise<void> {
+    try {
+      await this.repository.insert({ projectId, row });
+    } catch (insertError) {
+      this.telemetry.recordWriteFailure(purpose);
+      try {
+        await registry.delete(storageUri);
+      } catch (deleteError) {
+        logger.error(
+          {
+            projectId,
+            id,
+            storageUri: redactStoredObjectStorageUri(storageUri),
+            deleteError,
+            insertError,
+          },
+          "compensating delete failed; bytes may be orphaned",
+        );
+      }
+
+      throw insertError;
+    }
   }
 
   /**

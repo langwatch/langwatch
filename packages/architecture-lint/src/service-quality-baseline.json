@@ -3,7 +3,7 @@
   "services": [
     {
       "file": "packages/enterprise/features/billing/server/src/services/notification.service.ts",
-      "moduleLines": 670,
+      "moduleLines": 660,
       "methodLines": 93,
       "statements": 24,
       "complexity": 24,
@@ -11,8 +11,8 @@
     },
     {
       "file": "packages/enterprise/features/billing/server/src/services/seat-event-subscription.service.ts",
-      "moduleLines": 605,
-      "methodLines": 144,
+      "moduleLines": 569,
+      "methodLines": 80,
       "statements": 24,
       "complexity": 24,
       "lineLength": 160
@@ -35,7 +35,7 @@
     },
     {
       "file": "packages/features/authz/server/src/services/authz.service.ts",
-      "moduleLines": 858,
+      "moduleLines": 820,
       "methodLines": 80,
       "statements": 24,
       "complexity": 24,
@@ -43,15 +43,15 @@
     },
     {
       "file": "packages/features/dataset/server/src/services/dataset-chunk.service.ts",
-      "moduleLines": 1015,
-      "methodLines": 155,
+      "moduleLines": 1000,
+      "methodLines": 111,
       "statements": 24,
       "complexity": 24,
       "lineLength": 160
     },
     {
       "file": "packages/features/dataset/server/src/services/dataset.service.ts",
-      "moduleLines": 665,
+      "moduleLines": 552,
       "methodLines": 80,
       "statements": 24,
       "complexity": 24,
@@ -67,24 +67,16 @@
     },
     {
       "file": "packages/features/organization/server/src/services/organization.service.ts",
-      "moduleLines": 1433,
-      "methodLines": 136,
+      "moduleLines": 1283,
+      "methodLines": 80,
       "statements": 24,
       "complexity": 24,
       "lineLength": 160
     },
     {
       "file": "packages/features/prompt/server/src/services/prompt.service.ts",
-      "moduleLines": 1485,
-      "methodLines": 206,
-      "statements": 24,
-      "complexity": 31,
-      "lineLength": 160
-    },
-    {
-      "file": "packages/features/stored-object/server/src/services/stored-object.service.ts",
-      "moduleLines": 635,
-      "methodLines": 83,
+      "moduleLines": 1450,
+      "methodLines": 101,
       "statements": 24,
       "complexity": 24,
       "lineLength": 160

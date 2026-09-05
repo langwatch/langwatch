@@ -44,6 +44,12 @@ import {
   type EvaluatorInstallEnvironment,
 } from "./evaluator-availability.service";
 import { EvaluationThreadMappingService } from "./evaluation-thread-mapping.service";
+import { EvaluationDataService } from "./evaluation-data.service";
+import { executionResultOf } from "../rules/evaluation-execution-result.rules";
+import {
+  maxCausalityDepthOfSpans,
+  tryExtractParentTraceForNlpgo,
+} from "../rules/evaluation-causality.rules";
 
 // Evaluations need full access to trace data — no user-facing redaction.
 const INTERNAL_PROTECTIONS: EvaluationTraceProtections = {
@@ -74,35 +80,6 @@ export interface EvaluationExecutionDeps {
   telemetry?: EvaluationExecutionTelemetryPort;
 }
 
-const TRACE_ID_HEX = /^[0-9a-fA-F]{32}$/;
-const SPAN_ID_HEX = /^[0-9a-fA-F]{16}$/;
-
-function pickCausalityDepth(span: {
-  params?: Record<string, unknown> | null;
-  attributes?: Record<string, unknown> | null;
-}): unknown {
-  // Real production path: unflattened in params.langwatch.causality_depth.
-  const params = (span.params ?? null) as Record<string, unknown> | null;
-  if (params) {
-    const ns = params.langwatch as Record<string, unknown> | undefined;
-    if (ns && ns.causality_depth !== undefined) {
-      return ns.causality_depth;
-    }
-
-    if (params["langwatch.causality_depth"] !== undefined) {
-      return params["langwatch.causality_depth"];
-    }
-  }
-
-  // Legacy / synthetic test path.
-  const attrs = (span.attributes ?? null) as Record<string, unknown> | null;
-  if (attrs && attrs["langwatch.causality_depth"] !== undefined) {
-    return attrs["langwatch.causality_depth"];
-  }
-
-  return undefined;
-}
-
 // ---------------------------------------------------------------------------
 // Internal types
 // ---------------------------------------------------------------------------
@@ -119,88 +96,15 @@ export type DataForEvaluation =
 // ---------------------------------------------------------------------------
 
 export class EvaluationExecutionService {
-  /**
-   * Extract the W3C `traceparent` context for the eval workflow from the parent trace. nlpgo
-   * needs both pieces (32-hex trace_id + 16-hex root span_id) so its emitted spans land as
-   * children of the parent trace in Studio's waterfall rather than as a separate orphan trace.
-   */
-  static tryExtractParentTraceForNlpgo(
-    trace: Trace | undefined,
-  ): { traceId: string; parentSpanId: string } | undefined {
-    if (!trace?.trace_id || !TRACE_ID_HEX.test(trace.trace_id)) {
-      return undefined;
-    }
-
-    // Broken / multi-source instrumentation can leave a trace with more than one parent-less
-    // span. `find()` would then pick whichever span happened to be ingested first —
-    // non-deterministic across re-runs. Sort by started_at (earliest is the true root in any
-    // sane trace) with span_id as the tie-breaker to keep two consecutive eval runs pinned to
-    // the same parent_span_id.
-    const rootCandidates = (trace.spans ?? []).filter((s) => !s.parent_id);
-    if (rootCandidates.length === 0) {
-      return undefined;
-    }
-
-    rootCandidates.sort((a, b) => {
-      const aStart = a.timestamps?.started_at ?? Number.MAX_SAFE_INTEGER;
-      const bStart = b.timestamps?.started_at ?? Number.MAX_SAFE_INTEGER;
-      if (aStart !== bStart) {
-        return aStart - bStart;
-      }
-
-      return (a.span_id ?? "").localeCompare(b.span_id ?? "");
-    });
-    const rootSpan = rootCandidates[0];
-    if (!rootSpan?.span_id || !SPAN_ID_HEX.test(rootSpan.span_id)) {
-      return undefined;
-    }
-
-    return {
-      traceId: trace.trace_id.toLowerCase(),
-      parentSpanId: rootSpan.span_id.toLowerCase(),
-    };
-  }
-
-  /**
-   * Returns the max `langwatch.causality_depth` across the supplied spans (0 if absent on all).
-   * The dispatcher uses this to pass the parent depth to nlpgo, which increments and stamps on
-   * every span it emits.
-   */
-  static maxCausalityDepthOfSpans(
-    spans:
-      | Array<{
-          params?: Record<string, unknown> | null;
-          attributes?: Record<string, unknown> | null;
-        }>
-      | undefined
-      | null,
-  ): number {
-    if (!spans || spans.length === 0) {
-      return 0;
-    }
-
-    let max = 0;
-    for (const span of spans) {
-      const raw = pickCausalityDepth(span);
-      if (raw === undefined || raw === null) {
-        continue;
-      }
-
-      const n =
-        typeof raw === "number" ? raw : typeof raw === "string" ? Number.parseInt(raw, 10) : NaN;
-      if (Number.isFinite(n) && n > max) {
-        max = n;
-      }
-    }
-
-    return max;
-  }
-
   static create(deps: EvaluationExecutionDeps): EvaluationExecutionService {
     return new EvaluationExecutionService(deps);
   }
 
-  private constructor(private readonly deps: EvaluationExecutionDeps) {}
+  private readonly evaluationData: EvaluationDataService;
+
+  private constructor(private readonly deps: EvaluationExecutionDeps) {
+    this.evaluationData = EvaluationDataService.create(deps);
+  }
 
   async executeForTrace(params: {
     projectId: string;
@@ -223,24 +127,8 @@ export class EvaluationExecutionService {
       idempotencyKey,
     } = params;
 
-    // 1. Fetch trace. Evaluators must see the FULL IO values (not the 64 KB
-    // preview), so opt into blob resolution (#4888). Under the per-call gate
-    // (replacing construction-time gating) this is what keeps the eval path
-    // resolving offloaded event refs.
-    const traces = await this.deps.traceService.getTracesWithSpans(
-      projectId,
-      [traceId],
-      INTERNAL_PROTECTIONS,
-      undefined,
-      { full: true },
-    );
-    const trace = traces[0];
+    const trace = await this.loadTraceForEvaluation({ projectId, traceId, mappings });
 
-    if (!trace) {
-      throw new TraceNotEvaluatableError(traceId);
-    }
-
-    // 2. Validate trace is evaluatable
     if (trace.error && !trace.input && !trace.output) {
       return {
         status: "skipped",
@@ -268,21 +156,8 @@ export class EvaluationExecutionService {
       };
     }
 
-    // Enrich evaluations: getTracesWithSpans does not populate `trace.evaluations`, but
-    // evaluator field mappings that read the `evaluations` source need them. Fetch and attach
-    // before building the mapped data so they aren't silently empty (parity with
-    // runEvaluationForTrace in runEvaluation.ts).
-    if (mappingsReadEvaluationsSource(mappings)) {
-      const evaluationsByTrace = await this.deps.traceService.getEvaluationsMultiple(
-        projectId,
-        [traceId],
-        INTERNAL_PROTECTIONS,
-      );
-      trace.evaluations = (evaluationsByTrace[traceId] ?? []) as Trace["evaluations"];
-    }
-
     // 4. Build evaluation data
-    const data = await this.buildDataForEvaluation({
+    const data = await this.evaluationData.buildDataForEvaluation({
       evaluatorType,
       trace,
       mappings,
@@ -295,7 +170,7 @@ export class EvaluationExecutionService {
 
     // Compute parent causality depth from the trace's spans; nlpgo
     // increments and stamps the result on every span it emits.
-    const parentCausalityDepth = EvaluationExecutionService.maxCausalityDepthOfSpans(
+    const parentCausalityDepth = maxCausalityDepthOfSpans(
       trace.spans as unknown as Array<{
         attributes?: Record<string, unknown> | null;
       }>,
@@ -312,26 +187,49 @@ export class EvaluationExecutionService {
       idempotencyKey,
     });
 
-    const isError = result.status === "error";
-    const rawDetails = "details" in result ? result.details : undefined;
-    const traceback =
-      isError && "traceback" in result && Array.isArray(result.traceback)
-        ? result.traceback.join("\n")
-        : undefined;
-
-    return {
-      status: result.status,
-      score: result.status === "processed" ? result.score : undefined,
-      passed: result.status === "processed" ? result.passed : undefined,
-      label: result.status === "processed" ? result.label : undefined,
-      details: isError ? undefined : rawDetails,
-      error: isError ? (rawDetails ?? "Evaluator failed") : undefined,
-      errorDetails: traceback,
-      cost:
-        result.status === "processed" && "cost" in result && result.cost ? result.cost : undefined,
+    return executionResultOf({
+      result,
       evaluationThreadId,
       inputs: data.data as Record<string, unknown>,
-    };
+    });
+  }
+
+  /**
+   * The trace the evaluator sees. Evaluators must see the FULL IO values (not the 64 KB
+   * preview), so this opts into blob resolution (#4888), and it attaches the trace's
+   * evaluations where a field mapping reads them — `getTracesWithSpans` leaves them empty.
+   */
+  private async loadTraceForEvaluation({
+    projectId,
+    traceId,
+    mappings,
+  }: {
+    projectId: string;
+    traceId: string;
+    mappings: MappingState | null;
+  }): Promise<Trace> {
+    const traces = await this.deps.traceService.getTracesWithSpans(
+      projectId,
+      [traceId],
+      INTERNAL_PROTECTIONS,
+      undefined,
+      { full: true },
+    );
+    const trace = traces[0];
+    if (!trace) {
+      throw new TraceNotEvaluatableError(traceId);
+    }
+
+    if (mappingsReadEvaluationsSource(mappings)) {
+      const evaluationsByTrace = await this.deps.traceService.getEvaluationsMultiple(
+        projectId,
+        [traceId],
+        INTERNAL_PROTECTIONS,
+      );
+      trace.evaluations = (evaluationsByTrace[traceId] ?? []) as Trace["evaluations"];
+    }
+
+    return trace;
   }
 
   /**
@@ -357,195 +255,6 @@ export class EvaluationExecutionService {
    * (e.g. a formatted transcript from the span digest) — fills those fields
    * into `mappedData` in place.
    */
-  private async fillServerOnlyTraceSources({
-    mapping,
-    mappedData,
-    trace,
-  }: {
-    mapping: MappingState["mapping"];
-    mappedData: Record<string, unknown>;
-    trace: Trace;
-  }): Promise<void> {
-    for (const [field, config] of Object.entries(mapping)) {
-      if (
-        !("source" in config) ||
-        !(SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(config.source)
-      ) {
-        continue;
-      }
-
-      if (config.source === "formatted_trace") {
-        mappedData[field] = await this.deps.spanDigest.format(trace.spans ?? []);
-      }
-    }
-  }
-
-  private async buildDataForEvaluation(params: {
-    evaluatorType: string;
-    trace: Trace;
-    mappings: MappingState | null;
-    isThreadLevel: boolean;
-    projectId: string;
-  }): Promise<DataForEvaluation> {
-    const { evaluatorType, trace, mappings, isThreadLevel, projectId } = params;
-
-    let data: Record<string, unknown>;
-
-    if (isThreadLevel) {
-      data = await this.buildThreadData(projectId, trace, mappings);
-    } else {
-      const mappedData = switchMapping(trace, mappings ?? DEFAULT_MAPPINGS);
-      if (!mappedData) {
-        throw new TraceNotEvaluatableError(trace.trace_id);
-      }
-
-      // Fill in server-only trace sources
-      if (mappings?.mapping) {
-        await this.fillServerOnlyTraceSources({
-          mapping: mappings.mapping,
-          mappedData: mappedData as Record<string, unknown>,
-          trace,
-        });
-      }
-
-      data = mappedData as Record<string, unknown>;
-
-      // Resolve any thread-typed mappings mixed into trace-level evaluations
-      if (mappings && EvaluationThreadMappingService.hasThreadMappings(mappings)) {
-        await EvaluationThreadMappingService.resolveThreadMappingsIntoData({
-          data,
-          trace,
-          mappings,
-          spanDigest: this.deps.spanDigest,
-          getThreadTraces: (threadId) =>
-            this.deps.traceService.getTracesWithSpansByThreadIds(
-              projectId,
-              [threadId],
-              INTERNAL_PROTECTIONS,
-              { full: true },
-            ),
-        });
-      }
-    }
-
-    // Workflow/code/custom evaluators pass data through as-is
-    if (
-      evaluatorType.startsWith("custom/") ||
-      evaluatorType === "workflow" ||
-      isCodeEvaluatorCheckType(evaluatorType)
-    ) {
-      return { type: "custom", data };
-    }
-
-    const evaluator = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
-    if (!evaluator) {
-      throw new EvaluatorNotFoundError(evaluatorType);
-    }
-
-    // An evaluator this install skipped is not a broken one. Say which it is,
-    // and how to get it, rather than letting the request reach an evaluator
-    // service with no route for it and come back as a bare 404.
-    const unavailable = EvaluatorAvailabilityService.tryEvaluatorUnavailability({
-      evaluatorType,
-      environment: this.deps.installEnvironment,
-    });
-    if (unavailable) {
-      throw new EvaluatorConfigError(
-        EvaluatorAvailabilityService.unavailableEvaluatorMessage({ unavailability: unavailable }),
-        {
-          meta: { evaluatorType },
-        },
-      );
-    }
-
-    const fields = [...evaluator.requiredFields, ...evaluator.optionalFields];
-    const filtered = Object.fromEntries(fields.map((field) => [field, data[field] ?? ""]));
-
-    return { type: "default", data: filtered };
-  }
-
-  private async buildThreadData(
-    projectId: string,
-    trace: Trace,
-    mappings: MappingState | null,
-  ): Promise<Record<string, unknown>> {
-    if (!mappings) {
-      throw new EvaluatorConfigError("Mapping state is required for thread-based evaluation");
-    }
-
-    const threadId = trace.metadata?.thread_id;
-    if (!threadId) {
-      throw new EvaluatorConfigError("Trace does not have a thread_id for thread-based evaluation");
-    }
-
-    const threadTraces = await this.deps.traceService.getTracesWithSpansByThreadIds(
-      projectId,
-      [threadId],
-      INTERNAL_PROTECTIONS,
-      { full: true },
-    );
-
-    const result: Record<string, unknown> = {};
-
-    for (const [targetField, mappingConfig] of Object.entries(mappings.mapping)) {
-      const isThreadMapping =
-        ("type" in mappingConfig && mappingConfig.type === "thread") ||
-        ("source" in mappingConfig &&
-          (mappingConfig.source in THREAD_MAPPINGS ||
-            (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(mappingConfig.source)));
-
-      if (isThreadMapping && "source" in mappingConfig) {
-        const source = mappingConfig.source;
-        if (!source) {
-          continue;
-        }
-
-        if ((SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)) {
-          if (source === "formatted_traces") {
-            result[targetField] = (
-              await Promise.all(threadTraces.map((t) => this.deps.spanDigest.format(t.spans ?? [])))
-            ).join("\n\n---\n\n");
-          }
-        } else {
-          const threadSource = source as keyof typeof THREAD_MAPPINGS;
-          const selectedFields =
-            ("selectedFields" in mappingConfig ? mappingConfig.selectedFields : undefined) ?? [];
-          result[targetField] = THREAD_MAPPINGS[threadSource].mapping(
-            { thread_id: threadId, traces: threadTraces },
-            selectedFields as (keyof typeof TRACE_MAPPINGS)[],
-          );
-        }
-      } else if ("source" in mappingConfig) {
-        // Regular trace mapping
-        if ((SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(mappingConfig.source)) {
-          if (mappingConfig.source === "formatted_trace") {
-            result[targetField] = await this.deps.spanDigest.format(trace.spans ?? []);
-          }
-        } else {
-          const traceMappingConfig: {
-            source: string;
-            key?: string;
-            subkey?: string;
-          } = {
-            source: mappingConfig.source,
-            key: mappingConfig.key,
-            subkey: mappingConfig.subkey,
-          };
-          const mapped = mapTraceToDatasetEntry(
-            trace,
-            { [targetField]: traceMappingConfig },
-            new Set(),
-            undefined,
-            undefined,
-          )[0];
-          result[targetField] = mapped?.[targetField];
-        }
-      }
-    }
-
-    return result;
-  }
-
   // ---------------------------------------------------------------------------
   // Evaluation execution (built-in vs custom/workflow)
   // ---------------------------------------------------------------------------
@@ -571,31 +280,17 @@ export class EvaluationExecutionService {
       idempotencyKey,
     } = params;
 
-    // Custom/workflow/code evaluators
     if (data.type === "custom") {
-      const codeEvaluatorId = codeEvaluatorIdFromCheckType(evaluatorType);
-      if (codeEvaluatorId) {
-        return this.deps.evaluators.executeCode({
-          projectId,
-          evaluatorId: codeEvaluatorId,
-          data: data.data,
-          traceId: trace?.trace_id,
-          parentCausalityDepth,
-          parentTrace: EvaluationExecutionService.tryExtractParentTraceForNlpgo(trace),
-        });
-      }
-
-      return this.runCustomEvaluation(
+      return this.runCustomOrCodeEvaluation({
         projectId,
         evaluatorType,
-        data.data,
+        data: data.data,
         trace,
         workflowId,
         parentCausalityDepth,
-      );
+      });
     }
 
-    // Built-in evaluators
     const builtInType = evaluatorType as EvaluatorTypes;
     const evaluator = AVAILABLE_EVALUATORS[builtInType];
     if (!evaluator) {
@@ -608,23 +303,11 @@ export class EvaluationExecutionService {
     // the remote ones run through the shared augmenter so redaction or drop at
     // ingestion never hides a leak from the result.
     if (isNativeEvaluatorType(builtInType)) {
-      const nativeStart = performance.now();
-      const nativeResult = await this.deps.evaluators.executeNative({
-        evaluatorType: builtInType,
+      return this.runNativeEvaluation({
+        builtInType,
         data: data.data,
-      });
-      this.deps.telemetry?.record({
-        evaluatorType: builtInType,
-        status: nativeResult.status,
-        durationMs: performance.now() - nativeStart,
-      });
-
-      return this.deps.evaluators.augmentResult({
-        evaluatorType: builtInType,
-        mappedData: data.data,
         settings,
         droppedCategories,
-        result: nativeResult,
       });
     }
 
@@ -652,6 +335,79 @@ export class EvaluationExecutionService {
     });
   }
 
+  /** A code evaluator answers in-process; anything else custom is a workflow run. */
+  private async runCustomOrCodeEvaluation({
+    projectId,
+    evaluatorType,
+    data,
+    trace,
+    workflowId,
+    parentCausalityDepth,
+  }: {
+    projectId: string;
+    evaluatorType: string;
+    data: Record<string, unknown>;
+    trace?: Trace;
+    workflowId?: string | null;
+    parentCausalityDepth?: number;
+  }): Promise<SingleEvaluationResult> {
+    const codeEvaluatorId = codeEvaluatorIdFromCheckType(evaluatorType);
+    if (codeEvaluatorId) {
+      return this.deps.evaluators.executeCode({
+        projectId,
+        evaluatorId: codeEvaluatorId,
+        data,
+        traceId: trace?.trace_id,
+        parentCausalityDepth,
+        parentTrace: tryExtractParentTraceForNlpgo(trace),
+      });
+    }
+
+    return this.runCustomEvaluation(
+      projectId,
+      evaluatorType,
+      data,
+      trace,
+      workflowId,
+      parentCausalityDepth,
+    );
+  }
+
+  /**
+   * Native evaluators skip the analysis service; both they and the remote ones run through the
+   * shared augmenter, so redaction or drop at ingestion never hides a leak from the result.
+   */
+  private async runNativeEvaluation({
+    builtInType,
+    data,
+    settings,
+    droppedCategories,
+  }: {
+    builtInType: EvaluatorTypes;
+    data: Record<string, unknown>;
+    settings: Record<string, unknown> | undefined;
+    droppedCategories: string[];
+  }): Promise<SingleEvaluationResult> {
+    const nativeStart = performance.now();
+    const nativeResult = await this.deps.evaluators.executeNative({
+      evaluatorType: builtInType,
+      data,
+    });
+    this.deps.telemetry?.record({
+      evaluatorType: builtInType,
+      status: nativeResult.status,
+      durationMs: performance.now() - nativeStart,
+    });
+
+    return this.deps.evaluators.augmentResult({
+      evaluatorType: builtInType,
+      mappedData: data,
+      settings,
+      droppedCategories,
+      result: nativeResult,
+    });
+  }
+
   private async runCustomEvaluation(
     projectId: string,
     evaluatorType: string,
@@ -676,7 +432,7 @@ export class EvaluationExecutionService {
     // trace's root span so Studio's waterfall renders them as a child
     // sub-tree (not a separate orphan trace, which is the 2026-05-14
     // bug rchaves caught in prod).
-    const parentTrace = EvaluationExecutionService.tryExtractParentTraceForNlpgo(trace);
+    const parentTrace = tryExtractParentTraceForNlpgo(trace);
 
     const response = await this.deps.workflowExecutor.runEvaluationWorkflow(
       resolvedWorkflowId,
@@ -693,33 +449,4 @@ export class EvaluationExecutionService {
 
     return { ...response.result, status: "processed" };
   }
-}
-
-// ---------------------------------------------------------------------------
-// Pure helper functions
-// ---------------------------------------------------------------------------
-
-function switchMapping(
-  trace: Trace,
-  mapping_: MappingState,
-): Record<string, string | number> | undefined {
-  const mapping: MappingState =
-    "mapping" in mapping_
-      ? mapping_
-      : migrateLegacyMappings(mapping_ as unknown as Record<string, string>);
-
-  return mapTraceToDatasetEntry(
-    trace,
-    mapping.mapping as Record<
-      string,
-      {
-        source: string;
-        key?: string;
-        subkey?: string;
-      }
-    >,
-    new Set(),
-    undefined,
-    undefined,
-  )[0];
 }

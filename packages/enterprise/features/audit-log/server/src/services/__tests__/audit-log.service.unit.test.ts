@@ -1,15 +1,7 @@
 /**
- * What an audit entry is allowed to carry.
- *
- * `args` is whatever the audited call was given, so its size is not ours to
- * predict — a bulk import's arguments can be megabytes. An audit row is
- * written on every privileged action, so an unbounded one turns a routine
- * write into a large one on the busiest path there is.
- *
- * The bound narrows in steps rather than cutting at a byte offset, because an
- * entry is read by a person: shorter strings that still say what the call was
- * about are worth more than a prefix of the JSON. Only when no step fits does
- * it give up and say so, which is still better than storing the lot.
+ * What an audit entry is allowed to carry. `args` can be megabytes, and an
+ * audit row writes on every privileged action, so unbounded is a large
+ * write on the busiest path there is. Narrows in steps, not a byte cutoff.
  */
 
 import { describe, expect, it, vi } from "vitest";

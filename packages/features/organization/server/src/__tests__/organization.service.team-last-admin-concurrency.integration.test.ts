@@ -1,20 +1,7 @@
 /**
- * The team's last-admin guard under two removals landing at once.
- *
  * @vitest-environment node
  *
- * Read-then-write is the failure: both removals see two admins, both pass the
- * guard, and both commit, leaving a team nobody administers. What stops the
- * second is the team row's own compare-and-swap fence, which only exists
- * against a real database — so this runs against one.
- *
- * Ported from
- * platform/app/src/server/teams/__tests__/team.service.last-admin-concurrency.integration.test.ts,
- * whose refusal was Postgres's serialization failure. On this branch the
- * membership change is fenced on the team's `updatedAt`, so the loser is
- * refused by name (`team_membership_changed`) instead.
- *
- * @see specs/members/member-role-team-restrictions.feature
+ * The team's last-admin guard under two removals landing at once — read-then-write means both could pass and commit, leaving a team nobody administers. Stopped by the team row's compare-and-swap fence on `updatedAt`.
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -61,10 +48,9 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
   const prisma = connection.client as PrismaClient;
 
   /**
-   * The binding reads and revocations, over the real `RoleBinding` rows the
-   * fixture wrote. The scenario is about the team fence, so the bindings have
-   * to be real rows rather than canned answers, but the AuthZ engine's own
-   * resolution is not what is under test.
+   * The binding reads/revocations, over real `RoleBinding` rows — the
+   * scenario is about the team fence, so bindings must be real rows, but
+   * the AuthZ engine's own resolution isn't what's under test.
    */
   const authz = {
     listScopeBindings: async (input: {

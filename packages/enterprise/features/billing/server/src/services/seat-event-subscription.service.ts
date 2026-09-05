@@ -285,41 +285,7 @@ export class SeatEventSubscriptionService {
       }),
     );
 
-    // Find stale PENDING subs so we can clean up their PAYMENT_PENDING invites too
-    const staleSubs = await this.db.subscription.findMany({
-      where: {
-        organizationId,
-        plan: { in: [...GROWTH_SEAT_PLAN_TYPES] },
-        status: SubscriptionStatus.PENDING,
-      },
-      select: { id: true },
-    });
-
-    const staleSubIds = staleSubs.map((s) => s.id);
-
-    // Cancel stale PENDING subs from abandoned checkouts
-    await this.db.subscription.updateMany({
-      where: {
-        organizationId,
-        plan: { in: [...GROWTH_SEAT_PLAN_TYPES] },
-        status: SubscriptionStatus.PENDING,
-      },
-      data: {
-        status: SubscriptionStatus.CANCELLED,
-        endDate: new Date(),
-      },
-    });
-
-    // Clean up orphaned PAYMENT_PENDING invites from stale subs
-    if (staleSubIds.length > 0) {
-      await this.db.organizationInvite.deleteMany({
-        where: {
-          organizationId,
-          status: "PAYMENT_PENDING",
-          subscriptionId: { in: staleSubIds },
-        },
-      });
-    }
+    await this.cancelAbandonedCheckouts(organizationId);
 
     // Build line items BEFORE persisting anything so a validation failure
     // doesn't leave orphaned pending records in the database.
@@ -330,52 +296,12 @@ export class SeatEventSubscriptionService {
       prices: this.prices,
     });
 
-    // Create subscription + invites in a transaction
-    const subscription = await this.db.$transaction(async (tx) => {
-      const sub = await tx.subscription.create({
-        data: {
-          organizationId,
-          status: SubscriptionStatus.PENDING,
-          plan: resolveGrowthSeatPlanType({
-            currency: checkoutCurrency,
-            interval: billingInterval,
-          }),
-          maxMembers: membersToAdd,
-        },
-      });
-
-      if (invites && invites.length > 0) {
-        for (const invite of invites) {
-          // Skip duplicates (existing PENDING or PAYMENT_PENDING invites)
-          const existing = await tx.organizationInvite.findFirst({
-            where: {
-              email: invite.email,
-              organizationId,
-              status: { in: ["PENDING", "PAYMENT_PENDING"] },
-              OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
-            },
-          });
-
-          if (existing) {
-            continue;
-          }
-
-          await tx.organizationInvite.create({
-            data: {
-              email: invite.email,
-              inviteCode: nanoid(),
-              expiration: null,
-              organizationId,
-              teamIds: invite.teamIds,
-              role: invite.role,
-              status: "PAYMENT_PENDING",
-              subscriptionId: sub.id,
-            },
-          });
-        }
-      }
-
-      return sub;
+    const subscription = await this.createPendingSubscription({
+      organizationId,
+      membersToAdd,
+      checkoutCurrency,
+      billingInterval,
+      invites,
     });
 
     const selectedOptionsMetadata = {
@@ -417,6 +343,95 @@ export class SeatEventSubscriptionService {
     });
 
     return { url: session.url };
+  }
+
+  /**
+   * Cancels the PENDING subscriptions abandoned checkouts left behind, and the
+   * PAYMENT_PENDING invites that hung off them.
+   */
+  private async cancelAbandonedCheckouts(organizationId: string): Promise<void> {
+    const where = {
+      organizationId,
+      plan: { in: [...GROWTH_SEAT_PLAN_TYPES] },
+      status: SubscriptionStatus.PENDING,
+    };
+    const staleSubs = await this.db.subscription.findMany({ where, select: { id: true } });
+    const staleSubIds = staleSubs.map((s) => s.id);
+
+    await this.db.subscription.updateMany({
+      where,
+      data: { status: SubscriptionStatus.CANCELLED, endDate: new Date() },
+    });
+    if (staleSubIds.length === 0) {
+      return;
+    }
+
+    await this.db.organizationInvite.deleteMany({
+      where: {
+        organizationId,
+        status: "PAYMENT_PENDING",
+        subscriptionId: { in: staleSubIds },
+      },
+    });
+  }
+
+  /** The pending subscription and the payment-pending invites it pays for, written together. */
+  private async createPendingSubscription({
+    organizationId,
+    membersToAdd,
+    checkoutCurrency,
+    billingInterval,
+    invites,
+  }: {
+    organizationId: string;
+    membersToAdd: number;
+    checkoutCurrency: Currency;
+    billingInterval: BillingInterval;
+    invites?: InviteInput[];
+  }): Promise<{ id: string }> {
+    return this.db.$transaction(async (tx) => {
+      const sub = await tx.subscription.create({
+        data: {
+          organizationId,
+          status: SubscriptionStatus.PENDING,
+          plan: resolveGrowthSeatPlanType({
+            currency: checkoutCurrency,
+            interval: billingInterval,
+          }),
+          maxMembers: membersToAdd,
+        },
+      });
+
+      for (const invite of invites ?? []) {
+        // Skip duplicates: an existing PENDING or PAYMENT_PENDING invite.
+        const existing = await tx.organizationInvite.findFirst({
+          where: {
+            email: invite.email,
+            organizationId,
+            status: { in: ["PENDING", "PAYMENT_PENDING"] },
+            OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
+          },
+        });
+        if (existing) {
+          continue;
+        }
+
+        await tx.organizationInvite.create({
+          data: {
+            email: invite.email,
+            inviteCode: nanoid(),
+            expiration: null,
+            organizationId,
+            teamIds: invite.teamIds,
+            role: invite.role,
+            status: "PAYMENT_PENDING",
+            subscriptionId: sub.id,
+          },
+        });
+      }
+
+      return sub;
+    });
   }
 
   async updateSeatEventItems({

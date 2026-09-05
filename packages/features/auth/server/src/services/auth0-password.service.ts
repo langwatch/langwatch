@@ -61,7 +61,9 @@ function loadConfig(credentials: Auth0ManagementCredentials): Auth0Config {
       status: 500,
       code: "not_configured",
       message:
-        "Auth0 environment variables are not set. Set AUTH0_ISSUER and either AUTH0_MGMT_CLIENT_ID/SECRET (preferred — a separate Machine-to-Machine app) or AUTH0_CLIENT_ID/SECRET.",
+        "Auth0 environment variables are not set. Set AUTH0_ISSUER and either " +
+        "AUTH0_MGMT_CLIENT_ID/SECRET (preferred — a separate Machine-to-Machine app) " +
+        "or AUTH0_CLIENT_ID/SECRET.",
     });
   }
 
@@ -369,7 +371,8 @@ export class Auth0PasswordService {
         status: res.status,
         code: "password_grant_not_enabled",
         message:
-          "Auth0 Password grant type is not enabled on the Management M2M application. Enable 'Password' under that application's Advanced Settings → Grant Types.",
+          "Auth0 Password grant type is not enabled on the Management M2M application. " +
+          "Enable 'Password' under that application's Advanced Settings → Grant Types.",
         body,
       });
     }

@@ -16,6 +16,7 @@ import {
   ObjectStorageMigrationService,
   type QueueMigrationBlocker,
 } from "../object-storage-migration.service";
+import { createMigrationStorageEndpoint } from "../object-storage-migration-transfer.service";
 
 class MemoryDriver implements StoredObjectStorageDriver {
   readonly objects = new Map<string, Buffer>();
@@ -86,14 +87,14 @@ const setup = ({
 } = {}) => {
   const sourceDriver = new MemoryDriver();
   const destinationDriver = new MemoryDriver();
-  const source = ObjectStorageMigrationService.createStorageEndpoint({
+  const source = createMigrationStorageEndpoint({
     provider: sourceProvider,
     driver: sourceDriver,
     bucket: "source-bucket",
     accountName: "source-account",
     container: "source-container",
   });
-  const destination = ObjectStorageMigrationService.createStorageEndpoint({
+  const destination = createMigrationStorageEndpoint({
     provider: destinationProvider,
     driver: destinationDriver,
     bucket: "destination-bucket",

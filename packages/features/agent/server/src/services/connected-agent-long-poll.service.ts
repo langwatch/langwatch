@@ -23,6 +23,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { InstanceWatchService, type Watch } from "./connected-agent-instance-watch.service";
 import { type InstanceNudge, instanceNudgeSchema } from "@langwatch/agent-contract";
 import {
   callDeliveredKey,
@@ -92,13 +93,6 @@ export interface RegisterAnswer {
 }
 
 /** What one pod keeps per instance it has served: the channel, and who waits on it. */
-interface Watch {
-  session: SessionInfo;
-  unsubscribe: Unsubscribe;
-  waiters: Set<(nudge: InstanceNudge) => void>;
-  expiry: NodeJS.Timeout;
-}
-
 export interface LongPollTransportOptions extends SessionCoreOptions {
   /** How long a poll waits for a frame before it answers empty. */
   pollWaitMs?: number;
@@ -132,19 +126,21 @@ export class LongPollTransportService {
 
   private readonly core: AgentSessionService;
   private readonly pollWaitMs: number;
-  private readonly watchTtlMs: number;
-  private readonly watches = new Map<string, Watch>();
+  private readonly watchesOfInstances: InstanceWatchService;
   private closed = false;
 
   private constructor(options: LongPollTransportOptions) {
     this.core = AgentSessionService.create(options);
     this.pollWaitMs = options.pollWaitMs ?? POLL_WAIT_MS;
-    this.watchTtlMs = options.watchTtlMs ?? PRESENCE_TTL_SECONDS * 1000 + GONE_CHECK_SLACK_MS;
+    this.watchesOfInstances = InstanceWatchService.create({
+      core: this.core,
+      watchTtlMs: options.watchTtlMs ?? PRESENCE_TTL_SECONDS * 1000 + GONE_CHECK_SLACK_MS,
+    });
   }
 
   /** How many instances this pod watches. */
   get watchCount(): number {
-    return this.watches.size;
+    return this.watchesOfInstances.watchCount;
   }
 
   /**
@@ -213,7 +209,7 @@ export class LongPollTransportService {
       );
     }
 
-    await this.ensureWatch(session);
+    await this.watchesOfInstances.ensureWatch(session);
 
     return { status: 200, body: { frame: registered, instanceToken: token } };
   }
@@ -235,7 +231,7 @@ export class LongPollTransportService {
     signal?: AbortSignal;
   }): Promise<{ frames: (CallFrame | CancelFrame)[] }> {
     const { session, stored } = await this.openSession({ credentials, token });
-    const watch = await this.ensureWatch(session);
+    const watch = await this.watchesOfInstances.ensureWatch(session);
     await this.touch(stored, session);
     const frames = await this.collectFrames({
       session,
@@ -271,7 +267,7 @@ export class LongPollTransportService {
         return frames;
       }
 
-      const nudge = await this.waitForNudge({ watch, ms: remaining, signal });
+      const nudge = await this.watchesOfInstances.tryWaitForNudge({ watch, ms: remaining, signal });
       const outcome = nudgeOutcome({ nudge, closed: this.closed });
       if (outcome === "stop") {
         return frames;
@@ -325,15 +321,7 @@ export class LongPollTransportService {
   /** Releases every waiting poll and every watch; sessions stay in the store. */
   async close(): Promise<void> {
     this.closed = true;
-    for (const [watchKey, watch] of this.watches) {
-      this.watches.delete(watchKey);
-      clearTimeout(watch.expiry);
-      for (const waiter of watch.waiters) {
-        waiter({ cancel: "" });
-      }
-
-      await watch.unsubscribe();
-    }
+    await this.watchesOfInstances.closeAll();
   }
 
   private refused(error: unknown): RegisterAnswer {
@@ -453,118 +441,14 @@ export class LongPollTransportService {
     return frames.length > 0 || signal?.aborted === true || this.closed;
   }
 
-  private waitForNudge({
-    watch,
-    ms,
-    signal,
-  }: {
-    watch: Watch;
-    ms: number;
-    signal?: AbortSignal;
-  }): Promise<InstanceNudge | null> {
-    return new Promise((resolve) => {
-      const finish = (nudge: InstanceNudge | null) => {
-        clearTimeout(timer);
-        watch.waiters.delete(waiter);
-        signal?.removeEventListener("abort", onAbort);
-        resolve(nudge);
-      };
-      const waiter = (nudge: InstanceNudge) => finish(nudge);
-      const onAbort = () => finish(null);
-      const timer = setTimeout(() => finish(null), ms);
-      watch.waiters.add(waiter);
-      signal?.addEventListener("abort", onAbort, { once: true });
-    });
-  }
-
-  /** Subscribes this pod to the instance's channel, or extends the watch it holds. */
-  private async ensureWatch(session: SessionInfo): Promise<Watch> {
-    const watchKey = watchKeyOf(session);
-    const existing = this.watches.get(watchKey);
-    if (existing) {
-      existing.session = session;
-      existing.expiry.refresh();
-
-      return existing;
-    }
-
-    const watch: Watch = {
-      session,
-      unsubscribe: async () => undefined,
-      waiters: new Set(),
-      expiry: setTimeout(() => void this.expireWatch(watchKey), this.watchTtlMs),
-    };
-    watch.expiry.unref();
-    this.watches.set(watchKey, watch);
-    watch.unsubscribe = await this.core.runtime.store.subscribe(
-      instanceChannel(session.projectId, session.instanceId),
-      (raw) => {
-        let nudge: InstanceNudge;
-        try {
-          nudge = instanceNudgeSchema.parse(JSON.parse(raw));
-        } catch {
-          return;
-        }
-
-        for (const waiter of [...watch.waiters]) {
-          waiter(nudge);
-        }
-      },
-    );
-
-    return watch;
-  }
-
-  /**
-   * No poll reached this pod inside the TTL. When no pod did, the instance
-   * is gone and the calls it held fail now; otherwise only this pod's
-   * watch is dropped.
-   */
-  private async expireWatch(watchKey: string): Promise<void> {
-    const watch = this.watches.get(watchKey);
-    if (!watch) {
-      return;
-    }
-
-    this.watches.delete(watchKey);
-    await watch.unsubscribe();
-    const { projectId, instanceId } = watch.session;
-    const live = await this.core.runtime.store.tryHgetall(instanceMetaKey(projectId, instanceId));
-    if (live) {
-      return;
-    }
-
-    const pending = await this.core.runtime.store.zrangebyscore(
-      pendingKey(projectId, instanceId),
-      0,
-    );
-    logger.info({ instanceId }, "instance stopped polling, retiring it");
-    await this.core.retire(watch.session, pending);
-  }
-
   private async deregister(stored: StoredSession, session: SessionInfo): Promise<void> {
     const store = this.core.runtime.store;
     await store.del(httpSessionKey(stored.projectId, stored.token));
-    const watchKey = watchKeyOf(session);
-    const watch = this.watches.get(watchKey);
-    if (watch) {
-      this.watches.delete(watchKey);
-      clearTimeout(watch.expiry);
-      for (const waiter of watch.waiters) {
-        waiter({ cancel: "" });
-      }
-
-      await watch.unsubscribe();
-    }
+    await this.watchesOfInstances.drop(session);
 
     const pending = await store.zrangebyscore(pendingKey(session.projectId, session.instanceId), 0);
     await this.core.retire(session, pending);
   }
-}
-
-/** A watch is per instance of one project: the instance id is client-chosen. */
-function watchKeyOf(session: SessionInfo): string {
-  return `${session.projectId}:${session.instanceId}`;
 }
 
 /**

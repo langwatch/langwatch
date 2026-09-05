@@ -279,6 +279,8 @@ function compareNullableText(left: string | null, right: string | null): number 
   return left.localeCompare(right);
 }
 
+import { OrganizationGroupService } from "./organization-group.service";
+
 export class OrganizationService extends OrganizationServiceContract {
   private constructor(
     private readonly repository: OrganizationRepository,
@@ -292,7 +294,16 @@ export class OrganizationService extends OrganizationServiceContract {
     private readonly diagnostics: PersonalWorkspaceDiagnosticsPort | undefined,
   ) {
     super();
+    this.groupService = OrganizationGroupService.create({
+      groups,
+      groupIdentities,
+      teams,
+      authz,
+      grants,
+    });
   }
+
+  private readonly groupService: OrganizationGroupService;
 
   async isMember(input: {
     organizationId: string;
@@ -960,12 +971,53 @@ export class OrganizationService extends OrganizationServiceContract {
     const projectIds = new Set(input.projects.map(({ id }) => id));
     const projectBindings = input.projectBindings.filter(({ scopeId }) => projectIds.has(scopeId));
     const groupBindings = input.teamBindings.filter(({ groupId }) => groupId);
+    const directMembers = this.teamAccessMembers({
+      teamBindings: input.teamBindings,
+      groupBindings,
+      groupMembers: input.groupMembers,
+    });
+    const teamBoundUserIds = new Set(
+      directMembers.flatMap(({ userId }) => (userId ? [userId] : [])),
+    );
+
+    return {
+      id: input.team.id,
+      name: input.team.name,
+      slug: input.team.slug,
+      projects: input.projects,
+      directMembers,
+      projectOnlyAccess: this.projectOnlyAccess({
+        projectBindings,
+        projects: input.projects,
+        teamBoundUserIds,
+      }),
+      projectAccess: this.projectAccess({
+        projects: input.projects,
+        projectBindings,
+        teamBindings: input.teamBindings,
+        groupBindings,
+        groupMembers: input.groupMembers,
+        directMembers,
+        teamBoundUserIds,
+      }),
+    };
+  }
+
+  /**
+   * Who the team names directly, plus the people its group bindings expand to. A person named
+   * both ways is listed once, under the strongest role their group bindings carry.
+   */
+  private teamAccessMembers(input: {
+    teamBindings: AuthzAccessBinding[];
+    groupBindings: AuthzAccessBinding[];
+    groupMembers: Map<string, OrganizationGroupMember[]>;
+  }): OrganizationTeamAccessMember[] {
     const directUserBindings = input.teamBindings.filter(({ userId }) => userId);
     const directUserIds = new Set(
       directUserBindings.flatMap(({ userId }) => (userId ? [userId] : [])),
     );
     const seenExpandedUserIds = new Set<string>();
-    const expandedGroupMembers = [...groupBindings]
+    const expandedGroupMembers = [...input.groupBindings]
       .sort((left, right) => TEAM_ROLE_PRIORITY[left.role] - TEAM_ROLE_PRIORITY[right.role])
       .flatMap((binding): OrganizationTeamAccessMember[] => {
         if (!binding.groupId) {
@@ -996,7 +1048,8 @@ export class OrganizationService extends OrganizationServiceContract {
           ];
         });
       });
-    const directMembers: OrganizationTeamAccessMember[] = [
+
+    return [
       ...directUserBindings.map((binding) => ({
         bindingId: binding.id,
         userId: binding.userId,
@@ -1021,15 +1074,20 @@ export class OrganizationService extends OrganizationServiceContract {
 
       return byEmail !== 0 ? byEmail : (left.userId ?? "").localeCompare(right.userId ?? "");
     });
-    const teamBoundUserIds = new Set(
-      directMembers.flatMap(({ userId }) => (userId ? [userId] : [])),
-    );
+  }
+
+  /** People who reach a project without reaching the team it belongs to. */
+  private projectOnlyAccess(input: {
+    projectBindings: AuthzAccessBinding[];
+    projects: OrganizationTeamAccessProject[];
+    teamBoundUserIds: Set<string>;
+  }): OrganizationTeamAccess["projectOnlyAccess"] {
     const projectOnlyAccess = new Map<
       string,
       OrganizationTeamAccess["projectOnlyAccess"][number]
     >();
-    for (const binding of projectBindings) {
-      if (!binding.userId || teamBoundUserIds.has(binding.userId)) {
+    for (const binding of input.projectBindings) {
+      if (!binding.userId || input.teamBoundUserIds.has(binding.userId)) {
         continue;
       }
 
@@ -1055,12 +1113,25 @@ export class OrganizationService extends OrganizationServiceContract {
       }
     }
 
+    return [...projectOnlyAccess.values()];
+  }
+
+  /** Per project: who inherits their access from the team, and who is bound to it directly. */
+  private projectAccess(input: {
+    projects: OrganizationTeamAccessProject[];
+    projectBindings: AuthzAccessBinding[];
+    teamBindings: AuthzAccessBinding[];
+    groupBindings: AuthzAccessBinding[];
+    groupMembers: Map<string, OrganizationGroupMember[]>;
+    directMembers: OrganizationTeamAccessMember[];
+    teamBoundUserIds: Set<string>;
+  }): OrganizationTeamAccess["projectAccess"] {
     const projectAccess: OrganizationTeamAccess["projectAccess"] = {};
     const teamBoundGroupIds = new Set(
-      groupBindings.flatMap(({ groupId }) => (groupId ? [groupId] : [])),
+      input.groupBindings.flatMap(({ groupId }) => (groupId ? [groupId] : [])),
     );
     for (const project of input.projects) {
-      const bindings = projectBindings.filter(({ scopeId }) => scopeId === project.id);
+      const bindings = input.projectBindings.filter(({ scopeId }) => scopeId === project.id);
       const overriddenUserIds = new Set(bindings.flatMap(({ userId }) => (userId ? [userId] : [])));
       for (const binding of bindings) {
         if (!binding.groupId) {
@@ -1072,7 +1143,7 @@ export class OrganizationService extends OrganizationServiceContract {
         }
       }
 
-      const inherited = directMembers
+      const inherited = input.directMembers
         .filter(({ userId }) => !userId || !overriddenUserIds.has(userId))
         .map(({ viaGroupId: _viaGroupId, ...member }) => ({
           ...member,
@@ -1083,7 +1154,7 @@ export class OrganizationService extends OrganizationServiceContract {
           (candidate) => candidate.userId && candidate.userId === binding.userId,
         );
         const inherits =
-          (!!binding.userId && teamBoundUserIds.has(binding.userId)) ||
+          (!!binding.userId && input.teamBoundUserIds.has(binding.userId)) ||
           (!!binding.groupId && teamBoundGroupIds.has(binding.groupId));
 
         return {
@@ -1104,431 +1175,79 @@ export class OrganizationService extends OrganizationServiceContract {
       projectAccess[project.id] = [...inherited, ...direct];
     }
 
-    return {
-      id: input.team.id,
-      name: input.team.name,
-      slug: input.team.slug,
-      projects: input.projects,
-      directMembers,
-      projectOnlyAccess: [...projectOnlyAccess.values()],
-      projectAccess,
-    };
+    return projectAccess;
   }
 
-  async getGroup(input: GetOrganizationGroupInput): Promise<OrganizationGroupDetails> {
-    const parsed = getOrganizationGroupInputSchema.parse(input);
-    const [group, members, bindings] = await Promise.all([
-      this.groups.get(parsed),
-      this.groups.listMembers(parsed),
-      this.readGroupBindings(parsed),
-    ]);
-
-    return { ...group, members, bindings };
+  async getGroup(
+    input: Parameters<OrganizationGroupService["getGroup"]>[0],
+  ): ReturnType<OrganizationGroupService["getGroup"]> {
+    return this.groupService.getGroup(input);
   }
 
-  async listGroups(input: ListOrganizationGroupsInput): Promise<OrganizationGroupPage> {
-    const parsed = listOrganizationGroupsInputSchema.parse(input);
-    const [page, bindings] = await Promise.all([
-      this.groups.list(parsed),
-      this.authz.listOrganizationBindings({
-        organizationId: parsed.organizationId,
-      }),
-    ]);
-    const bindingsByGroup = this.groupBindingsByGroup(bindings);
-
-    return {
-      ...page,
-      data: page.data.map((group) => ({
-        ...group,
-        bindings: bindingsByGroup.get(group.id) ?? [],
-      })),
-    };
+  async listGroups(
+    input: Parameters<OrganizationGroupService["listGroups"]>[0],
+  ): ReturnType<OrganizationGroupService["listGroups"]> {
+    return this.groupService.listGroups(input);
   }
 
   async listGroupsForMember(
-    input: ListMemberOrganizationGroupsInput,
-  ): Promise<OrganizationGroupSummary[]> {
-    const parsed = listMemberOrganizationGroupsInputSchema.parse(input);
-    const [groups, bindings] = await Promise.all([
-      this.groups.listForMember(parsed),
-      this.authz.listOrganizationBindings({
-        organizationId: parsed.organizationId,
-      }),
-    ]);
-    const bindingsByGroup = this.groupBindingsByGroup(bindings);
-
-    return groups.map((group) => ({
-      ...group,
-      bindings: bindingsByGroup.get(group.id) ?? [],
-    }));
+    input: Parameters<OrganizationGroupService["listGroupsForMember"]>[0],
+  ): ReturnType<OrganizationGroupService["listGroupsForMember"]> {
+    return this.groupService.listGroupsForMember(input);
   }
 
-  async createGroup(input: CreateOrganizationGroupInput): Promise<OrganizationGroup> {
-    const parsed = createOrganizationGroupInputSchema.parse(input);
-    const memberIds = [...new Set(parsed.memberIds ?? [])];
-    await this.teams.getOrganizationMembers({
-      organizationId: parsed.organizationId,
-      userIds: memberIds,
-    });
-    const bindings = parsed.bindings ?? [];
-    await this.validateGroupBindings(parsed.organizationId, bindings);
-    const baseSlug = this.groupIdentities.slugify(parsed.name);
-    const slug = await this.groups.nextAvailableSlug({
-      organizationId: parsed.organizationId,
-      baseSlug,
-    });
-    const group = await this.groups.create({
-      groupId: this.groupIdentities.createGroupId(),
-      organizationId: parsed.organizationId,
-      name: parsed.name,
-      slug,
-      memberIds,
-    });
-    if (bindings.length > 0) {
-      await this.grants.attachBindings({
-        organizationId: parsed.organizationId,
-        bindings: bindings.map((binding) => this.groupBindingWrite(group.id, binding)),
-        actor: parsed.actor,
-        onDuplicate: "skip",
-      });
-    }
-
-    return group;
+  async createGroup(
+    input: Parameters<OrganizationGroupService["createGroup"]>[0],
+  ): ReturnType<OrganizationGroupService["createGroup"]> {
+    return this.groupService.createGroup(input);
   }
 
-  async renameGroup(input: RenameOrganizationGroupInput): Promise<OrganizationGroup> {
-    const parsed = renameOrganizationGroupInputSchema.parse(input);
-    const group = await this.groups.get(parsed);
-    if (group.scimSource) {
-      throw new ScimManagedGroupError(group.id);
-    }
-
-    const slug = await this.groups.nextAvailableSlug({
-      organizationId: parsed.organizationId,
-      baseSlug: this.groupIdentities.slugify(parsed.name),
-      excludeGroupId: parsed.groupId,
-    });
-
-    return this.groups.rename({ ...parsed, slug });
+  async renameGroup(
+    input: Parameters<OrganizationGroupService["renameGroup"]>[0],
+  ): ReturnType<OrganizationGroupService["renameGroup"]> {
+    return this.groupService.renameGroup(input);
   }
 
-  async deleteGroup(input: DeleteOrganizationGroupInput): Promise<void> {
-    const parsed = deleteOrganizationGroupInputSchema.parse(input);
-    const group = await this.groups.get(parsed);
-    if (group.scimSource && !parsed.allowScimManaged) {
-      throw new ScimManagedGroupError(group.id);
-    }
-
-    await this.grants.revokeBindingsWhere({
-      organizationId: parsed.organizationId,
-      where: { groupId: parsed.groupId },
-      actor: parsed.actor,
-      reason: "group deleted",
-    });
-    await this.groups.delete(parsed);
+  async deleteGroup(
+    input: Parameters<OrganizationGroupService["deleteGroup"]>[0],
+  ): ReturnType<OrganizationGroupService["deleteGroup"]> {
+    return this.groupService.deleteGroup(input);
   }
 
-  async addGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void> {
-    const parsed = changeOrganizationGroupMemberInputSchema.parse(input);
-    const group = await this.groups.get(parsed);
-    if (group.scimSource) {
-      throw new ScimManagedGroupError(group.id);
-    }
-
-    await this.teams.getOrganizationMembers({
-      organizationId: parsed.organizationId,
-      userIds: [parsed.userId],
-    });
-    await this.groups.addMember(parsed);
+  async addGroupMember(
+    input: Parameters<OrganizationGroupService["addGroupMember"]>[0],
+  ): ReturnType<OrganizationGroupService["addGroupMember"]> {
+    return this.groupService.addGroupMember(input);
   }
 
-  async removeGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void> {
-    const parsed = changeOrganizationGroupMemberInputSchema.parse(input);
-    const group = await this.groups.get(parsed);
-    if (group.scimSource) {
-      throw new ScimManagedGroupError(group.id);
-    }
-
-    await this.groups.removeMember(parsed);
+  async removeGroupMember(
+    input: Parameters<OrganizationGroupService["removeGroupMember"]>[0],
+  ): ReturnType<OrganizationGroupService["removeGroupMember"]> {
+    return this.groupService.removeGroupMember(input);
   }
 
-  async listGroupBindings(input: GetOrganizationGroupInput): Promise<OrganizationGroupBinding[]> {
-    const parsed = getOrganizationGroupInputSchema.parse(input);
-    await this.groups.get(parsed);
-
-    return this.readGroupBindings(parsed);
+  async listGroupBindings(
+    input: Parameters<OrganizationGroupService["listGroupBindings"]>[0],
+  ): ReturnType<OrganizationGroupService["listGroupBindings"]> {
+    return this.groupService.listGroupBindings(input);
   }
 
   async addGroupBinding(
-    input: AddOrganizationGroupBindingInput,
-  ): Promise<OrganizationGroupBinding> {
-    const parsed = addOrganizationGroupBindingInputSchema.parse(input);
-    await this.groups.get(parsed);
-    await this.validateGroupBindings(parsed.organizationId, [parsed.binding]);
-    const write = this.groupBindingWrite(parsed.groupId, parsed.binding);
-    try {
-      await this.grants.attachBindings({
-        organizationId: parsed.organizationId,
-        bindings: [write],
-        actor: parsed.actor,
-        onDuplicate: "reject",
-      });
-    } catch (error) {
-      if (
-        error instanceof DuplicateBindingError ||
-        (typeof error === "object" &&
-          error !== null &&
-          "code" in error &&
-          error.code === "role_binding_already_exists")
-      ) {
-        throw new GroupBindingAlreadyExistsError();
-      }
-
-      throw error;
-    }
-
-    return {
-      id: write.bindingId,
-      role: write.role,
-      customRoleId: write.customRoleId,
-      customRoleName: null,
-      scopeType: write.scopeType,
-      scopeId: write.scopeId,
-    };
+    input: Parameters<OrganizationGroupService["addGroupBinding"]>[0],
+  ): ReturnType<OrganizationGroupService["addGroupBinding"]> {
+    return this.groupService.addGroupBinding(input);
   }
 
-  async removeGroupBinding(input: RemoveOrganizationGroupBindingInput): Promise<void> {
-    const parsed = removeOrganizationGroupBindingInputSchema.parse(input);
-    const rawBindings = parsed.groupId
-      ? await this.authz.listGroupBindings({
-          organizationId: parsed.organizationId,
-          groupId: parsed.groupId,
-        })
-      : await this.authz.listOrganizationBindings({
-          organizationId: parsed.organizationId,
-        });
-    const rawBinding = rawBindings.find(
-      ({ id, groupId }) =>
-        id === parsed.bindingId &&
-        groupId !== null &&
-        (parsed.groupId === undefined || groupId === parsed.groupId),
-    );
-    if (!rawBinding?.groupId) {
-      throw new GroupBindingNotFoundError(parsed.bindingId);
-    }
-
-    await this.groups.get({
-      organizationId: parsed.organizationId,
-      groupId: rawBinding.groupId,
-    });
-    const binding = this.toGroupBinding(rawBinding);
-    await this.assertGroupScopes(parsed.organizationId, [binding]);
-    await this.grants.revokeBindings({
-      organizationId: parsed.organizationId,
-      bindingIds: [parsed.bindingId],
-      actor: parsed.actor,
-      reason: "group binding removed",
-    });
+  async removeGroupBinding(
+    input: Parameters<OrganizationGroupService["removeGroupBinding"]>[0],
+  ): ReturnType<OrganizationGroupService["removeGroupBinding"]> {
+    return this.groupService.removeGroupBinding(input);
   }
 
-  async applyGroupEdits(input: ApplyOrganizationGroupEditsInput): Promise<void> {
-    const parsed = applyOrganizationGroupEditsInputSchema.parse(input);
-    const group = await this.groups.get(parsed);
-    if (
-      group.scimSource &&
-      (parsed.rename ||
-        parsed.memberUserIdsToAdd.length > 0 ||
-        parsed.memberUserIdsToRemove.length > 0)
-    ) {
-      throw new ScimManagedGroupError(group.id);
-    }
-
-    const memberIdsToAdd = [...new Set(parsed.memberUserIdsToAdd)];
-    await this.teams.getOrganizationMembers({
-      organizationId: parsed.organizationId,
-      userIds: memberIdsToAdd,
-    });
-    await this.validateGroupBindings(parsed.organizationId, parsed.bindingsToCreate);
-    const currentBindings = await this.readGroupBindings(parsed);
-    const deletedIds = new Set(parsed.bindingIdsToDelete);
-    const bindingsToDelete = currentBindings.filter(({ id }) => deletedIds.has(id));
-    await this.assertGroupScopes(parsed.organizationId, bindingsToDelete);
-    if (bindingsToDelete.length > 0) {
-      await this.grants.revokeBindings({
-        organizationId: parsed.organizationId,
-        bindingIds: bindingsToDelete.map(({ id }) => id),
-        actor: parsed.actor,
-      });
-    }
-
-    const rename = parsed.rename
-      ? {
-          name: parsed.rename.name,
-          slug: await this.groups.nextAvailableSlug({
-            organizationId: parsed.organizationId,
-            baseSlug: this.groupIdentities.slugify(parsed.rename.name),
-            excludeGroupId: parsed.groupId,
-          }),
-        }
-      : parsed.rename;
-    await this.groups.applyEdits({
-      groupId: parsed.groupId,
-      organizationId: parsed.organizationId,
-      rename,
-      memberUserIdsToAdd: memberIdsToAdd,
-      memberUserIdsToRemove: [...new Set(parsed.memberUserIdsToRemove)],
-    });
-    if (parsed.bindingsToCreate.length > 0) {
-      await this.grants.attachBindings({
-        organizationId: parsed.organizationId,
-        bindings: parsed.bindingsToCreate.map((binding) =>
-          this.groupBindingWrite(parsed.groupId, binding),
-        ),
-        actor: parsed.actor,
-        onDuplicate: "skip",
-      });
-    }
-  }
-
-  private async validateGroupBindings(
-    organizationId: string,
-    bindings: OrganizationGroupBindingInput[],
-  ): Promise<void> {
-    const customBindings = bindings.filter(({ role }) => role === "CUSTOM");
-    if (customBindings.some(({ customRoleId }) => !customRoleId)) {
-      throw new GroupCustomRoleRequiredError();
-    }
-
-    const customRoleIds = [
-      ...new Set(customBindings.map(({ customRoleId }) => customRoleId as string)),
-    ];
-    const roles =
-      customRoleIds.length === 0 ? [] : await this.authz.listUserCreatedRoles({ organizationId });
-    const rolesById = new Map(roles.map((role) => [role.id, role]));
-    const missingRole = customRoleIds.find((id) => !rolesById.has(id));
-    if (missingRole) {
-      throw new GroupRoleNotAssignableError(missingRole);
-    }
-
-    for (const binding of customBindings) {
-      const role = rolesById.get(binding.customRoleId as string);
-      const permissions = Array.isArray(role?.permissions)
-        ? role.permissions.filter(
-            (permission): permission is string => typeof permission === "string",
-          )
-        : [];
-      const refused = permissions.find(
-        (permission) =>
-          !bindingScopeCanGrantPermission({
-            scopeType: binding.scopeType,
-            permission,
-          }),
-      );
-      if (refused) {
-        throw new GroupRoleScopeError(refused, binding.scopeType);
-      }
-    }
-
-    await this.assertGroupScopes(organizationId, bindings);
-  }
-
-  private async assertGroupScopes(
-    organizationId: string,
-    bindings: Array<{
-      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-      scopeId: string;
-    }>,
-  ): Promise<void> {
-    for (const binding of bindings) {
-      const scope = await this.authz.tryResolveScope(
-        binding.scopeType === "ORGANIZATION"
-          ? { organizationId: binding.scopeId }
-          : binding.scopeType === "TEAM"
-            ? { teamId: binding.scopeId }
-            : { projectId: binding.scopeId },
-      );
-      const resolvedOrganizationId =
-        scope?.type === "organization" ? scope.id : scope?.organizationId;
-      if (!scope || resolvedOrganizationId !== organizationId) {
-        throw new GroupScopeNotInOrganizationError(binding.scopeType);
-      }
-
-      if (scope.type === "team" || scope.type === "project") {
-        const team = await this.teams.get({
-          organizationId,
-          teamId: scope.type === "team" ? scope.id : scope.teamId,
-        });
-        if (team.isPersonal) {
-          throw new PersonalWorkspaceNotManagedHereError();
-        }
-      }
-    }
-  }
-
-  private groupBindingWrite(groupId: string, binding: OrganizationGroupBindingInput) {
-    return {
-      bindingId: this.groupIdentities.createBindingId(),
-      principal: { groupId },
-      role: binding.role,
-      customRoleId: binding.role === "CUSTOM" ? (binding.customRoleId ?? null) : null,
-      scopeType: binding.scopeType,
-      scopeId: binding.scopeId,
-    };
-  }
-
-  private async readGroupBindings(input: {
-    organizationId: string;
-    groupId: string;
-  }): Promise<OrganizationGroupBinding[]> {
-    const bindings = await this.authz.listGroupBindings({
-      organizationId: input.organizationId,
-      groupId: input.groupId,
-    });
-
-    return bindings.map((binding) => this.toGroupBinding(binding));
-  }
-
-  private toGroupBinding(binding: {
-    id: string;
-    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-    customRoleId: string | null;
-    customRole: { name: string } | null;
-    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-    scopeId: string;
-  }): OrganizationGroupBinding {
-    return {
-      id: binding.id,
-      role: binding.role,
-      customRoleId: binding.customRoleId,
-      customRoleName: binding.customRole?.name ?? null,
-      scopeType: binding.scopeType,
-      scopeId: binding.scopeId,
-    };
-  }
-
-  private groupBindingsByGroup(
-    bindings: Array<{
-      id: string;
-      groupId: string | null;
-      role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-      customRoleId: string | null;
-      customRole: { name: string } | null;
-      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-      scopeId: string;
-    }>,
-  ): Map<string, OrganizationGroupBinding[]> {
-    const result = new Map<string, OrganizationGroupBinding[]>();
-    for (const binding of bindings) {
-      if (!binding.groupId) {
-        continue;
-      }
-
-      const groupBindings = result.get(binding.groupId) ?? [];
-      groupBindings.push(this.toGroupBinding(binding));
-      result.set(binding.groupId, groupBindings);
-    }
-
-    return result;
+  async applyGroupEdits(
+    input: Parameters<OrganizationGroupService["applyGroupEdits"]>[0],
+  ): ReturnType<OrganizationGroupService["applyGroupEdits"]> {
+    return this.groupService.applyGroupEdits(input);
   }
 
   private async setPersonalWorkspaceFeatures(

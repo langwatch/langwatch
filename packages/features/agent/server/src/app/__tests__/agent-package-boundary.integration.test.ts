@@ -1,7 +1,5 @@
 /**
- * Both Agents doors — the package-owned tRPC router and the legacy REST app —
- * driven over one AgentApp, so what each transport does with the same command
- * is observable side by side.
+ * Both Agents doors — the tRPC router and the legacy REST app — driven over one AgentApp.
  * @vitest-environment node
  * @see packages/features/agent/specs/package-boundary.feature
  */

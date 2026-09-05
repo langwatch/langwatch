@@ -1,35 +1,46 @@
 import type { CustomGraph, ReportChart, ReportSource } from "@langwatch/automation-contract";
-import {
-  aggregateSeriesValues,
-  buildSeriesName,
-  extractGroupTotals,
-  extractSeriesPoints,
-  type AnalyticsSeries,
-  type AnalyticsTimeseriesInput,
-  type AnalyticsTimeseriesResult,
+import type {
+  AnalyticsTimeseriesInput,
+  AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
+import {
+  bucketKeysOf,
+  chartTypeOf,
+  emptyChartOf,
+  pieChartOf,
+  seriesInputsOf,
+  trendChartOf,
+  type ReportGraphInput,
+} from "../rules/report-chart.rules";
+
+/** Minutes per bucket at or above which a bucket is a whole day. */
+const DAY_SCALE_MINUTES = 1440;
 
 /**
- * The stored graph JSON as a report reads it. The full `CustomGraphInput` is a BROWSER type
- * (colour sets, chart heights, tooltip options) owned by `@langwatch/analytics-web`, and no
- * server module may value-import a browser package.
+ * Axis label for one time bucket. The TEMPLATE cannot do this — it has no idea whether a bucket
+ * is an hour or a week, so it would render every daily bucket as "00:00". The scale is known
+ * here, so the label is resolved here and the template just prints it.
  */
-export interface ReportGraphInput {
-  graphType:
-    | "line"
-    | "bar"
-    | "horizontal_bar"
-    | "stacked_bar"
-    | "area"
-    | "stacked_area"
-    | "scatter"
-    | "pie"
-    | "donnut"
-    | "summary"
-    | "monitor_graph";
-  series?: Array<AnalyticsSeries & { name?: string }>;
-  groupBy?: string;
-  timeScale?: "full" | number;
+function formatBucketLabel({
+  date,
+  timeScale,
+}: {
+  date: string;
+  timeScale: ReportGraphInput["timeScale"];
+}): string {
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) {
+    return date;
+  }
+
+  const daily = timeScale === "full" || Number(timeScale) >= DAY_SCALE_MINUTES;
+
+  return parsed.toLocaleString("en-US", {
+    timeZone: "UTC",
+    ...(daily
+      ? { month: "short", day: "2-digit" }
+      : { hour: "2-digit", minute: "2-digit", hour12: false }),
+  });
 }
 
 /**
@@ -46,30 +57,6 @@ export interface ReportChartDeps {
   loadDashboardGraphs(params: { projectId: string; dashboardId: string }): Promise<CustomGraph[]>;
   getTimeseries(input: AnalyticsTimeseriesInput): Promise<AnalyticsTimeseriesResult>;
 }
-
-/** Slack renders four chart types; a graph can be any of eleven. Map onto the
- *  nearest one so a stacked bar still arrives as a bar rather than nothing. */
-function chartTypeOf(graphType: ReportGraphInput["graphType"]): ReportChart["type"] {
-  switch (graphType) {
-    case "pie":
-    case "donnut":
-      return "pie";
-    case "bar":
-    case "horizontal_bar":
-    case "stacked_bar":
-      return "bar";
-    case "area":
-    case "stacked_area":
-      return "area";
-    // line / scatter / summary / monitor_graph all read as a trend over time.
-    default:
-      return "line";
-  }
-}
-
-/** Slack caps what a chart can carry; past this it stops being readable. */
-const MAX_SERIES = 5;
-const MAX_SEGMENTS = 8;
 
 /**
  * Max panels a single report queries at once (ADR-044 §5 "Load & scale"). Each
@@ -102,36 +89,6 @@ async function mapWithConcurrency<T, R>(
   await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
 
   return results;
-}
-
-/** Minutes per bucket at or above which a bucket is a whole day. */
-const DAY_SCALE_MINUTES = 1440;
-
-/**
- * Axis label for one time bucket. The TEMPLATE cannot do this — it has no idea whether a bucket
- * is an hour or a week, so it would render every daily bucket as "00:00". The scale is known
- * here, so the label is resolved here and the template just prints it.
- */
-function formatBucketLabel({
-  date,
-  timeScale,
-}: {
-  date: string;
-  timeScale: ReportGraphInput["timeScale"];
-}): string {
-  const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) {
-    return date;
-  }
-
-  const daily = timeScale === "full" || Number(timeScale) >= DAY_SCALE_MINUTES;
-
-  return parsed.toLocaleString("en-US", {
-    timeZone: "UTC",
-    ...(daily
-      ? { month: "short", day: "2-digit" }
-      : { hour: "2-digit", minute: "2-digit", hour12: false }),
-  });
 }
 
 /** The report's chart panels: what each graph in a source renders for one window. */
@@ -207,28 +164,8 @@ async function buildChart({
 }): Promise<ReportChart> {
   const graphData = graph.graph as unknown as ReportGraphInput;
   const type = chartTypeOf(graphData.graphType);
-  const seriesInputs: AnalyticsSeries[] = (graphData.series ?? [])
-    .slice(0, MAX_SERIES)
-    .map((series) => ({
-      metric: series.metric,
-      aggregation: series.aggregation,
-      key: series.key,
-      subkey: series.subkey,
-      pipeline: series.pipeline,
-      filters: series.filters,
-      asPercent: series.asPercent,
-    }));
-
-  const empty: ReportChart = {
-    id: graph.id,
-    title: graph.name,
-    type,
-    categories: [],
-    series: [],
-    segments: [],
-    total: 0,
-    isEmpty: true,
-  };
+  const seriesInputs = seriesInputsOf(graphData);
+  const empty = emptyChartOf({ graph, type });
   if (seriesInputs.length === 0) {
     return empty;
   }
@@ -251,91 +188,13 @@ async function buildChart({
     return empty;
   }
 
-  // Result buckets key each series by `buildSeriesName(input, queryIndex)`, NOT
-  // by the series' display name — the two encodings differ, and reading by the
-  // display name silently yields zeroes.
-  const bucketKeys = seriesInputs.map((input, index) => buildSeriesName(input, index));
-
+  const bucketKeys = bucketKeysOf(seriesInputs);
   if (type === "pie") {
-    const segments = pieSegments({
-      buckets,
-      bucketKeys,
-      seriesInputs,
-      names: graphData.series ?? [],
-      groupBy: graphData.groupBy,
-    });
-    const total = segments.reduce((sum, segment) => sum + segment.value, 0);
-
-    return {
-      ...empty,
-      segments: segments.slice(0, MAX_SEGMENTS),
-      total,
-      // Slack rejects a pie whose segments are all zero, and a chart of nothing
-      // is not worth sending — fall back to the empty-report copy.
-      isEmpty: segments.length === 0 || total <= 0,
-    };
+    return pieChartOf({ empty, buckets, bucketKeys, seriesInputs, graphData });
   }
 
   const timeScale = graphData.timeScale ?? 60;
   const categories = buckets.map((bucket) => formatBucketLabel({ date: bucket.date, timeScale }));
-  const series = seriesInputs.map((input, index) => ({
-    name: graphData.series?.[index]?.name ?? bucketKeys[index]!,
-    data: extractSeriesPoints(buckets, bucketKeys[index]!, graphData.groupBy).map(
-      (point, pointIndex) => ({
-        label: categories[pointIndex] ?? point.timestamp,
-        value: point.value,
-      }),
-    ),
-  }));
 
-  const primary = series[0];
-  const total = aggregateSeriesValues(
-    primary?.data.map((point) => point.value) ?? [],
-    String(graphData.series?.[0]?.aggregation ?? "avg"),
-    buckets.length,
-  );
-
-  return {
-    ...empty,
-    categories,
-    series,
-    total,
-    isEmpty: series.every((one) => one.data.every((point) => point.value === 0)),
-  };
-}
-
-/**
- * A pie needs one value per slice, not a value per time bucket. When the graph
- * groups (by model, by user, …), each group is a slice; when it does not, each
- * series is its own slice.
- */
-function pieSegments({
-  buckets,
-  bucketKeys,
-  seriesInputs,
-  names,
-  groupBy,
-}: {
-  buckets: AnalyticsTimeseriesResult["currentPeriod"];
-  bucketKeys: string[];
-  seriesInputs: AnalyticsSeries[];
-  names: ReportGraphInput["series"];
-  groupBy?: string;
-}): Array<{ label: string; value: number }> {
-  if (groupBy) {
-    return extractGroupTotals(buckets, bucketKeys[0]!, groupBy).filter(
-      (segment) => segment.value > 0,
-    );
-  }
-
-  return seriesInputs
-    .map((input, index) => ({
-      label: names?.[index]?.name ?? bucketKeys[index]!,
-      value: aggregateSeriesValues(
-        extractSeriesPoints(buckets, bucketKeys[index]!).map((point) => point.value),
-        String(input.aggregation),
-        buckets.length,
-      ),
-    }))
-    .filter((segment) => segment.value > 0);
+  return trendChartOf({ empty, buckets, bucketKeys, seriesInputs, graphData, categories });
 }

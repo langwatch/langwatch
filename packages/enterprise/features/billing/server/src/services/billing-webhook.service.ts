@@ -14,7 +14,6 @@ import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   retentionCategories,
 } from "@langwatch/data-retention-contract";
-import { AnnualEventsBillingThresholdService } from "./annual-events-billing-threshold.service";
 import { BestEffortService } from "./best-effort.service";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service";
 import type { BillingWebhookHostPort } from "../ports/billing-webhook-host.port";
@@ -24,6 +23,11 @@ import type {
   SubscriptionWithOrg,
 } from "../ports/billing-webhook-subscription.port";
 import { NurturingSubscriptionSyncService } from "./nurturing-subscription-sync.service";
+import { BillingSubscriptionLifecycleService } from "./billing-subscription-lifecycle.service";
+import {
+  BillingCheckoutCompletionService,
+  type InviteApprover,
+} from "./billing-checkout-completion.service";
 
 const logger = createLogger("langwatch:billing:webhookService");
 
@@ -32,13 +36,6 @@ const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
 
 type ItemCalculator = Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {
   readonly prices: StripePriceMap;
-};
-
-type InviteApprover = {
-  approvePaymentPendingInvites(params: {
-    subscriptionId: string;
-    organizationId: string;
-  }): Promise<unknown>;
 };
 
 /**
@@ -102,7 +99,8 @@ export class EEWebhookService implements WebhookService {
   private readonly getPostHog?: () => PostHog | null;
   private readonly host: BillingWebhookHostPort;
   private readonly bestEffort = BestEffortService.create();
-  private readonly annualThreshold: AnnualEventsBillingThresholdService;
+  private readonly lifecycle: BillingSubscriptionLifecycleService;
+  private readonly checkout: BillingCheckoutCompletionService;
 
   private constructor({
     subscriptionRepository,
@@ -137,9 +135,21 @@ export class EEWebhookService implements WebhookService {
     this.licensePrivateKey = licensePrivateKey;
     this.getPostHog = getPostHog;
     this.host = host;
-    this.annualThreshold = AnnualEventsBillingThresholdService.create({
+    this.checkout = BillingCheckoutCompletionService.create({
+      subscriptionRepository,
+      organizationRepository,
       stripe,
-      prices: itemCalculator.prices,
+      itemCalculator,
+      inviteApprover,
+      getPostHog,
+      host,
+    });
+    this.lifecycle = BillingSubscriptionLifecycleService.create({
+      subscriptionRepository,
+      organizationRepository,
+      stripe,
+      itemCalculator,
+      host,
     });
   }
 
@@ -307,7 +317,7 @@ export class EEWebhookService implements WebhookService {
 
     switch (event.type) {
       case "checkout.session.completed":
-        await this.dispatchCheckoutCompleted({
+        await this.checkout.dispatchCheckoutCompleted({
           event: event as Stripe.Event & { type: "checkout.session.completed" },
           subscriptionId,
           customerId,
@@ -323,88 +333,6 @@ export class EEWebhookService implements WebhookService {
         await this.handleInvoicePaymentFailed({ subscriptionId });
         return { status: "ok" };
     }
-  }
-
-  private async dispatchCheckoutCompleted({
-    event,
-    subscriptionId,
-    customerId,
-    organizationId,
-  }: {
-    event: Stripe.Event & { type: "checkout.session.completed" };
-    subscriptionId: string;
-    customerId?: string;
-    organizationId: string | null;
-  }): Promise<void> {
-    const checkoutSession = event.data.object as Stripe.Checkout.Session;
-    const selectedCurrencyRaw = checkoutSession.metadata?.selectedCurrency;
-    const selectedCurrency =
-      selectedCurrencyRaw && VALID_CURRENCIES_FOR_CHECKOUT.has(selectedCurrencyRaw)
-        ? selectedCurrencyRaw
-        : null;
-
-    const result = await this.handleCheckoutCompleted({
-      subscriptionId,
-      clientReferenceId: checkoutSession.client_reference_id ?? null,
-      selectedCurrency,
-    });
-
-    if (result.earlyReturn) {
-      logger.error(
-        {
-          eventId: event.id,
-          customerId: customerId ? maskCustomerId(customerId) : null,
-        },
-        "[stripeWebhook] No client_reference_id in checkout session",
-      );
-
-      return;
-    }
-
-    if (organizationId) {
-      await this.bestEffort.run({
-        label: "checkout analytics",
-        context: { eventId: event.id, organizationId },
-        effect: () =>
-          this.emitCheckoutAnalytics({
-            checkoutSession,
-            subscriptionId,
-            organizationId,
-          }),
-      });
-    }
-  }
-
-  private emitCheckoutAnalytics({
-    checkoutSession,
-    subscriptionId,
-    organizationId,
-  }: {
-    checkoutSession: Stripe.Checkout.Session;
-    subscriptionId: string;
-    organizationId: string;
-  }): void {
-    const posthog = this.getPostHog?.() ?? null;
-    if (!posthog) {
-      return;
-    }
-
-    posthog.capture({
-      distinctId: organizationId,
-      event: "subscription_created",
-      properties: {
-        subscriptionId,
-        $groups: { organization: organizationId },
-      },
-    });
-    posthog.groupIdentify({
-      groupType: "organization",
-      groupKey: organizationId,
-      properties: {
-        subscriptionCreatedAt: new Date(checkoutSession.created * 1000).toISOString(),
-        hasActiveSubscription: true,
-      },
-    });
   }
 
   private async routeSubscriptionLifecycle(
@@ -433,113 +361,12 @@ export class EEWebhookService implements WebhookService {
     return { status: "ok" };
   }
 
-  async handleCheckoutCompleted({
-    subscriptionId,
-    clientReferenceId,
-    selectedCurrency,
-  }: {
+  async handleCheckoutCompleted(params: {
     subscriptionId: string;
     clientReferenceId: string | null;
     selectedCurrency?: string | null;
   }): Promise<{ earlyReturn: boolean }> {
-    const subscriptionClientReferenceId = clientReferenceId?.replace("subscription_setup_", "");
-
-    if (!subscriptionClientReferenceId) {
-      return { earlyReturn: true };
-    }
-
-    const updateResult = await this.subscriptionRepository.linkStripeId({
-      id: subscriptionClientReferenceId,
-      stripeSubscriptionId: subscriptionId,
-    });
-
-    if (updateResult.count === 0) {
-      logger.error(
-        { subscriptionClientReferenceId },
-        "[stripeWebhook] No subscription found for checkout",
-      );
-
-      throw new SubscriptionRecordNotFoundError(subscriptionClientReferenceId);
-    }
-
-    await this.syncInvoicePaymentSuccess({
-      subscriptionId,
-      throwOnMissing: true,
-    });
-
-    const subscriptionRecord = await this.subscriptionRepository.tryFindByStripeId(subscriptionId);
-
-    const normalizedCurrency = this.normalizeSelectedCurrency(selectedCurrency);
-    if (normalizedCurrency && subscriptionRecord) {
-      try {
-        await this.organizationRepository.updateCurrency({
-          organizationId: subscriptionRecord.organizationId,
-          currency: normalizedCurrency,
-        });
-      } catch (err) {
-        logger.warn(
-          { subscriptionId, selectedCurrency: normalizedCurrency, err },
-          "[stripeWebhook] Failed to persist selected currency on checkout completion",
-        );
-      }
-    }
-
-    // Approve PAYMENT_PENDING invites linked to this subscription
-    if (this.inviteApprover && subscriptionRecord) {
-      try {
-        await this.inviteApprover.approvePaymentPendingInvites({
-          subscriptionId: subscriptionRecord.id,
-          organizationId: subscriptionRecord.organizationId,
-        });
-      } catch (err) {
-        logger.error(
-          { subscriptionId, err },
-          "[stripeWebhook] Failed to approve PAYMENT_PENDING invites after checkout, manual resolution may be needed",
-        );
-      }
-    }
-
-    // Cancel any active trial subscriptions for this org
-    if (subscriptionRecord) {
-      await this.subscriptionRepository.cancelTrialSubscriptions(subscriptionRecord.organizationId);
-    }
-
-    await this.trySetAnnualEventsBillingThreshold(subscriptionId);
-
-    return { earlyReturn: false };
-  }
-
-  /**
-   * The billing threshold makes Stripe collect annual overage in slices, not
-   * one oversized invoice. Best-effort — we answer Stripe 200 regardless, so
-   * a failure raises a (also best-effort) Slack alert instead.
-   */
-  private async trySetAnnualEventsBillingThreshold(subscriptionId: string): Promise<void> {
-    try {
-      const thresholdResult = await this.annualThreshold.apply({
-        stripeSubscriptionId: subscriptionId,
-      });
-      logger.info(
-        { subscriptionId, thresholdResult },
-        "[stripeWebhook] Annual events billing threshold evaluated",
-      );
-    } catch (err) {
-      logger.error(
-        { subscriptionId, err },
-        "[stripeWebhook] Failed to set annual events billing threshold — re-run the backfill script or apply manually",
-      );
-      try {
-        await this.host.sendSlackBillingThresholdFailureAlert({
-          stripeSubscriptionId: subscriptionId,
-          reason: err instanceof Error ? err.message : String(err),
-        });
-      } catch (alertErr) {
-        logger.error(
-          { subscriptionId, err: alertErr },
-          "[stripeWebhook] Failed to alert on billing-threshold failure",
-        );
-      }
-    }
+    return this.checkout.handleCheckoutCompleted(params);
   }
 
   async handleInvoicePaymentSucceeded({
@@ -549,7 +376,7 @@ export class EEWebhookService implements WebhookService {
     subscriptionId: string;
     throwOnMissing?: boolean;
   }): Promise<void> {
-    await this.syncInvoicePaymentSuccess({ subscriptionId, throwOnMissing });
+    await this.lifecycle.syncInvoicePaymentSuccess({ subscriptionId, throwOnMissing });
   }
 
   async handleInvoicePaymentFailed({ subscriptionId }: { subscriptionId: string }): Promise<void> {
@@ -572,364 +399,11 @@ export class EEWebhookService implements WebhookService {
     });
   }
 
-  async handleSubscriptionDeleted({
-    stripeSubscriptionId,
-  }: {
-    stripeSubscriptionId: string;
-  }): Promise<void> {
-    await waitForStripeConsistency();
-
-    const existingSubscription =
-      await this.subscriptionRepository.tryFindByStripeId(stripeSubscriptionId);
-
-    if (!existingSubscription) {
-      logger.warn(
-        { stripeSubscriptionId },
-        "[stripeWebhook] No subscription for deletion event, skipping",
-      );
-
-      return;
-    }
-
-    // Idempotency: if already CANCELLED (e.g., by upgrade flow), skip redundant update
-    if (existingSubscription.status === SubscriptionStatus.CANCELLED) {
-      logger.info(
-        { stripeSubscriptionId },
-        "[stripeWebhook] Subscription already cancelled, skipping redundant update",
-      );
-
-      return;
-    }
-
-    await this.subscriptionRepository.cancel({ id: existingSubscription.id });
-
-    await this.bestEffort.run({
-      label: "cancellation notification",
-      context: { stripeSubscriptionId },
-      effect: async () => {
-        const org = await this.organizationRepository.tryFindNameById(
-          existingSubscription.organizationId,
-        );
-        await this.host.sendSlackSubscriptionEvent({
-          type: "cancelled",
-          organizationId: existingSubscription.organizationId,
-          organizationName: org?.name ?? "Unknown",
-          plan: existingSubscription.plan,
-          subscriptionId: existingSubscription.id,
-          cancellationDate: new Date(),
-        });
-      },
-    });
-
-    const remainingActive = await this.subscriptionRepository.tryFindLastNonCancelled(
-      existingSubscription.organizationId,
-    );
-    NurturingSubscriptionSyncService.fireSubscriptionSync({
-      organizationId: existingSubscription.organizationId,
-      hasSubscription: !!remainingActive,
-    });
-
-    // Cancellation deliberately leaves the org's retention policies in place
-    // until the paid-retention feature is released.
+  async handleSubscriptionDeleted(params: { stripeSubscriptionId: string }): Promise<void> {
+    await this.lifecycle.handleSubscriptionDeleted(params);
   }
 
-  async handleSubscriptionUpdated({
-    subscription,
-  }: {
-    subscription: Stripe.Subscription;
-  }): Promise<void> {
-    await waitForStripeConsistency();
-
-    const existingSubForUpdate = await this.subscriptionRepository.tryFindByStripeId(subscription.id);
-
-    if (!existingSubForUpdate) {
-      logger.warn(
-        { stripeSubscriptionId: subscription.id },
-        "[stripeWebhook] No subscription for update event, skipping",
-      );
-
-      return;
-    }
-
-    if (subscription.status !== "active" || subscription.ended_at) {
-      // Truly cancelled or ended — mark as CANCELLED in DB.
-      // Note: canceled_at alone means "scheduled for cancellation at period end"
-      // — the sub is still active until then, so we don't cancel in DB yet.
-      // When the period ends, Stripe fires `customer.subscription.deleted`
-      // which is handled by handleSubscriptionDeleted.
-      await this.subscriptionRepository.cancel({ id: existingSubForUpdate.id });
-
-      const remainingActive = await this.subscriptionRepository.tryFindLastNonCancelled(
-        existingSubForUpdate.organizationId,
-      );
-      NurturingSubscriptionSyncService.fireSubscriptionSync({
-        organizationId: existingSubForUpdate.organizationId,
-        hasSubscription: !!remainingActive,
-      });
-
-      // Cancellation deliberately leaves the org's retention policies in place
-      // until the paid-retention feature is released.
-    } else if (subscription.status === "active") {
-      const shouldNotify = existingSubForUpdate.status !== SubscriptionStatus.ACTIVE;
-
-      let tracesQuantity: number | null = null;
-      let usersQuantity: number | null = null;
-
-      for (const item of subscription.items.data) {
-        if (isGrowthSeatPrice(item.price.id, this.itemCalculator.prices)) {
-          usersQuantity = item.quantity ?? 0;
-        } else if (isGrowthEventsPrice(item.price.id, this.itemCalculator.prices)) {
-          // Events price exists on the subscription; traces limit comes from plan limits
-        } else if (
-          item.price.id === this.itemCalculator.prices.LAUNCH_USERS ||
-          item.price.id === this.itemCalculator.prices.ACCELERATE_USERS ||
-          item.price.id === this.itemCalculator.prices.LAUNCH_ANNUAL_USERS ||
-          item.price.id === this.itemCalculator.prices.ACCELERATE_ANNUAL_USERS
-        ) {
-          const calculateQuantity = this.itemCalculator.calculateQuantityForPrice({
-            priceId: item.price.id,
-            quantity: item.quantity ?? 0,
-            plan: existingSubForUpdate.plan,
-          });
-          usersQuantity = calculateQuantity;
-        } else if (
-          item.price.id === this.itemCalculator.prices.ACCELERATE_TRACES_100K ||
-          item.price.id === this.itemCalculator.prices.LAUNCH_TRACES_10K ||
-          item.price.id === this.itemCalculator.prices.LAUNCH_ANNUAL_TRACES_10K ||
-          item.price.id === this.itemCalculator.prices.ACCELERATE_ANNUAL_TRACES_100K
-        ) {
-          const calculateQuantity = this.itemCalculator.calculateQuantityForPrice({
-            priceId: item.price.id,
-            quantity: item.quantity ?? 0,
-            plan: existingSubForUpdate.plan,
-          });
-          tracesQuantity = calculateQuantity;
-        }
-      }
-
-      const updatedSubscription = await this.subscriptionRepository.tryUpdateQuantities({
-        id: existingSubForUpdate.id,
-        maxMembers: usersQuantity,
-        maxMessagesPerMonth: tracesQuantity,
-      });
-
-      if (!updatedSubscription) {
-        return;
-      }
-
-      await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription updated to active");
-
-      if (shouldNotify) {
-        await this.bestEffort.run({
-          label: "subscription confirmed notification",
-          context: { subscriptionId: updatedSubscription.id },
-          effect: () =>
-            this.host.sendSlackSubscriptionEvent({
-              type: "confirmed",
-              organizationId: updatedSubscription.organizationId,
-              organizationName: updatedSubscription.organization.name,
-              plan: updatedSubscription.plan,
-              subscriptionId: updatedSubscription.id,
-              startDate: updatedSubscription.startDate,
-              maxMembers: updatedSubscription.maxMembers,
-              maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
-            }),
-        });
-      }
-    }
-  }
-
-  // --- Private helpers ---
-
-  private async syncInvoicePaymentSuccess({
-    subscriptionId,
-    throwOnMissing = false,
-  }: {
-    subscriptionId: string;
-    throwOnMissing?: boolean;
-  }) {
-    await waitForStripeConsistency();
-
-    const previousSubscription = await this.subscriptionRepository.tryFindByStripeId(subscriptionId);
-
-    if (!previousSubscription) {
-      if (throwOnMissing) {
-        throw new SubscriptionRecordNotFoundError(subscriptionId);
-      }
-
-      logger.warn(
-        { subscriptionId },
-        "[stripeWebhook] No subscription record found, skipping sync",
-      );
-
-      return;
-    }
-
-    // Guard: a $0 invoice generated during cancellation must not reactivate the subscription.
-    // Stripe fires invoice.payment_succeeded for $0 prorated invoices even when the subscription
-    // is being cancelled. Check the authoritative Stripe status before activating.
-    let stripeCanceled = false;
-    try {
-      const stripeSubscription = await this.stripe.subscriptions.retrieve(subscriptionId);
-      stripeCanceled = stripeSubscription.status === "canceled";
-    } catch (err) {
-      logger.warn(
-        { subscriptionId, err },
-        "[stripeWebhook] Failed to verify Stripe subscription status, proceeding with activation",
-      );
-      if (previousSubscription.status === SubscriptionStatus.CANCELLED) {
-        logger.info(
-          { subscriptionId },
-          "[stripeWebhook] Stripe status unavailable and DB is CANCELLED, skipping activation",
-        );
-
-        return;
-      }
-    }
-
-    if (stripeCanceled) {
-      logger.info(
-        { subscriptionId },
-        "[stripeWebhook] Stripe subscription is canceled, skipping activation from $0 invoice",
-      );
-
-      return;
-    }
-
-    const updatedSubscription = await this.subscriptionRepository.tryActivate({
-      id: previousSubscription.id,
-      previousStatus: previousSubscription.status,
-    });
-
-    if (!updatedSubscription) {
-      return;
-    }
-
-    if (previousSubscription.status !== SubscriptionStatus.ACTIVE) {
-      await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription activated");
-
-      if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
-        const oldSubscriptions = await this.subscriptionRepository.migrateToSeatEvent({
-          organizationId: updatedSubscription.organizationId,
-          excludeSubscriptionId: updatedSubscription.id,
-        });
-
-        // Cancel in Stripe after DB is consistent (outside transaction)
-        for (const oldSub of oldSubscriptions) {
-          if (!oldSub.stripeSubscriptionId) {
-            continue;
-          }
-
-          try {
-            await this.stripe.subscriptions.cancel(oldSub.stripeSubscriptionId, {
-              prorate: true,
-            });
-          } catch (err) {
-            logger.error(
-              { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
-              "[stripeWebhook] CRITICAL: Failed to cancel old Stripe subscription during upgrade. Manual intervention required.",
-            );
-          }
-        }
-
-        await this.applySeatRetentionPolicy(updatedSubscription.organizationId);
-      }
-
-      await this.bestEffort.run({
-        label: "subscription confirmed notification",
-        context: { subscriptionId: updatedSubscription.id },
-        effect: () =>
-          this.host.sendSlackSubscriptionEvent({
-            type: "confirmed",
-            organizationId: updatedSubscription.organizationId,
-            organizationName: updatedSubscription.organization.name,
-            plan: updatedSubscription.plan,
-            subscriptionId: updatedSubscription.id,
-            startDate: updatedSubscription.startDate,
-            maxMembers: updatedSubscription.maxMembers,
-            maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
-          }),
-      });
-
-      NurturingSubscriptionSyncService.fireSubscriptionSync({
-        organizationId: updatedSubscription.organizationId,
-        hasSubscription: true,
-      });
-    }
-  }
-
-  /**
-   * A paid Growth-Seat subscription entitles the org to explicit per-category
-   * retention policies at the platform default (49 days), stamped on first
-   * activation. Create-if-absent; best-effort — never fails the Stripe webhook.
-   */
-  private async applySeatRetentionPolicy(organizationId: string): Promise<void> {
-    // Create-if-absent, NOT upsert: a seat/subscription event must never
-    // overwrite an existing org-level override, which could clobber a
-    // grandfathered high policy down to 49d and DELETE data. Mirrors
-    // licenseHandler.provisionMissingRetentionPolicies.
-    let covered: Set<string>;
-    try {
-      const existing = await this.host.listOrganizationRetentionRules({
-        organizationId,
-      });
-      covered = new Set(
-        existing
-          .filter((row) => row.scopeType === "ORGANIZATION" && row.scopeId === organizationId)
-          .map((row) => row.category),
-      );
-    } catch (err) {
-      // If we can't read the current rules we can't prove a category is absent,
-      // so skip provisioning rather than risk a clobber. Ingestion still stamps
-      // PLATFORM_DEFAULT_RETENTION_DAYS via the cascade fallback.
-      logger.error(
-        { organizationId, err },
-        "[stripeWebhook] Failed to read retention rules; skipping seat provisioning",
-      );
-
-      return;
-    }
-
-    for (const category of retentionCategories) {
-      if (covered.has(category)) {
-        continue;
-      }
-
-      try {
-        await this.host.setOrganizationRetention({
-          scope: { scopeType: "ORGANIZATION", scopeId: organizationId },
-          category,
-          retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-        });
-      } catch (err) {
-        logger.error(
-          { organizationId, category, err },
-          "[stripeWebhook] Failed to apply seat retention policy",
-        );
-      }
-    }
-  }
-
-  private async clearTrialLicenseIfPresent(
-    updatedSubscription: SubscriptionWithOrg,
-    reason: string,
-  ) {
-    if (!updatedSubscription.organization.license) {
-      return;
-    }
-
-    logger.info(
-      { organizationId: updatedSubscription.organizationId },
-      `[stripeWebhook] Clearing trial license — ${reason}`,
-    );
-    await this.organizationRepository.clearTrialLicense(updatedSubscription.organizationId);
-  }
-
-  private normalizeSelectedCurrency(value?: string | null): Currency | null {
-    if (value === Currency.EUR || value === Currency.USD) {
-      return value;
-    }
-
-    return null;
+  async handleSubscriptionUpdated(params: { subscription: Stripe.Subscription }): Promise<void> {
+    await this.lifecycle.handleSubscriptionUpdated(params);
   }
 }

@@ -23,6 +23,7 @@ import {
   type DatasetListResult,
   type DatasetHead,
   type DatasetRecordPage,
+  type DatasetEntrySelection,
   type DatasetRecordMutationResult,
   type DatasetWithRecords,
   type DeleteDatasetRecordsInput,
@@ -50,7 +51,14 @@ import {
   DatasetNotReadyError,
   InvalidColumnError,
 } from "@langwatch/dataset-contract";
-import { stripNullBytes } from "../rules/dataset-sanitize.rules";
+import { DatasetRecordService } from "./dataset-record.service";
+import {
+  datasetSlugOf,
+  isDatasetRecordNotFound,
+  limitDatasetRecordsByBytes,
+  sanitizedEntry,
+  selectDatasetRecords,
+} from "../rules/dataset-selection.rules";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
 import type { DatasetRepository, DatasetUpdateInput } from "../repositories/dataset.repository";
 import type { DatasetRecordRepository } from "../repositories/dataset-record.repository";
@@ -68,9 +76,18 @@ export type DatasetServiceOptions = {
 export class DatasetService extends DatasetServiceContract {
   private readonly generateId: () => string;
 
+  private readonly records: DatasetRecordService;
+
   private constructor(private readonly options: DatasetServiceOptions) {
     super();
     this.generateId = options.generateId ?? nanoid;
+    this.records = DatasetRecordService.create({
+      options,
+      getBySlugOrId: (input) => this.getBySlugOrId(input),
+      assertReady: (dataset) => this.assertReady(dataset),
+      assertKnownColumns: (columns) => DatasetService.assertKnownColumns(columns),
+      generateId: () => this.generateId(),
+    });
   }
 
   static create(options: DatasetServiceOptions): DatasetService {
@@ -80,7 +97,7 @@ export class DatasetService extends DatasetServiceContract {
   async upsertDataset(input: UpsertDatasetInput): Promise<Dataset> {
     const parsed = upsertDatasetInputSchema.parse(input);
     const name = parsed.name.trim();
-    const slug = DatasetService.slugify(name);
+    const slug = datasetSlugOf(name);
     if (parsed.datasetId) {
       const existing = await this.getBySlugOrId({
         projectId: parsed.projectId,
@@ -150,7 +167,7 @@ export class DatasetService extends DatasetServiceContract {
 
   async validateDatasetName(input: DatasetNameInput): Promise<DatasetNameResult> {
     const parsed = datasetNameInputSchema.parse(input);
-    const slug = DatasetService.slugify(parsed.proposedName);
+    const slug = datasetSlugOf(parsed.proposedName);
     const conflict = await this.options.repository.tryFindBySlug({
       projectId: parsed.projectId,
       slug,
@@ -294,7 +311,7 @@ export class DatasetService extends DatasetServiceContract {
     await this.options.repository.restore({
       id: dataset.id,
       projectId: input.projectId,
-      slug: DatasetService.slugify(dataset.name),
+      slug: datasetSlugOf(dataset.name),
     });
 
     return { success: true };
@@ -324,253 +341,46 @@ export class DatasetService extends DatasetServiceContract {
   }
 
   async listRecords(input: DatasetPageInput): Promise<DatasetRecordPage> {
-    const parsed = datasetPageInputSchema.parse(input);
-    const dataset = await this.getBySlugOrId({
-      slugOrId: parsed.slugOrId,
-      projectId: parsed.projectId,
-    });
-    this.assertReady(dataset);
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      return this.options.content.listRecords({ dataset, input: parsed });
-    }
-
-    const result = await this.options.records.list({
-      datasetId: dataset.id,
-      projectId: parsed.projectId,
-      page: parsed.page ?? 1,
-      limit: parsed.limit ?? 50,
-    });
-    const page = parsed.page ?? 1;
-    const limit = parsed.limit ?? 50;
-
-    return {
-      data: result.records,
-      pagination: {
-        page,
-        limit,
-        total: result.total,
-        totalPages: result.total === 0 ? 0 : Math.ceil(result.total / limit),
-      },
-    };
+    return this.records.listRecords(input);
   }
 
   async getDatasetPage(input: DatasetPageInput): Promise<DatasetPage> {
-    const parsed = datasetPageInputSchema.parse(input);
-    const dataset = await this.getBySlugOrId({
-      slugOrId: parsed.slugOrId,
-      projectId: parsed.projectId,
-    });
-    this.assertReady(dataset);
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      return this.options.content.getDatasetPage({ dataset, input: parsed });
-    }
-
-    const page = await this.options.records.list({
-      datasetId: dataset.id,
-      projectId: parsed.projectId,
-      page: parsed.page ?? 1,
-      limit: parsed.limit ?? 50,
-    });
-
-    return {
-      id: dataset.id,
-      name: dataset.name,
-      columnTypes: dataset.columnTypes,
-      datasetRecords: page.records,
-      count: page.total,
-      page: parsed.page ?? 1,
-      limit: parsed.limit ?? 50,
-      totalPages: page.total === 0 ? 0 : Math.ceil(page.total / (parsed.limit ?? 50)),
-    };
+    return this.records.getDatasetPage(input);
   }
 
   async getDatasetWithRecords(
     input: DatasetLookupInput & {
       limitMb?: number | null;
-      entrySelection?: import("@langwatch/dataset-contract").DatasetEntrySelection;
+      entrySelection?: DatasetEntrySelection;
     },
   ): Promise<DatasetWithRecords> {
-    const parsed = datasetWithRecordsInputSchema.parse(input);
-    const dataset = await this.getBySlugOrId({
-      slugOrId: parsed.slugOrId,
-      projectId: parsed.projectId,
-    });
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      return this.options.content.getDatasetWithRecords({
-        dataset,
-        projectId: parsed.projectId,
-        entrySelection: parsed.entrySelection,
-        limitMb: parsed.limitMb ?? 5,
-      });
-    }
-
-    const records: DatasetRecord[] = [];
-    let page = 1;
-    while (true) {
-      const result = await this.listRecords({
-        slugOrId: parsed.slugOrId,
-        projectId: parsed.projectId,
-        page,
-        limit: 200,
-      });
-      records.push(...result.data);
-      if (result.data.length < 200 || records.length >= result.pagination.total) {
-        break;
-      }
-
-      page += 1;
-    }
-
-    const selected = DatasetService.selectRecords(records, parsed.entrySelection);
-    const limited = DatasetService.limitRecordsByBytes(selected, parsed.limitMb ?? 5);
-
-    return { dataset, records: limited.records, truncated: limited.truncated };
+    return this.records.getDatasetWithRecords(input);
   }
 
   async getDatasetHead(input: DatasetLookupInput): Promise<DatasetHead> {
-    const parsed = datasetLookupInputSchema.parse(input);
-    const dataset = await this.getBySlugOrId({
-      slugOrId: parsed.slugOrId,
-      projectId: parsed.projectId,
-    });
-    this.assertReady(dataset);
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      return this.options.content.getDatasetHead({ dataset });
-    }
-
-    const page = await this.listRecords({
-      slugOrId: parsed.slugOrId,
-      projectId: parsed.projectId,
-      page: 1,
-      limit: 5,
-    });
-
-    return { dataset, records: page.data, total: page.pagination.total };
+    return this.records.getDatasetHead(input);
   }
 
   async upsertRecord(
     input: UpdateDatasetRecordInput & { recordId: string },
   ): Promise<DatasetRecordMutationResult> {
-    const parsed = updateDatasetRecordInputSchema.parse(input);
-    const dataset = await this.getBySlugOrId({
-      slugOrId: parsed.slugOrId,
-      projectId: parsed.projectId,
-    });
-    this.assertReady(dataset);
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      return this.options.content.upsertRecord({ dataset, input: parsed });
-    }
-
-    try {
-      return {
-        record: await this.options.records.update({
-          id: parsed.recordId,
-          datasetId: dataset.id,
-          projectId: parsed.projectId,
-          entry: sanitizedEntry(parsed.updatedRecord),
-        }),
-        created: false,
-      };
-    } catch (error) {
-      if (!DatasetService.isNotFound(error)) {
-        throw error;
-      }
-    }
-
-    const [record] = await this.options.records.createMany({
-      datasetId: dataset.id,
-      projectId: parsed.projectId,
-      entries: [{ id: parsed.recordId, ...sanitizedEntry(parsed.updatedRecord) }],
-    });
-    if (!record) {
-      throw new Error("Dataset record creation returned no record");
-    }
-
-    return { record, created: true };
+    return this.records.upsertRecord(input);
   }
 
   async batchCreateRecords(input: CreateDatasetRecordsInput): Promise<DatasetRecord[]> {
-    const parsed = createDatasetRecordsInputSchema.parse(input);
-    const dataset = await this.getBySlugOrId({
-      slugOrId: parsed.slugOrId,
-      projectId: parsed.projectId,
-    });
-    this.assertReady(dataset);
-    const columns = dataset.columnTypes.map((column) => column.name);
-    DatasetService.assertKnownColumns({
-      datasetName: dataset.name,
-      columns,
-      entries: parsed.entries,
-    });
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      return this.options.content.batchCreateRecords({ dataset, input: parsed });
-    }
-
-    return this.options.records.createMany({
-      datasetId: dataset.id,
-      projectId: parsed.projectId,
-      entries: parsed.entries.map((entry) => ({
-        id: entry.id ?? this.generateId(),
-        ...sanitizedEntry(Object.fromEntries(columns.map((c) => [c, entry[c] ?? null]))),
-      })),
-    });
+    return this.records.batchCreateRecords(input);
   }
 
   async createRecords(input: CreateDatasetRecordsInput): Promise<DatasetRecord[]> {
-    const parsed = createDatasetRecordsInputSchema.parse(input);
-
-    return this.batchCreateRecords(parsed);
+    return this.records.createRecords(input);
   }
 
   async updateRecord(input: UpdateDatasetRecordInput): Promise<DatasetRecord> {
-    const parsed = updateDatasetRecordInputSchema.parse(input);
-    const dataset = await this.getBySlugOrId({
-      slugOrId: parsed.slugOrId,
-      projectId: parsed.projectId,
-    });
-    this.assertReady(dataset);
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      const result = await this.options.content.upsertRecord({
-        dataset,
-        input: { ...parsed, recordId: parsed.recordId },
-      });
-
-      return result.record;
-    }
-
-    try {
-      return await this.options.records.update({
-        id: parsed.recordId,
-        datasetId: dataset.id,
-        projectId: parsed.projectId,
-        entry: sanitizedEntry(parsed.updatedRecord),
-      });
-    } catch (error) {
-      if (DatasetService.isNotFound(error)) {
-        throw new DatasetRecordNotFoundError();
-      }
-
-      throw error;
-    }
+    return this.records.updateRecord(input);
   }
 
   async deleteRecords(input: DeleteDatasetRecordsInput): Promise<{ count: number }> {
-    const parsed = deleteDatasetRecordsInputSchema.parse(input);
-    const dataset = await this.getBySlugOrId({
-      slugOrId: parsed.slugOrId,
-      projectId: parsed.projectId,
-    });
-    this.assertReady(dataset);
-    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
-      return this.options.content.deleteRecords({ dataset, input: parsed });
-    }
-
-    const count = await this.options.records.deleteMany({
-      ...parsed,
-      datasetId: dataset.id,
-    });
-
-    return { count };
+    return this.records.deleteRecords(input);
   }
 
   async uploadToExistingDataset(
@@ -738,75 +548,4 @@ export class DatasetService extends DatasetServiceContract {
 
     await this.options.queue.enqueueNormalize({ projectId, datasetId });
   }
-
-  private static slugify(value: string): string {
-    const slug = value
-      .normalize("NFKD")
-      .replaceAll(/[^\p{L}\p{N}]+/gu, "-")
-      .replaceAll(/^-+|-+$/g, "")
-      .toLowerCase();
-
-    return slug || "dataset";
-  }
-
-  private static isNotFound(error: unknown): boolean {
-    return error instanceof Error && error.name === "DatasetRecordNotFoundError";
-  }
-
-  private static selectRecords(
-    records: DatasetRecord[],
-    selection: import("@langwatch/dataset-contract").DatasetEntrySelection,
-  ): DatasetRecord[] {
-    if (selection === "all") {
-      return records;
-    }
-
-    if (records.length === 0) {
-      return [];
-    }
-
-    const index =
-      selection === "first"
-        ? 0
-        : selection === "last"
-          ? records.length - 1
-          : selection === "random"
-            ? Math.floor(Math.random() * records.length)
-            : Math.min(Math.max(selection, 0), records.length - 1);
-
-    return [records[index]!];
-  }
-
-  private static limitRecordsByBytes(
-    records: DatasetRecord[],
-    limitMb: number | null,
-  ): { records: DatasetRecord[]; truncated: boolean } {
-    if (limitMb === null) {
-      return { records, truncated: false };
-    }
-
-    const limitBytes = limitMb * 1024 * 1024;
-    let bytes = 0;
-    const result: DatasetRecord[] = [];
-    for (const record of records) {
-      const recordBytes = JSON.stringify(record.entry).length;
-      if (bytes + recordBytes >= limitBytes) {
-        return { records: result, truncated: true };
-      }
-
-      bytes += recordBytes;
-      result.push(record);
-    }
-
-    return { records: result, truncated: false };
-  }
-}
-
-/**
- * Postgres jsonb cannot hold U+0000, so a customer-supplied entry is scrubbed
- * before it reaches the inline record table. The s3_jsonl paths scrub in the
- * chunk writer instead.
- */
-function sanitizedEntry(entry: Record<string, unknown>): Record<string, unknown> {
-  return stripNullBytes(entry) as Record<string, unknown>;
 }

@@ -24,6 +24,16 @@ export type DataPrivacySnapshotPolicies = Readonly<{
   listOrganizationRules(input: { organizationId: string }): Promise<DataPrivacyPolicy[]>;
 }>;
 
+type DataPrivacyDirectory = Awaited<
+  ReturnType<DataPrivacyDirectoryPort["listOrganizationDirectory"]>
+>;
+
+/** Reading a scope: whether this user may see its rule, and what the scope is called. */
+type ScopeLens = {
+  canRead(scopeType: DataPrivacyScopeType, scopeId: string): boolean;
+  nameOf(scopeType: DataPrivacyScopeType, scopeId: string): string;
+};
+
 export class DataPrivacySnapshotService {
   static create(options: {
     policies: DataPrivacySnapshotPolicies;
@@ -47,12 +57,30 @@ export class DataPrivacySnapshotService {
     ]);
 
     const organizationId = project?.organizationId ?? null;
-    const organizationName = project?.organizationName ?? null;
-
     if (!organizationId) {
       return this.personalAccountSnapshot({ userId, projectId, effective, project });
     }
 
+    return this.organizationSnapshot({
+      userId,
+      projectId,
+      effective,
+      project,
+      organizationId,
+      organizationName: project?.organizationName ?? null,
+    });
+  }
+
+  /** The snapshot for a project inside an organization: its cascade, its rules, its pickers. */
+  private async organizationSnapshot(input: {
+    userId: string;
+    projectId: string;
+    effective: DataPrivacySnapshot["effective"];
+    project: { teamId: string | null } | null;
+    organizationId: string;
+    organizationName: string | null;
+  }): Promise<DataPrivacySnapshot> {
+    const { userId, projectId, organizationId, organizationName } = input;
     const [directory, rows, canManageOrganization] = await Promise.all([
       this.directory.listOrganizationDirectory({ organizationId }),
       this.policies.listOrganizationRules({ organizationId }),
@@ -72,38 +100,83 @@ export class DataPrivacySnapshotService {
       }),
     ]);
 
+    const lens = this.scopeLens({
+      directory,
+      organizationName,
+      canManageOrganization,
+      teamManage,
+      projectUpdate,
+    });
+    const allRows = this.parseRows(rows);
+    const baselines = this.baselineCascades({
+      rows: allRows,
+      organizationId,
+      teamId: input.project?.teamId ?? "",
+    });
+
+    return {
+      projectId,
+      effective: input.effective,
+      effectiveTeam: baselines.effectiveTeam,
+      effectiveOrganization: baselines.effectiveOrganization,
+      rules: this.visibleRules({ rows: allRows, lens }),
+      available: this.availableScopes({
+        directory,
+        organizationId,
+        organizationName,
+        canManageOrganization,
+        teamManage,
+        projectUpdate,
+      }),
+      audienceOptions: { groups: [...directory.groups] },
+    };
+  }
+
+  /** Who may read a scope's rule, and what that scope is called on the page. */
+  private scopeLens(input: {
+    directory: DataPrivacyDirectory;
+    organizationName: string | null;
+    canManageOrganization: boolean;
+    teamManage: ReadonlyMap<string, boolean>;
+    projectUpdate: ReadonlyMap<string, boolean>;
+  }): ScopeLens {
+    const { directory, organizationName, canManageOrganization, teamManage, projectUpdate } = input;
     const departmentName = new Map(directory.departments.map((row) => [row.id, row.name]));
     const teamName = new Map(directory.teams.map((row) => [row.id, row.name]));
     const projectName = new Map(directory.projects.map((row) => [row.id, row.name]));
 
-    const canReadScope = (scopeType: DataPrivacyScopeType, scopeId: string): boolean => {
-      if (scopeType === "ORGANIZATION" || scopeType === "DEPARTMENT") {
-        return canManageOrganization;
-      }
+    return {
+      canRead: (scopeType, scopeId) => {
+        if (scopeType === "ORGANIZATION" || scopeType === "DEPARTMENT") {
+          return canManageOrganization;
+        }
 
-      if (scopeType === "TEAM") {
-        return teamManage.get(scopeId) === true;
-      }
+        if (scopeType === "TEAM") {
+          return teamManage.get(scopeId) === true;
+        }
 
-      return projectUpdate.get(scopeId) === true;
+        return projectUpdate.get(scopeId) === true;
+      },
+      nameOf: (scopeType, scopeId) => {
+        if (scopeType === "ORGANIZATION") {
+          return organizationName ?? scopeId;
+        }
+
+        if (scopeType === "DEPARTMENT") {
+          return departmentName.get(scopeId) ?? scopeId;
+        }
+
+        if (scopeType === "TEAM") {
+          return teamName.get(scopeId) ?? scopeId;
+        }
+
+        return projectName.get(scopeId) ?? scopeId;
+      },
     };
+  }
 
-    const scopeName = (scopeType: DataPrivacyScopeType, scopeId: string): string => {
-      if (scopeType === "ORGANIZATION") {
-        return organizationName ?? scopeId;
-      }
-
-      if (scopeType === "DEPARTMENT") {
-        return departmentName.get(scopeId) ?? scopeId;
-      }
-
-      if (scopeType === "TEAM") {
-        return teamName.get(scopeId) ?? scopeId;
-      }
-
-      return projectName.get(scopeId) ?? scopeId;
-    };
-
+  /** The stored rules whose config still parses; anything else is not renderable. */
+  private parseRows(rows: DataPrivacyPolicy[]): DataPrivacyRow[] {
     const allRows: DataPrivacyRow[] = [];
     for (const row of rows) {
       const parsed = dataPrivacyConfigSchema.safeParse(row.config);
@@ -119,46 +192,66 @@ export class DataPrivacySnapshotService {
       });
     }
 
-    // Synthetic facts with empty narrower ids make those tiers no-ops, which is
-    // what turns the one cascade into the two baselines the page compares
-    // against.
-    const effectiveTeam = resolveDataPrivacy({
-      rows: allRows,
-      facts: {
-        organizationId,
-        teamId: project?.teamId ?? "",
-        projectId: "",
-        departmentId: null,
-        isPersonal: false,
-      },
-    });
-    const effectiveOrganization = resolveDataPrivacy({
-      rows: allRows,
-      facts: {
-        organizationId,
-        teamId: "",
-        projectId: "",
-        departmentId: null,
-        isPersonal: false,
-      },
-    });
+    return allRows;
+  }
 
-    const rules: DataPrivacyRule[] = [];
-    for (const row of allRows) {
-      if (!canReadScope(row.scopeType, row.scopeId)) {
-        continue;
-      }
+  /**
+   * Synthetic facts with empty narrower ids make those tiers no-ops, which is
+   * what turns the one cascade into the two baselines the page compares against.
+   */
+  private baselineCascades(input: {
+    rows: DataPrivacyRow[];
+    organizationId: string;
+    teamId: string;
+  }): {
+    effectiveTeam: DataPrivacySnapshot["effectiveTeam"];
+    effectiveOrganization: DataPrivacySnapshot["effectiveOrganization"];
+  } {
+    const { rows, organizationId, teamId } = input;
 
-      rules.push({
+    return {
+      effectiveTeam: resolveDataPrivacy({
+        rows,
+        facts: { organizationId, teamId, projectId: "", departmentId: null, isPersonal: false },
+      }),
+      effectiveOrganization: resolveDataPrivacy({
+        rows,
+        facts: {
+          organizationId,
+          teamId: "",
+          projectId: "",
+          departmentId: null,
+          isPersonal: false,
+        },
+      }),
+    };
+  }
+
+  /** The rules this reader may see, named for the scope each sits at. */
+  private visibleRules(input: { rows: DataPrivacyRow[]; lens: ScopeLens }): DataPrivacyRule[] {
+    return input.rows
+      .filter((row) => input.lens.canRead(row.scopeType, row.scopeId))
+      .map((row) => ({
         scopeType: row.scopeType,
         scopeId: row.scopeId,
-        name: scopeName(row.scopeType, row.scopeId),
+        name: input.lens.nameOf(row.scopeType, row.scopeId),
         personalOnly: row.personalOnly,
         config: row.config,
-      });
-    }
+      }));
+  }
 
-    const available: DataPrivacyScopeAvailable = {
+  /** The scopes this reader may write a new rule at, as the pickers offer them. */
+  private availableScopes(input: {
+    directory: DataPrivacyDirectory;
+    organizationId: string;
+    organizationName: string | null;
+    canManageOrganization: boolean;
+    teamManage: ReadonlyMap<string, boolean>;
+    projectUpdate: ReadonlyMap<string, boolean>;
+  }): DataPrivacyScopeAvailable {
+    const { directory, organizationId, organizationName, canManageOrganization } = input;
+
+    return {
       organization: canManageOrganization
         ? { id: organizationId, name: organizationName ?? organizationId }
         : null,
@@ -169,21 +262,11 @@ export class DataPrivacySnapshotService {
         ? directory.departments.filter((row) => !row.archived).map(({ id, name }) => ({ id, name }))
         : [],
       teams: directory.teams
-        .filter((team) => teamManage.get(team.id) === true)
+        .filter((team) => input.teamManage.get(team.id) === true)
         .map(({ id, name }) => ({ id, name })),
       projects: directory.projects
-        .filter((candidate) => projectUpdate.get(candidate.id) === true)
+        .filter((candidate) => input.projectUpdate.get(candidate.id) === true)
         .map(({ id, name, teamId }) => ({ id, name, teamId })),
-    };
-
-    return {
-      projectId,
-      effective,
-      effectiveTeam,
-      effectiveOrganization,
-      rules,
-      available,
-      audienceOptions: { groups: [...directory.groups] },
     };
   }
 

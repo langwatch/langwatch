@@ -18,12 +18,9 @@ export class PrismaImpersonationRepository extends ImpersonationRepository {
   }
 
   /**
-   * The memberships ride along as a NESTED read on purpose. "Which of this
-   * person's organizations require a second factor" carries no
-   * single-organization predicate, so a top-level `organizationUser.findMany`
-   * is refused by the tenancy guard (ADR-021) and takes the whole request down
-   * rather than deciding it. Reading them through the target row asks the same
-   * question in one round trip, where the guard is right not to look.
+   * Memberships ride along as a NESTED read on purpose: a top-level
+   * `organizationUser.findMany` carries no single-organization predicate,
+   * so the tenancy guard (ADR-021) refuses it outright.
    */
   async tryFindTarget(userId: string): Promise<ImpersonationTarget | null> {
     const row = await this.database.user.findUnique({
