@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/langwatch/langwatch/compare/skills@v1.3.0...skills@v1.3.1) (2026-09-05)
+
+
+### Documentation
+
+* **improve-your-agent:** follow-ups: plain connected target, native GEPA tracking, writing-rules sweep ([#7897](https://github.com/langwatch/langwatch/issues/7897)) ([a710273](https://github.com/langwatch/langwatch/commit/a7102738c0f13b9c8dd8152c3b947d72f4b604c4))
+
 ## [1.3.0](https://github.com/langwatch/langwatch/compare/skills@v1.2.0...skills@v1.3.0) (2026-09-01)
 
 
