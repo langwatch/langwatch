@@ -51,6 +51,7 @@ import {
   groupWriteAckSchema,
   organizationApiScopeSchema,
   organizationGroupSchema,
+  type OrganizationGroupBinding,
 } from "@langwatch/organization-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import type { OrganizationApp } from "#app/organization.app";
@@ -111,6 +112,25 @@ const ORGANIZATION_MANAGE: AuthzDeclaration = {
   permission: "organization:manage",
 };
 
+/** Resolves one binding's scope id to the name an admin reads, keeping every other field as-is. */
+function withResolvedScopeName(scopeNames: ReadonlyMap<string, string>) {
+  return (binding: OrganizationGroupBinding) => ({
+    ...binding,
+    scopeName: scopeNames.get(binding.scopeId) ?? null,
+  });
+}
+
+/** The member drawer's binding shape: named fields only, scope id dropped for its resolved name. */
+function toGroupMembershipBinding(scopeNames: ReadonlyMap<string, string>) {
+  return (binding: OrganizationGroupBinding) => ({
+    id: binding.id,
+    role: binding.role,
+    customRoleName: binding.customRoleName,
+    scopeType: binding.scopeType,
+    scopeName: scopeNames.get(binding.scopeId) ?? binding.scopeId,
+  });
+}
+
 /**
  * Installs the complete `group.*` tRPC surface on a process-owned root. The
  * procedure and the policy are injected by the process so its auth, audit,
@@ -157,10 +177,7 @@ export class GroupTrpcApi {
               externalId: group.externalId,
               scimSource: group.scimSource,
               memberCount: group.memberCount,
-              bindings: group.bindings.map((binding) => ({
-                ...binding,
-                scopeName: scopeNames.get(binding.scopeId) ?? null,
-              })),
+              bindings: group.bindings.map(withResolvedScopeName(scopeNames)),
               createdAt: group.createdAt,
             }));
           }),
@@ -270,13 +287,7 @@ export class GroupTrpcApi {
               id: group.id,
               name: group.name,
               scimSource: group.scimSource,
-              bindings: group.bindings.map((binding) => ({
-                id: binding.id,
-                role: binding.role,
-                customRoleName: binding.customRoleName,
-                scopeType: binding.scopeType,
-                scopeName: scopeNames.get(binding.scopeId) ?? binding.scopeId,
-              })),
+              bindings: group.bindings.map(toGroupMembershipBinding(scopeNames)),
             }));
           }),
       )

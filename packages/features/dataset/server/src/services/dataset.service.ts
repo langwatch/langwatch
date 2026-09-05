@@ -1,14 +1,9 @@
 import { nanoid } from "nanoid";
 import {
-  DatasetRecordNotFoundError,
   DatasetService as DatasetServiceContract,
   copyDatasetInputSchema,
-  createDatasetRecordsInputSchema,
   datasetLookupInputSchema,
-  datasetWithRecordsInputSchema,
   datasetNameInputSchema,
-  datasetPageInputSchema,
-  deleteDatasetRecordsInputSchema,
   listDatasetsInputSchema,
   type CopyDatasetInput,
   type CreateDatasetRecordsInput,
@@ -37,7 +32,6 @@ import {
   type UpdateDatasetRecordInput,
   type UploadExistingDatasetInput,
   type UpsertDatasetInput,
-  updateDatasetRecordInputSchema,
   upsertDatasetInputSchema,
 } from "@langwatch/dataset-contract";
 import type {
@@ -52,13 +46,7 @@ import {
   InvalidColumnError,
 } from "@langwatch/dataset-contract";
 import { DatasetRecordService } from "./dataset-record.service";
-import {
-  datasetSlugOf,
-  isDatasetRecordNotFound,
-  limitDatasetRecordsByBytes,
-  sanitizedEntry,
-  selectDatasetRecords,
-} from "../rules/dataset-selection.rules";
+import { datasetSlugOf } from "../rules/dataset-selection.rules";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
 import type { DatasetRepository, DatasetUpdateInput } from "../repositories/dataset.repository";
 import type { DatasetRecordRepository } from "../repositories/dataset-record.repository";

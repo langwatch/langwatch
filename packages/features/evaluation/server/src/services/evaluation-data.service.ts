@@ -5,10 +5,8 @@
 
 import {
   AVAILABLE_EVALUATORS,
-  codeEvaluatorIdFromCheckType,
   DEFAULT_MAPPINGS,
   isCodeEvaluatorCheckType,
-  isNativeEvaluatorType,
   migrateLegacyMappings,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
@@ -29,10 +27,7 @@ import {
 import type { EvaluationTraceProtections } from "../ports/evaluation-execution.port";
 import type { DataForEvaluation, EvaluationExecutionDeps } from "./evaluation-execution.service";
 import { EvaluationThreadMappingService } from "./evaluation-thread-mapping.service";
-import {
-  EvaluatorAvailabilityService,
-  type EvaluatorInstallEnvironment,
-} from "./evaluator-availability.service";
+import { EvaluatorAvailabilityService } from "./evaluator-availability.service";
 
 // Evaluations need full access to trace data — no user-facing redaction.
 const INTERNAL_PROTECTIONS: EvaluationTraceProtections = {

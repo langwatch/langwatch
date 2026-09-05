@@ -65,9 +65,16 @@ function adjustTimeScaleForBucketCap({
   startDate: Date;
   endDate: Date;
 }): number | "full" {
-  if (timeScale === undefined) return MINUTES_PER_DAY;
-  if (timeScale === "full") return timeScale;
+  if (timeScale === undefined) {
+    return MINUTES_PER_DAY;
+  }
+
+  if (timeScale === "full") {
+    return timeScale;
+  }
+
   const estimatedBuckets = (endDate.getTime() - startDate.getTime()) / MS_PER_MINUTE / timeScale;
+
   return estimatedBuckets > MAX_TIMESERIES_BUCKETS ? MINUTES_PER_DAY : timeScale;
 }
 

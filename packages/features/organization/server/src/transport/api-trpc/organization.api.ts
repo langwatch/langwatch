@@ -435,6 +435,22 @@ function sessionUser(ctx: OrganizationTrpcContext): OrganizationTrpcSessionUser 
   return user;
 }
 
+/** Matches a project by id — the demo project carve-out, reused across the getAll walk. */
+function projectMatchesId(id: string) {
+  return (project: Readonly<{ id: string }>) => project.id === id;
+}
+
+/** Matches a member whose userId is one of the given ids — the demo/self carve-outs. */
+function memberIsOneOf(...userIds: readonly string[]) {
+  return (member: Readonly<{ userId: string }>) => userIds.includes(member.userId);
+}
+
+/** Whether an invite names a custom role on any of its teams. */
+function inviteHasCustomRole(ports: Readonly<{ isCustomRole(role: string): boolean }>) {
+  return (invite: Readonly<{ teams?: readonly Readonly<{ role: unknown }>[] | null }>): boolean =>
+    (invite.teams ?? []).some((t) => typeof t.role === "string" && ports.isCustomRole(t.role));
+}
+
 /** Installs the complete `organization.*` tRPC surface on a process-owned root. */
 export class OrganizationTrpcApi {
   static create<
@@ -675,7 +691,7 @@ export class OrganizationTrpcApi {
                 const isDemoOrg =
                   isDemo &&
                   organization.teams.some((team) =>
-                    team.projects.some((project) => project.id === demoProjectId),
+                    team.projects.some(projectMatchesId(demoProjectId)),
                   );
 
                 organization.members = organization.members.filter(
@@ -736,9 +752,7 @@ export class OrganizationTrpcApi {
                   organization.members[0]?.role !== "MEMBER";
 
                 organization.teams = organization.teams.filter((team) => {
-                  team.members = team.members.filter(
-                    (member) => member.userId === userId || member.userId === demoProjectUserId,
-                  );
+                  team.members = team.members.filter(memberIsOneOf(userId, demoProjectUserId));
 
                   // RoleBinding is authoritative for team membership and role. Always prefer a team-scoped RoleBinding over any stale TeamUser row, since
                   // dual-writes to TeamUser have been removed. Org-scoped bindings are intentionally excluded: org MEMBER/VIEWER bindings only grant
@@ -754,21 +768,15 @@ export class OrganizationTrpcApi {
                   team.members = enriched.members;
 
                   if (isDemoOrg) return true;
-                  return isExternal
-                    ? team.members.some((member) => member.userId === userId)
-                    : true;
+                  return isExternal ? team.members.some(memberIsOneOf(userId)) : true;
                 });
 
                 if (isDemoOrg) {
                   organization.teams = organization.teams.flatMap((team) => {
-                    if (team.projects.some((project) => project.id === demoProjectId)) {
-                      team.projects = team.projects.filter(
-                        (project) => project.id === demoProjectId,
-                      );
+                    if (team.projects.some(projectMatchesId(demoProjectId))) {
+                      team.projects = team.projects.filter(projectMatchesId(demoProjectId));
 
-                      team.members = team.members.filter(
-                        (member) => member.userId === demoProjectUserId || member.userId === userId,
-                      );
+                      team.members = team.members.filter(memberIsOneOf(demoProjectUserId, userId));
                       return [team];
                     }
                     return [];
@@ -906,11 +914,7 @@ export class OrganizationTrpcApi {
             .withPermission(ORGANIZATION_MANAGE)
             .handle(async ({ input, ctx }) => {
               const user = sessionUser(ctx);
-              const hasCustomRoleInvite = input.invites.some((invite) =>
-                (invite.teams ?? []).some(
-                  (t) => typeof t.role === "string" && ports.isCustomRole(t.role),
-                ),
-              );
+              const hasCustomRoleInvite = input.invites.some(inviteHasCustomRole(ports));
               if (hasCustomRoleInvite) {
                 await ports.assertCustomRolesAllowed(ctx, {
                   organizationId: input.organizationId,

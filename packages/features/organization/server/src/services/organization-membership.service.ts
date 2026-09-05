@@ -13,17 +13,9 @@ import {
 } from "@langwatch/organization-contract";
 import type { AuthzBindingForSynthesis } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { PersonalWorkspaceNotManagedHereError } from "@langwatch/organization-contract";
 import slugify from "slugify";
 import { OrganizationMemberRoleService } from "./organization-member-role.service";
-import { isCustomRole } from "../rules/custom-role-naming.rules";
-import type { TeamRoleValue } from "../rules/member-role-constraints.rules";
-import {
-  CannotDisableSelfError,
-  CannotRemoveSelfError,
-  MemberNotFoundError,
-  MemberSeatLimitReachedError,
-} from "@langwatch/organization-contract";
+import { CannotRemoveSelfError, MemberNotFoundError } from "@langwatch/organization-contract";
 
 import {
   OrganizationGrantCachePort,
@@ -43,7 +35,6 @@ import type {
   OrganizationProvisioningSummary,
   OrganizationMembershipRepository,
   OrganizationWithMembersAndTheirTeams,
-  UpdateMemberRoleResult,
 } from "../repositories/organization-membership.repository";
 
 /** The KSUID resources an organization and its first team are born under. */
@@ -64,19 +55,6 @@ type TeamMembershipLike = {
   createdAt: Date;
   updatedAt: Date;
 };
-
-/**
- * A team-role update the caller could not have meant: it names a different
- * member, or a team outside the organization whose seats are being changed.
- */
-class TeamRoleUpdateRejectedError extends HandledError {
-  declare readonly code: "validation_error";
-
-  constructor(message: string, meta: Readonly<Record<string, unknown>>) {
-    super("validation_error", message, { httpStatus: 400, fault: "customer", meta });
-    this.name = "TeamRoleUpdateRejectedError";
-  }
-}
 
 /**
  * The membership, provisioning and audit operations, over one repository and

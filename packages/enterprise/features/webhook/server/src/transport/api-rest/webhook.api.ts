@@ -10,11 +10,7 @@ import {
   canonicalConflictResponses,
   createCanonicalFamilyErrorHandler,
   ForbiddenError,
-  idempotencyKeyParameter,
-  idempotentJson,
   idempotentReplayHeaders,
-  IDEMPOTENCY_KEY_HEADER,
-  readIdempotencyKey,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
   type OrganizationScopedContext,
@@ -349,17 +345,6 @@ const nextCursorSchema = z
     "Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more.",
   );
 
-/** One documented 200, in this family's canonical envelope for errors. */
-function okResponse(description: string, schema: z.ZodTypeAny) {
-  return {
-    ...canonicalBaseResponses,
-    200: {
-      description,
-      content: { "application/json": { schema: resolver(schema) } },
-    },
-  };
-}
-
 /** The refusal every route that names an endpoint or an event can answer. */
 const notFoundResponse = {
   404: {
@@ -533,45 +518,33 @@ export function createWebhookRestApp(options: {
       MANAGEMENT_API_VERSION,
       async (c: WebhookContext, body: z.infer<typeof createEndpointSchema>) => {
         const organization = organizationOf(c);
-        const services = webhooks();
-        // Scoped to the organization, not a project: this family authenticates at
-        // the org, so that is the tenancy a key is unique within.
-        const outcome = await services.runIdempotent({
-          operation: "webhooks.v1.endpoints.create",
-          scopeId: organization.id,
-          key: readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER)),
-          validatedBody: body,
-          handler: async () => {
-            const { endpoint, secret } = await services.endpoints.create({
-              organizationId: organization.id,
-              ...destinationFromBody(body),
-              enabledEvents: body.enabled_events,
-              maxBatchSize: body.max_batch_size,
-              maxBatchDelayMs: body.max_batch_delay_ms,
-              maxInFlight: body.max_in_flight,
-            });
-            return {
-              status: 201,
-              body: { data: { ...endpointResponse(endpoint), secret } },
-            };
-          },
+        const { endpoint, secret } = await webhooks().endpoints.create({
+          organizationId: organization.id,
+          ...destinationFromBody(body),
+          enabledEvents: body.enabled_events,
+          maxBatchSize: body.max_batch_size,
+          maxBatchDelayMs: body.max_batch_delay_ms,
+          maxInFlight: body.max_in_flight,
         });
-        return idempotentJson({ c, outcome });
+        return { data: { ...endpointResponse(endpoint), secret } };
       },
       (b) =>
         policy(requires("webhookEndpoints:manage"))(b)
           .withInput(createEndpointSchema)
-          // The ledger writes the replay from the STORED bytes, so the answer
-          // is written through rather than re-serialised: a replay of a lost
-          // create is the only way to recover its signing secret.
-          .withRawResponse(
-            "a replayable create answers the ORIGINAL stored response, marked with " +
-              "X-Idempotent-Replay, so it cannot drift from the answer it stands in for",
-          )
+          .withOutput(z.object({ data: endpointWithSecretDtoSchema }))
+          .withStatus(201)
+          // Scoped to the organization, not a project: this family
+          // authenticates at the org, so that is the tenancy a key is unique
+          // within. The framework reads the key, dispatches through the
+          // process's ledger and writes a replay from the STORED bytes — a
+          // replay of a lost create is the only way to recover its secret.
+          .withIdempotency({
+            operation: "webhooks.v1.endpoints.create",
+            scope: (c) => organizationOf(c).id,
+          })
           .withDocs({
             tags: ["Webhooks"],
             summary: "Create a webhook endpoint",
-            parameters: [idempotencyKeyParameter],
             description:
               "Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for `destination_kind: sqs`. Naming the other kind's field is a 400 that says which field does not belong, rather than a 201 that saved half the body. `destination_kind` may be omitted and then means `http`. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
             responses: {

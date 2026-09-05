@@ -119,6 +119,7 @@ export class RecentItemsService {
         }
 
         const href = `/${prompt.project.slug}/prompts?prompt=${prompt.id}`;
+
         return { id: prompt.id, name: prompt.name, href };
       }
       case "workflow": {
@@ -128,6 +129,7 @@ export class RecentItemsService {
         }
 
         const href = `/${workflow.project.slug}/studio/${workflow.id}`;
+
         return { id: workflow.id, name: workflow.name, href };
       }
       case "dataset": {
@@ -137,6 +139,7 @@ export class RecentItemsService {
         }
 
         const href = `/${dataset.project.slug}/datasets/${dataset.id}`;
+
         return { id: dataset.id, name: dataset.name, href };
       }
       case "evaluation": {
@@ -146,6 +149,7 @@ export class RecentItemsService {
         }
 
         const href = `/${monitor.project.slug}/online-evaluations`;
+
         return { id: monitor.id, name: monitor.name, href };
       }
       case "annotation": {
@@ -155,6 +159,7 @@ export class RecentItemsService {
         }
 
         const href = `/${queue.project.slug}/annotations/${queue.slug}`;
+
         return { id: queue.id, name: queue.name, href };
       }
       default:

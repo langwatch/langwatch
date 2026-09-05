@@ -1,28 +1,12 @@
 import { createLogger } from "@langwatch/observability";
 import type { PostHog } from "posthog-node";
 import type Stripe from "stripe";
-import {
-  Currency,
-  isGrowthEventsPrice,
-  isGrowthSeatEventPlan,
-  isGrowthSeatPrice,
-  SubscriptionRecordNotFoundError,
-  SubscriptionStatus,
-  type StripePriceMap,
-} from "@langwatch/enterprise-billing-contract";
-import {
-  PLATFORM_DEFAULT_RETENTION_DAYS,
-  retentionCategories,
-} from "@langwatch/data-retention-contract";
+import { type StripePriceMap } from "@langwatch/enterprise-billing-contract";
 import { BestEffortService } from "./best-effort.service";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service";
 import type { BillingWebhookHostPort } from "../ports/billing-webhook-host.port";
 import type { BillingWebhookOrganizationPort } from "../ports/billing-webhook-organization.port";
-import type {
-  BillingWebhookSubscriptionPort,
-  SubscriptionWithOrg,
-} from "../ports/billing-webhook-subscription.port";
-import { NurturingSubscriptionSyncService } from "./nurturing-subscription-sync.service";
+import type { BillingWebhookSubscriptionPort } from "../ports/billing-webhook-subscription.port";
 import { BillingSubscriptionLifecycleService } from "./billing-subscription-lifecycle.service";
 import {
   BillingCheckoutCompletionService,
@@ -31,7 +15,6 @@ import {
 
 const logger = createLogger("langwatch:billing:webhookService");
 
-const VALID_CURRENCIES_FOR_CHECKOUT = new Set<string>(Object.values(Currency));
 const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
 
 type ItemCalculator = Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {

@@ -29,10 +29,14 @@ export class LangyNavigateFallbackService {
    */
   async tryResolveUrl(input: { projectId: string; resourceId: string }): Promise<string | null> {
     const path = navigatePagePathFor(input.resourceId);
-    if (!path) return null;
+    if (!path) {
+      return null;
+    }
 
     const projectSlug = await this.projects.trySlugOf(input.projectId).catch(() => null);
-    if (!projectSlug) return null;
+    if (!projectSlug) {
+      return null;
+    }
 
     return this.platformUrl({ projectSlug, path });
   }

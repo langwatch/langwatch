@@ -25,7 +25,6 @@ import {
   type OrganizationPlanUser,
 } from "../ports/organization-membership.port";
 import type {
-  MemberTeamBinding,
   OrganizationMembershipRepository,
   UpdateMemberRoleResult,
 } from "../repositories/organization-membership.repository";

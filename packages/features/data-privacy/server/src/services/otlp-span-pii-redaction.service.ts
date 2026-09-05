@@ -365,6 +365,7 @@ export class OtlpSpanPiiRedactionService {
 
     return { skipped, collected, totalLength };
   }
+
   /**
    * Redacts the body + attributes of a log record in place. Native secrets +
    * essential PII run in-process when a policy is resolvable; strict still uses

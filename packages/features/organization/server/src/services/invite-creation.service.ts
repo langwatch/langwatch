@@ -2,25 +2,17 @@
  * Creating invitations: the duplicate and membership guards, the seat-licence check, the team
  * assignments each invite carries, and the batch transaction that persists them.
  */
-import { ledgerActorFor } from "@langwatch/actor";
-import { CustomRoleIdRequiredError, type AuthzGrantsService } from "@langwatch/authz-contract";
-import { normalizeIdentifierValue } from "@langwatch/identity-contract";
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { createLogger } from "@langwatch/observability";
 import {
   AlreadyOrganizationMemberError,
-  CustomRoleNotAssignableError,
   DuplicateInviteError,
-  InviteNotFoundError,
-  InviteNotReadyError,
   LiteMemberViewerOnlyError,
   MemberSeatLimitReachedError,
   OrganizationNotFoundError,
   OrganizationUserRole,
   PersonalWorkspaceNotManagedHereError,
   RoleBindingScopeType,
-  TeamNotInOrganizationError,
   TeamUserRole,
   type Organization,
   type OrganizationInvite,
@@ -29,12 +21,7 @@ import {
 import type { PlanProvider, PlanProviderUser } from "@langwatch/entitlement-contract";
 import type { RoleService } from "@langwatch/role-contract";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository";
-import type {
-  OrganizationInviteMailPort,
-  OrganizationInviteSeatCensusPort,
-} from "../ports/invite.port";
-import { isCustomRole } from "../rules/custom-role-naming.rules";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules";
+import type { OrganizationInviteMailPort } from "../ports/invite.port";
 import { buildInviteAcceptUrl } from "../rules/invite-link.rules";
 import { InviteService } from "./invite.service";
 import { InviteTeamAssignmentService } from "./invite-team-assignment.service";
@@ -42,12 +29,9 @@ import {
   INVITE_BATCH_TXN_MAX_WAIT_MS,
   INVITE_BATCH_TXN_TIMEOUT_MS,
   INVITE_EXPIRATION_MS,
-  ROLE_BINDING_KSUID_RESOURCE,
   type CreateAdminInviteInput,
   type CreateInvitesInviteInput,
-  type CreatePaymentPendingInviteInput,
   type InviteServiceDependencies,
-  type ResolvedInviteTeams,
   type TeamAssignmentInput,
 } from "../rules/invite-contracts.rules";
 

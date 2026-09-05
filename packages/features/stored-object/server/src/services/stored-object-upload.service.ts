@@ -242,6 +242,7 @@ export class StoredObjectUploadService {
 
     return storedObjectReferenceOf(available);
   }
+
   private async readBounded(source: StoreStoredObjectFromBytesInput["bytes"]): Promise<Uint8Array> {
     const chunks: Uint8Array[] = [];
     let byteLength = 0;

@@ -1,8 +1,4 @@
-import {
-  DEFAULT_MAPPINGS,
-  mappingsReadEvaluationsSource,
-  migrateLegacyMappings,
-} from "@langwatch/evaluator-contract";
+import { mappingsReadEvaluationsSource } from "@langwatch/evaluator-contract";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorService,
@@ -10,25 +6,14 @@ import {
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
 import { isNativeEvaluatorType } from "@langwatch/evaluator-contract";
-import {
-  codeEvaluatorIdFromCheckType,
-  isCodeEvaluatorCheckType,
-} from "@langwatch/evaluator-contract";
+import { codeEvaluatorIdFromCheckType } from "@langwatch/evaluator-contract";
 import {
   type EvaluationExecutionResult,
   EvaluatorConfigError,
   EvaluatorNotFoundError,
   TraceNotEvaluatableError,
 } from "@langwatch/evaluation-contract";
-import {
-  type MappingState,
-  mapTraceToDatasetEntry,
-  SERVER_ONLY_THREAD_SOURCES,
-  SERVER_ONLY_TRACE_SOURCES,
-  THREAD_MAPPINGS,
-  type TRACE_MAPPINGS,
-  type Trace,
-} from "@langwatch/trace-contract";
+import { type MappingState, type Trace } from "@langwatch/trace-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import {
   type EvaluationExecutionTelemetryPort,
@@ -39,10 +24,7 @@ import {
   type EvaluationTraceReadPort,
   type EvaluationWorkflowExecutorPort,
 } from "../ports/evaluation-execution.port";
-import {
-  EvaluatorAvailabilityService,
-  type EvaluatorInstallEnvironment,
-} from "./evaluator-availability.service";
+import { type EvaluatorInstallEnvironment } from "./evaluator-availability.service";
 import { EvaluationThreadMappingService } from "./evaluation-thread-mapping.service";
 import { EvaluationDataService } from "./evaluation-data.service";
 import { executionResultOf } from "../rules/evaluation-execution-result.rules";

@@ -2,17 +2,14 @@
  * An invitation after it exists: resending it, asking for a fresh one, and the
  * payment-pending invites a checkout creates and later approves.
  */
-import { createLogger } from "@langwatch/observability";
 import {
   InviteNotFoundError,
-  InviteNotReadyError,
   OrganizationNotFoundError,
   type OrganizationInvite,
 } from "@langwatch/organization-contract";
 import { nanoid } from "nanoid";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository";
 import type { OrganizationInviteMailPort } from "../ports/invite.port";
-import { buildInviteAcceptUrl } from "../rules/invite-link.rules";
 import { resolveInviteDisplayStatus } from "../rules/invite-display-status.rules";
 import {
   INVITE_EXPIRATION_MS,
@@ -20,8 +17,6 @@ import {
   type InviteServiceDependencies,
 } from "../rules/invite-contracts.rules";
 import { InviteCreationService } from "./invite-creation.service";
-
-const logger = createLogger("langwatch:invites");
 
 export class InviteLifecycleService {
   static create(deps: InviteServiceDependencies): InviteLifecycleService {

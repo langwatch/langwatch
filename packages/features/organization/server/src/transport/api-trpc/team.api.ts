@@ -121,6 +121,14 @@ export type TeamTrpcPorts = Readonly<{
 /** The page size the two project lookups read the organization at. */
 const ORGANIZATION_PROJECT_PAGE = { page: 1, limit: 1_000 } as const;
 
+/** The projects belonging to one team, out of a page already keyed by teamId. */
+function projectsForTeam<T extends Readonly<{ teamId: string }>>(
+  projects: readonly T[],
+  teamId: string,
+): T[] {
+  return projects.filter((project) => project.teamId === teamId);
+}
+
 /**
  * Installs the complete `team.*` tRPC surface on a process-owned root. The
  * procedure and the policy are injected by the process so its auth, audit,
@@ -176,7 +184,7 @@ export class TeamTrpcApi {
             ]);
             return teams.map((team) => ({
               ...team,
-              projects: projects.data.filter(({ teamId }) => teamId === team.id),
+              projects: projectsForTeam(projects.data, team.id),
             }));
           }),
       )

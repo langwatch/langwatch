@@ -121,8 +121,13 @@ export class ImpersonationService {
     operatorUserId: string;
     target: ImpersonationTarget;
   }): Promise<void> {
-    if (target.mfaRequiredOrganizationSlugs.length === 0) return;
-    if (await this.repository.hasSecondFactor(operatorUserId)) return;
+    if (target.mfaRequiredOrganizationSlugs.length === 0) {
+      return;
+    }
+
+    if (await this.repository.hasSecondFactor(operatorUserId)) {
+      return;
+    }
 
     throw new CannotImpersonateWithoutSecondFactorError(
       `impersonate: operator ${operatorUserId} has no second factor; target ${

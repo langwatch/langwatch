@@ -860,8 +860,8 @@ export function createGatewayInternalRestApp(options: {
           return c.json(rejectionBody(parseRejection), parseRejection.status);
         }
 
-        const service = ports.virtualKeys();
-        const vk = await service.tryGetBySecretInternal(presented);
+        const virtualKeysService = ports.virtualKeys();
+        const vk = await virtualKeysService.tryGetBySecretInternal(presented);
         if (!vk) {
           logAuthDecision(c, "virtual_key_not_found", 401);
           return c.json(
@@ -909,7 +909,7 @@ export function createGatewayInternalRestApp(options: {
         });
 
         // Fire-and-forget last-used bump. Failures here must not deny the request.
-        void service.touchUsage(vk.id).catch(() => {});
+        void virtualKeysService.touchUsage(vk.id).catch(() => {});
 
         return c.json({
           jwt,

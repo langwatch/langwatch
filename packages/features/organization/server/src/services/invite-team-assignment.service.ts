@@ -5,7 +5,6 @@
 import { CustomRoleIdRequiredError } from "@langwatch/authz-contract";
 import {
   CustomRoleNotAssignableError,
-  LiteMemberViewerOnlyError,
   OrganizationUserRole,
   TeamNotInOrganizationError,
   TeamUserRole,

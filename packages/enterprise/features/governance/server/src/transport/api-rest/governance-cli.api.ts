@@ -966,12 +966,12 @@ export function createGovernanceCliRestApp(options: {
         ? PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE[parsed.data.source_type]
         : undefined;
       if (policedSlug) {
-        const policy = await ports.governance().aiToolResolvePolicy({
+        const aiToolPolicy = await ports.governance().aiToolResolvePolicy({
           organizationId: caller.organization_id,
           userId: caller.user_id,
           slug: policedSlug,
         });
-        if (!policy.allowOtelDirect) {
+        if (!aiToolPolicy.allowOtelDirect) {
           return c.json(
             {
               error: "direct_otel_not_allowed",

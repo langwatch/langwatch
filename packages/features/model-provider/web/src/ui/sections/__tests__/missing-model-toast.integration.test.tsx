@@ -8,7 +8,6 @@ import { Toaster, toaster } from "@langwatch/design-system/toaster";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  aiCallFailedToastId,
   missingModelToastId,
   type ProviderDisabledInfo,
   providerDisabledToastId,

@@ -55,10 +55,12 @@ export class NlpLambdaCleanupService {
         );
         continue;
       }
+
       if (lastActivityAt < functionCutoff) {
         await this.fleet.deleteFunction({ functionName: fn.name });
         report.functionsDeleted++;
       }
+
       if (lastActivityAt < logGroupCutoff) {
         await this.fleet.deleteLogGroup({ functionName: fn.name });
         report.logGroupsDeleted++;
@@ -71,13 +73,16 @@ export class NlpLambdaCleanupService {
     for (const functionName of await this.fleet.listLogGroups({
       namePrefix: NLP_LAMBDA_NAME_PREFIX,
     })) {
-      if (await this.fleet.functionExists({ functionName })) continue;
+      if (await this.fleet.functionExists({ functionName })) {
+        continue;
+      }
 
       const lastActivityAt = await this.fleet.tryReadLastActivityAt({ functionName });
       if (!lastActivityAt) {
         report.skippedUnknownActivity++;
         continue;
       }
+
       if (lastActivityAt < logGroupCutoff) {
         await this.fleet.deleteLogGroup({ functionName });
         report.logGroupsDeleted++;
@@ -85,6 +90,7 @@ export class NlpLambdaCleanupService {
     }
 
     this.logger?.info({ ...report }, "swept the studio's quiet NLP Lambda functions");
+
     return report;
   }
 }

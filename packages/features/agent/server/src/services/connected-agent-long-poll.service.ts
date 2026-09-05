@@ -20,20 +20,16 @@ import {
   registerFrameSchema,
   type SdkFrame,
 } from "@langwatch/agent-contract";
-import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { InstanceWatchService, type Watch } from "./connected-agent-instance-watch.service";
-import { type InstanceNudge, instanceNudgeSchema } from "@langwatch/agent-contract";
+import { type InstanceNudge } from "@langwatch/agent-contract";
 import {
   callDeliveredKey,
   callKey,
   httpSessionKey,
-  instanceChannel,
-  instanceMetaKey,
   pendingKey,
 } from "../rules/connected-agent-keys.rules";
-import type { Unsubscribe } from "../ports/agent-state-store.port";
 import type { InstanceMeta } from "../ports/connected-agent-runtime.port";
 import {
   AgentSessionService,
@@ -41,8 +37,6 @@ import {
   type SessionCoreOptions,
   type SessionInfo,
 } from "./connected-agent-session.service";
-
-const logger = createLogger("langwatch:connected-agents:long-poll");
 
 /** The instance token an HTTP session is addressed by. */
 export const INSTANCE_TOKEN_HEADER = "x-agent-instance-token";

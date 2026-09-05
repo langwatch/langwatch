@@ -147,6 +147,7 @@ export class SystemMigrationsService {
   requiresOperatorConfirmation({ migrationName }: { migrationName: string }): boolean {
     return requireRegisteredMigration(this.deps, migrationName).requiresOperatorConfirmation;
   }
+
   /**
    * Kick a pass now instead of waiting for the next worker boot - the lever for processing a fresh enrollment right away or
    * re-verifying held tenants after remediation. Fire-and-forget: per-organization claims keep two passes off the same

@@ -63,6 +63,7 @@ export class GenAiSpanService {
       transform: (raw) => (typeof raw === "string" ? raw : null),
     });
   }
+
   private canonicaliseMessages(ctx: ExtractorContext): void {
     const inputExtracted = extractInputMessages(
       ctx,

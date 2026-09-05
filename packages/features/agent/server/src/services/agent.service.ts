@@ -1,10 +1,6 @@
 import {
-  AgentCopiesNotFoundError,
-  AgentCopySelectionError,
-  AgentIsNotCopyError,
   AgentNotFoundError,
   AgentRegisterOnlyError,
-  AgentSourceNotFoundError,
   InvalidAgentConfigError,
   type Agent,
   type AgentFields,
@@ -13,21 +9,15 @@ import {
   type ConnectedAgentConfig,
   type ConnectedAgentIdentity,
   createAgentCommandSchema,
-  copyAgentCommandSchema,
   linkedWorkflowId,
   parseAgentConfig,
   updateAgentCommandSchema,
 } from "@langwatch/agent-contract";
-import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { nanoid } from "nanoid";
 import type { AgentsAuditLogPort, AgentsWorkflowPort } from "../ports/agent.port";
 import type { AgentRepository } from "../repositories/agent.repository";
 import { AgentCopyService } from "./agent-copy.service";
-import {
-  agentWithResolvedFields,
-  declaredAgentParameters,
-  isUniqueConstraintViolation,
-} from "../rules/agent-view.rules";
+import { agentWithResolvedFields, isUniqueConstraintViolation } from "../rules/agent-view.rules";
 
 type AgentServiceOptions = {
   repository: AgentRepository;

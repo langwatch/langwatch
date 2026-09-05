@@ -10,9 +10,6 @@ import {
   AgentRegisterRefusedError,
   type AgentService,
   CALL_KEY_SLACK_SECONDS,
-  DEFAULT_CALL_TIMEOUT_MS,
-  DEFAULT_CONCURRENCY,
-  MAX_CALL_TIMEOUT_MS,
   PROTOCOL_VERSION,
   RESULT_TTL_SECONDS,
   type CallFrame,
@@ -21,14 +18,8 @@ import {
   type RegisterFrame,
   type RegisteredFrame,
   type ResultFrame,
-  deriveScope,
-  identityKeyOf,
-  isValidEnvironment,
   relayPayloadCaps,
-  sanitizeEnvironment,
-  scopeColumns,
 } from "@langwatch/agent-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { AgentPlatformUrlBuilder } from "../transport/api-rest/agent-legacy.api";
 import { resultCapViolation } from "../rules/connected-agent-caps.rules";

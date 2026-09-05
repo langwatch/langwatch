@@ -1,18 +1,10 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
-  DirectUploadUnavailableError,
-  StorageUnavailableError,
   StoredObjectBytesMissingError,
   StoredObjectDeletedError,
-  StoredObjectIntegrityConflictError,
   StoredObjectNotFoundError,
   StoredObjectService as StoredObjectServiceContract,
   StoredObjectUnavailableError,
-  UploadChecksumMismatchError,
-  UploadExpiredError,
-  UploadIncompleteError,
-  UploadTokenInvalidError,
-  UploadTooLargeError,
   type ConfirmStoredObjectUploadInput,
   type CreateStoredObjectUploadInput,
   type DeleteProjectStoredObjectsResult,
@@ -35,10 +27,9 @@ import {
   StoredObjectStoragePort,
   StoredObjectUploadTokenPort,
   type StoredObjectStorageAddress,
-  type StoredObjectUploadTokenClaims,
 } from "../ports/stored-object.port";
 import { StoredObjectStore, type StoredObjectRecord } from "../stores/stored-object.store";
-import { storedObjectMetadataOf, storedObjectReferenceOf } from "../rules/stored-object-view.rules";
+import { storedObjectMetadataOf } from "../rules/stored-object-view.rules";
 import { StoredObjectUploadService, storageCall } from "./stored-object-upload.service";
 
 export type StoredObjectServiceOptions = Readonly<{

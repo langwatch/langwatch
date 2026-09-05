@@ -1,14 +1,14 @@
 /**
  * The agent feature's application: what all of its doors call.
  */
-import type { AgentService, AgentWithFields } from "@langwatch/agent-contract";
-import { nanoid } from "nanoid";
 import type {
-  AgentTestPort,
+  AgentService,
   AgentTestRunResult,
   AgentTestTurnResult,
-} from "../ports/agent-test.port";
-import { AgentService as AgentServiceImplementation } from "../services/agent.service";
+  AgentWithFields,
+} from "@langwatch/agent-contract";
+import { nanoid } from "nanoid";
+import type { AgentTestPort } from "../ports/agent-test.port";
 import { declaredAgentParameters } from "../rules/agent-view.rules";
 import {
   ConnectedAgentPresenceService,
