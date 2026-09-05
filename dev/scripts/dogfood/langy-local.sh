@@ -129,6 +129,26 @@ if listening "$AGENT_PORT"; then ok "langyagent on :$AGENT_PORT"; else
   hint "make -C \"$ROOT\" service svc=langyagent   (sources platform/app/.env; runs the no-sandbox dev runner)"
 fi
 
+# --- demo applications -----------------------------------------------------
+# Advisory: the customer applications Langy works on in the dogfood and the
+# guided onboarding. A turn needs none of them, so a missing one never fails
+# the doctor; the line says which make target boots it.
+echo "demo applications (advisory):"
+if command -v uv >/dev/null 2>&1; then ok "uv on PATH (the Python demos)"; else
+  warn "uv not on PATH, the Python demos cannot boot"
+  hint "brew install uv"
+fi
+check_demo() {
+  local name="$1" port="$2" lang="$3"
+  if listening "$port"; then ok "$name on :$port"; else
+    warn "$name not listening on :$port"
+    hint "make -C \"$ROOT\" dogfood-langy-local lang=$lang"
+  fi
+}
+check_demo "ACME support (FastAPI)" 8765 python
+check_demo "ACME support (Hono)" 8766 typescript
+check_demo "ACME checkout (LangGraph)" 8767 langgraph
+
 # --- provider keys ---------------------------------------------------------
 # Advisory: a rejected key fails turns with a distant mid-stream symptom, so
 # name it here. A rejection does not fail the doctor, another provider's key

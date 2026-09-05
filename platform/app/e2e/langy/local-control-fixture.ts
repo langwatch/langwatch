@@ -42,23 +42,48 @@ const SCENARIO_REPO_DIR = path.join(
   "scenario-repos",
 );
 
-/** The demo applications a scenario can share. */
-export type DemoLanguage = "python" | "typescript";
+/**
+ * The demo applications a scenario can share: the two ACME support agents,
+ * and the ACME checkout agent, a LangGraph application with no LangWatch
+ * dependency at all that the guided onboarding has Langy instrument.
+ */
+export type DemoLanguage = "python" | "typescript" | "langgraph";
 
-const DEMO_SOURCE: Record<DemoLanguage, string> = {
-  python: path.join(REPO_ROOT, "dev", "dogfood", "acme-support", "python"),
-  typescript: path.join(
-    REPO_ROOT,
-    "dev",
-    "dogfood",
-    "acme-support",
-    "typescript",
-  ),
+interface DemoSource {
+  /** The folder copied into the temporary repository. */
+  dir: string;
+  /** What installs and runs the copy. */
+  runtime: "uv" | "npm";
+  /** The subject of the copy's first commit. */
+  commit: string;
+}
+
+const DEMO: Record<DemoLanguage, DemoSource> = {
+  python: {
+    dir: path.join(REPO_ROOT, "dev", "dogfood", "acme-support", "python"),
+    runtime: "uv",
+    commit: "chore: the ACME support agent",
+  },
+  typescript: {
+    dir: path.join(REPO_ROOT, "dev", "dogfood", "acme-support", "typescript"),
+    runtime: "npm",
+    commit: "chore: the ACME support agent",
+  },
+  langgraph: {
+    dir: path.join(REPO_ROOT, "dev", "dogfood", "acme-checkout", "python"),
+    runtime: "uv",
+    commit: "chore: the ACME checkout agent",
+  },
 };
 
-/** Never copied: they are rebuilt in the temporary repository, or they are noise. */
+/**
+ * Never copied: they are rebuilt in the temporary repository, or they are
+ * noise. `.env` is the developer's own credentials in the source folder; the
+ * copy gets the ones its launcher writes.
+ */
 const SKIPPED_ENTRIES = new Set([
   ".git",
+  ".env",
   ".venv",
   "node_modules",
   "__pycache__",
@@ -88,7 +113,7 @@ const sleep = (ms: number): Promise<void> =>
  * The model key the demo applications need, from the environment or from the
  * app's own `.env`, which is where this checkout keeps it.
  */
-function openaiKey(): string {
+export function openaiKey(): string {
   const fromEnvironment = process.env.OPENAI_API_KEY;
   if (fromEnvironment) return fromEnvironment;
   try {
@@ -290,11 +315,14 @@ async function copyTree(from: string, to: string): Promise<void> {
 /**
  * Point the demo's LangWatch SDK dependency at this checkout by absolute path.
  *
- * Both applications depend on the SDK through a relative path that only
+ * The support applications depend on the SDK through a relative path that only
  * resolves inside the monorepo (`../../../../sdks/python`,
  * `file:../../../../sdks/typescript`). A copy outside it must name the same
  * SDK by its absolute path, or the install fails and the scenario measures the
  * fixture rather than the product.
+ *
+ * The checkout application has no SDK dependency, Langy adds it, so the
+ * rewrite finds nothing there and its manifest stays byte for byte as shipped.
  */
 async function pointSdkAtThisCheckout({
   root,
@@ -303,7 +331,7 @@ async function pointSdkAtThisCheckout({
   root: string;
   language: DemoLanguage;
 }): Promise<void> {
-  if (language === "python") {
+  if (DEMO[language].runtime === "uv") {
     const file = path.join(root, "pyproject.toml");
     const source = await fs.readFile(file, "utf8");
     await fs.writeFile(
@@ -401,7 +429,7 @@ export async function createDemoRepo({
     `${name}-${Date.now().toString(36)}`,
   );
   await fs.rm(root, { recursive: true, force: true });
-  await copyTree(DEMO_SOURCE[language], root);
+  await copyTree(DEMO[language].dir, root);
   await pointSdkAtThisCheckout({ root, language });
 
   const git = (args: string[]): string => sh("git", args, { cwd: root });
@@ -410,7 +438,7 @@ export async function createDemoRepo({
   git(["config", "user.email", "scenario@langwatch.localhost"]);
   git(["config", "commit.gpgsign", "false"]);
   git(["add", "-A"]);
-  git(["commit", "-m", "chore: the ACME support agent"]);
+  git(["commit", "-m", DEMO[language].commit]);
 
   // A repository with no remote makes `git push` exit 128, and the pull
   // request path can then never finish in a scenario. A bare repository beside
@@ -424,7 +452,7 @@ export async function createDemoRepo({
   git(["push", "-u", "origin", "main"]);
 
   if (install) {
-    if (language === "python") {
+    if (DEMO[language].runtime === "uv") {
       sh("uv", ["sync"], { cwd: root, timeoutMs: 600_000 });
     } else {
       sh("npm", ["install", "--no-audit", "--no-fund"], {
@@ -1557,7 +1585,7 @@ export async function startDemoApp({
   const sessionName = `acme-${label}-${Date.now().toString(36)}`;
   const logPath = path.join(repo.root, "..", `${sessionName}.log`);
   const command =
-    repo.language === "python"
+    DEMO[repo.language].runtime === "uv"
       ? `uv run uvicorn app.main:app --port ${chosenPort}`
       : `npm run start`;
   const script = path.join(repo.root, "..", `${sessionName}.sh`);
