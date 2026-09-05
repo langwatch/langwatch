@@ -195,27 +195,27 @@ jobs:
 
       # Shared pnpm + Node setup with pnpm-store caching, so this job stops
       # re-downloading the full langwatch + skills dependency trees on every run.
+      #
+      # The install runs through the action rather than as a step of its own.
+      # skills/ pulls node-pty, whose postinstall falls back to `node-gyp
+      # rebuild` on linux, and the action prepares both halves of that: it
+      # installs node-gyp for scripts that resolve it on PATH, and it restores
+      # the executable bit on the node-gyp pnpm bundles in its own dist, which
+      # reaches the runner without one often enough to matter. Both steps are
+      # skipped when the action is asked for no install, so a job that installs
+      # by hand gets neither and dies in the generated Makefile with a
+      # permission error on gyp_main.py.
+      #
+      # skills/ used to need `--ignore-workspace` to escape the root workspace
+      # it sat inside without being a member of; it is a member now. See
+      # ADR-076.
       - name: Setup pnpm + Node
         uses: ./.github/actions/setup-pnpm-node
         with:
           cache-dependency-path: pnpm-lock.yaml
-
-      # skills/ pulls node-pty, whose postinstall falls back to `node-gyp
-      # rebuild` on linux. The composite action above installs node-gyp only
-      # when it does the install itself, and here it does not, so it has to be
-      # installed explicitly before the install below reaches that lifecycle
-      # script — otherwise it ELIFECYCLEs with "node-gyp: not found".
-      - name: Install node-gyp (for node-pty postinstall)
-        run: npm install -g node-gyp@12.3.0
-
-      # One install for the app and the skills compiler. skills/ used to need
-      # `--ignore-workspace` to escape the root workspace it sat inside without
-      # being a member of; it is a member now. See ADR-076.
-      - name: Install dependencies
-        run: >
-          pnpm install --frozen-lockfile
-          --filter "@langwatch/web..."
-          --filter "@langwatch/skills..."
+          install: >
+            @langwatch/web...
+            @langwatch/skills...
 
       - name: Regenerate docs/skills pages
         run: bash docs/scripts/sync-prompts.sh
