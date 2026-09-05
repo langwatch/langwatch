@@ -48,7 +48,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Annotation"][];
+                        "application/json": {
+                            data: components["schemas"]["Annotation"][];
+                        };
                     };
                 };
                 /** @description Unexpected error */
@@ -99,7 +101,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Annotation"][];
+                        "application/json": {
+                            data: components["schemas"]["Annotation"][];
+                        };
                     };
                 };
                 /** @description Unexpected error */
@@ -129,8 +133,8 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        comment?: string;
-                        isThumbsUp?: boolean;
+                        comment: string;
+                        isThumbsUp: boolean;
                         email?: string;
                     };
                 };
@@ -142,7 +146,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Annotation"];
+                        "application/json": {
+                            data: components["schemas"]["Annotation"];
+                        };
                     };
                 };
                 /** @description Invalid input */
@@ -188,7 +194,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Annotation"];
+                        "application/json": {
+                            data: components["schemas"]["Annotation"];
+                        };
                     };
                 };
                 /** @description Unexpected error */
@@ -256,8 +264,8 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        comment?: string;
-                        isThumbsUp?: boolean;
+                        comment: string;
+                        isThumbsUp: boolean;
                         email?: string;
                     };
                 };
@@ -270,8 +278,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            status?: string;
-                            message?: string;
+                            data: components["schemas"]["Annotation"];
                         };
                     };
                 };
@@ -4234,23 +4241,23 @@ export interface components {
     schemas: {
         Annotation: {
             /** @description The ID of the annotation */
-            id?: string;
+            id: string;
             /** @description The ID of the project */
-            projectId?: string;
+            projectId: string;
             /** @description The ID of the trace */
-            traceId?: string;
+            traceId: string;
             /** @description The comment of the annotation */
-            comment?: string;
+            comment: string | null;
             /** @description The thumbs up status of the annotation */
-            isThumbsUp?: boolean;
+            isThumbsUp: boolean | null;
             /** @description The ID of the user */
-            userId?: string;
+            userId: string | null;
             /** @description The created at of the annotation */
-            createdAt?: string;
+            createdAt: string;
             /** @description The updated at of the annotation */
-            updatedAt?: string;
+            updatedAt: string;
             /** @description The email of the user */
-            email?: string;
+            email: string | null;
         };
         Error: {
             /** Format: int32 */
