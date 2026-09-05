@@ -1,5 +1,5 @@
 {
-  "input": "../../../.claude/tmp/video/raw/agenttest-v2/agenttest.webm",
+  "input": "../../../../.claude/tmp/video/raw/agenttest-v2/agenttest.webm",
   "output": "../../../media/videos/agent-testing-overview.webm",
   "fps": 30,
   "page": {
