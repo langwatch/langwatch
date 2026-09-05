@@ -51,9 +51,11 @@ describe("queueGuidedKickoff", () => {
   describe("given the organization already attached a conversation", () => {
     /** @scenario "A queued kickoff for an attached conversation continues that conversation" */
     it("points at that conversation and loads its history before the kickoff sends", () => {
-      useLangyStore
-        .getState()
-        .queueGuidedKickoff({ ...KICKOFF, path: "gateway", conversationId: "conv-attached" });
+      useLangyStore.getState().queueGuidedKickoff({
+        ...KICKOFF,
+        path: "gateway",
+        conversationId: "conv-attached",
+      });
       const state = useLangyStore.getState();
       expect(state.activeConversationId).toBe("conv-attached");
       expect(state.historyLoadConversationId).toBe("conv-attached");

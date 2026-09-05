@@ -74,9 +74,7 @@ describe("the guided onboarding kickoff", () => {
 
   describe("given a message that is not a kickoff", () => {
     it("finds no kickoff part", () => {
-      expect(
-        guidedKickoffPartOf([{ type: "text", text: "hello" }]),
-      ).toBeNull();
+      expect(guidedKickoffPartOf([{ type: "text", text: "hello" }])).toBeNull();
       expect(guidedKickoffPartOf(undefined)).toBeNull();
       expect(
         guidedKickoffPartOf([

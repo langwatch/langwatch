@@ -190,7 +190,9 @@ describe("given the guided tour is over", () => {
 
   /** @scenario "A kickoff without an organization name sets up for you" */
   it("sets up for you when the organization has no name", () => {
-    renderMessage(kickoffMessage({ input: { ...KICKOFF, orgName: undefined } }));
+    renderMessage(
+      kickoffMessage({ input: { ...KICKOFF, orgName: undefined } }),
+    );
     fireEvent.click(screen.getByText("Guided tour"));
 
     expect(screen.getByText("Setting up for").nextSibling?.textContent).toBe(

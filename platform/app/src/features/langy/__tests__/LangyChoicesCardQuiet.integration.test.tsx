@@ -7,8 +7,8 @@
  * @see specs/langy/langy-guided-onboarding.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { LangyDerivedChoicesCard } from "@langwatch/langy";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/utils/compat/next-router", () => ({

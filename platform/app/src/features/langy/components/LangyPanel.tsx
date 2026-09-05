@@ -57,6 +57,7 @@ import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { readHandledError, showErrorToast } from "~/features/errors";
+import { planGuidedKickoffSend } from "~/features/guided-onboarding/kickoff";
 import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
@@ -167,7 +168,6 @@ import { buildTimeTravelView } from "../logic/langyTimeTravel";
 import { isLangyTranscriptMessage } from "../logic/langyTranscript";
 import { deriveWaveActivity } from "../logic/langyWaveMotion";
 import { isInternalHref } from "../logic/spaLink";
-import { planGuidedKickoffSend } from "~/features/guided-onboarding/kickoff";
 import { tapeForConversation, useLangyDevLog } from "../stores/langyDevLog";
 import { useLangyLocalControlStore } from "../stores/langyLocalControlStore";
 import {

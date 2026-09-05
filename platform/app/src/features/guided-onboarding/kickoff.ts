@@ -10,11 +10,7 @@
  * @see specs/langy/langy-guided-onboarding.feature
  */
 import { z } from "zod";
-import {
-  GUIDED_PATH_TITLES,
-  type GuidedPath,
-  guidedPathSchema,
-} from "./paths";
+import { GUIDED_PATH_TITLES, type GuidedPath, guidedPathSchema } from "./paths";
 
 export const GUIDED_ONBOARDING_KICKOFF_PART_TYPE = "guided-onboarding-kickoff";
 
@@ -53,7 +49,9 @@ export const guidedKickoffPartSchema = z
 export type GuidedKickoffPart = z.infer<typeof guidedKickoffPartSchema>;
 
 /** Parse an opaque message part as the kickoff part, or null. */
-export function parseGuidedKickoffPart(part: unknown): GuidedKickoffPart | null {
+export function parseGuidedKickoffPart(
+  part: unknown,
+): GuidedKickoffPart | null {
   const parsed = guidedKickoffPartSchema.safeParse(part);
   return parsed.success ? parsed.data : null;
 }
