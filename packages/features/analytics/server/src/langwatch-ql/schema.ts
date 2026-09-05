@@ -5,9 +5,8 @@
  * catalog derivations keep publication and validator eligibility identical.
  */
 
-import type { LangWatchQLSchema } from "@langwatch/analytics-contract";
+import type { LangWatchQLProtections, LangWatchQLSchema } from "@langwatch/analytics-contract";
 
-import type { Protections } from "@langwatch/trace-server";
 import { LWQL_VIEW_CATALOG } from "./catalog/lwql-views";
 import {
   type LangWatchQLViewDefinition,
@@ -86,7 +85,7 @@ export function lwqlExampleSql({
 /**
  * The LangWatchQL schema, scoped to what one caller's permissions unlock.
  *
- * Pure: it reads the catalog and the caller's `Protections` and touches nothing
+ * Pure: it reads the catalog and the caller's `LangWatchQLProtections` and touches nothing
  * else, which is what lets the endpoint publish a schema without a database
  * round trip.
  */
@@ -96,7 +95,7 @@ export function describeLangWatchQLSchema({
   views = LWQL_VIEW_CATALOG,
 }: {
   database: string;
-  protections: Protections;
+  protections: LangWatchQLProtections;
   views?: readonly LangWatchQLViewDefinition[];
 }): LangWatchQLSchema {
   const withheld = new Set(lwqlGatedColumns({ protections, views }));

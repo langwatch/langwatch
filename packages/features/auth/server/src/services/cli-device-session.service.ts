@@ -182,22 +182,6 @@ export type CliMintedSession = Readonly<{
 const BEARER_ACCESS_TOKEN_REGEX = /^Bearer\s+(lw_at_[A-Za-z0-9_-]+)$/;
 
 /**
- * Extract the bearer access token from an `Authorization` header, or null.
- *
- * Kept separate from resolution so a caller that needs the raw token string
- * (to revoke it) does not re-run the full read.
- */
-export function bearerCliAccessToken(authHeader: string | null | undefined): string | null {
-  if (!authHeader) {
-    return null;
-  }
-
-  const match = BEARER_ACCESS_TOKEN_REGEX.exec(authHeader.trim());
-
-  return match ? match[1]! : null;
-}
-
-/**
  * Generate an RFC 8628 user_code: 8 characters, dashed in the middle for
  * readability, on a base32 alphabet that excludes the ambiguous ones.
  *
@@ -230,6 +214,22 @@ function pollRateKey(deviceCode: string): string {
 
 /** Everything the device grant stores, over one process's substrate. */
 export class CliDeviceSessionService {
+  /**
+   * Extract the bearer access token from an `Authorization` header, or null.
+   *
+   * Kept separate from resolution so a caller that needs the raw token string
+   * (to revoke it) does not re-run the full read.
+   */
+  static bearerCliAccessToken(authHeader: string | null | undefined): string | null {
+    if (!authHeader) {
+      return null;
+    }
+
+    const match = BEARER_ACCESS_TOKEN_REGEX.exec(authHeader.trim());
+
+    return match ? match[1]! : null;
+  }
+
   static create(options: {
     store: CliDeviceSessionStorePort;
     /**
@@ -482,7 +482,7 @@ export class CliDeviceSessionService {
   async tryResolveAccessToken(
     authHeader: string | null | undefined,
   ): Promise<CliAccessTokenRecord | null> {
-    const token = bearerCliAccessToken(authHeader);
+    const token = CliDeviceSessionService.bearerCliAccessToken(authHeader);
     if (!token) {
       return null;
     }
@@ -519,7 +519,7 @@ export class CliDeviceSessionService {
     authHeader: string | null | undefined;
     userId: string;
   }): Promise<void> {
-    const token = bearerCliAccessToken(input.authHeader);
+    const token = CliDeviceSessionService.bearerCliAccessToken(input.authHeader);
     if (!token) {
       return;
     }

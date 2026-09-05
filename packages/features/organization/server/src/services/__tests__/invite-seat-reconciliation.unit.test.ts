@@ -22,7 +22,7 @@ function buildService(options: { maxMembers: number; currentFullMembers: number 
 
   const getMemberCount = vi.fn().mockResolvedValue(options.currentFullMembers);
 
-  const service = new InviteService({
+  const service = InviteService.create({
     prisma,
     seats: {
       getMemberCount,

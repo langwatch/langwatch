@@ -58,9 +58,10 @@ export { createDashboardsRestApp } from "./transport/api-rest/dashboard.api";
  * live here as adapters a composition root binds, rather than as a shape every
  * deployment restates.
  */
-export { AnalyticsSavedWorkbenchChartPolicy } from "./adapters/saved-workbench-chart-policy.adapter";
-export { mapDashboardSavedWorkbenchChartError } from "./adapters/saved-workbench-chart-policy.adapter";
-export { WorkbenchAwareGraphVisibilityPolicy } from "./adapters/graph-visibility-policy.adapter";
+export { AnalyticsSavedWorkbenchChartPolicyAdapter } from "./adapters/saved-workbench-chart-policy.adapter";
+export { mapDashboardSavedWorkbenchChartError } from "./transport/api-trpc/saved-workbench-chart.transport-errors";
+export { WorkbenchAwareGraphVisibilityAdapter } from "./adapters/graph-visibility-policy.adapter";
+export { WorkbenchAccessPort } from "./ports/workbench-access.port";
 export {
   SavedWorkbenchChartAlreadyExistsError,
   SavedWorkbenchChartDashboardNotFoundError,

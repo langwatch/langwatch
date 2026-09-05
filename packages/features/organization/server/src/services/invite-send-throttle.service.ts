@@ -28,7 +28,11 @@ export const INVITE_SENDS_PER_WINDOW = 3;
  * this unreachable from any process that meters differently.
  */
 export class InviteSendThrottleService {
-  constructor(private readonly rateLimit: OrganizationInviteRateLimitPort) {}
+  private constructor(private readonly rateLimit: OrganizationInviteRateLimitPort) {}
+
+  static create(rateLimit: OrganizationInviteRateLimitPort): InviteSendThrottleService {
+    return new InviteSendThrottleService(rateLimit);
+  }
 
   /**
    * Refuses when this invitation has already been sent its fill for now.

@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { matchInviteToAcceptor } from "../invite.service";
+import { InviteService } from "../invite.service";
 
 /**
  * D11 — identifier-aware acceptance (specs/identity/resilient-invitations.feature).
- * `matchInviteToAcceptor` is pure: the identity read fork's proven-address
+ * `InviteService.matchInviteToAcceptor` is pure: the identity read fork's proven-address
  * set is a plain array in, a match decision out.
  */
-describe("matchInviteToAcceptor", () => {
+describe("InviteService.matchInviteToAcceptor", () => {
   describe("given the signed-in user holds a verified identifier for the invited address", () => {
     describe("when matching against the invite", () => {
       /** @scenario "Acceptance works through any verified identifier matching the invite" */
       it("matches via that identifier and reports which one vouched", () => {
-        const result = matchInviteToAcceptor({
+        const result = InviteService.matchInviteToAcceptor({
           inviteEmail: "sam@acme.com",
           sessionEmail: "sam@home.net",
           matchable: [{ identifierId: "idf_google", value: "sam@acme.com" }],
@@ -29,7 +29,7 @@ describe("matchInviteToAcceptor", () => {
         // The account is Google-born under a different primary email; the
         // invited work address survives only as a verified secondary
         // identifier, not the session email.
-        const result = matchInviteToAcceptor({
+        const result = InviteService.matchInviteToAcceptor({
           inviteEmail: "sam@acme.com",
           sessionEmail: "sam.googleborn@gmail.com",
           matchable: [{ identifierId: "idf_cross", value: "sam@acme.com" }],
@@ -45,7 +45,7 @@ describe("matchInviteToAcceptor", () => {
     describe("when the invitee signs in with Google and the invite is matched", () => {
       /** @scenario "The Google-linked invitee support case replays green" */
       it("matches via the Google identifier without archiving a user", () => {
-        const result = matchInviteToAcceptor({
+        const result = InviteService.matchInviteToAcceptor({
           inviteEmail: "invitee@acme.com",
           sessionEmail: "invitee@acme.com",
           matchable: [{ identifierId: "idf_gl", value: "invitee@acme.com" }],

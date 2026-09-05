@@ -96,7 +96,7 @@ import {
   WorkflowStudioDispatchService,
 } from "@langwatch/workflow-server";
 import { getConnectedAgentRuntime } from "@langwatch/agent-server";
-import { assertConnectedAgentsRunnable } from "@langwatch/suite-server";
+import { ConnectedTargetService } from "@langwatch/suite-server";
 import type { CallOutcome, DispatchAgent, DispatchCall } from "@langwatch/agent-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
 
@@ -501,7 +501,7 @@ class ApiExperimentConnectedAgentOwnershipAdapter extends ExperimentConnectedAge
     agents: readonly ExperimentConnectedAgentSubject[];
     actor: RunActor | undefined;
   }): Promise<void> {
-    return assertConnectedAgentsRunnable({ agents: input.agents, actor: input.actor });
+    return ConnectedTargetService.assertConnectedAgentsRunnable({ agents: input.agents, actor: input.actor });
   }
 }
 

@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
 import { CanonicalMetricAdapter, MetricService } from "@langwatch/metric-server/testing";
-import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import type { RecordMetricCorrelationCommandData } from "@langwatch/trace-contract";
 import {
   type MetricRequestCollectionResult,
   MetricRequestCollectionService,
 } from "../metric-request-collection.service";
-import { OtlpSpanPiiRedactionService } from "@langwatch/data-privacy-server";
-import { DataPrivacyServiceFake } from "@langwatch/data-privacy-server";
+import type { MetricRedactionPort } from "../../ports/metric-redaction.port";
+
+/** The request context below asks for no redaction, so the port never rewrites. */
+const disabledRedaction: MetricRedactionPort = { redactMetricAttributes: async () => {} };
 
 /** Narrows the result union so a test can assert on the collected counters. */
 function expectCollected(
@@ -30,21 +31,10 @@ function makeService(
   >(async () => {});
   const metrics = MetricService.create({
     preparation: CanonicalMetricAdapter.create({
-      redaction: OtlpSpanPiiRedactionService.create({
-        transport: {
-          tryClearGoogleDlp: async () => null,
-          clearPresidio: async () => [],
-          close: async () => undefined,
-        },
-        isLangevalsConfigured: false,
-        isProduction: false,
-        nativePolicyEnforced: false,
-        piiRedactionMaxAttributeLength: 250_000,
-        dataPrivacy: new DataPrivacyServiceFake(PLATFORM_DEFAULT_DATA_PRIVACY),
-      }),
+      redaction: disabledRedaction,
     }),
   });
-  const service = new MetricRequestCollectionService({
+  const service = MetricRequestCollectionService.create({
     metrics,
     recordDataPoints,
     recordMetricCorrelations,

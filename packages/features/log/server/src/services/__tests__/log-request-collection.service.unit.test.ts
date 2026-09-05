@@ -4,14 +4,13 @@ import type { CanonicalLogRecordRepository } from "../../repositories/canonical-
 import { CanonicalLogAdapter, LogService } from "@langwatch/log-server/testing";
 import type { LogTraceContribution } from "@langwatch/trace-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-server/testing";
-import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
-import { IO_PREVIEW_BYTES } from "@langwatch/trace-server";
 import {
   type LogRequestCollectionResult,
   LogRequestCollectionService,
 } from "../log-request-collection.service";
-import { OtlpSpanPiiRedactionService } from "@langwatch/data-privacy-server";
-import { DataPrivacyServiceFake } from "@langwatch/data-privacy-server";
+import type { LogRedactionPort } from "../../ports/log-redaction.port";
+import { LogTraceIoPort, type LogTraceIo } from "../../ports/log-trace-io.port";
+import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";
 
 /**
  * This suite drives the COLLECTION, which prepares records and hands them to
@@ -25,6 +24,29 @@ const unreadableLogRecords = {
     throw new Error("this suite reads no log back");
   },
 } as unknown as CanonicalLogRecordRepository;
+
+/** Every request below asks for no redaction, so the port never rewrites. */
+const disabledRedaction: LogRedactionPort = { redactLog: async () => {} };
+
+/** Trace's byte budget stands in for `IO_PREVIEW_BYTES`; the flag is what matters. */
+const PREVIEW_BYTES = 64;
+
+/**
+ * Stands in for Trace's log reader: input is the record's `prompt` attribute,
+ * clamped to whole UTF-8 characters within the budget above.
+ */
+class PromptTraceIo extends LogTraceIoPort {
+  extractIo(data: LogRecordReceivedEventData): LogTraceIo {
+    const prompt = data.attributes.prompt;
+    return { input: typeof prompt === "string" ? prompt : null, output: null };
+  }
+
+  preview(value: string): string {
+    const bytes = Buffer.from(value, "utf8");
+    if (bytes.byteLength <= PREVIEW_BYTES) return value;
+    return new TextDecoder("utf-8").decode(bytes.subarray(0, PREVIEW_BYTES)).replace(/\uFFFD$/, "");
+  }
+}
 
 /** Narrows the result union so a test can assert on the collected counters. */
 function expectCollected(
@@ -49,24 +71,14 @@ function makeService(args?: { storageFails?: boolean; contributionFails?: boolea
   });
   const logs = LogService.create({
     preparation: CanonicalLogAdapter.create({
-      redaction: OtlpSpanPiiRedactionService.create({
-        transport: {
-          tryClearGoogleDlp: async () => null,
-          clearPresidio: async () => [],
-          close: async () => undefined,
-        },
-        isLangevalsConfigured: false,
-        isProduction: false,
-        nativePolicyEnforced: false,
-        piiRedactionMaxAttributeLength: 250_000,
-        dataPrivacy: new DataPrivacyServiceFake(PLATFORM_DEFAULT_DATA_PRIVACY),
-      }),
+      redaction: disabledRedaction,
     }),
     repository: unreadableLogRecords,
   });
-  const service = new LogRequestCollectionService({
+  const service = LogRequestCollectionService.create({
     logs,
     traceCanonicalisation: TraceCanonicalisationService.create(),
+    traceIo: new PromptTraceIo(),
     recordLogRecords,
     recordLogContributions,
   });
@@ -221,7 +233,7 @@ describe("LogRequestCollectionService", () => {
 
   it("bounds duplicated trace I/O while retaining the full canonical log", async () => {
     const request = logRequest();
-    const prompt = "é".repeat(IO_PREVIEW_BYTES);
+    const prompt = "é".repeat(PREVIEW_BYTES);
     request.resourceLogs[0].scopeLogs[0].logRecords[0].attributes.find(
       (attribute: { key: string }) => attribute.key === "prompt",
     ).value.stringValue = prompt;
@@ -230,9 +242,7 @@ describe("LogRequestCollectionService", () => {
     await service.handleOtlpLogRequest({ ...args, logRequest: request });
 
     expect(records[0]!.canonicalPayload).toContain(prompt);
-    expect(Buffer.byteLength(contributions[0]!.input!, "utf8")).toBeLessThanOrEqual(
-      IO_PREVIEW_BYTES + 3,
-    );
+    expect(Buffer.byteLength(contributions[0]!.input!, "utf8")).toBeLessThanOrEqual(PREVIEW_BYTES);
     expect(contributions[0]!.liftedAttributes["langwatch.reserved.log_io_truncated"]).toBe(true);
   });
 

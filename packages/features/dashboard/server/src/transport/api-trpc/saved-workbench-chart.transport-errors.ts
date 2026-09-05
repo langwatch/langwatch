@@ -1,4 +1,10 @@
 import type { VegaValidationError } from "@langwatch/analytics-contract/visualization/validation";
+import {
+  SavedWorkbenchChartAlreadyExistsError as DashboardSavedWorkbenchChartAlreadyExistsError,
+  SavedWorkbenchChartDashboardNotFoundError as DashboardSavedWorkbenchChartDashboardNotFoundError,
+  SavedWorkbenchChartDefinitionInvalidError as DashboardSavedWorkbenchChartDefinitionInvalidError,
+  SavedWorkbenchChartNotFoundError as DashboardSavedWorkbenchChartNotFoundError,
+} from "@langwatch/dashboard-contract";
 import { HandledError, remediation } from "@langwatch/handled-error";
 
 /** Preserves the established REST and tRPC error envelopes at the Dashboard transport edge. */
@@ -82,4 +88,21 @@ export class SavedWorkbenchChartDefinitionInvalidError extends HandledError {
     );
     this.name = "SavedWorkbenchChartDefinitionInvalidError";
   }
+}
+
+/** Keeps existing REST and tRPC handled-error response envelopes stable. */
+export function mapDashboardSavedWorkbenchChartError(error: unknown): never {
+  if (error instanceof DashboardSavedWorkbenchChartNotFoundError) {
+    throw new SavedWorkbenchChartNotFoundError();
+  }
+  if (error instanceof DashboardSavedWorkbenchChartDashboardNotFoundError) {
+    throw new SavedWorkbenchChartDashboardNotFoundError();
+  }
+  if (error instanceof DashboardSavedWorkbenchChartAlreadyExistsError) {
+    throw new SavedWorkbenchChartAlreadyExistsError();
+  }
+  if (error instanceof DashboardSavedWorkbenchChartDefinitionInvalidError) {
+    throw new SavedWorkbenchChartDefinitionInvalidError(error.chartId);
+  }
+  throw error;
 }

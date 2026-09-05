@@ -19,7 +19,7 @@ import type {
   OrganizationSeatLicensePort,
   OrganizationSessionRevocationPort,
 } from "../../ports/organization-membership.port";
-import type { OrganizationRepository } from "../../repositories/organization-membership.repository";
+import type { OrganizationMembershipRepository } from "../../repositories/organization-membership.repository";
 
 const mockInvalidateOrganization = vi.fn();
 const mockCheckLimit = vi.fn();
@@ -27,7 +27,7 @@ const mockAssertRoleChangeAllowed = vi.fn();
 const mockRevokeAllBrowserSessions = vi.fn();
 
 describe("OrganizationMembershipService", () => {
-  const mockRepo: OrganizationRepository = {
+  const mockRepo: OrganizationMembershipRepository = {
     getClient: vi.fn(),
     tryGetUserOrgRole: vi.fn(),
     getUserOrgRoleByTeamId: vi.fn(),
@@ -616,9 +616,9 @@ describe("OrganizationMembershipService", () => {
 
       const result = await service.listMembers({ organizationId: "org-123" });
 
-      expect(result.members.every((member) => (member as { disabledAt: null }).disabledAt === null)).toBe(
-        true,
-      );
+      expect(
+        result.members.every((member) => (member as { disabledAt: null }).disabledAt === null),
+      ).toBe(true);
       expect(mockCheckLimit).not.toHaveBeenCalled();
       expect(mockRepo.setMemberDisabled).not.toHaveBeenCalled();
     });

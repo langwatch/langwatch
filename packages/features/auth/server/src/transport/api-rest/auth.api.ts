@@ -19,7 +19,6 @@ import { publicEndpoint } from "@langwatch/api";
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { runWithIdentityBirth } from "@langwatch/identity-server/better-auth";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 
@@ -101,6 +100,14 @@ export type AuthRestPorts = Readonly<{
   baseUrl: string;
   /** Where a GET logout lands, once the local cookies are cleared. */
   federatedLogout: AuthRestFederatedLogout;
+  /**
+   * Runs the born-finalized handler inside Identity's birth context.
+   *
+   * A port because the context belongs to Identity: this door only decides
+   * WHICH requests enter through the born-finalized entrance, and the process
+   * that composed both features supplies the scope they share.
+   */
+  runWithIdentityBirth: <T>(run: () => Promise<T>) => Promise<T>;
 }>;
 
 /** Builds the `/api/auth` family over one process's ports. */
@@ -255,7 +262,7 @@ export function createAuthRestApp(options: {
         request: c.req.raw,
       })
     ) {
-      return runWithIdentityBirth(() => ports.betterAuth().handler(c.req.raw));
+      return ports.runWithIdentityBirth(() => ports.betterAuth().handler(c.req.raw));
     }
 
     // BetterAuth's auth.handler is fetch-compatible (Request => Response)

@@ -16,10 +16,7 @@ export {
   type OrganizationPlanUser,
   type OrganizationSeatDecision,
 } from "./ports/organization-membership.port";
-export {
-  enrichTeamWithRoleBindings,
-  OrganizationMembershipService,
-} from "./services/organization-membership.service";
+export { OrganizationMembershipService } from "./services/organization-membership.service";
 export {
   CannotDemoteLastAdminError,
   CannotDisableLastAdminError,
@@ -52,7 +49,7 @@ export type {
   MemberTeamBinding,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
-  OrganizationRepository,
+  OrganizationMembershipRepository,
   UpdateMemberRoleResult,
 } from "./repositories/organization-membership.repository";
 export {
@@ -149,10 +146,6 @@ export {
 export {
   INVITE_EXPIRATION_MS,
   InviteService,
-  classifyInvitesByMemberType,
-  maskInvitedAddress,
-  matchInviteToAcceptor,
-  resolveInviteTeamMemberships,
   type InviteServiceDependencies,
 } from "./services/invite.service";
 export {

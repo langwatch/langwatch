@@ -12,6 +12,23 @@ import {
   type TopicClusteringRunHistoryEntry,
 } from "../../projections/topic-clustering-run-history.projection";
 
+function fromRow(row: Row): StoredProjection<TopicClusteringRunHistoryData> {
+  return {
+    state: {
+      ProjectId: row.projectId,
+      Runs: PrismaTopicClusteringRunHistoryProjectionRepository.parseRunHistoryRuns(row.Runs),
+      CreatedAt: row.CreatedAt,
+      UpdatedAt: row.UpdatedAt,
+      LastEventOccurredAt: row.OccurredAt,
+    },
+    cursor: { acceptedAt: row.AcceptedAt, eventId: row.LastEventId },
+    occurredAt: row.OccurredAt,
+    createdAt: row.CreatedAt,
+    updatedAt: row.UpdatedAt,
+    version: row.ProjectionVersion,
+  };
+}
+
 /** KSUID resource for run-history projection rows (the app's KSUID_RESOURCES.TOPIC_CLUSTERING_RUN_HISTORY). */
 const TOPIC_CLUSTERING_RUN_HISTORY_KSUID_RESOURCE = "topicrunhist";
 
@@ -30,30 +47,13 @@ type RunHistoryPrismaClient = {
 // an empty history (which a replay rebuilds) instead of poisoning the fold.
 const runsSchema = z.array(topicClusteringRunHistoryProjectionEntrySchema);
 
-export function parseRunHistoryRuns(value: unknown): TopicClusteringRunHistoryEntry[] {
-  const parsed = runsSchema.safeParse(value);
-  return parsed.success ? parsed.data : [];
-}
-
-function fromRow(row: Row): StoredProjection<TopicClusteringRunHistoryData> {
-  return {
-    state: {
-      ProjectId: row.projectId,
-      Runs: parseRunHistoryRuns(row.Runs),
-      CreatedAt: row.CreatedAt,
-      UpdatedAt: row.UpdatedAt,
-      LastEventOccurredAt: row.OccurredAt,
-    },
-    cursor: { acceptedAt: row.AcceptedAt, eventId: row.LastEventId },
-    occurredAt: row.OccurredAt,
-    createdAt: row.CreatedAt,
-    updatedAt: row.UpdatedAt,
-    version: row.ProjectionVersion,
-  };
-}
-
 /** Postgres row I/O for the topic clustering run-history projection. */
 export class PrismaTopicClusteringRunHistoryProjectionRepository implements StateProjectionStore<TopicClusteringRunHistoryData> {
+  static parseRunHistoryRuns(value: unknown): TopicClusteringRunHistoryEntry[] {
+    const parsed = runsSchema.safeParse(value);
+    return parsed.success ? parsed.data : [];
+  }
+
   private constructor(private readonly prisma: RunHistoryPrismaClient) {}
 
   static create(options: {

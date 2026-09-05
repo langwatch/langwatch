@@ -1,9 +1,11 @@
 import type { SavedViewJson, SavedViewRecord } from "../../ports/dashboard.port";
 import type { Prisma, PrismaClient, SavedView } from "@langwatch/prisma-client/generated";
+import {
+  SavedViewRepository,
+  type CreateSavedViewInput,
+  type UpdateSavedViewInput,
+} from "../saved-view.repository";
 
-/**
- * Input types for saved view operations.
- */
 /**
  * Only the delegate this repository touches, plus the transaction it reorders in.
  *
@@ -12,48 +14,20 @@ import type { Prisma, PrismaClient, SavedView } from "@langwatch/prisma-client/g
  */
 export type SavedViewDatabase = Pick<PrismaClient, "savedView" | "$transaction">;
 
-export type CreateSavedViewInput = {
-  id: string;
-  projectId: string;
-  userId?: string;
-  name: string;
-  filters: SavedViewJson;
-  query?: string;
-  period?: SavedViewJson;
-  order: number;
-  /**
-   * Storage shape discriminator. Omit to keep the SavedView default
-   * ("v1-traces-filter"), which is what the v1 filter bar writes.
-   * The traces v2 lens system sends "v2-traces-lens" so the two
-   * clients can share this table without seeing each other's rows.
-   */
-  kind?: string;
-};
-
-/** The fields a saved view may be edited through, in portable terms. */
-export type SavedViewUpdate = {
-  name?: string;
-  filters?: SavedViewJson;
-  query?: string | null;
-  period?: SavedViewJson | null;
-  order?: number;
-  kind?: string;
-};
-
-export type UpdateSavedViewInput = {
-  id: string;
-  projectId: string;
-  data: SavedViewUpdate;
-};
-
 /**
  * Repository layer for saved view data access.
  * Single Responsibility: Database operations for saved views.
  *
  * CRITICAL: Every query includes projectId for multitenancy protection.
  */
-export class SavedViewRepository {
-  constructor(private readonly prisma: SavedViewDatabase) {}
+export class PrismaSavedViewRepository extends SavedViewRepository {
+  private constructor(private readonly prisma: SavedViewDatabase) {
+    super();
+  }
+
+  static create(options: { database: SavedViewDatabase }): PrismaSavedViewRepository {
+    return new PrismaSavedViewRepository(options.database);
+  }
 
   /**
    * Finds all saved views visible to a user: project-level views (userId IS NULL)

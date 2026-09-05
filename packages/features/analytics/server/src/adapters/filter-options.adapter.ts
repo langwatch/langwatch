@@ -14,8 +14,10 @@ export class FilterOptionsAdapter {
   static create(options: {
     resolveClient: ((tenantId: string) => Promise<ClickHouseClient>) | null;
   }): FilterService {
-    return new FilterService(
-      options.resolveClient ? new FilterOptionsClickHouseRepository(options.resolveClient) : null,
-    );
+    return FilterService.create({
+      repository: options.resolveClient
+        ? FilterOptionsClickHouseRepository.create({ resolveClient: options.resolveClient })
+        : null,
+    });
   }
 }

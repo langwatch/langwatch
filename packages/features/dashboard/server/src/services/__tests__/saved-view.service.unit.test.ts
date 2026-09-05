@@ -61,7 +61,7 @@ function serviceWith(
     },
   };
 
-  return { calls, service: new SavedViewService(repository as never) };
+  return { calls, service: SavedViewService.create({ repository: repository as never }) };
 }
 
 const seeded = (names: string[]) =>

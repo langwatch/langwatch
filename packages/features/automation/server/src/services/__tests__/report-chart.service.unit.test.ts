@@ -4,7 +4,7 @@ import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
 import { buildSeriesName } from "@langwatch/analytics-contract";
 import type { ReportSource } from "@langwatch/automation-contract";
 import {
-  loadReportCharts,
+  ReportChartService,
   REPORT_CHART_QUERY_CONCURRENCY,
   type ReportChartDeps,
 } from "../report-chart.service";
@@ -51,10 +51,10 @@ function makeDeps({
 const WINDOW = { from: 0, to: 3_600_000 };
 
 function run({ deps, source }: { deps: ReportChartDeps; source: ReportSource }) {
-  return loadReportCharts({ deps, source, projectId: "proj-1", ...WINDOW });
+  return ReportChartService.loadReportCharts({ deps, source, projectId: "proj-1", ...WINDOW });
 }
 
-describe("loadReportCharts", () => {
+describe("ReportChartService.loadReportCharts", () => {
   describe("given a customGraph report", () => {
     it("plots the graph's series over the report window", async () => {
       const deps = makeDeps({

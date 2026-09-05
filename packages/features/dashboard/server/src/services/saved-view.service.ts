@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import { SavedViewNotFoundError, SavedViewReorderError } from "@langwatch/dashboard-contract";
 import type { SavedViewJson, SavedViewRecord } from "../ports/dashboard.port";
-import { SavedViewRepository } from "../repositories/prisma/prisma.saved-view.repository";
+import type { SavedViewRepository } from "../repositories/saved-view.repository";
 
 /**
  * Seed views auto-populated on first access for a project.
@@ -23,7 +23,11 @@ const SEED_VIEWS = [
  * Throws domain-specific errors that can be mapped by the router layer.
  */
 export class SavedViewService {
-  constructor(private readonly repository: SavedViewRepository) {}
+  private constructor(private readonly repository: SavedViewRepository) {}
+
+  static create(options: { repository: SavedViewRepository }): SavedViewService {
+    return new SavedViewService(options.repository);
+  }
 
   /**
    * Gets all saved views for a project visible to a user.

@@ -1,7 +1,7 @@
 import type { StateProjectionStore } from "@langwatch/eventing";
 import type { TopicClusteringRunCompletedEventData } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
-import type { TopicClusteringProcessingEvent } from "../../adapters/eventing.topic.adapter";
+import type { TopicClusteringProcessingEvent } from "../../adapters/eventing.topic.events";
 import {
   type TopicClusteringRunStatusData,
   TopicClusteringRunStatusFoldProjection,
@@ -12,7 +12,7 @@ const stubStore: StateProjectionStore<TopicClusteringRunStatusData> = {
   store: async () => undefined,
 };
 
-const projection = new TopicClusteringRunStatusFoldProjection({
+const projection = TopicClusteringRunStatusFoldProjection.create({
   store: stubStore,
 });
 

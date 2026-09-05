@@ -12,12 +12,12 @@ import type {
   TopicClusteringRunCompletedEvent,
   TopicClusteringRunFailedEvent,
   TopicClusteringRunStartedEvent,
-} from "../adapters/eventing.topic.adapter";
+} from "../adapters/eventing.topic.events";
 import {
   TopicClusteringRunCompletedEventSchema,
   TopicClusteringRunFailedEventSchema,
   TopicClusteringRunStartedEventSchema,
-} from "../adapters/eventing.topic.adapter";
+} from "../adapters/eventing.topic.events";
 
 /**
  * One run in the project's history, accumulated across the run's pages.
@@ -152,6 +152,12 @@ export class TopicClusteringRunHistoryFoldProjection
   readonly store: StateProjectionStore<TopicClusteringRunHistoryData>;
 
   protected readonly events = historyEvents;
+
+  static create(deps: {
+    store: StateProjectionStore<TopicClusteringRunHistoryData>;
+  }): TopicClusteringRunHistoryFoldProjection {
+    return new TopicClusteringRunHistoryFoldProjection(deps);
+  }
 
   constructor(deps: { store: StateProjectionStore<TopicClusteringRunHistoryData> }) {
     super();

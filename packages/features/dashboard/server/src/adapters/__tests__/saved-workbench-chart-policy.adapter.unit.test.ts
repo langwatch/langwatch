@@ -19,11 +19,9 @@
 import { describe, expect, it } from "vitest";
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-contract/visualization/validation";
 import { SavedWorkbenchChartAlreadyExistsError } from "@langwatch/dashboard-contract";
-import {
-  AnalyticsSavedWorkbenchChartPolicy,
-  mapDashboardSavedWorkbenchChartError,
-} from "../saved-workbench-chart-policy.adapter";
-import { LangWatchQLService } from "@langwatch/analytics-server";
+import { AnalyticsSavedWorkbenchChartPolicyAdapter } from "../saved-workbench-chart-policy.adapter";
+import { mapDashboardSavedWorkbenchChartError } from "../../transport/api-trpc/saved-workbench-chart.transport-errors";
+import { LangWatchQLService } from "@langwatch/analytics-server/testing";
 
 const PROJECT_ID = "project_1";
 
@@ -54,8 +52,8 @@ const WITHOUT_CONTENT = {
  * The real LangWatchQL service with no executor. Validation needs no database,
  * and a stubbed validator would prove only that the stub refuses.
  */
-function policy(): AnalyticsSavedWorkbenchChartPolicy {
-  return AnalyticsSavedWorkbenchChartPolicy.create({
+function policy(): AnalyticsSavedWorkbenchChartPolicyAdapter {
+  return AnalyticsSavedWorkbenchChartPolicyAdapter.create({
     langWatchQL: new LangWatchQLService({ executor: null, database: "analytics" }),
   });
 }
@@ -72,7 +70,7 @@ function refusalOf(run: () => unknown): { code: unknown; meta: unknown } {
   throw new Error("expected the definition to be refused, but it was admitted");
 }
 
-describe("AnalyticsSavedWorkbenchChartPolicy", () => {
+describe("AnalyticsSavedWorkbenchChartPolicyAdapter", () => {
   it("admits a definition the current caller may execute", () => {
     expect(() =>
       policy().validate({

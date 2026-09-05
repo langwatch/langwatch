@@ -55,6 +55,10 @@ type RunFailedInput = RunStartedInput & {
  * through the owning Eventing pipeline.
  */
 export class EventingTopicClusteringCommandsAdapter extends TopicClusteringCommandsPort {
+  static create(): EventingTopicClusteringCommandsAdapter {
+    return new EventingTopicClusteringCommandsAdapter();
+  }
+
   private recordTopicsCommand: CommandSender<RecordTopicsInput> | null = null;
   private requestClusteringCommand: CommandSender<RequestClusteringInput> | null = null;
 
@@ -91,6 +95,10 @@ export class EventingTopicClusteringCommandsAdapter extends TopicClusteringComma
 
 /** Late-bound outcome transport for the pipeline's own retry-safe intent executor. */
 export class EventingTopicClusteringOutcomeCommandsAdapter implements TopicClusteringOutcomeCommands {
+  static create(): EventingTopicClusteringOutcomeCommandsAdapter {
+    return new EventingTopicClusteringOutcomeCommandsAdapter();
+  }
+
   private runStartedCommand: CommandSender<RunStartedInput> | null = null;
   private runCompletedCommand: CommandSender<RunCompletedInput> | null = null;
   private runFailedCommand: CommandSender<RunFailedInput> | null = null;

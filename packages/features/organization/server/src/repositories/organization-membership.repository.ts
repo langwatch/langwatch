@@ -265,20 +265,20 @@ export interface UpdateTeamMemberRoleInput {
   currentUserId: string;
 }
 
-export interface OrganizationRepository {
-  tryGetUserOrgRole(params: {
+export abstract class OrganizationMembershipRepository {
+  abstract tryGetUserOrgRole(params: {
     userId: string;
     organizationId: string;
   }): Promise<OrganizationUserRole | null>;
-  getUserOrgRoleByTeamId(params: {
+  abstract getUserOrgRoleByTeamId(params: {
     userId: string;
     teamId: string;
   }): Promise<OrganizationUserRole | null>;
-  tryFindPrimaryIntentById(organizationId: string): Promise<OrganizationIntent | null>;
+  abstract tryFindPrimaryIntentById(organizationId: string): Promise<OrganizationIntent | null>;
 
   // --- New methods for router delegation ---
 
-  createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult>;
+  abstract createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult>;
 
   /**
    * Creates an organization and its default team with no user attached (the
@@ -286,12 +286,12 @@ export interface OrganizationRepository {
    * slug is already claimed, so provisioning tools get a deterministic 409 on
    * the natural key.
    */
-  createForProvisioning(input: CreateForProvisioningInput): Promise<CreateAndAssignResult>;
+  abstract createForProvisioning(input: CreateForProvisioningInput): Promise<CreateAndAssignResult>;
 
   /** Every organization on the instance, newest first. Instance-admin only. */
-  findAllProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
+  abstract findAllProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
 
-  tryFindProvisioningSummaryById(
+  abstract tryFindProvisioningSummaryById(
     organizationId: string,
   ): Promise<OrganizationProvisioningSummary | null>;
 
@@ -300,41 +300,41 @@ export interface OrganizationRepository {
    * Scoped to what provisioning creates before the first member ever signs
    * in: role bindings, API keys, prompt tags, teams and the organization row.
    */
-  deleteProvisionedOrganization(organizationId: string): Promise<void>;
+  abstract deleteProvisionedOrganization(organizationId: string): Promise<void>;
 
-  getAllForUser(params: {
+  abstract getAllForUser(params: {
     userId: string;
     isDemo: boolean;
     demoProjectUserId: string;
     demoProjectId: string;
   }): Promise<FullyLoadedOrganization[]>;
 
-  getOrganizationWithMembers(params: {
+  abstract getOrganizationWithMembers(params: {
     organizationId: string;
     userId: string;
     includeDeactivated: boolean;
   }): Promise<OrganizationWithMembersAndTheirTeams | null>;
 
-  getMemberById(params: {
+  abstract getMemberById(params: {
     organizationId: string;
     userId: string;
     currentUserId: string;
   }): Promise<OrganizationMemberWithUser | null>;
 
-  getAllMembers(organizationId: string): Promise<User[]>;
+  abstract getAllMembers(organizationId: string): Promise<User[]>;
 
   /**
    * A single membership row with its user, disabled or not. Unlike
    * `getMemberById` there is no caller pre-check: the management surface
    * authenticates through the organization credential, not a session user.
    */
-  tryFindMembership(params: {
+  abstract tryFindMembership(params: {
     organizationId: string;
     userId: string;
   }): Promise<OrganizationMemberSummary | null>;
 
   /** Paginated membership list for the management surface. */
-  findAllMembers(params: {
+  abstract findAllMembers(params: {
     organizationId: string;
     includeDisabled: boolean;
     offset: number;
@@ -345,14 +345,14 @@ export interface OrganizationRepository {
    * The member's TEAM-scoped role bindings with team names, personal
    * workspaces excluded.
    */
-  findMemberTeamBindings(params: {
+  abstract findMemberTeamBindings(params: {
     organizationId: string;
     userId: string;
   }): Promise<MemberTeamBinding[]>;
 
-  deleteMember(input: DeleteMemberInput): Promise<void>;
+  abstract deleteMember(input: DeleteMemberInput): Promise<void>;
 
-  setMemberDisabled(input: SetMemberDisabledInput): Promise<void>;
+  abstract setMemberDisabled(input: SetMemberDisabledInput): Promise<void>;
 
   /**
    * The raw Prisma client behind this repository, when it has one.
@@ -365,13 +365,13 @@ export interface OrganizationRepository {
    * Optional on purpose: the null repository has no client, and callers must
    * treat its absence as "this operation is unavailable".
    */
-  getClient?(): PrismaClient | null;
+  abstract getClient?(): PrismaClient | null;
 
-  updateMemberRole(input: UpdateMemberRoleInput): Promise<UpdateMemberRoleResult>;
+  abstract updateMemberRole(input: UpdateMemberRoleInput): Promise<UpdateMemberRoleResult>;
 
-  updateTeamMemberRole(input: UpdateTeamMemberRoleInput): Promise<void>;
+  abstract updateTeamMemberRole(input: UpdateTeamMemberRoleInput): Promise<void>;
 
-  getAuditLogs(
+  abstract getAuditLogs(
     filters: AuditLogFilters,
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }>;
 }

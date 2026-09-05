@@ -6,8 +6,8 @@ import {
   TOPIC_MODEL_RECORD_SOURCE,
   type TopicModelEntry,
 } from "@langwatch/topic-contract";
-import type { TopicClusteringTopicsRecordedEvent } from "../adapters/eventing.topic.adapter";
-import { TopicClusteringTopicsRecordedEventSchema } from "../adapters/eventing.topic.adapter";
+import type { TopicClusteringTopicsRecordedEvent } from "../adapters/eventing.topic.events";
+import { TopicClusteringTopicsRecordedEventSchema } from "../adapters/eventing.topic.events";
 
 /** A projected topic with its firstRecordedAt resolved (never optional). */
 export type ProjectedTopic = Omit<TopicModelEntry, "firstRecordedAt"> & {
@@ -54,6 +54,10 @@ export class TopicModelFoldProjection
   readonly store: StateProjectionStore<TopicModelData>;
 
   protected readonly events = topicModelEvents;
+
+  static create(deps: { store: StateProjectionStore<TopicModelData> }): TopicModelFoldProjection {
+    return new TopicModelFoldProjection(deps);
+  }
 
   constructor(deps: { store: StateProjectionStore<TopicModelData> }) {
     super();

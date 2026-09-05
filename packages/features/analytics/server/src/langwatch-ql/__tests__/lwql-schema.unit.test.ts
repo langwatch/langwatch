@@ -13,8 +13,8 @@
  */
 
 import { describe, expect, it } from "vitest";
+import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 
-import type { Protections } from "@langwatch/trace-server";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwql-views";
 import { lwqlAllowedTables, lwqlGatedColumns } from "../catalog/types";
 import { describeLangWatchQLSchema } from "../schema";
@@ -23,31 +23,31 @@ import { GATED_DATASET, GATED_DATASET_QUALIFIED_NAME } from "./gatedDatasetFixtu
 
 const DATABASE = "analytics";
 
-const FULLY_PERMITTED: Protections = {
+const FULLY_PERMITTED: LangWatchQLProtections = {
   canSeeCapturedInput: true,
   canSeeCapturedOutput: true,
   canSeeCosts: true,
 };
 
-const WITHOUT_CONTENT: Protections = {
+const WITHOUT_CONTENT: LangWatchQLProtections = {
   canSeeCapturedInput: false,
   canSeeCapturedOutput: false,
   canSeeCosts: true,
 };
 
-const WITHOUT_ANYTHING: Protections = {};
+const WITHOUT_ANYTHING: LangWatchQLProtections = {};
 
-function schemaFor(protections: Protections) {
+function schemaFor(protections: LangWatchQLProtections) {
   return describeLangWatchQLSchema({ database: DATABASE, protections });
 }
 
-function columnsOf(protections: Protections) {
+function columnsOf(protections: LangWatchQLProtections) {
   return schemaFor(protections).datasets.flatMap((dataset) =>
     dataset.columns.map((column) => ({ dataset: dataset.name, ...column })),
   );
 }
 
-function policyFor(protections: Protections) {
+function policyFor(protections: LangWatchQLProtections) {
   return {
     allowedTables: lwqlAllowedTables({
       database: DATABASE,
@@ -252,7 +252,7 @@ describe("given the LangWatchQL schema catalog", () => {
    */
   describe("when a dataset is outside the caller's permissions", () => {
     const views = [...LWQL_VIEW_CATALOG, GATED_DATASET];
-    const schemaWith = (protections: Protections) =>
+    const schemaWith = (protections: LangWatchQLProtections) =>
       describeLangWatchQLSchema({ database: DATABASE, protections, views });
 
     it("leaves it out of the published schema entirely", () => {

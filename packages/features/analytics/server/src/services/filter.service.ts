@@ -33,6 +33,10 @@ export class FilterService {
    */
   constructor(private readonly repository: FilterOptionsPort | null) {}
 
+  static create(options: { repository: FilterOptionsPort | null }): FilterService {
+    return new FilterService(options.repository);
+  }
+
   async getFilterOptions(input: GetFilterOptionsInput): Promise<FilterOption[]> {
     return await this.tracer.withActiveSpan(
       "FilterService.getFilterOptions",

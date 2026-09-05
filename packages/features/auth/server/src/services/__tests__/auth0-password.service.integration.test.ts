@@ -14,13 +14,9 @@ import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
-  _resetManagementApiTokenCache,
   Auth0ApiError,
-  changeAuth0Password,
-  getManagementApiToken,
+  Auth0PasswordService,
   type Auth0ManagementCredentials,
-  updateUserPassword,
-  verifyCurrentPassword,
 } from "../auth0-password.service";
 
 let auth0Issuer = "http://127.0.0.1:0";
@@ -95,10 +91,10 @@ beforeEach(() => {
   handler = () => ({ status: 404 });
   // Reset between cases so each test starts with no cached Management
   // API token (the cache is module-scoped).
-  _resetManagementApiTokenCache();
+  Auth0PasswordService._resetManagementApiTokenCache();
 });
 
-describe("getManagementApiToken", () => {
+describe("Auth0PasswordService.getManagementApiToken", () => {
   describe("when client credentials grant succeeds", () => {
     it("returns the access token", async () => {
       handler = () => ({
@@ -110,7 +106,7 @@ describe("getManagementApiToken", () => {
         },
       });
 
-      const token = await getManagementApiToken(credentials());
+      const token = await Auth0PasswordService.getManagementApiToken(credentials());
       expect(token).toBe("mgmt-token");
       expect(captured[0]?.body).toMatchObject({
         grant_type: "client_credentials",
@@ -132,8 +128,8 @@ describe("getManagementApiToken", () => {
         },
       });
 
-      const t1 = await getManagementApiToken(credentials());
-      const t2 = await getManagementApiToken(credentials());
+      const t1 = await Auth0PasswordService.getManagementApiToken(credentials());
+      const t2 = await Auth0PasswordService.getManagementApiToken(credentials());
 
       expect(t1).toBe("cached-mgmt-token");
       expect(t2).toBe("cached-mgmt-token");
@@ -149,8 +145,8 @@ describe("getManagementApiToken", () => {
         body: { access_token: "uncached-mgmt-token", token_type: "Bearer" },
       });
 
-      await getManagementApiToken(credentials());
-      await getManagementApiToken(credentials());
+      await Auth0PasswordService.getManagementApiToken(credentials());
+      await Auth0PasswordService.getManagementApiToken(credentials());
       // Both calls hit the network because we refused to cache without
       // an explicit expiry.
       expect(captured).toHaveLength(2);
@@ -163,7 +159,9 @@ describe("getManagementApiToken", () => {
         status: 401,
         body: { error: "access_denied" },
       });
-      await expect(getManagementApiToken(credentials())).rejects.toBeInstanceOf(Auth0ApiError);
+      await expect(
+        Auth0PasswordService.getManagementApiToken(credentials()),
+      ).rejects.toBeInstanceOf(Auth0ApiError);
     });
   });
 
@@ -175,7 +173,9 @@ describe("getManagementApiToken", () => {
       const original = auth0Issuer;
       auth0Issuer = "http://127.0.0.1:1"; // closed port
       try {
-        await expect(getManagementApiToken(credentials())).rejects.toBeInstanceOf(Auth0ApiError);
+        await expect(
+          Auth0PasswordService.getManagementApiToken(credentials()),
+        ).rejects.toBeInstanceOf(Auth0ApiError);
       } finally {
         auth0Issuer = original;
       }
@@ -183,7 +183,7 @@ describe("getManagementApiToken", () => {
   });
 });
 
-describe("updateUserPassword", () => {
+describe("Auth0PasswordService.updateUserPassword", () => {
   describe("when the Management API returns 200 OK", () => {
     it("sends the password + connection and bearer token", async () => {
       handler = (req) => {
@@ -193,7 +193,7 @@ describe("updateUserPassword", () => {
         return { status: 404 };
       };
 
-      await updateUserPassword({
+      await Auth0PasswordService.updateUserPassword({
         credentials: credentials(),
         auth0UserId: "auth0|abc123",
         newPassword: "n3w-secret-pw",
@@ -223,7 +223,7 @@ describe("updateUserPassword", () => {
       });
 
       await expect(
-        updateUserPassword({
+        Auth0PasswordService.updateUserPassword({
           credentials: credentials(),
           auth0UserId: "auth0|abc",
           newPassword: "pw12345678",
@@ -244,7 +244,7 @@ describe("updateUserPassword", () => {
       });
 
       await expect(
-        updateUserPassword({
+        Auth0PasswordService.updateUserPassword({
           credentials: credentials(),
           auth0UserId: "auth0|abc",
           newPassword: "pw12345678",
@@ -274,7 +274,7 @@ describe("updateUserPassword", () => {
       });
 
       await expect(
-        updateUserPassword({
+        Auth0PasswordService.updateUserPassword({
           credentials: credentials(),
           auth0UserId: "auth0|abc",
           newPassword: "short",
@@ -298,7 +298,7 @@ describe("updateUserPassword", () => {
       });
 
       await expect(
-        updateUserPassword({
+        Auth0PasswordService.updateUserPassword({
           credentials: credentials(),
           auth0UserId: "auth0|abc",
           newPassword: "short",
@@ -330,7 +330,7 @@ describe("updateUserPassword", () => {
       });
 
       await expect(
-        updateUserPassword({
+        Auth0PasswordService.updateUserPassword({
           credentials: credentials(),
           auth0UserId: "auth0|abc",
           newPassword: "pw12345678",
@@ -345,7 +345,7 @@ describe("updateUserPassword", () => {
   });
 });
 
-describe("verifyCurrentPassword", () => {
+describe("Auth0PasswordService.verifyCurrentPassword", () => {
   describe("when Auth0 accepts the password (200)", () => {
     /** @scenario Auth0 backend verifies the current password via Resource Owner Password Grant before updating */
     it("returns true and sends a Resource Owner Password Grant request", async () => {
@@ -359,7 +359,7 @@ describe("verifyCurrentPassword", () => {
         return { status: 404 };
       };
 
-      const ok = await verifyCurrentPassword({
+      const ok = await Auth0PasswordService.verifyCurrentPassword({
         credentials: credentials(),
         email: "user@example.com",
         password: "hunter2",
@@ -389,7 +389,7 @@ describe("verifyCurrentPassword", () => {
         },
       });
 
-      const ok = await verifyCurrentPassword({
+      const ok = await Auth0PasswordService.verifyCurrentPassword({
         credentials: credentials(),
         email: "user@example.com",
         password: "wrong",
@@ -410,7 +410,7 @@ describe("verifyCurrentPassword", () => {
       });
 
       await expect(
-        verifyCurrentPassword({
+        Auth0PasswordService.verifyCurrentPassword({
           credentials: credentials(),
           email: "u@example.com",
           password: "x",
@@ -430,7 +430,7 @@ describe("verifyCurrentPassword", () => {
       });
 
       await expect(
-        verifyCurrentPassword({
+        Auth0PasswordService.verifyCurrentPassword({
           credentials: credentials(),
           email: "u@example.com",
           password: "x",
@@ -443,7 +443,7 @@ describe("verifyCurrentPassword", () => {
   });
 });
 
-describe("changeAuth0Password", () => {
+describe("Auth0PasswordService.changeAuth0Password", () => {
   describe("given a correct current password and valid M2M credentials", () => {
     /** @scenario Auth0 backend verifies the current password via Resource Owner Password Grant before updating */
     it("verifies, gets management token, and PATCHes the user's password", async () => {
@@ -466,7 +466,7 @@ describe("changeAuth0Password", () => {
         return { status: 404 };
       };
 
-      const result = await changeAuth0Password({
+      const result = await Auth0PasswordService.changeAuth0Password({
         credentials: credentials(),
         email: "user@example.com",
         auth0UserId: "auth0|abc",
@@ -502,7 +502,7 @@ describe("changeAuth0Password", () => {
         return { status: 500 };
       };
 
-      const result = await changeAuth0Password({
+      const result = await Auth0PasswordService.changeAuth0Password({
         credentials: credentials(),
         email: "user@example.com",
         auth0UserId: "auth0|abc",
@@ -540,7 +540,7 @@ describe("changeAuth0Password", () => {
       };
 
       await expect(
-        changeAuth0Password({
+        Auth0PasswordService.changeAuth0Password({
           credentials: credentials(),
           email: "user@example.com",
           auth0UserId: "auth0|abc",

@@ -20,7 +20,7 @@ const logger = createLogger("langwatch:tasks:topic-clustering-run");
  * needs a model-provider gateway, langevals and a Prisma repository —
  * `apps/tasks` composes none of them. The two producer-only Eventing
  * registrations this task would ALSO need now both have factories
- * (`createTopicClusteringProcessingProducerPipeline` here,
+ * (`TopicClusteringProcessingProducerAdapter.createPipeline` here,
  * `createTraceProcessingProducerPipeline` in `@langwatch/trace-server`, for
  * `TraceTopicAssignmentPort`); the model-provider/langevals/Prisma runner
  * collaborator graph is the remaining blocker. Full collaborator list:

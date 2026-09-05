@@ -105,8 +105,12 @@ interface PendingSignUp {
 export class SignUpVerificationService {
   private readonly deps: SignUpVerificationDeps;
 
-  constructor(deps: SignUpVerificationDeps) {
+  private constructor(deps: SignUpVerificationDeps) {
     this.deps = deps;
+  }
+
+  static create(deps: SignUpVerificationDeps): SignUpVerificationService {
+    return new SignUpVerificationService(deps);
   }
 
   /**

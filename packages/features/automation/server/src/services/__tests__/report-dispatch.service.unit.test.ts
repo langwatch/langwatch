@@ -14,9 +14,9 @@ import type { ScheduledJobFire } from "@langwatch/eventing/server";
 import { describe, expect, it, vi } from "vitest";
 import { AutomationNotificationDeliveryPort } from "../../ports/automation-notification-delivery.port";
 import { AutomationSlackProviderPort } from "../../ports/automation-provider.port";
-import { loadReportCharts } from "../report-chart.service";
-import { dispatchScheduledReport, type ReportDispatchDeps } from "../report-dispatch.service";
-import { toReportTraceRow } from "../report-trace-row.service";
+import { ReportChartService } from "../report-chart.service";
+import { ReportDispatchService, type ReportDispatchDeps } from "../report-dispatch.service";
+import { ReportTraceRowService } from "../report-trace-row.service";
 
 const BASE_HOST = "https://app.langwatch.test";
 const PROJECT = { id: "project-1", name: "Checkout", slug: "checkout" };
@@ -27,7 +27,7 @@ const SCHEDULE = { cron: "0 9 * * *", timezone: "UTC" };
 /**
  * The mail gateway a report actually leaves through, faked.
  *
- * It captures what `dispatchScheduledReport` handed the transport rather than
+ * It captures what `ReportDispatchService.dispatchScheduledReport` handed the transport rather than
  * standing in for the dispatch itself: every assertion below reads the rendered
  * subject and body of a real send, so a report that renders an empty message or
  * never reaches the transport fails here rather than passing on a spy call.
@@ -186,7 +186,7 @@ function graphRow(overrides: Partial<CustomGraph> = {}): CustomGraph {
 
 /**
  * The chart reader wired the way the worker wires it: the REAL
- * `loadReportCharts` over a faked timeseries, so a report's panels are rendered
+ * `ReportChartService.loadReportCharts` over a faked timeseries, so a report's panels are rendered
  * rather than handed to the dispatch pre-built.
  */
 function chartReader({
@@ -199,7 +199,7 @@ function chartReader({
   getTimeseries?: (input: AnalyticsTimeseriesInput) => Promise<AnalyticsTimeseriesResult>;
 }): ReportDispatchDeps["loadReportCharts"] {
   return ({ projectId, source, from, to }): Promise<ReportChart[]> =>
-    loadReportCharts({
+    ReportChartService.loadReportCharts({
       deps: {
         loadCustomGraph: async () => graphs[0] ?? null,
         loadDashboardGraphs: async () => graphs,
@@ -213,13 +213,13 @@ function chartReader({
     });
 }
 
-describe("dispatchScheduledReport", () => {
+describe("ReportDispatchService.dispatchScheduledReport", () => {
   describe("given a report whose source is matching traces", () => {
     /** @scenario "A trace-query report sends the traces that matched" */
     it("sends the top traces matching the author's query over the report's window", async () => {
       const mail = new FakeMailGateway();
       const listReportTraces = vi.fn(async ({ projectSlug }: { projectSlug: string }) => [
-        toReportTraceRow({
+        ReportTraceRowService.toReportTraceRow({
           item: traceListItem() as never,
           projectUrl: `${BASE_HOST}/${projectSlug}`,
         }),
@@ -229,7 +229,7 @@ describe("dispatchScheduledReport", () => {
         filterQuery: "status:error",
       });
 
-      await dispatchScheduledReport({
+      await ReportDispatchService.dispatchScheduledReport({
         deps: makeDeps({ trigger, mail, listReportTraces }),
         fire: FIRE,
       });
@@ -258,7 +258,7 @@ describe("dispatchScheduledReport", () => {
     it("asks for the whole window when the author wrote no query", async () => {
       const mail = new FakeMailGateway();
       const listReportTraces: ReportDispatchDeps["listReportTraces"] = vi.fn(async () => [
-        toReportTraceRow({
+        ReportTraceRowService.toReportTraceRow({
           item: traceListItem({ traceId: "trace-recent" }) as never,
           projectUrl: `${BASE_HOST}/${PROJECT.slug}`,
         }),
@@ -268,7 +268,7 @@ describe("dispatchScheduledReport", () => {
         filterQuery: null,
       });
 
-      await dispatchScheduledReport({
+      await ReportDispatchService.dispatchScheduledReport({
         deps: makeDeps({ trigger, mail, listReportTraces }),
         fire: FIRE,
       });
@@ -299,7 +299,7 @@ describe("dispatchScheduledReport", () => {
         source: { kind: "customGraph", customGraphId: "graph-1" },
       });
 
-      await dispatchScheduledReport({
+      await ReportDispatchService.dispatchScheduledReport({
         deps: makeDeps({
           trigger,
           mail,
@@ -331,7 +331,7 @@ describe("dispatchScheduledReport", () => {
         source: { kind: "dashboard", dashboardId: "dashboard-1" },
       });
 
-      await dispatchScheduledReport({
+      await ReportDispatchService.dispatchScheduledReport({
         deps: makeDeps({
           trigger,
           mail,
@@ -376,7 +376,7 @@ describe("dispatchScheduledReport", () => {
         }),
       });
 
-      await dispatchScheduledReport({ deps, fire: FIRE });
+      await ReportDispatchService.dispatchScheduledReport({ deps, fire: FIRE });
 
       expect(mail.emails).toHaveLength(1);
       expect(mail.emails[0]?.html).toContain("Nothing to show for this period");

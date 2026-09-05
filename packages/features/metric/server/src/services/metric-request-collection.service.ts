@@ -69,7 +69,11 @@ const PERSISTENCE_ERROR_MESSAGE = "failed to record data point";
 export class MetricRequestCollectionService {
   private readonly tracer = getLangWatchTracer("langwatch.metric-processing.metric-ingestion");
   private readonly logger = createLogger("langwatch:metric-processing:metric-ingestion");
-  constructor(private readonly deps: MetricRequestCollectionDeps) {}
+  private constructor(private readonly deps: MetricRequestCollectionDeps) {}
+
+  static create(deps: MetricRequestCollectionDeps): MetricRequestCollectionService {
+    return new MetricRequestCollectionService(deps);
+  }
 
   async handleOtlpMetricRequest({
     tenantId,

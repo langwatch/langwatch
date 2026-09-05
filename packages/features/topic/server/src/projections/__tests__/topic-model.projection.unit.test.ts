@@ -1,6 +1,6 @@
 import type { StateProjectionStore } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import type { TopicClusteringTopicsRecordedEvent } from "../../adapters/eventing.topic.adapter";
+import type { TopicClusteringTopicsRecordedEvent } from "../../adapters/eventing.topic.events";
 import { type TopicModelData, TopicModelFoldProjection } from "../topic-model.projection";
 
 const stubStore: StateProjectionStore<TopicModelData> = {
@@ -8,7 +8,7 @@ const stubStore: StateProjectionStore<TopicModelData> = {
   store: async () => undefined,
 };
 
-const projection = new TopicModelFoldProjection({ store: stubStore });
+const projection = TopicModelFoldProjection.create({ store: stubStore });
 
 function entry(id: string, overrides: Record<string, unknown> = {}) {
   return {

@@ -47,7 +47,7 @@ import type {
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
   OrganizationProvisioningSummary,
-  OrganizationRepository,
+  OrganizationMembershipRepository,
   OrganizationWithMembersAndTheirTeams,
   SetMemberDisabledInput,
   UpdateMemberRoleInput,
@@ -280,7 +280,7 @@ async function emitScopeBindingPlans({
  */
 const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
 
-export class PrismaOrganizationMembershipRepository implements OrganizationRepository {
+export class PrismaOrganizationMembershipRepository implements OrganizationMembershipRepository {
   static create(options: {
     database: PrismaClient;
     /**

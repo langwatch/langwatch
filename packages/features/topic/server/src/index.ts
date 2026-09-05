@@ -9,7 +9,7 @@ export {
   type TopicClusteringRunStatusData,
   type TopicModelData,
 } from "./adapters/eventing.topic-clustering.adapter";
-export { createTopicClusteringProcessingProducerPipeline } from "./adapters/topic-clustering-processing-producer.adapter";
+export { TopicClusteringProcessingProducerAdapter } from "./adapters/topic-clustering-processing-producer.adapter";
 export {
   PostgresTopicAdapter,
   type TopicClusteringPersistence,
@@ -18,7 +18,7 @@ export {
   TopicServerInstaller,
   type TopicClusteringExecutionDependencies,
   type TopicServerInstallerDependencies,
-} from "./adapters/topic-server.adapter";
+} from "./adapters/topic-server.installer";
 export type { TopicClusteringDatabase } from "./repositories/prisma/prisma.topic-clustering.repository";
 export { EventingTopicClusteringScheduleAdapter } from "./adapters/eventing.topic-clustering-schedule.adapter";
 export {
@@ -81,7 +81,7 @@ export {
 } from "./ports/langevals-payload-staging.port";
 export {
   LangevalsPayloadStagingUnavailableError,
-  LangevalsStagedPayloadClient,
+  LangevalsStagedPayloadAdapter,
   PayloadTooLargeError,
   type LangevalsCallKind,
   type LangevalsStagedPayloadConfig,

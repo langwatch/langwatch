@@ -129,7 +129,9 @@ export class ComposedWorkerReportTraceList extends WorkerReportTraceListPort {
       ...(filterWhere ? { filterWhere } : {}),
     });
     const projectUrl = `${this.baseHost}/${input.projectSlug}`;
-    return page.items.map((item) => ReportTraceRowService.toReportTraceRow({ item: item as never, projectUrl }));
+    return page.items.map((item) =>
+      ReportTraceRowService.toReportTraceRow({ item: item as never, projectUrl }),
+    );
   }
 }
 

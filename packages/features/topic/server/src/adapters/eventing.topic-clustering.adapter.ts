@@ -14,7 +14,7 @@ import {
   recordTopicsDedupeId,
   type TopicClusteringDispatchDeps,
 } from "../intents/topic-clustering.intent";
-import type { TopicClusteringProcessingEvent } from "./eventing.topic.adapter";
+import type { TopicClusteringProcessingEvent } from "./eventing.topic.events";
 import {
   TOPIC_CLUSTERING_PROCESS_NAME,
   TopicClusteringProcess,
@@ -98,16 +98,16 @@ export class TopicClusteringEventingAdapter {
       }),
     })
       .withPostgresProjection(
-        new TopicClusteringRunStatusFoldProjection({
+        TopicClusteringRunStatusFoldProjection.create({
           store: this.deps.topicClusteringRunStatusStore,
         }),
       )
       .withPostgresProjection(
-        new TopicClusteringRunHistoryFoldProjection({
+        TopicClusteringRunHistoryFoldProjection.create({
           store: this.deps.topicClusteringRunHistoryStore,
         }),
       )
-      .withPostgresProjection(new TopicModelFoldProjection({ store: this.deps.topicModelStore }))
+      .withPostgresProjection(TopicModelFoldProjection.create({ store: this.deps.topicModelStore }))
       .withCommand("requestClustering", RequestTopicClusteringCommand)
       .withCommand("recordClusteringRunStarted", RecordClusteringRunStartedCommand)
       .withCommand("recordClusteringRunCompleted", RecordClusteringRunCompletedCommand)

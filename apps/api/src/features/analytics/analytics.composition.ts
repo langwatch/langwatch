@@ -63,11 +63,12 @@ import {
 import type { Trigger } from "@langwatch/automation-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import {
-  AnalyticsSavedWorkbenchChartPolicy,
+  AnalyticsSavedWorkbenchChartPolicyAdapter,
   DashboardApp,
   mapDashboardSavedWorkbenchChartError,
   PostgresDashboardAdapter,
-  WorkbenchAwareGraphVisibilityPolicy,
+  WorkbenchAccessPort,
+  WorkbenchAwareGraphVisibilityAdapter,
   type DashboardGraphAlertLookup,
   type GraphTrpcPorts,
   type SavedWorkbenchChartTrpcPorts,
@@ -186,6 +187,38 @@ export type ComposedAnalyticsFeature = Readonly<{
   apiKeyProtections: (input: { projectId: string }) => Promise<LangWatchQLProtections>;
 }>;
 
+/**
+ * Dashboard's card-placement gate, answered by LangWatchQL's own rollout flag.
+ *
+ * Dashboard states the question and this process answers it, so the feature
+ * package never reads Analytics' server package to find out.
+ */
+class LangWatchQLWorkbenchAccess extends WorkbenchAccessPort {
+  private constructor(
+    private readonly dependencies: {
+      featureFlags: FeatureFlagService;
+      projects: ProjectService;
+    },
+  ) {
+    super();
+  }
+
+  static create(dependencies: {
+    featureFlags: FeatureFlagService;
+    projects: ProjectService;
+  }): LangWatchQLWorkbenchAccess {
+    return new LangWatchQLWorkbenchAccess(dependencies);
+  }
+
+  isWorkbenchEnabled({ projectId }: { projectId: string }): Promise<boolean> {
+    return lwqlEnabled({
+      featureFlags: this.dependencies.featureFlags,
+      projectId,
+      projects: this.dependencies.projects,
+    });
+  }
+}
+
 /** The filter fields this deployment offers, as the enum publishes them. */
 export type ApiFilterField = (typeof filterFieldsEnum)["options"][number];
 
@@ -250,10 +283,12 @@ export function composeAnalyticsFeature(
       // Both governors — the LangWatchQL validator over the SQL, the Vega-Lite
       // policy over the specification — measured against the protections the
       // WRITE arrived with, which every door resolves for its own caller.
-      savedWorkbenchChartPolicy: AnalyticsSavedWorkbenchChartPolicy.create({ langWatchQL }),
-      graphVisibility: WorkbenchAwareGraphVisibilityPolicy.create({
-        featureFlags,
-        projects: options.projects,
+      savedWorkbenchChartPolicy: AnalyticsSavedWorkbenchChartPolicyAdapter.create({ langWatchQL }),
+      graphVisibility: WorkbenchAwareGraphVisibilityAdapter.create({
+        workbenchAccess: LangWatchQLWorkbenchAccess.create({
+          featureFlags,
+          projects: options.projects,
+        }),
       }),
       langWatchQL,
     }).build(),
@@ -319,7 +354,7 @@ export function composeAnalyticsFeature(
     return { project, protections: await resolveProtections(ctx, input) };
   };
 
-  const savedChartPolicy = AnalyticsSavedWorkbenchChartPolicy.create({ langWatchQL });
+  const savedChartPolicy = AnalyticsSavedWorkbenchChartPolicyAdapter.create({ langWatchQL });
 
   const ports = {
     reads: {
@@ -425,7 +460,7 @@ export function refusingAnalyticsFeature(): ComposedAnalyticsFeature {
 
   const workbench: LangWatchQLTrpcPorts = {
     // Applied while the procedure is built; it refuses when one is CALLED.
-    requireWorkbenchEnabled: <TProcedure,>(procedure: TProcedure): TProcedure =>
+    requireWorkbenchEnabled: <TProcedure>(procedure: TProcedure): TProcedure =>
       (procedure as ChainableProcedure).use(refuse) as TProcedure,
     isWorkbenchEnabled: refuseAsync,
     maxStatementLength: MAX_LWQL_LENGTH,
@@ -450,7 +485,7 @@ export function refusingAnalyticsFeature(): ComposedAnalyticsFeature {
     // handed a saved chart's.
     savedCharts: {
       // Applied while the procedure is built; it refuses when one is CALLED.
-      requireWorkbenchEnabled: <TProcedure,>(procedure: TProcedure): TProcedure =>
+      requireWorkbenchEnabled: <TProcedure>(procedure: TProcedure): TProcedure =>
         (procedure as ChainableProcedure).use(refuse) as TProcedure,
       timeWindowSchema: lwqlTimeWindowSchema,
       granularityStepSchema: lwqlGranularityStepSchema,
@@ -461,7 +496,7 @@ export function refusingAnalyticsFeature(): ComposedAnalyticsFeature {
     },
   };
 
-  const refusingApplication = <T,>(): T =>
+  const refusingApplication = <T>(): T =>
     new Proxy(
       {},
       {
@@ -508,7 +543,6 @@ const NO_GRAPH_ALERTS: DashboardGraphAlertLookup = {
   getByCustomGraphIds: () => Promise.resolve([]),
   tryGetByCustomGraphId: () => Promise.resolve(null),
 };
-
 
 /**
  * What one member may read of a project's content, as LangWatchQL's catalogue

@@ -12,8 +12,12 @@ import type {
  * costs no schema of its own. The identifier the service writes is
  * namespaced, so a token minted here can only ever be spent here.
  */
-export class PrismaSignUpVerificationTokenStore implements SignUpVerificationTokenStore {
-  constructor(private readonly prisma: PrismaClient) {}
+export class PrismaSignUpVerificationTokenRepository implements SignUpVerificationTokenStore {
+  private constructor(private readonly prisma: PrismaClient) {}
+
+  static create(options: { prisma: PrismaClient }): PrismaSignUpVerificationTokenRepository {
+    return new PrismaSignUpVerificationTokenRepository(options.prisma);
+  }
 
   async issue({
     identifier,
@@ -57,8 +61,12 @@ export class PrismaSignUpVerificationTokenStore implements SignUpVerificationTok
  * may carry capitals, and a case-twin beside one would leave two accounts
  * answering for one person.
  */
-export class PrismaSignUpAccountDirectory implements SignUpAccountDirectory {
-  constructor(private readonly prisma: PrismaClient) {}
+export class PrismaSignUpAccountDirectoryRepository implements SignUpAccountDirectory {
+  private constructor(private readonly prisma: PrismaClient) {}
+
+  static create(options: { prisma: PrismaClient }): PrismaSignUpAccountDirectoryRepository {
+    return new PrismaSignUpAccountDirectoryRepository(options.prisma);
+  }
 
   async hasAccountFor({ email }: { email: string }): Promise<boolean> {
     const user = await this.prisma.user.findFirst({

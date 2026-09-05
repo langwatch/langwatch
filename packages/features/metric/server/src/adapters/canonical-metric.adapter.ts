@@ -6,7 +6,7 @@ import { z } from "zod";
 import { buildPoint } from "./metric-point.rules";
 import { candidatePointCount, METRIC_KIND_DATA_KEY, metricKind } from "./metric-kinds.rules";
 import { isRecord, type UnknownRecord } from "./metric-serialization.rules";
-import { redactTypedAttributes } from "./metric-redaction.adapter";
+import { MetricRedactionAdapter } from "./metric-redaction.adapter";
 import {
   MetricPreparationPort,
   type MetricPreparationInput,
@@ -56,7 +56,7 @@ async function prepareMetric({
   resourceMetric,
   scopeMetric,
   args,
-  redactionService,
+  redaction,
   acceptedAt,
   accepted,
   rejections,
@@ -65,7 +65,7 @@ async function prepareMetric({
   resourceMetric: UnknownRecord;
   scopeMetric: UnknownRecord;
   args: PrepareMetricDataPointsArgs;
-  redactionService: MetricRedactionPort;
+  redaction: MetricRedactionAdapter;
   acceptedAt: number;
   accepted: MetricDataPointPreparation["accepted"];
   rejections: RejectionLog;
@@ -100,12 +100,11 @@ async function prepareMetric({
     const resource = structuredClone(resourceTemplate);
     const scope = structuredClone(scopeTemplate);
     try {
-      await redactTypedAttributes({
+      await redaction.redactTypedAttributes({
         resourceAttributes: resource.attributes,
         scopeAttributes: scope.attributes,
         pointAttributes: point.attributes,
         exemplarAttributes: point.exemplars,
-        redactionService,
         piiRedactionLevel: args.piiRedactionLevel,
         tenantId: args.tenantId,
       });
@@ -147,6 +146,7 @@ async function prepareMetricDataPoints(
   args: PrepareMetricDataPointsArgs,
   redactionService: MetricRedactionPort,
 ): Promise<MetricDataPointPreparation> {
+  const redaction = MetricRedactionAdapter.create({ redaction: redactionService });
   const accepted: MetricDataPointPreparation["accepted"] = [];
   const rejections = new RejectionLog();
   const acceptedAt = args.acceptedAt ?? Date.now();
@@ -186,7 +186,7 @@ async function prepareMetricDataPoints(
           resourceMetric,
           scopeMetric,
           args,
-          redactionService,
+          redaction,
           acceptedAt,
           accepted,
           rejections,

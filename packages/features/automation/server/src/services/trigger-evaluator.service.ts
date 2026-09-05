@@ -160,6 +160,10 @@ export const GRAPH_TRIGGER_MAX_RESULT_ROWS = 10_000;
 export class TriggerEvaluatorService {
   private constructor() {}
 
+  static create(): TriggerEvaluatorService {
+    return new TriggerEvaluatorService();
+  }
+
   /** A result that stops the evaluation before it reads any data. */
   static skippedGraphEvaluation(input: {
     triggerId: string;

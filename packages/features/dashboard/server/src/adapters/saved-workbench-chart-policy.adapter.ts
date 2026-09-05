@@ -1,9 +1,5 @@
 import type { LangWatchQLProtections, LangWatchQLService } from "@langwatch/analytics-contract";
 import {
-  SavedWorkbenchChartAlreadyExistsError as DashboardSavedWorkbenchChartAlreadyExistsError,
-  SavedWorkbenchChartDashboardNotFoundError as DashboardSavedWorkbenchChartDashboardNotFoundError,
-  SavedWorkbenchChartDefinitionInvalidError as DashboardSavedWorkbenchChartDefinitionInvalidError,
-  SavedWorkbenchChartNotFoundError as DashboardSavedWorkbenchChartNotFoundError,
   SavedWorkbenchChartValidationError,
   savedWorkbenchChartDefinitionSchema,
   type SavedWorkbenchChartDefinition,
@@ -14,24 +10,20 @@ import {
   LWQL_QUERY_RESULT_DATASET,
   validateVegaLiteSpecStructure,
 } from "@langwatch/analytics-contract/visualization/validation";
-import {
-  SavedWorkbenchChartAlreadyExistsError,
-  SavedWorkbenchChartDashboardNotFoundError,
-  SavedWorkbenchChartDefinitionInvalidError,
-  SavedWorkbenchChartNotFoundError,
-  SavedWorkbenchChartSpecificationRefusedError,
-} from "../transport/api-trpc/saved-workbench-chart.transport-errors";
+import { SavedWorkbenchChartSpecificationRefusedError } from "../transport/api-trpc/saved-workbench-chart.transport-errors";
 
 const logger = createLogger("langwatch:dashboard:saved-workbench-chart-policy");
 
 /** App composition of Analytics admission and the browser-safe Vega policy. */
-export class AnalyticsSavedWorkbenchChartPolicy extends SavedWorkbenchChartPolicy {
+export class AnalyticsSavedWorkbenchChartPolicyAdapter extends SavedWorkbenchChartPolicy {
   private constructor(private readonly langWatchQL: LangWatchQLService) {
     super();
   }
 
-  static create(input: { langWatchQL: LangWatchQLService }): AnalyticsSavedWorkbenchChartPolicy {
-    return new AnalyticsSavedWorkbenchChartPolicy(input.langWatchQL);
+  static create(input: {
+    langWatchQL: LangWatchQLService;
+  }): AnalyticsSavedWorkbenchChartPolicyAdapter {
+    return new AnalyticsSavedWorkbenchChartPolicyAdapter(input.langWatchQL);
   }
 
   validate(input: {
@@ -88,21 +80,4 @@ export class AnalyticsSavedWorkbenchChartPolicy extends SavedWorkbenchChartPolic
 
     return parsed.data;
   }
-}
-
-/** Keeps existing REST and tRPC handled-error response envelopes stable. */
-export function mapDashboardSavedWorkbenchChartError(error: unknown): never {
-  if (error instanceof DashboardSavedWorkbenchChartNotFoundError) {
-    throw new SavedWorkbenchChartNotFoundError();
-  }
-  if (error instanceof DashboardSavedWorkbenchChartDashboardNotFoundError) {
-    throw new SavedWorkbenchChartDashboardNotFoundError();
-  }
-  if (error instanceof DashboardSavedWorkbenchChartAlreadyExistsError) {
-    throw new SavedWorkbenchChartAlreadyExistsError();
-  }
-  if (error instanceof DashboardSavedWorkbenchChartDefinitionInvalidError) {
-    throw new SavedWorkbenchChartDefinitionInvalidError(error.chartId);
-  }
-  throw error;
 }

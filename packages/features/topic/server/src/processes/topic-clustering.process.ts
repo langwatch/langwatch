@@ -12,7 +12,7 @@ import {
 } from "@langwatch/topic-contract";
 import crypto from "crypto";
 import { z } from "zod";
-import type { TopicClusteringProcessingEvent } from "../adapters/eventing.topic.adapter";
+import type { TopicClusteringProcessingEvent } from "../adapters/eventing.topic.events";
 import {
   createTopicClusteringRunHandler,
   TOPIC_CLUSTERING_MAX_ATTEMPTS,

@@ -8,6 +8,7 @@ export { LogRuntimeAdapter } from "./adapters/runtime.log.adapter";
  * and their trace contributions out. Was
  * `platform/app/src/server/app-layer/traces/log-request-collection.service.ts`.
  */
+export { LogTraceIoPort, type LogTraceIo } from "./ports/log-trace-io.port";
 export {
   LogRequestCollectionService,
   type LogRequestCollectionDeps,

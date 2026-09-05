@@ -30,8 +30,8 @@
  */
 import {
   AuthApp,
-  PrismaSignUpAccountDirectory,
-  PrismaSignUpVerificationTokenStore,
+  PrismaSignUpAccountDirectoryRepository,
+  PrismaSignUpVerificationTokenRepository,
   SignUpVerificationService,
 } from "@langwatch/auth-server";
 import { HandledError } from "@langwatch/handled-error";
@@ -172,9 +172,9 @@ export function composeAuthFeature(options: {
   });
 
   const signUpVerification = mail
-    ? new SignUpVerificationService({
-        tokens: new PrismaSignUpVerificationTokenStore(prisma),
-        directory: new PrismaSignUpAccountDirectory(prisma),
+    ? SignUpVerificationService.create({
+        tokens: PrismaSignUpVerificationTokenRepository.create({ prisma }),
+        directory: PrismaSignUpAccountDirectoryRepository.create({ prisma }),
         mailer: {
           sendVerificationLink: async ({
             email,

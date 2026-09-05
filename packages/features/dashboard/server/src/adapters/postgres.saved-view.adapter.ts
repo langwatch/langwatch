@@ -1,7 +1,7 @@
 import type { SavedViewsPort } from "../transport/api-trpc/saved-view.api";
 import type { SavedViewJson, SavedViewRecord } from "../ports/dashboard.port";
 import {
-  SavedViewRepository,
+  PrismaSavedViewRepository,
   type SavedViewDatabase,
 } from "../repositories/prisma/prisma.saved-view.repository";
 import { SavedViewService } from "../services/saved-view.service";
@@ -22,7 +22,9 @@ export class PostgresSavedViewAdapter {
   }
 
   build(): SavedViewsPort<SavedViewRecord> {
-    const savedViews = new SavedViewService(new SavedViewRepository(this.options.database));
+    const savedViews = SavedViewService.create({
+      repository: PrismaSavedViewRepository.create({ database: this.options.database }),
+    });
 
     return {
       getAll: (input) => savedViews.getAll(input),

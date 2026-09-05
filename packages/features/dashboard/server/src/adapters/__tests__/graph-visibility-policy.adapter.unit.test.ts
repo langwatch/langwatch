@@ -1,28 +1,30 @@
-import { describe, expect, it, vi } from "vitest";
-import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
-import { ProjectService } from "@langwatch/project-contract";
-import { WorkbenchAwareGraphVisibilityPolicy } from "../graph-visibility-policy.adapter";
+import { describe, expect, it } from "vitest";
+import { WorkbenchAccessPort } from "../../ports/workbench-access.port";
+import { WorkbenchAwareGraphVisibilityAdapter } from "../graph-visibility-policy.adapter";
 
-function projectsWithOrganization(organizationId: string): ProjectService {
-  const projects: ProjectService = Object.create(ProjectService.prototype);
-  projects.getOrganizationId = vi.fn().mockResolvedValue(organizationId);
-  return projects;
+class FixedWorkbenchAccess extends WorkbenchAccessPort {
+  constructor(private readonly enabled: boolean) {
+    super();
+  }
+
+  async isWorkbenchEnabled(): Promise<boolean> {
+    return this.enabled;
+  }
 }
 
-describe("WorkbenchAwareGraphVisibilityPolicy", () => {
-  it("uses the project-scoped LangWatchQL gate to expose placeable kinds", async () => {
-    const featureFlags = MemoryFeatureFlagService.create();
-    featureFlags.setFlag("release_lwql_workbench", true);
-    const projects = projectsWithOrganization("organization_1");
-    const policy = WorkbenchAwareGraphVisibilityPolicy.create({ featureFlags, projects });
+describe("WorkbenchAwareGraphVisibilityAdapter", () => {
+  it("offers the workbench kind only while the project may place one", async () => {
+    const permitted = WorkbenchAwareGraphVisibilityAdapter.create({
+      workbenchAccess: new FixedWorkbenchAccess(true),
+    });
+    const refused = WorkbenchAwareGraphVisibilityAdapter.create({
+      workbenchAccess: new FixedWorkbenchAccess(false),
+    });
 
-    await expect(policy.placeableKinds({ projectId: "project_1" })).resolves.toEqual([
+    await expect(permitted.placeableKinds({ projectId: "project_1" })).resolves.toEqual([
       "builder",
       "workbench_sql",
     ]);
-    expect(projects.getOrganizationId).toHaveBeenCalledWith("project_1");
-
-    featureFlags.setFlag("release_lwql_workbench", false);
-    await expect(policy.placeableKinds({ projectId: "project_1" })).resolves.toEqual(["builder"]);
+    await expect(refused.placeableKinds({ projectId: "project_1" })).resolves.toEqual(["builder"]);
   });
 });

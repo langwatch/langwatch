@@ -21,8 +21,8 @@
  * @see specs/analytics/lwql-api.feature
  */
 
+import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 import type { FieldProtection } from "./field-protection";
-import type { Protections } from "@langwatch/trace-server";
 
 /**
  * What a column's numbers are measured in.
@@ -91,8 +91,8 @@ export interface LangWatchQLViewColumn {
    * Permissions a caller must hold to reference this column, all of them.
    *
    * Every entry traces to the canonical visibility policy: `input` / `output`
-   * are `Protections.canSeeCapturedInput` / `canSeeCapturedOutput`, `costs` is
-   * `Protections.canSeeCosts`.
+   * are `LangWatchQLProtections.canSeeCapturedInput` / `canSeeCapturedOutput`, `costs` is
+   * `LangWatchQLProtections.canSeeCosts`.
    */
   readonly gates: readonly FieldProtection[];
   /**
@@ -499,7 +499,7 @@ export function lwqlAllowedTables({
  * The validator's `gatedColumns` for one caller.
  *
  * Fail-closed on purpose: a permission is withheld unless it is explicitly
- * `true`, so an unresolved `Protections` (the shape `getUserProtectionsForProject`
+ * `true`, so an unresolved `LangWatchQLProtections` (the shape `getUserProtectionsForProject`
  * returns when the policy resolver is down) gates everything rather than
  * nothing. Matches how the trace read path reads the same flags.
  */
@@ -507,7 +507,7 @@ export function lwqlGatedColumns({
   protections,
   views,
 }: {
-  protections: Protections;
+  protections: LangWatchQLProtections;
   views: readonly LangWatchQLViewDefinition[];
 }): readonly string[] {
   const held = heldPermissions(protections);
@@ -526,7 +526,7 @@ export function lwqlGatedColumns({
  * `getUserProtectionsForProject` returns when the policy resolver is down
  * grants nothing.
  */
-function heldPermissions(protections: Protections): ReadonlySet<FieldProtection> {
+function heldPermissions(protections: LangWatchQLProtections): ReadonlySet<FieldProtection> {
   const held = new Set<FieldProtection>();
   if (protections.canSeeCapturedInput === true) held.add("input");
   if (protections.canSeeCapturedOutput === true) held.add("output");
@@ -551,7 +551,7 @@ export function lwqlVisibleViews({
   protections,
   views,
 }: {
-  protections: Protections;
+  protections: LangWatchQLProtections;
   views: readonly LangWatchQLViewDefinition[];
 }): readonly LangWatchQLViewDefinition[] {
   const held = heldPermissions(protections);

@@ -1,5 +1,6 @@
 import type { LwqlKeyMapRow } from "../../langwatch-ql/production-provisioning";
 import type { ClickHouseClientResolver } from "./clickhouse.filter-options.repository";
+import { LwqlKeyMapRepository } from "../langwatch-ql-key-map.repository";
 
 /**
  * The one place runtime code writes the LangWatchQL key-map table.
@@ -31,12 +32,16 @@ export const LWQL_KEY_MAP_INSERT_SETTINGS = {
   wait_for_async_insert: 1,
 } as const;
 
-export interface LwqlKeyMapRepository {
-  insertRow(input: { table: string; row: LwqlKeyMapRow }): Promise<void>;
-}
+export class LwqlKeyMapClickHouseRepository extends LwqlKeyMapRepository {
+  private constructor(private readonly resolveClient: ClickHouseClientResolver) {
+    super();
+  }
 
-export class LwqlKeyMapClickHouseRepository implements LwqlKeyMapRepository {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  static create(options: {
+    resolveClient: ClickHouseClientResolver;
+  }): LwqlKeyMapClickHouseRepository {
+    return new LwqlKeyMapClickHouseRepository(options.resolveClient);
+  }
 
   /** @param table Already mode-qualified via `lwqlKeyMapTableQualifiedName`. */
   async insertRow({ table, row }: { table: string; row: LwqlKeyMapRow }): Promise<void> {
@@ -56,7 +61,11 @@ export class LwqlKeyMapClickHouseRepository implements LwqlKeyMapRepository {
  * backfill exists to prevent, and the caller already treats a throw as
  * "the scheduled backfill will pick it up".
  */
-export class NullLwqlKeyMapRepository implements LwqlKeyMapRepository {
+export class NullLwqlKeyMapRepository extends LwqlKeyMapRepository {
+  static create(): NullLwqlKeyMapRepository {
+    return new NullLwqlKeyMapRepository();
+  }
+
   insertRow(): Promise<void> {
     return Promise.reject(
       new Error("No ClickHouse in this preset — the LangWatchQL key-map row was not written"),

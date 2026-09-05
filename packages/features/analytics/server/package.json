@@ -17,7 +17,7 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./internal": {
+    "./testing": {
       "types": "./src/testing.ts",
       "default": "./src/testing.ts"
     }

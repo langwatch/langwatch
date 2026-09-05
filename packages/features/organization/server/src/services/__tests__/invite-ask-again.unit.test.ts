@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InviteNotFoundError, InviteThrottledError } from "../invite.errors";
-import { InviteService, maskInvitedAddress } from "../invite.service";
+import { InviteService } from "../invite.service";
 import { InviteSendThrottleService } from "../invite-send-throttle.service";
 import type {
   OrganizationInviteMailPort,
@@ -44,7 +44,7 @@ function makeService({
   throttle: { assertInviteSendAllowed: (input: { inviteId: string }) => Promise<void> };
   mail?: OrganizationInviteMailPort;
 }): InviteService {
-  return new InviteService({
+  return InviteService.create({
     prisma,
     seats: { getMemberCount: vi.fn(), getMembersLiteCount: vi.fn() } as any,
     plans: { getActivePlan: vi.fn() } as any,
@@ -60,26 +60,28 @@ describe("given an invitation whose holder is signed in as somebody else", () =>
   describe("when the invited address is shown back to them", () => {
     /** @scenario The hint recognizes the address without spelling it out */
     it("keeps the domain and the first character, and hides the rest", () => {
-      expect(maskInvitedAddress("sam@acme.com")).toBe("s•••@acme.com");
-      expect(maskInvitedAddress("alexander@big-company.co.uk")).toBe("a•••@big-company.co.uk");
+      expect(InviteService.maskInvitedAddress("sam@acme.com")).toBe("s•••@acme.com");
+      expect(InviteService.maskInvitedAddress("alexander@big-company.co.uk")).toBe(
+        "a•••@big-company.co.uk",
+      );
     });
 
     /** @scenario The hint recognizes the address without spelling it out */
     it("never lets the local part through whole", () => {
-      const masked = maskInvitedAddress("sam@acme.com");
+      const masked = InviteService.maskInvitedAddress("sam@acme.com");
 
       expect(masked).not.toContain("sam");
       expect(masked.startsWith("s•••@")).toBe(true);
     });
 
     it("masks a value it cannot parse as an address entirely", () => {
-      expect(maskInvitedAddress("not-an-address")).toBe("•••");
-      expect(maskInvitedAddress("@acme.com")).toBe("•••");
-      expect(maskInvitedAddress("sam@")).toBe("•••");
+      expect(InviteService.maskInvitedAddress("not-an-address")).toBe("•••");
+      expect(InviteService.maskInvitedAddress("@acme.com")).toBe("•••");
+      expect(InviteService.maskInvitedAddress("sam@")).toBe("•••");
     });
 
     it("reveals nothing further for a single-character local part", () => {
-      expect(maskInvitedAddress("s@acme.com")).toBe("s•••@acme.com");
+      expect(InviteService.maskInvitedAddress("s@acme.com")).toBe("s•••@acme.com");
     });
   });
 });
@@ -90,7 +92,7 @@ describe("given one invitation and the two routes that mail it", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-24T12:00:00Z"));
-    throttleService = new InviteSendThrottleService(makeInMemoryRateLimiter());
+    throttleService = InviteSendThrottleService.create(makeInMemoryRateLimiter());
   });
 
   describe("when it is sent its fill within the window", () => {

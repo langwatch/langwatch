@@ -1,33 +1,23 @@
 import { DashboardGraphVisibilityPolicyPort } from "../ports/dashboard.port";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
-import type { ProjectService } from "@langwatch/project-contract";
-import { lwqlEnabled } from "@langwatch/analytics-server";
+import type { WorkbenchAccessPort } from "../ports/workbench-access.port";
 
 /** Preserves the project-level LangWatchQL gate when Dashboard counts visible cards. */
-export class WorkbenchAwareGraphVisibilityPolicy extends DashboardGraphVisibilityPolicyPort {
-  private constructor(
-    private readonly dependencies: {
-      featureFlags: FeatureFlagService;
-      projects: ProjectService;
-    },
-  ) {
+export class WorkbenchAwareGraphVisibilityAdapter extends DashboardGraphVisibilityPolicyPort {
+  private constructor(private readonly workbenchAccess: WorkbenchAccessPort) {
     super();
   }
 
   static create(dependencies: {
-    featureFlags: FeatureFlagService;
-    projects: ProjectService;
-  }): WorkbenchAwareGraphVisibilityPolicy {
-    return new WorkbenchAwareGraphVisibilityPolicy(dependencies);
+    workbenchAccess: WorkbenchAccessPort;
+  }): WorkbenchAwareGraphVisibilityAdapter {
+    return new WorkbenchAwareGraphVisibilityAdapter(dependencies.workbenchAccess);
   }
 
   async placeableKinds(input: {
     projectId: string;
   }): Promise<readonly ("builder" | "workbench_sql")[]> {
-    const enabled = await lwqlEnabled({
-      featureFlags: this.dependencies.featureFlags,
+    const enabled = await this.workbenchAccess.isWorkbenchEnabled({
       projectId: input.projectId,
-      projects: this.dependencies.projects,
     });
     return enabled ? ["builder", "workbench_sql"] : ["builder"];
   }

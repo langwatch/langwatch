@@ -1,24 +1,12 @@
 import type { AuditLog, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GetRecentItemsParams } from "../../services/recent-items.types";
 import { ACTION_TO_TYPE_MAP } from "../../services/recent-items.types";
-
-/** The columns the strip needs to render one row and link it. */
-type RecentEntityRow = {
-  id: string;
-  name: string;
-  updatedAt: Date;
-  projectId: string;
-  project: { slug: string };
-};
-
-/** A prompt is hidden once it is soft-deleted rather than removed. */
-export type RecentPromptRow = RecentEntityRow & { deletedAt: Date | null };
-
-/** Workflows and datasets are hidden once archived. */
-export type RecentArchivableRow = RecentEntityRow & { archivedAt: Date | null };
-
-/** Monitors and annotation queues are addressed by slug, not id. */
-export type RecentSluggedRow = RecentEntityRow & { slug: string };
+import {
+  RecentItemsRepository,
+  type RecentArchivableRow,
+  type RecentPromptRow,
+  type RecentSluggedRow,
+} from "../recent-items.repository";
 
 /**
  * The audit-trail reads behind the home screen's recent strip, and the five
@@ -32,8 +20,14 @@ export type RecentSluggedRow = RecentEntityRow & { slug: string };
  * rows that may since have been deleted, and absence is the ordinary answer
  * rather than a failure.
  */
-export class PrismaRecentItemsRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+export class PrismaRecentItemsRepository extends RecentItemsRepository {
+  private constructor(private readonly prisma: PrismaClient) {
+    super();
+  }
+
+  static create(options: { prisma: PrismaClient }): PrismaRecentItemsRepository {
+    return new PrismaRecentItemsRepository(options.prisma);
+  }
 
   /**
    * Get recent audit log entries for a user and project

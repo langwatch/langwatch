@@ -25,8 +25,8 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaRecentItemsRepository } from "../../repositories/prisma/prisma.recent-items.repository";
-import { RecentItemsService } from "../recent-items.service";
+import { PrismaRecentItemsRepository } from "../repositories/prisma/prisma.recent-items.repository";
+import { RecentItemsService } from "../services/recent-items.service";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -37,7 +37,9 @@ describe.skipIf(!DB_URL)("given a project with an audit-log trail", () => {
     guard: PrismaTenancyGuardService.create(),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
-  const service = new RecentItemsService(new PrismaRecentItemsRepository(prisma));
+  const service = RecentItemsService.create({
+    repository: PrismaRecentItemsRepository.create({ prisma }),
+  });
 
   let organizationId: string;
   let teamId: string;

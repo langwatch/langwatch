@@ -252,18 +252,17 @@ export {
 
 /** The scheduled-report handler and the two readers it renders from. */
 export {
-  dispatchScheduledReport,
-  reportWindowMs,
+  ReportDispatchService,
   type ReportDispatchDeps,
   type ReportProject,
 } from "./services/report-dispatch.service";
 export {
-  loadReportCharts,
+  ReportChartService,
   REPORT_CHART_QUERY_CONCURRENCY,
   type ReportChartDeps,
   type ReportGraphInput,
 } from "./services/report-chart.service";
-export { toReportTraceRow } from "./services/report-trace-row.service";
+export { ReportTraceRowService } from "./services/report-trace-row.service";
 /**
  * The two Postgres reads a scheduled report fires through, published so a
  * background process can compose the handler over its own client.

@@ -123,38 +123,45 @@ class ProducerOnlyTopicClusteringOutcomeCommands implements TopicClusteringOutco
   }
 }
 
-/**
- * Builds the topic-clustering-processing definition for a process that only
- * sends commands on it — `recordTopics` and `requestClustering`, the whole of
- * `TopicClusteringCommandsPort`.
- *
- * `processName` names the refusal, so a stand-in reached by accident says
- * which process reached it rather than reporting an anonymous failure.
- */
-export function createTopicClusteringProcessingProducerPipeline(input: { processName: string }) {
-  const { processName } = input;
-  const dispatch: TopicClusteringDispatchDeps = {
-    runPort: new ProducerOnlyTopicClusteringRunPort(processName),
-    commands: new ProducerOnlyTopicClusteringOutcomeCommands(processName),
-    classifyError: classifyClusteringError,
-    metrics: new ProducerOnlyTopicClusteringMetrics(processName),
-  };
+/** The topic-clustering-processing pipeline as a send-only process composes it. */
+export class TopicClusteringProcessingProducerAdapter {
+  static create(): TopicClusteringProcessingProducerAdapter {
+    return new TopicClusteringProcessingProducerAdapter();
+  }
 
-  return TopicClusteringEventingAdapter.createPipeline({
-    topicClusteringRunStatusStore:
-      new ProducerOnlyStateProjectionStore<TopicClusteringRunStatusData>(
+  /**
+   * Builds the topic-clustering-processing definition for a process that only
+   * sends commands on it — `recordTopics` and `requestClustering`, the whole of
+   * `TopicClusteringCommandsPort`.
+   *
+   * `processName` names the refusal, so a stand-in reached by accident says
+   * which process reached it rather than reporting an anonymous failure.
+   */
+  static createPipeline(input: { processName: string }) {
+    const { processName } = input;
+    const dispatch: TopicClusteringDispatchDeps = {
+      runPort: new ProducerOnlyTopicClusteringRunPort(processName),
+      commands: new ProducerOnlyTopicClusteringOutcomeCommands(processName),
+      classifyError: classifyClusteringError,
+      metrics: new ProducerOnlyTopicClusteringMetrics(processName),
+    };
+
+    return TopicClusteringEventingAdapter.createPipeline({
+      topicClusteringRunStatusStore:
+        new ProducerOnlyStateProjectionStore<TopicClusteringRunStatusData>(
+          processName,
+          "topic clustering run status",
+        ),
+      topicClusteringRunHistoryStore:
+        new ProducerOnlyStateProjectionStore<TopicClusteringRunHistoryData>(
+          processName,
+          "topic clustering run history",
+        ),
+      topicModelStore: new ProducerOnlyStateProjectionStore<TopicModelData>(
         processName,
-        "topic clustering run status",
+        "topic model",
       ),
-    topicClusteringRunHistoryStore:
-      new ProducerOnlyStateProjectionStore<TopicClusteringRunHistoryData>(
-        processName,
-        "topic clustering run history",
-      ),
-    topicModelStore: new ProducerOnlyStateProjectionStore<TopicModelData>(
-      processName,
-      "topic model",
-    ),
-    dispatch,
-  });
+      dispatch,
+    });
+  }
 }

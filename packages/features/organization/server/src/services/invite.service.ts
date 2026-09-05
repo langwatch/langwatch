@@ -81,195 +81,12 @@ import type { InviteSendThrottleService } from "./invite-send-throttle.service";
 const logger = createLogger("langwatch:invites");
 
 /**
- * Whether the signed-in person may accept an invitation targeting
- * `inviteEmail`, and through which identifier (D11).
- *
- * `matchable` is the user's proven addresses from the identity read fork —
- * `null` for a user not yet on identifiers, who keeps the legacy
- * case-insensitive session-email comparison byte-for-byte. For a user on
- * identifiers the proven set is the authority: a session email nothing
- * verified does not accept.
- */
-export function matchInviteToAcceptor({
-  inviteEmail,
-  sessionEmail,
-  matchable,
-}: {
-  inviteEmail: string;
-  sessionEmail: string;
-  matchable: Array<{ identifierId: string; value: string }> | null;
-}): { matches: boolean; viaIdentifierId: string | null } {
-  if (matchable === null) {
-    return {
-      matches: sessionEmail.toLowerCase() === inviteEmail.trim().toLowerCase(),
-      viaIdentifierId: null,
-    };
-  }
-
-  const normalizedInviteEmail = normalizeIdentifierValue(inviteEmail);
-  const hit = matchable.find((candidate) => candidate.value === normalizedInviteEmail);
-
-  return {
-    matches: hit !== undefined,
-    viaIdentifierId: hit?.identifierId ?? null,
-  };
-}
-
-/**
- * The invited address as somebody signed in as the wrong account is allowed
- * to see it: first character, then the domain — `s•••@acme.com`.
- *
- * Enough to recognize an address you already own, and not enough to learn
- * one you do not. The domain survives whole because that is the half that
- * makes the hint useful ("oh, my work account"), and the half a person
- * holding a link for a colleague at that company already knows. The local
- * part is what identifies the individual, so only its first character
- * survives — and a single-character local part reveals nothing further by
- * being shown, since the mask would be the whole of it either way.
- *
- * Anything that is not an address is masked whole rather than passed
- * through: a value this function cannot parse is a value it cannot promise
- * to have redacted.
- */
-export function maskInvitedAddress(email: string): string {
-  const trimmed = email.trim();
-  const at = trimmed.lastIndexOf("@");
-  if (at <= 0 || at === trimmed.length - 1) {
-    return "•••";
-  }
-
-  const local = trimmed.slice(0, at);
-  const domain = trimmed.slice(at + 1);
-
-  return `${local[0]}•••@${domain}`;
-}
-
-/**
  * Team assignment input for invite creation.
  */
 interface TeamAssignmentInput {
   teamId: string;
   role: TeamUserRole;
   customRoleId?: string;
-}
-
-/**
- * Pure function that classifies invites by member type (full vs lite).
- * Testable in isolation without database or dependencies.
- *
- * @param invites - Array of invites with role and optional team assignments
- * @param customRoleMap - Map of custom role ID to permissions array
- * @returns Count of full members and lite members
- */
-/**
- * The team memberships an accepted invitation grants. Pure, like
- * `classifyInvitesByMemberType`, so the correction is testable in isolation.
- *
- * A Lite Member seat allows the Viewer team role only, and a custom role
- * requires a full seat. New invitations are refused above that ceiling when
- * they are written, but invitations stored before the rule may still promise
- * more; the seat corrects them here, the same way a seat change corrects
- * stored access rows, rather than refusing the person who clicked the link.
- */
-export function resolveInviteTeamMemberships({
-  role,
-  teamIds,
-  teamAssignments,
-}: {
-  role: OrganizationUserRole;
-  teamIds: string;
-  teamAssignments: unknown;
-}): Array<{ teamId: string; role: TeamUserRole; customRoleId?: string }> {
-  let memberships: Array<{
-    teamId: string;
-    role: TeamUserRole;
-    customRoleId?: string;
-  }>;
-
-  if (teamAssignments && Array.isArray(teamAssignments)) {
-    const assignments = teamAssignments as unknown as Array<{
-      teamId: string;
-      role: TeamUserRole;
-      customRoleId?: string;
-    }>;
-    memberships = assignments.map((a) => ({
-      teamId: a.teamId,
-      role: a.role,
-      customRoleId: a.customRoleId,
-    }));
-  } else {
-    const dedupedTeamIds = Array.from(
-      new Set(
-        teamIds
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-      ),
-    );
-    memberships = dedupedTeamIds.map((teamId) => ({
-      teamId,
-      role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],
-    }));
-  }
-
-  if (role !== OrganizationUserRole.EXTERNAL) {
-    return memberships;
-  }
-
-  return memberships.map((membership) =>
-    membership.role === TeamUserRole.VIEWER && !membership.customRoleId
-      ? membership
-      : {
-          teamId: membership.teamId,
-          role: TeamUserRole.VIEWER,
-          customRoleId: undefined,
-        },
-  );
-}
-
-export function classifyInvitesByMemberType({
-  invites,
-  customRoleMap,
-  isViewOnlyCustomRole,
-}: {
-  invites: Array<{
-    role: OrganizationUserRole;
-    teams?: Array<{ customRoleId?: string }>;
-  }>;
-  customRoleMap: Map<string, string[]>;
-  /**
-   * The lite-seat rule, from whichever vertical owns it. Passed rather than
-   * imported: it is the entitlement feature's answer, and a core package
-   * reaching into that one for a predicate is how two counts of the same
-   * organization start disagreeing.
-   */
-  isViewOnlyCustomRole: (permissions: string[]) => boolean;
-}): { fullMembers: number; liteMembers: number } {
-  let fullMembers = 0;
-  let liteMembers = 0;
-
-  for (const invite of invites) {
-    if (invite.role === OrganizationUserRole.ADMIN || invite.role === OrganizationUserRole.MEMBER) {
-      fullMembers++;
-    } else if (invite.role === OrganizationUserRole.EXTERNAL) {
-      const hasNonViewRole = invite.teams?.some((t) => {
-        if (!t.customRoleId) {
-          return false;
-        }
-
-        const permissions = customRoleMap.get(t.customRoleId);
-
-        return permissions && !isViewOnlyCustomRole(permissions);
-      });
-      if (hasNonViewRole) {
-        fullMembers++;
-      } else {
-        liteMembers++;
-      }
-    }
-  }
-
-  return { fullMembers, liteMembers };
 }
 
 /**
@@ -354,7 +171,198 @@ export type InviteServiceDependencies = Readonly<{
 }>;
 
 export class InviteService {
-  constructor(private readonly deps: InviteServiceDependencies) {}
+  private constructor(private readonly deps: InviteServiceDependencies) {}
+
+  static create(deps: InviteServiceDependencies): InviteService {
+    return new InviteService(deps);
+  }
+
+  /**
+   * Whether the signed-in person may accept an invitation targeting
+   * `inviteEmail`, and through which identifier (D11).
+   *
+   * `matchable` is the user's proven addresses from the identity read fork —
+   * `null` for a user not yet on identifiers, who keeps the legacy
+   * case-insensitive session-email comparison byte-for-byte. For a user on
+   * identifiers the proven set is the authority: a session email nothing
+   * verified does not accept.
+   */
+  static matchInviteToAcceptor({
+    inviteEmail,
+    sessionEmail,
+    matchable,
+  }: {
+    inviteEmail: string;
+    sessionEmail: string;
+    matchable: Array<{ identifierId: string; value: string }> | null;
+  }): { matches: boolean; viaIdentifierId: string | null } {
+    if (matchable === null) {
+      return {
+        matches: sessionEmail.toLowerCase() === inviteEmail.trim().toLowerCase(),
+        viaIdentifierId: null,
+      };
+    }
+
+    const normalizedInviteEmail = normalizeIdentifierValue(inviteEmail);
+    const hit = matchable.find((candidate) => candidate.value === normalizedInviteEmail);
+
+    return {
+      matches: hit !== undefined,
+      viaIdentifierId: hit?.identifierId ?? null,
+    };
+  }
+
+  /**
+   * The invited address as somebody signed in as the wrong account is allowed
+   * to see it: first character, then the domain — `s•••@acme.com`.
+   *
+   * Enough to recognize an address you already own, and not enough to learn
+   * one you do not. The domain survives whole because that is the half that
+   * makes the hint useful ("oh, my work account"), and the half a person
+   * holding a link for a colleague at that company already knows. The local
+   * part is what identifies the individual, so only its first character
+   * survives — and a single-character local part reveals nothing further by
+   * being shown, since the mask would be the whole of it either way.
+   *
+   * Anything that is not an address is masked whole rather than passed
+   * through: a value this function cannot parse is a value it cannot promise
+   * to have redacted.
+   */
+  static maskInvitedAddress(email: string): string {
+    const trimmed = email.trim();
+    const at = trimmed.lastIndexOf("@");
+    if (at <= 0 || at === trimmed.length - 1) {
+      return "•••";
+    }
+
+    const local = trimmed.slice(0, at);
+    const domain = trimmed.slice(at + 1);
+
+    return `${local[0]}•••@${domain}`;
+  }
+
+  /**
+   * The team memberships an accepted invitation grants. Pure, like
+   * `classifyInvitesByMemberType`, so the correction is testable in isolation.
+   *
+   * A Lite Member seat allows the Viewer team role only, and a custom role
+   * requires a full seat. New invitations are refused above that ceiling when
+   * they are written, but invitations stored before the rule may still promise
+   * more; the seat corrects them here, the same way a seat change corrects
+   * stored access rows, rather than refusing the person who clicked the link.
+   */
+  static resolveInviteTeamMemberships({
+    role,
+    teamIds,
+    teamAssignments,
+  }: {
+    role: OrganizationUserRole;
+    teamIds: string;
+    teamAssignments: unknown;
+  }): Array<{ teamId: string; role: TeamUserRole; customRoleId?: string }> {
+    let memberships: Array<{
+      teamId: string;
+      role: TeamUserRole;
+      customRoleId?: string;
+    }>;
+
+    if (teamAssignments && Array.isArray(teamAssignments)) {
+      const assignments = teamAssignments as unknown as Array<{
+        teamId: string;
+        role: TeamUserRole;
+        customRoleId?: string;
+      }>;
+      memberships = assignments.map((a) => ({
+        teamId: a.teamId,
+        role: a.role,
+        customRoleId: a.customRoleId,
+      }));
+    } else {
+      const dedupedTeamIds = Array.from(
+        new Set(
+          teamIds
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+        ),
+      );
+      memberships = dedupedTeamIds.map((teamId) => ({
+        teamId,
+        role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],
+      }));
+    }
+
+    if (role !== OrganizationUserRole.EXTERNAL) {
+      return memberships;
+    }
+
+    return memberships.map((membership) =>
+      membership.role === TeamUserRole.VIEWER && !membership.customRoleId
+        ? membership
+        : {
+            teamId: membership.teamId,
+            role: TeamUserRole.VIEWER,
+            customRoleId: undefined,
+          },
+    );
+  }
+
+  /**
+   * Pure function that classifies invites by member type (full vs lite).
+   * Testable in isolation without database or dependencies.
+   *
+   * @param invites - Array of invites with role and optional team assignments
+   * @param customRoleMap - Map of custom role ID to permissions array
+   * @returns Count of full members and lite members
+   */
+
+  static classifyInvitesByMemberType({
+    invites,
+    customRoleMap,
+    isViewOnlyCustomRole,
+  }: {
+    invites: Array<{
+      role: OrganizationUserRole;
+      teams?: Array<{ customRoleId?: string }>;
+    }>;
+    customRoleMap: Map<string, string[]>;
+    /**
+     * The lite-seat rule, from whichever vertical owns it. Passed rather than
+     * imported: it is the entitlement feature's answer, and a core package
+     * reaching into that one for a predicate is how two counts of the same
+     * organization start disagreeing.
+     */
+    isViewOnlyCustomRole: (permissions: string[]) => boolean;
+  }): { fullMembers: number; liteMembers: number } {
+    let fullMembers = 0;
+    let liteMembers = 0;
+
+    for (const invite of invites) {
+      if (
+        invite.role === OrganizationUserRole.ADMIN ||
+        invite.role === OrganizationUserRole.MEMBER
+      ) {
+        fullMembers++;
+      } else if (invite.role === OrganizationUserRole.EXTERNAL) {
+        const hasNonViewRole = invite.teams?.some((t) => {
+          if (!t.customRoleId) {
+            return false;
+          }
+
+          const permissions = customRoleMap.get(t.customRoleId);
+
+          return permissions && !isViewOnlyCustomRole(permissions);
+        });
+        if (hasNonViewRole) {
+          fullMembers++;
+        } else {
+          liteMembers++;
+        }
+      }
+    }
+
+    return { fullMembers, liteMembers };
+  }
 
   private get prisma(): PrismaClient | Prisma.TransactionClient {
     return this.deps.prisma;
@@ -504,7 +512,7 @@ export class InviteService {
     );
 
     const { fullMembers: newFullMembers, liteMembers: newLiteMembers } =
-      classifyInvitesByMemberType({
+      InviteService.classifyInvitesByMemberType({
         invites: newInvites,
         customRoleMap,
         isViewOnlyCustomRole: (permissions) => this.deps.seats.isViewOnlyCustomRole(permissions),
@@ -1611,7 +1619,7 @@ export class InviteService {
       });
     }
 
-    let teamMembershipData = resolveInviteTeamMemberships({
+    let teamMembershipData = InviteService.resolveInviteTeamMemberships({
       role: invite.role,
       teamIds: invite.teamIds,
       teamAssignments: invite.teamAssignments,

@@ -55,7 +55,7 @@ import type {
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
   OrganizationProvisioningSummary,
-  OrganizationRepository,
+  OrganizationMembershipRepository,
   OrganizationWithMembersAndTheirTeams,
   UpdateMemberRoleResult,
 } from "../repositories/organization-membership.repository";
@@ -86,58 +86,6 @@ type TeamMembershipLike = {
   updatedAt: Date;
 };
 
-export function enrichTeamWithRoleBindings<
-  T extends {
-    members: TeamMembershipLike[];
-    id: string;
-    projects: { id: string }[];
-  },
->(
-  team: T,
-  userId: string,
-  userRoleBindings: AuthzBindingForSynthesis[],
-  organizationId: string,
-): T {
-  const teamProjectIds = new Set(team.projects.map((p) => p.id));
-  // TEAM scope takes precedence over PROJECT scope so the synthesized role is
-  // deterministic when a user has both kinds of binding for the same team.
-  const teamBinding = userRoleBindings.find(
-    (b) =>
-      b.organizationId === organizationId &&
-      b.scopeType === RoleBindingScopeType.TEAM &&
-      b.scopeId === team.id,
-  );
-  const projectBinding = teamBinding
-    ? undefined
-    : userRoleBindings.find(
-        (b) =>
-          b.organizationId === organizationId &&
-          b.scopeType === RoleBindingScopeType.PROJECT &&
-          teamProjectIds.has(b.scopeId),
-      );
-  const binding = teamBinding ?? projectBinding;
-  if (!binding) {
-    return team;
-  }
-
-  const bindingMember = {
-    userId,
-    teamId: team.id,
-    role: binding.role,
-    assignedRoleId: binding.customRoleId ?? null,
-    assignedRole: binding.customRole ?? null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-  const existingIndex = team.members.findIndex((m) => m.userId === userId);
-  const newMembers =
-    existingIndex >= 0
-      ? team.members.map((m, i) => (i === existingIndex ? bindingMember : m))
-      : [...team.members, bindingMember];
-
-  return { ...team, members: newMembers };
-}
-
 /**
  * The raw client behind the repository, for orchestrations that compose
  * helpers operating on one (the personal-team guard, shared-team
@@ -150,7 +98,7 @@ export function enrichTeamWithRoleBindings<
  * async call returning a Promise, and a Promise standing in for a Prisma
  * client fails only later, deep inside whatever received it.
  */
-function clientFromRepo(repo: OrganizationRepository): PrismaClient {
+function clientFromRepo(repo: OrganizationMembershipRepository): PrismaClient {
   const client = repo.getClient?.();
   if (!client) {
     throw new Error("This operation requires a Prisma-backed organization repository");
@@ -223,8 +171,60 @@ class TeamRoleUpdateRejectedError extends HandledError {
  * four ports.
  */
 export class OrganizationMembershipService {
+  static enrichTeamWithRoleBindings<
+    T extends {
+      members: TeamMembershipLike[];
+      id: string;
+      projects: { id: string }[];
+    },
+  >(
+    team: T,
+    userId: string,
+    userRoleBindings: AuthzBindingForSynthesis[],
+    organizationId: string,
+  ): T {
+    const teamProjectIds = new Set(team.projects.map((p) => p.id));
+    // TEAM scope takes precedence over PROJECT scope so the synthesized role is
+    // deterministic when a user has both kinds of binding for the same team.
+    const teamBinding = userRoleBindings.find(
+      (b) =>
+        b.organizationId === organizationId &&
+        b.scopeType === RoleBindingScopeType.TEAM &&
+        b.scopeId === team.id,
+    );
+    const projectBinding = teamBinding
+      ? undefined
+      : userRoleBindings.find(
+          (b) =>
+            b.organizationId === organizationId &&
+            b.scopeType === RoleBindingScopeType.PROJECT &&
+            teamProjectIds.has(b.scopeId),
+        );
+    const binding = teamBinding ?? projectBinding;
+    if (!binding) {
+      return team;
+    }
+
+    const bindingMember = {
+      userId,
+      teamId: team.id,
+      role: binding.role,
+      assignedRoleId: binding.customRoleId ?? null,
+      assignedRole: binding.customRole ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const existingIndex = team.members.findIndex((m) => m.userId === userId);
+    const newMembers =
+      existingIndex >= 0
+        ? team.members.map((m, i) => (i === existingIndex ? bindingMember : m))
+        : [...team.members, bindingMember];
+
+    return { ...team, members: newMembers };
+  }
+
   static create(dependencies: {
-    repository: OrganizationRepository;
+    repository: OrganizationMembershipRepository;
     prompts: OrganizationPromptSeedPort;
     seats: OrganizationSeatLicensePort;
     sessions: OrganizationSessionRevocationPort;
@@ -235,7 +235,7 @@ export class OrganizationMembershipService {
 
   private constructor(
     private readonly dependencies: {
-      repository: OrganizationRepository;
+      repository: OrganizationMembershipRepository;
       prompts: OrganizationPromptSeedPort;
       seats: OrganizationSeatLicensePort;
       sessions: OrganizationSessionRevocationPort;
@@ -243,7 +243,7 @@ export class OrganizationMembershipService {
     },
   ) {}
 
-  private get repo(): OrganizationRepository {
+  private get repo(): OrganizationMembershipRepository {
     return this.dependencies.repository;
   }
 

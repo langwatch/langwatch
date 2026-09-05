@@ -1,7 +1,7 @@
 import { formatReportRowLine } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
 import type { TraceListItem } from "@langwatch/trace-contract";
-import { toReportTraceRow } from "../report-trace-row.service";
+import { ReportTraceRowService } from "../report-trace-row.service";
 
 const PROJECT_URL = "https://app.langwatch.ai/my-project";
 
@@ -19,10 +19,10 @@ function makeItem(overrides: Partial<TraceListItem>): TraceListItem {
   } as TraceListItem;
 }
 
-describe("toReportTraceRow", () => {
+describe("ReportTraceRowService.toReportTraceRow", () => {
   describe("given a trace with an input preview", () => {
     it("collapses whitespace in the snippet", () => {
-      const row = toReportTraceRow({
+      const row = ReportTraceRowService.toReportTraceRow({
         item: makeItem({ input: "hello\n   world  " }),
         projectUrl: PROJECT_URL,
       });
@@ -32,7 +32,7 @@ describe("toReportTraceRow", () => {
 
   describe("given an input longer than the cap", () => {
     it("truncates the snippet with an ellipsis", () => {
-      const row = toReportTraceRow({
+      const row = ReportTraceRowService.toReportTraceRow({
         item: makeItem({ input: "x".repeat(500) }),
         projectUrl: PROJECT_URL,
       });
@@ -43,7 +43,7 @@ describe("toReportTraceRow", () => {
 
   describe("when the trace carries cost and duration", () => {
     it("keeps them as numbers so a table can render numeric cells", () => {
-      const row = toReportTraceRow({
+      const row = ReportTraceRowService.toReportTraceRow({
         item: makeItem({ totalCost: 0.0241, durationMs: 1834 }),
         projectUrl: PROJECT_URL,
       });
@@ -54,7 +54,7 @@ describe("toReportTraceRow", () => {
 
   describe("when the trace used models", () => {
     it("joins them into one label", () => {
-      const row = toReportTraceRow({
+      const row = ReportTraceRowService.toReportTraceRow({
         item: makeItem({ models: ["gpt-5-mini", "claude-opus-4-8"] }),
         projectUrl: PROJECT_URL,
       });
@@ -63,7 +63,7 @@ describe("toReportTraceRow", () => {
   });
 
   it("deep-links the trace", () => {
-    const row = toReportTraceRow({
+    const row = ReportTraceRowService.toReportTraceRow({
       item: makeItem({ traceId: "trace-abc" }),
       projectUrl: PROJECT_URL,
     });
@@ -74,7 +74,7 @@ describe("toReportTraceRow", () => {
 describe("formatReportRowLine", () => {
   describe("given a row with an input snippet", () => {
     it("renders `<traceId> — <snippet>`", () => {
-      const row = toReportTraceRow({
+      const row = ReportTraceRowService.toReportTraceRow({
         item: makeItem({ traceId: "trace-abc", input: "hello world" }),
         projectUrl: PROJECT_URL,
       });
@@ -84,7 +84,7 @@ describe("formatReportRowLine", () => {
 
   describe("given a row with no input preview", () => {
     it("falls back to the bare trace id", () => {
-      const row = toReportTraceRow({
+      const row = ReportTraceRowService.toReportTraceRow({
         item: makeItem({ traceId: "trace-xyz", input: "   " }),
         projectUrl: PROJECT_URL,
       });

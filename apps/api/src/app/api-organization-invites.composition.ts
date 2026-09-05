@@ -42,8 +42,6 @@ import {
   InviteSendThrottleService,
   OrganizationInviteRateLimitPort,
   OrganizationInviteSeatCensusPort,
-  maskInvitedAddress,
-  matchInviteToAcceptor,
   type OrganizationInviteMailPort,
   type OrganizationRestInviteService,
   type OrganizationTrpcPorts,
@@ -176,9 +174,9 @@ export type ApiOrganizationInvitesOptions = Readonly<{
  * Composes the invitation service and the eleven ports `organization.*` reads
  * it through.
  *
- * The two pure ones — `matchInviteToAcceptor` and `maskInvitedAddress` — are
- * the service module's own functions rather than methods, so they answer here
- * with no service instance behind them.
+ * The two pure ones — `InviteService.matchInviteToAcceptor` and
+ * `InviteService.maskInvitedAddress` — are statics, so they answer here with no
+ * service instance behind them.
  */
 /**
  * The invitation half, as this process's two doors take it.
@@ -202,8 +200,8 @@ export type ApiOrganizationInvites = Readonly<{
 export function composeApiOrganizationInvites(
   options: ApiOrganizationInvitesOptions,
 ): ApiOrganizationInvites {
-  const throttle = new InviteSendThrottleService(new ApiInviteRateLimit(options.rateLimit));
-  const invites = new InviteService({
+  const throttle = InviteSendThrottleService.create(new ApiInviteRateLimit(options.rateLimit));
+  const invites = InviteService.create({
     prisma: options.prisma,
     seats: new ApiInviteSeatCensus(PrismaUsageMembershipRepository.create(options.prisma)),
     plans: options.plans,
@@ -250,13 +248,13 @@ export function composeApiOrganizationInvites(
       // A user not yet on identifiers keeps the legacy case-insensitive
       // session-email comparison byte for byte, and `null` is what says so.
       const matchable = await identityEmails.tryVerifiedEmailsOf({ userId: input.userId });
-      return matchInviteToAcceptor({
+      return InviteService.matchInviteToAcceptor({
         inviteEmail: input.inviteEmail,
         sessionEmail: input.sessionEmail,
         matchable,
       });
     },
-    maskInvitedAddress: (email) => maskInvitedAddress(email),
+    maskInvitedAddress: (email) => InviteService.maskInvitedAddress(email),
     applyInvite: (_ctx, input) =>
       invites.applyInvite({
         userId: input.userId,

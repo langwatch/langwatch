@@ -9,7 +9,7 @@ import type {
   TopicClusteringRunCompletedEvent,
   TopicClusteringRunFailedEvent,
   TopicClusteringRunStartedEvent,
-} from "../../adapters/eventing.topic.adapter";
+} from "../../adapters/eventing.topic.events";
 import {
   type TopicClusteringRunHistoryData,
   TopicClusteringRunHistoryFoldProjection,
@@ -20,7 +20,7 @@ const stubStore: StateProjectionStore<TopicClusteringRunHistoryData> = {
   store: async () => undefined,
 };
 
-const projection = new TopicClusteringRunHistoryFoldProjection({
+const projection = TopicClusteringRunHistoryFoldProjection.create({
   store: stubStore,
 });
 

@@ -22,7 +22,7 @@ function makeService({ registered = false }: { registered?: boolean } = {}) {
   const confirmed: string[] = [];
   let addressIsTaken = registered;
 
-  const service = new SignUpVerificationService({
+  const service = SignUpVerificationService.create({
     tokens: {
       issue: async (record) => {
         issued.push(record);

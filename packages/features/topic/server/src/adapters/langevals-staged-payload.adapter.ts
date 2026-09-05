@@ -82,12 +82,12 @@ export type LangevalsStagedPayloadConfig = {
  * composed no staging refuses by name rather than silently posting a payload
  * the receiver will reject with a 413.
  */
-export class LangevalsStagedPayloadClient {
+export class LangevalsStagedPayloadAdapter {
   static create(input: {
     config: LangevalsStagedPayloadConfig;
     staging?: LangevalsPayloadStagingPort | undefined;
-  }): LangevalsStagedPayloadClient {
-    return new LangevalsStagedPayloadClient(input.config, input.staging);
+  }): LangevalsStagedPayloadAdapter {
+    return new LangevalsStagedPayloadAdapter(input.config, input.staging);
   }
 
   private constructor(

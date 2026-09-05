@@ -61,57 +61,63 @@ function collectStringRefs({
   }
 }
 
-/** Redacts every nested AnyValue string without flattening its stored type. */
-async function redactTypedAttributes(args: {
-  resourceAttributes: unknown;
-  scopeAttributes: unknown;
-  pointAttributes: unknown;
-  exemplarAttributes: unknown;
-  redactionService: MetricRedactionPort;
-  piiRedactionLevel: MetricPiiRedactionLevel;
-  tenantId: string;
-}): Promise<void> {
-  const refs: StringRef[] = [];
-  collectStringRefs({
-    value: args.resourceAttributes,
-    prefix: "resource",
-    out: refs,
-  });
-  collectStringRefs({
-    value: args.scopeAttributes,
-    prefix: "scope",
-    out: refs,
-  });
-  collectStringRefs({
-    value: args.pointAttributes,
-    prefix: "point",
-    out: refs,
-  });
-  collectStringRefs({
-    value: args.exemplarAttributes,
-    prefix: "exemplar",
-    out: refs,
-  });
-  const attributes: Record<string, string> = Object.fromEntries(
-    refs.map((ref): [string, string] => {
-      const value = ref.owner[ref.key];
-      return [ref.syntheticKey, typeof value === "string" ? value : String(value)];
-    }),
-  );
-  const attributeNames = Object.fromEntries(
-    refs.flatMap((ref) =>
-      ref.attributeName === undefined ? [] : [[ref.syntheticKey, ref.attributeName]],
-    ),
-  );
-  await args.redactionService.redactMetricAttributes(
-    { attributes, resourceAttributes: {}, attributeNames },
-    args.piiRedactionLevel,
-    args.tenantId,
-  );
-  for (const ref of refs) {
-    const redacted = attributes[ref.syntheticKey];
-    if (redacted !== undefined) ref.owner[ref.key] = redacted;
+/** Applies the redaction port to every nested AnyValue string in one OTLP point. */
+export class MetricRedactionAdapter {
+  private constructor(private readonly redaction: MetricRedactionPort) {}
+
+  static create(options: { redaction: MetricRedactionPort }): MetricRedactionAdapter {
+    return new MetricRedactionAdapter(options.redaction);
+  }
+
+  /** Redacts every nested AnyValue string without flattening its stored type. */
+  async redactTypedAttributes(args: {
+    resourceAttributes: unknown;
+    scopeAttributes: unknown;
+    pointAttributes: unknown;
+    exemplarAttributes: unknown;
+    piiRedactionLevel: MetricPiiRedactionLevel;
+    tenantId: string;
+  }): Promise<void> {
+    const refs: StringRef[] = [];
+    collectStringRefs({
+      value: args.resourceAttributes,
+      prefix: "resource",
+      out: refs,
+    });
+    collectStringRefs({
+      value: args.scopeAttributes,
+      prefix: "scope",
+      out: refs,
+    });
+    collectStringRefs({
+      value: args.pointAttributes,
+      prefix: "point",
+      out: refs,
+    });
+    collectStringRefs({
+      value: args.exemplarAttributes,
+      prefix: "exemplar",
+      out: refs,
+    });
+    const attributes: Record<string, string> = Object.fromEntries(
+      refs.map((ref): [string, string] => {
+        const value = ref.owner[ref.key];
+        return [ref.syntheticKey, typeof value === "string" ? value : String(value)];
+      }),
+    );
+    const attributeNames = Object.fromEntries(
+      refs.flatMap((ref) =>
+        ref.attributeName === undefined ? [] : [[ref.syntheticKey, ref.attributeName]],
+      ),
+    );
+    await this.redaction.redactMetricAttributes(
+      { attributes, resourceAttributes: {}, attributeNames },
+      args.piiRedactionLevel,
+      args.tenantId,
+    );
+    for (const ref of refs) {
+      const redacted = attributes[ref.syntheticKey];
+      if (redacted !== undefined) ref.owner[ref.key] = redacted;
+    }
   }
 }
-
-export { redactTypedAttributes };

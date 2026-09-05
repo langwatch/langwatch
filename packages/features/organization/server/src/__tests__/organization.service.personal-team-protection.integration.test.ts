@@ -31,12 +31,12 @@ import {
   GroupIdentityAdapter,
   PersonalWorkspaceIdentityAdapter,
   TeamIdentityAdapter,
-} from "../../adapters/resource-identifiers.adapter";
-import { PrismaGroupRepository } from "../../repositories/prisma/prisma.group.repository";
-import { PrismaOrganizationRepository } from "../../repositories/prisma/prisma.organization.repository";
-import { PrismaTeamRepository } from "../../repositories/prisma/prisma.team.repository";
-import type { OrganizationSettingsSecretPort } from "../../ports/organization.port";
-import { OrganizationService } from "../organization.service";
+} from "../adapters/resource-identifiers.adapter";
+import { PrismaGroupRepository } from "../repositories/prisma/prisma.group.repository";
+import { PrismaOrganizationRepository } from "../repositories/prisma/prisma.organization.repository";
+import { PrismaTeamRepository } from "../repositories/prisma/prisma.team.repository";
+import type { OrganizationSettingsSecretPort } from "../ports/organization.port";
+import { OrganizationService } from "../services/organization.service";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

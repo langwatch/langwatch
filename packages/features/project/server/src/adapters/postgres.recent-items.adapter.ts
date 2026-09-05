@@ -19,6 +19,8 @@ export class PostgresRecentItemsAdapter {
   private constructor(private readonly database: PrismaClient) {}
 
   build(): RecentItemsService {
-    return new RecentItemsService(new PrismaRecentItemsRepository(this.database));
+    return RecentItemsService.create({
+      repository: PrismaRecentItemsRepository.create({ prisma: this.database }),
+    });
   }
 }

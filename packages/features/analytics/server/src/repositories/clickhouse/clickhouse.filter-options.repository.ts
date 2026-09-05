@@ -29,6 +29,12 @@ export class FilterOptionsClickHouseRepository extends FilterOptionsPort {
     super();
   }
 
+  static create(options: {
+    resolveClient: ClickHouseClientResolver;
+  }): FilterOptionsClickHouseRepository {
+    return new FilterOptionsClickHouseRepository(options.resolveClient);
+  }
+
   async findOptions(input: FindFilterOptionsInput): Promise<FilterOption[]> {
     const definition = this.definitionFor(input.field);
     if (!definition) return [];

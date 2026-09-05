@@ -20,7 +20,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { SavedViewRepository } from "../prisma.saved-view.repository";
+import { PrismaSavedViewRepository } from "../prisma.saved-view.repository";
 import { SavedViewService } from "../../../services/saved-view.service";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -44,7 +44,9 @@ function database(): PrismaClient {
 }
 
 function service(): SavedViewService {
-  return new SavedViewService(new SavedViewRepository(database()));
+  return SavedViewService.create({
+    repository: PrismaSavedViewRepository.create({ database: database() }),
+  });
 }
 
 const namespace = `saved-view-${randomUUID()}`;
@@ -178,9 +180,18 @@ describe.skipIf(!databaseUrl)("Saved view persistence", () => {
   describe("reorder", () => {
     /** @scenario reorder updates the order of all views */
     it("updates the order field for each view and getAll reflects it", async () => {
-      const viewA = await service().createView({ projectId, input: { name: "View A", filters: {} } });
-      const viewB = await service().createView({ projectId, input: { name: "View B", filters: {} } });
-      const viewC = await service().createView({ projectId, input: { name: "View C", filters: {} } });
+      const viewA = await service().createView({
+        projectId,
+        input: { name: "View A", filters: {} },
+      });
+      const viewB = await service().createView({
+        projectId,
+        input: { name: "View B", filters: {} },
+      });
+      const viewC = await service().createView({
+        projectId,
+        input: { name: "View C", filters: {} },
+      });
 
       await service().reorder({ projectId, viewIds: [viewC.id, viewA.id, viewB.id] });
 

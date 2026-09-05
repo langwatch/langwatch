@@ -36,6 +36,10 @@ const RESERVED_TOP_LEVEL_ROUTES = new Set([
 const PROJECT_ID_SLUG_CHARS = 6;
 
 export class ProjectSlugService {
+  static create(): ProjectSlugService {
+    return new ProjectSlugService();
+  }
+
   static mint(name: string, projectId: string): string {
     const slug = `${ProjectSlugService.slugify(name)}-${projectId.substring(0, PROJECT_ID_SLUG_CHARS)}`;
     if (RESERVED_TOP_LEVEL_ROUTES.has(slug)) {

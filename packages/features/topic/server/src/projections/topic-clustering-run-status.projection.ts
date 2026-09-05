@@ -9,13 +9,13 @@ import type {
   TopicClusteringRunCompletedEvent,
   TopicClusteringRunFailedEvent,
   TopicClusteringRunStartedEvent,
-} from "../adapters/eventing.topic.adapter";
+} from "../adapters/eventing.topic.events";
 import {
   TopicClusteringRequestedEventSchema,
   TopicClusteringRunCompletedEventSchema,
   TopicClusteringRunFailedEventSchema,
   TopicClusteringRunStartedEventSchema,
-} from "../adapters/eventing.topic.adapter";
+} from "../adapters/eventing.topic.events";
 
 /**
  * Per-project topic clustering run status (ADR-051 §1/§7): the public read
@@ -87,6 +87,12 @@ export class TopicClusteringRunStatusFoldProjection
   readonly store: StateProjectionStore<TopicClusteringRunStatusData>;
 
   protected readonly events = topicClusteringEvents;
+
+  static create(deps: {
+    store: StateProjectionStore<TopicClusteringRunStatusData>;
+  }): TopicClusteringRunStatusFoldProjection {
+    return new TopicClusteringRunStatusFoldProjection(deps);
+  }
 
   constructor(deps: { store: StateProjectionStore<TopicClusteringRunStatusData> }) {
     super();

@@ -4,9 +4,8 @@ import {
   DashboardIdGenerator,
   PostgresDashboardAdapter,
 } from "@langwatch/dashboard-server";
-import { recordingExecutor } from "@langwatch/analytics-server/internal";
-import { LangWatchQLService } from "@langwatch/analytics-server";
-import { AnalyticsSavedWorkbenchChartPolicy } from "../saved-workbench-chart-policy.adapter";
+import { LangWatchQLService, recordingExecutor } from "@langwatch/analytics-server/testing";
+import { AnalyticsSavedWorkbenchChartPolicyAdapter } from "../saved-workbench-chart-policy.adapter";
 
 const PROJECT = { id: "project_1", lwqlKey: "restricted-project-key" };
 const WEEK = {
@@ -62,7 +61,7 @@ function serviceWithSavedChart() {
       typeof PostgresDashboardAdapter.create
     >[0]["database"],
     ids: new TestDashboardIds(),
-    savedWorkbenchChartPolicy: AnalyticsSavedWorkbenchChartPolicy.create({ langWatchQL }),
+    savedWorkbenchChartPolicy: AnalyticsSavedWorkbenchChartPolicyAdapter.create({ langWatchQL }),
     graphVisibility: new UnusedGraphVisibility(),
     langWatchQL,
   }).build();

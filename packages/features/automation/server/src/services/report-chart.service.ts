@@ -152,27 +152,34 @@ function formatBucketLabel({
   });
 }
 
-export async function loadReportCharts({
-  deps,
-  source,
-  projectId,
-  from,
-  to,
-}: {
-  deps: ReportChartDeps;
-  source: ReportSource;
-  projectId: string;
-  from: number;
-  to: number;
-}): Promise<ReportChart[]> {
-  const graphs = await loadGraphs({ deps, source, projectId });
+/** The report's chart panels: what each graph in a source renders for one window. */
+export class ReportChartService {
+  static create(): ReportChartService {
+    return new ReportChartService();
+  }
 
-  // Panels are independent queries, so overlap them rather than paying eight
-  // round-trips in series — but under a concurrency cap (ADR-044 §5) so a large
-  // dashboard doesn't fire every panel's heavy ClickHouse query at once.
-  return mapWithConcurrency(graphs, REPORT_CHART_QUERY_CONCURRENCY, (graph) =>
-    buildChart({ deps, graph, projectId, from, to }),
-  );
+  static async loadReportCharts({
+    deps,
+    source,
+    projectId,
+    from,
+    to,
+  }: {
+    deps: ReportChartDeps;
+    source: ReportSource;
+    projectId: string;
+    from: number;
+    to: number;
+  }): Promise<ReportChart[]> {
+    const graphs = await loadGraphs({ deps, source, projectId });
+
+    // Panels are independent queries, so overlap them rather than paying eight
+    // round-trips in series — but under a concurrency cap (ADR-044 §5) so a large
+    // dashboard doesn't fire every panel's heavy ClickHouse query at once.
+    return mapWithConcurrency(graphs, REPORT_CHART_QUERY_CONCURRENCY, (graph) =>
+      buildChart({ deps, graph, projectId, from, to }),
+    );
+  }
 }
 
 async function loadGraphs({

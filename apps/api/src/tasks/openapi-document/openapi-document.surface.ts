@@ -328,6 +328,7 @@ function processPorts(): ApiProcessRestPorts {
       database: refuse("The member directory") as AuthRestPorts["database"],
       baseUrl: PUBLIC_BASE_URL,
       federatedLogout: refuse<Promise<string | null>>("Federated logout"),
+      runWithIdentityBirth: (run) => run(),
     },
     // The SCIM 2.0 provisioning surface. Both families are described: the
     // fifteen protocol operations are the frozen document's largest single

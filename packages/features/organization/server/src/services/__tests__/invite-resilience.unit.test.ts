@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { InviteNotFoundError } from "../invite.errors";
-import { InviteService, matchInviteToAcceptor } from "../invite.service";
+import { InviteService } from "../invite.service";
 import { resolveInviteDisplayStatus } from "../invite-rules";
 
 /**
@@ -64,7 +64,7 @@ describe("InviteService resilience", () => {
       customRole: { findMany: vi.fn() },
     };
 
-    service = new InviteService({
+    service = InviteService.create({
       prisma: mockPrisma,
       seats: { getMemberCount: vi.fn(), getMembersLiteCount: vi.fn() } as any,
       plans: { getActivePlan: vi.fn() } as any,
@@ -274,7 +274,7 @@ describe("InviteService resilience", () => {
           inviteId: "inv-race-1",
         });
 
-        const match = matchInviteToAcceptor({
+        const match = InviteService.matchInviteToAcceptor({
           inviteEmail: resent.email,
           sessionEmail: "sam@work.other",
           matchable: [{ identifierId: "idf_debug", value: resent.email }],

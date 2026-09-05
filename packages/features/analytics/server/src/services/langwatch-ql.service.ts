@@ -9,10 +9,10 @@
 import { createLogger } from "@langwatch/observability";
 import type {
   LangWatchQLBudgetOverflowMode,
+  LangWatchQLProtections,
   LangWatchQLQueryResult,
   LangWatchQLSchema,
 } from "@langwatch/analytics-contract";
-import type { Protections } from "@langwatch/trace-server";
 import { lwqlTenantCapability } from "../langwatch-ql/capability";
 import { LWQL_VIEW_CATALOG } from "../langwatch-ql/catalog/lwql-views";
 import {
@@ -139,7 +139,7 @@ export interface LangWatchQLCaller {
 export interface LangWatchQLExecuteInput {
   readonly project: LangWatchQLCaller;
   /** Resolved server-side from the authenticated context. */
-  readonly protections: Protections;
+  readonly protections: LangWatchQLProtections;
   /** The SQL exactly as submitted. */
   readonly sql: string;
   /** Values for the parameters the SQL declares. */
@@ -231,6 +231,33 @@ export interface LangWatchQLServiceDependencies {
  * Holds no SQL of its own and opens no connection: it derives policy from the
  * catalog and hands the caller's statement, untouched, to the executor.
  */
+/**
+ * ## Why this is not on the application container — do not copy the pattern
+ *
+ * The house rule is that a server-side caller obtains a service from
+ * `getApp()`, and a module-level cache with an exported setter is a second
+ * dependency-injection mechanism. This slice keeps the local one anyway, and
+ * the reason is the container's lifecycle rather than a preference:
+ *
+ *  - `App`'s fields are `readonly` and it is built once by `initializeApp`.
+ *    There is no per-field override, so a suite swapping the executor means
+ *    `resetApp()` plus a full re-initialisation with different dependencies.
+ *  - The endpoint suites swap the executor *between describe blocks* — a
+ *    Testcontainers-backed one, a throwing one, a lowered-ceilings one — half a
+ *    dozen times per file. On the container that is half a dozen full app
+ *    teardowns, each closing the event-sourcing and Redis handles the rest of
+ *    the file still needs.
+ *
+ * Migrating is therefore a change to `dependencies.ts`, `presets.ts`, `app.ts`,
+ * the barrel, the route and both endpoint suites, and it changes their
+ * lifecycle rather than only their wiring. That is a slice of its own, not a
+ * late edit to this one.
+ *
+ * The setter is reachable from anything importing the barrel, and that is a
+ * real cost: nothing but a test should ever call it.
+ */
+let cached: LangWatchQLService | null = null;
+
 export class LangWatchQLService {
   private readonly views: readonly LangWatchQLViewDefinition[];
   private readonly limits: LangWatchQLResultLimits;
@@ -252,6 +279,64 @@ export class LangWatchQLService {
     this.now = deps.now ?? (() => new Date());
   }
 
+  static create(deps: LangWatchQLServiceDependencies): LangWatchQLService {
+    return new LangWatchQLService(deps);
+  }
+
+  /**
+   * Builds the service from the environment.
+   *
+   * The database name defaults to the namespace the catalog documents, so a
+   * deployment that provisions the standard objects needs only the credentials.
+   */
+  static fromEnvironment(
+    overrides: Partial<LangWatchQLServiceDependencies> = {},
+  ): LangWatchQLService {
+    const connection = lwqlConnectionFromEnv();
+
+    return new LangWatchQLService({
+      executor: connection ? createLangWatchQLExecutor(connection) : null,
+      database: connection?.database ?? DEFAULT_LWQL_DATABASE,
+      ...overrides,
+    });
+  }
+
+  /** The process-wide service, built from the environment on first use. */
+  static shared(): LangWatchQLService {
+    cached ??= LangWatchQLService.fromEnvironment();
+
+    return cached;
+  }
+
+  /**
+   * Replaces the process-wide service, or clears it so the next read rebuilds
+   * from the environment.
+   *
+   * **Tests only.** The seam the endpoint suites wire a Testcontainers-provisioned
+   * executor through. Production code builds its service from the environment and
+   * never calls this — see the note above for why the container is not the seam
+   * in this slice.
+   */
+  static setShared(service: LangWatchQLService | null): void {
+    cached = service;
+  }
+
+  /**
+   * Clears the process-wide service, releasing the transport it holds first.
+   *
+   * Separate from {@link LangWatchQLService.setShared}, and awaitable, because closing a
+   * connection pool is asynchronous and that setter is not. Making the setter
+   * async would change every call site; having it start a close it cannot await
+   * would leave an unobserved promise in a teardown path, which is the one place
+   * a rejection has nowhere to go. So the suites that swap the service several
+   * times per file call this between swaps and get the sockets back.
+   */
+  static async closeShared(): Promise<void> {
+    const previous = cached;
+    cached = null;
+    await previous?.close();
+  }
+
   /**
    * Whether this deployment has a LangWatchQL identity to run a query as.
    *
@@ -271,7 +356,7 @@ export class LangWatchQLService {
    * LangWatchQL identity can still describe what the API would expose. Answering
    * it does not disclose anything a caller could not read in the docs.
    */
-  describeSchema({ protections }: { protections: Protections }): LangWatchQLSchema {
+  describeSchema({ protections }: { protections: LangWatchQLProtections }): LangWatchQLSchema {
     return describeLangWatchQLSchema({
       database: this.deps.database,
       protections,
@@ -313,7 +398,7 @@ export class LangWatchQLService {
   }: {
     /** Logged with a refusal. The database, not this, decides the tenant. */
     readonly projectId: string;
-    readonly protections: Protections;
+    readonly protections: LangWatchQLProtections;
     readonly sql: string;
     readonly parameters?: Readonly<Record<string, unknown>>;
     /** The period the surface is showing, when one is asking. */
@@ -549,84 +634,3 @@ export class LangWatchQLService {
  * names no other.
  */
 export const DEFAULT_LWQL_DATABASE = "analytics";
-
-/**
- * Builds the service from the environment.
- *
- * The database name defaults to the namespace the catalog documents, so a
- * deployment that provisions the standard objects needs only the credentials.
- */
-export function createLangWatchQLService(
-  overrides: Partial<LangWatchQLServiceDependencies> = {},
-): LangWatchQLService {
-  const connection = lwqlConnectionFromEnv();
-
-  return new LangWatchQLService({
-    executor: connection ? createLangWatchQLExecutor(connection) : null,
-    database: connection?.database ?? DEFAULT_LWQL_DATABASE,
-    ...overrides,
-  });
-}
-
-/**
- * ## Why this is not on the application container — do not copy the pattern
- *
- * The house rule is that a server-side caller obtains a service from
- * `getApp()`, and a module-level cache with an exported setter is a second
- * dependency-injection mechanism. This slice keeps the local one anyway, and
- * the reason is the container's lifecycle rather than a preference:
- *
- *  - `App`'s fields are `readonly` and it is built once by `initializeApp`.
- *    There is no per-field override, so a suite swapping the executor means
- *    `resetApp()` plus a full re-initialisation with different dependencies.
- *  - The endpoint suites swap the executor *between describe blocks* — a
- *    Testcontainers-backed one, a throwing one, a lowered-ceilings one — half a
- *    dozen times per file. On the container that is half a dozen full app
- *    teardowns, each closing the event-sourcing and Redis handles the rest of
- *    the file still needs.
- *
- * Migrating is therefore a change to `dependencies.ts`, `presets.ts`, `app.ts`,
- * the barrel, the route and both endpoint suites, and it changes their
- * lifecycle rather than only their wiring. That is a slice of its own, not a
- * late edit to this one.
- *
- * The setter is reachable from anything importing the barrel, and that is a
- * real cost: nothing but a test should ever call it.
- */
-let cached: LangWatchQLService | null = null;
-
-/** The process-wide service, built from the environment on first use. */
-export function getLangWatchQLService(): LangWatchQLService {
-  cached ??= createLangWatchQLService();
-
-  return cached;
-}
-
-/**
- * Replaces the process-wide service, or clears it so the next read rebuilds
- * from the environment.
- *
- * **Tests only.** The seam the endpoint suites wire a Testcontainers-provisioned
- * executor through. Production code builds its service from the environment and
- * never calls this — see the note above for why the container is not the seam
- * in this slice.
- */
-export function setLangWatchQLService(service: LangWatchQLService | null): void {
-  cached = service;
-}
-
-/**
- * Clears the process-wide service, releasing the transport it holds first.
- *
- * Separate from {@link setLangWatchQLService}, and awaitable, because closing a
- * connection pool is asynchronous and that setter is not. Making the setter
- * async would change every call site; having it start a close it cannot await
- * would leave an unobserved promise in a teardown path, which is the one place
- * a rejection has nowhere to go. So the suites that swap the service several
- * times per file call this between swaps and get the sockets back.
- */
-export async function closeLangWatchQLService(): Promise<void> {
-  const previous = cached;
-  cached = null;
-  await previous?.close();
-}

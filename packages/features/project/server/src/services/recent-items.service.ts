@@ -1,4 +1,4 @@
-import type { PrismaRecentItemsRepository } from "../repositories/prisma/prisma.recent-items.repository";
+import type { RecentItemsRepository } from "../repositories/recent-items.repository";
 import {
   ACTION_TO_TYPE_MAP,
   ENTITY_ID_EXTRACTORS,
@@ -12,7 +12,11 @@ import {
  * Handles business logic for retrieving and hydrating recent user activity
  */
 export class RecentItemsService {
-  constructor(private readonly repository: PrismaRecentItemsRepository) {}
+  private constructor(private readonly repository: RecentItemsRepository) {}
+
+  static create(options: { repository: RecentItemsRepository }): RecentItemsService {
+    return new RecentItemsService(options.repository);
+  }
 
   /**
    * Get recent items the user has interacted with

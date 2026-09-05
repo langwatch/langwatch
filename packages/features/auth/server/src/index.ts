@@ -19,8 +19,8 @@ export {
   type SignUpVerificationTokenStore,
 } from "./services/signup-verification.service";
 export {
-  PrismaSignUpAccountDirectory,
-  PrismaSignUpVerificationTokenStore,
+  PrismaSignUpAccountDirectoryRepository,
+  PrismaSignUpVerificationTokenRepository,
 } from "./repositories/prisma/prisma.signup-verification.repository";
 export {
   BetterAuthAnnouncementsPort,
@@ -68,11 +68,7 @@ export {
 } from "./transport/better-auth/sign-in-router-shadow";
 export {
   Auth0ApiError,
-  changeAuth0Password,
-  getManagementApiToken,
-  updateUserPassword,
-  verifyCurrentPassword,
-  _resetManagementApiTokenCache,
+  Auth0PasswordService,
   type Auth0ErrorCode,
   type Auth0ManagementCredentials,
 } from "./services/auth0-password.service";
@@ -102,7 +98,6 @@ export {
 export { CliDeviceSessionStorePort } from "./ports/cli-device-session-store.port";
 export {
   ACCESS_TOKEN_TTL_SECONDS,
-  bearerCliAccessToken,
   CliDeviceSessionService,
   DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
   DEVICE_CODE_TTL_SECONDS,

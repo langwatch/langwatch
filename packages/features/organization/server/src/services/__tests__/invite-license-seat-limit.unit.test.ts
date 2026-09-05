@@ -16,7 +16,7 @@ function buildService(options: { maxMembers: number; currentFullMembers: number 
     customRole: { findMany: vi.fn().mockResolvedValue([]) },
   } as never;
 
-  const service = new InviteService({
+  const service = InviteService.create({
     prisma,
     seats: {
       getMemberCount: vi.fn().mockResolvedValue(options.currentFullMembers),

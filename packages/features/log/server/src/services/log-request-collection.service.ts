@@ -8,10 +8,9 @@ import {
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
-import { TraceLogRecordIOService } from "@langwatch/trace-server";
 import { piiRedactionLevelSchema } from "@langwatch/trace-contract";
 import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";
-import { IO_PREVIEW_BYTES, TraceProjectionLeanService } from "@langwatch/trace-server";
+import type { LogTraceIoPort } from "../ports/log-trace-io.port";
 
 /**
  * Every field optional, all the way down.
@@ -26,6 +25,7 @@ type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } 
 
 export interface LogRequestCollectionDeps {
   traceCanonicalisation: TraceCanonicalisationService;
+  traceIo: LogTraceIoPort;
   logs: LogService;
   recordLogRecords: (data: CanonicalLogRecord[]) => Promise<void>;
   recordLogContributions: (data: LogTraceContribution[]) => Promise<void>;
@@ -66,7 +66,11 @@ const PERSISTENCE_ERROR_MESSAGE = "failed to record log record";
 export class LogRequestCollectionService {
   private readonly tracer = getLangWatchTracer("langwatch.log-processing.log-ingestion");
   private readonly logger = createLogger("langwatch:log-processing:log-ingestion");
-  constructor(private readonly deps: LogRequestCollectionDeps) {}
+  private constructor(private readonly deps: LogRequestCollectionDeps) {}
+
+  static create(deps: LogRequestCollectionDeps): LogRequestCollectionService {
+    return new LogRequestCollectionService(deps);
+  }
 
   async handleOtlpLogRequest({
     tenantId,
@@ -143,7 +147,13 @@ export class LogRequestCollectionService {
             }
 
             try {
-              contributions.push(makeTraceContribution(prepared, this.deps.traceCanonicalisation));
+              contributions.push(
+                makeTraceContribution({
+                  prepared,
+                  traceCanonicalisation: this.deps.traceCanonicalisation,
+                  traceIo: this.deps.traceIo,
+                }),
+              );
             } catch (error) {
               // Best-effort, for the same reason the enqueue failure below is:
               // the canonical record is already durably enqueued, so failing to
@@ -199,10 +209,15 @@ export class LogRequestCollectionService {
   }
 }
 
-function makeTraceContribution(
-  prepared: LogPreparation["accepted"][number],
-  traceCanonicalisation: TraceCanonicalisationService,
-): LogTraceContribution {
+function makeTraceContribution({
+  prepared,
+  traceCanonicalisation,
+  traceIo,
+}: {
+  prepared: LogPreparation["accepted"][number];
+  traceCanonicalisation: TraceCanonicalisationService;
+  traceIo: LogTraceIoPort;
+}): LogTraceContribution {
   const { record, normalized } = prepared;
   const legacyView: LogRecordReceivedEventData = {
     traceId: record.correlationTraceId,
@@ -229,11 +244,9 @@ function makeTraceContribution(
     }
   }
 
-  const io = TraceLogRecordIOService.create(traceCanonicalisation).extractIO(legacyView);
-  const input =
-    io.input === null ? null : TraceProjectionLeanService.utf8Preview(io.input, IO_PREVIEW_BYTES);
-  const output =
-    io.output === null ? null : TraceProjectionLeanService.utf8Preview(io.output, IO_PREVIEW_BYTES);
+  const io = traceIo.extractIo(legacyView);
+  const input = io.input === null ? null : traceIo.preview(io.input);
+  const output = io.output === null ? null : traceIo.preview(io.output);
   if (input !== io.input || output !== io.output) {
     liftedAttributes["langwatch.reserved.log_io_truncated"] = true;
   }

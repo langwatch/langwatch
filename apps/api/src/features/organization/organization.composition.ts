@@ -48,7 +48,7 @@ import {
   EmailJoinRequestNotifier,
   IdentityEventingPort,
   JoinRequestGuards,
-  JoinRequestLedgerWriter,
+  JoinRequestLedgerWriterAdapter,
   JoinRequestService,
   JoinRequestsService,
   PostgresIdentityEmailAdapter,
@@ -66,9 +66,9 @@ import {
   OrganizationNotFoundError,
   assertNoPersonalTeamScope,
   buildInviteAcceptUrl,
-  enrichTeamWithRoleBindings,
   isCustomRole,
   isTeamRoleAllowedForOrganizationRole,
+  OrganizationMembershipService,
   resolveInviteDisplayStatus,
   InviteExpiredError,
   InviteNotFoundError,
@@ -385,7 +385,7 @@ function organizationPorts(
     listBindingsForSynthesis: (_ctx, input) =>
       authz.listBindingsForSynthesis(input) as Promise<AuthzBindingForSynthesis[]>,
 
-    enrichTeamWithRoleBindings,
+    enrichTeamWithRoleBindings: OrganizationMembershipService.enrichTeamWithRoleBindings,
 
     demoProject: () => options.demoProject,
     decryptStoredSecret: (value) => decryptStoredSecret(peers.encryption, value),
@@ -790,10 +790,10 @@ function composeMembershipHalf(options: {
     );
   }
 
-  const joinRequests = new JoinRequestsService({
+  const joinRequests = JoinRequestsService.create({
     requests: new JoinRequestService(
       new JoinRequestGuards({ requests: new PrismaJoinRequestReadRepository(prisma) }),
-      new JoinRequestLedgerWriter({
+      JoinRequestLedgerWriterAdapter.create({
         projectionStore: new PrismaJoinRequestProjectionRepository(prisma),
         eventing,
       }),
