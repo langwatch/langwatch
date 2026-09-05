@@ -1,11 +1,5 @@
 /**
  * Turning any thrown value into the canonical REST error envelope.
- *
- * The envelope itself is `@langwatch/api/rest`'s ({@link apiErrorSchema});
- * this module is the single place that decides, for every kind of error the
- * boundary can see, which `code`, which status and which `meta` it answers
- * with. Route families share it so two surfaces cannot drift into two
- * taxonomies for the same failure.
  */
 import { HandledError } from "@langwatch/handled-error";
 import type { Context } from "hono";
@@ -14,12 +8,9 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { type ApiErrorBody, apiErrorBody, requestTraceIds } from "@langwatch/api/rest";
 
 /**
- * The code for a refusal that only knows its status.
- *
- * `HttpError` carries a status and a sentence but no machine name, so without
- * this a caller branching on `error.code` would get nothing to branch on. The
- * values are the status names in the same lower_snake_case as every other
- * code on the wire.
+ * The code for a refusal that only knows its status. `HttpError` carries a status and a
+ * sentence but no machine name, so without this a caller branching on `error.code` would
+ * get nothing to branch on.
  */
 const CODE_BY_STATUS: Record<number, string> = {
   400: "bad_request",
@@ -35,32 +26,22 @@ const CODE_BY_STATUS: Record<number, string> = {
 const FALLBACK_ERROR_CODE = "internal_error";
 
 /**
- * What a 5xx says out loud.
- *
- * An unexpected failure's message names Prisma models, SQL, hosts and stack
- * fragments. None of that is API copy, and the structured trace ids carried
- * alongside are the correlation channel that replaces it.
+ * What a 5xx says out loud. An unexpected failure's message names Prisma models, SQL,
+ * hosts and stack fragments. None of that is API copy, and the structured trace ids
+ * carried alongside are the correlation channel that replaces it.
  */
 const INTERNAL_ERROR_MESSAGE = "An unknown error occurred";
 
 /**
- * Request validation answers 400, not 422.
- *
- * The shared validator raises `validation_error` at 422 for the route families
- * that predate the canonical envelope. Those two statuses for one code is the
- * divergence this collapses: a caller reconciling spend should not have to
- * learn that a bad `from` is 422 here and 400 on the platform routes.
+ * Request validation answers 400, not 422. The shared validator raises `validation_error`
+ * at 422 for the route families that predate the canonical envelope.
  */
 const VALIDATION_ERROR_CODE = "validation_error";
 const VALIDATION_ERROR_STATUS = 400;
 
 /**
- * One link in `meta.reasons`, in the wire's own casing.
- *
- * `HandledError.serialize()` is written for the app's own client and emits
- * camelCase plus a deprecated `kind` alias. Neither belongs on a public
- * envelope whose every other key is lower_snake_case, so the fields a caller
- * can act on are re-read here and the rest dropped.
+ * One link in `meta.reasons`, in the wire's own casing. `HandledError.serialize()` is
+ * written for the app's own client and emits camelCase plus a deprecated `kind` alias.
  */
 export interface ApiErrorReason {
   code: string;
@@ -80,16 +61,9 @@ function reasonsOf(error: unknown): ApiErrorReason[] {
 }
 
 /**
- * A status-carrying REST error, recognised by its shape rather than by its
- * class.
- *
- * There are two `HttpError` trees while the REST families move into
- * `@langwatch/platform-api`: the application's own, and the packaged one a
- * moved family throws. An `instanceof` against either would render the other
- * as an opaque 500, turning a 400 the caller could act on into an incident
- * they cannot. The pair of fields is the whole of the public surface of both,
- * and nothing else at this boundary carries them: a `HandledError` names its
- * status `httpStatus` and has no `error`, and it is matched first anyway.
+ * A status-carrying REST error, recognised by its shape rather than by its class. There
+ * are two `HttpError` trees while the REST families move into `@langwatch/platform-api`:
+ * the application's own, and the packaged one a moved family throws.
  */
 function isStatusCarryingError(
   error: unknown,
@@ -103,10 +77,6 @@ function isStatusCarryingError(
 
 /**
  * The canonical body and status for any thrown value.
- *
- * Exported separately from {@link canonicalErrorResponse} so a caller that
- * already holds a `Context` (a middleware answering a denial itself) and a
- * caller that has only the error (a test, a log line) read the same mapping.
  */
 export function canonicalErrorFor(
   error: unknown,
@@ -143,19 +113,9 @@ export function canonicalErrorFor(
 }
 
 /**
- * The envelope for a handled error: its own code, status, meta, and reason
- * chain below 5xx; the opaque body at 5xx.
- *
- * A HandledError's message is customer-safe by construction (ADR-045), but
- * customer-safe and caller-actionable are different questions. At 5xx the
- * failure is the platform's — retrying the same request does not fix
- * `lwql_unavailable` any more than it fixes a database outage — so the
- * caller has nothing to act on and the class's own code/message/meta/reasons
- * are not API copy. The status still answers as the class's own (503 stays
- * 503); only the body collapses, to the same opaque shape an unhandled
- * failure gets. Trace ids are the correlation channel that survives the
- * collapse — quote one to support and the platform-side detail is in the
- * logs, not the response.
+ * The envelope for a handled error: its own code, status, meta, and reason chain below
+ * 5xx; the opaque body at 5xx. A HandledError's message is customer-safe by construction
+ * (ADR-045), but customer-safe and caller-actionable are different questions.
  */
 function handledErrorEnvelope(
   error: HandledError,

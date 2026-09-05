@@ -1,15 +1,5 @@
 /**
- * What an organization has spent and what its plan allows, composed as its own
- * feature.
- *
- * `costs.*` is this process's own row read — one organization's spend, rolled
- * up per project and narrowed to the projects the caller can reach — and
- * `limits.*` is the deployment's billing store, which arrives as a port because
- * no core package owns it.
- *
- * Both used to be composed inside the observability half. They are here
- * together because they are the same question asked twice: what this
- * organization has used, and against what allowance.
+ * What an organization has spent and what its plan allows, composed as its own feature.
  */
 import type { CostTrpcPorts, LimitsTrpcPorts } from "@langwatch/entitlement-server";
 import { HandledError } from "@langwatch/handled-error";
@@ -21,11 +11,9 @@ import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructu
 import { createCostTrpcRouter, createLimitsTrpcRouter } from "./entitlement-trpc.mount";
 
 /**
- * The usage reading and the approaching-limit mail, over the deployment's
- * billing store.
- *
- * Absent, both refuse rather than reporting zero: a usage panel showing zero of
- * an allowance is a wrong answer, not a smaller one.
+ * The usage reading and the approaching-limit mail, over the deployment's billing store.
+ * Absent, both refuse rather than reporting zero: a usage panel showing zero of an
+ * allowance is a wrong answer, not a smaller one.
  */
 export abstract class ApiUsageStatsPort {
   abstract ports(): LimitsTrpcPorts;
@@ -102,10 +90,9 @@ export function composeSpendFeature(options: {
 }
 
 /**
- * Both namespaces on a process that composed no database.
- *
- * They still mount and every call refuses by name, so the billing screen says
- * the deployment cannot answer rather than reporting a spend of zero.
+ * Both namespaces on a process that composed no database. They still mount and every call
+ * refuses by name, so the billing screen says the deployment cannot answer rather than
+ * reporting a spend of zero.
  */
 export function refusingSpendFeature(): ComposedSpendFeature {
   const refuse = (): never => {
@@ -129,23 +116,17 @@ function refusingLimits(): LimitsTrpcPorts {
   return new Proxy(
     {},
     {
-      get:
-        () =>
-        (): never => {
-          throw new ApiSpendUnavailableError("The usage reading");
-        },
+      get: () => (): never => {
+        throw new ApiSpendUnavailableError("The usage reading");
+      },
       has: () => true,
     },
   ) as LimitsTrpcPorts;
 }
 
 /**
- * One organization's spend, rolled up per project and narrowed to the projects
- * this caller can reach.
- *
- * Two `groupBy` reads rather than one: `TRACE_CHECK` rows are grouped by the
- * evaluator they belong to as well, because the billing screen names each
- * check, and every other cost type is grouped only by type and currency.
+ * One organization's spend, rolled up per project and narrowed to the projects this
+ * caller can reach.
  */
 async function readOrganizationSpend(
   prisma: PrismaClient,

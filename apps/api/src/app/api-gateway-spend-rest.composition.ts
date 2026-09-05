@@ -1,36 +1,5 @@
 /**
  * The billing reconciliation REST family's seam, filled from this process.
- *
- * `createGatewaySpendRestApp` is four routes over the spend ledger — a cursor
- * walk, a rollup, one end user's standing, and a replay onto a webhook
- * endpoint — and it reads the SAME ledger the gateway application prices a
- * budget against, which is why the two reads are taken off the gateway
- * composition rather than opened a second time here.
- *
- * ## The three decisions this module makes
- *
- * **The plan gate is stated once, here, and it is the WEBHOOK platform's
- * flag** (ADR-072: pull and push are two views of one enterprise capability,
- * so a customer entitled to the deliveries is entitled to the pull). It is
- * built over the SAME plan provider every allowance banner on this process
- * reads, so one organization cannot be entitled on one surface and refused on
- * another. The sentence it refuses with is transcribed from the middleware it
- * replaces, not invented: a caller's own error copy quotes it.
- *
- * **The webhook trio arrives as ONE member or none.** The replay route names a
- * delivery endpoint, appends to its stream and walks the emitted-envelope log;
- * all three belong to the Enterprise webhook platform, which
- * `api-gateway-webhooks.composition.ts` builds for this process out of the
- * same registry, outbox and ClickHouse the worker's delivery process manager
- * ships from. On a deployment that composed no cipher or no database there is
- * no platform at all: the replay route then refuses by name and the other
- * three answer normally, which is the honest split — a reconciliation client
- * can still pull its spend.
- *
- * **The datastore refusal is the analytics package's own
- * `ClickHouseUnavailableError`**, the same one every other read on this
- * process raises when the instance is unreachable, rather than a second
- * taxonomy for one failure.
  */
 import { ApiRestCapabilityUnavailableError } from "./api-rest-ports";
 import { ClickHouseUnavailableError } from "@langwatch/analytics-server";
@@ -53,11 +22,6 @@ import type { ApiGatewayComposition } from "./api-gateway.composition";
 
 /**
  * The Enterprise webhook platform, as the replay route reads it.
- *
- * Stated as the two members this family calls rather than as the whole
- * `WebhookApp`, so a process holding one and not the other cannot be
- * expressed: the endpoint registry says where a replay goes, and the emitted
- * log says what there is to replay.
  */
 export type ApiGatewaySpendWebhookPort = Readonly<{
   endpoints: GatewaySpendWebhookEndpoints;
@@ -84,12 +48,8 @@ export type ApiGatewaySpendRestComposition = Readonly<{
 }>;
 
 /**
- * The registry a replay names its destination in, on a process with no
- * Enterprise webhook platform.
- *
- * It REFUSES rather than answering `null`. A null would be read as "no such
- * endpoint", which tells a customer their endpoint was deleted when the truth
- * is that this deployment cannot deliver at all.
+ * The registry a replay names its destination in, on a process with no Enterprise webhook
+ * platform. It REFUSES rather than answering `null`.
  */
 const webhookPlatformAbsent: GatewaySpendWebhookEndpoints = {
   tryGetDeliverable: () =>
@@ -102,10 +62,6 @@ const webhookPlatformAbsent: GatewaySpendWebhookEndpoints = {
 
 /**
  * Composes the family's ports and its plan gate from this process's graph.
- *
- * Everything here is either a read the gateway half already opened or a
- * decision the process owns; nothing opens a second connection to a store
- * something else on this process is already reading.
  */
 export function composeApiGatewaySpendRest(
   options: ApiGatewaySpendRestOptions,
@@ -141,12 +97,8 @@ export function composeApiGatewaySpendRest(
 }
 
 /**
- * ADR-072: the pull API gates under the webhook platform's plan flag, because
- * pull and push are two views of one enterprise capability.
- *
- * Fail-closed by construction: a plan lookup that rejects propagates, so a
- * deployment whose billing store is unreachable refuses the read rather than
- * admitting it.
+ * ADR-072: the pull API gates under the webhook platform's plan flag, because pull and
+ * push are two views of one enterprise capability.
  */
 function createBillingPlanGate(plans: PlanProvider): MiddlewareHandler {
   return async (c, next) => {

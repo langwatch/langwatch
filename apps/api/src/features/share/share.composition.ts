@@ -1,14 +1,7 @@
 /**
- * The links a project shares outside itself, composed as their own feature.
- *
- * `share.*` administers the links; `pinnedTrace.*` is the same ledger read as
- * the traces a person kept. Both take no ports — a link and a pin are rows this
- * deployment owns outright, reached through `ctx.app.share` — so what this
- * composition supplies is the SERVICE behind that slice.
- *
- * One service, published: the settings form, the explorer, the anonymous read's
- * token redemption and the organization's own sharing rule all resolve through
- * it, and two of them would be two answers to what a project has shared.
+ * The links a project shares outside itself, composed as their own feature. `share.*`
+ * administers the links; `pinnedTrace.*` is the same ledger read as the traces a person
+ * kept.
  */
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
@@ -61,21 +54,17 @@ export function composeShareFeature(options: {
 }
 
 /**
- * The share surfaces on a process that composed no database.
- *
- * Both namespaces still mount and every call refuses by name, so the settings
- * form says the deployment cannot answer rather than reporting that a project
- * has shared nothing.
+ * The share surfaces on a process that composed no database. Both namespaces still mount
+ * and every call refuses by name, so the settings form says the deployment cannot answer
+ * rather than reporting that a project has shared nothing.
  */
 export function refusingShareFeature(): ComposedShareFeature {
   const service = new Proxy(
     {},
     {
-      get:
-        () =>
-        (): never => {
-          throw new ApiShareUnavailableError("Sharing");
-        },
+      get: () => (): never => {
+        throw new ApiShareUnavailableError("Sharing");
+      },
       has: () => true,
     },
   ) as ShareService;
@@ -84,11 +73,9 @@ export function refusingShareFeature(): ComposedShareFeature {
 }
 
 /**
- * Both routers, over the mount alone.
- *
- * Neither takes ports: every answer is read off `ctx.app.share`, which is the
- * service above — so a refusing composition and a real one mount the same two
- * namespaces and differ only in what the slice answers.
+ * Both routers, over the mount alone. Neither takes ports: every answer is read off
+ * `ctx.app.share`, which is the service above — so a refusing composition and a real one
+ * mount the same two namespaces and differ only in what the slice answers.
  */
 function mountRouters(mount: ApiTrpcFeatureMount) {
   return {

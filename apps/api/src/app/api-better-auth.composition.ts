@@ -26,57 +26,13 @@ import type { ApiBrowserSessionConfig } from "../platform/config/api.config";
 import type { ApiMailComposition } from "./api-mail.composition";
 
 /**
- * This process's own Better Auth instance — the deployment's ONE identity
- * seam, composed here rather than received.
- *
- * It used to be received, and the reason it could not be built was real: the
- * instance's option set decides whether a cookie verifies at all, so a second
- * one built from a different set verifies nothing and answers `null`, which
- * every caller reads as "signed out" rather than as a fault. What changed is
- * where the option set lives. `@langwatch/auth-server` now holds the whole
- * thing — the model mapping, the session TTL and dual-write, the credentials
- * gate, the rate-limit rules, the account-linking policy and every database
- * hook — and takes its collaborators as parameters. So there is one
- * description of the instance, and this root supplies the deployment's half of
- * it: the signing secret, the base URL, the storage engine and the plugins.
- *
- * ## What this process does not hold, said by name
- *
- * Four collaborators are absences here, and each one is a stated behaviour
- * rather than a silent default:
- *
- *  - **the event-sourced identity storage branch.** Better Auth's `database:`
- *    entry is the stock Prisma adapter. The identity branch's per-user gate
- *    ships CLOSED, so every user takes the legacy branch — the stock engine,
- *    byte for byte — which means the stock adapter IS the current production
- *    behaviour. What is absent is the ROUTING, and with it the ability to
- *    enrol a user onto event-sourced storage from this process.
- *  - **the identity ceremonies.** No attach, detach or erasure event is
- *    appended when Better Auth writes an account or deletes a user here. The
- *    account id is Better Auth's own rather than one pinned by a ceremony,
- *    which is exactly what it was before ADR-101 and is consistent with the
- *    storage absence above: nothing on the identity branch to pin it for.
- *  - **the pending-invitation lookup.** An SSO auto-join cannot apply a
- *    pending invite. Unreachable while the licence gate below denies, and
- *    named anyway so it is not discovered later as a behaviour change.
- *  - **the sign-in router shadow.** Reported `off`, which is the mode's own
- *    zero-footprint path: it returns having read nothing, computed nothing and
- *    logged nothing.
- *
- * And the licence: {@link ApiBetterAuthFederation} answers from the licensing
- * service it is GIVEN, so a licensed install is told it is licensed. A
- * deployment supplying none keeps the unlicensed answer and warns at boot, so
- * "federation is off" is a reported decision rather than a constant nobody
- * can see.
+ * This process's own Better Auth instance — the deployment's ONE identity seam, composed
+ * here rather than received.
  */
 
 /**
- * Better Auth's storage engine: the stock Prisma adapter over this process's
- * own guarded client.
- *
- * `provider` is stated rather than sniffed because the adapter uses it to
- * decide how to spell a query, and a wrong answer surfaces as a malformed
- * statement at the first sign-in rather than at boot.
+ * Better Auth's storage engine: the stock Prisma adapter over this process's own guarded
+ * client.
  */
 export class ApiPrismaBetterAuthStorage extends BetterAuthStoragePort {
   static create(database: PrismaClient): ApiPrismaBetterAuthStorage {
@@ -93,11 +49,7 @@ export class ApiPrismaBetterAuthStorage extends BetterAuthStoragePort {
 }
 
 /**
- * ADR-027's licence questions, answered from the licence this deployment
- * holds. `federationLicensed` is the same question the Enterprise SSO gate
- * asks — is any signed platform licence valid — and it decides both whether
- * SSO is refused AND whether the credential doors stay open: held to `false`,
- * a licensed install refused its own SSO and left `/sign-up/email` mounted.
+ * ADR-027's licence questions, answered from the licence this deployment holds.
  */
 export class ApiBetterAuthFederation extends BetterAuthFederationPort {
   private licensed: Promise<boolean> | null = null;
@@ -143,10 +95,8 @@ export class ApiBetterAuthFederation extends BetterAuthFederationPort {
   }
 
   /**
-   * The hosted product is licensed by definition; a self-hosted install is
-   * licensed when a signed licence inspects valid. No licensing store answers
-   * no — `composeApiBetterAuth` says so at boot — and an unreachable one
-   * denies this request and retries on the next.
+   * The hosted product is licensed by definition; a self-hosted install is licensed when
+   * a signed licence inspects valid.
    */
   private federationLicensed(): Promise<boolean> {
     if (this.deployment.isSaas) return Promise.resolve(true);
@@ -170,12 +120,9 @@ export class ApiBetterAuthFederation extends BetterAuthFederationPort {
 }
 
 /**
- * The identity ceremonies, absent.
- *
- * Every method is the no-op the legacy branch already ran: a user delete
- * erases no identifier, an account write is not restated as an attach, and its
- * id is Better Auth's own. Returning `undefined` from the account hook is what
- * leaves the row exactly as the stock adapter writes it.
+ * The identity ceremonies, absent. Every method is the no-op the legacy branch already
+ * ran: a user delete erases no identifier, an account write is not restated as an attach,
+ * and its id is Better Auth's own.
  */
 export class AbsentApiBetterAuthIdentityCeremonies extends BetterAuthIdentityCeremoniesPort {
   static create(): AbsentApiBetterAuthIdentityCeremonies {
@@ -192,11 +139,8 @@ export class AbsentApiBetterAuthIdentityCeremonies extends BetterAuthIdentityCer
 }
 
 /**
- * The pending-invitation lookup, absent.
- *
- * Answers "no pending invite", which sends an SSO auto-join down its default
- * membership path. Reached only when the licence gate allows federation, which
- * it does not here — so this is a name for a gap rather than a live one.
+ * The pending-invitation lookup, absent. Answers "no pending invite", which sends an SSO
+ * auto-join down its default membership path.
  */
 export class AbsentApiBetterAuthPendingInvites extends BetterAuthPendingInvitePort {
   static create(logger: Logger): AbsentApiBetterAuthPendingInvites {
@@ -225,13 +169,6 @@ export class AbsentApiBetterAuthPendingInvites extends BetterAuthPendingInvitePo
 
 /**
  * The announcements, over what this process actually holds.
- *
- * The product-analytics trail and the marketing nurturing calls are the
- * platform application's and are not composed here, so they are recorded in
- * the log rather than dropped: an operator asking why a signup produced no
- * event finds the answer instead of silence. `reportError` is a real
- * implementation — the errors it carries were caught and swallowed on purpose,
- * and a log line is where they were always meant to end up.
  */
 export class LoggedApiBetterAuthAnnouncements extends BetterAuthAnnouncementsPort {
   static create(logger: Logger): LoggedApiBetterAuthAnnouncements {
@@ -266,13 +203,9 @@ export class LoggedApiBetterAuthAnnouncements extends BetterAuthAnnouncementsPor
 }
 
 /**
- * The sign-in router shadow, reported off.
- *
- * `mode()` is the whole switch: `off` returns before the comparison reads,
- * computes or logs anything, so this absence costs exactly what the flag
- * being off costs. `route` and `resolveAuthProvider` are never reached, and
- * refuse rather than answer, so a future mode change fails loudly here instead
- * of comparing the router against a fabricated legacy answer.
+ * The sign-in router shadow, reported off. `mode()` is the whole switch: `off` returns
+ * before the comparison reads, computes or logs anything, so this absence costs exactly
+ * what the flag being off costs.
  */
 export class OffApiSignInRouterShadow extends SignInRouterShadowPort {
   static create(): OffApiSignInRouterShadow {
@@ -298,21 +231,6 @@ export class OffApiSignInRouterShadow extends SignInRouterShadowPort {
 
 /**
  * Sends the password-reset link.
- *
- * A PORT because Better Auth hands this composition a token and an address and
- * nothing else: the LINK is the deployment's, assembled from the host this
- * process was configured with, and the gateway it leaves through is the
- * process's too. Keeping both on this side of the port is what stops a
- * template from reaching for an environment variable of its own — the rule
- * `@langwatch/mail` states in its own header, that a message carrying a link
- * takes the link rather than building one.
- *
- * The React boundary is NOT what kept this unimplemented, and the note that
- * said so was wrong. `@langwatch/mail` is the one allowed terminal in
- * `frontend-boundary.unit.test.ts` — the walk stops on entry, and both process
- * roots value-import it. What was missing was underneath: a mailer
- * configuration and an `EmailDeliveryPort`. Both exist now
- * ({@link ApiComposedPasswordResetMail}, `api-mail.composition.ts`).
  */
 export abstract class ApiPasswordResetMailPort {
   abstract sendResetPassword(input: { email: string; token: string }): Promise<void>;
@@ -320,12 +238,6 @@ export abstract class ApiPasswordResetMailPort {
 
 /**
  * Password-reset mail, over this process's own gateway.
- *
- * The reset URL is built here rather than in the template, at the platform
- * application's exact shape — `<baseHost>/auth/reset-password?token=…` — so the
- * link a person clicks out of their inbox is the same address the browser
- * application already routes. The token is URL-encoded because it travels as a
- * query parameter and Better Auth does not encode it.
  */
 export class ApiComposedPasswordResetMail extends ApiPasswordResetMailPort {
   static create(mail: ApiMailComposition): ApiComposedPasswordResetMail {
@@ -346,17 +258,8 @@ export class ApiComposedPasswordResetMail extends ApiPasswordResetMailPort {
 }
 
 /**
- * Password-reset mail on a deployment that configured none.
- *
- * No longer a gap in this process — {@link ApiComposedPasswordResetMail} is
- * what a configured deployment gets. This is the DEGENERATE configuration:
- * `resolveApiMailConfig` answers nothing without a `BASE_HOST`, and
- * `sendResetPassword` is not optional on the transport, so something has to
- * answer.
- *
- * It REFUSES rather than resolving quietly. A reset request that reports
- * success and sends nothing leaves the person waiting on an inbox for a link
- * that was never minted, which is worse than being told the door is shut.
+ * Password-reset mail on a deployment that configured none. No longer a gap in this
+ * process — {@link ApiComposedPasswordResetMail} is what a configured deployment gets.
  */
 export class UnconfiguredApiPasswordResetMail extends ApiPasswordResetMailPort {
   static create(): UnconfiguredApiPasswordResetMail {
@@ -373,12 +276,8 @@ export class UnconfiguredApiPasswordResetMail extends ApiPasswordResetMailPort {
 }
 
 /**
- * Sign-up's address confirmation, absent.
- *
- * Reached only from the passkey sign-up ceremony, and only when the passkey
- * plugin is mounted. The ceremony never awaits it and never fails over it, so
- * an absence costs the confirmation mail and nothing else — which is why it
- * logs rather than throws.
+ * Sign-up's address confirmation, absent. Reached only from the passkey sign-up ceremony,
+ * and only when the passkey plugin is mounted.
  */
 export class AbsentApiSignUpVerification implements SignUpVerificationPort {
   static create(logger: Logger): AbsentApiSignUpVerification {
@@ -395,13 +294,9 @@ export class AbsentApiSignUpVerification implements SignUpVerificationPort {
 }
 
 /**
- * Nothing to write a grant with.
- *
- * Reached only from the SSO domain auto-join, which runs only when
- * {@link ApiBetterAuthFederation} allows platform SSO — and it answers that it
- * does not. Refuses rather than silently skipping, because a membership
- * written with no grant beside it is a person who is "in the organization" to
- * legacy code and has zero access under authorization.
+ * Nothing to write a grant with. Reached only from the SSO domain auto-join, which runs
+ * only when {@link ApiBetterAuthFederation} allows platform SSO — and it answers that it
+ * does not.
  */
 export class UnavailableApiBetterAuthGrants {
   static create(): AuthzGrantsService {
@@ -445,11 +340,9 @@ export type ApiBetterAuthCompositionOptions = Readonly<{
 }>;
 
 /**
- * Builds this deployment's Better Auth instance.
- *
- * Composed ONCE per process and shared. Calling this twice would produce two
- * instances over one cookie namespace, and the second would be the one that
- * happened to be asked.
+ * Builds this deployment's Better Auth instance. Composed ONCE per process and shared.
+ * Calling this twice would produce two instances over one cookie namespace, and the
+ * second would be the one that happened to be asked.
  */
 export function composeApiBetterAuth(options: ApiBetterAuthCompositionOptions) {
   const { configuration, logger } = options;

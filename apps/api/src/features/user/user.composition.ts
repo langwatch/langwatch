@@ -1,26 +1,7 @@
 /**
- * The signed-in person: `user.*` — their account, their sign-in methods and the
- * two requests they make of their administrator — beside `identity.*`, the
- * ceremony that spends a magic link.
- *
- * Two namespaces and one application, because they are one graph. The user
- * directory the browser session resolves through is the SAME one `user.*` reads
- * an account off and the verification ceremony states an identifier on, so this
- * feature takes the already-composed service rather than building a second
- * answer to "who is this person".
- *
- * ## What refuses by name
- *
- * The capabilities that are Enterprise-licensed or belong to a tier this
- * process does not compose are each a NAMED refusal rather than a value that
- * pretends: the CLI-token revocation and the gateway's routing, key and budget
- * reads are Enterprise, and an Auth0 password change needs tenant credentials
- * this process holds none of. Each raises an error naming the capability and
- * the process, so a customer's failure is traceable to a deployment shape
- * rather than to their input.
- *
- * The product-analytics sink is the one silent absence, and deliberately: an
- * analytics write has never been allowed to fail a request.
+ * The signed-in person: `user.*` — their account, their sign-in methods and the two
+ * requests they make of their administrator — beside `identity.*`, the ceremony that
+ * spends a magic link. Two namespaces and one application, because they are one graph.
  */
 import { compare, hash } from "bcrypt";
 import type { AuthService } from "@langwatch/auth-contract";
@@ -68,10 +49,6 @@ export type ComposedUserFeature = Readonly<{
   config: ApiTrpcFeatureApplication["config"];
   /**
    * The two port groups the namespaces are built on.
-   *
-   * Published beside the routers because they are this feature's contract with
-   * its transport: the credential seam — which reads are the feature's own and
-   * what crosses the port — is stated on them rather than on a wire call.
    */
   ports: Readonly<{ identity: IdentityTrpcPorts; user: UserTrpcPorts }>;
   routers(mount: ApiTrpcFeatureMount): Readonly<{
@@ -177,14 +154,6 @@ export function composeUserFeature(options: {
 
     /**
      * The four account-row answers, through this feature's own persistence.
-     *
-     * They were `prisma.account` statements in `api-trpc-ports.composition.ts`
-     * — including a `select` naming `password`, the bcrypt hash a credential
-     * sign-in is checked against. Nothing leaked, but the read was written
-     * where no rule about that column applies. `rotatePassword` is the shape
-     * that closes it: verification and replacement are one call on
-     * `UserCredentialService`, so the hash it reads is compared and discarded
-     * inside that service and no port above it is ever handed one.
      */
     rotatePassword: (
       _ctx: unknown,
@@ -264,11 +233,8 @@ export function composeUserFeature(options: {
       Promise.reject(unavailable("Enterprise gateway budget store, so it cannot check a budget")),
 
     /**
-     * The `User` rows behind the /me screens, the organization membership
-     * probe and the first-project slug. Every one is a row read with a project
-     * or user id already in hand, which is why they moved with the connection
-     * rather than staying behind a port — and `Account`, the table the stored
-     * password hash lives on, is not among them.
+     * The `User` rows behind the /me screens, the organization membership probe and the
+     * first-project slug.
      */
     emailIsTaken: async (_ctx: unknown, { email }: Readonly<{ email: string }>) =>
       (await prisma.user.findFirst({
@@ -329,11 +295,9 @@ export function composeUserFeature(options: {
 }
 
 /**
- * The signed-in person's namespaces on a process that composed no user
- * directory.
- *
- * Both still mount and every call refuses by name, so a person is told the
- * deployment cannot read their account rather than shown an empty one.
+ * The signed-in person's namespaces on a process that composed no user directory. Both
+ * still mount and every call refuses by name, so a person is told the deployment cannot
+ * read their account rather than shown an empty one.
  */
 export function refusingUserFeature(processName: string): ComposedUserFeature {
   const refuse = (): never => {
@@ -361,17 +325,8 @@ export function refusingUserFeature(processName: string): ComposedUserFeature {
 const PASSWORD_HASH_COST = 10;
 
 /**
- * The stored password format, stated ONCE for this process.
- *
- * bcrypt at cost 10, which is what every credential row in the database
- * already carries. The cost is spelled here rather than taken from
- * configuration on purpose — it is part of the stored format, and a process
- * that hashed at a different cost would write rows the other tier's
- * verification still reads but whose cost nobody can account for.
- *
- * A port implementation rather than two loose closures because the comparison
- * has one caller: `UserCredentialService`, which is the only code in the
- * deployment that ever holds a stored hash.
+ * The stored password format, stated ONCE for this process. bcrypt at cost 10, which is
+ * what every credential row in the database already carries.
  */
 class BcryptPasswordHasher extends UserPasswordHasherPort {
   hash({ password }: { password: string }): Promise<string> {
@@ -384,11 +339,9 @@ class BcryptPasswordHasher extends UserPasswordHasherPort {
 }
 
 /**
- * The organization's first administrator, by seat age.
- *
- * A row read with the organization id already in hand, which is why it lives
- * here beside the other reads this feature answers from its own connection
- * rather than behind a port.
+ * The organization's first administrator, by seat age. A row read with the organization
+ * id already in hand, which is why it lives here beside the other reads this feature
+ * answers from its own connection rather than behind a port.
  */
 async function firstAdminEmail(
   prisma: PrismaClient,
@@ -403,10 +356,8 @@ async function firstAdminEmail(
 }
 
 /**
- * A capability this deployment does not hold.
- *
- * `fault: "platform"` because nothing the customer sent caused it, and the
- * message names which capability and which process.
+ * A capability this deployment does not hold. `fault: "platform"` because nothing the
+ * customer sent caused it, and the message names which capability and which process.
  */
 export class ApiUserUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";

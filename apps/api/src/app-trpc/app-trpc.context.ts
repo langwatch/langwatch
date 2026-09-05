@@ -1,26 +1,7 @@
 /**
- * The request context every packaged tRPC surface on this process is resolved
- * against.
- *
- * Every mounted feature names its own context type, and each of those names one
- * slice of the host application plus, for a few, the authenticated session.
- * This module is that intersection written down once, so the process has a
- * single answer to "what must a request carry for the whole record to be
- * mountable" instead of discovering it one compile error at a time. It is the
- * context `createAppTrpcFeatures`'s mount is built on — the function used to
- * restate the same intersection as a type-parameter constraint, which made the
- * record's real type unreadable from outside.
- *
- * Two things are deliberately NOT here:
- *
- *  - the process-wide capabilities the ports reach (a mailer, a model gateway,
- *    the trace pipeline). Those are composition, not request state, and they
- *    arrive as {@link ApiTrpcCollaborators}. The platform app carried them on
- *    the request context because that is where its service locator lived; a
- *    process that composes its own graph has no reason to re-resolve them per
- *    call.
- *  - anything a feature package does not read. A slice nothing names is a slice
- *    nothing can depend on, which is what keeps this list honest.
+ * The request context every packaged tRPC surface on this process is resolved against.
+ * Every mounted feature names its own context type, and each of those names one slice of
+ * the host application plus, for a few, the authenticated session.
  */
 import type { AnalyticsApp } from "@langwatch/analytics-server";
 import type { LangyApp } from "@langwatch/langy-server";
@@ -66,21 +47,15 @@ import type { WorkflowApp } from "@langwatch/workflow-server";
 
 /**
  * The application slices the mounted surfaces read off `ctx.app`.
- *
- * `broadcast` serves two features on purpose: the export relay asks only for
- * `getTenantEmitter`, which is the narrower half of the presence emitter, so
- * one channel answers both rather than two channels answering the same
- * question differently.
  */
 export type ApiTrpcFeatureApplication = Readonly<{
   analytics: AnalyticsApp;
   annotations: AnnotationApp;
   apiKeys: ApiKeyApp;
   /**
-   * A project's triggers, their channels and the addresses that asked those
-   * channels to stop. One application for both wire names, because a
-   * suppression is a fact about a trigger's delivery rather than a resource of
-   * its own.
+   * A project's triggers, their channels and the addresses that asked those channels to
+   * stop. One application for both wire names, because a suppression is a fact about a
+   * trigger's delivery rather than a resource of its own.
    */
   automation: AutomationApp;
   /** What the coding agents did inside a project, as the read surfaces ask it. */
@@ -113,42 +88,21 @@ export type ApiTrpcFeatureApplication = Readonly<{
    */
   featureFlags: FeatureFlagService;
   /**
-   * The AI Gateway's one application, as all six core gateway surfaces reach
-   * it.
-   *
-   * One instance for the six namespaces AND for the two public REST families
-   * beside them: the browser's door and the SDK's door decide what a virtual
-   * key may reach, what a budget allows and what a key has spent from the same
-   * object, so they cannot enforce different rules. That was the whole reason
-   * the retired application grew this application in the first place.
+   * The AI Gateway's one application, as all six core gateway surfaces reach it.
    */
   gateway: GatewayApp;
   /**
    * The GitHub App an organization connected, as `github.*` reads it.
-   *
-   * Blank where the deployment registered no App — that is the service's own
-   * answer, not an absence this record models: a process with no App still
-   * mounts the namespace and reports "not connected", which is what the
-   * coding-agent settings page renders.
    */
   github: GithubService;
   /**
-   * The Enterprise governance capability the console's ten surfaces read, and
-   * the `/` landing decision reads the setup rollup from.
-   *
-   * Named here rather than taken from `EnterpriseTrpcContext["app"]` below
-   * because the governance transports declare their own contexts: the
-   * projection would satisfy the four licensing and SCIM slices and none of
-   * these.
+   * The Enterprise governance capability the console's ten surfaces read, and the `/`
+   * landing decision reads the setup rollup from.
    */
   governance: GovernanceService;
   /**
-   * The governance APPLICATION beside the capability: the personal virtual
-   * keys a member mints and the routing policies their traffic follows.
-   *
-   * Distinct from `governance` because they answer different questions — one is
-   * the organization's governance state, the other is the write path over it —
-   * and the two packaged transports name them apart.
+   * The governance APPLICATION beside the capability: the personal virtual keys a member
+   * mints and the routing policies their traffic follows.
    */
   governanceApp: GovernanceApp;
   /** The rules an organization bounds its members' sessions by. */
@@ -159,24 +113,14 @@ export type ApiTrpcFeatureApplication = Readonly<{
    */
   webhooks: WebhookApp;
   /**
-   * The Langy conversation panel's one application — the slim spine, one
-   * conversation's messages, the turn-start operation both doors share, and the
-   * project's egress allow-list.
-   *
-   * One instance for both `langy.*` and `langyEgress.*`, because who may see a
-   * conversation and what the agent behind it may reach are decided by the same
-   * object; two would let the panel and the settings page disagree.
+   * The Langy conversation panel's one application — the slim spine, one conversation's
+   * messages, the turn-start operation both doors share, and the project's egress
+   * allow-list.
    */
   langy: LangyApp;
   /**
-   * The operator back office, and the operator allow-list beside it.
-   *
-   * The WHOLE application rather than the single `isAdmin` probe it used to be.
-   * That narrow slice was enough while nothing on this process served `ops.*`;
-   * now it does, and the surface reads the queues, the event log, the process
-   * fleet and the replay runner through this same object. The narrow reader —
-   * the SSO connection surface, which gates on the staff list rather than on
-   * `ops:*` — is satisfied by it unchanged.
+   * The operator back office, and the operator allow-list beside it. The WHOLE
+   * application rather than the single `isAdmin` probe it used to be.
    */
   ops: OpsApp;
   /**
@@ -195,15 +139,9 @@ export type ApiTrpcFeatureApplication = Readonly<{
   permissions: Pick<AuthzService, "hasPermission">;
   presence: PresenceService;
   /**
-   * The project application, as `project.*` writes through it and every other
-   * surface reads a project's organization off it.
-   *
-   * The WHOLE application rather than the single read the flag surface
-   * declared. It was the narrow read while nothing on this process created,
-   * renamed, re-keyed or archived a project; now `project.*` does, and two
-   * project applications would let the settings form and the flag resolution
-   * disagree about which organization a project belongs to. The narrow
-   * declaration in the flag package stays exactly as it is — this satisfies it.
+   * The project application, as `project.*` writes through it and every other surface
+   * reads a project's organization off it. The WHOLE application rather than the single
+   * read the flag surface declared.
    */
   projects: ProjectApp;
   /** A project's prompt library, its versions and its tag catalogue. */
@@ -241,10 +179,9 @@ export type ApiTrpcFeatureApplication = Readonly<{
   /** The clusters a project's traces were grouped into. */
   topics: TopicService;
   /**
-   * The trace application all five trace doors read through — the explorer,
-   * the legacy grid, one trace's spans, the reviewer's correction, and the
-   * anonymous share page. One instance, so the share page can never drift
-   * behind an in-app redaction.
+   * The trace application all five trace doors read through — the explorer, the legacy
+   * grid, one trace's spans, the reviewer's correction, and the anonymous share page. One
+   * instance, so the share page can never drift behind an in-app redaction.
    */
   traces: TraceApp;
   /**
@@ -263,37 +200,18 @@ export type ApiTrpcFeatureApplication = Readonly<{
   config: Readonly<{ opsSidebarEmails?: readonly string[] | undefined }>;
 }> &
   /**
-   * The slices the four Enterprise surfaces read, taken from the ONE seam a
-   * core process may see them through.
-   *
-   * Spelled as a projection of `EnterpriseTrpcContext` rather than restated:
-   * the licensing application, the usage-limit notifier and the SCIM
-   * application live in Enterprise feature packages this package must not
-   * depend on, and `@langwatch/enterprise-api` is the only module that may
-   * name them. A restatement here would be a second description of types
-   * nobody here can check against the first.
+   * The slices the four Enterprise surfaces read, taken from the ONE seam a core process
+   * may see them through.
    */
   EnterpriseTrpcContext["app"];
 
 /**
  * The request member the two SaaS-only billing surfaces read.
- *
- * `undefined` on this process and that is the whole answer rather than a gap:
- * the currency quote is guessed from CDN headers only the hosted edge injects,
- * and this process mounts no `currency` namespace at all (see the Enterprise
- * mount's docblock). It is named because the Enterprise composition constrains
- * its context to all six of its surfaces, including the two it hands back
- * empty.
  */
 export type ApiTrpcEnterpriseRequest = Pick<EnterpriseTrpcContext, "req">;
 
 /**
  * The signed-in person, as the surfaces that render them read it.
- *
- * Wider than the actor the authorization chain uses, because presence draws
- * the person's name and picture and the ops surface reads the impersonator —
- * both from the session rather than from the payload, so a client cannot claim
- * to be somebody else.
  */
 export type ApiTrpcSessionUser = Readonly<{
   id: string;
@@ -303,12 +221,6 @@ export type ApiTrpcSessionUser = Readonly<{
   role?: string | null;
   /**
    * The real administrator when one is acting as this person.
-   *
-   * Optional but never `null`: two of the surfaces that read it describe the
-   * "nobody is impersonating" state as an ABSENT key and two describe it as
-   * `null`, and only the absent spelling satisfies both. One spelling is also
-   * the safer one to converge on — a `null` that slips past a truthiness check
-   * reads as an impersonator object.
    */
   impersonator?: ApiTrpcSessionUser;
 }>;
@@ -320,13 +232,9 @@ export type ApiTrpcSession = Readonly<{
 }>;
 
 /**
- * The context the process-owned ports read, as they read it.
- *
- * The packaged port signatures type their `ctx` against the FEATURE's own
- * context — the narrow slice that feature declared — because a port is written
- * for a host the package cannot name. A host implementing one reads its own
- * context back out, which is what this alias is for: one written statement of
- * what the API process's ports may rely on, rather than a cast per entry.
+ * The context the process-owned ports read, as they read it. The packaged port signatures
+ * type their `ctx` against the FEATURE's own context — the narrow slice that feature
+ * declared — because a port is written for a host the package cannot name.
  */
 export type ApiTrpcPortsContext = Readonly<{
   actor(): Readonly<{ id: string }>;

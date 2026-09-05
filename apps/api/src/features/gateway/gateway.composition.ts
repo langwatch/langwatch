@@ -1,33 +1,7 @@
 /**
- * The AI Gateway, composed as its own feature.
- *
- * Six tRPC namespaces, one `ctx.app` slice and two REST families, all over ONE
- * application — which is the whole reason this is a composition rather than a
- * per-door port bag. Two applications over one virtual key would let the public
- * REST door and the browser's tRPC door price the same budget differently.
- *
- * ## What it takes, and from where
- *
- * The shared infrastructure gives it the connection and the permission service.
- * Everything else it needs belongs to OTHER features — the project directory, the
- * evaluators a guardrail runs, the monitors an attachment names — and those
- * arrive as `peers`, named one by one rather than reached for out of a shared
- * bag, so every cross-feature edge is visible at the one call site that wires it.
- * The rest is this feature's own deployment configuration: the ClickHouse the
- * spend ledger is projected into, the pepper a stored secret is hashed under,
- * and the receipt ledger the keyed REST creates run through.
- *
- * ## When a peer is missing
- *
- * The six namespaces MOUNT and every call refuses by name, and `ctx.app.gateway`
- * is a refusing application rather than an absent one. A console asking what a
- * key has spent must be told this deployment cannot answer; a namespace that is
- * simply not there tells it nothing at all. Only this feature is affected —
- * a missing evaluator service used to take twenty namespaces off the wire.
- *
- * The same holds with no infrastructure at all, so the process composes this
- * once, unconditionally, and never has to decide a second time whether it has
- * a gateway.
+ * The AI Gateway, composed as its own feature. Six tRPC namespaces, one `ctx.app` slice
+ * and two REST families, all over ONE application — which is the whole reason this is a
+ * composition rather than a per-door port bag.
  */
 import { HandledError } from "@langwatch/handled-error";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
@@ -92,10 +66,9 @@ export type ComposedGatewayFeature = Readonly<{
   /** The `ctx.app.gateway` slice, and what the two REST families are handed. */
   app: ApiTrpcFeatureApplication["gateway"];
   /**
-   * Everything the composition opened, for the two doors that need more than
-   * the application: the billing reconciliation family walks the spend store
-   * directly, and the Go data plane materialises a key's warm-cache bundle
-   * against the decision store. Absent when a peer is.
+   * Everything the composition opened, for the two doors that need more than the
+   * application: the billing reconciliation family walks the spend store directly, and
+   * the Go data plane materialises a key's warm-cache bundle against the decision store.
    */
   composition: ApiGatewayComposition | undefined;
   /** The six namespaces, built on the process's own root. */
@@ -131,12 +104,9 @@ export function composeGatewayFeature(options: GatewayFeatureOptions): ComposedG
 const logger: Pick<Logger, "info"> = createLogger("langwatch:api:gateway");
 
 /**
- * The gateway on a process that composed none of its peers.
- *
- * The schemas are REAL — they are this feature's own parsers, not a peer's, so
- * the six namespaces build and publish the same inputs they always did. What
- * refuses is the application every resolver reaches through, which is the part
- * a missing peer actually costs.
+ * The gateway on a process that composed none of its peers. The schemas are REAL — they
+ * are this feature's own parsers, not a peer's, so the six namespaces build and publish
+ * the same inputs they always did.
  */
 function refusingGateway(): ComposedGatewayFeature {
   logger.info(

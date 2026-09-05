@@ -1,25 +1,5 @@
 /**
  * The operator back office, composed as its own feature.
- *
- * `ops.*` — the scheduled-job store, the admin allow-list, the impersonation
- * ledger, the event-log explorer and the back-office reads — plus the
- * `ctx.app.ops` slice every other surface's staff check reads, and the
- * platform-tier gate the whole namespace is behind.
- *
- * It used to be composed inside the agent group, because a scenario run and the
- * queues it travels on were read through one graph. They are not one graph: ops
- * reads the operations tables, the scheduler and the shared event log, and
- * nothing a scenario composes. So it composes itself, from the shared
- * infrastructure plus the three other features' services it names below.
- *
- * ## What answers, and what refuses by name
- *
- * The Postgres half answers for real. Three runtime capabilities do not, and
- * each says so by name rather than by an empty list: this process registers no
- * projections and no subscribers (its Eventing is producer-only), it holds no
- * Grafana configuration, and it runs no system migrations. The process-manager
- * fleet and the replay runner are refused for the reasons
- * {@link unavailableOperatorRuntime} gives.
  */
 import { declareAuthzMiddleware, type AuthzPermission } from "@langwatch/authz-contract";
 import type { AuthService } from "@langwatch/auth-contract";
@@ -157,12 +137,9 @@ export function composeOpsFeature(options: {
 }
 
 /**
- * The operator surface on a process that composed no graph to run it over.
- *
- * The namespace still mounts and the staff check still runs, so `ctx.app.ops`
- * is never undefined and no other surface has to branch on it. Every call
- * refuses by name instead, which is what tells an operator that this process
- * holds no operations graph rather than that they are not staff.
+ * The operator surface on a process that composed no graph to run it over. The namespace
+ * still mounts and the staff check still runs, so `ctx.app.ops` is never undefined and no
+ * other surface has to branch on it.
  */
 export function refusingOpsFeature(): ComposedOpsFeature {
   const app = refusingOps<OpsApp>();
@@ -197,16 +174,8 @@ function refusingOps<T>(): T {
 // ---------------------------------------------------------------------------
 
 /**
- * The operator application, over the Postgres half of the operations capability.
- *
- * `redis` is deliberately NOT passed. The adapter's own invariant is that a
- * Redis connection demands a queue payload decoder, and decoding a queued job's
- * payload needs the tiered blob store — Redis blobs plus the project's own
- * object storage — which the stored-object vertical has not moved. Passing
- * Redis without the decoder throws at build; passing a decoder that cannot read
- * offloaded payloads would render a queue view that silently omits the large
- * jobs. So the queue and blob views take the package's own no-Redis form and
- * the absence is reported.
+ * The operator application, over the Postgres half of the operations capability. `redis`
+ * is deliberately NOT passed.
  */
 function composeOps(options: OpsFeatureCollaborators, logger: Logger): OpsApp {
   const operations = PostgresOpsAdapter.create({
@@ -238,23 +207,8 @@ function composeOps(options: OpsFeatureCollaborators, logger: Logger): OpsApp {
 }
 
 /**
- * The event-log explorer, over the install's own shared endpoint.
- *
- * Two collaborators, and this process holds both. The REPOSITORY takes one
- * client because its three reads are cross-tenant by design — "which
- * aggregates exist", "which match this string", "what happened to this one" —
- * and the shared endpoint is the install's own event log. A tenant-keyed
- * resolver cannot serve them: there is no project id until the operator has
- * already found the aggregate.
- *
- * The INTROSPECTION half is read off the pipeline definitions this process
- * registered, resolved lazily on every call because the agent-side pipelines
- * are registered by this same composition a few lines above. Producer-only
- * registration keeps the definition WHOLE — the runtime declines to RUN the
- * managers, it does not drop the declaration — so the projections an operator
- * picks in the replay wizard are the same names the worker folds under. A
- * process that registered none answers an empty list, which is the true answer
- * rather than a missing one.
+ * The event-log explorer, over the install's own shared endpoint. Two collaborators, and
+ * this process holds both.
  */
 function composeEventExplorer(options: OpsFeatureCollaborators): OpsEventExplorer {
   const client = options.eventLogClient;
@@ -270,28 +224,6 @@ function composeEventExplorer(options: OpsFeatureCollaborators): OpsEventExplore
 
 /**
  * One operator explorer, refused by name on every method.
- *
- * A Proxy rather than twenty-seven written stand-ins: these three types are
- * structural views over the operations vocabulary, so what this file has to say
- * about them is one sentence — "this process has none" — and writing it out per
- * method would bury that in boilerplate a new method would silently escape.
- *
- * Two callers are left, and what each waits on is NOT the same thing:
- *
- *   - the PROCESS-MANAGER FLEET wants `ManagerExplorerService` over
- *     `PrismaProcessStore`, `ProcessOpsPrismaRepository` and an introspection
- *     adapter. Every part exists; what is unsettled is whether a PRODUCER-ONLY
- *     process should render a fleet at all — it runs none of the machines the
- *     table lists, and the rows would be the worker's. That is a decision, not
- *     a wiring gap, and it is deliberately left open.
- *   - the REPLAY RUNNER is the one genuine absence: `OpsReplayRuntimePort` has
- *     no implementation anywhere in the tree, so `ReplayService` cannot be
- *     constructed at all.
- *
- * The EVENT-LOG EXPLORER used to be a third. It waited on an accessor for the
- * shared endpoint, which `ApiClickHouseInfrastructure` now publishes as
- * `resolveSharedClient`; it is composed by {@link composeEventExplorer} and
- * refuses only where a deployment has no shared endpoint to read.
  */
 function unavailableOperatorRuntime<T>(capability: string): T {
   return new Proxy(
@@ -330,13 +262,8 @@ class ApiOpsAuditSink extends AdminAuditSink {
 }
 
 /**
- * The four operator ports, each answering for the PROCESS rather than for the
- * operations service.
- *
- * Three of them describe a runtime this process does not run: it registers no
- * pipelines (its Eventing is producer-only), it holds no Grafana configuration,
- * and it runs no system migrations. Each says so by name or by an explicit
- * "none", rather than by an empty list that reads as "nothing is registered".
+ * The four operator ports, each answering for the PROCESS rather than for the operations
+ * service.
  */
 function composeOpsPorts(): OpsTrpcPorts {
   return {
@@ -359,19 +286,9 @@ function composeOpsPorts(): OpsTrpcPorts {
 }
 
 /**
- * The platform-tier operator gate.
- *
- * Custom rather than a permission, and declared as such so the router sweep
- * counts it: it resolves the deployment's admin allow-list into an ops scope no
- * procedure input carries. Two details it must keep, because both are
- * load-bearing:
- *
- *  - the IMPERSONATOR's own grant carries through. An impersonation session
- *    rewrites the session user to the customer being debugged, so reading only
- *    that identity would hide the operator surface at exactly the moment an
- *    admin opened it to look at somebody's account.
- *  - `throwOnDeny: false` REPORTS "no access" instead of refusing, which is
- *    what lets the global menu poll the scope on every page load.
+ * The platform-tier operator gate. Custom rather than a permission, and declared as such
+ * so the router sweep counts it: it resolves the deployment's admin allow-list into an
+ * ops scope no procedure input carries.
  */
 export function composeOpsCheck(ops: Pick<OpsApp, "isAdmin">) {
   return ({

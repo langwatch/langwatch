@@ -1,15 +1,6 @@
 /**
- * The teams management family (`/api/teams`), mounted the way this process
- * mounts it and driven through this process's OWN security spine.
- *
- * Ported from `platform/app/src/app/api/teams/__tests__/teams-rest-api.integration.test.ts`
- * on origin/main, which drove the retired platform router against Postgres.
- * Two things are real here that a hand-rolled spine would have faked away:
- * `ApiRestSecurity` resolves the credential, decides 401 from 403 and runs the
- * per-team RBAC check, and `ApiRestObservabilityComposition` renders every
- * refusal, so a code is asserted at the wire a customer reads. What is in
- * memory is the directory the routes would have read from Postgres.
- *
+ * The teams management family (`/api/teams`), mounted the way this process mounts it and
+ * driven through this process's OWN security spine.
  * @see specs/teams/teams-rest-api.feature
  */
 import { type ApiKeyService } from "@langwatch/api-key-contract";
@@ -426,9 +417,9 @@ describe("given the organization's teams over REST", () => {
     // @scenario "Removing somebody who holds no role on the team names the code"
     it("names team_membership_not_found for somebody who is not on the team", async () => {
       const { api } = mountTeams();
-      const team = (await (
-        await api.post("/api/v1/teams", { name: "Empty" }, asAdmin)
-      ).json()) as { id: string };
+      const team = (await (await api.post("/api/v1/teams", { name: "Empty" }, asAdmin)).json()) as {
+        id: string;
+      };
 
       const response = await api.delete(
         `/api/v1/teams/${team.id}/members/${COLLEAGUE_USER_ID}`,
@@ -512,10 +503,6 @@ type StoredBinding = {
 
 /**
  * The teams, their role bindings and the organization's roster, in memory.
- *
- * The refusals below are the ones `OrganizationService` raises for these
- * routes, spelled with the contract's own error classes so the code a customer
- * reads is the code the service publishes rather than one this suite invented.
  */
 class TeamDirectory {
   readonly teams = new Map<string, OrganizationTeam>();
@@ -573,15 +560,9 @@ class TeamDirectory {
     return team;
   }
 
-  listTeams(input: {
-    organizationId: string;
-    page: number;
-    limit: number;
-  }): OrganizationTeamPage {
+  listTeams(input: { organizationId: string; page: number; limit: number }): OrganizationTeamPage {
     const rows = [...this.teams.values()]
-      .filter(
-        (team) => team.organizationId === input.organizationId && team.archivedAt === null,
-      )
+      .filter((team) => team.organizationId === input.organizationId && team.archivedAt === null)
       .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
     const from = (input.page - 1) * input.limit;
     return {
@@ -603,11 +584,7 @@ class TeamDirectory {
     return this.teams.get(identity.teamId) as OrganizationTeam;
   }
 
-  updateTeam(input: {
-    teamId: string;
-    organizationId: string;
-    name?: string;
-  }): OrganizationTeam {
+  updateTeam(input: { teamId: string; organizationId: string; name?: string }): OrganizationTeam {
     const team = this.getTeam(input);
     const updated = {
       ...team,
@@ -745,11 +722,8 @@ function mountTeams(): { api: MountedRestFamily; directory: TeamDirectory } {
         userId: string;
         role: string;
       }) => directory.addTeamMember(input),
-      removeTeamMember: async (input: {
-        teamId: string;
-        organizationId: string;
-        userId: string;
-      }) => directory.removeTeamMember(input),
+      removeTeamMember: async (input: { teamId: string; organizationId: string; userId: string }) =>
+        directory.removeTeamMember(input),
     },
     "organization",
   );

@@ -1,20 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The billing reconciliation REST surface's BOUNDARY, driven through the real
- * organization credential chain this process builds.
- *
- * What is pinned here is everything a caller meets before the ledger is read:
- * the canonical error envelope on every refusal, the enterprise plan gate,
- * the window and cursor validation, the grouping-stability guard with its
- * query-string boolean, and the replay cap. The ledger itself is a double at
- * the port, because none of those decisions depend on what ClickHouse
- * answers — and the arithmetic that does is asserted against real rows in
- * `@langwatch/gateway-server`'s own ledger suite.
- *
- * Spec: specs/ai-gateway/gateway-spend-rest.feature
- * Spec: specs/ai-gateway/public-rest-api.feature
- * Spec: specs/ai-gateway/billing-spend-events.feature
+ * The billing reconciliation REST surface'''s BOUNDARY: canonical error envelope, plan gate, cursor validation and replay cap — the ledger itself is a double since none of these depend on it.
+ * Spec: specs/ai-gateway/gateway-spend-rest.feature, specs/ai-gateway/public-rest-api.feature, specs/ai-gateway/billing-spend-events.feature
  */
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { apiErrorSchema, requestTraceIds } from "@langwatch/api/rest";
@@ -45,12 +32,9 @@ const PROJECT_TOKEN = "project-key-token";
 const BASE_TIME = Date.UTC(2026, 0, 10, 12, 0, 0);
 
 /**
- * Asserts a response carries the canonical error envelope, and returns it.
- *
- * Parses with the shipped schema rather than poking at fields, so a route that
- * answers a nearly-right shape fails here instead of passing a hand-written
- * field check. The envelope is checked STRICTLY at the top level: a leftover
- * sibling is exactly how the pre-canonical shapes leaked.
+ * Asserts a response carries the canonical error envelope, and returns it. Parses with
+ * the shipped schema rather than poking at fields, so a route that answers a nearly-right
+ * shape fails here instead of passing a hand-written field check.
  */
 async function expectCanonicalError(
   response: Response,

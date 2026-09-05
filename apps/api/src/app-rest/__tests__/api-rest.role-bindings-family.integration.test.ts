@@ -1,13 +1,6 @@
 /**
- * The role-bindings REST family (`/api/role-bindings`), driven through the
- * real Hono app `createApiProcessRestFeatures` returns.
- *
- * The route itself is thin: every business rule (principal exclusivity,
- * cross-organization checks, org-exclusive-permission scope fencing, the
- * duplicate/personal-workspace refusals) lives in the grants service the
- * mount is handed, so what is under test here is that each of that service's
- * named refusals reaches the caller at the status and code it declares, and
- * that a successful write reads back through the same wire it lists with.
+ * The role-bindings REST family (`/api/role-bindings`), driven through the real Hono app
+ * `createApiProcessRestFeatures` returns.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import {
@@ -62,19 +55,26 @@ describe("given the role-bindings family this process composes", () => {
     it("filters by principal and narrows further by scope", async () => {
       const rows = [
         bindingRow({ id: "b-user", userId: "user-1", scopeType: "TEAM", scopeId: "team-1" }),
-        bindingRow({ id: "b-user-other-scope", userId: "user-1", scopeType: "PROJECT", scopeId: "project-1" }),
+        bindingRow({
+          id: "b-user-other-scope",
+          userId: "user-1",
+          scopeType: "PROJECT",
+          scopeId: "project-1",
+        }),
         bindingRow({ id: "b-group", groupId: "group-1", userId: null }),
         bindingRow({ id: "b-key", apiKeyId: "key-1", userId: null }),
       ];
       const listManagedBindingsForOrganization = vi.fn(async () => rows);
       const api = mount({
-        permissions: () =>
-          ({ listManagedBindingsForOrganization }) as unknown as AuthzService,
+        permissions: () => ({ listManagedBindingsForOrganization }) as unknown as AuthzService,
       });
 
       const byUser = await api.fetch("/api/role-bindings/latest/?userId=user-1");
       expect(byUser.status).toBe(200);
-      const byUserBody = (await byUser.json()) as { bindings: { id: string }[]; totalCount: number };
+      const byUserBody = (await byUser.json()) as {
+        bindings: { id: string }[];
+        totalCount: number;
+      };
       expect(byUserBody.bindings.map((b) => b.id)).toEqual(["b-user", "b-user-other-scope"]);
 
       const byUserAndScope = await api.fetch(
@@ -310,7 +310,9 @@ describe("given the role-bindings family this process composes", () => {
       });
 
       expect(response.status).toBe(422);
-      await expect(response.json()).resolves.toMatchObject({ code: "org_exclusive_permission_scope" });
+      await expect(response.json()).resolves.toMatchObject({
+        code: "org_exclusive_permission_scope",
+      });
     });
 
     /** @scenario "A duplicate binding is reported as already existing" */
@@ -423,7 +425,9 @@ describe("given the role-bindings family this process composes", () => {
         authzGrants: () => ({ deleteBinding }) as unknown as AuthzGrantsService,
       });
 
-      const response = await api.fetch("/api/role-bindings/latest/missing-binding", { method: "DELETE" });
+      const response = await api.fetch("/api/role-bindings/latest/missing-binding", {
+        method: "DELETE",
+      });
 
       expect(response.status).toBe(404);
       await expect(response.json()).resolves.toMatchObject({ code: "role_binding_not_found" });

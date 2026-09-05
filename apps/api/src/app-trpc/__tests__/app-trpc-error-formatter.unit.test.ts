@@ -27,11 +27,9 @@ function format(error: TRPCError) {
 }
 
 /**
- * Run `fn` inside a live span and hand back the trace id it ran under.
- *
- * `data.traceId` is read from the ambient span, so with no context manager
- * registered every trace-id assertion would pass or fail for the wrong reason —
- * there would simply never be a span. The app registers the same pair.
+ * Run `fn` inside a live span and hand back the trace id it ran under. `data.traceId` is
+ * read from the ambient span, so with no context manager registered every trace-id
+ * assertion would pass or fail for the wrong reason — there would simply never be a span.
  */
 function withActiveSpan<T>(fn: () => T): { result: T; traceId: string } {
   otelContext.setGlobalContextManager(new StackContextManager().enable());
@@ -163,11 +161,9 @@ describe("tRPC error response boundary", () => {
     });
 
     /**
-     * A 5xx handled error is OUR failure, not the caller's, and `fault` is the
-     * axis that says so — it drives log level and alerting, and an unannotated
-     * 5xx logs a real incident as routine customer noise. The wire must carry
-     * it, and the message must still collapse to the code like every other
-     * handled error.
+     * A 5xx handled error is OUR failure, not the caller's, and `fault` is the axis that
+     * says so — it drives log level and alerting, and an unannotated 5xx logs a real
+     * incident as routine customer noise.
      */
     describe("when it is a 5xx the platform is at fault for", () => {
       /** @scenario "A handled error's free-text message does not cross the tRPC boundary" */
@@ -304,10 +300,8 @@ describe("tRPC error response boundary", () => {
 });
 
 /**
- * `data.authored` is the server's verdict on whether `message` is prose
- * somebody wrote for a person. The client renders it when true and degrades to
- * "we've been notified" when false, so a wrong verdict either leaks a driver
- * string or throws away the one sentence that told the user what to fix.
+ * `data.authored` is the server's verdict on whether `message` is prose somebody wrote
+ * for a person.
  */
 describe("authored-message verdict", () => {
   describe("given a procedure that wrote its own copy", () => {
@@ -321,10 +315,9 @@ describe("authored-message verdict", () => {
     });
 
     /**
-     * The majority shape in this codebase: the sentence is ours, `cause` is
-     * passed so the log line keeps the driver's story. Rejecting it on the
-     * presence of `cause` told an admin who mistyped a field to wait for
-     * something that was never going to change.
+     * The majority shape in this codebase: the sentence is ours, `cause` is passed so the
+     * log line keeps the driver's story. Rejecting it on the presence of `cause` told an
+     * admin who mistyped a field to wait for something that was never going to change.
      */
     it("marks a message passed alongside a cause as authored", () => {
       const error = new TRPCError({
@@ -381,10 +374,9 @@ describe("authored-message verdict", () => {
 
   describe("given a cause the walk cannot take at face value", () => {
     /**
-     * A cause that crossed a worker or serialisation boundary arrives as a
-     * plain object carrying a `message` string, not an `Error`. An
-     * `instanceof Error` guard made that shape invisible to the comparison and
-     * published its string as our own copy.
+     * A cause that crossed a worker or serialisation boundary arrives as a plain object
+     * carrying a `message` string, not an `Error`. An `instanceof Error` guard made that
+     * shape invisible to the comparison and published its string as our own copy.
      */
     it("treats a non-Error cause carrying a message as a donor", () => {
       const formatted = errorFormatter({
@@ -424,9 +416,7 @@ describe("authored-message verdict", () => {
 
     /**
      * With no cause at all, tRPC falls back to the CODE NAME as the message, so
-     * "undefined cause" and "nobody wrote copy" are the same event. The
-     * code-name check is what catches it rather than the chain walk — either
-     * way the customer must never read `BAD_REQUEST`.
+     * "undefined cause" and "nobody wrote copy" are the same event.
      */
     it("does not present the tRPC code name as copy when the cause is undefined", () => {
       const error = new TRPCError({ code: "BAD_REQUEST", cause: undefined });

@@ -18,13 +18,6 @@ import { ApiRawRequestSurfacePort } from "../../api-http.listener";
 
 /**
  * The hosted Model Context Protocol endpoint, composed for this process.
- *
- * It is a raw surface rather than a REST feature, and that is a property of
- * the protocol rather than a shortcut: the Streamable HTTP and Server-Sent
- * Events transports the MCP SDK owns write to the Node response object and
- * hold it open for the life of a session. It carries its own bearer and OAuth
- * authentication for the same reason — the tokens it accepts are ones it
- * minted, and no other surface issues or reads them.
  */
 export class HostedMcpSurface extends ApiRawRequestSurfacePort {
   private constructor(private readonly handler: McpHandler) {
@@ -50,12 +43,8 @@ export class HostedMcpSurface extends ApiRawRequestSurfacePort {
 }
 
 /**
- * The project an MCP bearer token belongs to, read through the process's own
- * guarded client.
- *
- * Archived projects are excluded in the query rather than filtered after: a
- * key that still authenticates against an archived project is an
- * authentication decision, and it belongs in the predicate that makes it.
+ * The project an MCP bearer token belongs to, read through the process's own guarded
+ * client.
  */
 export class PrismaMcpProjectLookupAdapter extends McpProjectLookupPort {
   private constructor(private readonly prisma: PrismaClient) {
@@ -79,10 +68,8 @@ export class PrismaMcpProjectLookupAdapter extends McpProjectLookupPort {
 }
 
 /**
- * Whether the person an MCP bearer was minted for still holds the grant the
- * approval step demanded. The SAME permission the authorize step names, read
- * through the SAME `AuthzService` every other door decides on — a second
- * answer here would be a token that outlived the membership behind it.
+ * Whether the person an MCP bearer was minted for still holds the grant the approval step
+ * demanded.
  */
 export class AuthzMcpSessionGrantAdapter extends McpSessionGrantPort {
   private constructor(private readonly authz: AuthzService) {
@@ -110,12 +97,6 @@ export class AuthzMcpSessionGrantAdapter extends McpSessionGrantPort {
 
 /**
  * Installs the tools an Enterprise deployment adds to each MCP session.
- *
- * The registrar is a function rather than the governance module itself
- * because this file may not name an Enterprise package's internals: what the
- * composition root holds is `registerGovernanceMcpTools` from
- * `@langwatch/enterprise-governance-server`, already bound to its service and
- * its permission probe, and what the endpoint holds is this port.
  */
 export class DelegatingMcpSessionToolRegistrar extends McpSessionToolRegistrarPort {
   private constructor(
@@ -148,14 +129,8 @@ export class DelegatingMcpSessionToolRegistrar extends McpSessionToolRegistrarPo
 }
 
 /**
- * Composes the endpoint, or reports that this process cannot serve it.
- *
- * Three things are required and none has a safe default. Without the cipher
- * the endpoint cannot store the API key an OAuth session was minted from, so
- * every session it issued would fail on its first tool call; without a
- * database it cannot tell whose key a bearer token is; without authorization
- * it cannot re-prove the grant a thirty-day bearer was minted from. A
- * deployment missing any serves no MCP rather than a broken one, and says so.
+ * Composes the endpoint, or reports that this process cannot serve it. Three things are
+ * required and none has a safe default.
  */
 export function tryCreateHostedMcpSurface(options: {
   prisma: PrismaClient | undefined;

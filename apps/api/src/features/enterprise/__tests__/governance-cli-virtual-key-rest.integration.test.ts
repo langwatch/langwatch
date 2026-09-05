@@ -1,16 +1,6 @@
 /**
- * `POST /api/auth/cli/virtual-key` — the only way the CLI gets a personal
- * gateway credential, since login itself mints nothing.
- *
- * The route's own logic is the fallback chain, and that is what is pinned
- * here. The first ask takes the organization default. A second machine cannot
- * be handed that key again — its secret is stored hashed and unreadable — so
- * the route falls through to issuing a device-named key of its own, with the
- * free-form label reduced to the charset a key name carries.
- *
- * The refusal is the other half: an organization with nothing to route to gets
- * a 409 rather than a key whose very first gateway call would fail.
- *
+ * `POST /api/auth/cli/virtual-key` — the only way the CLI gets a personal gateway
+ * credential, since login itself mints nothing.
  * Spec: specs/ai-gateway/governance/cli-login.feature
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";

@@ -1,47 +1,5 @@
 /**
  * The workbench run loop, composed for this process.
- *
- * `@langwatch/experiment-server` owns the loop — the orchestrator, the polling
- * runner, the data load and the workflow-evaluate trigger — and states in one
- * injected bag, {@link ExperimentRunPorts}, everything a run reaches outside
- * itself. This file is where that bag is filled from the graph this process
- * already holds, so nothing here is a second answer to a question another
- * composition already answers:
- *
- *   studio               `WorkflowStudioDispatchService`, the protocol half of
- *                        the retired application's `studioBackendPostEvent`,
- *                        over this process's engine address and its gateway.
- *   cost                 the deployment's rate table, read the way the
- *                        trace-ingest collector reads it: the project's own
- *                        cost rules first, the static catalogue behind them.
- *   abort                `RedisExperimentRunAbortAdapter` on the queue's Redis.
- *   experiments          the execution half's OWN `ExperimentService`.
- *   evaluationReporting  the execution half's OWN `reportEvaluation`.
- *   sandboxCredentials   the API-key service plus the project's organization.
- *
- * Beside the bag: `RedisExperimentRunProgressAdapter` on the same Redis, the
- * two Postgres reads a run makes against rows this feature does not own (a
- * workflow target's committed DSL, and what the agents and evaluators a saved
- * workbench points at are called), the `ExecutionDataServices` the execution
- * half already composed, and this deployment's public origin.
- *
- * ## Why an absent Redis takes the whole loop
- *
- * The retired application read `tryGetApp()?.redis` before every progress
- * write and skipped silently when there was none, so a deployment without
- * Redis served `GET /runs/:runId` a 404 for every run it had started. The
- * packaged port is required now, which turns that skip into a composition
- * decision — and this is where it is made. A process with no progress store
- * refuses to START a run, by name, rather than starting one nothing can ever
- * report on. The public base URL is the second such fact: a run answers with a
- * shareable results link, and a link built on no origin is not a link.
- *
- * ## What is still absent, on purpose
- *
- * `ExperimentRunErrorReportingPort` is optional in the package and is left
- * out here: the retired application sent these to its product-analytics
- * capture, nothing downstream reads the report, and a null object would read
- * as wired. The run's own log line is what remains, which is what it was.
  */
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { tryMintAgentSandboxApiKey } from "@langwatch/api-key-server";
@@ -101,46 +59,14 @@ import type { CallOutcome, DispatchAgent, DispatchCall } from "@langwatch/agent-
 import type { RunActor } from "@langwatch/scenario-contract";
 
 /**
- * The four dispatchers a run's HISTORY is written through, or `undefined`
- * where this process composed no command queue.
- *
- * Derived from the adapter's own option rather than restated, so the four
- * signatures cannot drift from the ones the Experiment service validates
- * against.
+ * The four dispatchers a run's HISTORY is written through, or `undefined` where this
+ * process composed no command queue.
  */
 export type ApiExperimentRunCommands = NonNullable<PostgresExperimentAdapterOptions["execution"]>;
 
 /**
- * Registers `experiment_run_processing` as a PRODUCER and hands back the four
- * dispatchers the Experiment service writes a run's history through.
- *
- * ## Why this is not optional decoration
- *
- * The orchestrator rethrows a failed `startExperimentRun` — a run whose first
- * event never reached the log is a run nothing downstream will ever be able to
- * reconstruct, so it stops rather than continuing into a history with a hole
- * at the front. Without this registration the packaged
- * `UnavailableExperimentExecutionAdapter` refuses that first call, and every
- * polling run on this process dies on its first cell. Composing the loop
- * without composing this would have been a run loop in name only.
- *
- * ## One definition, two registrations
- *
- * The SAME packaged definition the worker drains — nothing here forks it,
- * because the routing triple every job carries is derived from the pipeline
- * and command names, and two descriptions of one event stream drift into jobs
- * the worker cannot route. What a producer does not have is the definition's
- * consumer-side stores, so they are the stand-ins below: they exist so the
- * definition can be CONSTRUCTED and refuse by name if they are ever CALLED.
- * Refusing rather than no-op'ing is the point — a silently-succeeding fold
- * store in a process that folds nothing would report a projection as written
- * when the row simply never appears.
- *
- * This is `createEvaluationProcessingProducerPipeline`'s shape, built at the
- * composition root rather than in the package because
- * `@langwatch/experiment-server` publishes no producer variant of its own yet.
- * The package is the better home for it, and moving it there is recorded work
- * rather than work done badly here.
+ * Registers `experiment_run_processing` as a PRODUCER and hands back the four dispatchers
+ * the Experiment service writes a run's history through.
  */
 export function composeApiExperimentRunCommands(options: {
   eventing: EventSourcing | undefined;
@@ -227,26 +153,14 @@ class ProducerOnlyExperimentRunItemStore implements ExperimentRunItemAppendStore
 }
 
 /**
- * Cells in flight at once when the request names no limit of its own.
- *
- * The retired application bound this to `EVAL_V3_CONCURRENCY` and defaulted to
- * ten. This process reads no such variable yet — adding a leaf would change
- * the shape of `api.config.ts` that a concurrent lane is editing — so the
- * default is stated here and the variable is recorded as still unread. Ten is
- * what every deployment that never set it already runs at.
+ * Cells in flight at once when the request names no limit of its own. The retired
+ * application bound this to `EVAL_V3_CONCURRENCY` and defaulted to ten.
  */
 export const API_EXPERIMENT_RUN_DEFAULT_CONCURRENCY = 10;
 
 /**
- * The connection shape the packaged Redis adapters name.
- *
- * They name ioredis's standalone client because that is what the retired
- * application held. Every command they issue is a single-key GET/SET/DEL,
- * which a cluster answers on the slot the key hashes to, so this process hands
- * over whatever connection it opened rather than refusing a clustered
- * deployment its run loop. The alias is derived from the adapter's own
- * signature so it cannot drift, and this process names no ioredis type of its
- * own.
+ * The connection shape the packaged Redis adapters name. They name ioredis's standalone
+ * client because that is what the retired application held.
  */
 type ApiExperimentRunRedis = Parameters<
   typeof RedisExperimentRunProgressAdapter.create
@@ -291,10 +205,9 @@ export type ApiExperimentRunOptions = Readonly<{
 }>;
 
 /**
- * One polling run, as a transport asks for it.
- *
- * The packaged input minus the five members this composition fills, so a
- * transport states the RUN and nothing about the process it runs on.
+ * One polling run, as a transport asks for it. The packaged input minus the five members
+ * this composition fills, so a transport states the RUN and nothing about the process it
+ * runs on.
  */
 export type ApiExperimentRunStartInput = Omit<
   StartPollingRunInput,
@@ -347,11 +260,6 @@ export type ApiExperimentRun = Readonly<{
   evaluateWorkflow(input: ApiWorkflowEvaluationInput): Promise<WorkflowEvaluationOutcome>;
   /**
    * What each column of a saved workbench is called.
-   *
-   * Composed here rather than at the read, because it resolves through the
-   * SAME prompt service and the SAME agent and evaluator rows the run itself
-   * reads — a second graph would let a column's name in the reader disagree
-   * with the name in the run's own error.
    */
   resolveTargetNames(input: {
     projectId: string;
@@ -470,11 +378,9 @@ export function composeApiExperimentRun(options: ApiExperimentRunOptions): ApiEx
 }
 
 /**
- * The connected-agent dispatcher a run's turns go through (ADR-128).
- *
- * Composed here because neither feature server package may import the other:
- * the runtime lives in `@langwatch/agent-server` and the run loop in
- * `@langwatch/experiment-server`.
+ * The connected-agent dispatcher a run's turns go through (ADR-128). Composed here
+ * because neither feature server package may import the other: the runtime lives in
+ * `@langwatch/agent-server` and the run loop in `@langwatch/experiment-server`.
  */
 class ApiExperimentConnectedDispatchAdapter extends ExperimentConnectedDispatchPort {
   static create(): ApiExperimentConnectedDispatchAdapter {
@@ -509,19 +415,9 @@ class ApiExperimentConnectedAgentOwnershipAdapter extends ExperimentConnectedAge
 }
 
 /**
- * How this process dispatches one workbench cell to the studio engine.
- *
- * The dispatch service is built here rather than taken from
- * `api-studio-host.composition.ts`, which builds its own for the `httpProxy.*`
- * surface. It is not a second answer to anything: the service holds no
- * connection — each `postEvent` opens its own stream — and the parameter strip
- * it applies reads the SAME model gateway this process composed once. Taking
- * the studio host's would invert the composition order, since the trace group
- * that builds it composes after the execution half that builds this.
- *
- * With no engine address the packaged unconfigured stream refuses by name, and
- * the run reports that to the caller AS a studio event, which is what turns a
- * missing engine into a red cell rather than a hung run.
+ * How this process dispatches one workbench cell to the studio engine. The dispatch
+ * service is built here rather than taken from `api-studio-host.composition.ts`, which
+ * builds its own for the `httpProxy.*` surface.
  */
 class ApiExperimentStudioDispatchAdapter extends ExperimentStudioDispatchPort {
   static create(options: {
@@ -555,17 +451,6 @@ class ApiExperimentStudioDispatchAdapter extends ExperimentStudioDispatchPort {
 
 /**
  * What a cell's tokens cost, in this deployment's own rate table.
- *
- * The same cascade the trace-ingest collector runs, so a cell's cost matches
- * its trace's cost: the project's own cost rules are matched by regex against
- * the model name first and travel as the per-token override attributes the
- * catalogue reads, and the static catalogue answers behind them. Reading only
- * the static rates would price an operator's overridden model at the list rate
- * with nothing to show that it happened.
- *
- * `estimateCost` answers zero for "no known rate", and the port's contract is
- * `undefined` — the run leaves an unpriced cell blank rather than claiming it
- * was free.
  */
 class ApiExperimentModelCostAdapter extends ExperimentModelCostPort {
   static create(options: { modelProviders: ModelProviderService }): ApiExperimentModelCostAdapter {
@@ -592,17 +477,9 @@ class ApiExperimentModelCostAdapter extends ExperimentModelCostPort {
   }
 
   /**
-   * The project's own rate for this model, as the catalogue reads an override.
-   *
-   * Empty where the project wrote no rule that matches, which is the common
-   * case and the one the static catalogue answers. A failed read is empty too:
-   * pricing a cell at the list rate is a better answer than failing the run
-   * over its cost column.
-   *
-   * One read per priced cell, which is what the retired application did as
-   * well — `getMatchingLLMModelCost` listed the project's rules on every call.
-   * Memoising it for the life of a run would be an improvement rather than a
-   * restoration, and it belongs with the catalogue rather than here.
+   * The project's own rate for this model, as the catalogue reads an override. Empty
+   * where the project wrote no rule that matches, which is the common case and the one
+   * the static catalogue answers.
    */
   private async overrideAttributes(input: {
     projectId: string;
@@ -650,12 +527,6 @@ class ApiExperimentModelCostAdapter extends ExperimentModelCostPort {
 
 /**
  * Where a workbench cell's evaluator result is reported as an evaluation.
- *
- * The execution half already registered the `evaluation_processing` pipeline
- * as a producer and holds its one sender; this only puts that sender behind
- * the port, so a run reports through the same registration a re-score does. A
- * process with no command queue rejects here for the reason that composition
- * states, not this one.
  */
 class ApiExperimentEvaluationReportingAdapter extends ExperimentEvaluationReportingPort {
   static create(options: {
@@ -676,17 +547,8 @@ class ApiExperimentEvaluationReportingAdapter extends ExperimentEvaluationReport
 }
 
 /**
- * The scoped key a run lends the code it executes.
- *
- * One question, two reads: the project's organization, and the mint. A run has
- * no signed-in member to authorize the mint, which is why it is the packaged
- * `tryMintAgentSandboxApiKey` — it mints an owner-less key holding the agent
- * cache grains and nothing else, and reports a failure as `undefined` rather
- * than stopping a run that can still do every row's work itself.
- *
- * `undefined` also covers a project with no organization and a deployment that
- * composed no API-key service. Both already read that way to the caller, which
- * omits the credential.
+ * The scoped key a run lends the code it executes. One question, two reads: the project's
+ * organization, and the mint.
  */
 class ApiExperimentSandboxCredentialAdapter extends ExperimentSandboxCredentialPort {
   static create(options: {
@@ -724,13 +586,6 @@ class ApiExperimentSandboxCredentialAdapter extends ExperimentSandboxCredentialP
 
 /**
  * The committed studio workflow a workflow target runs, once per dataset row.
- *
- * Four narrow reads rather than one "load the workflow" call, because the run
- * tells a workflow that does not exist apart from one with nothing committed
- * to evaluate and says so differently. They are Prisma reads here rather than
- * calls on the workflow SERVICE because two of them are the archived-excluding
- * and latest-commit-else-latest-autosave selections the evaluate trigger makes,
- * which the service does not express.
  */
 class PostgresExperimentWorkflowDslAdapter extends ExperimentWorkflowDslPort {
   static create(options: { prisma: PrismaClient }): PostgresExperimentWorkflowDslAdapter {
@@ -818,11 +673,8 @@ class PostgresExperimentWorkflowDslAdapter extends ExperimentWorkflowDslPort {
 }
 
 /**
- * What the agents and evaluators a saved workbench points at are called.
- *
- * Two batched reads. An id with no row is simply absent from the answer, so a
- * deleted entity falls back to the column id the rest of the projection is
- * keyed by rather than showing a blank column header.
+ * What the agents and evaluators a saved workbench points at are called. Two batched
+ * reads.
  */
 class PostgresExperimentTargetEntityNamesAdapter extends ExperimentTargetEntityNamesPort {
   static create(options: { prisma: PrismaClient }): PostgresExperimentTargetEntityNamesAdapter {
@@ -861,10 +713,6 @@ const namesOf = (rows: ReadonlyArray<{ id: string; name: string }>): Record<stri
 
 /**
  * A run this deployment cannot start, refused by name.
- *
- * A handled error rather than a bare throw: the boundary serialises its code,
- * which is what a client keys its own copy off, and both reasons are DEPLOYMENT
- * gaps an operator can act on rather than a customer mistake.
  */
 export class ApiExperimentRunUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";

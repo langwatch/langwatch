@@ -1,15 +1,6 @@
 /**
- * The `/api/auth` family's membership in this process's REST app, driven
- * through the real Hono app `createApiProcessRestFeatures` returns.
- *
- * Membership is the whole subject. The family was authored, exported and never
- * mounted, so every path a browser needs to sign in answered 404 while the
- * Better Auth instance behind it was composed and healthy — finding F2 of
- * `dev/docs/plans/e2e-walk-2026-09-03.md`. What these pin is that the door
- * exists where the instance does, that the catch-all reaches that ONE instance,
- * and that it is registered after the `/api/auth/cli` halves whose paths it
- * would otherwise swallow.
- *
+ * The `/api/auth` family's membership in this process's REST app, driven through the real
+ * Hono app `createApiProcessRestFeatures` returns. Membership is the whole subject.
  * Spec: specs/auth/auth-rest-family-mounted.feature
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";

@@ -1,20 +1,6 @@
 /**
- * The four Enterprise `ctx.app` slices the fifteen governance and
- * gateway-governance surfaces read, or a refusal per capability.
- *
- * A refusing application rather than an absent one, because the fifteen
- * namespaces MOUNT either way: a console asking which ingestion sources an
- * organization has must be told this deployment cannot answer, and a namespace
- * that simply is not there tells it nothing at all.
- *
- * The application itself is a PORT rather than something composed here, and
- * that is a fence rather than a difficulty: `AppGovernanceRuntime.create`
- * requires a `GovernanceEventingPort` built from the ingestion-pull and
- * pulled-usage command registrations, and the event-sourcing runtime that owns
- * them has not moved out of the retired application. The only in-tree
- * alternative is that package's no-op eventing port, which would accept every
- * ingestion-pull command and queue none of them — a silent drop, which is the
- * one thing a named absence exists to prevent.
+ * The four Enterprise `ctx.app` slices the fifteen governance and gateway-governance
+ * surfaces read, or a refusal per capability.
  */
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";

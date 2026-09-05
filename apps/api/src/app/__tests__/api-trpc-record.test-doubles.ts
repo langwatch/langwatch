@@ -1,15 +1,7 @@
 /**
- * Stub builders for the features an integration test is NOT exercising, plus
- * the shared `stub()` proxy every one of those tests already used to fake a
- * namespace's build-time surface.
- *
- * Each composition integration test composes the REAL feature its file names
- * and needs the rest only well enough for
- * `ApiTrpcFeaturesComposition.tryCompose(...).build(mount)` to construct the
- * full ninety-one-namespace router — which reads every namespace's input
- * schemas and middleware wrappers at BUILD time, not only the ones a test's
- * own HTTP call reaches. `stubComposedFeatures()` returns every feature
- * refusing by default; pass the one(s) under test as overrides.
+ * Stub builders for the features an integration test is NOT exercising, plus the shared
+ * `stub()` proxy every one of those tests already used to fake a namespace's build-time
+ * surface.
  */
 import { EventEmitter } from "node:events";
 import { z } from "zod";
@@ -58,10 +50,9 @@ import type { ComposedApiFeatures } from "../../app-trpc/app-trpc.composed";
 const anySchema = z.any();
 
 /**
- * A collaborator surface with only the members the record reads while it is
- * being BUILT. Everything else answers a function that refuses by name if a
- * call actually reaches it — a stub is a promise about what a test drives,
- * not a full fake.
+ * A collaborator surface with only the members the record reads while it is being BUILT.
+ * Everything else answers a function that refuses by name if a call actually reaches it —
+ * a stub is a promise about what a test drives, not a full fake.
  */
 export function stub<T>(group: string, buildTime: Record<string, unknown> = {}): T {
   return new Proxy(buildTime, {
@@ -76,10 +67,9 @@ export function stub<T>(group: string, buildTime: Record<string, unknown> = {}):
 }
 
 /**
- * The plan lookup and the flag store the record's own compositions read, as a
- * suite that drives neither supplies them: every organization is on the free
- * plan and inside every rollout, so a feature gated on either still MOUNTS and
- * a suite asserting on the gate itself overrides them.
+ * The plan lookup and the flag store the record's own compositions read, as a suite that
+ * drives neither supplies them: every organization is on the free plan and inside every
+ * rollout, so a feature gated on either still MOUNTS and a suite asserting on the gate
  */
 export function stubInfrastructureEntitlements(): Pick<
   ApiTrpcInfrastructure,
@@ -95,14 +85,9 @@ export function stubInfrastructureEntitlements(): Pick<
 }
 
 /**
- * The whole `ctx.app` application, as a suite that drives none of it supplies
- * it: every slice refuses by name if a call reaches it, except the handful
- * that surfaces which are NOT under test still read while they are built.
- *
+ * The whole `ctx.app` application, as a suite that drives none of it supplies it: every
+ * slice refuses by name if a call reaches it, except the handful that surfaces which are
  * @param broadcast The tenant fan-out `ctx.app.broadcast.getTenantEmitter()`
- * returns. A real `EventEmitter`, not a stub: a subscription test emits on this
- * instance and asserts the SSE lane relays it, so it has to be the SAME object
- * both the caller and the test hold.
  */
 export function stubApplicationSlices(
   broadcast: EventEmitter = new EventEmitter(),
@@ -160,9 +145,8 @@ export function stubApplicationSlices(
 }
 
 /**
- * The record's collaborators: the whole stubbed application, with the slices a
- * suite actually drives passed as overrides.
- *
+ * The record's collaborators: the whole stubbed application, with the slices a suite
+ * actually drives passed as overrides.
  * @param broadcast see {@link stubApplicationSlices}.
  */
 export function stubCollaborators(
@@ -228,11 +212,9 @@ export function stubComposedFeatures(): ComposedApiFeatures {
 }
 
 /**
- * The mount a record is built on, for the structural assertions that ask what
- * a record CONTAINS rather than what it answers.
- *
- * The mount only has to be constructible: every procedure builder below
- * returns itself, which is what a chain of decorators expects.
+ * The mount a record is built on, for the structural assertions that ask what a record
+ * CONTAINS rather than what it answers. The mount only has to be constructible: every
+ * procedure builder below returns itself, which is what a chain of decorators expects.
  */
 export function stubMount(): never {
   const procedure: Record<string, unknown> = {};

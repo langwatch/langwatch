@@ -1,25 +1,6 @@
 /**
  * What the user feature's composition reads on its own connection, and how.
- *
- * The four account answers behind `/settings/authentication` — the password
- * rotation, the Auth0 subject lookup, the linked-method list and the unlink —
- * used to be `prisma.account` statements in the API's tRPC ports composition,
- * one of them a `select` naming `password`, the bcrypt hash a credential
- * sign-in is checked against.
- *
- * Nothing leaked. What was wrong is the seam. `prisma-containment` governs
- * which modules may NAME the generated client, not which rows they then ask
- * for, so a composition that legitimately holds a client could select a
- * credential column with no rule about that column attached to the read.
- *
- * So the client below records every account statement the composed feature
- * makes, honouring `select` rather than ignoring it, and what is pinned is
- * WHOSE read each one is and WHAT crosses the port: the predicate and the
- * selection are `PrismaUserCredentialRepository`'s, the hash is compared and
- * discarded inside `UserCredentialService`, and every answer a port returns is
- * a word rather than a stored hash.
  */
-// @vitest-environment node
 import { compareSync, hashSync } from "bcrypt";
 import type { AuthService } from "@langwatch/auth-contract";
 import { IdentityEventingPort } from "@langwatch/identity-server";
@@ -63,10 +44,6 @@ function accountRows() {
 
 /**
  * The ONE connection the composed feature holds, recording every statement.
- *
- * `select` is honoured rather than ignored: a repository that asked for the
- * credential column would be visible in what came back, and a test that
- * returned whole rows regardless could not tell the two apart.
  */
 function testPrisma() {
   const rows = accountRows();

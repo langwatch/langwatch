@@ -1,17 +1,6 @@
 /**
- * The report calendar, driven through the real `automation.*` tRPC surface.
- *
- * The proof this file exists for is a two-process one. A report is authored on
- * the interactive process and fired by the worker, and the only thing they
- * share is one `ScheduledJob` row. So every assertion here is made against
- * `PrismaScheduledJobStore` — the SAME class the worker's loop claims through
- * (`apps/worker/src/app/worker-report-schedule.composition.ts`) — over one
- * in-memory table. A row this process wrote in a shape that class cannot read
- * back would fail here rather than as a report that silently never sends.
- *
- * Everything below the transport is the real thing: the composition, the
- * automation application, `ReportScheduleService`, and Eventing's own store.
- * Only Postgres and Redis are fakes.
+ * The report calendar, driven through the real `automation.*` tRPC surface. The proof
+ * this file exists for is a two-process one.
  */
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
@@ -65,11 +54,6 @@ const TRIGGER_COLUMN_DEFAULTS: Row = {
 
 /**
  * The two tables this path writes, in memory.
- *
- * `scheduledJob` is deliberately a list of plain rows rather than a mock: the
- * store's upsert is update-first-then-create, and only a table that actually
- * remembers what it holds can tell "moved the existing row" apart from "wrote
- * a second one".
  */
 function createFakePostgres() {
   const triggers = new Map<string, Row>();
@@ -117,12 +101,8 @@ function createFakePostgres() {
 }
 
 /**
- * A stand-in whose every member refuses by name.
- *
- * These are the collaborators the report path must never reach. A refusal is
- * what makes that assertion rather than an assumption: a save that started
- * asking the project directory or the plan provider for anything would fail
- * here instead of passing quietly.
+ * A stand-in whose every member refuses by name. These are the collaborators the report
+ * path must never reach.
  */
 function refuse<T extends object>(capability: string): T {
   return new Proxy({} as T, {
@@ -134,13 +114,8 @@ function refuse<T extends object>(capability: string): T {
 }
 
 /**
- * The one provider registry both the application and the transport read
- * through, over a cipher that refuses.
- *
- * One registry rather than two, because that is the deployment's shape: the
- * transport redacts a row with the same registry the application stored it
- * with. The refusing cipher is the assertion that a report over email carries
- * no secret at all — a path that started encrypting one would fail here.
+ * The one provider registry both the application and the transport read through, over a
+ * cipher that refuses.
  */
 function createProviderRegistry(): AutomationProviderRegistryAdapter {
   const refuseSecret = (): never => {
@@ -235,11 +210,6 @@ function harness() {
 
 /**
  * The calendar instant, read the way a person reads a cron line.
- *
- * `isAhead` is part of the reading rather than a separate assertion: a
- * resolver that answered with the cron's LAST occurrence lands on the right
- * weekday and hour, comes due immediately, and sends a report for a window
- * that already went out.
  */
 function whenItNextRuns(nextRunAt: unknown): {
   weekday: number;

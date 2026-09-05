@@ -1,9 +1,6 @@
 /**
- * The reach of one minted sandbox key (ADR: agent cache), proved against the
- * real permission set `mintAgentSandboxApiKey` requests: exactly
- * `agentCache:manage`, so a key minted for a run authorizes the agent-cache
- * route and nothing that asks for a different grain.
- *
+ * The reach of one minted sandbox key (ADR: agent cache), proved against the real
+ * permission set `mintAgentSandboxApiKey` requests: exactly `agentCache:manage`, so a key
  * @see specs/agent-cache/agent-cache.feature
  */
 import {
@@ -56,7 +53,8 @@ function sandboxKeySecurity(grantedPermissions: readonly string[]): AppRestSecur
     });
     await next();
   };
-  const authorizeProjectPermission = (args: { permission: string }): MiddlewareHandler =>
+  const authorizeProjectPermission =
+    (args: { permission: string }): MiddlewareHandler =>
     async (c, next) => {
       if (!grantedPermissions.includes(args.permission)) {
         return c.json({ error: "forbidden" }, 403);
@@ -82,7 +80,8 @@ function sandboxKeySecurity(grantedPermissions: readonly string[]): AppRestSecur
       );
     },
     authenticateProject: () => authenticateProject,
-    authorizeProjectPermission: (args) => authorizeProjectPermission(args as { permission: string }),
+    authorizeProjectPermission: (args) =>
+      authorizeProjectPermission(args as { permission: string }),
     authorizeApiKeyCeiling: () => pass,
     authenticateOrganization: () => pass,
     authorizeOrganizationPermission: () => pass,
@@ -124,7 +123,7 @@ describe("given a key minted for the runs of a project", () => {
 
     const read = await app.hono.request("/api/agent-cache/ACME_SESSION");
     expect(read.status).toBe(200);
-    expect((await read.json())).toMatchObject({ value: "session-1" });
+    expect(await read.json()).toMatchObject({ value: "session-1" });
   });
 
   /** @scenario "The sandbox key reaches nothing else" */

@@ -1,19 +1,7 @@
 /**
- * The evaluators a project defines, composed as their own feature.
- *
- * `evaluators.*` reads and writes the evaluator rows, and publishes the
- * `ctx.app.evaluatorApp` slice the packaged evaluator REST family reads. Its
- * ports are also what the MONITOR feature takes as its replication peer: a
- * monitor copy carries its evaluator and that evaluator's workflow with it, and
- * a second replication would be a second answer to what copying one does to the
- * graph behind it.
- *
- * ## What the host answers and the package does not
- *
- * Every port below is a WORKFLOW question — the studio DSL, its saved versions
- * and the monitors pointing at it. The studio graph is Workflow's and the
- * evaluator package never reaches into one, so the host answers them off its
- * own connection and the evaluator package stays unaware of a workflow.
+ * The evaluators a project defines, composed as their own feature. `evaluators.*` reads
+ * and writes the evaluator rows, and publishes the `ctx.app.evaluatorApp` slice the
+ * packaged evaluator REST family reads.
  */
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import {
@@ -37,16 +25,6 @@ import { createEvaluatorTrpcRouter } from "./evaluator-trpc.mount";
 
 /**
  * The ONE evaluator service on this process.
- *
- * Composed on its own and before the feature, because three other surfaces
- * read it: the workflow application publishes a workflow as an evaluator, a
- * monitor names the evaluator it runs, and an experiment scores against one. A
- * second service over the same rows would be a second answer to what an
- * evaluator is.
- *
- * A code evaluator dispatches through the SAME engine a studio run uses, which
- * is the point of taking the runtime rather than dialling an address here: one
- * path, one trace.
  */
 export function composeEvaluatorService(options: {
   infrastructure: ApiTrpcInfrastructure;
@@ -74,19 +52,14 @@ export type EvaluatorPeers = Readonly<{
    */
   evaluators: EvaluatorService;
   /**
-   * The workflow application a WORKFLOW evaluator's graph is replicated
-   * through. The studio DSL, its dataset references and its version history are
-   * Workflow's, and neither the evaluator nor the monitor package reaches into
-   * them.
+   * The workflow application a WORKFLOW evaluator's graph is replicated through. The
+   * studio DSL, its dataset references and its version history are Workflow's, and
+   * neither the evaluator nor the monitor package reaches into them.
    */
   workflows: WorkflowApp;
   /**
-   * The model gateway, where the deployment composed one.
-   *
-   * It resolves a project's default and embeddings models when an evaluator is
-   * created without naming them. With none composed the evaluator package's own
-   * rule applies — the caller must name the model — which is a narrower surface
-   * rather than a wrong answer.
+   * The model gateway, where the deployment composed one. It resolves a project's default
+   * and embeddings models when an evaluator is created without naming them.
    */
   modelProviders?: ModelProviderService;
 }>;
@@ -127,17 +100,12 @@ export function composeEvaluatorFeature(options: {
 
 /**
  * The evaluator surface on a process that composed no graph to run it over.
- *
- * The namespace still mounts and every call refuses by name, and the monitor
- * feature takes the same refusing ports — so a monitor copy fails where it is
- * asked for rather than half-succeeding against a graph nobody opened.
  */
 export function refusingEvaluatorFeature(): ComposedEvaluatorFeature {
   const refuse = (): never => {
     throw new ApiEvaluatorUnavailableError();
   };
-  const refuseEvery = <T>(): T =>
-    new Proxy({}, { get: () => refuse, has: () => true }) as T;
+  const refuseEvery = <T>(): T => new Proxy({}, { get: () => refuse, has: () => true }) as T;
   const ports = refuseEvery<EvaluatorTrpcPorts>();
 
   return {
@@ -161,13 +129,9 @@ class ApiEvaluatorUnavailableError extends HandledError {
 }
 
 /**
- * Everything an evaluator reaches that the evaluator package does not own.
- *
- * Four of the six are row reads on the process's own connection — the linked
- * workflow, the monitors running this evaluator, their deletion, and archiving
- * the graph. The other two REPLICATE that graph into another project, which is
- * the workflow application's copy: its dataset copier, its DSL rewrite, its
- * version parentage. None of it belongs to an evaluator.
+ * Everything an evaluator reaches that the evaluator package does not own. Four of the
+ * six are row reads on the process's own connection — the linked workflow, the monitors
+ * running this evaluator, their deletion, and archiving the graph.
  */
 function composeEvaluatorPorts(options: EvaluatorFeatureCollaborators): EvaluatorTrpcPorts {
   const { prisma, workflows } = options;

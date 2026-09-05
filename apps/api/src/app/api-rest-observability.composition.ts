@@ -13,20 +13,7 @@ import type { ApiRestSecurityObservability } from "../api-rest.security";
 const logger = createLogger("langwatch:api:rest");
 
 /**
- * The observability and error-rendering half of the API process's REST
- * enforcement.
- *
- * Split from {@link ApiRestSecurity} because these five are the process's
- * rather than the credential's: a logger and a tracer belong to the running
- * process, and both error shapes render the application's own taxonomy. The
- * security class answers "who is this caller"; this one answers "how does
- * this process talk".
- *
- * The two error shapes are not interchangeable. `legacy` is the flat
- * `{ error, message }` the families that predate the envelope already publish
- * and whose consumers parse it; `canonical` is the enveloped
- * `{ error: { code, message, ... } }` new families use. A family picks one
- * deliberately, and this composition renders whichever it picked.
+ * The observability and error-rendering half of the API process's REST enforcement.
  */
 export class ApiRestObservabilityComposition {
   static create(): ApiRestSecurityObservability {
@@ -68,12 +55,6 @@ const renderLegacy: ErrorHandler = (error, context) => {
 
 /**
  * A handled refusal as the flat legacy body, WITHOUT writing a response.
- *
- * Exported because `onError` is not the only place a handled error becomes a
- * legacy body: a middleware that answers a denial itself — the credential and
- * API-key-ceiling refusals on the security spine — must produce the SAME body,
- * or the caller gets a code and a sentence with no remediation, no fault and
- * no reasons, which is a refusal an agent or a CLI cannot act on.
  */
 export function legacyErrorBody(error: HandledError): Record<string, unknown> {
   const label = "legacyError" in error ? (error.legacyError as string) : error.code;
@@ -94,11 +75,8 @@ export function legacyErrorBody(error: HandledError): Record<string, unknown> {
 }
 
 /**
- * The canonical envelope, built by the package's own `apiErrorBody` so `type`
- * is derived from the status rather than invented here. A handled error
- * publishes its code, message, `meta` and retryability; an unhandled one
- * publishes `internal_error` and nothing about itself, with the correlation
- * handles as the only thread back to what actually happened.
+ * The canonical envelope, built by the package's own `apiErrorBody` so `type` is derived
+ * from the status rather than invented here.
  */
 const renderCanonical: ErrorHandler = (error, context) => {
   const status = statusOf(error);
@@ -107,14 +85,8 @@ const renderCanonical: ErrorHandler = (error, context) => {
 };
 
 /**
- * Any thrown value as the canonical envelope, WITHOUT writing a response.
- *
- * The two callers want different things from one mapping. The `onError` above
- * writes the response; a family that installs its own `onError` — to log what
- * the caller actually received under its own name — wants the status and the
- * body and writes them itself. Rendering it twice is how two surfaces come to
- * publish two taxonomies for the same failure, so this is the one mapping and
- * `renderCanonical` is a caller of it.
+ * Any thrown value as the canonical envelope, WITHOUT writing a response. The two callers
+ * want different things from one mapping.
  */
 export function canonicalErrorFor(error: unknown): {
   status: ContentfulStatusCode;

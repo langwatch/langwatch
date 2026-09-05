@@ -1,20 +1,6 @@
 /**
  * @vitest-environment node
- *
  * Security-critical unit tests for the direct-upload authorizer (ADR-032 D4).
- * This is the only auth gate on the browser -> S3 direct-upload routes, so it
- * must:
- *   - admit a session member holding `datasets:manage`,
- *   - deny a session member for a foreign project (the IDOR defense -> 403),
- *   - refuse a cookie-authed request that originated cross-site (CSRF),
- *   - reject a request with no credentials -> 401,
- *   - reject an API key minted for a different project -> 401,
- *   - admit a valid API key for the project (and bump lastUsedAt).
- *
- * The two ports are fakes rather than module mocks: since the move, the gate
- * takes the process's ONE session port and its ONE handler-managed credential
- * as arguments, so the decision under test is reachable without standing up
- * either resolver.
  */
 import type { Context } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";

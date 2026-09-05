@@ -1,14 +1,5 @@
 /**
- * The subsystem health probes, driven through the real Hono app the API
- * process mounts.
- *
- * These endpoints exist for an external monitor, so what is pinned is the
- * shape that monitor branches on: the two 401 sentences an unusable credential
- * gets, the 404s the trigger probe tells apart, and — the part the move could
- * have widened silently — that a SCOPED api key is still refused. The probes
- * have only ever accepted the deprecated project key, and they check no
- * permission at all, so accepting a scoped key would have turned every
- * least-privilege key in the fleet into one that can drive a canary.
+ * The subsystem health probes, driven through the real Hono app the API process mounts.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";

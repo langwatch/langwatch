@@ -1,20 +1,12 @@
 /**
  * The process's ONE answer to "did this request come from our own origin?".
- *
- * Every cookie-authed door needs it — a session cookie is `SameSite=Lax`, so a
- * cross-site top-level GET and a cross-site simple POST both arrive carrying
- * it — and two doors answering the question differently is how one of them ends
- * up wrong. The dataset direct-upload authorizer and the subscription lane both
- * read this.
  */
 import type { Context } from "hono";
 
 /**
- * `Sec-Fetch-Site` is the primary signal — set by every modern browser based on
- * the real request initiator and unaffected by reverse proxies; `cross-site` is
- * exactly the CSRF vector, while `same-origin`/`same-site`/`none` (direct nav)
- * are legitimate. For older browsers that omit it, fall back to comparing the
- * `Origin` host against the forwarded/Host header.
+ * `Sec-Fetch-Site` is the primary signal — set by every modern browser based on the real
+ * request initiator and unaffected by reverse proxies; `cross-site` is exactly the CSRF
+ * vector, while `same-origin`/`same-site`/`none` (direct nav) are legitimate.
  */
 export function isCrossSiteRequest(c: Context): boolean {
   const secFetchSite = c.req.header("sec-fetch-site");

@@ -1,24 +1,6 @@
 /**
- * `project.*` — one project's lifecycle and its settings form — composed as
- * its own feature.
- *
- * The application is the project package's own: the directory, the credential
- * service the API doors already authenticate through, the sharing rule and the
- * topic tree, all taken rather than rebuilt so the settings form and the
- * explorer cannot disagree about what a project holds.
- *
- * ## The named absences
- *
- * `project.triggerTopicClustering` refuses by name: clustering runs are
- * scheduled by the worker, and a request this process accepted would be a run
- * nobody starts. `project.provisionLangyVirtualKey` logs instead of refusing —
- * it is best-effort by the port's own contract, and a failure there must never
- * cost somebody the project they just created.
- *
- * {@link ApiViewerProtectionsPort} is what `getFieldRedactionStatus` resolves
- * a viewer's redactions through. Absent, it refuses rather than guessing:
- * guessing high would show a reader captured content they may not see, and
- * guessing low would tell them their project has nothing in it.
+ * `project.*` — one project's lifecycle and its settings form — composed as its own
+ * feature.
  */
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import {
@@ -100,10 +82,9 @@ export function composeProjectFeature(options: {
 }
 
 /**
- * `project.*` on a process that composed no project directory.
- *
- * The namespace still mounts and every call refuses by name: a settings form
- * that rendered empty would tell somebody their project has no settings.
+ * `project.*` on a process that composed no project directory. The namespace still mounts
+ * and every call refuses by name: a settings form that rendered empty would tell somebody
+ * their project has no settings.
  */
 export function refusingProjectFeature(): ComposedProjectFeature {
   const refuse = (): never => {
@@ -135,11 +116,6 @@ const PROJECT_CREATE_DECLARATION = {
 
 /**
  * `project.create`'s tier resolution and the trace-sharing demand.
- *
- * `create` names two tiers and acts on exactly one, decided by what was asked
- * for; the trace-sharing flip is a SECOND demand on top of the declared
- * `project:update`, applied after it, because it changes who outside the
- * project may read its traces.
  */
 function projectChecks(authz: AuthzService): ProjectTrpcChecks {
   const probeTeam = (userId: string, permission: AuthzPermission, teamId: string) =>
@@ -260,10 +236,8 @@ function projectPorts(
       return protections.getViewerProtections(ctx, input);
     },
     /**
-     * Best effort by the port's own contract: a project is created whether or
-     * not Langy gets a key, and the credential service mints one on the first
-     * chat call. So an absent gateway logs rather than refusing — refusing
-     * would cost somebody the project they just created.
+     * Best effort by the port's own contract: a project is created whether or not Langy
+     * gets a key, and the credential service mints one on the first chat call.
      */
     provisionLangyVirtualKey: (_ctx, input) => {
       logger.debug(

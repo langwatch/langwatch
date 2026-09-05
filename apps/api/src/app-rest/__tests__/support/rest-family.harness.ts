@@ -1,24 +1,6 @@
 /**
- * One REST family, mounted the way this process mounts it, over services a
- * suite stands up itself.
- *
- * The management families — teams, organization, organization members,
- * organization provisioning, SCIM tokens, run plans, test suites and the
- * `/api/suites` alias — had no harness on this branch at all: their bindings
- * lived in the retired platform router's Postgres-backed suites. This module
- * is the one they share, so a family gets a suite by naming its services
- * rather than by describing the mount a fifth time.
- *
- * Three things are REAL here, and that is the point:
- *
- *   - the mount is `createApiProcessRestFeatures`, the same enumeration
- *     production composes, so a family that stops being mounted fails here;
- *   - the error rendering is `ApiRestObservabilityComposition`, this process's
- *     own, so a refusal is asserted at the wire a customer reads rather than
- *     at a shape the harness invented;
- *   - the families' own access declarations still run. What is faked is only
- *     the credential resolution — who the caller is — which is what lets one
- *     suite drive an organization-scoped route and a project-scoped one.
+ * One REST family, mounted the way this process mounts it, over services a suite stands
+ * up itself.
  */
 import {
   createAppRestSecurity,
@@ -56,11 +38,9 @@ export const TEST_TEAM_ID = "team-1";
 export const TEST_USER_ID = "user-1";
 
 /**
- * Who the credential chain resolved the caller as.
- *
- * A field left out keeps the default; `userId: null` is the distinct case of a
- * key that names no person, which is what decides whether a run records an
- * actor.
+ * Who the credential chain resolved the caller as. A field left out keeps the default;
+ * `userId: null` is the distinct case of a key that names no person, which is what
+ * decides whether a run records an actor.
  */
 export type RestFamilyCaller = {
   project?: Record<string, unknown> | undefined;
@@ -71,13 +51,9 @@ export type RestFamilyCaller = {
 };
 
 /**
- * Enforcement that authenticates every caller as one project, one
- * organization and one person.
- *
- * The declarations a family makes over these — `requires("scenarios:view")`,
- * the API-key ceiling, the route-level team and project checks — still run.
- * Only the resolution the process would have done against Postgres is stood in
- * for, so a suite drives the real access spine without a database.
+ * Enforcement that authenticates every caller as one project, one organization and one
+ * person. The declarations a family makes over these — `requires("scenarios:view")`, the
+ * API-key ceiling, the route-level team and project checks — still run.
  */
 export function createRestFamilySecurity(caller: RestFamilyCaller = {}): AppRestSecurity {
   const pass: MiddlewareHandler = async (_c, next) => {
@@ -120,11 +96,9 @@ const noopMiddleware: MiddlewareHandler = async (_c, next) => {
 };
 
 /**
- * Every packaged port, stood up open.
- *
- * Open rather than absent because a port left out takes a family off the mount
- * entirely, and a suite about a family's own refusals would then be driving
- * Hono's 404. What a suite is about, it overrides.
+ * Every packaged port, stood up open. Open rather than absent because a port left out
+ * takes a family off the mount entirely, and a suite about a family's own refusals would
+ * then be driving Hono's 404. What a suite is about, it overrides.
  */
 export function packagedRestPorts(
   overrides: Partial<ApiPackagedRestPorts> = {},
@@ -177,12 +151,9 @@ export type MountedRestFamily = {
 };
 
 /**
- * Mounts whichever families the given services compose, and nothing else.
- *
- * `packaged` is the bag the feature-package families read; `services` reaches
- * the ones this process composes for itself (`organizationManagement` among
- * them). A suite names only what its family needs, so an absent service is a
- * family honestly not mounted rather than one answering 500.
+ * Mounts whichever families the given services compose, and nothing else. `packaged` is
+ * the bag the feature-package families read; `services` reaches the ones this process
+ * composes for itself (`organizationManagement` among them).
  */
 export function mountRestFamily(options: {
   packaged?: ApiPackagedRestServices | undefined;

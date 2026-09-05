@@ -1,19 +1,7 @@
 /**
- * `github.*`, composed as its own feature rather than as a member of a group.
- *
- * The GitHub App an organization connected, the repositories it reaches and the
- * pull requests its coding agents opened. One namespace, two answers nobody
- * else owns, and no graph shared with anything beside it — so it is composed
- * here, from the shared infrastructure every feature composition is handed,
- * and named once in the application's router literal.
- *
- * The organization is derived from the project rather than taken from the
- * client: the pull-request read is project-scoped because that is how a caller
- * reaches it, and a caller naming an organization id could otherwise ask about
- * another tenant's pull requests.
- *
- * The REST half of this feature is composed the same way one file over, in
- * {@link composeApiGithubRest} — a feature owns both its doors.
+ * `github.*`, composed as its own feature rather than as a member of a group. The GitHub
+ * App an organization connected, the repositories it reaches and the pull requests its
+ * coding agents opened.
  */
 import type { GithubService } from "@langwatch/github-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -72,11 +60,6 @@ class ApiCapabilityUnavailableError extends HandledError {
 
 /**
  * The `ctx.app.github` slice on a process that opened no database.
- *
- * A refusing directory rather than an absent one, for the reason every other
- * refusal on this migration gives: `github.*` mounts either way, and a caller
- * asking whether an organization has connected the App must be told this
- * deployment cannot answer rather than have the call disappear.
  */
 export function refusingGithubService(): GithubService {
   logger.info(

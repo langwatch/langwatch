@@ -1,18 +1,7 @@
 /**
- * `presence.*` — who else is looking at this project, and where their cursor
- * is — composed as its own feature, together with the tenant fan-out it
- * publishes on.
- *
- * The fabric is the load-bearing half. `BroadcastService` is ONE emitter per
- * tenant, and the trace subscriptions, the Langy conversation stream, the
- * scenario simulation lane and the two bulk exports all publish and listen on
- * it. A second instance would leave a browser watching a channel nothing writes
- * to, so it is composed here, once, and handed to every surface that needs it.
- *
- * It is also owned rather than left to the garbage collector: the fabric
- * duplicates the Redis connection for its subscriber and holds an interval that
- * reaps idle tenant emitters, so a drain that left the subscriber open would
- * keep the process alive past its deadline.
+ * `presence.*` — who else is looking at this project, and where their cursor is —
+ * composed as its own feature, together with the tenant fan-out it publishes on. The
+ * fabric is the load-bearing half.
  */
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -37,10 +26,9 @@ export type ComposedPresenceFeature = Readonly<{
   /** The `ctx.app.broadcast` slice, which the export relay reads too. */
   emitter: PresenceEmitterPort;
   /**
-   * The fan-out itself, for the REST families and the three subscription
-   * surfaces that broadcast on it. Absent on a process that composed no
-   * presence graph, so each of them refuses by name rather than publishing
-   * into a fabric nobody subscribed to.
+   * The fan-out itself, for the REST families and the three subscription surfaces that
+   * broadcast on it. Absent on a process that composed no presence graph, so each of them
+   * refuses by name rather than publishing into a fabric nobody subscribed to.
    */
   broadcast: BroadcastService | undefined;
   router(mount: ApiTrpcFeatureMount): ReturnType<typeof createPresenceTrpcRouter>;
@@ -75,11 +63,9 @@ export function composePresenceFeature(options: {
 }
 
 /**
- * Presence on a process that composed no graph to answer it.
- *
- * The namespace still mounts and every call refuses by name, so a person is
- * told the deployment cannot report who else is here rather than shown an
- * empty room they are in fact sharing.
+ * Presence on a process that composed no graph to answer it. The namespace still mounts
+ * and every call refuses by name, so a person is told the deployment cannot report who
+ * else is here rather than shown an empty room they are in fact sharing.
  */
 export function refusingPresenceFeature(): ComposedPresenceFeature {
   const refuse = (): never => {

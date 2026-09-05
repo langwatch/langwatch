@@ -1,22 +1,7 @@
 /**
- * `GET /api/image-proxy` — the SSRF-guarded image relay.
- *
- * A public, credential-less door that fetches an image on the browser's behalf,
- * so a page can render an asset whose origin sets no CORS headers. Everything
- * dangerous about that shape is the fetch, which is why the fence is the whole
- * of the composition: `@langwatch/egress`'s `fetchValidatedDestination` resolves
- * the host, refuses private and metadata addresses, PINS the resolved address
- * for the connection so a name cannot be re-resolved to a different one between
- * the check and the socket, and refuses redirects outright.
- *
- * It lives in `apps/api` rather than in a feature package because it belongs to
- * no feature: nothing about it is a fact about traces, scenarios or prompts.
- * The one thing it does own is the response shape, which is bytes rather than
- * JSON, and the upstream status passthrough that a caller distinguishes a
- * broken link from a refused one by. That shape is NOT this module's own
- * invention: it borrows the stored-object read hardening wholesale, because
- * relayed bytes on the product's origin are the same hazard whether they came
- * out of our bucket or off somebody else's host.
+ * `GET /api/image-proxy` — the SSRF-guarded image relay. A public, credential-less door
+ * that fetches an image on the browser's behalf, so a page can render an asset whose
+ * origin sets no CORS headers.
  */
 import { publicEndpoint } from "@langwatch/api";
 import {
@@ -36,11 +21,9 @@ const CACHE_CONTROL = "public, max-age=31536000";
 export function createImageProxyRestApp(options: {
   security: AppRestSecurity;
   /**
-   * Whether this deployment refuses egress to private addresses.
-   *
-   * Passed rather than assumed because a self-hosted install legitimately
-   * proxies an image from a host on its own network, and a fence that always
-   * refused would make the door useless there. The default is to refuse.
+   * Whether this deployment refuses egress to private addresses. Passed rather than
+   * assumed because a self-hosted install legitimately proxies an image from a host on
+   * its own network, and a fence that always refused would make the door useless there.
    */
   blockLocalHttpCalls: boolean;
   /** Hosts the deployment allows through the fence regardless. */
@@ -117,10 +100,9 @@ function mediaTypeOf(contentType: string): string {
 }
 
 /**
- * A filename for the `Content-Disposition`, taken from the requested URL's
- * last path segment and sanitised the way every other byte door sanitises one:
- * the whole string is the caller's, so it reaches a header only as ASCII
- * filename-safe characters.
+ * A filename for the `Content-Disposition`, taken from the requested URL's last path
+ * segment and sanitised the way every other byte door sanitises one: the whole string is
+ * the caller's, so it reaches a header only as ASCII filename-safe characters.
  */
 function proxiedFilename(requestedUrl: string): string {
   const segments = requestedUrl.split("?")[0]?.split("/") ?? [];

@@ -1,15 +1,5 @@
 /**
  * The plan allowance the packaged families' one metered door is gated on.
- *
- * The guard used to be composed as a middleware that called `next()` and
- * nothing else, so the scenario-event door accepted a write from a team that
- * had already spent its cap while the collector and the OTLP receiver refused
- * the same team's. What is under test is the WIRING: the port the families
- * receive has to be the ingest composition's own gate, not a second one and
- * not an empty one.
- *
- * The guard is driven through a real Hono request with the project variable
- * the access chain sets, because that read is the part a no-op could not have.
  */
 import { Hono, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";

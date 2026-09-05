@@ -1,16 +1,5 @@
 /**
  * "Test agent", over the Scenario application this process already composes.
- *
- * A bridge in the PROCESS rather than in either package, the same shape
- * {@link ApiAgentWorkflowCopyAdapter} occupies for the workflow copy: `agent`
- * and `scenario` are both core features and neither may reach the other, so
- * the seam belongs to the composition root.
- *
- * The service arrives as a THUNK because of composition order, not taste.
- * `resolveAgents` runs before the scenario feature that builds
- * `AgentTestService`, so a service read at composition time would always be
- * absent. It is read at the call instead, which is the only moment it is
- * needed.
  */
 import { AgentTestPort, type AgentTestActor } from "@langwatch/agent-server";
 import type { AgentWithFields } from "@langwatch/agent-contract";

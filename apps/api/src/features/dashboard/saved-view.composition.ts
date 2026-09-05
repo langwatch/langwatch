@@ -1,10 +1,6 @@
 /**
  * The stored filter sets the explorer offers, composed as their own feature.
- *
- * `savedViews.*` — one namespace over one Postgres adapter. It used to be
- * composed inside the observability half beside the trace read stack, the
- * share ledger and the provider gateway; a saved view is a row this process
- * owns and shares nothing with that graph.
+ * `savedViews.*` — one namespace over one Postgres adapter.
  */
 import { PostgresSavedViewAdapter, type SavedViewTrpcPorts } from "@langwatch/dashboard-server";
 import { HandledError } from "@langwatch/handled-error";
@@ -32,11 +28,9 @@ export function composeSavedViewFeature(options: {
 }
 
 /**
- * The stored filter sets on a process that composed no database.
- *
- * The namespace still mounts and every call refuses by name, so the explorer
- * says the deployment cannot answer rather than showing a person an empty list
- * of views they know they saved.
+ * The stored filter sets on a process that composed no database. The namespace still
+ * mounts and every call refuses by name, so the explorer says the deployment cannot
+ * answer rather than showing a person an empty list of views they know they saved.
  */
 export function refusingSavedViewFeature(): ComposedSavedViewFeature {
   const refuse = (): never => {

@@ -1,13 +1,6 @@
 /**
- * Characterisation of `POST /api/bug-reports` through the real Hono app the
- * API process mounts, over fakes at every port.
- *
- * Three things are pinned, and each of them is a wire the CLI and the MCP
- * report tool already parse: an accepted report answers 201 `{ id }`, a
- * malformed one answers 400 without reaching the intake at all, and the flood
- * refusal answers 429 `{ error, code }` — the handled shape, not a generic
- * envelope. The fourth is the reason this door is public: a request carrying
- * NO credential still files a report, unlinked.
+ * Characterisation of `POST /api/bug-reports` through the real Hono app the API process
+ * mounts, over fakes at every port.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import {

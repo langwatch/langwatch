@@ -1,12 +1,7 @@
 /**
- * What the image proxy puts on the wire, which is the half of this door that is
- * not about egress at all.
- *
- * The bytes are an attacker's to choose — the URL is the caller's, and the door
- * needs no credential — and they come back on the product's own origin. So the
- * headers are the feature: without them an upstream answering `image/svg+xml`
- * is a document that runs script as the signed-in person, with their session
- * cookie and their `localStorage`.
+ * What the image proxy puts on the wire, which is the half of this door that is not about
+ * egress at all. The bytes are an attacker's to choose — the URL is the caller's, and the
+ * door needs no credential — and they come back on the product's own origin.
  */
 import { ApiKeyService } from "@langwatch/api-key-contract";
 import { AuthzService } from "@langwatch/authz-contract";

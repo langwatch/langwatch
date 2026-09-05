@@ -1,17 +1,5 @@
 /**
  * The named-project branch of `POST /api/auth/cli/governance/ingestion-key`.
- *
- * A repository checkout sends its coding-agent traces to the project that owns
- * the code, so the CLI names a project by id or by slug. Both readings resolve
- * through the SAME org-scoped lookup, which is what keeps a spoofed reference
- * from reaching another tenant: a project that exists elsewhere reports
- * `project_not_found`, exactly as one that exists nowhere does, so the refusal
- * never says which ids are real somewhere else.
- *
- * The gate is `traces:create` on the named project — the same permission the
- * minted key carries — so a member who cannot write traces there cannot mint a
- * key that can.
- *
  * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";

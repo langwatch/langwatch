@@ -1,41 +1,6 @@
 /**
  * The subscription lane: every tRPC subscription this process serves, over one
- * hand-rolled Server-Sent Events channel.
- *
- * It is NOT `@trpc/server`'s own SSE format. The browser half is
- * `packages/platform-api-client/src/sse-subscription-link.ts`, and the wire it
- * speaks is this one, pinned by `dev/docs/plans/ui-subscription-transport.md`:
- *
- * ```
- * GET  {origin}/api/sse/{procedure.path}?input={superjson.stringify(input)}
- *      Content-Type: text/event-stream; charset=utf-8
- *      Cache-Control: no-cache, no-transform
- *      X-Accel-Buffering: no
- *
- * data: {superjson frame}      <- one frame, split across lines on \n and
- *                                 terminated by a blank line
- * : ping                       <- keep-alive comment every 25s
- * ```
- *
- * Three frame types are the protocol's own — `{type:"connected"}`,
- * `{type:"complete"}` and `{type:"error", message}` — and everything else is
- * the procedure's data. The one shape that is easy to get wrong is a DOMAIN
- * `error` value a procedure yields as data: it carries no `message`, and the
- * client classifies on that absence, so it must not be dressed up as a
- * protocol error here. {@link sseErrorFrame} is the only writer of the
- * protocol's error frame.
- *
- * The lane serves SUBSCRIPTIONS and refuses everything else. A GET carries a
- * `SameSite=Lax` session cookie across sites, and `fetchRequestHandler`'s own
- * refusal of a mutation over GET does not apply here, so the two gates below —
- * the same-origin check and the procedure-type check — are what stand between
- * a page a signed-in person visits and every mutation on the router.
- *
- * What this module deliberately does NOT own is the caller. Resolving a
- * browser session, building a request context and choosing which router the
- * path is addressed against are all the process's, and they arrive as
- * {@link SseSubscriptionPorts.createCaller} — which is also what lets the
- * suite drive the whole protocol against a caller made of two functions.
+ * hand-rolled Server-Sent Events channel. It is NOT `@trpc/server`'s own SSE format.
  */
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -54,13 +19,9 @@ import {
 export const SSE_KEEPALIVE_INTERVAL_MS = 25_000;
 
 /**
- * The caller a request's subscription is resolved on: a nested record whose
- * leaves are the procedures, exactly what `router.createCaller` returns.
- *
- * `unknown` rather than a router-derived type on purpose. The path arrives as
- * a string off the URL and is walked at runtime, so nothing here can be
- * type-checked against a specific root — and naming one would tie the lane to
- * whichever router happened to be mounted first.
+ * The caller a request's subscription is resolved on: a nested record whose leaves are
+ * the procedures, exactly what `router.createCaller` returns. `unknown` rather than a
+ * router-derived type on purpose.
  */
 export type SseSubscriptionCaller = unknown;
 
@@ -68,12 +29,6 @@ export type SseSubscriptionCaller = unknown;
 export interface SseSubscriptionPorts {
   /**
    * Build the caller this request's procedure is looked up on.
-   *
-   * `signal` is the browser's own — a subscription awaits an event that may
-   * never come, so without it a procedure stays suspended after the browser is
-   * gone, holding its emitter listener and skipping its own cleanup. Closing
-   * the stream cannot interrupt a pending `await` from the outside, which is
-   * why the signal has to reach the procedure rather than only the transport.
    */
   createCaller(options: {
     request: Request;
@@ -81,24 +36,14 @@ export interface SseSubscriptionPorts {
   }): Promise<SseSubscriptionCaller>;
 
   /**
-   * What KIND of procedure the composed router carries at a dotted path, read
-   * off its own procedure record rather than off the caller.
-   *
-   * The caller cannot answer this. `createCaller` exposes queries, mutations
-   * and subscriptions as identical callable leaves, so walking it would run a
-   * mutation on a plain GET carrying a `SameSite=Lax` session cookie — every
-   * mutation on the router, reachable from any page a signed-in person visits.
-   * The router's record is the only place the type is still stated.
+   * What KIND of procedure the composed router carries at a dotted path, read off its own
+   * procedure record rather than off the caller. The caller cannot answer this.
    */
   procedureTypeAt(path: string): "query" | "mutation" | "subscription" | undefined;
 }
 
 /**
- * The SSE error frame. HTTP 200 is already on the wire when a stream fails, so
- * the handled shape has to ride inside the frame: a HandledError (directly, or
- * as a TRPCError cause) carries its full serialized domain error; a
- * client-safe TRPCError keeps its message; anything else degrades to the
- * generic unknown message — the raw detail stays server-side in the log
+ * The SSE error frame.
  * (ADR-045).
  */
 export function sseErrorFrame(err: unknown): Record<string, unknown> {
@@ -129,14 +74,6 @@ function handledCauseOf(err: unknown): HandledError | undefined {
 
 /**
  * The procedure a dotted path names, or undefined when the path names none.
- *
- * A namespace on a tRPC caller is a PROXY, and `typeof` a proxy over a
- * function is `"function"`, not `"object"` — so narrowing the walk to objects
- * would resolve nothing on a real router and answer 404 for every live view.
- *
- * Which is also why this walk is NOT the gate: it cannot tell a subscription
- * from a mutation. `SseSubscriptionPorts.procedureTypeAt` answers that, and
- * has already refused by the time this runs.
  */
 function procedureAt(
   caller: SseSubscriptionCaller,
@@ -180,19 +117,6 @@ function logStreamFailure(
 
 /**
  * Mount the subscription lane on one process's REST security.
- *
- * The access declaration is `handlerManagedAuth` with an empty permission
- * list, and both halves of that are claims rather than omissions: the channel
- * is opened by a browser SESSION (the caller factory resolves it — an
- * `EventSource` carries no header, so a same-origin cookie is the only
- * credential it can present), and the per-message authorization is upstream,
- * inside each subscription procedure's own policy chain. Writing `[]` says
- * this route enforces no RBAC permission of its own; leaving it out would say
- * nothing at all, and the declaration sweep would walk straight past the one
- * route on the process that streams.
- *
- * What the route DOES enforce itself is the pair of gates in the handler: the
- * request must be same-origin, and the path must name a subscription.
  */
 export function createSseSubscriptionApp(options: {
   security: AppRestSecurity;

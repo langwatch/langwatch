@@ -1,15 +1,6 @@
 /**
- * The organization-keyed pull-request usage door, driven through the real Hono
- * app the API process mounts.
- *
- * What is pinned here is the door's own decisions, which are the three the v1
- * family exists to make: the organization comes from the CREDENTIAL and from
- * nowhere in the request, the caller handed to the application is the KEY
- * rather than the person who created it, and the read is recorded before the
- * answer leaves. The per-project cut those decisions feed is proved against
- * the real authorization engine in
- * `apps/api/src/app/__tests__/api-coding-agent-caller-scope.unit.test.ts`.
- *
+ * The organization-keyed pull-request usage door, driven through the real Hono app the
+ * API process mounts.
  * Spec: specs/coding-agent/pull-request-linkage.feature
  */
 import { createAppRestSecurity, getRoutePolicy, type AppRestSecurity } from "@langwatch/api/rest";

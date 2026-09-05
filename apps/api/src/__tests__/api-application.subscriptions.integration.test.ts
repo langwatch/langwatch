@@ -1,19 +1,6 @@
 /**
- * The subscription lane, mounted on the process rather than merely built.
- *
- * Two properties, and the mount is where both are decidable. The first is what
- * the plan's API-side mount is FOR: a path resolves against the SAME tRPC root
- * the `/api/trpc` endpoint serves, through the same request context — one root,
- * two transports, so a procedure cannot be callable and un-watchable. The
- * second is the fence around that: the lane streams SUBSCRIPTIONS, and the
- * router's own procedure record is what tells it so. A caller cannot — it hands
- * back queries, mutations and subscriptions as identical callable leaves, which
- * is how a plain GET carrying a `SameSite=Lax` session cookie used to reach
- * every mutation on the process.
- *
- * So the mutation case here runs against the real record, not a stand-in:
- * `secrets.create` is a real mutation on this root, and the assertion is that
- * the service behind it never runs.
+ * The subscription lane, mounted on the process rather than merely built. Two properties,
+ * and the mount is where both are decidable.
  */
 import { ApiKeyService } from "@langwatch/api-key-contract";
 import { AuthzService } from "@langwatch/authz-contract";
@@ -54,11 +41,9 @@ class TestSecretService extends SecretService {
 }
 
 /**
- * One real subscription on this process's root.
- *
- * The application's own two namespaces carry queries and mutations only, so
- * without this the positive case could only be asserted against a procedure the
- * lane is now right to refuse. Everything else is delegated to the empty port.
+ * One real subscription on this process's root. The application's own two namespaces
+ * carry queries and mutations only, so without this the positive case could only be
+ * asserted against a procedure the lane is now right to refuse.
  */
 class LiveUpdateFeatures extends ApiTrpcFeaturesPort<TRPCCreateRouterOptions> {
   private readonly none = new NoApiTrpcFeatures();

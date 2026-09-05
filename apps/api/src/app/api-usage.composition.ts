@@ -1,62 +1,5 @@
 /**
  * What an organization is allowed, and what it has used.
- *
- * Three things this process composes for itself, all read off its own graph:
- *
- *   - the PLAN PROVIDER every surface resolves an allowance through,
- *   - the USAGE READING the subscription screen's panel renders, and
- *   - the ENFORCEMENT the ingest doors refuse an over-plan export with.
- *
- * They are one module because all three are taken AGAINST the plan: the
- * allowance, the unit it is measured in and whether the organization is on a
- * free tier all come from the plan, and a second plan provider composed for
- * any of them would let the panel, the banner and the refusal disagree about
- * which plan an organization is on.
- *
- * ## What this deployment cannot resolve, and why it says so
- *
- *   - **No licence source, on a process that opened no database.** The licence
- *     leg is composed now, off the organization row it was activated on, which
- *     is how a licensed self-hosted deployment gets the Enterprise tier it
- *     bought. What is left is the DEGENERATE case: no database, no licence row,
- *     and the absence reported rather than a licensed install reading as one.
- *   - **No subscription source.** On the hosted deployment a paid plan comes
- *     from a Stripe subscription row, which is the Enterprise billing store.
- *     Absent, every organization resolves to the free baseline — reported at
- *     composition rather than discovered by a customer whose paid plan reads
- *     as free.
- *   - **No approaching-limit mail, on a deployment that named no `BASE_HOST`.**
- *     Not a gap in this process any more, and the reason recorded here was
- *     wrong twice over. The Notification vertical exists, so do
- *     `UsageLimitService` and `UsageWarningService` — and the two things that
- *     did not are now here: {@link ApiUsageLimitEmailAdapter} is a real
- *     `UsageLimitEmailAdapter` over `@langwatch/mail`, and this process reads a
- *     mailer configuration (`resolveApiMailConfig`). What is left is the
- *     DEGENERATE case: no `BASE_HOST` means no gateway and no host to build the
- *     usage link from, and `limits.checkAndSendUsageLimitNotification` refuses
- *     BY NAME rather than reporting that it sent something it did not.
- *
- * ## What it does resolve, and what that took
- *
- * An organization metered in EVENTS is counted here rather than reported
- * unknown. The rollup is keyed by ORGANIZATION — an organization's billable
- * events span every project it owns, so there is no project to route on — and
- * a tenant-keyed resolver cannot answer that id: the directory behind it looks
- * a project row up, so an organization id raises `UnknownTenantError` rather
- * than reading one tenant's rows on another's endpoint. What closed it was the
- * second accessor `ApiClickHouseInfrastructure` now publishes beside the
- * tenant-keyed one, over the SAME connection and the same physical endpoints:
- * `resolveOrganizationClient`. The two arrive here as ONE option, because they
- * are one object and a caller holding half of them is a state no root can
- * produce.
- *
- * The approaching-limit MAIL resolves too, and what that took is one composed
- * gateway plus three collaborators the warning service needs and no package
- * ships: the organization's administrators, the per-project breakdown the
- * message is mostly made of, and the notification row that stops a second
- * message going out the same month. All three are read off this process's own
- * graph, which is why they are here rather than in a feature package — which
- * store a deployment counts and mails from is a composition decision.
  */
 import {
   BillableEventsQueryService,
@@ -105,42 +48,22 @@ import { ApiUsageStatsPort } from "../features/entitlement/spend.composition";
 export type ApiPlanProviderOptions = Readonly<{
   /**
    * Whether this is the hosted deployment.
-   *
-   * It picks the BASELINE, and the two baselines are opposites: hosted starts
-   * every organization on the free plan's limits and lifts them with a paid
-   * source, self-hosted starts unlimited and a licence only narrows what is
-   * switched on. Getting it wrong either way is a wrong answer in production,
-   * so it is configuration rather than a guess.
    */
   isSaas: boolean;
   /**
    * Where an organization's activated licence key is read from.
-   *
-   * Absent exactly when this process opened no Postgres connection, and the
-   * absence is reported: on a self-hosted deployment the licence is the ONLY
-   * paid source there is, so a process that cannot read it resolves the
-   * unlimited baseline for a customer whose contract names an Enterprise tier
-   * — every allowance intact, and the tier's own entitlements withheld.
    */
   licenses?: OrganizationLicensePort;
   /**
-   * The public key a licence signature is checked against, where the operator
-   * rotated it.
-   *
-   * Absent means the key embedded in the licensing contract, which is what
-   * verifies every licence LangWatch issues. A deployment that rotated the key
-   * and did not name it here would refuse its own valid licence and fall
-   * silently back to the baseline.
+   * The public key a licence signature is checked against, where the operator rotated it.
+   * Absent means the key embedded in the licensing contract, which is what verifies every
+   * licence LangWatch issues.
    */
   licensePublicKey?: string;
   /**
-   * The Stripe subscription rows a hosted paid plan is read from.
-   *
-   * Optional because a self-hosted deployment has none to read, and because a
-   * host may compose the provider itself. Supplied, it becomes the SUBSCRIPTION
-   * source `EntitlementService` consults before the baseline; absent on a
-   * hosted deployment, every organization resolves free and the absence is
-   * reported.
+   * The Stripe subscription rows a hosted paid plan is read from. Optional because a
+   * self-hosted deployment has none to read, and because a host may compose the provider
+   * itself.
    */
   subscriptions?: BillingSubscriptionRepository;
   /**
@@ -183,24 +106,9 @@ const ENTITLEMENT_CONSEQUENCE = {
 } as const;
 
 /**
- * Composes the plan provider this process resolves every allowance through.
- *
- * **The policy itself is not written here.** Which baseline this deployment
- * starts from, which paid source is consulted over it and what that source is
- * built from come from `deploymentPlanSources`
- * (`@langwatch/enterprise-billing-server`), which the background process reads
- * too. It used to be written out in both roots and held together only by two
- * suites asserting the same fixtures. What is this process's own is the rest of
- * this function: the absences it names, and the entitlement service it
- * constructs around the answer — the service belongs to the core Entitlements
- * feature, which a feature package may not import.
- *
- * The tier enricher travels with the licence leg and is threaded by the shared
- * policy, not here. It fills a tier entitlement only where the resolved plan
- * left it undefined, and a signed licence is the one leg that can: a contract
- * minted before a flag existed resolves `ENTERPRISE` with that field unset. A
- * tier entitlement the plan table does not carry fails
- * `deployment-plan-sources.unit.test.ts` rather than reaching a customer.
+ * Composes the plan provider this process resolves every allowance through. **The policy
+ * itself is not written here.** Which baseline this deployment starts from, which paid
+ * source is consulted over it and what that source is built from come from
  */
 export function composeApiPlanProvider(options: ApiPlanProviderOptions): PlanProvider {
   // Built here rather than inside the shared policy: verification lives in the
@@ -232,13 +140,6 @@ export function composeApiPlanProvider(options: ApiPlanProviderOptions): PlanPro
 
 /**
  * The two routings the usage rollups take, off the one connection.
- *
- * They differ in the ID, not the endpoint: `trace_summaries` is scoped by a set
- * of PROJECT ids and routes through the tenant directory, `billable_events` by
- * the ORGANIZATION that is billed for them, which the directory cannot answer
- * — it looks a project row up, so an organization id raises
- * `UnknownTenantError`. Both land on the same physical endpoint for the same
- * customer.
  */
 export type ApiUsageClickHouse = Readonly<{
   /** Tenant-keyed, for the trace rollup. */
@@ -255,12 +156,6 @@ export type ApiUsageEnforcementOptions = Readonly<{
   plans: PlanProvider;
   /**
    * The two routings the rollups take, or none at all.
-   *
-   * None is the ONE case enforcement declines to run: a process that opened no
-   * ClickHouse cannot count what an organization has used, and a meter whose
-   * every reading is UNKNOWN is not enforcement — it is a warn line per
-   * ingested batch and an allowance nobody is held to. Saying so once at boot
-   * is the honest shape.
    */
   clickhouse: ApiUsageClickHouse | null;
   /** Picks the upgrade sentence the refusal ends with. */
@@ -271,19 +166,6 @@ export type ApiUsageEnforcementOptions = Readonly<{
 
 /**
  * The plan's monthly allowance, measured against the month's real volume.
- *
- * Composed here rather than shipped by a package because all three of its
- * collaborators are this root's own: `UsageOrganizationPort` is a join across
- * the team, project and organization aggregates that no ONE feature package
- * may name at once — the same reason {@link ApiUsageWarningDirectory} is
- * here — and the two counters are the deployment's decision about which store
- * it meters from. The package owns the POLICY (`UsageService`), which is why
- * none of it is re-implemented below.
- *
- * The two counters are unit-specific on purpose. `UsageService` resolves the
- * meter itself and then asks the counter for that unit, so a single counter
- * that re-resolved the unit would decide it twice, and the two decisions would
- * be taken against two reads of the same plan.
  */
 export function composeApiUsageEnforcement(
   options: ApiUsageEnforcementOptions,
@@ -317,16 +199,8 @@ export type ApiUsageStatsOptions = Readonly<{
   /** The plan the reading is taken against — the SAME one every banner reads. */
   plans: PlanProvider;
   /**
-   * The ClickHouse this process opened, as the two routings the rollups take,
-   * or none at all.
-   *
-   * ONE option rather than two, because they are one object: both accessors
-   * are published by this process's single `ApiClickHouseInfrastructure` and
-   * no deployment holds one without the other. As two fields they let a caller
-   * compose HALF a ClickHouse — the trace rollup readable and the events
-   * rollup not — which no root can produce, and which this reading has no
-   * honest answer for: its seven readings are issued together, so a refusal in
-   * one of them is a blank panel rather than one figure withheld.
+   * The ClickHouse this process opened, as the two routings the rollups take, or none at
+   * all.
    */
   clickhouse: ApiUsageClickHouse | null;
   /**
@@ -364,13 +238,8 @@ export function composeApiUsageStats(options: ApiUsageStatsOptions): ApiUsageSta
 }
 
 /**
- * The approaching-limit warning, or nothing to send it with.
- *
- * Nothing exactly when the deployment composed no mail. Every other
- * collaborator is available on a process that opened a database: the
- * administrators to write to, the per-project breakdown the message is mostly
- * made of, and the notification row that keeps a second message from going out
- * the same month.
+ * The approaching-limit warning, or nothing to send it with. Nothing exactly when the
+ * deployment composed no mail.
  */
 function composeApiUsageWarnings(
   options: ApiUsageStatsOptions,
@@ -425,14 +294,9 @@ class ApiComposedUsageStats extends ApiUsageStatsPort {
 }
 
 /**
- * The approaching-limit mail, rendered and sent by `@langwatch/mail`.
- *
- * A WHOLE send rather than a rendered body handed back: one recipient, one
- * subject, no BCC fan-out and no footer to sign, so there is no envelope
- * decision left for this process to make. Reaching the template here breaks no
- * boundary — `@langwatch/mail` is the one terminal
- * `frontend-boundary.unit.test.ts` allows a backend graph to enter, because
- * react-email renders server-side at send time.
+ * The approaching-limit mail, rendered and sent by `@langwatch/mail`. A WHOLE send rather
+ * than a rendered body handed back: one recipient, one subject, no BCC fan-out and no
+ * footer to sign, so there is no envelope decision left for this process to make.
  */
 export class ApiUsageLimitEmailAdapter extends UsageLimitEmailAdapter {
   static create(mail: ApiMailComposition): ApiUsageLimitEmailAdapter {
@@ -459,14 +323,9 @@ export class ApiUsageLimitEmailAdapter extends UsageLimitEmailAdapter {
 }
 
 /**
- * Who the warning goes to, and which projects it breaks down.
- *
- * Three reads no package ships an implementation of, because each is a join
- * across two aggregates a feature package may not name at once. They are the
- * platform application's own queries, unchanged: administrators only —
- * a warning about an allowance is addressed to the people who can act on it —
- * and every project the organization owns, ordered by name so the table in the
- * message reads the same way twice.
+ * Who the warning goes to, and which projects it breaks down. Three reads no package
+ * ships an implementation of, because each is a join across two aggregates a feature
+ * package may not name at once.
  */
 class ApiUsageWarningDirectory implements BillingUsageLimitOrganization {
   static create(prisma: PrismaClient): ApiUsageWarningDirectory {
@@ -513,27 +372,9 @@ class ApiUsageWarningDirectory implements BillingUsageLimitOrganization {
 }
 
 /**
- * One organization's volume, split by project, in whichever unit it is metered.
- *
- * The two units take different routes, and neither is the display counter's
- * single total. Events are one organization-keyed `GROUP BY TenantId` on the
- * billable-events rollup. Traces have no per-project read of their own — the
- * repository answers a total over a set of tenant ids — so this asks the same
- * question once per project, which is what tenant routing costs and what it
- * buys: each read lands on that project's own endpoint. An organization holds
- * a handful of projects and this runs on a user-initiated mutation, so the
- * fan-out is bounded and rare.
- *
- * UNKNOWN travels rather than a zero, all the way to the send: the message's
- * whole premise is that usage is high, and a table of zeros under that heading
- * tells an administrator the opposite of what happened. `UsageWarningService`
- * sends nothing on unknown and the threshold is still crossed on the next run.
- *
- * A process with NO ClickHouse answers unknown without asking, and that is the
- * one case the read below cannot recognise on its own: the events rollup is a
- * `GROUP BY`, so an unread rollup and an organization that sent nothing this
- * month both come back as an empty set. The difference is known here, at
- * composition, and nowhere below it.
+ * One organization's volume, split by project, in whichever unit it is metered. The two
+ * units take different routes, and neither is the display counter's single total. Events
+ * are one organization-keyed `GROUP BY TenantId` on the billable-events rollup.
  */
 class ApiUsageBreakdownAdapter implements BillingUsageCounter {
   static create(counter: ApiUsageCounterAdapter, readable: boolean): ApiUsageBreakdownAdapter {
@@ -556,14 +397,9 @@ class ApiUsageBreakdownAdapter implements BillingUsageCounter {
 }
 
 /**
- * The month's volume, and the unit it is counted in.
- *
- * The unit decision is the platform application's, unchanged: a licence's own
- * `usageUnit` wins, then a seat-and-event pricing model, then the free tier,
- * and otherwise traces. Both answers are read: `events` off the
- * organization-keyed `billable_events` rollup, `traces` off the tenant-keyed
- * `trace_summaries` one, and each returns UNKNOWN rather than zero when its
- * query did not run.
+ * The month's volume, and the unit it is counted in. The unit decision is the platform
+ * application's, unchanged: a licence's own `usageUnit` wins, then a seat-and-event
+ * pricing model, then the free tier, and otherwise traces.
  */
 class ApiUsageCounterAdapter extends UsageCounterPort {
   static create(options: ApiUsageStatsOptions): ApiUsageCounterAdapter {
@@ -615,14 +451,8 @@ class ApiUsageCounterAdapter extends UsageCounterPort {
   }
 
   /**
-   * The same month's volume, split by project, in the same unit.
-   *
-   * Events come back in one organization-keyed read. Traces have no
-   * per-project query — the repository answers a total over a set of tenant
-   * ids — so each project is asked for separately, which is what tenant
-   * routing costs: every read lands on that project's own endpoint. A single
-   * null anywhere makes the whole breakdown UNKNOWN rather than a table with
-   * one project silently reading zero.
+   * The same month's volume, split by project, in the same unit. Events come back in one
+   * organization-keyed read.
    */
   async countByProjects(input: {
     organizationId: string;
@@ -679,17 +509,6 @@ class ApiUsageCounterAdapter extends UsageCounterPort {
 
 /**
  * The organization graph, as enforcement needs it: three reads, one client.
- *
- * Written here rather than in a feature package because each of the three
- * crosses an aggregate boundary a package may not: a team's organization, an
- * organization's projects, and the organization row's pricing model. They are
- * the platform application's own queries, unchanged.
- *
- * `tryGetOrganizationIdByTeamId` answers null rather than throwing on a team
- * nobody owns. `UsageService` turns that into `OrganizationNotFoundForTeamError`,
- * which the ingest door treats as a failed lookup and lets the batch through —
- * refusing a customer's telemetry because our own directory could not place
- * their team is the worse of the two errors.
  */
 class ApiUsageOrganizationDirectory extends UsageOrganizationPort {
   static create(prisma: PrismaClient): ApiUsageOrganizationDirectory {
@@ -727,17 +546,6 @@ class ApiUsageOrganizationDirectory extends UsageOrganizationPort {
 
 /**
  * The month's TRACE volume, one project at a time.
- *
- * The rollup has no per-project read of its own — it answers a total over a
- * set of tenant ids — so each project is asked for separately, which is what
- * tenant routing costs and what it buys: every read lands on that project's
- * own endpoint. An organization holds a handful of projects.
- *
- * A single null anywhere makes the whole reading UNKNOWN rather than a total
- * with one project silently counted as zero: enforcement reads UNKNOWN as "we
- * cannot say" and lets traffic through, and it reads a short total as "well
- * inside the plan", which is the same permissive answer for the wrong reason
- * and stops being permissive the moment the real total crosses the cap.
  */
 class ApiTraceVolumeCounter extends UsageVolumeCounterPort {
   static create(billing: BillableEventsQueryService): ApiTraceVolumeCounter {
@@ -769,13 +577,9 @@ class ApiTraceVolumeCounter extends UsageVolumeCounterPort {
 }
 
 /**
- * The month's EVENT volume, in one organization-keyed read.
- *
- * The events rollup is a `GROUP BY TenantId` on rows already keyed by the
- * organization that is billed for them, so there is nothing to fan out and
- * `projectIds` is not consulted. An empty answer is a real measurement here —
- * this composition only builds the counter where a ClickHouse was opened, so
- * "no rows" means the organization sent nothing rather than "nobody asked".
+ * The month's EVENT volume, in one organization-keyed read. The events rollup is a `GROUP
+ * BY TenantId` on rows already keyed by the organization that is billed for them, so
+ * there is nothing to fan out and `projectIds` is not consulted.
  */
 class ApiEventVolumeCounter extends UsageVolumeCounterPort {
   static create(billing: BillableEventsQueryService): ApiEventVolumeCounter {

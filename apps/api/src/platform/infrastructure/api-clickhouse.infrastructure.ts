@@ -1,20 +1,6 @@
 /**
- * API-owned ClickHouse construction: one routed, pooled, bounded connection per
- * process, and its shutdown.
- *
- * The analytics reads, the filter pickers and every dashboard graph resolve
- * their client through here, and the resolution is TENANT-KEYED rather than
- * global: a project belonging to an organization with its own endpoint reaches
- * that endpoint, and everything else reaches the shared one. That routing is
- * `@langwatch/clickhouse-client`'s, not this module's — what this module owns
- * is the three process-shaped decisions the package deliberately does not
- * make: which vendor driver to build, how many sockets it may hold, and what a
- * refused statement becomes.
- *
- * The restricted LangWatchQL identity is NOT composed here. It is a different
- * database user with a row policy over the same cluster, it is opened by the
- * analytics collaborators from its own configuration, and keeping the two apart
- * is what stops a member's own SQL ever running on the administrative client.
+ * API-owned ClickHouse construction: one routed, pooled, bounded connection per process,
+ * and its shutdown.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createClient } from "@clickhouse/client";
@@ -49,12 +35,9 @@ export abstract class ApiClickHouseAbsenceReportPort {
 }
 
 /**
- * Which organization a tenant belongs to.
- *
- * Declared as the one question the router asks rather than as a Prisma client,
- * because that is all the routing needs and naming the client here would make
- * this composable only where a database exists. A process without one composes
- * no ClickHouse at all, which is the branch above this.
+ * Which organization a tenant belongs to. Declared as the one question the router asks
+ * rather than as a Prisma client, because that is all the routing needs and naming the
+ * client here would make this composable only where a database exists.
  */
 export type ApiTenantDirectory = TenantDirectory;
 
@@ -66,12 +49,8 @@ export type ApiClickHouseInfrastructureOptions = {
 };
 
 /**
- * This process refused the statement itself: its concurrency slots were taken
- * and its wait queue was full, so the statement never reached ClickHouse.
- *
- * Raised here rather than imported because the package asks the PROCESS what a
- * shedding refusal becomes: the shape is the limiter's, the code a client
- * renders its words from is the deployment's.
+ * This process refused the statement itself: its concurrency slots were taken and its
+ * wait queue was full, so the statement never reached ClickHouse.
  */
 class ClickHouseOverloadedError extends HandledError {
   declare readonly code: "clickhouse_overloaded";
@@ -96,11 +75,9 @@ class ApiOverloadErrorFactory extends ClickHouseOverloadErrorFactory {
 }
 
 /**
- * The vendor driver, built once per physical endpoint.
- *
- * `@clickhouse/client` is named in exactly this one place: everything above it
- * receives a client the package has already wrapped in retries, a statement
- * limiter and the default query settings.
+ * The vendor driver, built once per physical endpoint. `@clickhouse/client` is named in
+ * exactly this one place: everything above it receives a client the package has already
+ * wrapped in retries, a statement limiter and the default query settings.
  */
 class ApiVendorClickHouseClientFactory implements ClickHouseVendorClientFactory<
   ClickHouseClient & ClickHouseVendorClient
@@ -124,11 +101,6 @@ class ApiVendorClickHouseClientFactory implements ClickHouseVendorClientFactory<
 
 /**
  * The statement limiter's counters, as this process reports them.
- *
- * Logged rather than exported as metrics for now: the API process's Prometheus
- * registry is composed after infrastructure, and a gauge registered against a
- * registry that does not exist yet is a gauge nobody scrapes. Shedding still
- * says so out loud, which is the fact an operator acts on.
  */
 class LoggingClickHouseTelemetry extends ClickHouseManagedClientTelemetry {
   private readonly logger: Pick<Logger, "warn"> = createLogger("langwatch:api:clickhouse");
@@ -182,12 +154,6 @@ const apiManagedClickHouseClientFactory: ClickHouseClientFactory<
 export class ApiClickHouseInfrastructure {
   /**
    * Composes the connection only when this process was given an endpoint.
-   *
-   * A deployment with no `CLICKHOUSE_URL` and no private route reads no
-   * analytics, and that is a smaller process rather than a dead one: the
-   * charted surfaces refuse at the call with the message they always had. What
-   * it must not do is compose a connection over a blank string, whose first
-   * query would be the one that discovers the problem.
    */
   static tryCreate(
     options: ApiClickHouseInfrastructureOptions & { report?: ApiClickHouseAbsenceReportPort },
@@ -224,45 +190,22 @@ export class ApiClickHouseInfrastructure {
   ) {}
 
   /**
-   * The tenant-keyed resolver every analytics read runs through.
-   *
-   * Bound as a closure rather than handed out as the connection, so a caller
-   * cannot reach `shared()` and read one organization's data on another's
-   * endpoint. The one question they may ask is "the client for THIS tenant".
+   * The tenant-keyed resolver every analytics read runs through. Bound as a closure
+   * rather than handed out as the connection, so a caller cannot reach `shared()` and
+   * read one organization's data on another's endpoint.
    */
   readonly resolveClient = (tenantId: string): Promise<ClickHouseClient> =>
     this.connection.resolve(tenantId);
 
   /**
    * One ORGANIZATION's endpoint, keyed by the organization itself.
-   *
-   * A second closure rather than a widening of the one above, because the two
-   * take different ids and one of them is not a tenant: the billable-events
-   * rollup is scoped by `OrganizationId` — an organization's events span every
-   * project it owns — and there is no project to route on. Handing that id to
-   * the tenant resolver does not mis-route, it simply cannot answer: the
-   * directory behind it looks a PROJECT row up and an organization id has
-   * none, so the router raises `UnknownTenantError`.
-   *
-   * The routing itself is the same table the tenant resolver lands on — a
-   * private route for this organization, and otherwise the shared endpoint —
-   * so this opens no second connection pool. It is not a way to reach another
-   * organization's rows: the id names the organization whose endpoint is
-   * returned.
    */
   readonly resolveOrganizationClient = async (organizationId: string): Promise<ClickHouseClient> =>
     this.connection.resolveOrganization(organizationId);
 
   /**
-   * The install's own shared endpoint, or none when this deployment has only
-   * private routes.
-   *
-   * The third and last question, and the only one that is nobody's tenant: the
-   * operator's event-log explorer reads `event_log` ACROSS tenants, so it has
-   * neither a project nor an organization to route on. Null rather than a
-   * throw, because "this deployment has no shared endpoint" is a composition
-   * fact the caller acts on — it composes the explorer or it names its
-   * absence — rather than an error at the first query.
+   * The install's own shared endpoint, or none when this deployment has only private
+   * routes.
    */
   readonly resolveSharedClient = (): ClickHouseClient | null => {
     try {
@@ -274,11 +217,9 @@ export class ApiClickHouseInfrastructure {
   };
 
   /**
-   * Whether a query issued now would reach an endpoint.
-   *
-   * Reported rather than assumed: the connection exists as soon as one route
-   * does, and a process holding only private routes has no shared client for a
-   * tenant that maps to none.
+   * Whether a query issued now would reach an endpoint. Reported rather than assumed: the
+   * connection exists as soon as one route does, and a process holding only private
+   * routes has no shared client for a tenant that maps to none.
    */
   get sharedEndpointConfigured(): boolean {
     return this.resolveSharedClient() !== null;

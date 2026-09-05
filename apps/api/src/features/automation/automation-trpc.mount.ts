@@ -1,15 +1,7 @@
 /**
- * App-process transport mounts for the automation vertical.
- *
- * Behaviour is package-owned (`@langwatch/automation-server`); this supplies
- * the process's root, its procedures, the policy chain, and the ports the
- * automation package does not own.
- *
- * One of those ports is supplied here rather than by the composing process:
- * the trace-filter dry run is `@langwatch/trace-server`'s compiler, which this
- * process already depends on, and routing it through the composition root
- * would only move the same import one file further away from the transport
- * that needs it.
+ * App-process transport mounts for the automation vertical. Behaviour is package-owned
+ * (`@langwatch/automation-server`); this supplies the process's root, its procedures, the
+ * policy chain, and the ports the automation package does not own.
  */
 import {
   AutomationTrpcApi,
@@ -29,11 +21,7 @@ import { TraceQueryClickHouseAdapter } from "@langwatch/trace-server";
 import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
 /**
- * The automation ports the composing process supplies. Each reaches a
- * capability automation does not own: the shared rate-limit counter, the
- * provider registry's secret handling (the encryption key is the
- * deployment's), and the Slack channel listing, which goes out through the
- * process's own SSRF-checked HTTP client.
+ * The automation ports the composing process supplies.
  */
 export type AutomationMountPorts = Omit<AutomationTrpcPorts, "assertTraceFilterQueryCompiles">;
 
@@ -54,10 +42,9 @@ export function createAutomationTrpcRouter<
 }
 
 /**
- * Mounts `emailSuppression.*` on the app process's tRPC root.
- *
- * The unsubscribe pair arrives from a mail client, with no session, which is
- * why this mount takes the process's public procedure as well.
+ * Mounts `emailSuppression.*` on the app process's tRPC root. The unsubscribe pair
+ * arrives from a mail client, with no session, which is why this mount takes the
+ * process's public procedure as well.
  */
 export function createEmailSuppressionTrpcRouter<
   TContext extends EmailSuppressionTrpcContext,

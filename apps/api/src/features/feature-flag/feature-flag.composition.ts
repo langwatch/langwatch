@@ -1,28 +1,7 @@
 /**
  * The deployment's rollout flags, composed once for the whole process.
- *
- * `featureFlag.*` answers a browser which rollouts an account is inside, and
- * every other surface that gates on one — the Langy panel, the governance
- * console, the LangWatchQL workbench, the gateway menu — asks THIS service.
- *
- * ## Why it is its own composition
- *
- * It used to be built twice: once inside the product-group half, which
- * published it as `ctx.app.featureFlags` and as the record's shared
- * infrastructure, and once inside the analytics half, for the workbench
- * rollout gate and the graph-visibility policy. Both read the same table
- * through the same uncached port, so they agreed — but they were two objects
- * answering one question, which is the shape this codebase refuses everywhere
- * else. A rollout that answers two ways at one instant is worse than one that
- * answers slowly.
- *
- * So the process composes it FIRST, before any feature that gates on a flag,
- * and hands the one instance to all of them.
  */
-import type {
-  FeatureFlagConfig,
-  FeatureFlagService,
-} from "@langwatch/feature-flag-contract";
+import type { FeatureFlagConfig, FeatureFlagService } from "@langwatch/feature-flag-contract";
 import {
   FeatureFlagCachePort,
   PostgresFeatureFlagAdapter,
@@ -60,12 +39,8 @@ export function composeFeatureFlagFeature(options: {
 }
 
 /**
- * The flag store on a process with no database.
- *
- * The namespace still mounts and every read refuses by name. It does NOT
- * answer "off": a surface behind a rollout would then render as deliberately
- * disabled, and an operator would look for the flag rather than for the
- * database this process never opened.
+ * The flag store on a process with no database. The namespace still mounts and every read
+ * refuses by name.
  */
 export function refusingFeatureFlagFeature(): ComposedFeatureFlagFeature {
   return {
@@ -73,11 +48,9 @@ export function refusingFeatureFlagFeature(): ComposedFeatureFlagFeature {
     service: new Proxy(
       {},
       {
-        get:
-          () =>
-          (): never => {
-            throw new ApiFeatureFlagUnavailableError();
-          },
+        get: () => (): never => {
+          throw new ApiFeatureFlagUnavailableError();
+        },
         has: () => true,
       },
     ) as FeatureFlagService,
@@ -98,12 +71,7 @@ class ApiFeatureFlagUnavailableError extends HandledError {
 }
 
 /**
- * The flag cache, absent.
- *
- * Every read goes to Postgres. That is the correct default for a process with
- * no shared cache rather than a degradation: a cached flag on one process and
- * an uncached one on another is a rollout that answers two different ways at
- * the same instant, which is worse than answering slowly.
+ * The flag cache, absent. Every read goes to Postgres.
  */
 class UncachedApiFeatureFlags extends FeatureFlagCachePort {
   tryGet(_key: string): Promise<FeatureFlagCacheSlot | undefined> {

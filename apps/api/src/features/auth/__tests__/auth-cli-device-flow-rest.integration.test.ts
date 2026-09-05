@@ -1,25 +1,6 @@
 /**
- * The RFC 8628 CLI device grant end to end, through the real Hono app this
- * process mounts and the real session service it composes.
- *
- * The whole grant is one state machine over one keyspace, so the test drives
- * the machine rather than a seam: `/device-code` mints, `/lookup` resolves what
- * the browser is being asked to approve, `/approve` stamps the identity, and
- * `/exchange` redeems it. The store is in memory and the collaborators are
- * fakes; everything between them — the record shapes, the TTL arithmetic, the
- * single-use consumption, the poll window — is the code that runs in
- * production.
- *
- * What it pins beyond the golden path is the two refusals that are load
- * bearing rather than cosmetic:
- *
- *  - a second poll inside the window answers `slow_down`, from ONE atomic
- *    claim. A get-then-set spelled by hand would let two concurrent polls both
- *    see the window free, which is the failure the throttle exists to prevent.
- *  - a seat disabled between approve and exchange is refused with the CLI's
- *    one fatal code AND the device code is burned. The CLI treats any non-200
- *    as "keep polling", so a refusal that left the record approved would spin
- *    one ceiling walk every four seconds with no terminal error on screen.
+ * The RFC 8628 CLI device grant end to end, through the real Hono app this process mounts
+ * and the real session service it composes.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import {
@@ -100,12 +81,11 @@ describe("given a CLI starting a device login", () => {
       // next login and leave credentials accumulating.
       expect(world.mintedKeys).toEqual([{ deviceLabel: "bobs-macbook-pro", userId: USER_ID }]);
 
-      // Single use: a replay mints nothing. The poll window is what answers
-      // first here, because a SUCCESSFUL exchange deliberately leaves it
-      // standing — only the fatal branches burn it, so that a CLI which has
-      // already been told the grant is over cannot mistake "gone" for "too
-      // soon". The record itself is consumed either way, which is what the
-      // disabled-seat scenario below pins.
+      // Single use: a replay mints nothing. The poll window is what answers first here,
+      // because a SUCCESSFUL exchange deliberately leaves it standing — only the fatal
+      // branches burn it, so that a CLI which has already been told the grant is over
+      // cannot mistake "gone" for "too soon". The record itself is consumed either way,
+      // which is what the disabled-seat scenario below pins.
       const replayed = await api.post("/api/auth/cli/exchange", {
         device_code: grant.device_code,
       });
@@ -419,7 +399,8 @@ function deviceFlowWorld(
           });
         },
         validateCliSelection: (input: { selection: unknown }) => {
-          if (overrides.validateSelectionError) return Promise.reject(overrides.validateSelectionError());
+          if (overrides.validateSelectionError)
+            return Promise.reject(overrides.validateSelectionError());
           return Promise.resolve(input.selection);
         },
         tryResolveDefaultCliSelection: () => Promise.resolve({ bindings: [], permissions: [] }),

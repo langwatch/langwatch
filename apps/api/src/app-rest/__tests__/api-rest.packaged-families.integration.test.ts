@@ -1,18 +1,7 @@
 /**
  * The families that live in a FEATURE PACKAGE, driven through the real Hono app
- * `createApiProcessRestFeatures` returns.
- *
- * The retired platform router mounted all of these through ONE all-or-nothing
- * call over thirty-two product services. What is under test here is the thing
- * that replaced it: each family is its own condition, so a process holding the
- * service serves it and a process without it serves nothing at that path
- * rather than a 500 — and the boot report names which.
- *
- * The membership assertions are the point of the file. A family reaches the
- * route-policy registry when it is BUILT, so "is it mounted" is exactly "is it
- * reachable", and the two tables below pin both directions at once. On top of
- * them, one golden path and one named failure per credential class drive real
- * requests through the real chain.
+ * `createApiProcessRestFeatures` returns. The retired platform router mounted all of
+ * these through ONE all-or-nothing call over thirty-two product services.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
@@ -199,15 +188,8 @@ describe("given the byte-serving file family", () => {
 });
 
 /**
- * The avatar family, whose read is authorized for ANY authenticated caller on
- * the platform.
- *
- * That breadth is only safe because the family refuses every object whose
- * purpose and owner kind are not the avatar ones, and that refusal is only real
- * if the process's object read ANSWERS the owner kind. It did not, which is why
- * this family was a named absence; these drive the mounted family over a reader
- * that carries both columns.
- *
+ * The avatar family, whose read is authorized for ANY authenticated caller on the
+ * platform.
  * Spec: specs/settings/user-avatar-upload.feature
  */
 describe("given the avatar family over a reader that carries the owner kind", () => {
@@ -316,13 +298,6 @@ describe("given the workflow family on a process with no evaluation runner", () 
 
 /**
  * The tracked-event family, whose two URLs are one endpoint.
- *
- * `/api/track_event` predates `/api/events/track` and every pre-rename SDK
- * release still posts to it, so the pair is driven together: what these pin is
- * that the legacy URL reaches the SAME recorder and answers the SAME refusal,
- * because a second handler would drift the first time one of them gained a
- * check the other did not.
- *
  * Spec: specs/api-reference/tracked-event-validation.feature
  */
 describe("given the tracked-event family", () => {
@@ -438,11 +413,6 @@ function mount(collaborators: ApiPackagedRestCollaborators, report?: MountReport
       hono.fetch(new Request(`http://api.test${path}`, init)),
     /**
      * Whether ANY route is registered under this path.
-     *
-     * Read off the router rather than by fetching, because "mounted" is a fact
-     * about registration: a family that is present but refuses is still
-     * mounted, and one that is absent answers Hono's own 404 with no handler
-     * of ours ever running.
      */
     claims: (path: string) =>
       hono.routes.some((route) => route.path === path || route.path.startsWith(`${path}/`)),
@@ -496,12 +466,8 @@ function emptyCollaborators(): ApiPackagedRestCollaborators {
 }
 
 /**
- * The tracked-event family over the REAL ports this process composes, whose
- * span collection records the command rather than enqueueing it.
- *
- * Real rather than stubbed because the two-pass validation the tests above
- * drive lives in the ports, not in the transport: a stand-in that accepted
- * everything would leave the 400 unproven.
+ * The tracked-event family over the REAL ports this process composes, whose span
+ * collection records the command rather than enqueueing it.
  */
 function withTrackedEvents(): {
   collaborators: ApiPackagedRestCollaborators;
@@ -559,10 +525,9 @@ class RecordingCommands extends TraceIngressCommandPort {
 }
 
 /**
- * One avatar read, in the shape the process's adapter answers with.
- *
- * The defaults are a real avatar; each test overrides only the field whose
- * refusal it is about, so what a case changes IS what it claims.
+ * One avatar read, in the shape the process's adapter answers with. The defaults are a
+ * real avatar; each test overrides only the field whose refusal it is about, so what a
+ * case changes IS what it claims.
  */
 function avatarRead(overrides: { purpose?: string; ownerKind?: string; mediaType?: string } = {}): {
   status: "available";
@@ -587,10 +552,6 @@ function avatarReader(read: ReturnType<typeof avatarRead>): UserAvatarObjectRead
 
 /**
  * The avatar family over a session-authenticated caller.
- *
- * The dual-auth verifier is the family's own credential resolution, and the
- * handler keys its rate limit on what that verifier left behind — so a
- * pass-through that set nothing would 500 before any refusal was reached.
  */
 function withAvatarObject(
   read: ReturnType<typeof avatarRead>,
@@ -610,13 +571,9 @@ function withAvatarObject(
 }
 
 /**
- * The avatar family behind the process's REAL dual-credential verifier.
- *
- * The other avatar cases stub the verifier, because what they are about is the
- * refusal the family itself makes on an object. This one is about the door in
- * front of it, so the middleware under test has to be the one the process
- * composes: an anonymous request claims neither credential kind, and
- * arbitration answers "unclaimed" before any object is read.
+ * The avatar family behind the process's REAL dual-credential verifier. The other avatar
+ * cases stub the verifier, because what they are about is the refusal the family itself
+ * makes on an object.
  */
 function withRealDualAuth(objects: UserAvatarObjectReader): ApiPackagedRestCollaborators {
   return {

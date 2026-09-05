@@ -1,26 +1,5 @@
 /**
  * The model providers a tenant attaches, composed as their own feature.
- *
- * `modelProvider.*` — the credentials and the vendor probes behind them;
- * `llmModelCost.*` — the cost rules those calls are priced by; `translate.*` —
- * the provider-failure policy one model call is wrapped in. Plus the
- * `ctx.app.modelProviders` slice every other surface reads a provider through.
- *
- * They used to be composed inside the observability half, so a deployment
- * missing the trace read stack lost the whole provider surface with it.
- *
- * ## What reaches outside this process
- *
- * The vendor credential probes, the Codex device flow, the cost-rule span
- * preview and the model registry's ceilings all leave this process, so they
- * arrive as one port. Absent, a probe refuses and a preview reports no
- * matching spans — the safe direction, because a preview that invented matches
- * would talk somebody into a pricing rule.
- *
- * The regex safety gate is the one capability that cannot degrade at call
- * time — the cost-rule write and preview SCHEMAS are built from it — so an
- * absent host gets a conservative gate that refuses any pattern with nested
- * unbounded quantifiers rather than a gate that says yes.
  */
 import {
   declareAuthzMiddleware,
@@ -127,7 +106,8 @@ export function composeModelProviderFeature(options: {
   if (!options.modelProviders) options.report?.absent("gateway");
 
   const app = ModelProviderApp.create({
-    modelProviders: options.modelProviders ?? refusing<ModelProviderService>("the provider gateway"),
+    modelProviders:
+      options.modelProviders ?? refusing<ModelProviderService>("the provider gateway"),
     // Always passed, `undefined` included: the cost-rule preview's span reader
     // is the trace read stack's, and a process that composed none has no
     // reader to hand over rather than a different one.
@@ -148,11 +128,9 @@ export function composeModelProviderFeature(options: {
 }
 
 /**
- * The provider surfaces on a process that composed no database.
- *
- * All three namespaces still mount and every call refuses by name, so the
- * settings screen says the deployment cannot answer rather than reporting that
- * a tenant has attached no providers.
+ * The provider surfaces on a process that composed no database. All three namespaces
+ * still mount and every call refuses by name, so the settings screen says the deployment
+ * cannot answer rather than reporting that a tenant has attached no providers.
  */
 export function refusingModelProviderFeature(): ComposedModelProviderFeature {
   return {
@@ -197,13 +175,6 @@ function buildRouters(options: {
 
 /**
  * The two data-dependent gates the provider surface authorizes through.
- *
- * Both are `kind: "custom"` because neither resolves its scope id by NAME: a
- * provider belongs to an organization and reaches the scopes attached to it, so
- * a project is one valid way to name the tenant and the organization is the
- * other. What the caller may actually write is then decided per scope inside
- * the service, which is where organization scope demands `organization:manage`,
- * team demands `team:manage` and project demands `project:manage`.
  */
 function modelProviderChecks(authz: AuthzService): ModelProviderTrpcChecks {
   const probe =
@@ -273,11 +244,6 @@ class ProviderTenantDeniedError extends HandledError {
 
 /**
  * The cost-rule ports for a process with no provider host.
- *
- * `isSafeRegex` cannot refuse — the write and preview schemas are BUILT from
- * it — so it answers conservatively instead: a pattern with a quantified group
- * that is itself quantified is the catastrophic-backtracking shape, and this
- * says no to it rather than yes to everything.
  */
 function conservativeCostRules(): LlmModelCostTrpcPorts {
   const nestedQuantifier = /\([^)]*[+*][^)]*\)\s*[+*]/;
@@ -294,11 +260,9 @@ function refusing<T>(capability: string): T {
   return new Proxy(
     {},
     {
-      get:
-        () =>
-        (): never => {
-          throw new ApiModelProviderUnavailableError(capability);
-        },
+      get: () => (): never => {
+        throw new ApiModelProviderUnavailableError(capability);
+      },
       has: () => true,
     },
   ) as T;

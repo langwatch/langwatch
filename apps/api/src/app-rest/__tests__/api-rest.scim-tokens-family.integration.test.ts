@@ -1,19 +1,6 @@
 /**
- * The SCIM tokens management family and the SCIM protocol family, mounted
- * together over ONE directory application.
- *
- * Together is the point. A SCIM token is the credential an identity provider
- * will hold, so what has to be pinned is not that three routes answer but that
- * the value the mint returns is the value the protocol door accepts, that it
- * appears nowhere else afterwards, and that a revoke takes it out of both
- * doors at once. Mounting the management family on its own would prove none of
- * that.
- *
- * The store below is in memory rather than Postgres, and it stores a DIGEST:
- * the assertions are about what crosses the wire in each direction, which is
- * the transport's own contract, and a store that kept plaintext would let the
- * "never returns secrets" assertion pass for the wrong reason.
- *
+ * The SCIM tokens management family and the SCIM protocol family, mounted together over
+ * ONE directory application. Together is the point.
  * @see specs/organizations/scim-tokens-rest-api.feature
  */
 import { createHash, randomUUID } from "node:crypto";
@@ -133,10 +120,9 @@ class TokenNotFound extends NotFoundError {
 }
 
 /**
- * One directory application behind both doors, keeping only digests.
- *
- * Everything outside the token lifecycle is a NAMED absence: an operation this
- * suite does not compose fails saying so rather than answering emptily.
+ * One directory application behind both doors, keeping only digests. Everything outside
+ * the token lifecycle is a NAMED absence: an operation this suite does not compose fails
+ * saying so rather than answering emptily.
  */
 function inMemoryScim(): ScimService {
   const tokens = new Map<

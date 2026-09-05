@@ -1,22 +1,7 @@
 /**
  * Integration tests for the execution-data load against the real database.
- *
- * Composed here rather than inside the Experiment feature package: the load
- * reads prompts through the Prompt feature's own server adapter, and no
- * feature server package may import another's.
- *
- * Regression coverage for: a workflow built in Optimization Studio and saved
- * as an agent (agent.type === "workflow") has no code of its own — it only
- * points at a Studio workflow. loadExecutionData must resolve that linked
- * workflow's published DSL so the orchestrator can run it as a whole
- * workflow, instead of falling through to the code-execution path with no
- * source at all.
- *
  * @see specs/experiments-v3/workbench-versioning.feature
  * @see specs/experiments-v3/evaluation-execution.feature
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it so the suite
- * stays runnable on a box with no database.
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

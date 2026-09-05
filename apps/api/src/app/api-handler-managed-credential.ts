@@ -1,23 +1,7 @@
 /**
- * The project credential, resolved for a family that answers its own refusals.
- *
- * Most REST families let the framework authenticate them: the chain resolves
- * the credential, checks the permission, and renders a refusal in whichever
- * envelope the family declared. A handful cannot, because they publish refusal
- * bodies that predate both envelopes and that deployed clients parse — a bare
- * `{ message }` for an unauthenticated call, and the full handled payload for a
- * ceiling denial. Routing those through the chain would change the wire.
- *
- * So they take a port instead, and this is the process's one implementation of
- * it. It resolves through the SAME `ApiKeyService` and `AuthzService` the
- * framework chain uses and refuses with the SAME two errors
- * (`ApiKeyPermissionDeniedError` / `ApiKeyPermissionNotDelegableError`), so the
- * two doors cannot decide differently about a caller; only the shape of the
- * sentence they write differs, which is the whole point of the port.
- *
- * The bodies below are transcribed from the routes that published them, not
- * invented: changing one is a wire change and belongs in a deliberate
- * deprecation, not in a refactor.
+ * The project credential, resolved for a family that answers its own refusals. Most REST
+ * families let the framework authenticate them: the chain resolves the credential, checks
+ * the permission, and renders a refusal in whichever envelope the family declared.
  */
 import { type ApiKeyService, type ResolvedApiKeyToken } from "@langwatch/api-key-contract";
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
@@ -39,10 +23,9 @@ export type HandlerManagedCredential =
   | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>;
 
 /**
- * The sentence an unauthenticated caller of these families receives.
- *
- * It names all three accepted credential shapes because that is what it has
- * always named, and an SDK's own error copy quotes it.
+ * The sentence an unauthenticated caller of these families receives. It names all three
+ * accepted credential shapes because that is what it has always named, and an SDK's own
+ * error copy quotes it.
  */
 const MISSING_CREDENTIAL_MESSAGE =
   "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).";
@@ -69,12 +52,8 @@ export class ApiHandlerManagedCredentials {
   ) {}
 
   /**
-   * Resolve the request's project credential and enforce one permission as an
-   * API-key ceiling.
-   *
-   * A legacy project key is NOT permission-checked: project keys predate RBAC
-   * and carry full project access by design, so a route's declared permission
-   * is decorative for that credential class. Only scoped API keys are checked.
+   * Resolve the request's project credential and enforce one permission as an API-key
+   * ceiling.
    */
   async authenticate(input: {
     request: Request;
@@ -118,19 +97,8 @@ export class ApiHandlerManagedCredentials {
   }
 
   /**
-   * Enforces one permission as an ALREADY-RESOLVED key's ceiling, THROWING the
-   * same refusal {@link authenticate} would have answered with.
-   *
-   * Separate from `authenticate` because two families cannot use the combined
-   * form: the Langy doors have to read the resolved key's PROJECT before they
-   * know whether the surface is even open for it, and the UI-action door only
-   * learns which permission to check once the dispatched action names one. Both
-   * would otherwise have to check a ceiling ahead of a rollout gate, which is
-   * how a dark surface reveals itself by answering 403.
-   *
-   * It throws rather than returning a refusal because the callers are inside a
-   * canonical-envelope family, whose error boundary is what renders a handled
-   * error — the same decision, in that family's own sentence.
+   * Enforces one permission as an ALREADY-RESOLVED key's ceiling, THROWING the same
+   * refusal {@link authenticate} would have answered with.
    */
   async enforceCeiling(input: {
     resolved: ResolvedApiKeyToken;
@@ -167,14 +135,9 @@ export class ApiHandlerManagedCredentials {
 }
 
 /**
- * The wire body for a handled error answered by a middleware rather than by an
- * error boundary: the code as the discriminant, the sentence, the meta bag
- * spread flat, and the remediation channel alongside.
- *
- * The same shape the process's own error boundary writes. A denial that
- * answered with only a sentence would give an agent or a CLI nothing to act
- * on, which is why the remediation fields ride along even though older clients
- * ignore them.
+ * The wire body for a handled error answered by a middleware rather than by an error
+ * boundary: the code as the discriminant, the sentence, the meta bag spread flat, and the
+ * remediation channel alongside. The same shape the process's own error boundary writes.
  */
 function handledErrorResponseBody(error: HandledError): object {
   const { code, message, meta, tips, docsUrl, fault, retryable } = error;

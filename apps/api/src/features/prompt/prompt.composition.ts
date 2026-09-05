@@ -1,15 +1,7 @@
 /**
- * A project's prompt library, composed as its own feature.
- *
- * `prompts.*` reads and writes the stored prompts and their versions, and
- * publishes the `ctx.app.prompts` slice the packaged prompt REST family and the
- * hosted MCP surface read.
- *
- * The model gateway is optional here on purpose: a prompt row reads and writes
- * without it, and the adapter's own contract treats an absent gateway as "no
- * provider metadata" rather than a failure. So the namespace mounts on a
- * deployment with no gateway; what it cannot do there is annotate a version
- * with the provider behind its model.
+ * A project's prompt library, composed as its own feature. `prompts.*` reads and writes
+ * the stored prompts and their versions, and publishes the `ctx.app.prompts` slice the
+ * packaged prompt REST family and the hosted MCP surface read.
  */
 import { HandledError } from "@langwatch/handled-error";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
@@ -67,10 +59,9 @@ export function composePromptFeature(options: {
 }
 
 /**
- * The prompt library on a process that composed no graph to read it over.
- *
- * The namespace still mounts and every call refuses by name, so a project is
- * told its prompts are unreachable rather than shown an empty library.
+ * The prompt library on a process that composed no graph to read it over. The namespace
+ * still mounts and every call refuses by name, so a project is told its prompts are
+ * unreachable rather than shown an empty library.
  */
 export function refusingPromptFeature(): ComposedPromptFeature {
   const logger = createLogger("langwatch:api:prompt");
@@ -79,18 +70,15 @@ export function refusingPromptFeature(): ComposedPromptFeature {
   };
 
   return {
-    router: (mount) =>
-      createPromptTrpcRouter({ ...mount, ports: promptPorts(logger, undefined) }),
+    router: (mount) => createPromptTrpcRouter({ ...mount, ports: promptPorts(logger, undefined) }),
     app: new Proxy({}, { get: () => refuse, has: () => true }) as PromptApp,
   };
 }
 
 /**
- * The one answer the prompt surface needs from the deployment.
- *
- * The same on a composed feature and a refusing one: the signal is
- * fire-and-forget marketing, so an absent sink logs once rather than refusing
- * the prompt it was meant to announce.
+ * The one answer the prompt surface needs from the deployment. The same on a composed
+ * feature and a refusing one: the signal is fire-and-forget marketing, so an absent sink
+ * logs once rather than refusing the prompt it was meant to announce.
  */
 function promptPorts(
   logger: Pick<Logger, "debug">,

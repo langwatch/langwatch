@@ -1,15 +1,7 @@
 /**
- * `automation.*` and `emailSuppression.*` — the triggers a project fires on,
- * their channels, and who asked those channels to stop writing to them —
- * composed as one feature.
- *
- * Two namespaces, one feature, because they are one application: a suppression
- * is what an automation's mail honours, and a process holding one without the
- * other would offer a list of addresses nothing consults.
- *
- * The API process READS and WRITES those rows. It does not RUN them — the six
- * capabilities of the running half are named absences inside
- * {@link composeApiAutomationApp}, which is where they refuse.
+ * `automation.*` and `emailSuppression.*` — the triggers a project fires on, their
+ * channels, and who asked those channels to stop writing to them — composed as one
+ * feature.
  */
 import {
   AutomationProviderRegistryAdapter,
@@ -52,11 +44,8 @@ export type ComposedAutomationFeature = Readonly<{
   /** For `ctx.app.automation`. */
   app: AutomationApp;
   /**
-   * The same application, where this process composed one, for the packaged
-   * automation REST family and the one-click unsubscribe door. Published
-   * separately because both doors are MOUNTED rather than refused: a mail
-   * client following an unsubscribe link must not be answered by a family
-   * standing over an application nobody composed.
+   * The same application, where this process composed one, for the packaged automation
+   * REST family and the one-click unsubscribe door.
    */
   service?: AutomationApp | undefined;
 }>;
@@ -144,10 +133,6 @@ export function composeAutomationFeature(options: {
 
 /**
  * Both automation namespaces on a process that composed no trigger store.
- *
- * They still mount and every call refuses by name: an empty trigger list reads
- * as "this project automates nothing", which is a different statement from
- * "this process cannot see its automations".
  */
 export function refusingAutomationFeature(): ComposedAutomationFeature {
   const refuse = (): never => {

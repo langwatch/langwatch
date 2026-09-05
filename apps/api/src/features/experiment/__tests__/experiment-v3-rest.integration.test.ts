@@ -1,17 +1,6 @@
 /**
- * The experiment workbench's REST doors, driven through the real Hono app the
- * API process mounts.
- *
- * What is pinned here is the part the move could have changed silently: which
- * credential class each door resolves, the order its refusals come in, and —
- * the reason the family is mounted at all on a process with no progress store
- * — that the four RUN doors refuse by NAME while the four SETUP doors keep
- * answering. A workbench that stopped serving a saved experiment because the
- * deployment cannot poll a run would be a worse outcome than the absence.
- *
- * The `/api/evaluations/v3` alias is here for the same reason it is a separate
- * app: it forwards INTO the canonical family, so the only way to know it still
- * arrives is to send a request down it.
+ * The experiment workbench's REST doors, driven through the real Hono app the API process
+ * mounts.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { ExperimentApp } from "@langwatch/experiment-server";

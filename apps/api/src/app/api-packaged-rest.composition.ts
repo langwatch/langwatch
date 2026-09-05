@@ -1,18 +1,5 @@
 /**
- * The packaged REST families' collaborators, composed from this process's own
- * graph.
- *
- * One place rather than twenty-eight lines inside `composeDoors`, because the
- * decisions are all the same shape: take the service the process already
- * composed for its tRPC record — never build a second one — and bind the few
- * things that are the PROCESS's rather than any feature's (the deep links, the
- * plan gate, the ledger attribution, the permission vocabulary, the two byte
- * gates). A family whose service is missing is left out of the list this
- * returns, and {@link LoggedApiPackagedRestAbsence} says which and why at boot.
- *
- * Everything here is TAKEN. The reason is the one this migration keeps
- * meeting: two applications over one project's rows let two doors answer the
- * same question differently, and REST and tRPC are exactly two doors.
+ * The packaged REST families' collaborators, composed from this process's own graph.
  */
 import { TraceContentExtractionService } from "@langwatch/trace-server";
 import { AgentApp } from "@langwatch/agent-server";
@@ -107,10 +94,8 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   experiment: ComposedExperimentFeature;
   workflow: ComposedWorkflowFeature;
   /**
-   * The Enterprise governance slices the `/api/governance` and
-   * `/api/webhooks/v1` families are handed. Taken rather than reached for
-   * through a group: the same two slices `ctx.app` carries, so the REST door
-   * and the browser's cannot answer differently.
+   * The Enterprise governance slices the `/api/governance` and `/api/webhooks/v1`
+   * families are handed.
    */
   enterpriseGovernance: EnterpriseGovernanceApplication;
   /** The tenant fan-out the bulk exports report their progress on. */
@@ -135,14 +120,8 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   /** The browser session, where this deployment composed a transport. */
   session: ApiHandlerManagedSessionPort | undefined;
   /**
-   * The ingest doors' one dedup gate and command sender, where this process
-   * registered a command queue.
-   *
-   * TAKEN rather than built here, and for a sharper reason than the rest of
-   * this file gives: the tracked-event family writes a span whose id is a
-   * digest of the trace and event ids, and that only deduplicates a retried
-   * REST call against a redelivered SDK event while both claim the same Redis
-   * keys. A second composition would score the same rating twice.
+   * The ingest doors' one dedup gate and command sender, where this process registered a
+   * command queue.
    */
   traceIngest: ApiTraceIngestComposition | undefined;
   /** The credential pair and the project directory every family resolves through. */
@@ -153,10 +132,6 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   modelProviders: ModelProviderService | undefined;
   /**
    * The API-key ceiling for one permission, as the framework chain applies it.
-   *
-   * Handed in rather than built here: it is the SAME middleware the declared
-   * access policies install, and a second implementation would be a second
-   * answer to whether a key may do something.
    */
   requireApiKeyPermission: (permission: AuthzPermission) => MiddlewareHandler;
   audit: ApiAuditPort | undefined;
@@ -169,11 +144,9 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
 }>;
 
 /**
- * Binds every packaged family this process can serve.
- *
- * Always returns a bag: the families themselves are individually conditional,
- * and a process that composed none of them still mounts none rather than
- * mounting a list of refusals.
+ * Binds every packaged family this process can serve. Always returns a bag: the families
+ * themselves are individually conditional, and a process that composed none of them still
+ * mounts none rather than mounting a list of refusals.
  */
 export function composeApiPackagedRest(
   options: ApiPackagedRestCompositionOptions,
@@ -273,15 +246,10 @@ export function composeApiPackagedRest(
       // narrowing the monitors tRPC surface already settled for.
       monitorMappingsSchema: monitorApiMappingsSchema,
       requireApiKeyPermission: options.requireApiKeyPermission,
-      // The SAME gate object both ingest doors hold, applied to the one
-      // packaged family that reports run data: a scenario event is trace
-      // content, and a project over its plan must be refused at every door
-      // that writes it or the allowance is only advisory.
-      //
-      // With no gate composed the request is accepted, which is the
-      // degradation the receiver has always had when the lookup failed:
-      // telemetry a customer already paid to produce is not dropped, and the
-      // absent meter is named at boot rather than once per request.
+      // The SAME gate object both ingest doors hold, applied to the one packaged family
+      // that reports run data: a scenario event is trace content, and a project over its
+      // plan must be refused at every door that writes it or the allowance is only
+      // advisory.
       traceUsageGuard: traceUsageGuardFor({
         usageLimit: options.traceIngest?.usageLimit,
         logger: options.logger,
@@ -318,13 +286,6 @@ export function composeApiPackagedRest(
 
 /**
  * Refuses a project's write once its team has spent the plan's allowance.
- *
- * The gate itself is the ingest composition's, taken rather than rebuilt: the
- * collector, the OTLP receiver and this family are one allowance, and a second
- * meter over the same team would let a customer route around the first by
- * choosing a door. It throws {@link PlanLimitExceededError}, which the family's
- * error boundary renders as a 402 — terminal rather than retryable, for the
- * reason the ingest composition's own docblock gives.
  */
 function traceUsageGuardFor(options: {
   usageLimit: CollectorUsageLimitPort | undefined;
@@ -356,14 +317,7 @@ function traceUsageGuardFor(options: {
 }
 
 /**
- * The content-addressed store, in the shape the trace vertical's extractor
- * takes.
- *
- * A bridge in the PROCESS rather than a dependency between two feature server
- * packages: the extractor is the trace vertical's rule about message content,
- * the store is the stored-object vertical's, and neither package may reach the
- * other. It is the same seam the LiteLLM parameter resolution and the Azure
- * credential read already occupy.
+ * The content-addressed store, in the shape the trace vertical's extractor takes.
  */
 class ApiTraceMediaStore extends TraceMediaStorePort {
   static create(store: StoredObjectsService): ApiTraceMediaStore {
@@ -393,10 +347,9 @@ function agentAppFrom(agents: AgentService): () => AgentApp {
 }
 
 /**
- * The `/api/v1/agents` family's connected-agent deps, over the SAME
- * composition the WebSocket gateway and the long-poll transport run on — a
- * relay dispatched through this door and one delivered over the socket read
- * one runtime.
+ * The `/api/v1/agents` family's connected-agent deps, over the SAME composition the
+ * WebSocket gateway and the long-poll transport run on — a relay dispatched through this
+ * door and one delivered over the socket read one runtime.
  */
 function agentsV1ConnectedFrom(connectedAgents: ApiConnectedAgentsComposition) {
   return () => ({
@@ -424,13 +377,8 @@ function secretAppFrom(secrets: SecretService): () => SecretApp {
 }
 
 /**
- * The tracked-event family's ports, over the span builder the ingest
- * composition already holds.
- *
- * Bound once and handed back by a provider, the way the two applications above
- * are: the bag is closures over one builder and one logger, and building a
- * second one per mount would make the two doors' error sinks two objects for
- * no gain.
+ * The tracked-event family's ports, over the span builder the ingest composition already
+ * holds.
  */
 function trackedEventPortsFrom(
   options: ApiPackagedRestCompositionOptions,
@@ -443,11 +391,9 @@ function trackedEventPortsFrom(
 }
 
 /**
- * The agent cache's store and cipher.
- *
- * Absent without a cipher: an entry holds whatever an agent produced — a
- * session envelope, a provider token — and writing it in the clear so the
- * family could mount would put that on a shared Redis in plaintext.
+ * The agent cache's store and cipher. Absent without a cipher: an entry holds whatever an
+ * agent produced — a session envelope, a provider token — and writing it in the clear so
+ * the family could mount would put that on a shared Redis in plaintext.
  */
 function composeAgentCache(
   options: ApiPackagedRestCompositionOptions,
@@ -460,10 +406,9 @@ function composeAgentCache(
 }
 
 /**
- * Refuses a route unless the resolved organization's plan is Enterprise.
- *
- * Absent without a plan provider rather than passing: a gate that cannot read
- * a plan and admits anyway hands an Enterprise capability to every deployment.
+ * Refuses a route unless the resolved organization's plan is Enterprise. Absent without a
+ * plan provider rather than passing: a gate that cannot read a plan and admits anyway
+ * hands an Enterprise capability to every deployment.
  */
 function composeEnterpriseGate(
   plans: PlanProvider | undefined,
@@ -488,18 +433,8 @@ function createPlatformUrl(publicBaseUrl: string | undefined): PlatformUrlBuilde
 }
 
 /**
- * The permission vocabulary a custom role is written in, derived from the
- * AuthZ registry rather than kept as a second cross product.
- *
- * The platform application kept its own action and resource lists plus a
- * hand-maintained organization-exclusive set that its own source marked
- * `@deprecated`. Deriving all three from `ALL_PERMISSIONS` is what makes the
- * catalogue `/api/roles` publishes and the check the engine performs one fact.
- *
- * Exported because the OpenAPI generator needs the SAME vocabulary: the custom
- * roles family builds its request enum from this list at mount time, so a
- * description composed over a stand-in vocabulary would publish an enum the
- * running process does not accept.
+ * The permission vocabulary a custom role is written in, derived from the AuthZ registry
+ * rather than kept as a second cross product.
  */
 export const REGISTRY_RBAC_VOCABULARY: AppRestRbacVocabulary = {
   actions: [...new Set(ALL_PERMISSIONS.map((permission) => permission.split(":")[1] ?? ""))].sort(),

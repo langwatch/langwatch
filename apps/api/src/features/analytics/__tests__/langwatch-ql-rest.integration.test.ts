@@ -1,14 +1,6 @@
 /**
- * The two analytics REST families, driven through the real Hono apps the API
- * process mounts.
- *
- * Raw LangWatchQL is `/api/v1/query` and nothing else: the per-project pair at
- * `.../analytics/query/clickhouse` and `.../analytics/schema` was removed with
- * issue #7565, so there is no path project id left to cross-check and no
- * rollout flag left to consult. What is pinned here is that the statement runs
- * as the CREDENTIAL's project, with the tenant key read server-side, and that
- * the saved-chart family still reads off the same dashboard application the
- * browser reads.
+ * The two analytics REST families, driven through the real Hono apps the API process
+ * mounts.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";

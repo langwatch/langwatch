@@ -1,17 +1,5 @@
 /**
  * The experiments REST surface, as an integrator finds it.
- *
- * The document is generated here through `generateOpenApiDocument`, over the
- * same `createApiProcessRestFeatures` enumeration the process mounts, so an
- * endpoint that stops being mounted or stops carrying `describeRoute` fails
- * here rather than being described by a list this file also owns.
- *
- * The defect this guards against was a customer reading the API reference,
- * finding no way to create an experiment, and concluding the REST API could
- * not do it — while `POST /api/experiment/init`, the call every SDK makes
- * first, had been serving traffic the whole time.
- *
- * See specs/api-reference/experiments-rest-api.feature.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdtemp } from "node:fs/promises";

@@ -1,31 +1,5 @@
 /**
  * The two credential kinds a browser-served BYTE endpoint accepts, arbitrated.
- *
- * Browsers fire `<audio src="/api/files/:id">` and `<img src="/api/user-avatar/…">`
- * with the session cookie and no custom headers, so a key-only chain would 401
- * the in-app player and every member list. These endpoints therefore accept
- * either a project API key or a browser session, decided by arbitration
- * (`arbitrateClaims`, specs/rbac/credential-arbitration.feature): a kind claims
- * the request iff it is in play — extractable API-key material in the headers,
- * or a cookie jar that resolves to a live session — and exactly one claim
- * proceeds.
- *
- *   - API key alone: the key decides, and its refusal is final. An invalid key
- *     is that key's own 401, never a silent retry as the session — masking one
- *     credential's failure with another identity was the bug class the old
- *     401/403 fallback carried.
- *   - Session alone: the session authenticates.
- *   - Both: refused as contested. Arbitration never ranks credentials — a
- *     precedence rule is a guess about which identity the caller meant.
- *   - Neither: structurally unauthenticated.
- *
- * On success `c.var.userId` (session path) or `c.var.apiKeyProjectId` (API-key
- * path) is set, so the handler applies the right gate.
- *
- * This process resolves both through the SAME services its framework chain and
- * its tRPC boundary do — `ApiKeyService` and `ApiHandlerManagedSession` — rather
- * than through a second middleware of its own, so the byte doors and every
- * other door cannot decide differently about one caller.
  */
 import { getTokenType, type ApiKeyService } from "@langwatch/api-key-contract";
 import { arbitrateClaims, type AuthzPermission } from "@langwatch/authz-contract";
@@ -38,10 +12,7 @@ import type { ApiHandlerManagedSessionPort } from "./api-handler-managed-session
 import { extractApiKeyRequestCredentials } from "./api-key-request-credentials";
 
 /**
- * More than one credential kind claimed the request. A knowable cause the
- * caller can act on — drop one credential — so it carries a stable `code`
- * rather than prose a caller would have to string-match, and is
- * distinguishable on the wire from the plain unauthenticated 401.
+ * More than one credential kind claimed the request.
  */
 export class ContestedCredentialsError extends HandledError {
   declare readonly code: "contested_credentials";
@@ -61,20 +32,14 @@ export type ApiDualAuthVariables = {
   userId?: string;
   /**
    * The resolved key's ceiling, bound to the credential this request carried.
-   * A byte door authorizes per object, so it decides which permission to ask
-   * for; without it the API-key branch enforced no ceiling at all and any key
-   * of the organization read any project's bytes through `X-Project-Id`.
    */
   apiKeyCeiling?: (permission: AuthzPermission) => Promise<void>;
 };
 
 /**
- * Whether the Authorization material claims the request. A prefix-less token
- * is either a legacy project key (pre-`sk-lw-`, still valid) or a reverse
- * proxy's own Basic header riding along on an `<img>`/`<audio>` fetch — the
- * prefix cannot tell them apart. So: with a live session, an unknown-prefix
- * token abstains and the session decides; with no session it claims and the
- * key lookup decides. A recognized LangWatch prefix always claims.
+ * Whether the Authorization material claims the request. A prefix-less token is either a
+ * legacy project key (pre-`sk-lw-`, still valid) or a reverse proxy's own Basic header
+ * riding along on an `<img>`/`<audio>` fetch — the prefix cannot tell them apart.
  */
 function apiKeyClaims({
   token,

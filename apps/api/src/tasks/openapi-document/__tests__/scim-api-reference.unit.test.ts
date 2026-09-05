@@ -1,13 +1,7 @@
 /**
- * SCIM 2.0 as an identity administrator finds it in the API reference.
- *
- * The routes served identity providers for as long as SCIM has shipped while
- * the reference said nothing about them. So the operations compared here are
- * read off the process's OWN router (`servedRoutes`) rather than a list this
- * file owns: a sixteenth route fails this test on the day it is registered,
- * not the day a customer asks where it is documented.
- *
- * See specs/api-reference/scim-api-reference.feature.
+ * SCIM 2.0 as an identity administrator finds it in the API reference. The routes served
+ * identity providers for as long as SCIM has shipped while the reference said nothing
+ * about them.
  */
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -49,7 +43,11 @@ beforeAll(async () => {
     .filter((route) => route.includes(SCIM_PREFIX) && !route.includes("*"))
     .map((route) => {
       const [method, path] = route.split(" ");
-      return { key: `${method!.toUpperCase()} ${path!}`, method: method!.toLowerCase(), path: path! };
+      return {
+        key: `${method!.toUpperCase()} ${path!}`,
+        method: method!.toLowerCase(),
+        path: path!,
+      };
     })
     .sort((left, right) => left.key.localeCompare(right.key));
 });
@@ -69,8 +67,10 @@ describe("given the SCIM 2.0 REST API", () => {
       const missing = operations
         .filter(({ method, path }) => operationIn(method, path) === undefined)
         .map(({ key }) => key);
-      expect(missing, `SCIM routes registered but absent from the document:\n${missing.join("\n")}`)
-        .toEqual([]);
+      expect(
+        missing,
+        `SCIM routes registered but absent from the document:\n${missing.join("\n")}`,
+      ).toEqual([]);
 
       // A derived id is built from the method and the URL segments. Those
       // become the generated SDKs' function names, which is why each is chosen.

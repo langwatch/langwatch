@@ -1,27 +1,5 @@
 /**
  * The API process's `/api/auth` door.
- *
- * Behaviour is package-owned (`@langwatch/auth-server`); this supplies the
- * eight things the family reaches that Auth does not own, and every one of
- * them is TAKEN from a half this process already composed — the Better Auth
- * instance the session transport reads, the Auth service the tRPC boundary
- * revokes through, the credential service every other door resolves a token
- * on, and the flag store and typed client the born-finalized entrance decides
- * per organization from. A second of any of them would let sign-in and every
- * other door disagree about one person.
- *
- * ## What makes the family absent
- *
- * No composed Better Auth instance, no database, no credential service or no
- * flag store. The first is the sharp one: where a host supplied its own
- * transport this process holds no instance and none of its options, and an
- * instance built here from a different option set would not fail — it would
- * verify nothing and answer "signed out" to everybody.
- *
- * NAMED ABSENCE: no federated logout. This process mounts no social or generic
- * OIDC provider at all (see `composeApiBetterAuth`), so there is no identity
- * provider session for a logout to end, and `null` — the local redirect to
- * `/auth/signin` — is the whole truth rather than a stub for one.
  */
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { AuthService } from "@langwatch/auth-contract";

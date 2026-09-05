@@ -1,16 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Which address a request came from: the socket, unless the hop it arrived
- * from is one the deployment named.
- *
- * Two regressions are pinned here. The reader used to trust the first
- * forwarding header that PARSED, from any peer — so a caller sending
- * `cf-connecting-ip: 203.0.113.<n>` landed every sign-in attempt in its own
- * rate-limit bucket and never met the limit. And before that it built a
- * request stub with headers only, so the socket fallback was dead and every
- * header-less caller shared one bucket.
- *
+ * Which address a request came from: the socket, unless the hop it arrived from is one
  * @regression
  */
 import { Hono } from "hono";

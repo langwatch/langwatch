@@ -1,23 +1,5 @@
 /**
- * The wizard, the workbench and the runs behind both, composed as their own
- * feature.
- *
- * `experiments.*` answers the reads and writes; the RUN LOOP beside it is
- * reached from outside tRPC, because the surfaces that start a run are REST
- * routes: `POST /api/experiments/execute` streams one,
- * `POST /api/experiments/{slug}/run` polls one, and
- * `POST /api/workflows/{id}/evaluate` triggers one. All three take THIS loop,
- * so a run dispatches through the same studio, prices against the same rate
- * table and reports onto the same pipeline the namespace beside it reads.
- *
- * Every service a run needs is composed by the feature that owns it and
- * arrives here as a peer — the studio graph, the datasets, the prompts, the
- * agents, the evaluators and the monitors. What this feature owns is the
- * EXPERIMENT: its rows, its run history, and the loop that fills them.
- *
- * With no queue Redis the loop is a named refusal rather than a gap: the
- * namespace still mounts and answers every read, and only starting a run says
- * the deployment cannot.
+ * The wizard, the workbench and the runs behind both, composed as their own feature.
  */
 import { TupleParam } from "@clickhouse/client";
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -64,22 +46,13 @@ import { permissiveCoerceMonitorMappings } from "../trace/trace-mappings";
 import { createExperimentTrpcRouter } from "./experiment-trpc.mount";
 
 /**
- * The retention floor a DSPy run read is bounded by when a project names no
- * policy of its own.
- *
- * The platform app's `PLATFORM_DEFAULT_RETENTION_DAYS`. The retention vertical
- * resolves per-project policies elsewhere, and defaulting to something shorter
- * here would quietly truncate a run history on a deployment that never changed
- * a setting.
+ * The retention floor a DSPy run read is bounded by when a project names no policy of its
+ * own. The platform app's `PLATFORM_DEFAULT_RETENTION_DAYS`.
  */
 const DEFAULT_RETENTION_DAYS = 49;
 
 /**
  * The slug an experiment is saved under, as every slugged resource derives it.
- *
- * The three punctuation classes are replaced BEFORE the slug library runs,
- * because `strict` drops them silently and two names differing only by a colon
- * would otherwise collide on one slug.
  */
 export const slugifyExperimentName = (value: string): string =>
   value
@@ -121,11 +94,6 @@ export type ComposedExperimentFeature = Readonly<{
   run: ApiExperimentRun;
   /**
    * The experiment service itself, where this process composed one.
-   *
-   * Published beside the application because the doors OUTSIDE tRPC take it
-   * directly — the SDK's find-or-create, its batch result log and the DSPy
-   * step family — and its absence is what leaves those doors off rather than
-   * mounting them over rows nobody can write.
    */
   experiments?: ExperimentService | undefined;
 }>;
@@ -236,15 +204,13 @@ export function composeExperimentFeature(options: {
   const workflowApp = options.peers.workflowApp;
 
   const ports: ExperimentTrpcPorts<unknown> = {
-    workbenchStateSchema: workbenchStateSchema as ExperimentTrpcPorts<unknown>["workbenchStateSchema"],
+    workbenchStateSchema:
+      workbenchStateSchema as ExperimentTrpcPorts<unknown>["workbenchStateSchema"],
     slugify: slugifyExperimentName,
-    saveWorkflowVersion: (ctx, input) =>
-      workflowApp.saveStudioVersion(input, { id: actorId(ctx) }),
+    saveWorkflowVersion: (ctx, input) => workflowApp.saveStudioVersion(input, { id: actorId(ctx) }),
     /**
-     * A copy whose SOURCE has no version cannot be copied, and the studio
-     * renders that as "not found" rather than as a failure of the copy. The
-     * refusal is the feature's; translating it for this transport is this
-     * process's, which is why it is caught here and nowhere deeper.
+     * A copy whose SOURCE has no version cannot be copied, and the studio renders that as
+     * "not found" rather than as a failure of the copy.
      */
     copyWorkflowWithDatasets: async (_ctx, input) => {
       try {
@@ -312,11 +278,9 @@ export function composeExperimentFeature(options: {
 }
 
 /**
- * The experiment surface on a process that composed no graph to run it over.
- *
- * The namespace still mounts and every call refuses by name, so the wizard
- * says the deployment cannot answer rather than showing a project no
- * experiments at all.
+ * The experiment surface on a process that composed no graph to run it over. The
+ * namespace still mounts and every call refuses by name, so the wizard says the
+ * deployment cannot answer rather than showing a project no experiments at all.
  */
 export function refusingExperimentFeature(): ComposedExperimentFeature {
   const refuse = (): never => {
@@ -368,11 +332,6 @@ const NO_BROADCAST: ExperimentBroadcast = (() => {
 
 /**
  * The DSPy retention floor, fixed for this process.
- *
- * The data-retention vertical resolves per-project policies elsewhere and this
- * read cannot reach it, so the deployment default is used for every project —
- * the answer for every project that never set one, and a longer window than
- * the floor for the few that did.
  */
 class FixedExperimentDspyRetention extends ExperimentDspyRetentionPort {
   static create(days: number): FixedExperimentDspyRetention {
@@ -389,12 +348,9 @@ class FixedExperimentDspyRetention extends ExperimentDspyRetentionPort {
 }
 
 /**
- * Run-history telemetry, as this process reports it.
- *
- * The trace wrapper is a pass-through: this process's tracer wraps the
- * REQUEST, and a second span per run-history read would only restate the
- * request it is already inside. The three log lines are kept, because each
- * names a condition an operator acts on.
+ * Run-history telemetry, as this process reports it. The trace wrapper is a pass-through:
+ * this process's tracer wraps the REQUEST, and a second span per run-history read would
+ * only restate the request it is already inside.
  */
 class LoggedExperimentRunHistoryTelemetry {
   static create(logger: Pick<Logger, "warn" | "error">): LoggedExperimentRunHistoryTelemetry {

@@ -1,23 +1,8 @@
 /**
  * The Go data plane's door into this process, driven over real HTTP.
- *
- * The HMAC gate is the whole of this surface's authentication — there is no
- * session, no API key and no RBAC behind it — so what it does with a signature
- * IS the security boundary, and it is pinned here against the REAL family
- * built by `composeApiGatewayInternalRest` through the REAL security chain.
- * The fakes are at the ports: a changes feed, a virtual-key service and a
- * store, none of which a refused request may reach.
- *
- * The refusal bodies are asserted verbatim, and deliberately so. The Go
- * gateway's own client branches on `error.code`, and its status monitor treats
- * a 200 on `/health` as proof that the shared secret matches — so a body that
- * drifted here would look like a working deployment while every virtual-key
- * resolve was being refused.
- *
  * @see apps/api/src/app/api-gateway-internal-rest.composition.ts
  * @see packages/features/gateway/server/src/transport/api-rest/gateway-internal.api.ts
  */
-// @vitest-environment node
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { AppRestSecurity } from "@langwatch/api/rest";
@@ -42,11 +27,6 @@ const ORGANIZATION_ID = "organization-1";
 
 /**
  * The change-event rows, as the row store under the real repository.
- *
- * The double sits at the DATABASE rather than at the port, so the repository
- * the composition builds — the one production runs — is what answers this
- * request: the `revision > since` predicate, the ascending order and the
- * bigint-to-string rendering on the wire are all really exercised.
  */
 function testChangeEventRows() {
   const findMany = vi.fn(async () => [
@@ -67,11 +47,6 @@ function testChangeEventRows() {
 
 /**
  * The spend pipeline's senders, as the producer registration publishes them.
- *
- * The doubles sit where `composeApiGatewaySpendPipeline` hands the family its
- * registration's dispatchers, so everything between the signed request and the
- * queue — the batch schema, the per-record mapping, the rating seam and the
- * batched-send preference — is really exercised.
  */
 function testSpendCommandSenders() {
   const send = () => vi.fn(async (_payload: unknown) => undefined);
@@ -151,11 +126,9 @@ function composeFamily(options: {
 }
 
 /**
- * One drained outcome, in the wire shape the gateway's spooler posts.
- *
- * `virtual_key_id` is deliberately absent: an outcome that names no key needs
- * no control-plane attribution join, so the record reaches the senders without
- * a database read. The quantities are what the rating seam prices.
+ * One drained outcome, in the wire shape the gateway's spooler posts. `virtual_key_id` is
+ * deliberately absent: an outcome that names no key needs no control-plane attribution
+ * join, so the record reaches the senders without a database read.
  */
 function spendCommandBatchBody(): string {
   return JSON.stringify({

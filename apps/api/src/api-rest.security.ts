@@ -21,23 +21,8 @@ import { legacyErrorBody } from "./app/api-rest-observability.composition";
 import type { ApiAuditPort } from "./api-request.policy";
 
 /**
- * The credential refusals this process publishes, one class per code.
- *
- * They were two classes over seven codes, each picking its code from a
- * constructor parameter. That shape is invisible to the registry guard in
- * `apps/ui/src/model/errors/__tests__/codes.unit.test.ts`, which finds a code
- * by the string literal at its declaration: a union in a signature has no
- * literal to find, and a `declare readonly code:` union yields only its FIRST
- * member. `credential_class_mismatch` and `invalid_credentials` were therefore
- * raised here and reported as copy nothing raises, which is the same report a
- * genuinely dead entry produces.
- *
- * The guard's own docblock names the remedy and prefers this one: a subclass
- * per code, so the scanner sees every code and a code added here can never
- * reach a customer without copy. The alternative — listing them in that file's
- * `PARAMETERIZED_CODES` — buys the same green run at the price of
- * hand-maintenance, and these families do not share one body: two statuses,
- * two faults, two legacy labels and a `meta` on exactly one of them.
+ * The credential refusals this process publishes, one class per code. They were two
+ * classes over seven codes, each picking its code from a constructor parameter.
  */
 
 /** No credential at all on a project route. */
@@ -81,10 +66,6 @@ export class ApiOrganizationMissingCredentialsError extends HandledError {
 
 /**
  * A project key presented where an organization key is required.
- *
- * Its own code rather than a plain refusal because the remediation is
- * specific and actionable: the caller holds a valid key of the wrong class,
- * and `meta` names both classes so a client can say which to swap in.
  */
 export class ApiOrganizationCredentialClassMismatchError extends HandledError {
   declare readonly code: "credential_class_mismatch";
@@ -116,11 +97,9 @@ export class ApiOrganizationInvalidCredentialsError extends HandledError {
 }
 
 /**
- * A credential whose organization has since been deleted.
- *
- * 401 rather than 404: the caller's credential is what stopped being usable,
- * and a management route that answered 404 would confirm the deletion to
- * whoever still holds the key.
+ * A credential whose organization has since been deleted. 401 rather than 404: the
+ * caller's credential is what stopped being usable, and a management route that answered
+ * 404 would confirm the deletion to whoever still holds the key.
  */
 export class ApiOrganizationNotFoundForCredentialError extends HandledError {
   declare readonly code: "organization_not_found";
@@ -136,11 +115,9 @@ export class ApiOrganizationNotFoundForCredentialError extends HandledError {
 }
 
 /**
- * The credential lookup itself failed.
- *
- * The one 5xx of the family, and `fault` says so explicitly: an unannotated
- * 500 defaults to `"customer"` and would record a real incident as routine
- * refusal noise.
+ * The credential lookup itself failed. The one 5xx of the family, and `fault` says so
+ * explicitly: an unannotated 500 defaults to `"customer"` and would record a real
+ * incident as routine refusal noise.
  */
 export class ApiOrganizationAuthenticationUnavailableError extends HandledError {
   declare readonly code: "internal_error";
@@ -156,11 +133,9 @@ export class ApiOrganizationAuthenticationUnavailableError extends HandledError 
 }
 
 /**
- * The refusal for a route naming a project the credential cannot reach.
- *
- * 404 rather than 403 deliberately: a project that does not exist and one the
- * caller may not see must be indistinguishable, or the status code itself
- * confirms existence to an unauthorized caller.
+ * The refusal for a route naming a project the credential cannot reach. 404 rather than
+ * 403 deliberately: a project that does not exist and one the caller may not see must be
+ * indistinguishable, or the status code itself confirms existence to an unauthorized
  */
 export class ApiRouteProjectNotFoundError extends HandledError {
   readonly legacyError = "Not Found";
@@ -186,12 +161,8 @@ export class ApiOrganizationPermissionError extends HandledError {
 }
 
 /**
- * What the process supplies beyond its own product services: observability
- * middleware and the two error renderers.
- *
- * Neither can come from `@langwatch/api` — a logger and a tracer are the
- * process's, and both error shapes render the application's own taxonomy —
- * so composition passes them in once and every family it builds gets them.
+ * What the process supplies beyond its own product services: observability middleware and
+ * the two error renderers.
  */
 export interface ApiRestSecurityObservability {
   /** Installs the process's application container on the request context. */
@@ -205,29 +176,12 @@ export interface ApiRestSecurityObservability {
 }
 
 /**
- * The API process's REST enforcement, in the shape `@langwatch/api/rest`
- * builds every family from.
- *
- * This replaces the pair of bespoke ports the process used to define
- * (`ApiRestSecurityPort` / `ApiOrganizationRestSecurityPort`) and their two
- * hand-rolled policy bridges. The framework already knows how to turn an
- * `AccessPolicy` into an authenticate-then-authorize chain and to record the
- * decision in the route registry; what it cannot know is how THIS process
- * resolves a credential. That is all this class supplies.
- *
- * Two credential classes, because the deployment has two: a project API key
- * (or a legacy project key) for the product routes, and an organization API
- * key for the management routes. They resolve through different service calls
- * and refuse with different bodies, so they are separate ports rather than one
- * port in two moods.
+ * The API process's REST enforcement, in the shape `@langwatch/api/rest` builds every
+ * family from.
  */
 export class ApiRestSecurity {
   /**
    * Bind the framework's REST service builder to this process's services.
-   *
-   * Returns the `AppRestSecurity` every REST family factory takes — obtaining
-   * it is the only way to build one, which is what makes a route with no
-   * declared access policy impossible to construct.
    */
   static create(options: {
     apiKeys: ApiKeyService;
@@ -248,14 +202,7 @@ export class ApiRestSecurity {
   }
 
   /**
-   * The same enforcement, exposed as the four callables
-   * `createRestService` takes.
-   *
-   * A family built by the additive public-REST builder rather than by
-   * `AppRestSecurity.createProjectApp` — Secret is the one today — installs
-   * its chain through these. They are the SAME middleware the ports above
-   * hand the framework, so the two doors cannot enforce differently; what
-   * differs is only the shape the builder asks for.
+   * The same enforcement, exposed as the four callables `createRestService` takes.
    */
   static projectPolicy(options: {
     apiKeys: ApiKeyService;
@@ -312,14 +259,10 @@ export class ApiRestSecurity {
   }
 
   /**
-   * Resolves a project credential and installs it, then stamps the key as
-   * used and audits the write once the handler has answered successfully.
-   *
-   * The mark-used and the audit are deliberately after `next()` and gated on a
-   * 2xx: a refused request must not move the key's last-used clock, and a
-   * failed write is not something to record as one.
+   * Resolves a project credential and installs it, then stamps the key as used and audits
+   * the write once the handler has answered successfully.
+   * @internal Shared with {@link ApiRestProjectPolicy}.
    */
-  /** @internal Shared with {@link ApiRestProjectPolicy}. */
   projectAuthentication(envelope: Envelope): MiddlewareHandler {
     return async (context, next) => {
       const credentials = extractApiKeyRequestCredentials(context.req.raw);
@@ -343,11 +286,9 @@ export class ApiRestSecurity {
   }
 
   /**
-   * The RBAC check for a project route. A legacy project key carries full
-   * access by construction and is not checked; a scoped API key must hold the
-   * permission at the project's scope.
+   * The RBAC check for a project route.
+   * @internal Shared with {@link ApiRestProjectPolicy}.
    */
-  /** @internal Shared with {@link ApiRestProjectPolicy}. */
   projectAuthorization(permission: AuthzPermission, envelope: Envelope): MiddlewareHandler {
     return async (context, next) => {
       const resolved = context.get("resolvedToken") as ResolvedApiKeyToken | undefined;
@@ -378,24 +319,16 @@ export class ApiRestSecurity {
   }
 
   /**
-   * The API-key ceiling. Identical enforcement to
-   * {@link projectAuthorization}: a scoped key must hold the permission, a
-   * legacy project key keeps full access. Named apart because the framework
-   * installs it at a different point in the chain — a route can declare a
-   * SECOND permission beyond its access policy, and that one is a ceiling
-   * check rather than the route's own RBAC decision.
+   * The API-key ceiling. Identical enforcement to {@link projectAuthorization}: a scoped
+   * key must hold the permission, a legacy project key keeps full access.
    */
   private apiKeyCeiling(permission: AuthzPermission, envelope: Envelope): MiddlewareHandler {
     return this.projectAuthorization(permission, envelope);
   }
 
   /**
-   * Resolves an organization credential and installs it, then stamps the key
-   * as used on success.
-   *
-   * The organization is looked up rather than trusted from the token: a key
-   * whose organization has since been deleted must refuse rather than serve a
-   * management route against a tenant that no longer exists.
+   * Resolves an organization credential and installs it, then stamps the key as used on
+   * success.
    */
   private organizationAuthentication(envelope: Envelope): MiddlewareHandler {
     return async (context, next) => {
@@ -485,10 +418,7 @@ export class ApiRestSecurity {
 
   /**
    * RBAC at the scope of the project named in the route, for an
-   * organization-authenticated family addressing one project at a time. The
-   * project id comes from the path parameter the caller named, never from the
-   * credential — that is what makes it a per-project check rather than an
-   * organization-wide one.
+   * organization-authenticated family addressing one project at a time.
    */
   private routeProjectAuthorization(
     permission: AuthzPermission,
@@ -521,10 +451,7 @@ export class ApiRestSecurity {
   }
 
   /**
-   * RBAC at the scope of the team named in the route. The team id comes from
-   * the path parameter, and the organization from the credential — never from
-   * the request — so a team id belonging to another tenant is resolved against
-   * the caller's own organization, finds no bindings, and is refused.
+   * RBAC at the scope of the team named in the route.
    */
   private routeTeamAuthorization(
     permission: AuthzPermission,
@@ -552,10 +479,7 @@ export class ApiRestSecurity {
   }
 
   /**
-   * Stamps the key as used, and records a successful mutation in the audit
-   * trail. Audit failures are logged and swallowed: the write has already
-   * committed when this runs, so raising here would report a failure the
-   * caller cannot act on for a request that in fact succeeded.
+   * Stamps the key as used, and records a successful mutation in the audit trail.
    */
   private async completeProjectRequest(
     context: Context,
@@ -595,12 +519,8 @@ export class ApiRestSecurity {
   }
 
   /**
-   * Render a refusal in the shape the family publishes, or raise it for a
-   * versioned family that renders every refusal through its own error handler.
-   *
-   * `throw` is not a third envelope: it is the mode the framework's versioned
-   * builder asks for, because a middleware that wrote its own body there would
-   * publish a shape the family's error contract never declared.
+   * Render a refusal in the shape the family publishes, or raise it for a versioned
+   * family that renders every refusal through its own error handler.
    */
   private refuse(context: Context, error: HandledError, envelope: Envelope): Response {
     if (envelope === "throw") {
@@ -618,12 +538,9 @@ export class ApiRestSecurity {
 }
 
 /**
- * The project-scope chain in the shape `createRestService` takes.
- *
- * Four callables over one {@link ApiRestSecurity}: the same middleware the
- * framework ports hand out, re-shaped for the additive public-REST builder.
- * Nothing is re-implemented here — a second implementation of "is this caller
- * allowed" is exactly the drift this class exists to prevent.
+ * The project-scope chain in the shape `createRestService` takes. Four callables over one
+ * {@link ApiRestSecurity}: the same middleware the framework ports hand out, re-shaped
+ * for the additive public-REST builder.
  */
 export class ApiRestProjectPolicy {
   constructor(private readonly security: ApiRestSecurity) {}

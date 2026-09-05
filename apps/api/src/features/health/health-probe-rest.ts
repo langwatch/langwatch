@@ -1,24 +1,6 @@
 /**
- * The five subsystem health probes:
- * `GET /api/health/{collector,evaluations,processor,triggers,workflows}`.
- *
- * Each one sends a CANARY through the deployment's own public boundary and
- * reports what came back, which is why every probe here dials an absolute URL
- * rather than calling a service: what is under test is the round trip a
- * customer's SDK makes, not a function this process can call directly. The
- * deployment's public origin is therefore a required port, and a process that
- * declared none serves no probes at all — a probe that cannot name the surface
- * it is probing would answer about nothing.
- *
- * They are `publicEndpoint` and resolve a PROJECT KEY in-handler, which is the
- * shape an external monitor needs: no session, no per-route permission, one
- * token that names the project the canary is written into. The two 401 bodies
- * are transcribed as sent.
- *
- * The bare `GET /api/health` (204) is not here — it is the process's own
- * lifecycle surface, and it answers whether this pod is alive rather than
- * whether the product is working.
- *
+ * The five subsystem health probes: `GET
+ * /api/health/{collector,evaluations,processor,triggers,workflows}`.
  * @see specs/ops/health-probe-failures.feature
  */
 import { publicEndpoint } from "@langwatch/api";
@@ -34,11 +16,6 @@ const logger = createLogger("langwatch:health-checks");
 
 /**
  * Every key of an object tree made optional, recursively.
- *
- * Restated beside its one use rather than imported: the OTLP export request is
- * built by hand here with only the fields a canary needs, and the shared
- * utility module that used to declare this was deleted with the tree it lived
- * in.
  */
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
@@ -49,10 +26,6 @@ export type HealthProbeProject = Readonly<{ id: string }>;
 export interface HealthProbeRestPorts {
   /**
    * Resolves a raw project API key to its project, or nothing.
-   *
-   * A key read rather than the process's credential port: these probes predate
-   * scoped keys and check no permission at all, and routing them onto a
-   * ceiling check would refuse the monitor keys already deployed against them.
    */
   resolveProjectByApiKey(token: string): Promise<HealthProbeProject | null>;
   /** The deployment's public origin, which every canary is posted back through. */

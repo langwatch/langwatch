@@ -1,23 +1,6 @@
 /**
- * `codingAgents.*` — what the coding agents did inside a tenant's projects —
- * composed as its own feature.
- *
- * A session is a ClickHouse PROJECTION, which is why `clickHouse: null` is a
- * supported shape rather than a degradation: a deployment holding no trace
- * storage holds no session to read, and the package's own null repositories
- * answer emptily.
- *
- * ## The named absences
- *
- * `github` is the App the reads resolve a pull request through. Composed from
- * configuration when a deployment registered one; the feature's own
- * `configured` flag turns a blank registration into "not connected" on the
- * screen, which is true rather than degraded.
- *
- * {@link ApiViewerProtectionsPort} decides what one viewer may see of a
- * session. Absent, the read THROWS, which the coding-agent package reads as
- * "not visible" on the pull-request path — so an absent resolver withholds
- * titles and costs rather than showing them.
+ * `codingAgents.*` — what the coding agents did inside a tenant's projects — composed as
+ * its own feature.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import {
@@ -46,11 +29,7 @@ import type { ApiViewerProtectionsPort } from "../trace/trace-viewer-protections
 import { createCodingAgentTrpcRouter } from "./coding-agent-trpc.mount";
 
 /**
- * The platform application's `PLATFORM_DEFAULT_RETENTION_DAYS`. Stated for the
- * reason every other composition states it: the retention vertical has not
- * moved, and defaulting to a shorter window would silently shorten what a
- * coding-agent session is readable for on every deployment that never changed
- * a setting.
+ * The platform application's `PLATFORM_DEFAULT_RETENTION_DAYS`.
  */
 const PLATFORM_DEFAULT_RETENTION_DAYS = 49;
 
@@ -72,10 +51,8 @@ export type ComposedCodingAgentFeature = Readonly<{
   /** For `ctx.app.codingAgentApp`. */
   app: CodingAgentApp;
   /**
-   * The same application, where this process composed one, for the packaged
-   * coding-agent REST family. Published separately because that door is
-   * MOUNTED rather than refused: a family over an application nobody composed
-   * would answer a session listing this deployment cannot produce.
+   * The same application, where this process composed one, for the packaged coding-agent
+   * REST family.
    */
   service?: CodingAgentApp | undefined;
 }>;
@@ -96,12 +73,7 @@ export function composeCodingAgentFeature(options: {
 }
 
 /**
- * `codingAgents.*` on a process that composed no project graph to read them
- * over.
- *
- * The namespace still mounts and every call refuses by name: an empty session
- * list reads as "no agent has run here", which is a different statement from
- * "this process cannot see them".
+ * `codingAgents.*` on a process that composed no project graph to read them over.
  */
 export function refusingCodingAgentFeature(): ComposedCodingAgentFeature {
   const refuse = (): never => {
@@ -117,12 +89,8 @@ export function refusingCodingAgentFeature(): ComposedCodingAgentFeature {
 }
 
 /**
- * What one viewer may see of one project: whether captured content is readable,
- * and whether spend is.
- *
- * It THROWS when the policy cannot be resolved, which the coding-agent package
- * reads as "not visible" on the pull-request path — so an absent resolver
- * withholds titles and costs rather than showing them.
+ * What one viewer may see of one project: whether captured content is readable, and
+ * whether spend is.
  */
 function codingAgentPorts(peers: CodingAgentPeers): CodingAgentTrpcPorts {
   return {
@@ -191,12 +159,8 @@ class ApiCodingAgentBilling extends CodingAgentBillingPolicyPort {
 }
 
 /**
- * The organization's projects and the person behind each personal workspace,
- * over this process's own connection.
- *
- * Composed here rather than inside the feature package because the package
- * declares no Prisma dependency, and this is the connection every other row
- * read on this process already runs on.
+ * The organization's projects and the person behind each personal workspace, over this
+ * process's own connection.
  */
 export class ApiCodingAgentScopeDirectory extends CodingAgentCallerScopeDirectoryPort {
   constructor(private readonly prisma: PrismaClient) {
@@ -239,19 +203,9 @@ export class ApiCodingAgentScopeDirectory extends CodingAgentCallerScopeDirector
 }
 
 /**
- * The two permission cuts, over the ONE AuthZ service this process decides
- * with, in ONE batched ask.
- *
- * `canBatchPermissionsByIds` collects the principal's grant snapshot once and
- * decides every (project, permission) pair against it in memory. The previous
- * shape asked per project per permission, which on a large organization is a
- * database pass per project per permission: the fan-out exhausted the
- * connection pool and turned the rollup into a 500.
- *
- * An API-key principal carries its own ceiling in the engine — the key's
- * bindings intersected with its holder's, and the key's alone when it owns
- * nobody — so a narrowed key is cut here exactly the way it is cut at every
- * other door, without this composition restating the rule.
+ * The two permission cuts, over the ONE AuthZ service this process decides with, in ONE
+ * batched ask. `canBatchPermissionsByIds` collects the principal's grant snapshot once
+ * and decides every (project, permission) pair against it in memory.
  */
 export class ApiCodingAgentScopePermissions extends CodingAgentScopePermissionsPort {
   constructor(private readonly authz: AuthzService) {

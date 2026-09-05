@@ -1,11 +1,7 @@
 /**
- * `apiKey.*`, composed as its own feature.
- *
- * A project's credentials, the application every other door reads one through,
- * and the one thing the surface reaches that the feature does not own: the
- * trail a mint, a rotation and a revocation are recorded on. That trail is the
- * PROCESS's, so it arrives as a port rather than through a group half that
- * happened to hold it.
+ * `apiKey.*`, composed as its own feature. A project's credentials, the application every
+ * other door reads one through, and the one thing the surface reaches that the feature
+ * does not own: the trail a mint, a rotation and a revocation are recorded on.
  */
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { ApiKeyApp } from "@langwatch/api-key-server";
@@ -41,11 +37,9 @@ export function composeApiKeyFeature(options: {
 }
 
 /**
- * `apiKey.*` on a process that composed no credential service.
- *
- * The namespace still mounts and every call refuses by name, so a person is
- * told the deployment holds no credential store rather than shown a project
- * with no keys in it.
+ * `apiKey.*` on a process that composed no credential service. The namespace still mounts
+ * and every call refuses by name, so a person is told the deployment holds no credential
+ * store rather than shown a project with no keys in it.
  */
 export function refusingApiKeyFeature(): ComposedApiKeyFeature {
   const refuse = (): never => {

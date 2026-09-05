@@ -1,13 +1,6 @@
 /**
  * @vitest-environment node
- *
  * Whether federation is licensed on this process.
- *
- * It was the constant `false`, whatever licence the deployment held. A
- * licensed self-hosted install therefore refused its own single sign-on and
- * left `/api/auth/sign-up/email` mounted and open — the inversion of the
- * invariant ADR-027 states.
- *
  * @regression
  */
 import type { LicensingService } from "@langwatch/enterprise-licensing-contract";
@@ -20,7 +13,9 @@ function testLogger(): Logger {
   return { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as Logger;
 }
 
-function licensing(inspect: () => Promise<{ allowed: boolean; inspections: [] }>): LicensingService {
+function licensing(
+  inspect: () => Promise<{ allowed: boolean; inspections: [] }>,
+): LicensingService {
   return { inspectPlatformAccess: inspect } as unknown as LicensingService;
 }
 
@@ -40,7 +35,9 @@ describe("ApiBetterAuthFederation", () => {
     it("reports federation as licensed", async () => {
       const inspect = vi.fn(async () => ({ allowed: true, inspections: [] as [] }));
 
-      const policy = await federation({ licensing: licensing(inspect) }).resolveSignInMethodPolicy();
+      const policy = await federation({
+        licensing: licensing(inspect),
+      }).resolveSignInMethodPolicy();
 
       expect(policy.federationLicensed).toBe(true);
     });
@@ -61,7 +58,9 @@ describe("ApiBetterAuthFederation", () => {
     it("reports federation as not licensed", async () => {
       const inspect = vi.fn(async () => ({ allowed: false, inspections: [] as [] }));
 
-      const policy = await federation({ licensing: licensing(inspect) }).resolveSignInMethodPolicy();
+      const policy = await federation({
+        licensing: licensing(inspect),
+      }).resolveSignInMethodPolicy();
 
       expect(policy.federationLicensed).toBe(false);
     });

@@ -1,16 +1,7 @@
 /**
- * The `/` landing decision, composed as its own feature.
- *
- * `governance.*` has two owners on one wire name: the five packaged procedures
- * the Enterprise console calls, and this — where a person lands when they open
- * the product with no path. The second half is composed HERE, out of the
- * shared infrastructure, because none of its six answers belongs to the
- * gateway or to governance. They are a row read, a plan lookup, a permission
- * probe and a flag read: the process's own graph, asked six questions.
- *
- * That it runs on the graph rather than on a service locator is what makes the
- * decision composable twice — a test, a second deployment shape — instead of
- * reachable only from a booted application.
+ * The `/` landing decision, composed as its own feature. `governance.*` has two owners on
+ * one wire name: the five packaged procedures the Enterprise console calls, and this —
+ * where a person lands when they open the product with no path.
  */
 import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
@@ -20,13 +11,9 @@ import {
 } from "./governance-home.mount";
 
 /**
- * The rollout gate the governance console and the /me page are both behind.
- *
- * Stated here under the key the flag registry publishes it by, because the
- * landing decision reads it and the flag store this process composed is what
- * answers. Without it `/me` and `/governance` both 404, so the auto-detected
- * destination is gated on it too — a non-governance organization never lands
- * on `/me`.
+ * The rollout gate the governance console and the /me page are both behind. Stated here
+ * under the key the flag registry publishes it by, because the landing decision reads it
+ * and the flag store this process composed is what answers.
  */
 const GOVERNANCE_UI_FLAG = "release_ui_ai_governance_enabled";
 

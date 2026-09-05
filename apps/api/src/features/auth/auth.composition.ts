@@ -1,32 +1,6 @@
 /**
- * The two signed-out doors — `frontDoor.*` and the `publicEnv` procedure beside
- * it — composed as their own feature.
- *
- * One {@link AuthApp} for both, because the sign-in mode it resolves is
- * ADR-027's single source of truth for the whole deployment and the two doors
- * must never disagree. Three ceremonies sit behind it: the sign-in router that
- * decides which method a domain routes to, the sign-up verification that mails
- * a confirmation link and spends it, and the landing read an invitation's link
- * lands on.
- *
- * ## The four deployment facts
- *
- * A signed-out door asks questions this package cannot answer from its own
- * configuration: where the deployment lives (every mailed link is built from
- * it), which sign-in provider it mounted, whether it registered passkeys, and
- * whether it is the hosted product. They arrive as
- * {@link ApiPersonDeploymentFacts} because they belong to the deployment, and a
- * process given none of them still composes — with the consequences each
- * absence below names, never a guess.
- *
- * ## What refuses by name
- *
- * The sign-up ceremony needs a mail gateway AND a public base URL, so both
- * absences are one refusal: a confirmation link that points at nowhere and is
- * never sent leaves the person unable to finish either way. The reissue request
- * an expired invitation's landing page makes goes through the invitation
- * service's own throttle, which this feature composes none of, so it refuses
- * rather than mailing an organization unthrottled.
+ * The two signed-out doors — `frontDoor.*` and the `publicEnv` procedure beside it —
+ * composed as their own feature.
  */
 import {
   AuthApp,
@@ -56,28 +30,20 @@ import type { ApiPersonMailPort } from "../../app/api-person-mail.port";
 import { createFrontDoorTrpcRouter, createPublicEnvTrpcProcedure } from "./auth-trpc.mount";
 
 /**
- * What the deployment answers so a person-shaped surface can be served.
- *
- * Five values, none of them any feature's. Every one is optional and every
- * absence has a stated consequence rather than a default that pretends to be
- * one.
+ * What the deployment answers so a person-shaped surface can be served. Five values, none
+ * of them any feature's. Every one is optional and every absence has a stated consequence
+ * rather than a default that pretends to be one.
  */
 export type ApiPersonDeploymentFacts = Readonly<{
   /**
-   * The public base URL every mailed link is built from — the confirmation
-   * link, the members page an admin is pointed at, the budgets page.
-   *
-   * Without it this process sends no mail that carries a link: a confirmation
-   * mail with a link to nowhere is worse than a refusal, because the person
-   * clicks it and lands on the wrong host with a token they have now spent.
+   * The public base URL every mailed link is built from — the confirmation link, the
+   * members page an admin is pointed at, the budgets page.
    */
   baseUrl?: string | undefined;
   /**
    * `"email"`, or the federated provider id this deployment mounted.
-   *
-   * ADR-027's single source of truth. Absent means email mode, which is what a
-   * process holding no licence gate offers — the licence is what would have
-   * unlocked a federated door, and this process composes none.
+   * Absent means email mode: ADR-027'''s single source of truth, and this
+   * process composes none of the federated door without a licence gate.
    */
   authProvider?: string | undefined;
   /** Whether the deployment registered the passkey plugin at boot. */
@@ -135,10 +101,7 @@ export function composeAuthFeature(options: {
     new ApiAuthUnavailableError({ capability, processName });
 
   /**
-   * A deployment that named a provider gets it; one that did not gets email
-   * mode. There is no licence gate here to deny SSO, which is exactly why an
-   * unnamed provider must not be guessed at: reporting a federated mode the
-   * process cannot serve would send a person to a door that does not open.
+   * A deployment that named a provider gets it; one that did not gets email mode.
    */
   const resolveAuthProvider = () => Promise.resolve(deployment.authProvider ?? "email");
 
@@ -214,12 +177,9 @@ export function composeAuthFeature(options: {
     : undefined;
 
   /**
-   * The ceremony, or the refusal that names why there is none.
-   *
-   * Both halves of it are absent together and that is not an accident: without
-   * a base URL a confirmation link points at nowhere, and without a mail
-   * gateway it is never sent. Either way the person cannot finish, so the door
-   * says so instead of accepting an address it will never write back to.
+   * The ceremony, or the refusal that names why there is none. Both halves of it are
+   * absent together and that is not an accident: without a base URL a confirmation link
+   * points at nowhere, and without a mail gateway it is never sent.
    */
   const requireSignUpVerification = (): SignUpVerificationService => {
     if (!signUpVerification || !deployment.baseUrl) {
@@ -245,10 +205,9 @@ export function composeAuthFeature(options: {
       requireSignUpVerification().completeVerification(input),
 
     /**
-     * A revoked invitation reads exactly like a missing one: the journey ends
-     * quietly, revealing nothing about the organization or the inviter.
-     * Expired is different — it is recoverable in one click by the inviter —
-     * so it gets its own named refusal.
+     * A revoked invitation reads exactly like a missing one: the journey ends quietly,
+     * revealing nothing about the organization or the inviter. Expired is different — it
+     * is recoverable in one click by the inviter — so it gets its own named refusal.
      */
     readInviteLanding: async (_ctx, { inviteCode }) => {
       const invite = await prisma.organizationInvite.findUnique({
@@ -276,10 +235,9 @@ export function composeAuthFeature(options: {
     },
 
     /**
-     * Asking an organization's admins to reissue a stale invitation goes
-     * through the invitation service, which owns the throttle that stops one
-     * stale code from mailing an organization repeatedly. This feature
-     * composes none, so it refuses by name rather than mailing unthrottled.
+     * Asking an organization's admins to reissue a stale invitation goes through the
+     * invitation service, which owns the throttle that stops one stale code from mailing
+     * an organization repeatedly.
      */
     requestFreshInvite: () =>
       Promise.reject(
@@ -295,12 +253,8 @@ export function composeAuthFeature(options: {
 }
 
 /**
- * The two signed-out doors on a process that composed no user directory.
- *
- * Both still mount and every call refuses by name. A person who cannot sign in
- * because a namespace vanished has no way to discover why, so the door answers
- * rather than disappearing — and `publicEnv` is what the browser reads before
- * it has any session at all.
+ * The two signed-out doors on a process that composed no user directory. Both still mount
+ * and every call refuses by name.
  */
 export function refusingAuthFeature(processName: string): ComposedAuthFeature {
   const refuse = (): never => {
@@ -325,11 +279,9 @@ function authRouters(mount: ApiTrpcFeatureMount, app: AuthApp) {
 }
 
 /**
- * A capability this deployment does not hold.
- *
- * `fault: "platform"` because nothing the customer sent caused it, and the
- * message names which capability and which process, so a support conversation
- * starts from the deployment shape rather than from a stack trace.
+ * A capability this deployment does not hold. `fault: "platform"` because nothing the
+ * customer sent caused it, and the message names which capability and which process, so a
+ * support conversation starts from the deployment shape rather than from a stack trace.
  */
 export class ApiAuthUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";

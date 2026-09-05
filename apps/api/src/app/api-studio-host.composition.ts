@@ -1,22 +1,6 @@
 /**
- * The two capabilities behind `httpProxy.*` that reach OUTSIDE this process:
- * the optimization studio's streaming dispatch, and the agent test's own trace
- * write.
- *
- * Neither is a row read, which is why they sit here rather than in the trace
- * group beside the surface that carries them. The dispatch opens a
- * server-sent-event stream to the NLP engine and relays it for as long as the
- * run lasts; the trace write enqueues one span on the ingest queue the
- * collector drains. A deployment can hold either, both, or neither, and each
- * one says so at the call rather than at boot.
- *
- * ## Why the trace write goes through the QUEUE
- *
- * An agent test's span is a span like any other. Writing it straight to
- * ClickHouse from here would give the test history a second ingest path with
- * its own idea of redaction, cost attribution and topic assignment — and the
- * one that drifts is always the second one. The queue is what makes the test
- * exchange the same kind of row as everything else the project captured.
+ * The two capabilities behind `httpProxy.*` that reach OUTSIDE this process: the
+ * optimization studio's streaming dispatch, and the agent test's own trace write.
  */
 import {
   buildAgentTestTrace,
@@ -59,20 +43,6 @@ export function composeApiStudioHost(options: ApiStudioHostOptions): ApiStudioHo
 
 /**
  * The ONE place this process builds a studio dispatch.
- *
- * Three surfaces open studio runs — `httpProxy.postStudioEvent`, the
- * workbench's cell runner and `POST /api/workflows/post_event` — and each
- * holds its own instance rather than sharing one, which is safe for exactly
- * the reason the workbench's composition already records: the service holds no
- * connection (each `postEvent` opens its own stream) and its
- * sampling-parameter strip reads the SAME model gateway this process composed
- * once. What must not be duplicated is the DECISION — which stream adapter,
- * and what an absent engine address means — so that lives here and the callers
- * take it.
- *
- * With no engine address the packaged unconfigured stream refuses by name, and
- * the caller reports that AS a studio event rather than throwing at a browser
- * that has a node lit up and a Stop button.
  */
 export function composeApiWorkflowStudioDispatch(options: {
   nlpServiceUrl: string | undefined;
@@ -115,11 +85,6 @@ class ApiComposedStudioHost extends ApiStudioHostPort {
 
   /**
    * One studio event, dispatched and streamed back.
-   *
-   * The event goes in UNENRICHED, which is what the transport's port
-   * documents: enrichment is the per-project engine context, and this surface
-   * carries the events that do not need it — the agent test's own run and the
-   * studio's own control events.
    */
   private postStudioEvent(
     input: Readonly<{
@@ -140,12 +105,9 @@ class ApiComposedStudioHost extends ApiStudioHostPort {
   }
 
   /**
-   * The agent test's span, enqueued on the same ingest the collector drains.
-   *
-   * The span arrives in LangWatch's own format because the feature built it
-   * that way; the queue speaks OTLP, so it is converted here with the SAME
-   * converter the collector uses. Two converters would be two answers to what
-   * an attribute is called.
+   * The agent test's span, enqueued on the same ingest the collector drains. The span
+   * arrives in LangWatch's own format because the feature built it that way; the queue
+   * speaks OTLP, so it is converted here with the SAME converter the collector uses.
    */
   private async recordAgentTestTrace(
     input: Readonly<{ projectId: string; trace: AgentTestTrace }>,

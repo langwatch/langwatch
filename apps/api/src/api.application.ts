@@ -59,22 +59,15 @@ export type ApiRequestContext = Readonly<{
   actor(): ApiActor;
   /**
    * The caller when there is one, and `null` when the request is anonymous.
-   *
-   * `actor()` refuses instead of answering `null`, which is right for a
-   * resolver and wrong for the policy chain: the declared authorization check
-   * has to answer "unauthenticated" BEFORE it looks at any scope id, and the
-   * request logger stamps a user id on a call that may legitimately have none.
-   * Both read this rather than catching the refusal.
    */
   tryActor?(): ApiActor | null;
   authorize(permission: AuthzPermission, target: Readonly<{ projectId: string }>): Promise<void>;
   can?(permission: AuthzPermission, target: Readonly<{ projectId: string }>): Promise<boolean>;
   authorizeScopeLineage?(input: unknown, permission: AuthzPermission): Promise<void>;
   /**
-   * The signed-in person as the surfaces that RENDER them read it — their
-   * name, picture and staff role — rather than the id authorization decides
-   * on. Absent for an anonymous caller, and absent entirely on a process that
-   * mounts no packaged surface.
+   * The signed-in person as the surfaces that RENDER them read it — their name, picture
+   * and staff role — rather than the id authorization decides on. Absent for an anonymous
+   * caller, and absent entirely on a process that mounts no packaged surface.
    */
   session?: ApiTrpcSession | null;
   /** The transport, as the request log line and the audit row describe it. */
@@ -95,11 +88,6 @@ export type ApiErrorFormatter = (options: {
 
 /**
  * The subscription lane, built against the caller this application resolves.
- *
- * A function rather than a Hono, because the lane cannot exist before the
- * caller does: the process's REST security declares the route's access policy,
- * and only the application holds the tRPC root a path is looked up on. Handing
- * over the ports is what lets those two be composed in either order.
  */
 export type ApiSubscriptionMount = (ports: SseSubscriptionPorts) => Hono;
 
@@ -119,23 +107,14 @@ export type ApiHttpOptions = Readonly<{
 }>;
 
 /**
- * The context every procedure on this process resolves against.
- *
- * Three groups, and they are not interchangeable. The first is the request
- * policy the host supplied. The second is what the packaged POLICY CHAIN reads
- * and writes — `permissionChecked` is the fail-closed backstop's flag and
- * `organizationRole` is what a resolved project check leaves behind — so both
- * are mutable where everything else is not. The third is the application, in
- * the one shape both this process's own routers and every packaged surface
- * read it.
+ * The context every procedure on this process resolves against. Three groups, and they
+ * are not interchangeable. The first is the request policy the host supplied.
  */
 type ApiTrpcContext = Omit<ApiRequestContext, "can"> & {
   can(permission: AuthzPermission, target: Readonly<{ projectId: string }>): Promise<boolean>;
   /**
-   * The caller's address, as the trusted-proxy resolver answers it, and the
-   * key every per-IP limit on the signed-out surfaces uses. Never absent:
-   * a caller this process cannot place gets the `unresolved` bucket rather
-   * than sharing one constant key with everybody, resolved or not.
+   * The caller's address, as the trusted-proxy resolver answers it, and the key every
+   * per-IP limit on the signed-out surfaces uses.
    */
   clientIp(): string;
   permissionChecked: boolean;
@@ -147,33 +126,20 @@ type ApiTrpcContext = Omit<ApiRequestContext, "can"> & {
    */
   session: ApiTrpcSession | null;
   /**
-   * The browser's own abort signal on a SUBSCRIPTION, and `undefined` on every
-   * ordinary request.
-   *
-   * It rides the context as well as the caller's own options because a
-   * subscription procedure may be resolved by a v10-shaped caller that leaves
-   * `opts.signal` undefined, and a generator that never learns the browser is
-   * gone stays suspended with its emitter listener attached and its tab
-   * registered forever. Present-and-undefined rather than optional: the
-   * surfaces that read it describe two states, not three.
+   * The browser's own abort signal on a SUBSCRIPTION, and `undefined` on every ordinary
+   * request.
    */
   signal: AbortSignal | undefined;
   /**
-   * The operator scope the platform-tier check resolves.
-   *
-   * Written by that check and read by the surface behind it. `undefined` means
-   * the check never ran, which is a third state the surface describes: it is
-   * how `ops.getScope` tells "not an operator" apart from "this procedure was
-   * reached without the gate".
+   * The operator scope the platform-tier check resolves. Written by that check and read
+   * by the surface behind it.
    */
   opsScope: { kind: "platform" | "none" } | undefined;
 } & AgentTrpcContext &
   SecretTrpcContext &
   /**
-   * `undefined` on every request here, deliberately: see
-   * {@link ApiTrpcEnterpriseRequest}. It is present rather than absent because
-   * the Enterprise composition names it, and a key that may be missing
-   * entirely is a third state its surface does not describe.
+   * `undefined` on every request here, deliberately: see {@link
+   * ApiTrpcEnterpriseRequest}.
    */
   ApiTrpcEnterpriseRequest & {
     app: ApiServices & ApiTrpcFeatureApplication;
@@ -183,13 +149,9 @@ type ApiTrpcContext = Omit<ApiRequestContext, "can"> & {
 export type ApiTrpcRoot = ReturnType<typeof createTrpcRoot>;
 
 /**
- * What a packaged feature record is built against: the root a feature router
- * must never create a second of, the two procedures it builds on, and the
- * concrete middlewares its policy chain is composed from.
- *
- * Structurally `TrpcApiMount & TrpcApiPublicMount` for this process's context,
- * written out rather than imported generically so the port below can name it
- * without carrying three type parameters through the whole application.
+ * What a packaged feature record is built against: the root a feature router must never
+ * create a second of, the two procedures it builds on, and the concrete middlewares its
+ * policy chain is composed from.
  */
 export type ApiTrpcFeatureMount = Readonly<{
   root: ApiTrpcRoot;
@@ -199,17 +161,8 @@ export type ApiTrpcFeatureMount = Readonly<{
 }>;
 
 /**
- * The packaged tRPC surfaces this process serves beyond its own two, and
- * everything their policy chain needs.
- *
- * A port rather than a value because the record cannot be built before the
- * root exists, and the root belongs to the application: the composition hands
- * over a builder, the application calls it with its own mount, and the
- * namespaces land on the SAME root the subscription lane resolves paths on.
- *
- * Absent for a process that composed none — this application then serves
- * exactly what it served before, and every `ctx.app` slice a packaged surface
- * would have read is absent rather than faked.
+ * The packaged tRPC surfaces this process serves beyond its own two, and everything their
+ * policy chain needs.
  */
 export abstract class ApiTrpcFeaturesPort<
   TRecord extends TRPCCreateRouterOptions = AppTrpcFeatureRecord,
@@ -315,10 +268,8 @@ export class MissingAgentService extends AgentService {
 }
 
 /**
- * What a process passes {@link ApiApplication.create} when it composed no
- * secret service, so `secrets.*` still mounts and answers by name instead of
- * being absent from the wire. The REST secret family is a separate decision,
- * made by the composition root, and stays unmounted without a real service.
+ * What a process passes {@link ApiApplication.create} when it composed no secret service,
+ * so `secrets.*` still mounts and answers by name instead of being absent from the wire.
  */
 export class MissingSecretService extends SecretService {
   private unavailable(): never {
@@ -367,26 +318,12 @@ function handledErrorCode(error: HandledError): TRPCError["code"] {
 
 /**
  * The wire shape a failed call arrives in, when the host supplies none.
- *
- * `appTrpcErrorFormatter` rather than a local reduction of it: the browser's
- * interceptors read `data.cause`, `data.authored` and `data.traceId` off every
- * failure, and a formatter that omits them turns a named model-provider
- * refusal into an unrenderable generic on the surface that serves it.
  */
 export const defaultErrorFormatter: ApiErrorFormatter = appTrpcErrorFormatter;
 
 /**
- * What stands in for the packaged application on a process that composed no
- * packaged surfaces.
- *
- * Unreachable through HTTP — none of the routers that read these slices are
- * mounted without a features port — and it exists so the tRPC context keeps one
- * shape either way. Reaching a slice some other way says which application is
- * missing rather than failing on `undefined` three layers down, which is the
- * same bargain {@link MissingAgentService} and {@link MissingSecretService}
- * make one level up. A proxy rather than thirteen written-out doubles because
- * the answer is identical for every slice and a hand-written set would drift
- * from the list the moment a fourteenth surface is mounted.
+ * What stands in for the packaged application on a process that composed no packaged
+ * surfaces.
  */
 const unavailableFeatureApplication = new Proxy({} as ApiTrpcFeatureApplication, {
   get(_target, property) {
@@ -398,13 +335,6 @@ const unavailableFeatureApplication = new Proxy({} as ApiTrpcFeatureApplication,
 
 /**
  * What a process that composed no packaged surfaces mounts instead.
- *
- * The same bargain {@link MissingAgentService} and {@link MissingSecretService}
- * make: the port is REQUIRED, so a deployment with no collaborators names this
- * rather than the application quietly defaulting to one. Its record is empty
- * and honestly so — nothing is mounted, so no policy chain built from the four
- * refusals below is ever reached, and `agents.*` and `secrets.*` are the whole
- * wire surface exactly as they were.
  */
 export class NoApiTrpcFeatures extends ApiTrpcFeaturesPort<Record<string, never>> {
   private unavailable(): never {
@@ -440,11 +370,6 @@ export class NoApiTrpcFeatures extends ApiTrpcFeaturesPort<Record<string, never>
 
 /**
  * This process's one tRPC root.
- *
- * Exported so a test can build the SAME root the application does — the
- * packaged record is typed against `ApiTrpcFeatureMount`, so a second root
- * shaped by hand would not satisfy it and the test would be proving something
- * else.
  */
 export function createTrpcRoot(errorFormatter: ApiErrorFormatter = defaultErrorFormatter) {
   return TrpcRootDefinition.forContext<ApiTrpcContext>().create({
@@ -467,17 +392,11 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
      */
     agents: AgentService;
     /**
-     * Runs "Test agent" over the Scenario application. Absent leaves
-     * `agents.testTurn`/`agents.testRun` composed but refusing by name — the
-     * agent router itself still mounts, since every other `agents.*`
-     * procedure needs nothing from Scenario.
+     * Runs "Test agent" over the Scenario application.
      */
     agentTesting?: AgentTestPort;
     /**
-     * Reads presence off the connected-agent runtime (ADR-128). Absent on a
-     * process that composed no connected-agent transport: every agent then
-     * reads as offline with no instances and no owner, the same degrade a
-     * process with no `connected` dependency at all gives `AgentApp`.
+     * Reads presence off the connected-agent runtime (ADR-128).
      */
     connectedAgents?: AgentAppDependencies["connected"];
     /**
@@ -542,10 +461,6 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
 
   /**
    * The packaged namespaces, built on this process's own mount.
-   *
-   * The policy chain is composed HERE rather than in the composition root for
-   * the same reason the record is: every middleware belongs to the root that
-   * produced it, and only the application holds that root.
    */
   private buildFeatureRouters(): TRecord {
     const features = this.features;
@@ -603,12 +518,9 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
   }
 
   /**
-   * The request's headers as a plain record, which is the shape every surface
-   * that reads `ctx.req` expects.
-   *
-   * A `Headers` instance would satisfy the type and answer `undefined` to
-   * every lookup, because those surfaces index it rather than calling `get`.
-   * Lowercased by `Headers` itself, which is what the lookups assume.
+   * The request's headers as a plain record, which is the shape every surface that reads
+   * `ctx.req` expects. A `Headers` instance would satisfy the type and answer `undefined`
+   * to every lookup, because those surfaces index it rather than calling `get`.
    */
   private static headersOf(request: Request): Record<string, string> {
     return Object.fromEntries(request.headers);
@@ -636,20 +548,9 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
       // Written by the operator check when one runs; absent says it did not.
       opsScope: undefined,
       /**
-       * The incoming request's headers, where one arrived.
-       *
-       * Pinned to `undefined` until now, on the reasoning that this process
-       * never sees the hosted edge's geo headers and quotes no currency from
-       * them. That was true of the CURRENCY surface and wrong for the context
-       * as a whole: `sharedTrace.get` — the one read the open internet can
-       * drive — resolves the caller's address off exactly this member, for
-       * its per-address ceiling and for the hash that collapses one viewer's
-       * refreshes into a single viewing. With `req` absent both fell back to
-       * "no address", so the 120-a-minute limit could never fire and every
-       * refresh burned a view.
-       *
-       * `undefined` remains for `createCaller`, which has no request at all —
-       * the two surfaces that read it already answer for an absent one.
+       * The incoming request's headers, where one arrived. Pinned to `undefined` until
+       * now, on the reasoning that this process never sees the hosted edge's geo headers
+       * and quotes no currency from them.
        */
       req: request
         ? {
@@ -717,11 +618,8 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
   private createHono(http: ApiHttpOptions, rest: Hono | undefined): Hono {
     const endpoint = http.endpoint ?? "/api/trpc";
     /**
-     * The request lane routes by procedure PATH and answers JSON either way, so
-     * it needs a router, not this application's record type. Named at the
-     * adapter's own bound rather than passed straight in: `trpc`'s record is
-     * generic here, which leaves `inferRouterContext` unresolved and the whole
-     * options object deferred.
+     * The request lane routes by procedure PATH and answers JSON either way, so it needs
+     * a router, not this application's record type.
      */
     const router: AnyTRPCRouter = this.trpc;
     const handler = async (request: Request, transport?: Context): Promise<Response> =>
@@ -776,12 +674,6 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
 
 /**
  * What kind of procedure a composed router serves at a dotted path.
- *
- * `_def.procedures` is tRPC's own flat record, keyed by exactly the dotted
- * path the wire carries, and a procedure's `_def.type` is the last place the
- * distinction between a query, a mutation and a subscription survives — the
- * caller erases it. Read defensively: the record is untyped at this bound, and
- * an unrecognised value must answer "no procedure" rather than pass a gate.
  */
 function procedureTypeOf(
   router: AnyTRPCRouter,

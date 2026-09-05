@@ -1,17 +1,6 @@
 /**
- * The four AUTHORING doors this process composes, driven through the real Hono
- * app `createApiProcessRestFeatures` returns.
- *
- * One file for four families because the thing under test is the same in all
- * four: each is `handlerManagedAuth({ credential: "session" })`, so the wire it
- * publishes for a signed-out caller and for one without the permission is the
- * family's own and must survive the move, and each dispatches a model through
- * a port this process fills rather than resolving one for itself.
- *
- * Each family gets its golden path and one named failure, and the failures are
- * the ones a customer would otherwise read as an answer: an editor that
- * silently returns nothing, a playground that streams from a provider the
- * project switched off, a generator that runs forever behind a proxy timeout.
+ * The four AUTHORING doors this process composes, driven through the real Hono app
+ * `createApiProcessRestFeatures` returns.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";

@@ -1,12 +1,5 @@
 /**
  * Characterisation of `POST /api/rum/v1/traces` through the real Hono app.
- *
- * The route is thin on purpose, so what is pinned is the wire it publishes:
- * an accepted report answers 202 with NO body, and every refusal the ingest
- * service raises reaches the browser as `{ error, code }` at the status the
- * handled error carries. The 202-with-no-body matters more than it looks — a
- * 5xx here is in the OTLP retryable set, so a shape change turns every open tab
- * into a retry loop against our own app.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { RUM_SESSION_HEADER } from "@langwatch/react-rum/constants";

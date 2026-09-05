@@ -1,11 +1,5 @@
 /**
- * The topic tree a project's traces are labelled by, composed as its own
- * feature.
- *
- * `topics.*` takes no ports — every answer is read off `ctx.app.topics` — so
- * what this composition supplies is the READER behind that slice, which the
- * trace grid's own topic-count labels share. Two readers would be two answers
- * to what a project's topics are, and the one that drifts is always the copy.
+ * The topic tree a project's traces are labelled by, composed as its own feature.
  */
 import { HandledError } from "@langwatch/handled-error";
 import type { TopicService } from "@langwatch/topic-contract";
@@ -38,21 +32,17 @@ export function composeTopicFeature(options: {
 }
 
 /**
- * The topic tree on a process that composed no database.
- *
- * The namespace still mounts and every call refuses by name, so the topics page
- * says the deployment cannot answer rather than reporting a project with no
- * topics, which reads as "clustering found nothing".
+ * The topic tree on a process that composed no database. The namespace still mounts and
+ * every call refuses by name, so the topics page says the deployment cannot answer rather
+ * than reporting a project with no topics, which reads as "clustering found nothing".
  */
 export function refusingTopicFeature(): ComposedTopicFeature {
   const service = new Proxy(
     {},
     {
-      get:
-        () =>
-        (): never => {
-          throw new ApiTopicUnavailableError("The topic tree");
-        },
+      get: () => (): never => {
+        throw new ApiTopicUnavailableError("The topic tree");
+      },
       has: () => true,
     },
   ) as TopicService;

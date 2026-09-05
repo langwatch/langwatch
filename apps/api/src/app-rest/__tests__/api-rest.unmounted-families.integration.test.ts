@@ -1,14 +1,6 @@
 /**
- * The two families that were BUILT and had no caller, driven through the real
- * Hono app `createApiProcessRestFeatures` returns.
- *
- * `/api/admin/*` and `/api/export/traces/download` both existed in their
- * feature packages and were mounted by nothing, so the back office and the
- * bulk trace download answered 404 on a fully composed deployment. What is
- * under test is the pair of conditions each is now mounted on, and that a
- * process missing one leaves the family OFF rather than serving a door that
- * refuses everybody — which, for the back office, is indistinguishable from
- * the hide it performs for a caller who is not staff.
+ * The two families that were BUILT and had no caller, driven through the real Hono app
+ * `createApiProcessRestFeatures` returns.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
@@ -185,10 +177,9 @@ function adminPorts(overrides: {
 }
 
 /**
- * The read stack, the session and the broadcast, as the process hands them
- * over. The export itself is NOT faked: the mount builds it from the stack's
- * own `tree` reader, which is the wiring this suite exists to pin, so the
- * stand-in is that reader.
+ * The read stack, the session and the broadcast, as the process hands them over. The
+ * export itself is NOT faked: the mount builds it from the stack's own `tree` reader,
+ * which is the wiring this suite exists to pin, so the stand-in is that reader.
  */
 function traceExportCollaborators(overrides: {
   session?: { user: { id: string } } | null;

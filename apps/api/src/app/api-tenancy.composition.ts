@@ -41,41 +41,12 @@ export type ApiTenancyCompositionOptions = {
 };
 
 /**
- * The organization, project and API-key services this process composes for
- * itself.
- *
- * They arrive together because they ARE one graph and cannot be composed
- * apart: the project service resolves a project's organization through the
- * organization service, and the API-key service reads both to answer what a
- * credential may do. Handing a host three of these separately would let a
- * deployment hold a project service built over one organization service and an
- * API-key service built over another.
- *
- * Every port below them is the feature packages' own — the personal-workspace,
- * team and group identity minters, the personal-workspace and API-key
- * diagnostics shims, the API-key binding-id minter and the project credential
- * format. They mint PERSISTED formats (ksuids with their exact prefixes, a
- * slug derived through the exact pre-pass, `sk-lw-` plus 48 characters of the
- * 54-byte alphabet), so a composition root that restated any of them would
- * write rows the other process's queries do not find. This root passes the
- * packaged adapters and describes none of those formats.
- *
- * Two collaborators are genuinely this process's own, and both are here rather
- * than in a package for the same reason: they resolve from THIS process's
- * environment. The settings cipher is the one the stored-secret family already
- * runs under, and the API-key pepper is a validated config leaf used verbatim
- * as an HMAC key.
+ * The organization, project and API-key services this process composes for itself.
  */
 export class ApiTenancyComposition {
   /**
-   * Composes the three services only when this process has everything they
-   * need to answer correctly.
-   *
-   * The pepper is on that list, and it is worth being exact about why: a
-   * missing pepper does not produce a weaker API-key service, it produces one
-   * that hashes every presented credential under a different key and
-   * authenticates none of the keys a customer already holds. Refusing to
-   * compose is the only reading of that which is not a silent lockout.
+   * Composes the three services only when this process has everything they need to answer
+   * correctly.
    */
   static tryCompose(
     options: Omit<ApiTenancyCompositionOptions, "database" | "authz" | "encryption" | "pepper"> & {
@@ -124,12 +95,11 @@ export class ApiTenancyComposition {
       ),
     }).build();
 
-    // `keyMap` and `storedObjects` are deliberately absent, and the adapter
-    // declares both optional because absence is a supported shape rather than a
-    // gap this root is papering over. Both are reach-outs to systems this
-    // process does not hold — a ClickHouse key map and the stored-object
-    // application — and a project deleted here leaves that cleanup to the tier
-    // that owns them.
+    // `keyMap` and `storedObjects` are deliberately absent, and the adapter declares both
+    // optional because absence is a supported shape rather than a gap this root is
+    // papering over. Both are reach-outs to systems this process does not hold — a
+    // ClickHouse key map and the stored-object application — and a project deleted here
+    // leaves that cleanup to the tier that owns them.
     const projects = PostgresProjectAdapter.create({
       database,
       credentials: ProjectCredentialsAdapter.create(),
@@ -163,14 +133,9 @@ export class ApiTenancyComposition {
 }
 
 /**
- * The project service's diagnostics, on this process's own structured logger.
- *
- * `capture` exists because a project operation can fail in a way nothing above
- * it can act on, and the platform app answers that by handing the error to
- * Sentry. This tier has no Sentry; what it has is the logger every other
- * failure in the process reaches, carrying the trace id a customer's error
- * message quotes back. Sending it there is the difference between an error
- * that is findable and one that was caught and dropped.
+ * The project service's diagnostics, on this process's own structured logger. `capture`
+ * exists because a project operation can fail in a way nothing above it can act on, and
+ * the platform app answers that by handing the error to Sentry.
  */
 class LoggedApiProjectDiagnostics extends ProjectDiagnosticsPort {
   static create(): LoggedApiProjectDiagnostics {

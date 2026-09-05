@@ -12,12 +12,6 @@ import type { ApiTrpcSession } from "./app-trpc/app-trpc.context";
 /**
  * Authenticates a web request without coupling the API process to a session
  * implementation.
- *
- * The whole session rather than the actor id, because the two halves of the
- * request read different parts of the same fact: authorization decides on
- * `user.id`, and the surfaces that RENDER the person read their name, picture
- * and impersonator. Resolving the session and answering only the id left every
- * packaged surface refusing a caller this process had just verified.
  */
 export abstract class ApiAuthenticationPort {
   abstract authenticate(request: Request): Promise<ApiTrpcSession | null>;
@@ -73,11 +67,9 @@ export class AuthzApiAuthorizationAdapter extends ApiAuthorizationPort {
 }
 
 /**
- * The request-policy graph for the standalone API process.
- *
- * Authentication is intentionally technical composition, while project
- * authorization stays with the one composed AuthZ service. Feature adapters
- * receive only the small request context they need.
+ * The request-policy graph for the standalone API process. Authentication is
+ * intentionally technical composition, while project authorization stays with the one
+ * composed AuthZ service.
  */
 export class ApiRequestPolicy {
   static create(options: {

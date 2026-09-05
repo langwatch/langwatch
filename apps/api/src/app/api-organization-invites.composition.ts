@@ -1,40 +1,7 @@
 /**
- * The invitation half of `organization.*`, composed on this process's own graph.
- *
- * It was an injected port with a refusing default, because the service lived in
- * the retired platform application and reached four verticals that had not
- * moved. All four have moved now, and each arrived as something this process
- * already holds:
- *
- *   the licence-enforcement counts   `@langwatch/entitlement-server`'s
- *                                    `PrismaUsageMembershipRepository` — the
- *                                    SAME reading the usage panel shows
- *   the plan provider                the one every allowance banner reads
- *   the role service                 the one `role.*` and `roleBinding.*` mount
- *   the mailer                       a PORT, still absent here, and honestly so
- *
- * `ApiOrganizationInvitePort` survives as the injection seam — a host that
- * composes its own invitation service still wins — but a process that injects
- * nothing now ANSWERS instead of refusing, on BOTH doors: the production
- * composition builds this once and hands the tRPC ports to the org-group half
- * and the three REST operations to `/api/organization`.
- *
- * ## The mail absence, and why it is not a refusal
- *
- * `OrganizationInviteMailPort` is left unfilled. Rendering a LangWatch message
- * is react-email, and `frontend-boundary.unit.test.ts` exists to stop a
- * value-import chain from a backend process to React — the same reason
- * `ApiIdentityMailPort` and `ApiPasswordResetMailPort` are ports rather than
- * calls into `@langwatch/mail`.
- *
- * Absent is a SUPPORTED state here rather than a degradation, and that is the
- * difference from the password-reset seam: an invitation is written either
- * way, it carries its accept URL in the listing, and the caller is told
- * `emailNotSent` so the screen can show the link to copy. That is byte for
- * byte what the platform application did on a deployment with no
- * `SENDGRID_API_KEY`. A reset that reports success and sends nothing leaves
- * somebody waiting on an inbox; an invitation that reports `emailNotSent`
- * leaves an administrator holding a link.
+ * The invitation half of `organization.*`, composed on this process's own graph. It was
+ * an injected port with a refusing default, because the service lived in the retired
+ * platform application and reached four verticals that had not moved.
  */
 import {
   buildInviteAcceptUrl,
@@ -60,10 +27,6 @@ import type { ApiOrganizationInvitePort } from "../features/organization/organiz
 
 /**
  * The seat census, over the SAME reading the usage panel shows.
- *
- * Two counts and the lite-seat rule from one vertical, so an administrator
- * refused a seat here and an administrator shown their usage there cannot be
- * told two different numbers about the same organization.
  */
 class ApiInviteSeatCensus extends OrganizationInviteSeatCensusPort {
   constructor(private readonly memberships: PrismaUsageMembershipRepository) {
@@ -102,10 +65,6 @@ class ApiInviteRateLimit extends OrganizationInviteRateLimitPort {
 
 /**
  * The two join-request writes the invitation surface performs.
- *
- * A narrow shape rather than the whole `JoinRequestTrpcPorts`, because these
- * are the only two an invitation ever reaches, and a process that composes the
- * identity half can satisfy it without this file learning what else is on it.
  */
 export interface ApiOrganizationInviteJoinRequests {
   resolveByInvitation(
@@ -171,22 +130,7 @@ export type ApiOrganizationInvitesOptions = Readonly<{
 }>;
 
 /**
- * Composes the invitation service and the eleven ports `organization.*` reads
- * it through.
- *
- * The two pure ones — `InviteService.matchInviteToAcceptor` and
- * `InviteService.maskInvitedAddress` — are statics, so they answer here with no
- * service instance behind them.
- */
-/**
- * The invitation half, as this process's two doors take it.
- *
- * ONE service behind both. The tRPC surface and the management REST family
- * administer the same invitations, and a second service would let the listing
- * one door returns disagree with what the other just created — including on
- * the acceptance link, which is minted from the deployment's base host and is
- * the only thing an administrator has to hand somebody when no mail gateway is
- * composed.
+ * Composes the invitation service and the eleven ports `organization.*` reads it through.
  */
 export type ApiOrganizationInvites = Readonly<{
   /** The eleven ports `organization.*` reads the invitation half through. */
@@ -262,12 +206,11 @@ export function composeApiOrganizationInvites(
         ...(input.viaIdentifierId === undefined ? {} : { viaIdentifierId: input.viaIdentifierId }),
       }),
     findLandingProjectSlug: (_ctx, input) => invites.findLandingProjectSlug(input.invite),
-    // Both of these tidy a request the same person already made — an
-    // invitation that ANSWERS one, and an acceptance that WITHDRAWS one — and
-    // the transport wraps each in its own try/catch because the invitation and
-    // the membership are the durable outcomes. Absent, they refuse BY NAME
-    // rather than resolving: a silent resolve would leave the request open on
-    // the admins' panel with nothing anywhere saying why.
+    // Both of these tidy a request the same person already made — an invitation that
+    // ANSWERS one, and an acceptance that WITHDRAWS one — and the transport wraps each in
+    // its own try/catch because the invitation and the membership are the durable
+    // outcomes. Absent, they refuse BY NAME rather than resolving: a silent resolve would
+    // leave the request open on the admins' panel with nothing anywhere saying why.
     resolveJoinRequestByInvitation: (_ctx, input) =>
       joinRequests
         ? joinRequests.resolveByInvitation(input)

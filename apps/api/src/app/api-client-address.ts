@@ -4,11 +4,8 @@ import { RuntimeConfig, trustedProxyConfigDefinition } from "@langwatch/config";
 import type { Context } from "hono";
 
 /**
- * Which address a request came from: the socket, unless the request arrived
- * from a hop named in `TRUSTED_PROXY_ADDRESSES` (empty by default). A
- * forwarding header is written by whoever sent the request, and every IP-keyed
- * throttle here is keyed on this, so a trusted hop's chain is read from the
- * RIGHT and an untrusted one's is not read at all.
+ * Which address a request came from: the socket, unless the request arrived from a hop
+ * named in `TRUSTED_PROXY_ADDRESSES` (empty by default).
  */
 export function apiClientAddress(
   c: Context,

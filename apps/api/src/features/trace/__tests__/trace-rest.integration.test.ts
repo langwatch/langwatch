@@ -1,26 +1,6 @@
 /**
- * The three trace REST doors this process mounts, driven through the real Hono
- * app `createApiProcessRestFeatures` builds.
- *
- * Nothing between the wire and the port is stubbed: the access declarations,
- * the body schemas built from the deployment's own filter vocabulary, the
- * projection compiler, the evaluation enricher, the two formatters and the
- * deprecation headers are all the ones that run in production. What is stood
- * in for is only what a test cannot hold — the trace read itself, the share
- * ledger, the credential resolution and the queue a collector span is enqueued
- * into.
- *
- * Each family gets its golden path and one named failure, and the failures are
- * chosen for what they would cost if they regressed:
- *
- *   - an unknown `select` path must be a VALIDATION failure naming the path,
- *     not an anonymous 400: a caller with twenty columns needs to know which
- *     one is wrong;
- *   - the deprecated read must answer its own bare `{ message }` 401 rather
- *     than the framework envelope, because a deployed SDK parses it;
- *   - the collector must hand the producer a `recordSpan` command for a real
- *     legacy payload, and must answer 400 rather than enqueueing anything when
- *     the payload names no trace at all.
+ * The three trace REST doors this process mounts, driven through the real Hono app
+ * `createApiProcessRestFeatures` builds.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { UsageLimitResult } from "@langwatch/entitlement-server";

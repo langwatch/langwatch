@@ -1,13 +1,5 @@
 /**
  * The caller's address on the tRPC surface.
- *
- * Every per-IP limit on the signed-out procedures — the front door, sign-up
- * verification, `user.register`, unsubscribe — keys on `ctx.clientIp()`.
- * Nothing set it, so all eight read the literal `"unknown"`: one global
- * counter for the whole deployment, which any unauthenticated caller could
- * spend on everybody's behalf. This drives the real HTTP listener because the
- * socket peer only exists there.
- *
  * @regression
  */
 import { SecretService, type Secret } from "@langwatch/secret-contract";

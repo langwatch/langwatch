@@ -1,10 +1,5 @@
 /**
  * The studio's outbound dispatch, composed as its own feature.
- *
- * Two things are pinned here, and they are the two halves of the same seam:
- * the dispatch relays the engine's own server events back to the watcher when
- * a gateway is composed, and refuses BY NAME when one is not — rather than
- * dispatching an event nothing receives.
  */
 import {
   HttpWorkflowStudioStreamAdapter,

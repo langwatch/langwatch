@@ -1,18 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The organization provisioning family, mounted the way this process mounts
- * it, over an in-memory instance directory.
- *
- * This is the one surface that exists before any organization does, so the
- * things worth pinning are the ones the FAMILY owns rather than the ones a
- * database owns: the slug shape it refuses, the deterministic 409 on a taken
- * slug, the compensating teardown when the bootstrap key cannot be minted,
- * the two distinct credential refusals, and the per-request availability that
- * answers 404 rather than 403 on cloud or with no instance key configured.
- * The directory and the credential store are in memory because they are the
- * datastore's half; everything above them is the real mount.
- *
+ * The organization provisioning family, mounted the way this process mounts it, over an
  * @see specs/organizations/organizations-provisioning-rest-api.feature
  */
 import { HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
@@ -124,7 +112,11 @@ describe("given a self-hosted deployment with the instance credential configured
       // failure the compensation is there for.
       const failed = await api.post(
         "/api/v1/organizations",
-        { name: "Acme Compensated", slug: "acme-comp", adminApiKeyName: HIDDEN_SYSTEM_KEY_NAMES[0] },
+        {
+          name: "Acme Compensated",
+          slug: "acme-comp",
+          adminApiKeyName: HIDDEN_SYSTEM_KEY_NAMES[0],
+        },
         instanceHeaders,
       );
 
@@ -367,9 +359,7 @@ function namedAbsences<T extends object>(implemented: T, subject: string): T {
   });
 }
 
-function mountProvisioning(
-  options: Omit<Parameters<typeof mountRestFamily>[0], "packaged"> = {},
-): {
+function mountProvisioning(options: Omit<Parameters<typeof mountRestFamily>[0], "packaged"> = {}): {
   api: MountedRestFamily;
   directory: ReturnType<typeof inMemoryDirectory>;
   keys: ReturnType<typeof inMemoryApiKeys>;

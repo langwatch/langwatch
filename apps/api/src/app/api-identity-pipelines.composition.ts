@@ -1,79 +1,7 @@
 /**
- * The four identity pipelines this process PRODUCES commands on.
- *
- *   identity          a person's thirteen identifier and two-step writes
- *   join-requests     the five verbs a join request has
- *   sso-connections   the fourteen a federated connection has
- *   scim-sync         the five an Enterprise directory's push states
- *
- * ## Why this file exists
- *
- * Every one of those writes arrives HERE — somebody attaches a sign-in method,
- * asks to join an organization, or an operator attests a domain — and none of
- * them could be enqueued. Two facts kept it that way, and both are now gone.
- *
- * `join-requests` and `sso-connections` each declare a PROCESS MANAGER (the
- * reminder-and-expiry lifecycle, and the teardown grace), and the Eventing
- * runtime refused to register any pipeline declaring one unless the process
- * also held a durable `ProcessStore`. A web process holds none — an inbox,
- * outbox and wakes are the worker's work — so ONE declaration inside a
- * definition made every command on it unsendable.
- * `EventSourcingOptions.processManagerMode: "producer-only"` separates the two
- * jobs: the producer registers the definition WHOLE and the runtime declines to
- * RUN the managers, by name, once at boot.
- *
- * `identity` declares no process manager at all and was simply never registered
- * on this process. That one was the sharper failure of the two, because a
- * ledger does not append and then stage — the QUEUED RUN is what appends — so
- * with no sender its `stage` threw and every ceremony that states an identifier
- * fact failed outright.
- *
- * ## One definition, two registrations
- *
- * Each pipeline is built from `@langwatch/identity-server`'s own producer
- * variant, which supplies stand-ins for the consumer-side dependencies — the
- * Postgres heads, the guards that read them, the mail the lifecycle sends —
- * so the definition can be CONSTRUCTED and refuses by name if one is ever
- * CALLED. That is the shape `SimulationProcessingProducerAdapter` and
- * `createTraceProcessingProducerPipeline` already have on this process.
- *
- * Registering the packaged definition rather than a local one is what keeps the
- * routing triple every job carries identical to the one the worker routes on.
- * Two descriptions of one event stream drift into jobs nothing can pick up, and
- * the queue rejects an unroutable job for redelivery rather than dropping it —
- * so a fork here is a queue that grows forever while the pods stay up.
- *
- * ## Nothing is appended here, and that is the design
- *
- * All four ledgers STAGE and stop (ADR-110, ADR-116): the queued run re-runs
- * the same guard the calling path ran and appends what it decides, so the
- * calling path appending as well would write every fact twice. That is why a
- * producer needs no event log — not a gap it is missing one. This process's
- * store is `EventStoreProducerOnly` and refuses `storeEvents` by name, which
- * is the structural half of the same ruling.
- *
- * `JoinRequestLedgerWriterAdapter` was one correction behind: it appended before
- * staging, so on this tier every join verb failed at the door with an
- * unhandled `ConfigurationError` — a generic "unknown error" for a request the
- * worker could serve. It stages now, like its three siblings.
- *
- * `ScimSyncLedgerWriterAdapter` took the same correction, and its swallow is the one
- * difference between them: a directory's push must never fail because its
- * history could not be written, so a loss there is logged rather than raised.
- *
- * ## `scim-sync` is registered here too, and that is what keeps the history
- *
- * `api-scim.composition.ts` composes `ScimSyncLedgerWriterAdapter` on every deployment
- * holding the Enterprise application, and this registration is the sender it
- * stages through. Without it the writer had nowhere to stage: it said so at
- * `error`, named the pipeline, and let the push through — so a directory's
- * history was lost permanently rather than transiently.
- *
- * It is the ONE of the four that declares no process manager and needs none
- * declined: a push is the DIRECTORY's to retry on its own schedule, so the
- * aggregate keeps no wake of its own. The worker registers and drains the
- * consumer side unconditionally (`ScimSyncWorkerFeatureInstaller`), so a
- * command staged here has a drain the moment it lands.
+ * The four identity pipelines this process PRODUCES commands on. identity          a
+ * person's thirteen identifier and two-step writes join-requests     the five verbs a
+ * join request has sso-connections   the fourteen a federated connection has scim-sync
  */
 import type { EventSourcing } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
@@ -96,13 +24,9 @@ const isSender = (value: unknown): value is ApiIdentityCommandSender =>
 /** Reports the composition decisions an absent queue would otherwise hide. */
 export abstract class ApiIdentityPipelinesAbsenceReport {
   /**
-   * No Eventing: every identity, join-request, connection and directory-sync
-   * write refuses.
-   *
-   * Named rather than silent because an absent sender is never "nothing
-   * happened": each ledger stages, and a staged command with no sender THROWS
-   * by name. A deployment reads that at boot rather than in one person's
-   * ceremony.
+   * No Eventing: every identity, join-request, connection and directory-sync write
+   * refuses. Named rather than silent because an absent sender is never "nothing
+   * happened": each ledger stages, and a staged command with no sender THROWS by name.
    */
   abstract withoutQueue(): void;
 }
@@ -120,11 +44,6 @@ export type ApiIdentityPipelinesOptions = Readonly<{
 
 /**
  * The command dispatchers the identity ledgers stage through.
- *
- * A registry resolved at BOOT rather than a lazy lookup per send: a pipeline
- * that registered without a command the ledger names is a composition error,
- * and the two ledgers turn a missing sender into a failed ceremony for one
- * person rather than a failed boot for the deployment.
  */
 export class ApiIdentityPipelines {
   static create(senders: Map<string, Map<string, ApiIdentityCommandSender>>): ApiIdentityPipelines {
@@ -136,12 +55,7 @@ export class ApiIdentityPipelines {
   ) {}
 
   /**
-   * One command's dispatcher, or `null` where this process registered no such
-   * pipeline.
-   *
-   * `null` for an unregistered PIPELINE and `null` for an unknown COMMAND are
-   * the same answer on purpose: the caller is what knows whether that is a
-   * delay it can absorb or a refusal it must state.
+   * One command's dispatcher, or `null` where this process registered no such pipeline.
    */
   tryCommand(input: { pipeline: string; command: string }): ApiIdentityCommandSender | null {
     return this.senders.get(input.pipeline)?.get(input.command) ?? null;
@@ -149,11 +63,9 @@ export class ApiIdentityPipelines {
 }
 
 /**
- * Registers the four definitions producer-only and resolves their senders.
- *
- * With no Eventing the registry is empty and every write refuses BY NAME
- * through the ledger that asked, which is the behaviour a deployment with no
- * Redis already has.
+ * Registers the four definitions producer-only and resolves their senders. With no
+ * Eventing the registry is empty and every write refuses BY NAME through the ledger that
+ * asked, which is the behaviour a deployment with no Redis already has.
  */
 export function composeApiIdentityPipelines(
   options: ApiIdentityPipelinesOptions,
@@ -203,13 +115,7 @@ export function composeApiIdentityPipelines(
 }
 
 /**
- * Reads one registration's senders, FAILING AT BOOT for a command it did not
- * produce.
- *
- * Naming the missing command at boot rather than at the first dispatch is the
- * whole reason the expected names are listed: an incompletely registered
- * pipeline is a composition error, and finding it when somebody presses the
- * button means finding it in their session.
+ * Reads one registration's senders, FAILING AT BOOT for a command it did not produce.
  */
 function resolveSenders(input: {
   pipeline: string;
@@ -231,11 +137,9 @@ function resolveSenders(input: {
 }
 
 /**
- * The thirteen identity verbs, listed once.
- *
- * A list rather than a trusted read of whatever the registration happened to
- * expose, so a command REMOVED from the packaged definition fails this
- * process's boot rather than one person's sign-in ceremony.
+ * The thirteen identity verbs, listed once. A list rather than a trusted read of whatever
+ * the registration happened to expose, so a command REMOVED from the packaged definition
+ * fails this process's boot rather than one person's sign-in ceremony.
  */
 const IDENTITY_COMMAND_NAMES = [
   "attachIdentifier",
@@ -264,10 +168,6 @@ const JOIN_REQUEST_COMMAND_NAMES = [
 
 /**
  * The five an Enterprise directory's push states.
- *
- * Every one of them is sent from this tier — the SCIM boundary is a web
- * request an identity provider makes — and none is sent from anywhere else, so
- * an absent sender here is a history nobody writes rather than a delay.
  */
 const SCIM_SYNC_COMMAND_NAMES = [
   "issueScimToken",
@@ -296,12 +196,9 @@ const SSO_CONNECTION_COMMAND_NAMES = [
 ] as const;
 
 /**
- * Names the one identity-side absence, at boot.
- *
- * `info` rather than `warn`: a deployment with no Redis has already been told
- * it has no queue, and every write on these four pipelines refuses BY NAME
- * when it is attempted. There is no second absence to report — a producer
- * holding no event log is the ruling working, not a capability missing.
+ * Names the one identity-side absence, at boot. `info` rather than `warn`: a deployment
+ * with no Redis has already been told it has no queue, and every write on these four
+ * pipelines refuses BY NAME when it is attempted.
  */
 export class LoggedApiIdentityPipelinesAbsence extends ApiIdentityPipelinesAbsenceReport {
   static create(logger: Pick<Logger, "info">): LoggedApiIdentityPipelinesAbsence {

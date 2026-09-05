@@ -1,27 +1,7 @@
 /**
- * `organization.*` — the members of a tenant, their team bindings, its audit
- * trail and its invitations — composed as its own feature.
- *
- * Three groups of answers, and the split is the point. The row reads and the
- * permission probes run on this process's own connection and its one AuthZ
- * service; the rules that MOVED — the seat constraints, the role-naming
- * convention, the invitation display status, the team enrichment — are
- * imported from `@langwatch/organization-server` rather than restated; and the
- * invitation COMMANDS come from a port, because the service behind them is
- * composed once for both doors that administer invitations.
- *
- * ## The named absences
- *
- * {@link ApiOrganizationInvitePort} is the injection seam for the invitation
- * half. An injected port wins; a process that injects none composes one over
- * its own graph, and only a process with no grant ledger or no role service
- * still refuses BY NAME — an empty invite list would tell an administrator
- * nobody had been invited.
- *
- * {@link ApiEnterpriseApplicationPort} carries the usage-limit notifier. Absent,
- * the resource-limit notification is logged rather than sent: it announces a
- * limit somebody already hit, so refusing the write that hit it would be a
- * second failure on top of the first.
+ * `organization.*` — the members of a tenant, their team bindings, its audit trail and
+ * its invitations — composed as its own feature. Three groups of answers, and the split
+ * is the point.
  */
 import type { AuthService } from "@langwatch/auth-contract";
 import {
@@ -116,31 +96,21 @@ import {
 } from "./organization-trpc.mount";
 
 /**
- * The questionnaire the sign-up form collects, as the ceremony forwards it.
- *
- * Opaque to the organization package on purpose — the shape is the
- * deployment's — so the schema is declared where the process that reads the
- * answers lives. Passthrough rather than a closed object: a deployment that
- * adds a field to its own form must not have the ceremony drop it.
+ * The questionnaire the sign-up form collects, as the ceremony forwards it. Opaque to the
+ * organization package on purpose — the shape is the deployment's — so the schema is
+ * declared where the process that reads the answers lives.
  */
 export const signUpDataSchema = z.object({}).passthrough();
 
 /**
- * The platform application's licence-limit copy, stated here.
- *
- * The message a member reads when an organization is out of full seats. Stated
- * rather than imported because the licence-enforcement vertical has not moved,
- * and the words are what a customer sees.
+ * The platform application's licence-limit copy, stated here. The message a member reads
+ * when an organization is out of full seats. Stated rather than imported because the
+ * licence-enforcement vertical has not moved, and the words are what a customer sees.
  */
 const FULL_MEMBER_LIMIT_MESSAGE = "Cannot complete action: full member limit reached";
 
 /**
  * The invitation half of `organization.*`, for a deployment that composed one.
- *
- * One port for twelve procedures because they are one service: an invitation
- * is created, listed, resent, revoked, matched to an acceptor and applied by
- * the same ledger, and a process holding half of it would offer an
- * administrator a list it cannot act on.
  */
 export abstract class ApiOrganizationInvitePort {
   /** Everything `organization.*` asks the invitation service. */
@@ -181,13 +151,8 @@ export type OrganizationPeers = Readonly<{
   /** The invitation service, where the deployment composed one. */
   invites?: ApiOrganizationInvitePort | undefined;
   /**
-   * The membership graph the four tenant-shaped namespaces are served over,
-   * where this process composed one.
-   *
-   * All of it or none: `group.*`, `joinRequests.*` and `onboarding.*` write
-   * seats, grants and organizations through ONE membership half, and a process
-   * holding part of it would let a person be admitted by one door and be
-   * invisible to the next.
+   * The membership graph the four tenant-shaped namespaces are served over, where this
+   * process composed one.
    */
   membership?: OrganizationMembershipPeers | undefined;
 }>;
@@ -228,19 +193,13 @@ export type ComposedOrganizationFeature = Readonly<{
   /** The `ctx.app.organizations` slice. */
   app: OrganizationApp;
   /**
-   * The organization object the MANAGEMENT REST family serves from: the
-   * canonical contract's settings reads and writes, plus the membership
-   * operations the contract does not declare, routed onto one object. Absent
-   * where this process composed no membership half.
+   * The organization object the MANAGEMENT REST family serves from: the canonical
+   * contract's settings reads and writes, plus the membership operations the contract
+   * does not declare, routed onto one object.
    */
   rest: OrganizationRestService | undefined;
   /**
    * The same object again, in the shape `/api/organizations` takes.
-   *
-   * Published rather than rebuilt: instance provisioning creates the tenant
-   * the management family then administers, and two objects over those rows
-   * would let a freshly provisioned organization be missing from the listing
-   * that is supposed to enumerate exactly them.
    */
   provisioning: (OrganizationService & OrganizationProvisioningPort) | undefined;
 }>;
@@ -250,11 +209,9 @@ export function composeOrganizationFeature(options: {
   infrastructure: ApiTrpcInfrastructure;
   peers: OrganizationPeers;
   /**
-   * The process's ONE fixed-window counter.
-   *
-   * The same instance every other throttle on this process meters through: two
-   * limiters would give one caller two budgets, which is the whole reason the
-   * production composition holds a single one.
+   * The process's ONE fixed-window counter. The same instance every other throttle on
+   * this process meters through: two limiters would give one caller two budgets, which is
+   * the whole reason the production composition holds a single one.
    */
   rateLimit(
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
@@ -287,11 +244,9 @@ export function composeOrganizationFeature(options: {
 }
 
 /**
- * `organization.*` on a process that composed no graph to administer.
- *
- * The namespace still mounts and every call refuses by name, so an
- * administrator is told the deployment cannot answer rather than shown an
- * organization with no members in it.
+ * `organization.*` on a process that composed no graph to administer. The namespace still
+ * mounts and every call refuses by name, so an administrator is told the deployment
+ * cannot answer rather than shown an organization with no members in it.
  */
 export function refusingOrganizationFeature(): ComposedOrganizationFeature {
   const refuse = (): never => {
@@ -367,10 +322,6 @@ function organizationPorts(
 
     /**
      * Which of an organization's projects this caller holds one permission on.
-     *
-     * Bounded concurrency rather than a fan-out: a large organization's
-     * project list would otherwise open one connection per project against the
-     * same pool the request itself is running on.
      */
     batchProjectPermissions: async (ctx, input) => {
       const userId = actorId(ctx);
@@ -391,10 +342,8 @@ function organizationPorts(
     decryptStoredSecret: (value) => decryptStoredSecret(peers.encryption, value),
 
     /**
-     * Both Enterprise plan gates, over the ONE plan provider this process
-     * resolves every allowance through. `assertEnterprisePlanType` is the same
-     * fail-closed equality test the platform ran: anything that is not
-     * `ENTERPRISE` is refused, including a tier this build does not know.
+     * Both Enterprise plan gates, over the ONE plan provider this process resolves every
+     * allowance through.
      */
     assertCustomRolesAllowed: async (_ctx, { organizationId }) => {
       const plan = await plans.getActivePlan({ organizationId });
@@ -447,11 +396,6 @@ function organizationPorts(
       }),
     /**
      * The seat guard on an external role change, refused by name.
-     *
-     * The same refusal the identity half already answers with for
-     * `OrganizationSeatLicensePort`: a process with no seat licence cannot
-     * decide whether a change stays within the licensed count, and permitting
-     * it would let an organization over its own limit.
      */
     assertTeamRoleChangeWithinSeatLimits: () =>
       Promise.reject(
@@ -543,10 +487,7 @@ function organizationPorts(
     },
 
     /**
-     * The product trail, on a process with no analytics sink. Every one of
-     * these is fire-and-forget by construction — a marketing signal on
-     * somebody's invitation — so an absent sink logs once rather than refusing
-     * the invitation it was meant to announce.
+     * The product trail, on a process with no analytics sink.
      */
     trackServerEvent: (input) => {
       logger.debug(
@@ -572,19 +513,8 @@ const AUDIT_LOG_DECLARATION = {
 } as const;
 
 /**
- * The audit-log read's own check: the ORGANIZATION tier, always.
- *
- * A bare `permission("auditLog:view")` cannot express this. `auditLog` is
- * grantable at project, team and organization, and the declared check resolves
- * to the narrowest tier whose id the input carries — so the optional
- * `projectId` filter would move the whole check to the project tier and leave
- * `organizationId`, the id the query is ANCHORED on, unauthorized. A caller
- * holding `auditLog:view` on any one project could then read a different
- * organization's org-scoped trail.
- *
- * So the organization is checked unconditionally, and when a project filter is
- * present the project is checked as well, so a project-scoped grant cannot
- * widen the read past that project either.
+ * The audit-log read's own check: the ORGANIZATION tier, always. A bare
+ * `permission("auditLog:view")` cannot express this.
  */
 function auditLogCheckFor(authz: AuthzService): unknown {
   return declareAuthzMiddleware(AUDIT_LOG_DECLARATION, async (params: never) => {
@@ -637,11 +567,9 @@ type ScopeCheckParams<TInput> = {
 const actorId = (ctx: unknown): string => (ctx as ApiTrpcPortsContext).actor().id;
 
 /**
- * Runs one asynchronous read over a list, a few at a time.
- *
- * Bounded rather than a fan-out: an organization's project list can be long,
- * and one decision per project opened at once would starve the same connection
- * pool the request itself is running on.
+ * Runs one asynchronous read over a list, a few at a time. Bounded rather than a fan-out:
+ * an organization's project list can be long, and one decision per project opened at once
+ * would starve the same connection pool the request itself is running on.
  */
 const PERMISSION_PROBE_CONCURRENCY = 8;
 
@@ -674,11 +602,9 @@ function decryptStoredSecret(encryption: SecretEncryptionPort | undefined, value
 }
 
 /**
- * An invited address, masked, for a deployment with no invitation service.
- *
- * The same shape the invitation service produces: enough of the address for
- * the person holding the link to recognise whether it is theirs, and not
- * enough to learn somebody else's.
+ * An invited address, masked, for a deployment with no invitation service. The same shape
+ * the invitation service produces: enough of the address for the person holding the link
+ * to recognise whether it is theirs, and not enough to learn somebody else's.
  */
 function maskAddress(email: string): string {
   const [local = "", domain = ""] = email.split("@");
@@ -733,13 +659,9 @@ function membershipRouters(mount: ApiTrpcFeatureMount, ports: MembershipPorts) {
 }
 
 /**
- * Composes the membership half over this process's own graph.
- *
- * The organization service, the project service, the grant ledger and the user
- * directory all arrive already composed. Taken rather than built: a second
- * directory is a second answer to who somebody is, and a second organization
- * service would let a seat this half refuses be a seat the invitation half
- * grants.
+ * Composes the membership half over this process's own graph. The organization service,
+ * the project service, the grant ledger and the user directory all arrive already
+ * composed.
  */
 function composeMembershipHalf(options: {
   prisma: PrismaClient;
@@ -828,14 +750,8 @@ function composeMembershipHalf(options: {
   });
 
   /**
-   * The caller's own verified address, and the reason every requester-side
-   * join-request procedure starts here.
-   *
-   * `tryVerifiedEmailsOf` answers `null` for a user who is not on identifiers
-   * yet, which is the legacy fallback the rest of the identity surface uses:
-   * the `User.email` column, but only where it is marked verified. An
-   * unverified address answers null, and every caller treats that as the
-   * universal nothing.
+   * The caller's own verified address, and the reason every requester-side join-request
+   * procedure starts here.
    */
   const verifiedEmailFor = async ({ userId }: { userId: string }): Promise<string | null> => {
     const verified = await identityEmails.tryVerifiedEmailsOf({ userId });
@@ -860,10 +776,7 @@ function composeMembershipHalf(options: {
       group: {
         /**
          * Groups arrive with SCIM, which is an Enterprise capability read per
-         * organization out of a billing store this process does not hold. It
-         * refuses rather than permitting: permitting would let a deployment
-         * outside the plan write group bindings that the plan's own tier would
-         * have refused.
+         * organization out of a billing store this process does not hold.
          */
         assertScimAllowed: () =>
           Promise.reject(
@@ -935,14 +848,9 @@ function composeMembershipHalf(options: {
 }
 
 /**
- * One organization object, two owners.
- *
- * `OrganizationApp` reads a single `organizations` dependency that is the
- * canonical contract AND the fourteen membership operations the contract does
- * not declare. Which half owns an operation is a fact about the contract
- * rather than about this process, so it is stated once here as a name list
- * and routed rather than restated as forty delegating methods — a list that
- * drifts fails the typecheck, and forty methods that drift do not.
+ * One organization object, two owners. `OrganizationApp` reads a single `organizations`
+ * dependency that is the canonical contract AND the fourteen membership operations the
+ * contract does not declare.
  */
 const MEMBERSHIP_OPERATIONS = new Set<string>([
   "createAndAssign",
@@ -964,12 +872,11 @@ const MEMBERSHIP_OPERATIONS = new Set<string>([
   // question each.
   "listMembers",
   "getMember",
-  // The four INSTANCE-PROVISIONING operations `/api/organizations` performs.
-  // Same reason again: the canonical contract does not declare them because
-  // they run before any credential for the organization exists, so the door
-  // that creates a tenant and the screens that administer it afterwards must
-  // resolve through one object or a provisioned organization would be
-  // invisible to the second.
+  // The four INSTANCE-PROVISIONING operations `/api/organizations` performs. Same reason
+  // again: the canonical contract does not declare them because they run before any
+  // credential for the organization exists, so the door that creates a tenant and the
+  // screens that administer it afterwards must resolve through one object or a
+  // provisioned organization would be invisible to the second.
   "createForProvisioning",
   "listProvisioningSummaries",
   "getProvisioningSummary",
@@ -1010,40 +917,8 @@ function refusingOrganizationApp(): OrganizationApp {
 }
 
 /**
- * The seat licence, over the SAME plan provider and the SAME membership counts
- * every other allowance in this process reads.
- *
- * The two decisions, and the rules they keep from the platform application byte
- * for byte:
- *
- *   checkLimit               `allowed` is `current < max` on the plan's own
- *                            allowance, and a plan carrying
- *                            `overrideAddingLimitations` — the unlimited
- *                            self-hosted tier — is allowed without a count.
- *                            It ANSWERS rather than throwing: the caller turns
- *                            it into `member_seat_limit_reached` carrying the
- *                            counts, and only the caller knows which write it
- *                            was about to make.
- *   assertRoleChangeAllowed  the seat classification first — a Lite Member
- *                            gaining non-view permissions re-checks the FULL
- *                            member seats, and a full member dropping to lite
- *                            re-checks the LITE ones — then the Enterprise
- *                            requirement that a custom-role assignment
- *                            implies. Both forms of that assignment count: a
- *                            `custom:{roleId}` role string, and a built-in role
- *                            string carrying a `customRoleId`, which the
- *                            cascade persists as a custom binding just the
- *                            same.
- *
- * A seat refusal is a `LimitExceededError` — `resource_limit_exceeded`,
- * carrying the allowance in its `meta` — which is the shape every other member
- * limit in the product raises, so the client's limit modal keeps opening off
- * one answer.
- *
- * What is NOT here: the ops notification the platform fired beside each
- * refusal. It reached a Slack channel through a vertical this process does not
- * compose, and a notification nobody receives must not be able to fail a seat
- * decision.
+ * The seat licence, over the SAME plan provider and the SAME membership counts every
+ * other allowance in this process reads.
  */
 class ApiOrganizationSeatLicense extends OrganizationSeatLicensePort {
   static create(options: {
@@ -1183,13 +1058,6 @@ class AuthzOrganizationGrantCache extends OrganizationGrantCachePort {
 
 /**
  * The prompt-tag seeding a new organization gets, absent.
- *
- * Non-fatal in one direction and fatal in the other, which is why it is not a
- * refusal: sign-up creates the organization first and seeds afterwards, so
- * refusing here would cost a person the organization they just made over a
- * catalogue of tags. It is logged instead, once, naming the organization —
- * the tags are a starting point a person can add for themselves, and the
- * compensation path a provisioning run needs is reported the same way.
  */
 class LoggedApiOrganizationPromptSeed extends OrganizationPromptSeedPort {
   static create(options: {

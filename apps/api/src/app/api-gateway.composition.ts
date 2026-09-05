@@ -1,37 +1,7 @@
 /**
- * The AI Gateway's application, composed once for this process.
- *
- * Moved whole out of `platform/app/src/server/app-layer/presets.ts`, where it
- * was `composeGatewayApp` over an `AppDependencies["gateway"]` bag the App
- * built. The bag is gone: every store it held is opened HERE, from this
- * process's own Prisma connection and its own ClickHouse, so the seven gateway
- * doors — six tRPC namespaces and the two REST families — are given ONE
- * application rather than each assembling its own view of what a virtual key
- * is worth.
- *
- * That was the whole reason the platform composition existed. It replaced two
- * bags that described the same process to the same feature and disagreed about
- * it — `budgets` meant the decision service on one side and the ClickHouse
- * spend source on the other. One composition is what stops the public REST door
- * and the browser's tRPC door enforcing different rules, and it is why this is
- * a composition rather than a per-door port bag.
- *
- * ## What arrives, and what refuses
- *
- * ClickHouse is optional and its absence is a supported shape rather than a
- * degradation: the budget ledger, the per-key spend rollup and the spend-event
- * feed all live there, and a deployment with no ClickHouse answers
- * `spend_source_unavailable` rather than a $0.00 that cannot be told apart from
- * a key that genuinely spent nothing. `spendSourceAvailable` is what carries
- * that distinction into the application.
- *
- * The idempotency ledger is a PORT — {@link ApiGatewayIdempotencyPort} — and
- * the process's own implementation of it is `api-idempotency.composition.ts`,
- * over `@langwatch/api/rest`'s receipt protocol. It stays a port because a
- * deployment can hold no database or no cipher, and then the three REST creates
- * that accept an `Idempotency-Key` refuse by name: a runner that executed
- * unguarded would mint a second virtual key on a retry the caller sent
- * precisely so it would not.
+ * The AI Gateway's application, composed once for this process. Moved whole out of
+ * `platform/app/src/server/app-layer/presets.ts`, where it was `composeGatewayApp` over
+ * an `AppDependencies["gateway"]` bag the App built.
  */
 import type { ApiKeyPermissionScope, AuthzService } from "@langwatch/authz-contract";
 import {
@@ -88,37 +58,26 @@ class ApiCapabilityUnavailableError extends HandledError {
 }
 
 /**
- * The receipt ledger a keyed REST create dispatches through.
- *
- * A port rather than a direct dependency because the ledger — the
- * `IdempotencyReceipt` claim, its heartbeat and its takeover window — needs a
- * database AND a cipher, and a deployment can hold neither. It is ONE ledger
- * per process wherever it exists: two would be two takeover clocks racing each
- * other's claims, which is the double create the header exists to prevent.
- * See `api-idempotency.composition.ts`.
+ * The receipt ledger a keyed REST create dispatches through. A port rather than a direct
+ * dependency because the ledger — the `IdempotencyReceipt` claim, its heartbeat and its
+ * takeover window — needs a database AND a cipher, and a deployment can hold neither.
  */
 export abstract class ApiGatewayIdempotencyPort {
   abstract readonly run: IdempotentRunner;
 }
 
 /**
- * The ClickHouse this process's gateway ledger runs on, as one resolution.
- *
- * `null` where the process opened none. The gateway's spend is a projection in
- * that instance, so a deployment holding no trace storage holds no spend to
- * price a budget against.
+ * The ClickHouse this process's gateway ledger runs on, as one resolution. `null` where
+ * the process opened none. The gateway's spend is a projection in that instance, so a
+ * deployment holding no trace storage holds no spend to price a budget against.
  */
 export type ApiGatewayClickHousePort = Readonly<{
   resolve(tenantId: string): Promise<GatewayClickHouseClient>;
 }>;
 
 /**
- * The two questions a virtual-key write is authorized by, answered from this
- * process's own AuthZ service.
- *
- * They stay apart because the two credentials answer them differently:
- * collapsing them would let a scoped API key inherit the whole of its owner's
- * cascade instead of its own ceiling. See {@link GatewayScopePermissionsPort}.
+ * The two questions a virtual-key write is authorized by, answered from this process's
+ * own AuthZ service.
  */
 class ApiGatewayScopePermissions extends GatewayScopePermissionsPort {
   static create(authz: AuthzService): ApiGatewayScopePermissions {
@@ -188,13 +147,8 @@ export type ApiGatewayCompositionOptions = Readonly<{
   /** The receipt ledger the keyed REST creates run through, where one exists. */
   idempotency?: ApiGatewayIdempotencyPort | undefined;
   /**
-   * Where a virtual key's lifecycle is announced, where the deployment composed
-   * a ledger for it.
-   *
-   * Optional and unset by default, which is the behaviour the platform
-   * application had rather than a new gap: `VirtualKeyService` constructed a
-   * disabled signal service in its own constructor, so all five emissions
-   * reached a null object in every process.
+   * Where a virtual key's lifecycle is announced, where the deployment composed a ledger
+   * for it.
    */
   governanceSignals?: GatewayGovernanceSignalsPort | undefined;
 }>;
@@ -213,22 +167,14 @@ export type ApiGatewayComposition = Readonly<{
   spendEvents: GatewaySpendEventsService | undefined;
   /**
    * The budget, cache-rule and guardrail decision store.
-   *
-   * Exposed as well as folded into the application because the Go data plane's
-   * warm-cache config is materialised against it: one key's bundle carries the
-   * budgets, the cache rules and the guardrails that apply to it, and reading
-   * them through a second service would let the bundle disagree with what the
-   * console shows.
    */
   budgetDecisions: GatewayService;
 }>;
 
 /**
- * Composes the gateway application from this process's own graph.
- *
- * Everything passed in is either a capability built over persistence the
- * feature package cannot reach, or a decision made against role bindings and
- * memberships it cannot see.
+ * Composes the gateway application from this process's own graph. Everything passed in is
+ * either a capability built over persistence the feature package cannot reach, or a
+ * decision made against role bindings and memberships it cannot see.
  */
 export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGatewayComposition {
   const { prisma, authz, projects, clickhouse } = options;
@@ -351,13 +297,8 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
       });
       return new Map(groups.map((group) => [group.id, group._count.members]));
     },
-    // The label per key a page of spend rows carries, read through the gateway
-    // feature's OWN persistence rather than by a key-table `findMany` written
-    // here. `VirtualKey` holds every key's hashed secret, its previous
-    // secret and the window that one stays valid in; the repository behind
-    // `resolveNames` selects an id, a name and a display prefix, and the
-    // organization fence that keeps a caller's id list from reaching another
-    // tenant's rows lives with it rather than being restated per call site.
+    // The label per key a page of spend rows carries, read through the gateway feature's
+    // OWN persistence rather than by a key-table `findMany` written here.
     resolveVirtualKeyNames: (input) => virtualKeys.resolveNames(input),
     isOrganizationMember: async ({ organizationId, userId }) =>
       (await prisma.organizationUser.findFirst({
@@ -501,24 +442,8 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
 }
 
 /**
- * The caller as the virtual-key authorization vocabulary names them, whichever
- * door they arrived through.
- *
- * `GatewayActor` is `unknown` on purpose: the feature hands a caller straight
- * into these checks and never reads one, because what an identity IS belongs
- * to this process's authentication. So exactly two shapes reach here — the
- * browser session a tRPC context carries, and the credential actor
- * `actorForCredential` builds above for a REST request — and one implementation
- * has to accept both.
- *
- * They are told apart by the member only one of them has: every
- * {@link VirtualKeyActor} carries `kind`, and a session has no such field. The
- * credential branches are rebuilt member by member rather than waved through,
- * so nothing reaches the permission port that was not read off the value first.
- *
- * Every unrecognised shape answers `{ kind: "session", session: null }`, which
- * `assertActorCanManageAllScopes` and its siblings refuse outright. This cannot
- * widen an authorization: what it fails to recognise, it denies.
+ * The caller as the virtual-key authorization vocabulary names them, whichever door they
+ * arrived through.
  */
 function gatewayVirtualKeyActor(actor: unknown): VirtualKeyActor {
   if (typeof actor !== "object" || actor === null) {
@@ -554,14 +479,9 @@ function gatewayVirtualKeyActor(actor: unknown): VirtualKeyActor {
 }
 
 /**
- * The one member the authorization vocabulary reads off a browser session: the
- * signed-in person's id.
- *
- * Narrower than the platform application's check, which asserted a whole
- * NextAuth `Session` including its `expires` string. That type belongs to a
- * sign-in library this process does not use, and the extra member was never
- * read — `VirtualKeySessionActor` is `{ user: { id: string } } | null`. A value
- * that fails becomes a null session, and every gateway check refuses one.
+ * The one member the authorization vocabulary reads off a browser session: the signed-in
+ * person's id. Narrower than the platform application's check, which asserted a whole
+ * NextAuth `Session` including its `expires` string.
  */
 function sessionActor(value: object): { user: { id: string } } | null {
   if (!("user" in value)) return null;

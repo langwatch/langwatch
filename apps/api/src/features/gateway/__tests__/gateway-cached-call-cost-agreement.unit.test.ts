@@ -1,22 +1,7 @@
 /**
- * One cached gateway call, priced by the two surfaces that hold money.
- *
- * A customer reads the same request's cost in two places computed from two
- * different records. The Usage page folds `trace_summaries`, built from the
- * span the gateway emits (trace-server). Budgets and the ledger read
- * `gateway_spend`, built from the spend record the gateway emits
- * (gateway-server). Both feed the same rate table, so they can only disagree
- * when the two records state different quantities for the same request.
- *
- * They did once: the span took the cached tokens out of its input count
- * while the spend record shipped the provider's cache-inclusive total, so the
- * rating seam priced every cached token twice — once at the input rate and
- * once at the cache-read rate. Composed here, in the composition root,
- * because the trace fold and the spend rater live in two feature packages
- * (trace-server, gateway-server) that may not import one another.
- *
- * The fixture is that call, measured through a locally lifted gateway: 4,814
- * prompt tokens of which 4,736 came from the provider's cache.
+ * One cached gateway call, priced by the two surfaces that hold money. A customer reads
+ * the same request's cost in two places computed from two different records. The Usage
+ * page folds `trace_summaries`, built from the span the gateway emits (trace-server).
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -69,12 +54,9 @@ const UNCACHED_CALL: ProviderUsage = {
 };
 
 /**
- * What the gateway charges at the plain input rate: the prompt total with the
- * cached tokens taken out. This mirrors `domain.Usage.BillableInputTokens` in
- * the Go gateway, which is the single place both records get their input
- * count from. Both surfaces below are fed from here, so a surface that
- * starts reading a different quantity fails this file rather than a
- * customer's invoice.
+ * What the gateway charges at the plain input rate: the prompt total with the cached
+ * tokens taken out. This mirrors `domain.Usage.BillableInputTokens` in the Go gateway,
+ * which is the single place both records get their input count from.
  */
 function billableInputTokens(usage: ProviderUsage): number {
   const fresh = usage.promptTokens - usage.cacheReadTokens - usage.cacheCreationTokens;
@@ -197,11 +179,9 @@ function billedCostUsd(usage: ProviderUsage, inputTokens: number): number {
 }
 
 /**
- * The trace fold rounds its running total to millionths of a dollar while the
- * spend record keeps whole nano-USD, so the two land within half a millionth
- * of each other rather than bit for bit. A gap wider than that is the two
- * surfaces pricing different quantities, which is the defect this file pins
- * shut.
+ * The trace fold rounds its running total to millionths of a dollar while the spend
+ * record keeps whole nano-USD, so the two land within half a millionth of each other
+ * rather than bit for bit.
  */
 const ONE_MILLIONTH_OF_A_DOLLAR = 1e-6;
 

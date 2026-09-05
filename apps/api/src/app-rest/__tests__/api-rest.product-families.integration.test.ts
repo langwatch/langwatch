@@ -1,12 +1,6 @@
 /**
- * The product REST families this process composes for itself, driven through
- * the real Hono app `createApiProcessRestFeatures` returns.
- *
- * Three families, one test file, because the thing under test is the same in
- * all three: the mount binds the packaged family to a service this process
- * composed, and the wire the family publishes is unchanged by the move. Each
- * gets its golden path and one named failure — the failure being, in every
- * case, the one a customer would otherwise read as an answer.
+ * The product REST families this process composes for itself, driven through the real
+ * Hono app `createApiProcessRestFeatures` returns.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { AnalyticsApp } from "@langwatch/analytics-server";
@@ -180,10 +174,9 @@ describe("given the organization management door this process composes", () => {
 
   describe("when this deployment composed an invitation service", () => {
     /**
-     * The same service `organization.*` administers over tRPC. What this pins
-     * is that the route reaches it and returns what it holds: a listing that
-     * answered `[]` would look like a working door and tell an administrator
-     * nobody had been invited.
+     * The same service `organization.*` administers over tRPC. What this pins is that the
+     * route reaches it and returns what it holds: a listing that answered `[]` would look
+     * like a working door and tell an administrator nobody had been invited.
      */
     it("lists the organization's invitations through it", async () => {
       const listInvites = vi.fn(async () => [

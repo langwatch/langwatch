@@ -1,17 +1,7 @@
 /**
- * The Evaluation capability the trace read stack reads through.
- *
- * Every single-trace read asks for the evaluations behind that trace, and the
- * grid asks for the summaries behind a page of them. Both go through
- * `EvaluationService`, so a process that serves either has to compose one —
- * left absent, the single-trace read threw a plain `Error` and answered a 500
- * to a route that was working (finding F3 of
- * `dev/docs/plans/e2e-walk-2026-09-04.md`).
- *
- * What this composes is the READ half and says so. `executeForTrace` needs an
- * evaluator runtime and a workflow capability the read path never reaches, and
- * this process's evaluation execution arrives by a different door, so both
- * refuse by name rather than being synthesised.
+ * The Evaluation capability the trace read stack reads through. Every single-trace read
+ * asks for the evaluations behind that trace, and the grid asks for the summaries behind
+ * a page of them.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
@@ -41,11 +31,6 @@ class UnavailableEvaluationExecution extends EvaluationExecutionPort {
 
 /**
  * A stand-in whose every member refuses by name.
- *
- * A proxy rather than an object literal because this is a collaborator
- * interface another package declares: writing out each member would be a
- * second declaration of somebody else's interface, and the copy is what goes
- * stale when the real one grows a method.
  */
 function refusingWorkflows(processName: string): WorkflowService {
   return new Proxy(

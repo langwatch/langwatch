@@ -1,25 +1,6 @@
 /**
- * The studio's own vertical, composed as its own feature.
- *
- * Two namespaces, one feature. `workflow.*` is the lifecycle — versions,
- * copies, publication, the archive cascade. `optimization.*` is the
- * optimization studio's panel, and its procedures are workflow procedures too.
- *
- * The workflow SERVICE is read by three other features: the evaluator service
- * publishes a workflow as an evaluator, the experiment wizard writes workflow
- * versions, and the workflow application itself runs one. Composing it more
- * than once would give this process two answers to "what is the current
- * version of this workflow", and the one that drifts is always the copy — so
- * {@link composeWorkflowRuntime} builds it once, BEFORE the feature, and the
- * process hands it to everything that reads it.
- *
- * ## The NLP engine is one address
- *
- * A studio run and a code evaluator reach the SAME engine through the SAME
- * port, which is why the runtime carries it beside the service. A second
- * dispatch path is what lets two paths disagree about which trace an
- * evaluation's spans belong to. With no engine address configured the port
- * refuses by name and every read beside it keeps working.
+ * The studio's own vertical, composed as its own feature. Two namespaces, one feature.
+ * `workflow.*` is the lifecycle — versions, copies, publication, the archive cascade.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
@@ -164,11 +145,6 @@ export type ComposedWorkflowFeature = Readonly<{
   app: WorkflowApp;
   /**
    * The studio graph service itself, where this process composed one.
-   *
-   * Published beside the application because the doors OUTSIDE tRPC take it
-   * directly — the three synchronous run URLs and the health probe's workflow
-   * lookup — and its absence is what leaves those doors off rather than
-   * mounting them over a graph nobody opened.
    */
   service?: WorkflowService | undefined;
 }>;
@@ -411,13 +387,8 @@ export function composeWorkflowFeature(options: {
   // generic over both so the client sees exactly that.
   const optimization = {
     /**
-     * The studio's chat panel runs the project's published workflow on the
-     * same service the public run endpoint dispatches through.
-     *
-     * In-process on purpose. Re-entering the public door carrying the
-     * project's legacy key ran the request as a credential that bypasses every
-     * ceiling, so the caller's own permission stopped deciding what they could
-     * execute (security pass 2026-09-04, finding H9).
+     * The studio's chat panel runs the project's published workflow on the same service
+     * the public run endpoint dispatches through. In-process on purpose.
      */
     runPublishedWorkflow: async (
       _ctx: unknown,
@@ -495,10 +466,9 @@ export function composeWorkflowFeature(options: {
 }
 
 /**
- * The studio on a process that composed no graph to run it over.
- *
- * Both namespaces still mount and every call refuses by name, so a person is
- * told the deployment cannot answer rather than shown an empty studio.
+ * The studio on a process that composed no graph to run it over. Both namespaces still
+ * mount and every call refuses by name, so a person is told the deployment cannot answer
+ * rather than shown an empty studio.
  */
 export function refusingWorkflowFeature(): ComposedWorkflowFeature {
   const refuse = (): never => {
@@ -520,10 +490,6 @@ export function refusingWorkflowFeature(): ComposedWorkflowFeature {
 
 /**
  * A capability this deployment did not compose, reported to the caller.
- *
- * A handled error rather than a bare throw: the boundary serialises its code,
- * which is what a client keys its own copy off, and every one of these is a
- * DEPLOYMENT gap an operator can act on rather than a customer mistake.
  */
 export class ApiWorkflowUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";
@@ -542,17 +508,6 @@ const actorId = (ctx: unknown): string => (ctx as ApiTrpcPortsContext).actor().i
 
 /**
  * The LiteLLM parameters one Studio run executes each of its models with.
- *
- * Lives in this process rather than in `@langwatch/workflow-server` because it
- * is a CROSS-FEATURE bridge: it reads the model-provider vertical's legacy
- * execution shape, and a feature server package may not depend on another
- * feature's server package. The composition root is where two features meet.
- *
- * The three-way answer per model is the platform app's and is preserved: a
- * provider the project never configured, one configured but switched off, and
- * one that is on and hands back prepared credentials. The studio renders those
- * three differently, so collapsing any two changes what a person is told about
- * why their run will not start. The provider rows themselves never leave here.
  */
 class ApiWorkflowLlmParametersAdapter extends WorkflowLlmParametersPort {
   static create(input: { modelProviders: ModelProviderService }): ApiWorkflowLlmParametersAdapter {

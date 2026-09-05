@@ -1,11 +1,6 @@
 /**
  * The `/api/agent-cache` REST family, driven through the real Hono app
- * `createAgentCacheRestApp` builds — mounted over a real `AgentCacheService`
- * on the in-memory `MemoryAgentCacheEntryStore`, so the name/size/lifetime
- * validation, the 404 mapping and the claim semantics are all the production
- * ones. Authentication and authorization are test doubles: the security spine
- * that resolves them is proved elsewhere.
- *
+ * `createAgentCacheRestApp` builds — mounted over a real `AgentCacheService` on the
  * @see specs/agent-cache/agent-cache.feature
  */
 import {
@@ -103,7 +98,10 @@ function buildApi(caller: Caller = "authenticated") {
     claim: (input) => service.claim(input),
     delete: (input) => service.delete(input),
   };
-  const app = createAgentCacheRestApp({ security: testSecurity(caller), agentCache: () => agentCache });
+  const app = createAgentCacheRestApp({
+    security: testSecurity(caller),
+    agentCache: () => agentCache,
+  });
 
   return {
     get: (name: string) => app.hono.request(`/api/agent-cache/${name}`),
@@ -231,7 +229,7 @@ describe("given a project with an API key that can manage the agent cache", () =
       expect(body.claimed).toBe(true);
 
       const read = await api.get("ACME_SESSION");
-      expect((await read.json())).toMatchObject({ value: "claimed-value" });
+      expect(await read.json()).toMatchObject({ value: "claimed-value" });
     });
 
     /** @scenario "A claim on a held name leaves the held value alone" */
@@ -244,7 +242,7 @@ describe("given a project with an API key that can manage the agent cache", () =
       expect(body.claimed).toBe(false);
 
       const read = await api.get("ACME_SESSION");
-      expect((await read.json())).toMatchObject({ value: "first-value" });
+      expect(await read.json()).toMatchObject({ value: "first-value" });
     });
 
     /** @scenario "A name is free again once its lifetime passes" */
@@ -306,6 +304,6 @@ describe("only a caller that can manage the cache reaches it", () => {
     const response = await api.get("ACME_SESSION");
 
     expect(response.status).toBe(200);
-    expect((await response.json())).toMatchObject({ value: "session-1" });
+    expect(await response.json()).toMatchObject({ value: "session-1" });
   });
 });

@@ -1,15 +1,6 @@
 /**
- * The operator chain, assembled from the process's own middlewares plus the
- * one gate a declaration cannot describe.
- *
- * Everything but `checkOpsPermission` is the SAME middleware every other
- * procedure on this root carries — the tracer, the logger, the handled-error
- * shaping, the scope-lineage guard, the fail-closed backstop and the audit
- * row — read straight off the mount rather than restated, so the operator
- * surface cannot drift into a chain of its own.
- *
- * It lives beside the ops feature rather than in the record's own file because
- * it is this feature's chain and nothing else builds one.
+ * The operator chain, assembled from the process's own middlewares plus the one gate a
+ * declaration cannot describe.
  */
 import type { TrpcApiMount } from "@langwatch/api/trpc";
 import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";

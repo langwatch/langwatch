@@ -1,13 +1,7 @@
 /**
- * The legacy evaluation family as this process mounts it, driven through the
- * real Hono app `createApiProcessRestFeatures` builds.
- *
- * Two facts are worth pinning, and they are the two halves of the mount's
- * decision. The catalogue must ANSWER — it is compiled in, it takes no
- * credential, and every SDK reads it before it has a key. The five routes
- * whose collaborators this process did not compose must be ABSENT — a 404 from
- * a door that is honestly not here, rather than a 401 or a 500 from one that
- * authenticates and then cannot run anything.
+ * The legacy evaluation family as this process mounts it, driven through the real Hono
+ * app `createApiProcessRestFeatures` builds. Two facts are worth pinning, and they are
+ * the two halves of the mount's decision.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";

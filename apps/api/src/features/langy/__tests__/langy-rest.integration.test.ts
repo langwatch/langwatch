@@ -1,16 +1,7 @@
 /**
- * Characterisation of the four Langy REST doors through the real Hono apps the
- * API process mounts, over fakes at every port.
- *
- * What is pinned here is the REFUSAL ORDER, because it is the part a rewrite
- * silently breaks. On the public doors: a missing credential answers 401 before
- * anything reads a project; a project the rollout has not reached answers Hono's
- * own plain-text 404, byte-identical to an unmounted path, so a dark surface
- * cannot be probed; and the ceiling is checked AFTER that 404 and — on the
- * UI-action door — after the dispatched kind is known, so the refusal names the
- * real problem. On the internal doors: an unconfigured secret answers 503 rather
- * than falling open, a wrong bearer answers 401, and a turn triple that does not
- * exist answers 404 without confirming which half of it was wrong.
+ * Characterisation of the four Langy REST doors through the real Hono apps the API
+ * process mounts, over fakes at every port. What is pinned here is the REFUSAL ORDER,
+ * because it is the part a rewrite silently breaks.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { ResolvedApiKeyToken } from "@langwatch/api-key-contract";

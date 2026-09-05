@@ -1,32 +1,6 @@
 /**
- * `POST /api/ingest/otel/:sourceId` end to end, through the real Hono app this
- * process mounts and the real trace ingestion it composes.
- *
- * Like the project-scoped OTLP receiver's test, this drives the whole path
- * rather than a seam: a REAL OTLP export is posted at the app returned by
- * `createApiProcessRestFeatures`, and what is asserted is that the PRODUCER
- * received a `recordSpan` command carrying that span. The source's bearer
- * resolution, the body read, the JSON parse, the origin stamping, the
- * provenance rewrite and the dedup claim are all the ones that run in
- * production; only the queue the command lands in is stood in for.
- *
- * The three things it pins beyond the golden path:
- *
- *  - the span is tenanted to the HIDDEN GOVERNANCE PROJECT, not to the
- *    source's organization. Governance ingestion shares the trace substrate,
- *    and the internal project is what keeps a customer's own projects free of
- *    it.
- *  - the origin attributes are RECEIVER-AUTHORITATIVE. A payload that supplies
- *    its own `langwatch.origin.kind` has it replaced rather than appended,
- *    because two entries under one key would let the payload forge its origin
- *    and every downstream governance filter reads that key.
- *  - a valid secret pointed at ANOTHER source's path is refused with the same
- *    bare 401 an unknown secret gets, so the answer never confirms that some
- *    other source id exists.
- *
- * And one named absence: the log and metric receivers are NOT MOUNTED on this
- * process, because it folds neither signal. A 404 from a receiver that
- * honestly does not serve them beats a 500 from one that pretends to.
+ * `POST /api/ingest/otel/:sourceId` end to end, through the real Hono app this process
+ * mounts and the real trace ingestion it composes.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { ApiGovernanceIngestKeyProvenance } from "../governance-ingest-rest.mount";

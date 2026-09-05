@@ -1,15 +1,6 @@
 /**
- * ADR-128's credential check for the WebSocket gateway and the HTTP long-poll
- * transport, over this process's own API-key and AuthZ services.
- *
- * Main's `AgentSessionService.authenticate` (session.core.ts) inlined
- * `TokenResolver` and `enforceApiKeyCeiling`, both of which live in
- * `@langwatch/api-key-*`, which `agent-server` may not depend on. This
- * adapter folds its four steps — resolve the token, refuse an ingestion or
- * Langy session key, enforce `scenarios:manage`, and name the reachable
- * projects of an org-scoped key that named none — into the one call
- * `ConnectCredentialPort.resolve` makes, throwing `AgentRegisterRefusedError`
- * for every refusal so the session service never has to know why.
+ * ADR-128's credential check for the WebSocket gateway and the HTTP long-poll transport,
+ * over this process's own API-key and AuthZ services.
  */
 import { AgentRegisterRefusedError } from "@langwatch/agent-contract";
 import { ConnectCredentialPort, type ResolvedConnectCredential } from "@langwatch/agent-server";

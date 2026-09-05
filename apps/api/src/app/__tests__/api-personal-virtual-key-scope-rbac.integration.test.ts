@@ -1,24 +1,6 @@
 /**
  * @vitest-environment node
- *
  * Scope-aware RBAC for the personal-VK path, over real Postgres.
- *
- * Ported from the retired application's
- * `server/api/routers/__tests__/personalVirtualKeys.scopeRbac.integration.test.ts`.
- * The router and the application are the Governance feature's now, but the
- * decision they turn on — may this caller see somebody else's personal keys —
- * is answered by this process's own `AuthzService`, so this is where the real
- * router, the real personal-key service and the real permission engine meet.
- * Nothing below stubs a permission: the ADMIN and MEMBER answers come from the
- * role templates the engine reads.
- *
- * Contract (specs/ai-gateway/governance/vk-scope-rbac.feature, personal-VK
- * block):
- *   - Any org member can lazy-mint + list their OWN personal keys with no
- *     explicit grant (principal-user match bypasses virtualKeys:view).
- *   - Viewing ANOTHER user's personal keys requires
- *     virtualKeys:viewOtherPersonal; org admins gain it via the ADMIN role
- *     template at runtime (no per-org backfill), plain members never do.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import {

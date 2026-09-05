@@ -1,25 +1,5 @@
 /**
  * Auth for the browser -> S3 direct-upload routes (ADR-032 D4).
- *
- * These three routes (`/direct-upload`, `/direct-upload/:id/finalize`,
- * `/direct-upload/:id/retry`) are driven by the in-app upload UI, which
- * authenticates with the logged-in user's session cookie — NOT an API key. The
- * rest of the dataset REST surface is `requires("datasets:manage")` (API-key
- * only via the framework chain), which would 401 a cookie-only browser
- * request. So these routes opt into the `handlerManagedAuth` pattern (same as
- * the experiments-v3 session endpoints) and resolve auth here.
- *
- * Dual path so the routes keep working for both callers:
- *   1. The browser session (the upload UI) — verified through the process's
- *      ONE session port, which is the same one the Studio's doors, the
- *      playground and the two generators resolve a person with.
- *   2. Project API key / legacy key / PAT (parity with the rest of the
- *      surface) — resolved and ceiling-checked through the process's ONE
- *      handler-managed credential, which is the same decision the framework
- *      chain makes.
- *
- * `projectId` comes from the request (the route reads it from the body/param
- * and passes it in) since there is no framework chain to set `c.get("project")`.
  */
 
 import type {
@@ -37,10 +17,8 @@ import type { ApiHandlerManagedSessionPort } from "../../app/api-handler-managed
 const PERMISSION = "datasets:manage" as const;
 
 /**
- * Authorize a direct-upload request for `projectId` via browser session OR API
- * key, requiring `datasets:manage`. Returns the resolved `projectId` + `teamId`
- * (the latter so the route can enforce resource limits in-handler) or a
- * discriminated error the route maps to a JSON response.
+ * Authorize a direct-upload request for `projectId` via browser session OR API key,
+ * requiring `datasets:manage`.
  */
 export function createDatasetDirectUploadAuthorizer(options: {
   session: ApiHandlerManagedSessionPort;
@@ -105,12 +83,9 @@ export function createDatasetDirectUploadAuthorizer(options: {
 }
 
 /**
- * The sentence inside a refusal body, for the `error` field this contract
- * carries beside it.
- *
- * Read rather than restated: the bodies are the wire the retired routes
- * published, so inventing a second sentence here would make the two fields of
- * one refusal disagree.
+ * The sentence inside a refusal body, for the `error` field this contract carries beside
+ * it. Read rather than restated: the bodies are the wire the retired routes published, so
+ * inventing a second sentence here would make the two fields of one refusal disagree.
  */
 function readRefusalSentence(body: object): string {
   const message = (body as { message?: unknown; error?: unknown }).message;

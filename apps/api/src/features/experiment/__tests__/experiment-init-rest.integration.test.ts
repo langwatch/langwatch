@@ -1,12 +1,5 @@
 /**
- * `POST /api/experiment/init`, driven through the real Hono app the API
- * process mounts.
- *
- * The thing worth pinning is the one that made this route worth moving: the
- * experiment it resolves and the one `POST /api/evaluations/batch/log_results`
- * resolves are the SAME experiment, because both doors are handed the same
- * `ExperimentFindOrCreateService` instance. So the two are mounted together
- * here and driven with one slug.
+ * `POST /api/experiment/init`, driven through the real Hono app the API process mounts.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { Experiment, ExperimentService } from "@langwatch/experiment-contract";

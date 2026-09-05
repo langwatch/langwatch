@@ -1,16 +1,7 @@
 /**
- * A project's datasets and the batch-evaluation rollups beside them, composed
- * as their own feature.
- *
- * `dataset.*` reads and writes the rows themselves; `batchRecord.*` answers the
- * two rollups an experiment's runs are summarised by. Beside them it publishes
- * the `ctx.app.dataset` slice the packaged dataset REST family reads.
- *
- * ## Why the rollups live here rather than in the dataset package
- *
- * `BatchEvaluation` records what an experiment RUN scored, and the dataset it
- * ran against is a join rather than the subject — so the table is the host's
- * and the two reads are answered straight off this process's connection.
+ * A project's datasets and the batch-evaluation rollups beside them, composed as their
+ * own feature. `dataset.*` reads and writes the rows themselves; `batchRecord.*` answers
+ * the two rollups an experiment's runs are summarised by.
  */
 import type { DatasetService } from "@langwatch/dataset-contract";
 import {
@@ -29,11 +20,6 @@ import { createBatchRecordTrpcRouter, createDatasetTrpcRouter } from "./dataset-
 
 /**
  * The ONE dataset service on this process.
- *
- * Composed on its own and before the feature, because a project's rows are one
- * set: the studio's node reads, the experiment's run load and `dataset.*`
- * itself all answer from this service, and a second one over the same table
- * would let them disagree about what a dataset contains.
  */
 export function composeDatasetService(options: {
   infrastructure: ApiTrpcInfrastructure;
@@ -45,11 +31,6 @@ export function composeDatasetService(options: {
 export type DatasetPeers = Readonly<{
   /**
    * The dataset service the execution half already composed.
-   *
-   * Taken rather than built, and that is the whole point: the workflow and
-   * experiment applications read a project's rows through this same service,
-   * and a second one here would let `dataset.getAll` and an experiment's own
-   * row read disagree about what a dataset contains.
    */
   datasets: DatasetService;
   /** The experiment lookup a dataset resolves a borrowed name through. */
@@ -80,10 +61,9 @@ export function composeDatasetFeature(options: {
 
   const dataset: DatasetTrpcPorts = {
     /**
-     * A copy reads a SECOND project — the source — that the declared check on
-     * the procedure never covered, so the source is probed separately before
-     * anything is read from it. Answered by the one AuthZ service this process
-     * authorizes with.
+     * A copy reads a SECOND project — the source — that the declared check on the
+     * procedure never covered, so the source is probed separately before anything is read
+     * from it. Answered by the one AuthZ service this process authorizes with.
      */
     probeProjectPermission: (ctx, projectId, permission) =>
       authz.hasPermission({
@@ -120,17 +100,12 @@ export function composeDatasetFeature(options: {
 
 /**
  * The dataset surfaces on a process that composed no graph to read them over.
- *
- * Both namespaces still mount and every call refuses by name, so a project is
- * told its datasets are unreachable rather than shown an empty list it would
- * read as "there are none".
  */
 export function refusingDatasetFeature(): ComposedDatasetFeature {
   const refuse = (): never => {
     throw new ApiDatasetUnavailableError();
   };
-  const refuseEvery = <T>(): T =>
-    new Proxy({}, { get: () => refuse, has: () => true }) as T;
+  const refuseEvery = <T>(): T => new Proxy({}, { get: () => refuse, has: () => true }) as T;
 
   return {
     routers: (mount) => ({

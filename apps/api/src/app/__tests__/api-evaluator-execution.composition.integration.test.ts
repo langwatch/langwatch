@@ -1,22 +1,8 @@
 /**
- * The evaluator runtime this process composes, driven over real HTTP through
- * the two doors that used to refuse by name.
- *
- * What is under test is that a request reaching either door comes out at the
- * LANGEVALS TRANSPORT carrying the data that door mapped — the guardrail's
- * input/output pair on one, an SDK's posted fields on the other — with the
- * evaluator's settings and the environment the model-env resolver produced.
- * The transport itself is real: the fake is `fetch`, which is the process
- * boundary, so the URL, the retry rule, the body shape and the response parse
- * are all exercised rather than mocked past.
- *
- * Before this composition the same two calls answered 503
- * `guardrail_evaluation_unavailable` and 404.
- *
+ * The evaluator runtime this process composes, driven over real HTTP through the two
  * @see apps/api/src/app/api-evaluator-execution.composition.ts
  * @see specs/ai-gateway/guardrail-check-endpoint.feature
  */
-// @vitest-environment node
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { AuthzService } from "@langwatch/authz-contract";
@@ -127,11 +113,8 @@ describe("given a process that composed an evaluator runtime", () => {
 
   describe("when an evaluation finishes", () => {
     /**
-     * The composition wires the telemetry adapter; the two series are the only
-     * evidence that it did. Read through the DOOR rather than off the adapter,
-     * because the adapter has its own unit test and what could regress here is
-     * the wiring — `HttpLangevalsEvaluatorAdapter.create` takes `telemetry` as
-     * an optional field, so dropping it compiles and reports nothing.
+     * The composition wires the telemetry adapter; the two series are the only evidence
+     * that it did.
      */
     it("reports its duration and outcome on this process's own series", async () => {
       const metrics = createRecordingMeterProvider();
@@ -211,10 +194,6 @@ function evaluatorExecution(): ApiEvaluatorExecution {
 
 /**
  * The evaluator service, as the engine calls it on the built-in path.
- *
- * `augmentResult` is the only member the installed-evaluator road reaches; it
- * is the real seam that puts a redaction back into a verdict, and returning the
- * result unchanged is what a trace with no dropped categories produces.
  */
 function recordingEvaluators(): EvaluatorService {
   return {
@@ -229,10 +208,9 @@ function recordingEvaluators(): EvaluatorService {
 }
 
 /**
- * A project whose model cascade names no default.
- *
- * The throw is the cascade's own shape for "nothing configured at any scope",
- * and the doors turn it into the evaluator's own default rather than a failure.
+ * A project whose model cascade names no default. The throw is the cascade's own shape
+ * for "nothing configured at any scope", and the doors turn it into the evaluator's own
+ * default rather than a failure.
  */
 function unconfiguredModelProviders(): ModelProviderService {
   return {
@@ -249,10 +227,6 @@ type LangevalsCall = {
 
 /**
  * The evaluator service, faked at the process boundary rather than at the port.
- *
- * `fetch` is where this process stops, so the transport under test is the real
- * `HttpLangevalsEvaluatorAdapter`: its URL construction, its body shape and its
- * response parse all run.
  */
 function recordingLangevals(verdict: { passed: boolean; score: number }): {
   calls: LangevalsCall[];

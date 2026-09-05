@@ -1,24 +1,6 @@
 /**
- * The CLI governance plane through the real Hono app this process mounts, over
- * fakes at every port.
- *
- * What is pinned is the GATE CHAIN, because every link of it is a control
- * rather than a convenience, and their ORDER is the contract:
- *
- *   bearer (401) → plan (402) → permission (403) → the read
- *
- * A bearer only proves organization membership, so a permission check that ran
- * first would still be correct but would tell a free-tier caller which
- * permissions they lack on a capability they cannot have at all; and a plan
- * check that ran after the read would have already answered Enterprise data to
- * a tenant that never bought it. The 402 also carries the upgrade URL inline,
- * so the CLI renders an actionable upsell without a second call.
- *
- * The credential-handing route pins the fourth link: current, active
- * membership, re-derived from rows rather than trusted from a token that was
- * cryptographically fine when it was minted — and the presented session is
- * severed on the way out, so an offboarded caller stops authenticating
- * immediately rather than at the next hourly expiry.
+ * The CLI governance plane through the real Hono app this process mounts, over fakes at
+ * every port.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type {

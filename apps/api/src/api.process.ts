@@ -39,10 +39,8 @@ export abstract class ApiProcessGraphPort {
 }
 
 /**
- * Boot boundary for a standalone API listener. The host owns socket binding;
- * this process object owns the finalization sequence. Intake drains first,
- * then telemetry flushes while request diagnostics are still available, and
- * only then are database and network resources released.
+ * Boot boundary for a standalone API listener. The host owns socket binding; this process
+ * object owns the finalization sequence.
  */
 export class ApiProcess {
   static create(options: {
@@ -70,10 +68,7 @@ export class ApiProcess {
     readiness?: ApiReadinessPort;
     metrics?: ApiMetricsPort;
     /**
-     * The packaged tRPC namespaces, when this process composed them. Absent
-     * leaves the root serving exactly the two routers it served before —
-     * forwarded as {@link NoApiTrpcFeatures}, since the application requires
-     * the port rather than defaulting to one internally.
+     * The packaged tRPC namespaces, when this process composed them.
      */
     features?: ApiTrpcFeaturesPort<TRPCCreateRouterOptions>;
   }): ApiProcess {
@@ -130,11 +125,9 @@ export class ApiProcess {
 
   private constructor(
     /**
-     * Widened to the record BOUND rather than this process's own instantiation:
-     * a deployment that composed no packaged surfaces holds an application over
-     * an empty record, and a process type that named only the full one could not
-     * hold it. Nothing reads a namespace off this — `AppRouter` is read from the
-     * class, not from a process instance.
+     * Widened to the record BOUND rather than this process's own instantiation: a
+     * deployment that composed no packaged surfaces holds an application over an empty
+     * record, and a process type that named only the full one could not hold it.
      */
     readonly application: ApiApplication<TRPCCreateRouterOptions>,
     private readonly observability: ProcessObservability,
@@ -165,12 +158,9 @@ export class ApiProcess {
 }
 
 /**
- * The one API finalization order, shared by every process shape.
- *
- * Intake stops first, then feature work drains, then telemetry flushes while
- * request diagnostics still exist, and only then are infrastructure resources
- * released. Every phase runs even after an earlier one fails, and the first
- * failure is the one reported.
+ * The one API finalization order, shared by every process shape. Intake stops first, then
+ * feature work drains, then telemetry flushes while request diagnostics still exist, and
+ * only then are infrastructure resources released.
  */
 export async function closeApiProcessResources(options: {
   listener?: Pick<ApiHttpListener, "close"> | undefined;

@@ -1,30 +1,7 @@
 /**
- * The SCIM 2.0 provisioning surface through the real Hono app this process
- * mounts, over the REAL directory-sync service `api-scim.composition.ts`
- * builds — only the rows and the collaborators below it are doubles.
- *
- * Driving the real service rather than a fake of it is the point. Fifteen
- * operations were published in the frozen OpenAPI document and answered by
- * nothing for the whole extraction, so what has to be pinned is not that a
- * route exists but that a directory's push reaches the same membership write
- * a person's own invitation acceptance does: the user directory creates the
- * account, `OrganizationUser` records the membership, and the AuthZ grant
- * ledger attaches the organization binding. A fake service would have proved
- * the mount and none of that.
- *
- * The gate CHAIN is the other contract, and its order is deliberate:
- *
- *   bearer (401) → plan (403) → the operation
- *
- * A missing token is 401 before the plan is looked up, and a valid token for
- * an organization that is not on Enterprise is 403 — so a customer with a bad
- * token and one with a lapsed plan get different answers, and neither leaks
- * the other's fact. Three discovery routes sit outside the chain entirely: an
- * identity provider negotiates capabilities before a token exists.
- *
- * Every refusal is `application/scim+json` with a SCIM error envelope, which
- * is what the provider parses; a bare 401 body would be logged by Okta or
- * Entra as a transport failure rather than an authentication one.
+ * The SCIM 2.0 provisioning surface through the real Hono app this process mounts, over
+ * the REAL directory-sync service `api-scim.composition.ts` builds — only the rows and
+ * the collaborators below it are doubles.
  */
 import { createHash, createHmac } from "node:crypto";
 
@@ -456,17 +433,7 @@ describe("given an API process that registered the directory-sync pipeline produ
 describe("given a directory pushing on a token bound to a connection", () => {
   describe("when the push arrives on the SCIM protocol routes", () => {
     /**
-     * A characterization, not an approval. `verifyToken` answers the token's
-     * `connectionId` and the protocol door keeps only the organization, so no
-     * protocol push carries the connection its own token was minted for — and
-     * a directory-sync fact is stated per CONNECTION. So the registration
-     * above restores the history for every caller that passes one and changes
-     * nothing for these fifteen routes.
-     *
-     * `specs/identity/scim-connection-sync.feature` holds this as
-     * `@unimplemented` ("One connection's token cannot touch another
-     * connection's people"); closing it is a write-authority change, not a
-     * wiring one, so it is not smuggled in beside a registration.
+     * A characterization, not an approval.
      */
     it("states no directory-sync fact, because the door forwards no connection", async () => {
       const queue = producerEventing();
@@ -494,15 +461,9 @@ describe("given a directory pushing on a token bound to a connection", () => {
 // --------------------------------------------------------------------------
 
 /**
- * This process's own producer-only Eventing, in the shape production composes
- * it: the REAL {@link EventStoreProducerOnly} over a queue that records rather
- * than runs, with `composeApiIdentityPipelines` registering the four packaged
- * definitions on it and handing back the senders it resolved.
- *
- * The store is the production one deliberately — a memory store in that seat
- * accepts an append, holds the event in one process's heap and loses it, which
- * is how a ledger that appended on this tier passed CI for as long as it did.
- * What is faked is Redis, and only Redis.
+ * This process's own producer-only Eventing, in the shape production composes it: the
+ * REAL {@link EventStoreProducerOnly} over a queue that records rather than runs, with
+ * `composeApiIdentityPipelines` registering the four packaged definitions on it and
  */
 function producerEventing() {
   const staged: Array<{ queue: string; payload: Record<string, unknown> }> = [];
@@ -538,11 +499,6 @@ function producerEventing() {
 
 /**
  * Every loss the directory-sync ledger reports while a scenario runs.
- *
- * Its own module logger, which is where the line has to land: the writer
- * SWALLOWS a history it cannot stage, so the log is the only observable the
- * absence has — and asserting it is empty is what makes "the sender exists
- * now" a claim with teeth rather than a silence two bugs could produce.
  */
 function recordLedgerLosses() {
   const messages: string[] = [];
@@ -556,13 +512,9 @@ function recordLedgerLosses() {
 }
 
 /**
- * The rows the composed service reads and writes, and the collaborators
- * underneath it.
- *
- * Doubles at the DATABASE and at the process's own services — never at
- * `ScimService`, which is the thing under test. `as never` at each seam
- * because the real types are Prisma's generated client and four contract
- * classes, and what these scenarios exercise is a handful of members of each.
+ * The rows the composed service reads and writes, and the collaborators underneath it.
+ * Doubles at the DATABASE and at the process's own services — never at `ScimService`,
+ * which is the thing under test.
  */
 function scimWorld(
   overrides: {

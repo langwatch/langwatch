@@ -1,14 +1,6 @@
 /**
- * The families the retired `routes/misc.ts` and `routes/ops.ts` held, driven
- * through the real Hono app `createApiProcessRestFeatures` returns.
- *
- * They were one file because they were what nothing else claimed, not because
- * they belong together — five unrelated verticals sharing a `secured` handle.
- * Each is now its own family in the package that owns the capability, and what
- * is under test is that each kept the wire it published: the legacy analytics
- * path's own two 400 bodies, the DSPy log's seconds-vs-milliseconds refusal,
- * the OAuth-shaped refusals of the MCP approval step, and the image relay's
- * single opaque failure.
+ * The families the retired `routes/misc.ts` and `routes/ops.ts` held, driven through the
+ * real Hono app `createApiProcessRestFeatures` returns.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";

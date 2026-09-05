@@ -1,22 +1,5 @@
 /**
- * The personal-project guards on the CLI device grant, through the real Hono
- * app this process mounts.
- *
- * Two separate rules share one route family and are easy to conflate:
- *
- *  - the DEVICE-SESSION branch provisions a personal workspace, which is a
- *    governance-plane capability. The flag ships on, so a default installation
- *    approves; an organization that switched governance off is refused rather
- *    than silently given a personal workspace that captures its evaluations.
- *  - the PROJECT-LOGIN branch hands back an existing project's key. Someone
- *    else's personal project can never back it, however much RBAC the caller
- *    holds, and the caller's OWN personal project is honoured only because the
- *    pick is explicit.
- *
- * Approval mints nothing either way: the ports this family is composed over
- * carry no virtual-key issuer at all, so a login repeated three times leaves
- * the same empty set of credentials behind.
- *
+ * The personal-project guards on the CLI device grant, through the real Hono app this
  * Spec: specs/ai-gateway/governance/cli-login-personal-guard.feature
  * Spec: specs/ai-gateway/governance/cli-login.feature
  */

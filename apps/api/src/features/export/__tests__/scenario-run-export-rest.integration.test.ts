@@ -1,12 +1,7 @@
 /**
- * The bulk run export, driven through the real Hono app the API process mounts.
- *
- * The family is handler-managed on purpose: it resolves the person itself and
- * publishes its own refusals. What is pinned here is that resolution — a
- * signed-out caller and a caller without `scenarios:view` are told apart, and
- * neither reaches the store — and that a permitted download is written to the
- * audit ledger BEFORE a byte is streamed, because a bulk export lifts a
- * project's whole run history.
+ * The bulk run export, driven through the real Hono app the API process mounts. The
+ * family is handler-managed on purpose: it resolves the person itself and publishes its
+ * own refusals.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { SimulationService } from "@langwatch/scenario-contract";

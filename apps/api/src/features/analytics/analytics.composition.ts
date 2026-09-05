@@ -1,43 +1,7 @@
 /**
- * The analytics half of {@link ApiTrpcCollaborators}: the two application
- * slices the charted surfaces read off `ctx.app`, and the four port groups the
- * `analytics.*` and `graphs.*` namespaces reach for.
- *
- * Five packaged surfaces are served from one composition, and they are one
- * composition because they are one graph:
- *
- *   analytics.getTimeseries / dataForFilter / topUsedDocuments / feedbacks
- *   analytics.langWatchQL.*            (the workbench)
- *   analytics.savedWorkbenchCharts.*   (Dashboard's, under Analytics' namespace)
- *   graphs.*                           (a dashboard's chart-builder cards)
- *   dashboards.*                       (through {@link DashboardApp})
- *
- * The workbench's saved charts are validated by the SAME LangWatchQL service a
- * workbench statement runs on, and a dashboard's placeable card kinds are
- * gated by the SAME rollout flag the workbench navigation reads. A process that
- * composed those separately would have two answers to one question, and the
- * one that drifts is always the copy — so they are built here once and handed
- * out.
- *
- * ## Two ClickHouse identities, never one
- *
- * The charted reads and the filter pickers run on the APPLICATION's connection:
- * the queries over it are ours, so it may read what the schema holds. A
- * member's own submitted SQL runs on a SECOND, restricted identity — a
- * different database user with a row policy and a read-only profile — which
- * this module opens from its own configuration and never derives from the
- * first. That separation is the last line of defence for customer-authored
- * SQL, and it is structural here: the two arrive as different options and
- * neither can stand in for the other.
- *
- * ## What arrives as a port, and why
- *
- * Three capabilities belong to verticals this process does not yet compose, so
- * they arrive as options and DEGRADE FAIL-CLOSED when a deployment has none:
- * the member's content protections, the alert watching a graph card, and the
- * secret redaction over that alert's parameters. Each default is the safe
- * answer rather than the convenient one — content hidden, no alert, every
- * parameter dropped — because the unsafe direction of each is a disclosure.
+ * The analytics half of {@link ApiTrpcCollaborators}: the two application slices the
+ * charted surfaces read off `ctx.app`, and the four port groups the `analytics.*` and
+ * `graphs.*` namespaces reach for.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
@@ -98,13 +62,8 @@ import {
 import { createAnalyticsTrpcRouter, createLangWatchQLTrpcRouter } from "./analytics-trpc.mount";
 
 /**
- * The retention floor an evaluation read is bounded by when a project names no
- * policy of its own.
- *
- * The platform app's `PLATFORM_DEFAULT_RETENTION_DAYS`. Stated rather than
- * imported: the retention vertical has not moved, and a floor that silently
- * defaulted to the adapter's own 30 would quietly shorten every chart's window
- * on a deployment that never changed a setting.
+ * The retention floor an evaluation read is bounded by when a project names no policy of
+ * its own. The platform app's `PLATFORM_DEFAULT_RETENTION_DAYS`.
  */
 const DEFAULT_RETENTION_DAYS = 49;
 
@@ -118,10 +77,6 @@ export type AnalyticsFeatureCollaborators = Readonly<{
   projects: ProjectService;
   /**
    * The process's ONE rollout store, composed by the feature-flag feature.
-   *
-   * Taken rather than built: the workbench gate and the browser's own flag read
-   * must never disagree about whether an account is inside the rollout, and
-   * this half used to build a second `PostgresFeatureFlagAdapter` of its own.
    */
   featureFlags: FeatureFlagService;
   /** The application's own ClickHouse, or `null` where the process composed none. */
@@ -131,21 +86,14 @@ export type AnalyticsFeatureCollaborators = Readonly<{
   /** Releases the restricted identity's transport with the rest of the process. */
   resources: ResourceScope;
   /**
-   * The alert watching a graph card.
-   *
-   * The two reads a card's bell renders, declared as themselves rather than as
-   * an automation service: Dashboard depends on nothing else Automation owns,
-   * and this process composes no automation vertical yet. Absent means a card
-   * shows no alert — smaller, not wrong.
+   * The alert watching a graph card. The two reads a card's bell renders, declared as
+   * themselves rather than as an automation service: Dashboard depends on nothing else
+   * Automation owns, and this process composes no automation vertical yet.
    */
   graphAlerts?: DashboardGraphAlertLookup;
   /**
-   * Strips the provider secrets an alert's `actionParams` carries before the
-   * row leaves the server.
-   *
-   * Absent drops every parameter rather than passing them through: an
-   * encrypted Slack bot token or a webhook header value reaching a browser is
-   * a disclosure, and an empty object is only a missing detail.
+   * Strips the provider secrets an alert's `actionParams` carries before the row leaves
+   * the server.
    */
   redactActionParams?: (
     action: Trigger["action"],
@@ -157,12 +105,6 @@ export type AnalyticsFeatureCollaborators = Readonly<{
 export type ComposedAnalyticsFeature = Readonly<{
   /**
    * `analytics.*` and `graphs.*`, on the process's own root.
-   *
-   * The first is one wire namespace assembled from three packaged transports,
-   * exactly as the client has always called it: the charted reads at
-   * `analytics.*`, the workbench at `analytics.lwql`, and the saved charts at
-   * `analytics.savedWorkbenchCharts`. Merged here rather than at the record so
-   * nothing outside this feature can add a fourth door onto the same name.
    */
   routers(mount: ApiTrpcFeatureMount): {
     analytics: ReturnType<ApiTrpcFeatureMount["root"]["mergeRouters"]>;
@@ -173,13 +115,9 @@ export type ComposedAnalyticsFeature = Readonly<{
   /** For `ctx.app.dashboard`. */
   dashboard: DashboardApp;
   /**
-   * The governed-SQL runner, the rollout switch it is behind, and the content
-   * protections an API KEY resolves to — the three the public governed-SQL
-   * REST family needs and the tRPC ports do not expose.
-   *
-   * Published rather than rebuilt at the REST mount: the workbench's door and
-   * the API key's door must run one validator against one catalogue, or a
-   * statement the browser refuses is a statement a key can still run.
+   * The governed-SQL runner, the rollout switch it is behind, and the content protections
+   * an API KEY resolves to — the three the public governed-SQL REST family needs and the
+   * tRPC ports do not expose.
    */
   langWatchQL: LangWatchQLService;
   featureFlags: FeatureFlagService;
@@ -188,10 +126,9 @@ export type ComposedAnalyticsFeature = Readonly<{
 }>;
 
 /**
- * Dashboard's card-placement gate, answered by LangWatchQL's own rollout flag.
- *
- * Dashboard states the question and this process answers it, so the feature
- * package never reads Analytics' server package to find out.
+ * Dashboard's card-placement gate, answered by LangWatchQL's own rollout flag. Dashboard
+ * states the question and this process answers it, so the feature package never reads
+ * Analytics' server package to find out.
  */
 class LangWatchQLWorkbenchAccess extends WorkbenchAccessPort {
   private constructor(
@@ -243,12 +180,6 @@ type ApiTimeseriesInputWire = z.input<typeof timeseriesInputSchema>;
 
 /**
  * Composes the analytics half from this process's graph.
- *
- * Everything below is built exactly once: the LangWatchQL service is shared by
- * the workbench, the saved-chart policy and Dashboard's own service, and the
- * feature-flag service is shared by the rollout gate and the graph-visibility
- * policy — because in both cases two of them would be two answers to one
- * question.
  */
 export function composeAnalyticsFeature(
   options: AnalyticsFeatureCollaborators,
@@ -307,14 +238,9 @@ export function composeAnalyticsFeature(
     lwqlEnabled({ featureFlags, projectId, projects: options.projects });
 
   /**
-   * The rollout gate, chained AFTER the permission check so a caller is placed
-   * by RBAC first and gated by the experiment second: a member who may not
-   * touch the project must not learn from the answer whether the experiment is
-   * on for it.
-   *
-   * The procedure builder's input generics belong to the feature package, so
-   * the one `.use` it needs is named structurally rather than reached for
-   * through an `any`.
+   * The rollout gate, chained AFTER the permission check so a caller is placed by RBAC
+   * first and gated by the experiment second: a member who may not touch the project must
+   * not learn from the answer whether the experiment is on for it.
    */
   const requireWorkbenchEnabled = <TProcedure>(procedure: TProcedure): TProcedure =>
     (procedure as unknown as ChainableProcedure).use(
@@ -337,11 +263,9 @@ export function composeAnalyticsFeature(
     protections.resolve({ userId: actorId(ctx), projectId: input.projectId });
 
   /**
-   * Who a session-authenticated execution runs as.
-   *
-   * The project's LangWatchQL secret is hashed into the tenant capability the
-   * statement runs under: it is read server-side and must never leave the
-   * calling procedure — no field of it may appear in a response.
+   * Who a session-authenticated execution runs as. The project's LangWatchQL secret is
+   * hashed into the tenant capability the statement runs under: it is read server-side
+   * and must never leave the calling procedure — no field of it may appear in a response.
    */
   const resolveRunCaller = async (ctx: unknown, input: Readonly<{ projectId: string }>) => {
     const project = await options.prisma.project.findUnique({
@@ -443,13 +367,6 @@ type AnalyticsFeaturePorts = Readonly<{
 
 /**
  * The analytics surfaces on a process that composed no graph to read them over.
- *
- * Both namespaces still mount, and every schema the record reads while it is
- * BUILDING them stays real — the two shared input schemas, the filter-field
- * enum, the workbench's time-window and granularity parsers and its statement
- * ceiling. A procedure cannot be constructed without its input parser, so a
- * refusing stand-in there would take the whole router down rather than the one
- * answer it cannot give. Only what a REQUEST reaches refuses, by name.
  */
 export function refusingAnalyticsFeature(): ComposedAnalyticsFeature {
   const refuse = (): never => {
@@ -545,20 +462,8 @@ const NO_GRAPH_ALERTS: DashboardGraphAlertLookup = {
 };
 
 /**
- * What one member may read of a project's content, as LangWatchQL's catalogue
- * asks it.
- *
- * Three booleans, from two independent sources, and they are independent on
- * purpose. Spend follows the caller's own PERMISSION — `cost:view`, the same
- * question the declared check on a cost-oriented read asks — while captured
- * input and output follow the project's DATA-PRIVACY policy, because whether a
- * conversation may be read is a customer setting rather than a role.
- *
- * It fails closed twice over. A policy that cannot be resolved hides content
- * rather than exposing it, and a `restrict` rule whose audience names groups is
- * refused here, because this process cannot yet resolve a member's group
- * membership and the safe reading of "I do not know whether you are in the
- * audience" is no.
+ * What one member may read of a project's content, as LangWatchQL's catalogue asks it.
+ * Three booleans, from two independent sources, and they are independent on purpose.
  */
 class ApiAnalyticsProtections {
   static create(dependencies: {
@@ -623,15 +528,9 @@ class ApiAnalyticsProtections {
   }
 
   /**
-   * What an API KEY may see, which is a different question from what a person
-   * may see.
-   *
-   * A project key carries full project access by design — it predates RBAC and
-   * every role that can hold one grants `cost:view` — so costs are visible.
-   * Captured content is NOT: it follows the project's own data-privacy policy
-   * read for a caller with no session, which is exactly what a `restrict` rule
-   * is for. Fail-closed on a resolution failure, for the same reason the
-   * member's resolution is.
+   * What an API KEY may see, which is a different question from what a person may see. A
+   * project key carries full project access by design — it predates RBAC and every role
+   * that can hold one grants `cost:view` — so costs are visible.
    */
   async resolveForApiKey(input: { projectId: string }): Promise<LangWatchQLProtections> {
     let policy: ResolvedDataPrivacy;

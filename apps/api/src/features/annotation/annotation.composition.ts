@@ -1,30 +1,7 @@
 /**
- * A reviewer's comments, scores and queues, composed as their own feature.
- *
- * `annotation.*` and `annotationScore.*`, plus the `ctx.app.annotations` slice
- * the annotation REST family reads. It used to be composed inside the product
- * half beside the support inbox, the privacy rules and the setup checklist; the
- * four shared this process's connection and nothing else.
- *
- * ## What reaches the trace pipeline, and what happens without it
- *
- * Four of the ports are trace-side, and they degrade three different ways
- * because the three failures are different:
- *
- *  - the reviewer's TRACE CONTENT (`loadTraces`) refuses by name. The review
- *    page joins that content onto every queue item; answering `[]` would show
- *    a reviewer an empty queue and tell them their work was done.
- *  - the trace-side ANNOTATION MARKER (`recordAnnotationOnTrace` and its
- *    removal) rides the `trace_processing` pipeline the worker drains,
- *    registered PRODUCER-only. With no queue it refuses rather than resolving:
- *    the port calls it best effort, and best effort is about tolerating a
- *    failure, not about hiding one.
- *  - TRACE EXISTENCE, which decides which of the ids a caller sent address a
- *    trace this project holds, answers the empty set with no ClickHouse. That
- *    is the safe direction and it is not a degradation of meaning: a
- *    deployment with no trace storage holds no trace to review, and a queue
- *    item for one would be an item the reviewer cannot read, cannot annotate
- *    and cannot get past.
+ * A reviewer's comments, scores and queues, composed as their own feature. `annotation.*`
+ * and `annotationScore.*`, plus the `ctx.app.annotations` slice the annotation REST
+ * family reads.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
@@ -56,21 +33,14 @@ import {
 } from "./annotation-trpc.mount";
 
 /**
- * The reviewer's trace content, as the annotation queue asks for it.
- *
- * Declared here rather than taken as a `TraceApp`, because what the queue needs
- * is ONE read and the application behind it takes twelve collaborators this
- * process does not compose. A deployment that grows a trace application
- * satisfies this with one method rather than by handing the whole thing over.
+ * The reviewer's trace content, as the annotation queue asks for it. Declared here rather
+ * than taken as a `TraceApp`, because what the queue needs is ONE read and the
+ * application behind it takes twelve collaborators this process does not compose.
  */
 export abstract class ApiAnnotationTraceContentPort {
   /**
-   * The traces behind a set of queue items, resolved in FULL and with the
-   * caller's own read-time redactions already applied.
-   *
-   * Full rather than the preview (#4991): annotators label the whole value,
-   * and the review page reads each trace's metadata, timestamps and spans off
-   * what this returns.
+   * The traces behind a set of queue items, resolved in FULL and with the caller's own
+   * read-time redactions already applied.
    */
   abstract loadTraces(input: {
     userId: string;
@@ -181,12 +151,7 @@ export function composeAnnotationFeature(options: {
 }
 
 /**
- * The annotation surfaces on a process that composed no database or no project
- * directory.
- *
- * Both namespaces still mount and every call refuses by name, so a reviewer is
- * told the deployment cannot answer rather than shown an empty queue — which
- * reads as "your work is done".
+ * The annotation surfaces on a process that composed no database or no project directory.
  */
 export function refusingAnnotationFeature(): ComposedAnnotationFeature {
   const refuse = (): never => {
@@ -207,11 +172,9 @@ export function refusingAnnotationFeature(): ComposedAnnotationFeature {
 }
 
 /**
- * Writes one suggestion into the trace's correction, or takes it back off when
- * the reviewer cleared the text.
- *
- * A suggestion rewrites the TRACE rather than the comment, which is why it is
- * an overlay write and not an annotation field.
+ * Writes one suggestion into the trace's correction, or takes it back off when the
+ * reviewer cleared the text. A suggestion rewrites the TRACE rather than the comment,
+ * which is why it is an overlay write and not an annotation field.
  */
 async function writeAnnotationSuggestionToOverlay(input: {
   overlay: TraceEditOverlayService;
@@ -245,10 +208,9 @@ type TraceExistence = Readonly<{
 }>;
 
 /**
- * Trace existence over this process's own ClickHouse, or the empty set.
- *
- * The empty answer is the correct one rather than a degraded one: a deployment
- * with no trace storage holds no trace to queue for review.
+ * Trace existence over this process's own ClickHouse, or the empty set. The empty answer
+ * is the correct one rather than a degraded one: a deployment with no trace storage holds
+ * no trace to queue for review.
  */
 function composeTraceExistence(
   resolve: ((tenantId: string) => Promise<ClickHouseClient>) | null,
@@ -261,11 +223,6 @@ function composeTraceExistence(
 
 /**
  * The slug `/annotations/<slug>` addresses, for a queue name.
- *
- * Written here rather than imported: the platform's helper took a whole
- * slugify library for one call, and the rule is two substitutions — the
- * underscore a queue name may carry becomes a dash, and everything that is not
- * a URL-safe word character collapses to one.
  */
 function annotationQueueSlug(name: string): string {
   return name

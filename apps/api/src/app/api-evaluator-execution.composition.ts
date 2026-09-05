@@ -1,59 +1,6 @@
 /**
- * The evaluator RUNTIME, composed from this process's own graph.
- *
- * Three doors on `apps/api` need one thing: an evaluator, run. The gateway's
- * inline guardrail check scores an input/output pair the Go data plane sent;
- * the four legacy evaluate doors score whatever an SDK posted; and
- * `evaluations.runEvaluation` re-scores a stored trace through its mappings.
- * Until this composition all three refused by name — `runEvaluator`,
- * `runEvaluation` and `runEvaluationForTrace` were the same absence written
- * down three times.
- *
- * They are ONE runtime here rather than three bindings because they are one
- * question. A guardrail that resolved a model provider differently from a
- * monitor would bill a customer's key against a provider they did not choose
- * on one path and not the other; a legacy evaluate door that dispatched a code
- * evaluator down its own road would put its spans on a second trace. The
- * engine, its Langevals transport, its model environment and its workflow
- * executor are built once and shared.
- *
- * ## What it is composed from, and where each piece comes from
- *
- *     traceService      the observability half's read stack (the three legacy
- *                       trace reads, including the thread read the
- *                       thread-mapping resolver walks)
- *     spanDigest        `@langwatch/trace-server`'s own renderer — the digest
- *                       an evaluator reads and the digest a judge is shown are
- *                       the same text
- *     modelEnvResolver  this module's bridge over the process's ONE model
- *                       gateway (`api-model-provider.composition.ts`)
- *     langevalsClient   the packaged HTTP transport over `LANGEVALS_ENDPOINT`
- *     evaluators        the execution half's evaluator service — the same one
- *                       the studio publishes evaluators through
- *     workflowExecutor  the packaged workflow adapter over the execution
- *                       half's own `WorkflowService`
- *
- * ## The named absences
- *
- * **No `LANGEVALS_ENDPOINT` and no runtime is composed at all.** The
- * deployment configured no evaluator service, so an installed evaluator has
- * nowhere to run; composing the runtime anyway would answer every guardrail
- * `skipped` — which reads as "checked and fine" — and would answer the
- * evaluate doors 200 with a verdict nothing produced. Native, code and
- * workflow evaluators do not need the endpoint, and leaving the whole runtime
- * off refuses those too; that is the deliberate side of the trade, because the
- * three doors are addressed by evaluator id and a door that serves a third of
- * the catalogue is a door that fails unpredictably.
- *
- * ## What it also composes, and what that took
- *
- * **The two evaluator process series.** `evaluation_duration_milliseconds` and
- * `evaluation_status_counter` are reported from this process, through
- * `OtelEvaluationExecutionMetricsAdapter`. It is threaded to BOTH holders of
- * the port — the engine, which times a native evaluator itself, and the
- * langevals transport, which is the only place a remote call's duration and
- * its four failure outcomes are known — because a run reported by one of them
- * and not the other is a dashboard that undercounts without saying so.
+ * The evaluator RUNTIME, composed from this process's own graph. Three doors on
+ * `apps/api` need one thing: an evaluator, run.
  */
 import { TraceReadableSpanService } from "@langwatch/trace-server";
 import {
@@ -92,10 +39,6 @@ import type { WorkflowService } from "@langwatch/workflow-contract";
 
 /**
  * The data an evaluator is handed, as this process's doors build it.
- *
- * Stated structurally rather than imported from the legacy REST family, so the
- * gateway's guardrail check — which knows nothing about that family — satisfies
- * the same runner with the pair it already has.
  */
 export type ApiEvaluatorRunData =
   | Readonly<{ type: "default"; data: Record<string, unknown> }>
@@ -104,11 +47,9 @@ export type ApiEvaluatorRunData =
 /** The runtime the three doors bind to. */
 export type ApiEvaluatorExecution = Readonly<{
   /**
-   * One evaluator over data the caller already holds.
-   *
-   * `settings` is optional so this one function satisfies BOTH consumers: the
-   * gateway's `EvaluatorRunner`, which may omit it, and the legacy family's
-   * `runEvaluation`, which always sends one.
+   * One evaluator over data the caller already holds. `settings` is optional so this one
+   * function satisfies BOTH consumers: the gateway's `EvaluatorRunner`, which may omit
+   * it, and the legacy family's `runEvaluation`, which always sends one.
    */
   runEvaluation(input: {
     projectId: string;
@@ -118,10 +59,6 @@ export type ApiEvaluatorExecution = Readonly<{
   }): Promise<SingleEvaluationResult>;
   /**
    * One evaluator over a stored trace, rendered through its mappings.
-   *
-   * The mappings arrive as an opaque value because a tRPC input is JSON and
-   * the registry that narrows them is a browser package; they are parsed here,
-   * at the boundary a malformed row actually crosses.
    */
   runEvaluationForTrace(input: {
     projectId: string;
@@ -140,13 +77,9 @@ export abstract class ApiEvaluatorExecutionAbsenceReportPort {
 
 export type ApiEvaluatorExecutionOptions = Readonly<{
   /**
-   * The three legacy trace reads an online evaluation makes, resolved at call
-   * time.
-   *
-   * A thunk because the observability half composes AFTER the execution half
-   * that publishes the evaluator service, and this runtime needs both. It is
-   * the SAME stack the trace explorer reads: an evaluator scores the content a
-   * reviewer sees, not a second projection of it.
+   * The three legacy trace reads an online evaluation makes, resolved at call time. A
+   * thunk because the observability half composes AFTER the execution half that publishes
+   * the evaluator service, and this runtime needs both.
    */
   traceReads: () => EvaluationTraceReadPort | undefined;
   /** The evaluator directory the studio publishes evaluators through. */
@@ -165,13 +98,9 @@ export type ApiEvaluatorExecutionOptions = Readonly<{
 }>;
 
 /**
- * How long one evaluator call may take, and how many 5xx it survives.
- *
- * The retry count is the platform's own (`retries = 1`). The timeout is NEW:
- * the platform's evaluate call carried none and relied on the socket, and the
- * packaged transport requires a number. Five minutes is past any LLM judge and
- * well short of a request that has silently died, which is the failure the
- * absent timeout used to hold a connection open for.
+ * How long one evaluator call may take, and how many 5xx it survives. The retry count is
+ * the platform's own (`retries = 1`). The timeout is NEW: the platform's evaluate call
+ * carried none and relied on the socket, and the packaged transport requires a number.
  */
 const LANGEVALS_MAX_RETRIES = 1;
 const LANGEVALS_TIMEOUT_MS = 5 * 60 * 1000;
@@ -244,13 +173,6 @@ export function composeApiEvaluatorExecution(
 
 /**
  * The engine's flattened result, back in the evaluator's own union.
- *
- * The engine reports a run as `{status, score, error, errorDetails, …}`,
- * because that is what an event carries; the tRPC surface answers the
- * evaluator's `SingleEvaluationResult`, because that is what the studio's
- * result card reads. `error_type` is stated rather than recovered — the
- * flattening dropped it, and inventing a specific one would name a failure
- * class this call cannot know.
  */
 function asRunOutcome(
   result: Awaited<ReturnType<EvaluationExecutionService["executeForTrace"]>>,
@@ -291,12 +213,8 @@ function asRunOutcome(
 }
 
 /**
- * The three legacy trace reads, resolved through the process's own stack when
- * a read is actually made.
- *
- * A refusal rather than an empty answer where the stack is absent: an
- * evaluation scored against no trace is a verdict on nothing, and the customer
- * would read it as a real one.
+ * The three legacy trace reads, resolved through the process's own stack when a read is
+ * actually made.
  */
 class ApiEvaluationTraceReads extends EvaluationTraceReadPort {
   static create(
@@ -343,11 +261,9 @@ class ApiEvaluationTraceReads extends EvaluationTraceReadPort {
 }
 
 /**
- * The readable digest an evaluator reads for `formatted_trace` and
- * `formatted_traces`.
- *
- * The trace package's own formatter, because the digest an evaluator is shown
- * and the digest a scenario judge is shown have to be the same text.
+ * The readable digest an evaluator reads for `formatted_trace` and `formatted_traces`.
+ * The trace package's own formatter, because the digest an evaluator is shown and the
+ * digest a scenario judge is shown have to be the same text.
  */
 class ApiEvaluationSpanDigest extends EvaluationSpanDigestPort {
   static create(): ApiEvaluationSpanDigest {
@@ -389,13 +305,8 @@ class ApiEvaluationWorkflowExecutor extends EvaluationWorkflowExecutorPort {
 }
 
 /**
- * The Azure Content Safety credentials, read off the project's own
- * `azure_safety` provider row.
- *
- * A port implementation rather than an inline read so the execution half's
- * `tryResolveAzureSafetyEnv` and the evaluator runtime cannot disagree about
- * whether a project has credentials: this is the ONE place that answers it,
- * and both bind to this instance's rule.
+ * The Azure Content Safety credentials, read off the project's own `azure_safety`
+ * provider row.
  */
 export class ApiEvaluationAzureSafetyCredentials extends EvaluationAzureSafetyCredentialsPort {
   static create(modelProviders: ModelProviderService): ApiEvaluationAzureSafetyCredentials {
@@ -424,14 +335,8 @@ export class ApiEvaluationAzureSafetyCredentials extends EvaluationAzureSafetyCr
 }
 
 /**
- * The environment an evaluator executes with, resolved from the project's own
- * model providers.
- *
- * The bridge between two features' server packages — Evaluation asks the
- * question, Model Provider answers it — which is why it lives in a composition
- * root rather than in either package. The Azure branch never reads the process
- * environment: those evaluators require a per-project `azure_safety` row, and
- * the port above is what answers for them.
+ * The environment an evaluator executes with, resolved from the project's own model
+ * providers.
  */
 class ApiEvaluationModelEnv extends EvaluationModelEnvPort {
   static create(deps: {
@@ -514,13 +419,8 @@ class ApiEvaluationModelEnv extends EvaluationModelEnvPort {
   }
 
   /**
-   * The `X_LITELLM_*` block for one model, validated against the project's own
-   * provider rows.
-   *
-   * `EvaluatorConfigError` for a provider that is missing, switched off or
-   * does not serve the model: the caller turns each of those into a `skipped`
-   * with the sentence a customer can act on, which is why they are a domain
-   * error rather than a failed run.
+   * The `X_LITELLM_*` block for one model, validated against the project's own provider
+   * rows.
    */
   private async setupModelEnv(input: {
     model: string;
@@ -548,12 +448,11 @@ class ApiEvaluationModelEnv extends EvaluationModelEnvPort {
     const isCustomModel = customModelList?.some((entry) => entry.modelId === modelName);
 
     if (modelList && modelList.length > 0 && !modelList.includes(modelName) && !isCustomModel) {
-      // The collapse winner for a provider key is not necessarily the row that
-      // serves this model: with multi-instance providers the model may come
-      // from a wider-scope row's custom catalog, and `prepareLitellmParams`
-      // swaps to that row. Only reject when no accessible enabled row serves
-      // the model at all, and treat a failed lookup as no rescue rather than
-      // masking the config error behind an infrastructure one.
+      // The collapse winner for a provider key is not necessarily the row that serves
+      // this model: with multi-instance providers the model may come from a wider-scope
+      // row's custom catalog, and `prepareLitellmParams` swaps to that row. Only reject
+      // when no accessible enabled row serves the model at all, and treat a failed lookup
+      // as no rescue rather than masking the config error behind an infrastructure one.
       let servingRow = null;
       try {
         servingRow = await this.deps.modelProviders.tryFindRowServingModel({

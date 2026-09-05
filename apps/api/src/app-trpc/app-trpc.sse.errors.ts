@@ -1,11 +1,7 @@
 /**
- * The subscription lane's own refusals.
- *
- * All three are the same claim from three angles: the lane streams
- * SUBSCRIPTIONS opened by this application's own pages, and nothing else. The
- * caller can act on every one of them — fix the path, call the procedure over
- * `/api/trpc` instead, or open the page in the app — which is what makes them
- * handled rather than unknown (ADR-045).
+ * The subscription lane's own refusals. All three are the same claim from three angles:
+ * the lane streams SUBSCRIPTIONS opened by this application's own pages, and nothing
+ * else.
  */
 import { HandledError } from "@langwatch/handled-error";
 
@@ -24,12 +20,6 @@ export class LiveStreamNotFoundError extends HandledError {
 
 /**
  * The path names a real procedure, but a query or a mutation.
- *
- * This is the lane's security boundary, not a nicety: the caller is a browser
- * carrying a `SameSite=Lax` session cookie on a plain GET, so streaming a
- * mutation here would run it for anyone who could talk the person's browser
- * into the navigation. 405 rather than 404 because the path exists — over
- * `/api/trpc`, which is where it takes its own transport's CSRF protection.
  */
 export class LiveStreamUnsupportedProcedureError extends HandledError {
   declare readonly code: "live_stream_unsupported_procedure";

@@ -42,11 +42,9 @@ const browserSession: BrowserSession = {
 };
 
 /**
- * A Better Auth double for the session lookup alone.
- *
- * `handler` is part of the boundary because the `/api/auth/*` catch-all hands
- * requests to it, and nothing here routes one — so it refuses by name rather
- * than answering a Response no test asked for.
+ * A Better Auth double for the session lookup alone. `handler` is part of the boundary
+ * because the `/api/auth/*` catch-all hands requests to it, and nothing here routes one —
+ * so it refuses by name rather than answering a Response no test asked for.
  */
 function transportLookingUp(
   getSession: (input: { headers: Headers }) => Promise<VerifiedBrowserSession | null>,
@@ -91,11 +89,9 @@ class TestAuthorization extends ApiAuthorizationPort {
 }
 
 /**
- * The user directory the Auth graph publishes, as a double.
- *
- * Every call refuses: this file describes how a verified browser session
- * becomes an actor, and that path reads no user through this seam — the
- * identity half does.
+ * The user directory the Auth graph publishes, as a double. Every call refuses: this file
+ * describes how a verified browser session becomes an actor, and that path reads no user
+ * through this seam — the identity half does.
  */
 function testUserService(): UserService {
   return new Proxy({} as UserService, {

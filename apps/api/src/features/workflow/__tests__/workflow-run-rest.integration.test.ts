@@ -1,13 +1,6 @@
 /**
- * The three URLs a synchronous studio run is started from, driven through the
- * real Hono app the API process mounts.
- *
- * The thing worth pinning is that they are ONE handler: the legacy
- * `/api/optimization/{id}/{version}` path used to carry its own copy of the
- * run and the two had drifted to answer different status codes for identical
- * failures. So each of the three is driven here, and the three named
- * refusals — no such workflow, never published, no such committed version —
- * are checked to keep their own codes rather than collapsing into one.
+ * The three URLs a synchronous studio run is started from, driven through the real Hono
+ * app the API process mounts.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import {

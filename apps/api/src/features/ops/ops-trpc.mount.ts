@@ -1,20 +1,9 @@
 /**
- * App-process transport mount for the operator back office.
- *
- * The routers themselves are package-owned: `@langwatch/ops-server` decides the
- * procedure names, the input and output shapes and which service answers. What
- * this file owns is the wiring — which policy wraps `ops:view` and which wraps
- * `ops:manage`, and which process capability answers each port.
- *
- * Everything the process must supply arrives through these functions. This
- * package never imports the legacy application; the legacy application imports
- * this.
+ * App-process transport mount for the operator back office. The routers themselves are
+ * package-owned: `@langwatch/ops-server` decides the procedure names, the input and
+ * output shapes and which service answers.
  */
-import {
-  OpsTrpcApi,
-  type OpsTrpcContext,
-  type OpsTrpcPorts,
-} from "@langwatch/ops-server";
+import { OpsTrpcApi, type OpsTrpcContext, type OpsTrpcPorts } from "@langwatch/ops-server";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { policyForCheck, type AppTrpcPolicyKit } from "../../app-trpc/app-trpc.policy-kit";
 

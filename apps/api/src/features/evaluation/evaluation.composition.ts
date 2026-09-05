@@ -1,25 +1,7 @@
 /**
- * One trace re-scored, and the pipeline the result is reported on, composed as
- * their own feature.
- *
- * `evaluations.*` is the evaluator inventory a project can run and the re-score
- * of one trace against one of them. Beside it this feature composes the
- * `reportEvaluation` sender the workbench's own runs report through, because
- * both write onto the SAME `evaluation_processing` pipeline: two registrations
- * of one event stream drift into jobs the worker cannot route.
- *
- * ## What is absent, and what that costs
- *
- *   - With no eventing runtime, `reportEvaluation` refuses by name. A re-score
- *     that silently reported nothing would leave the customer looking at a
- *     result the analytics never received.
- *   - With no evaluator runtime composed, a re-score refuses by name rather
- *     than scoring against an empty trace. The runtime is built FROM the
- *     evaluator service and the trace reads, one composed on either side of
- *     this feature, so it arrives as a call-time resolution.
- *   - `mappingsSchema` is the trace-mapping registry's, and that registry lives
- *     in a browser package no server module may value-import. It defaults to a
- *     permissive parse, and the narrowing it would have done is named here.
+ * One trace re-scored, and the pipeline the result is reported on, composed as their own
+ * feature. `evaluations.*` is the evaluator inventory a project can run and the re-score
+ * of one trace against one of them.
  */
 import {
   EvaluationProcessingProducerAdapter,
@@ -99,11 +81,8 @@ export function composeEvaluationFeature(options: {
     >["mappingsSchema"],
 
     /**
-     * Azure Content Safety credentials come solely from the project's
-     * `azure_safety` model provider. There is no `process.env` fallback, so an
-     * unconfigured provider deterministically resolves to null and the package
-     * reports every Azure variable as missing.
-     *
+     * Azure Content Safety credentials come solely from the project's `azure_safety`
+     * model provider.
      * Spec: specs/evaluators/azure-safety-byok-gating.feature.
      */
     tryResolveAzureSafetyEnv: async (_ctx, input) => {
@@ -145,12 +124,9 @@ export function composeEvaluationFeature(options: {
     trackEvaluationRan: (input) => options.trackEvaluationRan?.(input),
 
     /**
-     * One liveness probe at the evaluator backend.
-     *
-     * The platform app sent this down the engine's STREAMING route, which is
-     * the per-project Lambda path this process does not carry. Same engine,
-     * same process warmed; a probe that is not answered warmed nothing, which
-     * is why the failure is swallowed rather than raised.
+     * One liveness probe at the evaluator backend. The platform app sent this down the
+     * engine's STREAMING route, which is the per-project Lambda path this process does
+     * not carry.
      */
     sendKeepAliveProbe: async (_ctx, input) => {
       if (!(nlpRuntime instanceof HttpWorkflowNlpRuntimeAdapter)) return;
@@ -171,11 +147,9 @@ export function composeEvaluationFeature(options: {
 }
 
 /**
- * The evaluation surface on a process that composed no graph to run it over.
- *
- * The namespace still mounts and every call refuses by name, so a person is
- * told this deployment scores nothing rather than shown an empty evaluator
- * inventory.
+ * The evaluation surface on a process that composed no graph to run it over. The
+ * namespace still mounts and every call refuses by name, so a person is told this
+ * deployment scores nothing rather than shown an empty evaluator inventory.
  */
 export function refusingEvaluationFeature(): ComposedEvaluationFeature {
   const refuse = (): never => {
@@ -197,14 +171,8 @@ export function refusingEvaluationFeature(): ComposedEvaluationFeature {
 }
 
 /**
- * Registers the `evaluation_processing` pipeline as a PRODUCER and hands back
- * its `reportEvaluation` sender.
- *
- * The SAME packaged definition the worker installs — nothing here forks it,
- * because the routing triple every job carries is derived from the pipeline
- * and command names, and two descriptions of one event stream drift into jobs
- * the worker cannot route. Registration is passive: this process starts no
- * consumer loop and owns no event log.
+ * Registers the `evaluation_processing` pipeline as a PRODUCER and hands back its
+ * `reportEvaluation` sender.
  */
 function composeReportEvaluation(input: {
   eventing: EventSourcing | undefined;
@@ -240,10 +208,6 @@ const isSender = (value: unknown): value is CommandSender =>
 
 /**
  * A capability this deployment did not compose, reported to the caller.
- *
- * A handled error rather than a bare throw: the boundary serialises its code,
- * which is what a client keys its own copy off, and every one of these is a
- * DEPLOYMENT gap an operator can act on rather than a customer mistake.
  */
 export class ApiEvaluationUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";

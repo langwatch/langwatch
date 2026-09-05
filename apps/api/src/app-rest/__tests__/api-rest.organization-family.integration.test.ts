@@ -1,13 +1,6 @@
 /**
- * The organization profile over REST: the organization is implied by the
- * credential, reads return what writes accept, and the fields this API does
- * not own — the single sign-on domain and provider — never appear in either
- * direction.
- *
- * Mounted through this process's own composition, so the Enterprise plan gate
- * and the canonical error envelope are the real ones. Only the datastore is
- * stood in for; see `support/organization-family.world.ts`.
- *
+ * The organization profile over REST: the organization is implied by the credential,
+ * reads return what writes accept, and the fields this API does not own — the single
  * @see specs/organizations/organization-rest-api.feature
  */
 import { MANAGEMENT_API_VERSION } from "@langwatch/api/rest";

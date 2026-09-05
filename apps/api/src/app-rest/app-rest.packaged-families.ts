@@ -1,20 +1,7 @@
 /**
- * The REST families that live in a FEATURE PACKAGE, mounted one at a time from
- * the services this process actually composed.
- *
- * The platform application mounted all of these through a single all-or-nothing
- * enumeration over thirty-two product services. `apps/api` composes most of
- * those now but not every one, and a family whose service is missing must be
- * absent rather than mounted over a throwing stub — a route that exists and
- * answers 500 is worse than one that is honestly not there. So each entry below
- * is its own condition, and what is left out is named at boot by
- * {@link ApiPackagedRestAbsenceReport}.
- *
- * This is still ONE list, iterated once, spread into
- * `createApiProcessRestFeatures`. That matters for more than tidiness: a family
- * reaches the route-policy registry when it is BUILT, and the registry is what
- * the route-authorization audit reads, so a family served from anywhere but an
- * enumeration would drop silently out of that audit while still serving traffic.
+ * The REST families that live in a FEATURE PACKAGE, mounted one at a time from the
+ * services this process actually composed. The platform application mounted all of these
+ * through a single all-or-nothing enumeration over thirty-two product services.
  */
 import type {
   AgentApp,
@@ -133,10 +120,6 @@ import { mountTrackedEventLegacyPathRest } from "../features/trace/tracked-event
 
 /**
  * The product services this process may or may not have composed.
- *
- * Each is a provider for the same reason the process list's are: mounting a
- * family must not force its service to be constructed, which is what lets the
- * route-registry audits build every family without a running process.
  */
 export type ApiPackagedRestServices = Readonly<{
   /** The per-project expiring entry store the agent cache reads and writes. */
@@ -176,11 +159,6 @@ export type ApiPackagedRestServices = Readonly<{
   organizations?: (() => OrganizationService) | undefined;
   /**
    * The SAME directory in the shape `/api/organizations` takes.
-   *
-   * Held apart from the entry above because instance provisioning creates a
-   * tenant BEFORE any credential for it exists, which the canonical contract
-   * does not declare — so a process can serve the directory without serving
-   * the provisioning door.
    */
   organizationProvisioning?: (() => OrganizationService & OrganizationProvisioningPort) | undefined;
   /** Reading effective permissions and the bindings that confer them. */
@@ -198,24 +176,12 @@ export type ApiPackagedRestServices = Readonly<{
   suites?: (() => SuiteApp) | undefined;
   /**
    * One avatar object's metadata and bytes, for `/api/user-avatar`.
-   *
-   * Held apart from `storedObjects` even though this process builds both from
-   * the same application: the avatar read is authorized for ANY authenticated
-   * caller on the platform, and it is safe only because the reader answers the
-   * object's OWNER KIND and the family refuses everything that is not an
-   * avatar. A process whose object read cannot name the owner kind must leave
-   * this entry off — the family would then be a door onto every tenant's trace
-   * media — which is what this being its own condition preserves.
    */
   userAvatarObjects?: (() => UserAvatarObjectReader) | undefined;
   /**
-   * Recording a customer's feedback event as the one span that carries it,
-   * plus the second validation pass, the id, the error sink and the rendered
-   * rejection the family's two URLs need.
-   *
-   * Absent takes BOTH URLs off rather than mounting a door that answers 200
-   * and drops the event: a rating a customer believes they gave and we did not
-   * store is worse than a 404 they can see.
+   * Recording a customer's feedback event as the one span that carries it, plus the
+   * second validation pass, the id, the error sink and the rendered rejection the
+   * family's two URLs need.
    */
   trackedEvents?: (() => TrackedEventPorts) | undefined;
   /**
@@ -227,11 +193,9 @@ export type ApiPackagedRestServices = Readonly<{
 }>;
 
 /**
- * What these families need from the process that is not a service.
- *
- * The ones this process can always answer are required; the ones it may not be
- * able to compose are optional and take their family off with them. Each
- * optional entry says which family it decides.
+ * What these families need from the process that is not a service. The ones this process
+ * can always answer are required; the ones it may not be able to compose are optional and
+ * take their family off with them. Each optional entry says which family it decides.
  */
 export type ApiPackagedRestPorts = Readonly<{
   /** The external UI address of ONE agent's editor drawer. */
@@ -269,10 +233,9 @@ export type ApiPackagedRestPorts = Readonly<{
   /** One fixed-window counter, keyed on whatever the caller is identified by. */
   rateLimit: FilesRateLimiter;
   /**
-   * Which trace sources a monitor's `mappings` may name.
-   *
-   * A schema rather than a restatement here, so the request validator and the
-   * published document are built from one definition.
+   * Which trace sources a monitor's `mappings` may name. A schema rather than a
+   * restatement here, so the request validator and the published document are built from
+   * one definition.
    */
   monitorMappingsSchema: ZodType;
   /**
@@ -282,11 +245,6 @@ export type ApiPackagedRestPorts = Readonly<{
   requireApiKeyPermission: (permission: AuthzPermission) => MiddlewareHandler;
   /**
    * Refuses ingest once the project's team has spent its plan's allowance.
-   *
-   * Required rather than optional because a process with no usage meter still
-   * has to decide what happens, and this process's answer is the receiver's own
-   * long-standing degradation: telemetry a customer already paid to produce is
-   * accepted and the absent meter reported at boot.
    */
   traceUsageGuard: MiddlewareHandler;
   /**
@@ -302,11 +260,9 @@ export type ApiPackagedRestPorts = Readonly<{
    */
   dualAuth?: MiddlewareHandler | undefined;
   /**
-   * Refuses a route unless the resolved organization's plan is Enterprise.
-   *
-   * Absent takes the four gated families off — groups, custom roles, role
-   * bindings and SCIM tokens — rather than mounting them ungated: a plan gate
-   * that cannot read a plan must not pass.
+   * Refuses a route unless the resolved organization's plan is Enterprise. Absent takes
+   * the four gated families off — groups, custom roles, role bindings and SCIM tokens —
+   * rather than mounting them ungated: a plan gate that cannot read a plan must not pass.
    */
   enterpriseGate?: ((feature: EnterpriseFeature) => MiddlewareHandler) | undefined;
   /**
@@ -315,10 +271,9 @@ export type ApiPackagedRestPorts = Readonly<{
    */
   authorizeDatasetDirectUpload?: DatasetDirectUploadAuthorizer | undefined;
   /**
-   * Externalises the inline media a reported scenario event carries. Absent
-   * takes the scenario-event family off rather than storing a recording inline:
-   * a run's audio inlined into a ClickHouse row is the payload this exists to
-   * keep out of one.
+   * Externalises the inline media a reported scenario event carries. Absent takes the
+   * scenario-event family off rather than storing a recording inline: a run's audio
+   * inlined into a ClickHouse row is the payload this exists to keep out of one.
    */
   extractInlineMedia?: InlineMediaExtraction | undefined;
   /**
@@ -377,12 +332,9 @@ export type ApiPackagedRestFamilyName =
   | "workflows";
 
 /**
- * Every packaged family this process can build, in mount order.
- *
- * ORDERING inside this list is free: each family owns a literal first path
- * segment (`/api/agents`, `/api/dataset`, `/api/files`, …) that no sibling
- * here claims. Where the list as a whole sits relative to the process's own
- * families is not free, and `createApiProcessRestFeatures` states that.
+ * Every packaged family this process can build, in mount order. ORDERING inside this list
+ * is free: each family owns a literal first path segment (`/api/agents`, `/api/dataset`,
+ * `/api/files`, …) that no sibling here claims.
  */
 export function mountApiPackagedRestFamilies(options: {
   security: AppRestSecurity;
@@ -763,13 +715,11 @@ export function mountApiPackagedRestFamilies(options: {
       : null,
   );
 
-  // Both tracked-event doors, mounted together over the SAME ports.
-  // `/api/track_event` is the URL every pre-rename SDK release posts to and
-  // `/api/events/track` is the canonical one; the legacy app replays the
-  // request against the canonical route rather than handling it, so the two
-  // cannot answer differently. The alias takes the canonical app as an
-  // argument, so a process that composed no tracked-event ports mounts
-  // neither.
+  // Both tracked-event doors, mounted together over the SAME ports. `/api/track_event` is
+  // the URL every pre-rename SDK release posts to and `/api/events/track` is the
+  // canonical one; the legacy app replays the request against the canonical route rather
+  // than handling it, so the two cannot answer differently. The alias takes the canonical
+  // app as an argument, so a process that composed no tracked-event ports mounts neither.
   const trackedEvents = services.trackedEvents;
   mount(
     "tracked-events",

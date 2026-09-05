@@ -1,24 +1,6 @@
 /**
  * @vitest-environment node
- *
  * Scope-aware RBAC for the VirtualKey write paths, over real Postgres.
- *
- * Ported from the retired application's
- * `server/api/routers/__tests__/virtualKeys.scopeRbac.integration.test.ts`,
- * which drove the monolithic tRPC root. The router is the gateway feature's
- * now, but the decision it delegates to is composed HERE — the per-scope check
- * resolves through this process's `AuthzService`, so this is the only place the
- * real router, the real virtual-key service and the real permission cascade
- * meet. Nothing below re-implements a gate: every persona is an
- * `OrganizationUser.role=MEMBER` carrying ONLY an explicit CUSTOM RoleBinding
- * at a specific scope, so a pass can never come from an admin short-circuit.
- *
- * Contract:
- *   - create authorizes virtualKeys:manage on EVERY requested scope
- *     (upward cascade: a broader grant covers narrower scopes).
- *   - update / rotate / delete authorize the op permission on AT LEAST ONE
- *     of the key's existing scopes.
- *
  * Spec: specs/ai-gateway/governance/vk-scope-rbac.feature
  */
 import type { AuthzService } from "@langwatch/authz-contract";
@@ -111,10 +93,7 @@ function buildGateway() {
 }
 
 /**
- * The `virtualKeys.*` router on a bare root. The process's policy chain is
- * tracing, logging and audit; it declares the permissions but does not decide
- * them, so an identity decorator leaves exactly the resolver's own per-scope
- * check standing — which is what this file is about.
+ * The `virtualKeys.*` router on a bare root.
  */
 function buildRouter(gateway: ReturnType<typeof buildGateway>) {
   const trpc = initTRPC.context<VirtualKeyTrpcContext>().create();

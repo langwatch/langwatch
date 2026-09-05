@@ -54,12 +54,6 @@ const legacyDeprecationWarning: MiddlewareHandler = async (context, next) => {
 
 /**
  * The deprecated unversioned secrets REST family, `/api/secrets`.
- *
- * It derives the project from the credential and publishes the flat legacy
- * error body, which is why it still exists alongside the modern
- * `/api/v1/secret` family: both are deployed and their payload and error
- * semantics differ. No secret VALUE is ever read back — `toSecretPublic` is
- * the one projection every response goes through.
  */
 export function createSecretLegacyRestApp(options: {
   security: AppRestSecurity;

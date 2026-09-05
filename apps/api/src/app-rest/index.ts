@@ -1,29 +1,6 @@
 /**
- * The application's REST boundary, owned by the API process.
- *
- * The kit itself no longer lives here. The request validator, the error
- * vocabulary, the response schemas, the idempotency wire contract, the
- * correlation handles, the family error handlers and the port TYPES a family
- * declares are all `@langwatch/api/rest`, because a REST family that lives in
- * `packages/features/<f>/server/src/api/rest` needs exactly the same ones and
- * a package may not import an application.
- *
- * What this barrel owns now is only the re-exports below, which are the
- * legacy families' one import site; a family that has moved imports from
- * `@langwatch/api`, `@langwatch/api/rest` and its own feature package
- * instead. The all-or-nothing enumeration that used to live here
- * (`createAppRestFeatures`, thirty-two product services in one call) is gone:
- * the API process mounts what it composed through
- * `createApiProcessRestFeatures`, one family at a time, and names the rest.
- *
- * The REST service is NOT a module-level singleton. Building one needs
- * authentication that reads API keys, sessions and role bindings out of a
- * database, plus the application's own error taxonomy for the two envelopes;
- * a process supplies those to `createAppRestSecurity` once and passes the
- * result to each feature's mount. That keeps the invariant the service exists
- * for — a route cannot be registered without declaring an access policy, and
- * the policy's enforcement is bound before the route is built — while letting
- * the feature live in a package that has no database of its own.
+ * The application's REST boundary, owned by the API process. The kit itself no longer
+ * lives here.
  */
 export {
   type AccessPolicy,

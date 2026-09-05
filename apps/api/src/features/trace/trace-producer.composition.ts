@@ -1,18 +1,5 @@
 /**
  * The trace-side commands this process PRODUCES, composed once.
- *
- * Three senders come off ONE registration of the packaged `trace_processing`
- * pipeline, because a pipeline may only be registered once — a second
- * `register` of the same definition re-declares its aggregate and its event
- * catalogue. So the process registers here and hands the senders to everything
- * that writes on the lane: a reviewer's comment marker, the reserved-metadata
- * amendment's synthetic span, and the raw span an agent test writes.
- *
- * Registered PRODUCER-only: this process starts no consumer loop and folds
- * nothing. Registering the packaged definition rather than a local one is what
- * keeps the routing triple every job carries identical to the one the worker
- * routes on — two descriptions of one event stream drift into jobs nothing can
- * pick up.
  */
 import { TraceProcessingProducerAdapter } from "@langwatch/trace-server";
 import type { EventSourcing } from "@langwatch/eventing";
@@ -35,11 +22,8 @@ export type ApiTraceProducerCommands = Readonly<{
 }>;
 
 /**
- * Registers the pipeline and publishes its senders, or refuses by name where
- * this process composed no command queue.
- *
- * The refusal is not a resolved promise: every caller treats the write as best
- * effort, and best effort is about tolerating a failure, not about hiding one.
+ * Registers the pipeline and publishes its senders, or refuses by name where this process
+ * composed no command queue.
  */
 export function composeApiTraceProducerCommands(options: {
   eventing: EventSourcing | undefined;

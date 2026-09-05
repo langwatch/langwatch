@@ -1,17 +1,6 @@
 /**
- * `AppRouter` carries the procedures, not an erased record.
- *
- * A browser package builds ONE client from this type. If the feature record
- * reaches it as `TRPCRouterRecord` — which is what the `as unknown as` cast in
- * `api-trpc-features.composition.ts` used to guarantee — every call still
- * compiles, every input is `unknown`, and every answer is untyped: the client
- * would be no better than the hand-written api maps it replaces, and nothing
- * would say so. So the assertions below name real procedures across several
- * features and demand a real input and a real answer for each.
- *
- * These assertions are TYPE-LEVEL. Neither this package's vitest config nor
- * `apps/ui`'s enables `typecheck`, so a `vitest run` executes them as no-ops:
- * they fail `pnpm typecheck`, not the test run.
+ * `AppRouter` carries the procedures, not an erased record. A browser package builds ONE
+ * client from this type.
  */
 import type { inferProcedureInput, inferProcedureOutput } from "@trpc/server";
 import { describe, expectTypeOf, it } from "vitest";

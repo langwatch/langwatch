@@ -1,12 +1,6 @@
 /**
- * The gateway platform REST family, mounted the way this process mounts it,
- * over a real Postgres and a real ClickHouse.
- *
- * `api-production.composition.ts` builds this family from `restSecurity` and
- * one `GatewayApp`; the harness builds the SAME two from the same composition
- * roots, so a suite driving it exercises the real credential chain, the real
- * permission ceiling and the real ClickHouse spend source rather than a
- * pass-through stand-in.
+ * The gateway platform REST family, mounted the way this process mounts it, over a real
+ * Postgres and a real ClickHouse.
  */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
@@ -92,11 +86,9 @@ export type GatewayRestHarness = {
 };
 
 /**
- * Composes the family once for a suite.
- *
- * Everything below `createGatewayPlatformRestApp` is the process's own
- * composition root: a second description of any of it here would be a harness
- * that passed while production refused.
+ * Composes the family once for a suite. Everything below `createGatewayPlatformRestApp`
+ * is the process's own composition root: a second description of any of it here would be
+ * a harness that passed while production refused.
  */
 export function mountGatewayPlatformRest(): GatewayRestHarness {
   if (!databaseUrl) throw new Error("DATABASE_URL is required for this suite");

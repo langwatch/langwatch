@@ -34,11 +34,9 @@ function createCaller(service: TestSecretService) {
 }
 
 /**
- * The secret router, or a failed test.
- *
- * The root composes the router only for a process that was given a secret
- * service, so its type is optional at every caller. Narrowing here says which
- * of the two shapes each scenario below is about.
+ * The secret router, or a failed test. The root composes the router only for a process
+ * that was given a secret service, so its type is optional at every caller. Narrowing
+ * here says which of the two shapes each scenario below is about.
  */
 function secretRouterOf<Caller extends { secrets?: unknown }>(
   caller: Caller,

@@ -1,11 +1,6 @@
 /**
- * The custom-roles REST family (`/api/roles`), driven through the real Hono
- * app `createApiProcessRestFeatures` returns.
- *
- * The route validates the permission format against the process's own
- * vocabulary (an unknown key never reaches the service) and otherwise
- * delegates every organization-scoped rule — name conflicts, cross-org reads,
- * in-use deletes — to the `RoleService` the mount is handed.
+ * The custom-roles REST family (`/api/roles`), driven through the real Hono app
+ * `createApiProcessRestFeatures` returns.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import {
@@ -317,7 +312,10 @@ function passThroughSecurity(): AppRestSecurity {
     c.set("apiKeyUserId", "user-1");
     await next();
   };
-  const renderHandled = (error: unknown, c: Parameters<AppRestSecurity["legacyErrorHandler"]>[1]) => {
+  const renderHandled = (
+    error: unknown,
+    c: Parameters<AppRestSecurity["legacyErrorHandler"]>[1],
+  ) => {
     const handled = error as { httpStatus?: number; code?: string; message?: string };
     if (typeof handled.httpStatus === "number") {
       return c.json(

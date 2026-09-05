@@ -1,34 +1,6 @@
 /**
- * `POST /api/otel/v1/traces` end to end, through the real Hono app this
- * process mounts and the real ingestion service it composes.
- *
- * This is the deployment's critical path, so the test drives the whole of it
- * rather than a seam: a REAL OTLP export — once as protobuf, once as JSON — is
- * posted at the app returned by `createApiProcessRestFeatures`, and what is
- * asserted is that the PRODUCER received a `recordSpan` command carrying that
- * span. Nothing between the wire and the command is stubbed: the credential
- * mapping, the body read, the protobuf and JSON parsers, the receiver's
- * provenance rewrite, the dedup claim and the span validation are all the ones
- * that run in production. Only the two things this process cannot hold in a
- * test are stood in for — the credential resolution and the queue the command
- * is enqueued into.
- *
- * The four things it pins, and why each is worth a test:
- *
- *   - a span posted as PROTOBUF reaches the producer. Most production
- *     collectors emit protobuf for size, so a JSON-only test would pass while
- *     the fleet silently failed.
- *   - a span posted as JSON reaches the producer with the SAME trace id. The
- *     two encodings carry the id differently (bytes against base64), and a
- *     receiver that agreed on only one of them splits one customer's trace in
- *     two.
- *   - `langwatch.api_key.id` is rewritten from the CREDENTIAL on every
- *     request, even when the payload set it to something else. The redaction
- *     deny-list exempts that attribute name, and that exemption is only sound
- *     while the value cannot come from the payload.
- *   - the signals this process composed no collection for are NOT MOUNTED. A
- *     404 from a receiver that honestly does not serve logs is an exporter's
- *     problem to see; a 500 from one that pretends to is ours.
+ * `POST /api/otel/v1/traces` end to end, through the real Hono app this process mounts
+ * and the real ingestion service it composes.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { UsageLimitResult } from "@langwatch/entitlement-server";
@@ -348,11 +320,9 @@ type MountOverrides = {
 };
 
 /**
- * The process's REST door, over a producer that records rather than enqueues.
- *
- * `register` answers a `recordSpan` sender that pushes into an array, which is
- * the one seam a test can hold: everything on the customer's side of it is the
- * real path.
+ * The process's REST door, over a producer that records rather than enqueues. `register`
+ * answers a `recordSpan` sender that pushes into an array, which is the one seam a test
+ * can hold: everything on the customer's side of it is the real path.
  */
 function mount(overrides: MountOverrides = {}) {
   const commands: RecordSpanCommandData[] = [];
@@ -524,12 +494,8 @@ function protobufExport(): ArrayBuffer {
 }
 
 /**
- * A failure here must be legible rather than swallowed into a generic 500 —
- * EXCEPT a handled one, which is rendered by the process's own legacy renderer.
- *
- * The plan-limit refusal is only a refusal because that renderer turns it into
- * `{"error":"ERR_PLAN_LIMIT",…}` and a 402; asserting that against a body this
- * file invented would be asserting the test's own arithmetic.
+ * A failure here must be legible rather than swallowed into a generic 500 — EXCEPT a
+ * handled one, which is rendered by the process's own legacy renderer.
  */
 const renderUnexpected: ErrorHandler = (error, c) =>
   HandledError.isHandled(error)

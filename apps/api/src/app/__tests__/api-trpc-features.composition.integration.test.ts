@@ -1,19 +1,7 @@
 /**
- * The packaged tRPC record, served by the API process.
- *
- * What this pins is the seam the migration turns on: `createAppTrpcFeatures`
- * built on THIS process's root, with THIS process's policy chain, reachable
- * over the real `/api/trpc` handler. The four calls are one per kind of port
- * the composition answers, not one per namespace — a namespace is either in the
- * record or it does not exist, and the first assertion is what checks that.
- *
- *   dashboards.getAll  an application slice read off `ctx.app`, behind a
- *                      DECLARED permission, so the whole chain runs.
- *   workflow.getAll    a row read the composition lifted onto this process's
- *                      own Prisma connection, plus the AuthZ probe beside it.
- *   bugReports.getAll  a feature the process composed itself, with the audit
- *                      row it writes before the caller sees the transcript.
- *   publicEnv          the signed-out door, on the PUBLIC procedure.
+ * The packaged tRPC record, served by the API process. What this pins is the seam the
+ * migration turns on: `createAppTrpcFeatures` built on THIS process's root, with THIS
+ * process's policy chain, reachable over the real `/api/trpc` handler.
  */
 import { AuthService } from "@langwatch/auth-contract";
 import type { BrowserSession, VerifiedBrowserSession } from "@langwatch/auth-contract";
@@ -57,10 +45,6 @@ import {
 
 /**
  * The namespaces `createAppTrpcFeatures` mounts, as the wire names them.
- *
- * Written out rather than derived from the record under test: derived, the
- * assertion would pass for whatever the record happened to contain, including
- * a record that had silently lost half its surfaces.
  */
 const RECORD_NAMESPACES = [
   "analytics",
@@ -99,14 +83,8 @@ const RECORD_NAMESPACES = [
 ] as const;
 
 /**
- * A collaborator group with only the members the record reads while it is being
- * BUILT — the input schemas, and the one decorator a rollout gate applies to a
- * procedure. Everything else answers a function that refuses by name when a
- * call actually reaches it.
- *
- * The split matters: a router is assembled at composition time, so a schema
- * that refused on property access would fail the mount rather than the call,
- * and a test would be unable to tell a missing port from an unexercised one.
+ * A collaborator group with only the members the record reads while it is being BUILT —
+ * the input schemas, and the one decorator a rollout gate applies to a procedure.
  */
 function stub<T>(group: string, buildTime: Record<string, unknown> = {}): T {
   return new Proxy(buildTime, {
@@ -244,17 +222,9 @@ function testCollaborators(overrides: Record<string, unknown> = {}) {
     role: stub("role", { customRolePermission: anySchema }),
     team: stub("team"),
     /**
-     * The trace group, stubbed with only what the record reads while it is
-     * being BUILT: the input schemas its procedures are parsed with, and the
-     * two custom checks its model-provider mount wraps a procedure in. Its own
-     * suite is what proves it answers.
-     */
-    /**
-     * The nine tenant-administration surfaces, stubbed with only what the
-     * record reads while it is BUILT: the sign-up questionnaire the
-     * organization ceremony parses against, and the three data-dependent
-     * gates the mounts chain onto a procedure. Its own suite is what proves it
-     * answers.
+     * The trace group, stubbed with only what the record reads while it is being BUILT:
+     * the input schemas its procedures are parsed with, and the two custom checks its
+     * model-provider mount wraps a procedure in. Its own suite is what proves it answers.
      */
     organization: stub("organization", {
       signUpDataSchema: anySchema,
@@ -297,12 +267,9 @@ function testCollaborators(overrides: Record<string, unknown> = {}) {
     httpProxy: stub("httpProxy"),
     limits: stub("limits"),
     /**
-     * The six agent surfaces, stubbed with only what the record reads while it
-     * is being BUILT. Their own suite is what proves they answer.
+     * The six agent surfaces, stubbed with only what the record reads while it is being
+     * BUILT.
      */
-    // The virtual-key budget parser and the SaaS-billing decision, stubbed
-    // with only what the record reads while it is BUILT. Their own suite is
-    // what proves they answer.
     gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
     github: stub("github"),
     scenarios: stub("scenarios"),
@@ -529,10 +496,9 @@ describe("given an API process with no collaborators for the record", () => {
 });
 
 /**
- * The infrastructure is one object, so "a connection but no permission
- * service" is no longer a state a caller can reach: `ApiTrpcInfrastructure`
- * requires both, and the production root builds it only when it holds both.
- * What is left to pin at runtime is the refusal itself.
+ * The infrastructure is one object, so "a connection but no permission service" is no
+ * longer a state a caller can reach: `ApiTrpcInfrastructure` requires both, and the
+ * production root builds it only when it holds both.
  */
 describe("given a process that opened no infrastructure for the record", () => {
   it("refuses the record rather than mounting authorized surfaces over nothing", () => {

@@ -1,16 +1,6 @@
 /**
- * The strip of things a person recently touched, composed as its own feature.
- *
- * `home.*` is one read: the entities this person last opened, across every
- * vertical that records one.
- *
- * ## Why it answers off the connection rather than through a service
- *
- * The strip walks this process's own audit trail and then hydrates each entity
- * it finds there — a prompt, a dataset, a workflow, a scenario, a monitor. Five
- * verticals' rows behind one read is nobody's service but the application's, so
- * the recent-items adapter reads them together rather than fanning out across
- * five packages that would each answer a different question.
+ * The strip of things a person recently touched, composed as its own feature. `home.*` is
+ * one read: the entities this person last opened, across every vertical that records one.
  */
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -47,10 +37,9 @@ export function composeHomeFeature(options: {
 }
 
 /**
- * The strip on a process with no connection to walk.
- *
- * The namespace still mounts and the read refuses by name rather than answering
- * an empty strip, which a person would read as "you have opened nothing".
+ * The strip on a process with no connection to walk. The namespace still mounts and the
+ * read refuses by name rather than answering an empty strip, which a person would read as
+ * "you have opened nothing".
  */
 export function refusingHomeFeature(): ComposedHomeFeature {
   return {

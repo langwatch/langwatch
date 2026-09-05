@@ -1,13 +1,6 @@
 /**
- * The deprecated `/api/suites` family, as an integrator finds it in the
- * published description.
- *
- * The wire says the family moved on every response; the document has to say it
- * too, because a reader generating a client from the description never sees a
- * response header. Generated here through `generateOpenApiDocument` over the
- * same enumeration the process mounts, so an operation that stops carrying the
- * mark fails here rather than against a list this file also owns.
- *
+ * The deprecated `/api/suites` family, as an integrator finds it in the published
+ * description.
  * @see specs/api-reference/suites-legacy-alias.feature
  */
 import { mkdtemp } from "node:fs/promises";

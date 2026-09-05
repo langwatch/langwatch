@@ -1,8 +1,7 @@
 /**
- * `createApiDualCredentialAuth` arbitrates the two credential kinds a
- * browser-served byte endpoint accepts (files, avatars): a project API key
- * or a live session, never both, never neither, never a fallback from one to
- * the other. See specs/rbac/credential-arbitration.feature.
+ * `createApiDualCredentialAuth` arbitrates the two credential kinds a browser-served byte
+ * endpoint accepts (files, avatars): a project API key or a live session, never both,
+ * never neither, never a fallback from one to the other.
  */
 import type { ApiKeyService, ResolvedApiKeyToken } from "@langwatch/api-key-contract";
 import { Hono } from "hono";

@@ -1,25 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The public gateway REST surface (/api/gateway/v1/*), end to end against
- * real Postgres + real ClickHouse, through the same Hono app this process
- * mounts.
- *
- * This app shipped for months with zero tests, which is how its create
- * schema kept demanding an entity deleted in iter 110 (#6260) and its
- * budget service lost the ClickHouse spend wiring (#6248). These tests pin
- * the two properties that make that drift impossible to reintroduce
- * silently:
- *
- *   1. REST behaves exactly like tRPC because it runs the SAME service
- *      layer: the refusals asserted here (trace_project_required,
- *      permission_denied per scope, routing_policy_required,
- *      group-budget guards) are implemented ONLY in the shared services
- *      and asserts — remove the shared routing and these fail.
- *   2. Spend figures over REST come from the live ClickHouse ledgers, not
- *      the stale PG column: the ledger-backed assertions fail if the
- *      repository wiring is dropped again.
- *
+ * The public gateway REST surface (/api/gateway/v1/*), end to end against real Postgres +
  * Spec: specs/ai-gateway/public-rest-api.feature
  */
 
@@ -52,11 +33,6 @@ const prisma = harness?.prisma as PrismaClient;
 
 /**
  * Asserts a response carries the canonical error envelope, and returns it.
- *
- * Parses with the shipped schema rather than poking at fields, so a route that
- * answers a nearly-right shape (a flat `error` string, a stray top-level
- * `message`) fails here instead of passing a hand-written field check. The
- * envelope is checked STRICTLY at the top level: `error` is the only key.
  */
 async function expectCanonicalError(
   res: Response,
@@ -204,11 +180,9 @@ async function fetchPage(url: string): Promise<Page> {
 }
 
 /**
- * Every page of `path`, walked to exhaustion at `limit` rows a page.
- *
- * Throws rather than asserts, so the assertions all live in the `it` that
- * called it and a failure names the walk that produced it. The page cap means
- * a cursor that fails to advance fails the test instead of hanging the suite.
+ * Every page of `path`, walked to exhaustion at `limit` rows a page. Throws rather than
+ * asserts, so the assertions all live in the `it` that called it and a failure names the
+ * walk that produced it.
  */
 async function pagesOf(path: string, limit: number): Promise<Page[]> {
   const pages: Page[] = [];
@@ -1954,10 +1928,6 @@ describe.skipIf(!databaseUrl || !clickHouseUrl)(
 
       /**
        * Wait for a row a request in flight is about to write.
-       *
-       * The claim goes in before the handler runs, so a request parked inside
-       * its handler has certainly written it; this only covers the moment
-       * between starting that request and its insert landing.
        */
       async function pollFor<T>(read: () => Promise<T | null>): Promise<T> {
         for (let attempt = 0; attempt < 100; attempt++) {
@@ -2070,12 +2040,8 @@ describe.skipIf(!databaseUrl || !clickHouseUrl)(
       });
 
       /**
-       * Wind a receipt back to the state its first request held between
-       * claiming the key and storing its answer.
-       *
-       * Doctoring a real receipt rather than inserting one keeps the
-       * fingerprint identical to the route's, which is taken over the VALIDATED
-       * body and so cannot be recomputed here.
+       * Wind a receipt back to the state its first request held between claiming the key
+       * and storing its answer.
        */
       async function windBackToPending({
         key,
@@ -2129,12 +2095,11 @@ describe.skipIf(!databaseUrl || !clickHouseUrl)(
 
         expect((await post("/api/gateway/v1/budgets", body, keyed(key))).status).toBe(201);
 
-        // A request five minutes into its handler, waiting on a lock or a
-        // saturated pool, that reported itself alive a moment ago. Any rule
-        // reading the claim's age hands the key to this retry, which then
-        // creates a second budget alongside the one the original is still going
-        // to write. That is the exact failure this refusal exists to stop, and
-        // it lands hardest when the platform is already struggling.
+        // A request five minutes into its handler, waiting on a lock or a saturated pool,
+        // that reported itself alive a moment ago. Any rule reading the claim's age hands
+        // the key to this retry, which then creates a second budget alongside the one the
+        // original is still going to write. That is the exact failure this refusal exists
+        // to stop, and it lands hardest when the platform is already struggling.
         await windBackToPending({
           key,
           claimedAt: new Date(Date.now() - 5 * 60_000),

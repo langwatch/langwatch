@@ -1,21 +1,7 @@
 /**
- * The Langy conversation panel and the egress allow-list beside it, composed as
- * their own feature.
- *
- * `langy.*` and `langyEgress.*`, plus the `ctx.app.langy` slice both Langy
- * doors read. It used to be composed inside the agent group, next to the
- * scenario store, because both dispatch onto this process's producer-only
- * Eventing. Dispatching onto the same runtime is not being one graph: nothing
- * Langy reads is a scenario, and nothing a scenario reads is a conversation. So
- * it composes itself, from the shared infrastructure, the one peer it names,
- * and the conversation command sender the process registered.
- *
- * ## What answers, and what refuses by name
- *
- * The Postgres half and both live channels answer for real. Everything a TURN
- * needs to RUN is the worker's — resolving the model, reserving a pull-request
- * permit, minting a session key, provisioning a virtual key — so each refuses
- * by name rather than resolving into a turn that silently never runs.
+ * The Langy conversation panel and the egress allow-list beside it, composed as their own
+ * feature. `langy.*` and `langyEgress.*`, plus the `ctx.app.langy` slice both Langy doors
+ * read.
  */
 import type { FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
@@ -265,13 +251,9 @@ function composeLangy(options: LangyFeatureCollaborators): LangyApp {
 }
 
 /**
- * The two Langy budgets, the analytics sink and the UI-action channel.
- *
- * The budgets meter through the SAME counter the public REST surface and the
- * identity half's throttles use, so a caller has one budget per rule rather
- * than one per surface. They fail OPEN when the counter has no Redis, which is
- * the behaviour the platform host pinned: a chat that stops working because the
- * cache is down is worse than an unmetered minute.
+ * The two Langy budgets, the analytics sink and the UI-action channel. The budgets meter
+ * through the SAME counter the public REST surface and the identity half's throttles use,
+ * so a caller has one budget per rule rather than one per surface.
  */
 function composeLangyPorts(options: LangyFeatureCollaborators, langy: LangyApp): LangyTrpcPorts {
   const logger = createLogger(`${options.processName}:langy`);
@@ -311,14 +293,9 @@ function composeLangyPorts(options: LangyFeatureCollaborators, langy: LangyApp):
 }
 
 /**
- * The page-action catalogue, absent.
- *
- * The only catalogue that exists is the experiments workbench's, and it is a
- * browser module: a Langy server package may not reach it and neither may this
- * composition root. Every kind therefore reads as unknown, which refuses a
- * DISPATCH by name. The two procedures this record mounts — `claimUiAction` and
- * `completeUiAction` — never consult it, so the page half of the channel works
- * whole.
+ * The page-action catalogue, absent. The only catalogue that exists is the experiments
+ * workbench's, and it is a browser module: a Langy server package may not reach it and
+ * neither may this composition root.
  */
 class UnavailableApiLangyUiActionCatalog extends LangyUiActionCatalogPort {
   tryFind(_kind: string): LangyUiActionDefinition | null {
@@ -332,12 +309,9 @@ class UnavailableApiLangyUiActionCatalog extends LangyUiActionCatalogPort {
  */
 function composeLangyGates(options: LangyFeatureCollaborators) {
   /**
-   * Refuses the demo project outright.
-   *
-   * `project:view` is granted to every authenticated user on the demo project,
-   * so a permission check alone would expose whatever Langy chat somebody left
-   * there. The server never runs Langy on the demo project, so the refusal is
-   * explicit and it runs BEFORE the rollout gate.
+   * Refuses the demo project outright. `project:view` is granted to every authenticated
+   * user on the demo project, so a permission check alone would expose whatever Langy
+   * chat somebody left there.
    */
   const refuseDemoProject = async ({
     input,
@@ -353,13 +327,8 @@ function composeLangyGates(options: LangyFeatureCollaborators) {
   };
 
   /**
-   * The authoritative internal-only rollout decision, LAST in the chain so
-   * membership is always proven by RBAC before the flag is read.
-   *
-   * The organization is resolved from the project rather than read off the
-   * input: every project-scoped procedure carries only a `projectId`, and
-   * evaluating an ORG-targeted rule with no organization at all is what made an
-   * opted-in account read as "not enabled".
+   * The authoritative internal-only rollout decision, LAST in the chain so membership is
+   * always proven by RBAC before the flag is read.
    */
   const enforceLangyAccess = async ({
     ctx,

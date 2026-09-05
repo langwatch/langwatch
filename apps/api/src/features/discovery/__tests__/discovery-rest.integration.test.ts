@@ -1,12 +1,6 @@
 /**
- * Characterisation of the three discovery locations, through the real Hono app
- * the API process serves.
- *
- * These are the routes that tell a caller what the API is, so what is pinned is
- * the wire: the same bytes at all three URLs, a strong ETag, the conditional
- * 304, the cache policy, and the plain-text index. Every one of them is
- * unauthenticated on purpose — a caller reads the description to learn how to
- * authenticate.
+ * Characterisation of the three discovery locations, through the real Hono app the API
+ * process serves.
  */
 import { ApiKeyService } from "@langwatch/api-key-contract";
 import { AuthzService } from "@langwatch/authz-contract";
@@ -191,10 +185,6 @@ describe("given the API process's discovery locations", () => {
 
 /**
  * start.ts (the dev/prod host) dispatches root-level paths on this function.
- * It is the piece that silently regresses: drop a path from it and no handler
- * test fails — the handler is fine, it just stops being reachable, and the
- * SPA fallback answers with the HTML shell and a 200 that the caller reads as
- * success.
  */
 describe("given the server deciding where a request goes", () => {
   describe("when the path is a root-level discovery location", () => {

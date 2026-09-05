@@ -1,31 +1,5 @@
 /**
- * The person-shaped features of the packaged tRPC record, served by the API
- * process.
- *
- * What this pins is the seam the migration turns on for every person-shaped
- * surface: the organization feature's membership half and the user feature,
- * composed for real into the record, built on THIS process's root, with THIS
- * process's policy chain, reachable over the real `/api/trpc` handler.
- *
- * Two calls, one per side of the half, and neither is a stub reached through a
- * proxy:
- *
- *   onboarding.initializeOrganization  the ORGANIZATION side. It runs the whole
- *                                      moved membership service — the ksuid and
- *                                      slug minting, the one transaction, and
- *                                      the founder's two ADMIN grants on the
- *                                      grant ledger — through
- *                                      `ctx.app.organizations`.
- *   user.getAccountInfo                the AUTH/USER side, off `ctx.app.users`:
- *                                      the application this composition builds
- *                                      over the SAME user directory the
- *                                      browser-session boundary resolves
- *                                      through.
- *
- * And one refusal, because a named absence that nobody can observe is
- * indistinguishable from a stub: the SCIM plan gate this process does not hold
- * refuses `group.listAll` by name rather than listing groups it cannot
- * authorize.
+ * The person-shaped features of the packaged tRPC record, served by the API process.
  */
 import type { AuthService } from "@langwatch/auth-contract";
 import type {
@@ -84,12 +58,6 @@ const accountInfo = {
 
 /**
  * The rows the organization side actually writes, recorded.
- *
- * A double rather than a database, and the assertions are on the WRITES rather
- * than on a returned object, because what the move has to preserve is the shape
- * of those writes: an organization row carrying its ksuid and derived slug, a
- * founding ADMIN membership, and a first team — in one transaction, before the
- * grants that point at them.
  */
 function testPrisma() {
   const writes: Array<{ model: string; data: Record<string, unknown> }> = [];
@@ -180,11 +148,6 @@ const rateLimit = async () => ({ allowed: true, resetAt: Date.now() + 60_000 });
 
 /**
  * The two features composed for real, over one connection.
- *
- * The user feature builds the application `user.*` answers from and the
- * personal workspace the sign-up ceremony provisions; the organization feature
- * builds the membership half over it, which is the graph the seats, the groups,
- * the join requests and the ceremony are all served from.
  */
 function composePersonFeatures(
   prisma: PrismaClient,
@@ -316,10 +279,6 @@ const SEAT_MEMBER_ID = "user-disabled";
 
 /**
  * The rows a seat decision reads, and the one write it makes.
- *
- * Every model here is one the REAL composed graph reaches: the membership the
- * service looks up, the enabled memberships and pending invitations the seat
- * census counts, and the custom roles it classifies a Lite Member by.
  */
 function seatPrisma(members: ReadonlyArray<{ userId: string; role: string }>) {
   const updated: Array<{ userId: string; disabledAt: Date | null }> = [];
@@ -363,10 +322,9 @@ function seatPrisma(members: ReadonlyArray<{ userId: string; role: string }>) {
 }
 
 /**
- * The membership half composed against one organization's plan and its seats.
- *
- * The licence itself is the composed one — this supplies only the plan the
- * deployment is on and the rows the census counts.
+ * The membership half composed against one organization's plan and its seats. The licence
+ * itself is the composed one — this supplies only the plan the deployment is on and the
+ * rows the census counts.
  */
 function composeSeatLicence(options: {
   plan: { maxMembers: number; maxMembersLite: number; overrideAddingLimitations?: boolean };
@@ -548,30 +506,14 @@ describe("given an API process composed with its person-shaped features", () => 
 });
 
 /**
- * The organization that is open to `acme.test`, and the person asking to join
- * it.
- *
- * Every read below is one the join path actually makes, and the values are
- * chosen so the matcher ADMITS: a domain that is not a consumer mail provider,
- * no identity provider already covering it, `domainJoin` at `request` rather
- * than `off`, and one verified member on the domain to corroborate that the
- * company owns it.
+ * The organization that is open to `acme.test`, and the person asking to join it.
  */
 const JOIN_ORGANIZATION_ID = "organization-acme";
 const JOIN_DOMAIN = "acme.test";
 
 /**
- * The Prisma reads the join path makes, answered.
- *
- * `joinRequest.findUnique` is deliberately two answers to two readers. The
- * FIRST call is the guard's idempotency check — the same command id names the
- * same aggregate, and a second pass must cost no event — so it answers "no such
- * request". Every later call is the ledger's read-your-writes observation of
- * the fold, and it answers with a cursor past the events just appended, which
- * is what a converged projection looks like. A single answer could only model
- * one of the two, and answering "no row" to both would make the test spend the
- * ledger's whole two-second convergence window waiting for a queue this process
- * deliberately does not drain.
+ * The Prisma reads the join path makes, answered. `joinRequest.findUnique` is
+ * deliberately two answers to two readers.
  */
 function joinRequestPrisma() {
   let projectionReads = 0;
@@ -641,28 +583,9 @@ function joinRequestPrisma() {
 }
 
 /**
- * This process's own producer-only Eventing, in the shape production composes
- * it: the REAL {@link EventStoreProducerOnly}, over a queue that records
- * rather than runs.
- *
- * The store is the production one deliberately. This helper used to seat
- * `EventStoreMemory` here and was named for the production shape without
- * having it — which is precisely the substitution the producer-only store's
- * own docblock warns about, and precisely why an append that could never
- * succeed on this tier passed CI for as long as it did. A memory store accepts
- * the append, holds the event in one process's heap and loses it; this one
- * refuses by name, so a ledger that appends here fails the test rather than
- * the deployment.
- *
- * The runtime is REAL: `composeApiIdentityPipelines` registers the packaged
- * `join-requests` definition on it, process manager and all, and the senders
- * the ledger stages through are the ones that registration produced. What is
- * faked is Redis.
- *
- * The queue factory is what makes this a producer rather than an inline
- * executor. Without one, `send` runs the command handler in-process, and a
- * producer's guards refuse by name because reading a `JoinRequest` head is the
- * consumer's work.
+ * This process's own producer-only Eventing, in the shape production composes it: the
+ * REAL {@link EventStoreProducerOnly}, over a queue that records rather than runs. The
+ * store is the production one deliberately.
  */
 function producerEventing() {
   const eventStore = EventStoreProducerOnly.create({ processName: "langwatch-api" });
@@ -720,16 +643,11 @@ describe("given an API process that registered the identity pipelines producer-o
         result: { data: { json: { state: "PENDING" } } },
       });
 
-      // The ONE leg this tier has: the staged command, on the sender the
-      // producer registration produced. The queued run re-executes the guard
-      // and appends what it decides (ADR-110), so a staged command IS the
-      // durable write from here — and the ledger waits for it before
-      // answering, so a request that came back PENDING without one would be a
-      // request nothing could ever fold.
-      //
-      // It is also the leg that answered `null` before the registration
-      // existed, which the ledger turns into "the pipeline exposes no
-      // \"requestJoin\" sender" — a write that arrived and could not leave.
+      // The ONE leg this tier has: the staged command, on the sender the producer
+      // registration produced. The queued run re-executes the guard and appends what it
+      // decides (ADR-110), so a staged command IS the durable write from here — and the
+      // ledger waits for it before answering, so a request that came back PENDING without
+      // one would be a request nothing could ever fold.
       const requestId = (body as { result: { data: { json: { joinRequestId: string } } } }).result
         .data.json.joinRequestId;
       expect(queue.staged).toHaveLength(1);

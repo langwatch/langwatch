@@ -1,50 +1,7 @@
 /**
- * The three agent-side pipelines this process PRODUCES commands on.
- *
- *   simulation_processing         a scenario run's eight writes
- *   suite_run_processing          a suite run's start
- *   langy_conversation_processing a conversation's sixteen writes
- *
- * ## Why this file exists
- *
- * A scenario run and a Langy turn are the two places a customer's action turns
- * into durable work, and until this composition landed both refused with
- * `service_unavailable` on the API. The reason was one fact, and it was a
- * framework limitation rather than a deployment one: each of those two
- * definitions declares a PROCESS MANAGER, and the Eventing runtime refused to
- * register any pipeline declaring one unless the process also held a durable
- * `ProcessStore`. A web process holds none — a process manager's inbox, outbox
- * and wakes are the worker's work — so ONE declaration inside a definition made
- * every command on it unsendable from the tier the action actually arrives at.
- *
- * `EventSourcingOptions.processManagerMode: "producer-only"` separates the two
- * jobs. The producer registers the definition WHOLE — every command dispatcher,
- * every routing key — and the runtime declines to RUN the process managers, by
- * name, once at boot. Producing and running were never the same decision.
- *
- * ## One definition, two registrations
- *
- * Each pipeline is built here from its feature's own producer variant
- * (`SimulationProcessingProducerAdapter` and friends), which supplies
- * stand-ins for the consumer-side dependencies so the definition can be
- * CONSTRUCTED, and refuses by name if one is ever CALLED. That is the same
- * shape `createTraceProcessingProducerPipeline` and
- * `createEvaluationProcessingProducerPipeline` already have on this process.
- *
- * Registering the packaged definition rather than a local one is what keeps the
- * routing triple every job carries identical to the one the worker routes on.
- * Two descriptions of one event stream drift into jobs nothing can pick up, and
- * the queue rejects an unroutable job for redelivery rather than dropping it —
- * so a fork here is a queue that grows forever while the pods stay up.
- *
- * ## What is still absent
- *
- * The run EXECUTOR is not a command and is not composed here: submitting a
- * scenario run to a pool and resolving its target reach ten other verticals,
- * and `features/scenario/scenario.composition.ts` still refuses those by
- * name. Same for the Langy AGENT MANAGER: starting a turn dispatches to it over
- * HTTP, and a process with no `LANGY_*` configuration has none. Those are
- * deployment absences, which is exactly what this file's absence is NOT.
+ * The three agent-side pipelines this process PRODUCES commands on. simulation_processing
+ * a scenario run's eight writes suite_run_processing          a suite run's start
+ * langy_conversation_processing a conversation's sixteen writes A scenario run and a
  */
 import type { EventSourcing } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
@@ -76,10 +33,6 @@ import {
 
 /**
  * A write this deployment cannot enqueue, refused by name.
- *
- * The same `service_unavailable` the scenario feature answers with — the code
- * is what the client presentation registry is keyed by — declared here so this
- * module composes without reaching back into the half that consumes it.
  */
 class ApiAgentPipelineUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";
@@ -140,11 +93,6 @@ export type ApiAgentPipelines = Readonly<{
 
 /**
  * Registers the three definitions producer-only and publishes their senders.
- *
- * With no Eventing every surface refuses BY NAME rather than resolving: a
- * swallowed `queueRun` is a run that never starts while the page says it did,
- * and a swallowed `recordMessage` is a message a customer watched themselves
- * send and will never see again.
  */
 export function composeApiAgentPipelines(options: ApiAgentPipelinesOptions): ApiAgentPipelines {
   const { eventing, processName } = options;
@@ -197,13 +145,7 @@ const isSender = (value: unknown): value is CommandSender =>
 type Dispatch = (data: unknown) => Promise<void>;
 
 /**
- * Reads one registration's senders, FAILING AT BOOT for a command it did not
- * produce.
- *
- * Naming the missing command at boot rather than at the first dispatch is the
- * whole reason this is a function: an incompletely registered pipeline is a
- * composition error, and finding it when a customer presses the button means
- * finding it in their session.
+ * Reads one registration's senders, FAILING AT BOOT for a command it did not produce.
  */
 function commandLookup(input: {
   pipeline: string;
@@ -272,11 +214,6 @@ class EventingApiSimulationExecution extends SimulationExecutionPort {
 
 /**
  * The eight names, listed once.
- *
- * `computeRunMetrics` is deliberately not here: it is dispatched by the
- * pipeline's OWN subscriber when a run finishes, never by a customer's action,
- * so a producer that published it would be offering a write nothing on this
- * tier has a reason to make.
  */
 const SIMULATION_COMMAND_NAMES = [
   "queueRun",
@@ -359,11 +296,6 @@ class UnqueuedApiSuiteRunCommands extends SuiteRunCommandsPort {
 
 /**
  * All sixteen conversation commands, built from ONE list.
- *
- * A list rather than sixteen literals so a command added to the pipeline cannot
- * silently acquire a different wiring from its fifteen siblings — and so a
- * command REMOVED from the pipeline fails this process's boot rather than one
- * customer's message.
  */
 const LANGY_COMMAND_NAMES = [
   "createConversation",

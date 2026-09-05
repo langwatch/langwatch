@@ -1,16 +1,7 @@
 /**
- * The setup checklist the onboarding screens render, composed as its own
- * feature.
- *
- * `integrationsChecks.getCheckStatus` — nine other verticals' evidence plus the
- * project's own two columns, rolled up per project. It used to be composed
- * inside the product half beside a reviewer's annotations, the support inbox
- * and the privacy rules.
- *
- * A rollup rather than a feature service, and deliberately so: no one feature
- * package holds it. Every step is a `take: 1` existence probe rather than a
- * count, because the checklist only asks whether the customer has done a thing
- * once. Two steps are somebody else's read and arrive as ports below.
+ * The setup checklist the onboarding screens render, composed as its own feature.
+ * `integrationsChecks.getCheckStatus` — nine other verticals' evidence plus the project's
+ * own two columns, rolled up per project.
  */
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -22,34 +13,18 @@ import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructu
 import { createIntegrationsChecksTrpcRouter } from "./project-trpc.mount";
 
 /**
- * Whether this project has run any simulation, for the checklist's own step.
- *
- * The evidence is a scenario-set read in ClickHouse and the scenario vertical
- * is not composed here, so the step arrives as a port. Absent reports the step
- * as not started — which is what the application answered too whenever the
- * read failed, and the safe direction: a checklist that wrongly says "done"
- * stops somebody finishing their setup.
+ * Whether this project has run any simulation, for the checklist's own step. The evidence
+ * is a scenario-set read in ClickHouse and the scenario vertical is not composed here, so
+ * the step arrives as a port.
  */
 export abstract class ApiSimulationEvidencePort {
   abstract hasAnySimulation(input: { projectId: string }): Promise<boolean>;
 }
 
 /**
- * Whether this project has a model provider attached and switched on, for the
- * checklist's own step.
- *
- * A port rather than a `prisma.modelProvider` read written here, and the reason
- * is the column next to the one this needs. Every credential in the deployment
- * lives on the row this question is asked of, encrypted, and
- * `specs/model-providers/encrypt-custom-keys.feature` says the only reader of
- * that table is the model-provider feature's own repository — which decrypts
- * through the deployment's cipher and hands nobody the ciphertext. The lint
- * that enforces it governs IMPORTS rather than call sites, so a composition
- * holding the client could reach the table with no such rule attached, and
- * this one did.
- *
- * `ModelProviderEvidenceService` answers it, composed from the same client and
- * the same project directory the process already holds.
+ * Whether this project has a model provider attached and switched on, for the checklist's
+ * own step. A port rather than a `prisma.modelProvider` read written here, and the reason
+ * is the column next to the one this needs.
  */
 export abstract class ApiModelProviderEvidencePort {
   abstract hasEnabledProvider(input: { projectId: string }): Promise<boolean>;
@@ -105,10 +80,6 @@ export function composeIntegrationsChecksFeature(options: {
 
 /**
  * The setup checklist on a process that composed no database.
- *
- * The namespace still mounts and the read refuses by name, so the onboarding
- * screen says the deployment cannot answer rather than rendering a checklist
- * with every step at zero — which reads as "you have done none of this".
  */
 export function refusingIntegrationsChecksFeature(): ComposedIntegrationsChecksFeature {
   const ports: IntegrationsChecksTrpcPorts<ApiOnboardingCheckStatus> = {

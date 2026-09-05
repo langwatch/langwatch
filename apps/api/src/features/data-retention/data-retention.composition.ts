@@ -1,20 +1,7 @@
 /**
- * How long a project's scopes keep what they captured, composed as its own
- * feature.
- *
- * `dataRetention.*` — the window a scope is swept on, what its plan may set
- * that to, and how many bytes the current scope holds. It used to be composed
- * inside the product-infrastructure half beside the object store and the
- * monitors; the three shared a ClickHouse resolver and nothing else.
- *
- * ## The policy is composed, not re-implemented
- *
- * `@langwatch/data-retention-server` owns the rules — which permission each
- * tier demands, which values a plan may persist, the enterprise floor and the
- * paid presets. What this composition supplies is the four things those rules
- * run over and the feature may not reach: the organization directory, the
- * permission answers from the SAME AuthZ service every declared check asks,
- * the plan reading, and the platform-administrator allow-list.
+ * How long a project's scopes keep what they captured, composed as its own feature.
+ * `dataRetention.*` — the window a scope is swept on, what its plan may set that to, and
+ * how many bytes the current scope holds.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
@@ -72,11 +59,9 @@ export class LoggedApiDataRetentionAbsence extends ApiDataRetentionAbsenceReport
 }
 
 /**
- * The operator allow-list the retention gates read, named as the one peer this
- * feature has.
- *
- * The SAME slice `ctx.app.ops` carries, so "who may switch retention off" and
- * "who sees the operator sidebar" can never be two answers.
+ * The operator allow-list the retention gates read, named as the one peer this feature
+ * has. The SAME slice `ctx.app.ops` carries, so "who may switch retention off" and "who
+ * sees the operator sidebar" can never be two answers.
  */
 export type DataRetentionPeers = Readonly<{
   ops: ApiTrpcFeatureApplication["ops"];
@@ -102,10 +87,9 @@ export type DataRetentionFeatureCollaborators = Readonly<{
 export type ComposedDataRetentionFeature = Readonly<{
   router(mount: ApiTrpcFeatureMount): ReturnType<typeof createDataRetentionTrpcRouter>;
   /**
-   * For `ctx.app.dataRetention`, and for every other surface a retention window
-   * bounds: the trace read stack's own floor, a share link's expiry and the
-   * storage meter all read THIS service. A second adapter would be a second
-   * answer to how long a project keeps what it captured.
+   * For `ctx.app.dataRetention`, and for every other surface a retention window bounds:
+   * the trace read stack's own floor, a share link's expiry and the storage meter all
+   * read THIS service.
    */
   service: DataRetentionService;
 }>;
@@ -123,23 +107,23 @@ export function composeDataRetentionFeature(options: {
     typeof PrismaDataRetentionAdapter.create
   >[0]["resolveClickHouseClient"];
   /**
-   * A finished retention service, where the host supplies one.
-   *
-   * It WINS over the adapter below, which is how a test names the service it
-   * wants without standing up a database — the same seam the trace read stack
-   * offers.
+   * A finished retention service, where the host supplies one. It WINS over the adapter
+   * below, which is how a test names the service it wants without standing up a database
+   * — the same seam the trace read stack offers.
    */
   dataRetention?: DataRetentionService;
   report?: ApiDataRetentionAbsenceReport;
 }): ComposedDataRetentionFeature {
-  const service = options.dataRetention ?? PrismaDataRetentionAdapter.create({
-    database: options.infrastructure.prisma,
-    projects: options.peers.projects,
-    organizations: options.peers.organizations,
-    defaultRetentionDays: options.defaultRetentionDays,
-    redis: options.redis,
-    resolveClickHouseClient: options.resolveClickHouseClient,
-  });
+  const service =
+    options.dataRetention ??
+    PrismaDataRetentionAdapter.create({
+      database: options.infrastructure.prisma,
+      projects: options.peers.projects,
+      organizations: options.peers.organizations,
+      defaultRetentionDays: options.defaultRetentionDays,
+      redis: options.redis,
+      resolveClickHouseClient: options.resolveClickHouseClient,
+    });
   const collaborators: DataRetentionFeatureCollaborators = {
     prisma: options.infrastructure.prisma,
     authz: options.infrastructure.authz,
@@ -154,21 +138,17 @@ export function composeDataRetentionFeature(options: {
 }
 
 /**
- * The retention surface on a process that composed no retention service.
- *
- * The namespace still mounts and every read and write refuses by name, so the
- * settings page says the deployment cannot answer rather than rendering a
- * window nobody sweeps on.
+ * The retention surface on a process that composed no retention service. The namespace
+ * still mounts and every read and write refuses by name, so the settings page says the
+ * deployment cannot answer rather than rendering a window nobody sweeps on.
  */
 export function refusingDataRetentionFeature(): ComposedDataRetentionFeature {
   const ports = new Proxy(
     {},
     {
-      get:
-        () =>
-        (): never => {
-          throw new ApiDataRetentionUnavailableError("The retention policy");
-        },
+      get: () => (): never => {
+        throw new ApiDataRetentionUnavailableError("The retention policy");
+      },
       has: () => true,
     },
   ) as DataRetentionTrpcPolicy<RetentionPolicySnapshot, StorageScopeUsage>;
@@ -178,11 +158,9 @@ export function refusingDataRetentionFeature(): ComposedDataRetentionFeature {
     service: new Proxy(
       {},
       {
-        get:
-          () =>
-          (): never => {
-            throw new ApiDataRetentionUnavailableError("The retention window");
-          },
+        get: () => (): never => {
+          throw new ApiDataRetentionUnavailableError("The retention window");
+        },
         has: () => true,
       },
     ) as DataRetentionService,
@@ -207,11 +185,9 @@ class ApiDataRetentionUnavailableError extends HandledError {
 // ---------------------------------------------------------------------------
 
 /**
- * The retention policy this process supplies to the packaged transport.
- *
- * Each method takes the request context because the caller is resolved per
- * request; everything else is composed once. The refusals are the feature's —
- * this only translates a context into the actor the services take.
+ * The retention policy this process supplies to the packaged transport. Each method takes
+ * the request context because the caller is resolved per request; everything else is
+ * composed once.
  */
 function composeRetentionPolicy(
   options: DataRetentionFeatureCollaborators,
@@ -265,13 +241,8 @@ function actorOf(ctx: unknown): RetentionActor {
 }
 
 /**
- * The retention tiers' permission answers, over the SAME AuthZ service the
- * declared check on the same procedure asks.
- *
- * The batched reads go through `canBatchByIds`, which is the one call the
- * application's own `batchScopePermissions` made: an organization's project
- * list is every project it holds, and one probe per row would be one round
- * trip per row.
+ * The retention tiers' permission answers, over the SAME AuthZ service the declared check
+ * on the same procedure asks.
  */
 class ApiDataRetentionPermissions extends DataRetentionPermissionsPort {
   static create(authz: AuthzService): ApiDataRetentionPermissions {
@@ -360,14 +331,7 @@ class ApiDataRetentionPermissions extends DataRetentionPermissionsPort {
 }
 
 /**
- * The plan behind a retention gate, reduced to the two facts retention tiers
- * on.
- *
- * `uncapped` is where this deployment's billing and licensing plumbing stops:
- * an enterprise tier, or a self-hosted install, may take any whole-week value
- * above the feature's own floor. Everything else — which values that means —
- * is the retention feature's and stays there. An unrecognised tier resolves to
- * `false`, which fails CLOSED to the restrictive menu.
+ * The plan behind a retention gate, reduced to the two facts retention tiers on.
  */
 class ApiDataRetentionPlans extends DataRetentionPlanPort {
   static create(plans: Pick<PlanProvider, "getActivePlan"> | undefined): ApiDataRetentionPlans {

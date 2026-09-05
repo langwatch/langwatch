@@ -29,14 +29,9 @@ export type BetterAuthSessionLookup = Readonly<{
 }>;
 
 /**
- * The Better Auth instance this process composed, and the origin it verifies
- * against.
- *
- * Published so the `/api/auth` REST family can be mounted over the SAME
- * instance the session transport already reads. Absent where a host supplied
- * its own transport: this process then holds no instance and knows none of the
- * options — including the base URL its origin gate would have to check — and a
- * second one built here would verify nothing.
+ * The Better Auth instance this process composed, and the origin it verifies against.
+ * Published so the `/api/auth` REST family can be mounted over the SAME instance the
+ * session transport already reads.
  */
 export type ApiComposedBetterAuth = Readonly<{
   transport: BetterAuthSessionLookup;
@@ -51,16 +46,6 @@ export abstract class ApiBrowserSessionTransportPort {
 
 /**
  * The cookie names a Better Auth session token can arrive under.
- *
- * The name is `<prefix>.session_token`, where the prefix is the deployment's
- * `advanced.cookiePrefix` (`better-auth` unless it says otherwise) and where a
- * secure deployment adds `__Secure-` or `__Host-` in front of the whole thing.
- * Matching the suffix rather than any single literal is what keeps this
- * question answerable without this process knowing the other tier's cookie
- * configuration — which is exactly the configuration it does not hold.
- *
- * `session_data` is deliberately not matched: it is the cached payload, not the
- * credential, and a request can carry it without carrying a token.
  */
 const SESSION_TOKEN_COOKIE = /(?:^|;\s*)([^=;\s]*session_token)=/g;
 
@@ -72,23 +57,8 @@ function presentedSessionCookies(request: Request): string[] {
 }
 
 /**
- * Adapts Better Auth's verified browser session lookup to the API process.
- *
- * Two failures are told apart here, and keeping them apart is the point. A
- * request carrying no session cookie resolves to null because the caller is
- * anonymous, which is the ordinary case and says nothing. A request that DID
- * present a session token and still resolved to nothing is a refusal — the
- * token is expired or revoked, or this transport and the tier that minted it
- * disagree about the signing secret, the cookie prefix or the provider
- * configuration behind them.
- *
- * The second case is logged. A Better Auth misconfiguration has already taken
- * sign-in down in production once, and what made it expensive was that the
- * refusal was indistinguishable from an anonymous request: every caller was
- * simply treated as signed out, with nothing in any log to say a credential had
- * been presented and rejected. Cookie NAMES are recorded and values never are —
- * the name is what tells an operator which cookie configuration the browser is
- * actually using.
+ * Adapts Better Auth's verified browser session lookup to the API process. Two failures
+ * are told apart here, and keeping them apart is the point.
  */
 export class BetterAuthBrowserSessionTransportAdapter extends ApiBrowserSessionTransportPort {
   static create(transport: BetterAuthSessionLookup): BetterAuthBrowserSessionTransportAdapter {
@@ -124,24 +94,13 @@ export type ApiAuthSessionDependencies = Readonly<{
   auth: AuthService;
   sessions: ApiBrowserSessionTransportPort;
   /**
-   * The user directory the Auth service already resolves a signed-in person
-   * through.
-   *
-   * Published rather than kept private because the identity half of the tRPC
-   * record needs the SAME instance: `user.*` reads a person's account off it,
-   * and the sign-up ceremony creates one through it. A second
-   * `PostgresUserAdapter` would be a second answer to "who is this person",
-   * and the two would disagree the moment one of them caches.
+   * The user directory the Auth service already resolves a signed-in person through.
    */
   users: UserService;
 }>;
 
 /**
  * Required process composition for browser-session authentication.
- *
- * A host implements it when it already owns the graph; otherwise the process
- * composes {@link ApiAuthComposition} for itself over its own guarded client
- * and takes only the Better Auth transport from the deployment.
  */
 export abstract class ApiAuthSessionCompositionPort {
   abstract compose(): ApiAuthSessionDependencies;
@@ -162,19 +121,12 @@ export type ApiAuthCompositionOptions = {
   organizations: OrganizationService;
   /**
    * A host's own Better Auth request boundary, where it has one.
-   *
-   * An injected transport WINS, and that ordering is the point: a deployment
-   * that already runs an instance has one cookie namespace, and a second
-   * instance composed here would verify nothing and answer `null` — which
-   * reads to every caller as "signed out". Absent, this process composes the
-   * deployment's instance itself from {@link browserSession}.
    */
   browserSessions?: ApiBrowserSessionTransportPort | undefined;
   /**
-   * The deployment's browser-session identity, read from its environment.
-   *
-   * Without it — and without an injected transport — there is no way to
-   * verify a browser caller, and the Auth graph is not composed.
+   * The deployment's browser-session identity, read from its environment. Without it —
+   * and without an injected transport — there is no way to verify a browser caller, and
+   * the Auth graph is not composed.
    */
   browserSession?: ApiBrowserSessionConfig | undefined;
   /** `"email"`, or the federated provider id this deployment mounted. */
@@ -188,24 +140,12 @@ export type ApiAuthCompositionOptions = {
   /** Sign-up's address confirmation, for the passkey ceremony. */
   signUpVerification?: SignUpVerificationPort | undefined;
   /**
-   * The process's Redis, where it has one.
-   *
-   * Better Auth caches live sessions there under its own key prefix, so
-   * revoking a session has to clear that cache as well as the row. A process
-   * with no Redis revokes the rows only, which is correct for a deployment that
-   * keeps its sessions in Postgres alone and wrong for one that does not — so
-   * the connection is passed rather than assumed absent.
+   * The process's Redis, where it has one. Better Auth caches live sessions there under
+   * its own key prefix, so revoking a session has to clear that cache as well as the row.
    */
   redis?: RedisConnection | null;
   /**
    * Where an uploaded avatar's bytes are written.
-   *
-   * Supplied rather than composed here because the object store belongs to the
-   * product-infrastructure half, which this process opens AFTER the Auth graph
-   * — the browser-session boundary is what every other door stands on, so it
-   * cannot wait on a store it never reads. A caller that names none gets
-   * {@link ApiUserAvatarStorageAdapter.absent}, which refuses the write by name
-   * rather than accepting bytes it would then drop.
    */
   avatarStorage?: UserAvatarStoragePort | undefined;
   /** Names this process in the refusal an avatar upload produces. */
@@ -213,50 +153,12 @@ export type ApiAuthCompositionOptions = {
 };
 
 /**
- * The API process's own Auth service, composed rather than received — and the
- * one half of it that is still received.
- *
- * `API_UNAVAILABLE_PRODUCT_ADAPTERS` named `IdentityEmailService` and the
- * Better Auth browser-session transport together, because the entry is one
- * option a host fills: `ApiAuthSessionCompositionPort` hands over the Auth
- * service and the transport as a pair. They are not one gap.
- *
- * `IdentityEmailService` was never process-bound. It reads the `Identifier`
- * projection and one migration-state row, and `PostgresIdentityEmailAdapter`
- * is both over the client this process already composes. The user service
- * under it is the packaged `PostgresUserAdapter` over the same client, with
- * its avatar storage declared absent
- * ({@link ApiUserAvatarStorageAdapter}), bound to the object store this
- * process opens later: reading a profile needs none, writing an avatar does,
- * and the Auth graph must not wait on a store it never reads.
- *
- * The transport IS process-bound, and the difference is worth stating exactly.
- * It is not a session table this package could query; it is one configured
- * Better Auth server instance, and everything that decides whether a cookie
- * verifies lives in that instance's options: the signing secret, the base URL
- * and trusted origins, the cookie prefix, the session model mapping, the
- * secondary-storage prefix, the mounted social and generic-OIDC providers with
- * the provider ids a stored account row is keyed by, the identity storage
- * adapter, and the request hooks. A second instance composed here from a
- * different option set would not fail — it would verify nothing and answer
- * `null`, which reads to every caller as "signed out". That is the failure
- * mode a Better Auth provider-id mismatch has already produced in production,
- * and it stayed expensive precisely because nothing recorded the refusal.
- *
- * So the transport is supplied, and its absence is a composition decision this
- * process announces rather than papers over: without it there is no way to
- * authenticate a browser caller, so no request policy is built and the doors
- * that authenticate through one are not mounted.
+ * The API process's own Auth service, composed rather than received — and the one half of
+ * it that is still received.
  */
 export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
   /**
-   * Composes the Auth graph only when this process holds everything it reads
-   * through.
-   *
-   * Absent beats mounted at every one of these gaps, for the reason the secret
-   * and agents doors already follow: a door that answers every call with a 500
-   * — or, worse here, one that answers every call with "signed out" — is worse
-   * than a door that is not there.
+   * Composes the Auth graph only when this process holds everything it reads through.
    */
   static tryCompose(
     options: Omit<ApiAuthCompositionOptions, "database" | "organizations"> & {
@@ -326,14 +228,7 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
   }
 
   /**
-   * Composes the deployment's Better Auth instance over this process's own
-   * graph.
-   *
-   * Reached only when no host supplied a transport AND the deployment named a
-   * browser-session identity, which `tryCompose` has already established; a
-   * caller reaching `compose` directly with neither is asking for a graph that
-   * cannot authenticate anybody, and the refusal says so rather than composing
-   * an instance over a guessed secret.
+   * Composes the deployment's Better Auth instance over this process's own graph.
    */
   private static composeBetterAuth({
     options,
@@ -389,11 +284,8 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
 /** Converts one verified browser session into the request actor vocabulary. */
 export class AuthSessionApiAuthenticationAdapter extends ApiAuthenticationPort {
   /**
-   * Narrower than {@link ApiAuthSessionDependencies} on purpose: turning a
-   * verified session into an actor needs the Auth service and the transport
-   * and nothing else. The user directory travels on the same object because
-   * the identity half needs it, and a caller that only authenticates should
-   * not have to hold one to do it.
+   * Narrower than {@link ApiAuthSessionDependencies} on purpose: turning a verified
+   * session into an actor needs the Auth service and the transport and nothing else.
    */
   static create(
     options: Pick<ApiAuthSessionDependencies, "auth" | "sessions">,

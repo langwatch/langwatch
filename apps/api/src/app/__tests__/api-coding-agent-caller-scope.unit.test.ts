@@ -1,18 +1,5 @@
 /**
  * What the v1 pull-request rollup lets one CREDENTIAL see.
- *
- * The scope is resolved by this process's two collaborators over the real
- * authorization engine: the directory enumerates the organization's projects,
- * and the permission cut decides both `traces:view` and `cost:view` for every
- * one of them off a single collected grant snapshot. Only the read repository
- * is stubbed, so the ceiling below - a key's bindings capped by its holder's -
- * is the engine's own decision rather than this test's arithmetic.
- *
- * Two cuts, not one. `traces:view` decides whether a project's work appears at
- * all; `cost:view` decides whether it carries money. A project the caller may
- * read but not price still contributes its tokens with a null cost, because
- * the work happened and hiding it would understate the answer.
- *
  * Spec: specs/coding-agent/pull-request-linkage.feature
  */
 import { AuthzService, type AuthzServiceOptions } from "@langwatch/authz-server";

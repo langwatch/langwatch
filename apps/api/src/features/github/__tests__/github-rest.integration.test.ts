@@ -1,14 +1,7 @@
 /**
- * Characterisation of the GitHub App installation family through the real Hono
- * app the API process mounts, over fakes at every port.
- *
- * The guard chain is what is pinned, because every link of it is a
- * cross-tenant control. `/install` refuses a non-member BEFORE it probes the
- * permission, so a stranger's answer never depends on anything about the
- * organization; `/setup` re-binds the session to the user the signed state
- * names, so a link opened in somebody else's browser records nothing; and
- * `/webhook` verifies the HMAC over the RAW bytes before any parse, and
- * answers 404 rather than 401 where the install configured no secret.
+ * Characterisation of the GitHub App installation family through the real Hono app the
+ * API process mounts, over fakes at every port. The guard chain is what is pinned,
+ * because every link of it is a cross-tenant control.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { GithubInstallationNotFromFlowError } from "@langwatch/github-contract";

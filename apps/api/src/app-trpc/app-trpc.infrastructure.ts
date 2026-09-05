@@ -1,14 +1,7 @@
 /**
- * The shared infrastructure a feature composes itself from.
- *
- * One typed options object, handed to every `compose<Feature>()` the router
- * literal names, rather than a group half folding ten features' collaborators
- * into one record first. A feature takes the members it needs and ignores the
- * rest; nothing here is a feature's own service, and nothing here is optional
- * for one feature and required for another.
- *
- * It grows as features move onto it and shrinks as the ports record they used
- * to be reached through empties.
+ * The shared infrastructure a feature composes itself from. One typed options object,
+ * handed to every `compose<Feature>()` the router literal names, rather than a group half
+ * folding ten features' collaborators into one record first.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";

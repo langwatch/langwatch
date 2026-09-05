@@ -1,25 +1,6 @@
 /**
- * `POST /api/export/traces/download`, composed from this process's own graph.
- *
- * The bulk trace download, beside the bulk run download one file over. Both are
- * SESSION doors and both stream: a person asks for their project's captured
- * traces as CSV or JSONL, the bytes go straight to the response, and the
- * progress is broadcast to the tenant so a tRPC subscription on any pod can
- * relay it back to the browser that asked.
- *
- * Three things decide whether it is mounted at all: the browser-session
- * transport (an export is attributable to a person by design), the trace read
- * stack (which is what the export reads THROUGH, redactions and all) and the
- * broadcast fabric (the progress has nowhere to go without it). Missing any of
- * them leaves the family off rather than mounting a door that refuses every
- * caller.
- *
- * The request schema is joined HERE. The trace package publishes everything a
- * download request states except which filters narrow it, because the filter
- * vocabulary is Analytics's and a trace package may not reach into another
- * feature's server package for it. The process holds both, so the process is
- * where the two halves meet — the same seam the read stack's own filter
- * translator crosses.
+ * `POST /api/export/traces/download`, composed from this process's own graph. The bulk
+ * trace download, beside the bulk run download one file over.
  */
 import type { AppRestBroadcast, AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";

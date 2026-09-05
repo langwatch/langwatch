@@ -1,16 +1,5 @@
 /**
  * The model-provider capabilities that reach OUTSIDE this process.
- *
- * Four things sit here rather than in the gateway composition beside them,
- * because none of them is a row read: the vendor credential probes and the
- * Codex device flow open connections to somebody else's server, the cost-rule
- * span preview reads the trace store, and the translation wrapper is a failure
- * policy rather than a capability. The gateway is composed once and handed in;
- * what this adds is the outbound half of the provider surface.
- *
- * The regex safety gate is the one member that cannot degrade at call time —
- * the cost-rule write and preview SCHEMAS are built from it — so it is the
- * package's real `isSafeRegex` here rather than anything conservative.
  */
 import {
   AiCallFailureService,
@@ -66,11 +55,9 @@ class ApiComposedModelProviderHost extends ApiModelProviderHostPort {
   }
 
   /**
-   * The fence, built once per call rather than held.
-   *
-   * It carries no connection: it is the address policy applied to `fetch`, and
-   * the probe adapter reads the policy through it. Holding one would suggest a
-   * pool that does not exist.
+   * The fence, built once per call rather than held. It carries no connection: it is the
+   * address policy applied to `fetch`, and the probe adapter reads the policy through it.
+   * Holding one would suggest a pool that does not exist.
    */
   private egress() {
     return SsrfModelProviderEgressAdapter.create({ policy: this.options.egress });
@@ -110,12 +97,11 @@ class ApiComposedModelProviderHost extends ApiModelProviderHostPort {
       isSafeRegex: (pattern) => regexSafety.isSafeRegex(pattern),
       getModelLimits: (model) => modelLimits.getModelLimits(model),
       previewMatchingSpans: ({ spans, input }) => {
-        // The reader is the trace read stack's, carried through the
-        // application as an opaque handle: only a process that composed one
-        // knows its concrete type, and a process that composed none must say
-        // so rather than answering "no matching spans" — a preview that
-        // invented an empty result would talk somebody out of a rule that
-        // works.
+        // The reader is the trace read stack's, carried through the application as an
+        // opaque handle: only a process that composed one knows its concrete type, and a
+        // process that composed none must say so rather than answering "no matching
+        // spans" — a preview that invented an empty result would talk somebody out of a
+        // rule that works.
         if (!isPreviewSpanReader(spans)) {
           return Promise.reject(new ApiCostPreviewUnavailableError(processName));
         }

@@ -1,23 +1,7 @@
 /**
- * A project's scoped privacy rules, composed as its own feature.
- *
- * `dataPrivacy.*` — the snapshot the settings screen renders, and the two
- * writes that set and clear a rule at a scope. It used to be composed inside
- * the product half beside a reviewer's annotations and the support inbox; the
- * three shared this process's connection and nothing else.
- *
- * ## What the package owns, and what arrives here
- *
- * `@langwatch/data-privacy-server` owns the wire: the tiers, the durable
- * configuration parser and the two failures a caller can act on. What this
- * composition supplies is what those rules run over and the feature may not
- * reach — the organization, department, team and group directory the snapshot
- * is assembled from, and the permission answers from the SAME AuthZ service
- * every declared check on the same procedure asks.
- *
- * Both writes ANCHOR first and authorize second, and the order matters: a
- * request pairing a project with a scope in an unrelated tenant is refused
- * before any permission on the target is even asked about.
+ * A project's scoped privacy rules, composed as its own feature. `dataPrivacy.*` — the
+ * snapshot the settings screen renders, and the two writes that set and clear a rule at a
+ * scope.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import type {
@@ -41,10 +25,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
 import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
-import {
-  createDataPrivacyTrpcRouter,
-  type DataPrivacyTrpcChecks,
-} from "./data-privacy-trpc.mount";
+import { createDataPrivacyTrpcRouter, type DataPrivacyTrpcChecks } from "./data-privacy-trpc.mount";
 
 /** The two directories the privacy cascade is resolved through. */
 export type DataPrivacyPeers = Readonly<{
@@ -127,18 +108,12 @@ export function composeDataPrivacyFeature(options: {
   };
 
   return {
-    router: (mount) =>
-      createDataPrivacyTrpcRouter({ ...mount, ports, checks: scopeChecks(mount) }),
+    router: (mount) => createDataPrivacyTrpcRouter({ ...mount, ports, checks: scopeChecks(mount) }),
   };
 }
 
 /**
- * The privacy surface on a process that composed no database or no project
- * directory.
- *
- * The namespace still mounts and every read and write refuses by name, so the
- * settings screen says the deployment cannot answer rather than rendering a
- * cascade with no rules in it — which reads as "nothing is redacted here".
+ * The privacy surface on a process that composed no database or no project directory.
  */
 export function refusingDataPrivacyFeature(): ComposedDataPrivacyFeature {
   const refuse = (): never => {
@@ -147,20 +122,13 @@ export function refusingDataPrivacyFeature(): ComposedDataPrivacyFeature {
   const ports = new Proxy({}, { get: () => refuse, has: () => true }) as ApiDataPrivacyPorts;
 
   return {
-    router: (mount) =>
-      createDataPrivacyTrpcRouter({ ...mount, ports, checks: scopeChecks(mount) }),
+    router: (mount) => createDataPrivacyTrpcRouter({ ...mount, ports, checks: scopeChecks(mount) }),
   };
 }
 
 /**
- * What each rule write claims about the project id it accepts, written where
- * the enforcement is.
- *
- * Neither is a permission the runtime can resolve from the input: the id that
- * decides the answer is the TARGET scope's, and which tier that is only
- * becomes known once the scope has been anchored to this project's
- * organization. So the check is declared as resolver-authorized and the
- * sentence names what the port above actually runs.
+ * What each rule write claims about the project id it accepts, written where the
+ * enforcement is.
  */
 function scopeChecks(mount: ApiTrpcFeatureMount): DataPrivacyTrpcChecks {
   return {
@@ -188,15 +156,8 @@ function scopeChecks(mount: ApiTrpcFeatureMount): DataPrivacyTrpcChecks {
 }
 
 /**
- * Anchors a rule write to the acting project's organization and authorizes it
- * at the TARGET scope's own tier, then answers which organization the write
- * lands in.
- *
- * The order is the one the application ran and it matters: anchoring first
- * means a request pairing a project with a scope in an unrelated tenant is
- * refused before any permission on the target is even asked about. What comes
- * back is the ACTING project's organization, which the anchor has just proven
- * equal to the scope's own.
+ * Anchors a rule write to the acting project's organization and authorizes it at the
+ * TARGET scope's own tier, then answers which organization the write lands in.
  */
 async function authorizeScopeWrite(input: {
   scopeAuthorization: DataPrivacyScopeAuthorizationService;
@@ -218,13 +179,8 @@ async function authorizeScopeWrite(input: {
 }
 
 /**
- * The privacy tiers' permission answers, over the SAME AuthZ service the
- * declared check on the same procedure asks.
- *
- * The two batched reads go through `canBatchByIds`, which is the one call the
- * application's own `batchScopePermissions` made: an organization's project
- * list is every project it holds, and one probe per row would be one round
- * trip per row.
+ * The privacy tiers' permission answers, over the SAME AuthZ service the declared check
+ * on the same procedure asks.
  */
 class ApiDataPrivacyPermissions extends DataPrivacyPermissionsPort {
   static create(dependencies: { authz: AuthzService }): ApiDataPrivacyPermissions {

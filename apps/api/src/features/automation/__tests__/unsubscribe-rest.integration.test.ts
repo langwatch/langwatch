@@ -1,13 +1,5 @@
 /**
  * Characterisation of `POST /api/unsubscribe` through the real Hono app.
- *
- * The wire here is read by MAIL CLIENTS, not by our own code, so each shape is
- * load-bearing: 200 on a spent token (the client shows success), 400 on one
- * that is missing or tampered with, 405 with `Allow: POST` on any other
- * method — the registration order that produces it is the reason the guard is
- * a second route rather than a branch — and 500, never 400, when the write
- * itself fails, so a database blip is not reported to the recipient as a dead
- * link.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { createUnsubscribeRestApp, type UnsubscribeRestPorts } from "@langwatch/automation-server";

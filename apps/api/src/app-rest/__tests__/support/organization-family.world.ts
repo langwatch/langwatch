@@ -1,18 +1,8 @@
 /**
- * One organization's profile, membership and invitations, held in memory
- * behind the two service interfaces `/api/organization` is composed over.
- *
- * The family under test is this process's composition — the Enterprise plan
- * gate, the seat-limit rename and the invitation named absence all run for
- * real — so what is stood in for here is only the datastore: the rows, and the
- * guards a repository would raise from them. The refusals are raised with the
- * organization feature's OWN error classes, so a status or a code that changed
- * there shows up as a failure at this wire rather than as prose drifting apart.
+ * One organization's profile, membership and invitations, held in memory behind the two
+ * service interfaces `/api/organization` is composed over.
  */
-import {
-  createAppRestSecurity,
-  type AppRestSecurity,
-} from "@langwatch/api/rest";
+import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type {
   AuthzAccessBreakdownInput,
   AuthzAccessBreakdownOutput,
@@ -100,7 +90,10 @@ export type OrganizationWorldOptions = {
 export type OrganizationWorld = {
   api: MountedRestFamily;
   /** The stored profile, including the fields the API does not own. */
-  organization: () => OrganizationSettings & { ssoDomain: string | null; ssoProvider: string | null };
+  organization: () => OrganizationSettings & {
+    ssoDomain: string | null;
+    ssoProvider: string | null;
+  };
   member: (userId: string) => MemberRow | undefined;
   invites: () => InviteRow[];
 };
@@ -202,9 +195,7 @@ export function organizationWorld(options: OrganizationWorldOptions = {}): Organ
   const activeCount = () =>
     [...members.values()].filter((member) => member.disabledAt === null).length;
   const activeAdmins = () =>
-    [...members.values()].filter(
-      (member) => member.disabledAt === null && member.role === "ADMIN",
-    );
+    [...members.values()].filter((member) => member.disabledAt === null && member.role === "ADMIN");
   const seatsLeft = () =>
     options.seats === undefined ? Number.POSITIVE_INFINITY : options.seats - activeCount();
   const found = (userId: string): MemberRow => {

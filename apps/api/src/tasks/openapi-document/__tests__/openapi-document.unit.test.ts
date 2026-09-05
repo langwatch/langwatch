@@ -1,12 +1,5 @@
 /**
  * The OpenAPI describer and its drift check, driven through the real mount.
- *
- * Nothing here is a fixture of the surface: every assertion runs
- * `generateOpenApiDocument` over the same `createApiProcessRestFeatures`
- * enumeration production composes, so a family that stops being mounted fails
- * here rather than being described by a list this file also owns.
- *
- * See specs/api-reference/openapi-document-drift.feature.
  */
 import { createHash } from "node:crypto";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
@@ -28,13 +21,7 @@ import {
 } from "../openapi-document.generator";
 
 /**
- * One path per REST family the process mounts, spelled the way the document
- * spells it.
- *
- * A representative rather than the whole table: the point of the assertion is
- * that the FAMILY is described, and a family contributes all of its routes or
- * none of them — it is one Hono app either mounted or left off. Forty-two
- * entries is also a list a person can read, where 287 operations is not.
+ * One path per REST family the process mounts, spelled the way the document spells it.
  */
 const A_ROUTE_FROM_EVERY_MOUNTED_FAMILY = [
   "/api/v1/agent-cache/{name}",
@@ -222,12 +209,8 @@ describe("given the frozen document and the served surface", () => {
     });
 
     /**
-     * The same guard, over a frozen path this test OWNS.
-     *
-     * The assertion above proves the checker did not write the real artifact.
-     * This one proves it cannot write whatever it is pointed at either, which
-     * is what a sabotage of `frozenPath` would exploit: a sentinel that is not
-     * a document at all comes back identical, byte for byte.
+     * The same guard, over a frozen path this test OWNS. The assertion above proves the
+     * checker did not write the real artifact.
      */
     it("does not write the frozen path it was given, whatever is there", async () => {
       const sentinelPath = join(scratchDir, "sentinel-frozen.json");

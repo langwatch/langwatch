@@ -1,18 +1,7 @@
 /**
- * The API process's packaged tRPC record, composed.
- *
- * `createAppTrpcFeatures` builds all twenty-two namespaces from one mount, the
- * shared infrastructure and the features this process composed. This
- * composition is what supplies them, and the mount arrives from the
- * application, because only the application holds the root those routers must
- * be built on.
- *
- * The record is ALL OR NOTHING and that is deliberate. A deployment cannot
- * serve `frontDoor` and not `publicEnv`, or `analytics` and not the workbench
- * inside it — the client calls one surface. So a process missing what the
- * record needs composes none of it and says which half is missing, rather than
- * mounting a partial record whose gaps a person discovers by clicking into
- * them.
+ * The API process's packaged tRPC record, composed. `createAppTrpcFeatures` builds all
+ * twenty-two namespaces from one mount, the shared infrastructure and the features this
+ * process composed.
  */
 import { LiteMemberRestrictedError, type AuthzService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -28,14 +17,9 @@ import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
 import { createAppTrpcFeatures, type AppTrpcFeatureRecord } from "../app-trpc/app-trpc.features";
 
 /**
- * Everything the record is composed from: the shared infrastructure a feature
- * composes ITSELF out of, the features composed before the mount existed, and
- * the one application every packaged surface reads off `ctx.app`.
- *
- * Two of them are nullable, and each says something different when it is
- * missing. No infrastructure means this process opened no database or no
- * permission service; no collaborators means it composed no application for
- * the record to read.
+ * Everything the record is composed from: the shared infrastructure a feature composes
+ * ITSELF out of, the features composed before the mount existed, and the one application
+ * every packaged surface reads off `ctx.app`.
  */
 export type ApiTrpcFeaturesCompositionOptions = Readonly<{
   infrastructure: ApiTrpcInfrastructure | undefined;
@@ -46,16 +30,8 @@ export type ApiTrpcFeaturesCompositionOptions = Readonly<{
 }>;
 
 /**
- * The caller still holds a membership in this organization, but an admin
- * disabled it to stay within the licensed seat count, so it grants nothing.
- *
- * Raised HERE rather than imported because `TrpcAuthorizationDenialPort` asks
- * the PROCESS for it: the shape of the denial is the policy spine's, but the
- * copy and the code a client renders its own words from are the deployment's.
- * Deliberately not folded into the generic denial — reported as "you do not
- * have permission" it reads as a role problem the person could fix by asking
- * for a role, and reported as "no membership" it tells someone who IS a member
- * that they are not. An admin returning a seat is what actually resolves it.
+ * The caller still holds a membership in this organization, but an admin disabled it to
+ * stay within the licensed seat count, so it grants nothing.
  */
 class MembershipDisabledError extends HandledError {
   declare readonly code: "membership_disabled";
@@ -71,15 +47,8 @@ class MembershipDisabledError extends HandledError {
 
 export class ApiTrpcFeaturesComposition extends ApiTrpcFeaturesPort {
   /**
-   * Composes the record only when this process has BOTH halves of it.
-   *
-   * The INFRASTRUCTURE is not negotiable. Its connection is what forty of the
-   * ports read rows on, and a record mounted over a missing one is twenty-two
-   * namespaces that all answer the same 500; its permission service is what
-   * every authorized surface on this root resolves through, and a host driving
-   * this composition directly — a test, a second deployment shape — must not
-   * be able to mount those surfaces over a service that does not exist. The
-   * collaborator set is not negotiable for the reason its own docblock gives.
+   * Composes the record only when this process has BOTH halves of it. The INFRASTRUCTURE
+   * is not negotiable.
    */
   static tryCompose(
     options: ApiTrpcFeaturesCompositionOptions,
@@ -112,13 +81,9 @@ export class ApiTrpcFeaturesComposition extends ApiTrpcFeaturesPort {
   }
 
   /**
-   * The two refusals the declared check answers with.
-   *
-   * Supplied rather than imported because the port says so: they carry product
-   * copy and a code the client renders its own words from. `membership_disabled`
-   * is raised as a handled error directly — a subclass here would be a second
-   * class for one code, and the code is what the presentation registry is
-   * keyed by.
+   * The two refusals the declared check answers with. Supplied rather than imported
+   * because the port says so: they carry product copy and a code the client renders its
+   * own words from.
    */
   readonly denials = {
     membershipDisabled: () => new MembershipDisabledError(),
@@ -126,10 +91,7 @@ export class ApiTrpcFeaturesComposition extends ApiTrpcFeaturesPort {
   };
 
   /**
-   * No translation. A handled error already states its own status, and this
-   * process raises no untyped application class the chain would have to
-   * recognise — anything else stays itself and degrades to an unknown error
-   * with a trace id, which is ADR-045's intent rather than a gap.
+   * No translation.
    */
   readonly causes = { translate: () => undefined };
 
@@ -175,12 +137,7 @@ export class LoggedApiTrpcFeaturesAbsence extends ApiTrpcCollaboratorsAbsence {
 }
 
 /**
- * The `ctx.app` slices the record reads, each contributed by the feature that
- * composed it.
- *
- * The whole application, and it is a name rather than a shape: every feature
- * on this process composes its own slice or its own named refusal, so the
- * record is assembled from thirty-odd features rather than from a handful of
- * groups that each carried somebody else's.
+ * The `ctx.app` slices the record reads, each contributed by the feature that composed
+ * it.
  */
 export type ApiTrpcFeatureApplicationSlices = ApiTrpcFeatureApplication;

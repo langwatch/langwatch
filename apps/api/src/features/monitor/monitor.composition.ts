@@ -1,29 +1,6 @@
 /**
- * The real-time evaluations running against a project's traffic, composed as
- * their own feature.
- *
- * `monitors.*` — the monitors a project runs, their seven-day trend, and the
- * copy that replicates one, with its evaluator and that evaluator's workflow,
- * into another project — plus the `ctx.app.monitors` slice the packaged monitor
- * REST family reads.
- *
- * It used to be composed inside the product-infrastructure half beside the
- * object store and the retention policy, on the strength of a shared ClickHouse
- * resolver. A deployment with no byte backend has monitors all the same, so it
- * composes itself now, from the three peers below and this process's ClickHouse.
- *
- * ## The named absence
- *
- * The trend is one ClickHouse read over `evaluation_runs` joined to
- * `trace_summaries`, and `@langwatch/evaluation-server` publishes it as
- * `MonitorPerformanceAdapter` — the service alone, without the evaluator
- * executor and workflow capability `EvaluationAdapter` demands and this read
- * never touches.
- *
- * A deployment with NO ClickHouse has no trend to read, and there it refuses by
- * name rather than answering `[]`: an empty trend reads as "your monitors
- * caught nothing", which is the one answer a person acts on by turning a
- * monitor off.
+ * The real-time evaluations running against a project's traffic, composed as their own
+ * feature.
  */
 import { currentVsPreviousDates } from "@langwatch/analytics-server";
 import {
@@ -49,11 +26,6 @@ import { createMonitorTrpcRouter } from "./monitor-trpc.mount";
 
 /**
  * The ONE monitor service on this process.
- *
- * Composed on its own and before the feature, because an experiment upserts
- * its own monitor through the same service `monitors.*` lists from: two
- * services over the same table would let the wizard's list disagree with the
- * monitor it just created.
  */
 export function composeMonitorService(options: {
   infrastructure: ApiTrpcInfrastructure;
@@ -106,10 +78,9 @@ export type MonitorPeers = Readonly<{
    */
   evaluators: EvaluatorService;
   /**
-   * The evaluator replication the product-group half already built over this
-   * process's workflow application. Taken rather than rebuilt, because a
-   * second replication would be a second answer to what copying an evaluator
-   * does to the graph behind it.
+   * The evaluator replication the product-group half already built over this process's
+   * workflow application. Taken rather than rebuilt, because a second replication would
+   * be a second answer to what copying an evaluator does to the graph behind it.
    */
   evaluatorReplication: Pick<
     EvaluatorTrpcPorts,
@@ -153,21 +124,15 @@ export function composeMonitorFeature(options: {
 
 /**
  * The monitor surface on a process that composed no evaluator graph.
- *
- * The namespace still mounts and every call refuses by name, so the page says
- * this deployment runs no monitors rather than showing a project an empty list
- * it would read as "nothing is watching".
  */
 export function refusingMonitorFeature(): ComposedMonitorFeature {
   const refuse = <T>(): T =>
     new Proxy(
       {},
       {
-        get:
-          () =>
-          (): never => {
-            throw new ApiMonitorUnavailableError("The monitor surface");
-          },
+        get: () => (): never => {
+          throw new ApiMonitorUnavailableError("The monitor surface");
+        },
         has: () => true,
       },
     ) as T;
@@ -213,17 +178,9 @@ class ApiMonitorUnavailableError extends HandledError {
 // ---------------------------------------------------------------------------
 
 /**
- * The seven-day trend, over the SAME routed ClickHouse the object probe reads.
- *
- * The trend alone: `MonitorPerformanceAdapter` composes the read and the fold
- * that turns its buckets into a guardrail's pass rate or an evaluator's mean
- * score, and nothing else. `EvaluationAdapter` would compose the same read
- * behind an evaluator executor and a workflow capability this process never
- * asks the trend for.
- *
- * With no connection there is nothing to read, and the answer is a refusal by
- * name rather than an empty trend, which a person would read as "no monitor
- * caught anything" and act on by switching a monitor off.
+ * The seven-day trend, over the SAME routed ClickHouse the object probe reads. The trend
+ * alone: `MonitorPerformanceAdapter` composes the read and the fold that turns its
+ * buckets into a guardrail's pass rate or an evaluator's mean score, and nothing else.
  */
 function composeMonitorPerformance(
   options: MonitorFeatureCollaborators,
@@ -262,13 +219,9 @@ function composeMonitors(options: MonitorFeatureCollaborators): {
     app,
     ports: {
       /**
-       * The precondition SHAPE, not its vocabulary.
-       *
-       * Which rules a given field may carry is the trace-filter registry's
-       * answer, and that registry now lives in a browser package no server
-       * module may value-import. So this parses what the wire has always
-       * required and no more: the cross-check between a precondition's field
-       * and its rule returns with the registry.
+       * The precondition SHAPE, not its vocabulary. Which rules a given field may carry
+       * is the trace-filter registry's answer, and that registry now lives in a browser
+       * package no server module may value-import.
        */
       preconditionsSchema: monitorPreconditionsSchema,
       // The previous window comes from the same helper the analytics page
@@ -303,16 +256,9 @@ function composeMonitors(options: MonitorFeatureCollaborators): {
 
 /**
  * The same request, as the EVALUATOR ports declare their context.
- *
- * The two packages narrow `ctx` to the slice each one reads — the monitor
- * surface names `app.monitors`, the evaluator replication names
- * `app.evaluatorApp` — and this process's real context carries both. Named at
- * the one seam that hands a request from one feature's port signature to
- * another's, so the crossing is written down rather than repeated inline.
  */
 function evaluatorContext(
   ctx: unknown,
 ): Parameters<EvaluatorTrpcPorts["replicateEvaluatorWorkflow"]>[0] {
   return ctx as Parameters<EvaluatorTrpcPorts["replicateEvaluatorWorkflow"]>[0];
 }
-

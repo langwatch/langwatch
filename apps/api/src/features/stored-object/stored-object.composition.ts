@@ -1,26 +1,7 @@
 /**
- * A project's own object store, composed as its own feature.
- *
- * `storedObjects.*` answers one question — whether an externalized blob's ROW
- * and its BYTES are both still there — so a renderer can tell "the file is
- * gone" from "that id never existed". Beside the namespace it publishes the
- * `ctx.app.storedObjectApp` slice the two packaged REST families read, and the
- * content-addressed store itself for the one caller that writes bytes rather
- * than reading them.
- *
- * It used to be composed inside the product-infrastructure half, beside the
- * retention policy and the monitors. The three shared a ClickHouse resolver and
- * nothing else, and sharing a connection is not being one graph, so a
- * deployment with no byte backend used to cost the monitors page too.
- *
- * ## The named absence
- *
- * `owners` — the id-only legacy stored-object URL resolves its project by
- * scanning every ClickHouse instance the deployment operates. This process
- * composes a ROUTED connection, which resolves one tenant's client rather than
- * enumerating them, so the resolver refuses by name. Nothing on this record
- * asks it: `storedObjects.headById` carries its own `projectId`, and the
- * id-only path is the `/api/files` REST family's.
+ * A project's own object store, composed as its own feature. `storedObjects.*` answers
+ * one question — whether an externalized blob's ROW and its BYTES are both still there —
+ * so a renderer can tell "the file is gone" from "that id never existed".
  */
 import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
 import { HandledError } from "@langwatch/handled-error";
@@ -97,14 +78,9 @@ export type ComposedStoredObjectFeature = Readonly<{
   /** For `ctx.app.storedObjectApp`. */
   app: StoredObjectApp;
   /**
-   * The CONTENT-ADDRESSED store itself, published for the one caller that
-   * needs to write bytes rather than read them: the scenario-event door, whose
-   * inline media the trace vertical's extractor externalises.
-   *
-   * The application above deliberately does not expose it — its portable half
-   * refuses by name — so this is the store and not a second one. A scenario
-   * recording and the same recording observed on its trace hash to the same
-   * object precisely because both write through this instance.
+   * The CONTENT-ADDRESSED store itself, published for the one caller that needs to write
+   * bytes rather than read them: the scenario-event door, whose inline media the trace
+   * vertical's extractor externalises.
    */
   bytes: StoredObjectsService;
   /** Released with the process: the pooled outbound handlers the S3 clients share. */
@@ -127,10 +103,6 @@ export function composeStoredObjectFeature(
 
 /**
  * The object store on a process that composed no backend to address bytes in.
- *
- * The namespace still mounts, so a renderer's probe gets a named refusal rather
- * than a 404 for a file that exists, and `ctx.app.storedObjectApp` is never
- * undefined for the REST families that read it.
  */
 export function refusingStoredObjectFeature(): ComposedStoredObjectFeature {
   const refuse = <T>(): T =>
@@ -153,10 +125,9 @@ export function refusingStoredObjectFeature(): ComposedStoredObjectFeature {
 }
 
 /**
- * A capability this deployment did not compose, refused by name.
- *
- * One class rather than one per entry: the customer-facing distinction is WHICH
- * capability is missing, and that is the `capability` the message carries.
+ * A capability this deployment did not compose, refused by name. One class rather than
+ * one per entry: the customer-facing distinction is WHICH capability is missing, and that
+ * is the `capability` the message carries.
  */
 class ApiStoredObjectUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";
@@ -175,12 +146,8 @@ class ApiStoredObjectUnavailableError extends HandledError {
 // ---------------------------------------------------------------------------
 
 /**
- * The content-addressed object store, over this process's routed ClickHouse
- * connection and its own byte backend.
- *
- * The registry is built PER PROJECT because the S3 driver is: a BYOC tenant's
- * bucket lives on the tenant's own endpoint with the tenant's own credentials,
- * and one process-wide client would read another account's address space.
+ * The content-addressed object store, over this process's routed ClickHouse connection
+ * and its own byte backend.
  */
 function composeStoredObjects(
   options: StoredObjectFeatureCollaborators,
@@ -217,12 +184,11 @@ function composeStoredObjects(
           policy: { build: (input) => aws.build(input) },
         }),
         file: LocalFilesystemStoredObjectDriverAdapter.create(),
-        // A FACTORY rather than a driver, which is the registry's own Azure
-        // policy: a deployment that never reads an `azure-blob://` URI never
-        // resolves credentials, so an install with no Azure block configured
-        // is not made to fail at boot over a backend it does not use. The
-        // resolver's `purpose: "read"` is what lets an operator who migrated
-        // OFF Azure keep reading what was written before.
+        // A FACTORY rather than a driver, which is the registry's own Azure policy: a
+        // deployment that never reads an `azure-blob://` URI never resolves credentials,
+        // so an install with no Azure block configured is not made to fail at boot over a
+        // backend it does not use. The resolver's `purpose: "read"` is what lets an
+        // operator who migrated OFF Azure keep reading what was written before.
         "azure-blob": () =>
           AzureBlobStoredObjectDriverAdapter.create(
             resolveAzureCredentials({
@@ -242,14 +208,9 @@ function composeStoredObjects(
 
   return {
     app: StoredObjectApp.create({
-      // The byte reads are the moved service's; the PORTABLE capability — the
-      // upload ceremony, the delivery capability, the metadata read — is the
-      // canonical Postgres store's, which this process composes no token
-      // signer or delivery policy for. It refuses by name rather than being
-      // wired to the content-addressed store, because an upload confirmed
-      // against one store and read back through the other is a file nobody
-      // finds. Nothing on this record asks: `storedObjects.headById` is a
-      // probe, and the upload doors are the `/api/files` REST family's.
+      // The byte reads are the moved service's; the PORTABLE capability — the upload
+      // ceremony, the delivery capability, the metadata read — is the canonical Postgres
+      // store's, which this process composes no token signer or delivery policy for.
       storedObjects: ApiStoredObjectPortableAbsence.create(),
       files: service,
       owners: ApiStoredObjectOwnerAbsence.create(logger),
@@ -263,11 +224,9 @@ function composeStoredObjects(
 const DEFAULT_LOCAL_FILESYSTEM_ROOT = "/var/lib/langwatch/objects";
 
 /**
- * No outbound proxy for this process's object storage.
- *
- * Stated rather than read: the API process has no proxy configuration of its
- * own yet, and inventing one from an unrelated variable would route a tenant's
- * bytes through a host nobody chose.
+ * No outbound proxy for this process's object storage. Stated rather than read: the API
+ * process has no proxy configuration of its own yet, and inventing one from an unrelated
+ * variable would route a tenant's bytes through a host nobody chose.
  */
 class ApiNoOutboundProxy extends OutboundProxyResolverPort {
   tryResolveForHost(): string | undefined {
@@ -276,12 +235,8 @@ class ApiNoOutboundProxy extends OutboundProxyResolverPort {
 }
 
 /**
- * Which S3 account a project's objects belong in.
- *
- * THE PROJECT'S ORGANIZATION IS RE-READ ON EVERY RESOLUTION, deliberately.
- * Projects move between organizations, and a cached answer would keep
- * addressing the previous tenant's bucket — so the customer would see their
- * own objects disappear.
+ * Which S3 account a project's objects belong in. THE PROJECT'S ORGANIZATION IS RE-READ
+ * ON EVERY RESOLUTION, deliberately.
  */
 class ApiStoredObjectS3Targets extends StoredObjectS3TargetPort {
   static create(
@@ -299,10 +254,9 @@ class ApiStoredObjectS3Targets extends StoredObjectS3TargetPort {
   }
 
   /**
-   * The route's values first, then the deployment's, FIELD BY FIELD — which is
-   * how the platform application resolved this and why it is not a whole-object
-   * fallback: a tenant may be routed to its own endpoint while still reading
-   * with the deployment's credentials.
+   * The route's values first, then the deployment's, FIELD BY FIELD — which is how the
+   * platform application resolved this and why it is not a whole-object fallback: a
+   * tenant may be routed to its own endpoint while still reading with the deployment's
    */
   async resolve(projectId: string): Promise<StoredObjectS3Target> {
     const route = await this.tryRoute(projectId);
@@ -395,13 +349,8 @@ class ApiStoredObjectsClickHouse extends StoredObjectsClickHousePort {
 }
 
 /**
- * The legacy id-only owner lookup, absent.
- *
- * Resolving a project from an object id alone means scanning every ClickHouse
- * instance the deployment operates. This process holds a ROUTED connection —
- * it resolves one tenant's client rather than enumerating them — so the answer
- * is refused by name. Nothing on this record asks: the tRPC probe carries its
- * own `projectId`, and the id-only URL belongs to the `/api/files` family.
+ * The legacy id-only owner lookup, absent. Resolving a project from an object id alone
+ * means scanning every ClickHouse instance the deployment operates.
  */
 class ApiStoredObjectOwnerAbsence extends StoredObjectOwnerResolver {
   static create(logger: Pick<Logger, "warn">): ApiStoredObjectOwnerAbsence {
@@ -422,14 +371,9 @@ class ApiStoredObjectOwnerAbsence extends StoredObjectOwnerResolver {
 }
 
 /**
- * The PORTABLE stored-object capability, absent.
- *
- * The upload ceremony, the delivery capability and the metadata read belong to
- * the canonical Postgres store, and this process composes neither the token
- * signer nor the delivery policy that store takes. Every one of them refuses
- * by name: substituting the content-addressed store would let an upload be
- * confirmed against one store and read back through the other, which is a file
- * the customer uploaded and nobody can find.
+ * The PORTABLE stored-object capability, absent. The upload ceremony, the delivery
+ * capability and the metadata read belong to the canonical Postgres store, and this
+ * process composes neither the token signer nor the delivery policy that store takes.
  */
 class ApiStoredObjectPortableAbsence extends StoredObjectService {
   static create(): ApiStoredObjectPortableAbsence {

@@ -1,12 +1,5 @@
 /**
- * The Enterprise plan gate the process wraps around the package-owned
- * `role.*` transport.
- *
- * Custom roles are an Enterprise capability, but only the WRITE half of the
- * surface is gated: an organization that drops off the plan has to stay able
- * to read what it defined and to clean it up, or a downgrade would strand
- * rows nobody can reach. The mount is where that split is decided, so it is
- * where it is pinned.
+ * The Enterprise plan gate the process wraps around the package-owned `role.*` transport.
  */
 import { declareAuthzMiddleware, type AuthzDeclaration } from "@langwatch/authz-contract";
 import {

@@ -1,19 +1,5 @@
 /**
- * A budget's crossing fires once per BILLED period, not once per calendar
- * month.
- *
- * The gateway-debits process detects a budget crossing (gateway-server's
- * anchored-cycle math) and hands it to the governance webhook envelope
- * builder (governance-server), which is what a receiver dedups on: the
- * envelope's `id` is derived from `(budget_id, bucket_scope_id, kind,
- * period_started_at_ms)`. An anchored budget's period start is the anchor
- * instant walked forward, not the 1st of the month — stamping the calendar
- * start instead would fire a fresh id (and a fresh webhook) on the 1st even
- * though the billed period had not rolled over yet.
- *
- * Composed here, in the composition root, because the anchored-cycle math
- * lives in gateway-server and the envelope builder lives in
- * governance-server — two feature packages that may not import each other.
+ * A budget's crossing fires once per BILLED period, not once per calendar month.
  */
 import { describe, expect, it } from "vitest";
 import { GatewayWindow } from "@langwatch/gateway-contract";

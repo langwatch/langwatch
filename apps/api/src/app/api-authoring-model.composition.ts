@@ -1,21 +1,5 @@
 /**
  * The model an AUTHORING surface's feature key resolves to, on this process.
- *
- * Four doors dispatch a model on behalf of a person editing something — the
- * Studio's code completion, the dataset editor's row generator, the scenario
- * editor's author-assist and the playground — and none of them may resolve one
- * for itself. WHICH model answers a feature key is the deployment's cascade,
- * held by the model gateway; the feature package owns only the prompt, the
- * schema and the wire.
- *
- * So this is one resolver, over the SAME gateway the execution half composed
- * and the SAME project directory the tenancy half opened, handed to each of
- * them. A second one would let two authoring surfaces resolve the same feature
- * key to different models on one deployment.
- *
- * A process with no gateway REFUSES by name rather than resolving to a
- * default: substituting a model the customer did not configure is the failure
- * the cascade's own refusal exists to prevent.
  */
 import { HandledError } from "@langwatch/handled-error";
 import { ModelProviderExecutionHandleService } from "@langwatch/model-provider-server";
@@ -25,11 +9,6 @@ import { nlpProxyBaseUrl } from "@langwatch/workflow-server";
 
 /**
  * Resolves one authoring surface's model.
- *
- * The handle type is DERIVED from the gateway's own resolver rather than
- * restated, so this process cannot name a model type the gateway has stopped
- * returning — and so the composition root need not depend on the AI SDK to
- * describe a value it only ever passes along.
  */
 export type ApiAuthoringModelResolver = (input: {
   projectId: string;
@@ -38,10 +17,6 @@ export type ApiAuthoringModelResolver = (input: {
 
 /**
  * The resolver, or `undefined` where this process composed no model gateway.
- *
- * `undefined` rather than a resolver that throws, because the absence is what
- * decides whether the four doors are mounted at all: a door that answers 500
- * to every request is worse than one that is honestly not there.
  */
 export function composeApiAuthoringModelResolver(options: {
   modelProviders: ModelProviderService | undefined;

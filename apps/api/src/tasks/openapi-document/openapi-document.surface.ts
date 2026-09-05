@@ -1,33 +1,5 @@
 /**
- * The API process's REST surface, composed for description rather than for
- * service.
- *
- * The document is generated from the process's OWN mount, not from a
- * hand-maintained list of families: `createApiProcessRestFeatures` is the one
- * enumeration that decides what this process serves, so describing anything
- * else would describe a second surface that only agrees today. Two things
- * about hono-openapi make that the only correct shape rather than the tidy
- * one. Its route metadata hangs off a package-local symbol, so a SECOND app
- * instance built beside the mounted one is invisible to the generator; and the
- * families built on `@langwatch/api`'s versioned builder publish dotted,
- * parameterless RPC names (`/api/organization/organization.getSettings`),
- * which the default `excludeStaticFile` filter drops silently as static files.
- * So: one Hono, every family routed into it, one `generateSpecs` pass with
- * that filter off.
- *
- * NOTHING HERE IS SERVED. Generation walks each route's `describeRoute`
- * metadata and never invokes a handler, so every service and port below is a
- * stand-in that refuses if it is ever reached — the same shape the composition
- * tests in `src/app-rest/__tests__` use, for the same reason. A stand-in that
- * is reached is a bug in this task, not a missing wire, and it throws saying
- * so rather than fabricating an answer that would reach the published
- * document.
- *
- * ABSENCES ARE NAMED, not silently skipped. A family whose collaborators
- * cannot be stood in for off the request path — the two that need a live
- * Prisma client at BUILD time — is left off and reported by name, so the
- * checker's "documented but not served" list can be read as a fact about the
- * process rather than as a gap in this file.
+ * The API process's REST surface, composed for description rather than for service.
  */
 import { Hono } from "hono";
 import { ApiGovernanceIngestKeyProvenance } from "../../features/enterprise/governance-ingest-rest.mount";
@@ -72,11 +44,9 @@ export type OpenApiDocumentSurface = Readonly<{
 }>;
 
 /**
- * A provider that refuses.
- *
- * Named rather than anonymous so a stack trace from a generation run says
- * which collaborator a route reached for, which is the whole diagnostic value
- * of refusing instead of handing back an empty object.
+ * A provider that refuses. Named rather than anonymous so a stack trace from a generation
+ * run says which collaborator a route reached for, which is the whole diagnostic value of
+ * refusing instead of handing back an empty object.
  */
 function refuse<T>(what: string): () => T {
   return () => {
@@ -85,13 +55,9 @@ function refuse<T>(what: string): () => T {
 }
 
 /**
- * A collaborator whose SHAPE the description does not depend on.
- *
- * Spelled once, here, so that the casts are countable rather than scattered:
- * every use is a service object a handler would call and generation never
- * does. Where the shape DOES reach the document — a request schema, a URL
- * builder whose output is an example — the real value is supplied below
- * instead.
+ * A collaborator whose SHAPE the description does not depend on. Spelled once, here, so
+ * that the casts are countable rather than scattered: every use is a service object a
+ * handler would call and generation never does.
  */
 const opaque = <T>(): T => ({}) as T;
 
@@ -100,13 +66,9 @@ const noopMiddleware: MiddlewareHandler = async (_c, next) => {
 };
 
 /**
- * Enforcement that authenticates nobody.
- *
- * The middleware chain is still BUILT for every route, which is what registers
- * each route's access policy in the route registry — and that registry is what
- * stamps per-operation security onto the generated document. So this is not a
- * bypass of the security model; it is the security model with its per-request
- * halves replaced, because no request is ever made.
+ * Enforcement that authenticates nobody. The middleware chain is still BUILT for every
+ * route, which is what registers each route's access policy in the route registry — and
+ * that registry is what stamps per-operation security onto the generated document.
  */
 function descriptionOnlySecurity(): AppRestSecurity {
   const refuseAtRuntime: ErrorHandler = (error) => {
@@ -131,12 +93,8 @@ function descriptionOnlySecurity(): AppRestSecurity {
 }
 
 /**
- * The deployment origin the document's example links are built from.
- *
- * The hosted product's own, because that is what an integrator reading the
- * published document is looking at. A URL builder's OUTPUT reaches the
- * document in a handful of response descriptions, so this is one of the few
- * values that has to be real rather than refusing.
+ * The deployment origin the document's example links are built from. The hosted product's
+ * own, because that is what an integrator reading the published document is looking at.
  */
 const PUBLIC_BASE_URL = "https://app.langwatch.ai";
 
@@ -361,12 +319,8 @@ function processPorts(): ApiProcessRestPorts {
 
 /**
  * The families the process mounts BESIDE `createApiProcessRestFeatures`.
- *
- * `api-production.composition.ts` routes five more apps after that list, and
- * four of them publish operations. They are re-stated here rather than derived
- * because the composition that owns them takes a live database connection to
- * build; what is copied is the FACTORY CALL, not the routes, so a family that
- * changes shape breaks this build rather than drifting quietly.
+ * `api-production.composition.ts` routes five more apps after that list, and four of them
+ * publish operations.
  */
 function mountProcessTailFamilies(options: {
   app: Hono;

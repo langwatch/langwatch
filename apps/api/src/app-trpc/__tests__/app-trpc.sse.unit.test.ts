@@ -1,11 +1,5 @@
 /**
  * The subscription lane's wire, proved frame by frame.
- *
- * Everything here is the protocol rather than any one procedure: the browser
- * half in `packages/platform-api-client` classifies on these exact shapes, so
- * a frame that changes here is a live view that goes quiet, and the failure
- * shows up as a stale screen rather than an error. The caller is two functions,
- * which is the point — the lane owns the wire, and the process owns the router.
  */
 import { ApiKeyService } from "@langwatch/api-key-contract";
 import { AuthzService } from "@langwatch/authz-contract";
@@ -33,11 +27,9 @@ class TestHandledError extends HandledError {
 }
 
 /**
- * A security bound to services that are never reached.
- *
- * The route declares `handlerManagedAuth`, and the builder applies NO chain
- * for that policy — so a request arriving with no credential still reaches the
- * handler. That is the shape being asserted, not an omission in the fixture.
+ * A security bound to services that are never reached. The route declares
+ * `handlerManagedAuth`, and the builder applies NO chain for that policy — so a request
+ * arriving with no credential still reaches the handler.
  */
 function testSecurity(): AppRestSecurity {
   const unreachable = <T extends object>(prototype: T): T =>

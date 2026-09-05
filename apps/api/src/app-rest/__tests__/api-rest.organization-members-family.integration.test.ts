@@ -1,14 +1,6 @@
 /**
- * Members and invites over REST: the two self-lockout guards, the last-admin
- * guard that two parallel offboardings race against, the seat limit on
- * re-enabling and on inviting — surfaced as this family's one code,
- * `member_seat_limit_reached`, rather than the licence layer's — and the
- * acceptance link a provisioning run with no email provider still needs.
- *
- * The mount, the plan gate, the seat-limit rename and the error envelope are
- * this process's real ones; only the datastore is stood in for. See
- * `support/organization-family.world.ts`.
- *
+ * Members and invites over REST: the two self-lockout guards, the last-admin guard that
+ * two parallel offboardings race against, the seat limit on re-enabling and on inviting —
  * @see specs/organizations/organization-members-rest-api.feature
  */
 import { describe, expect, it } from "vitest";

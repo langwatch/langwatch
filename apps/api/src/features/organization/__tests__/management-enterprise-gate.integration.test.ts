@@ -1,11 +1,6 @@
 /**
- * The plan gate over the management REST families: organization, custom
- * roles, role bindings, SCIM tokens and groups. A fully-permissioned
- * credential on a plan below Enterprise is refused with the stable 402 code
- * and upgrade guidance; the SCIM protocol door refuses the same lapse with a
- * SCIM-shaped 403 because a bearer token is checked on every call, not only
- * when minted.
- *
+ * The plan gate over the management REST families: organization, custom roles, role
+ * bindings, SCIM tokens and groups.
  * @see specs/licensing/management-apis-enterprise-gate.feature
  */
 import { createHash, randomUUID } from "node:crypto";
@@ -17,7 +12,11 @@ import type { RoleService } from "@langwatch/role-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
-import { errorCodeOf, mountRestFamily, TEST_ORGANIZATION_ID } from "../../../app-rest/__tests__/support/rest-family.harness";
+import {
+  errorCodeOf,
+  mountRestFamily,
+  TEST_ORGANIZATION_ID,
+} from "../../../app-rest/__tests__/support/rest-family.harness";
 import { organizationWorld } from "../../../app-rest/__tests__/support/organization-family.world";
 
 /** A plan lookup a test can flip between FREE and ENTERPRISE mid-suite. */
@@ -195,7 +194,9 @@ const digest = (token: string) => createHash("sha256").update(token).digest("hex
  * (`ScimService`, production shape): a token names an organization, and the
  * plan is read fresh on every call rather than at mint time.
  */
-function inMemoryScim(initialPlan: string = "ENTERPRISE"): ScimService & { setPlan(plan: string): void } {
+function inMemoryScim(
+  initialPlan: string = "ENTERPRISE",
+): ScimService & { setPlan(plan: string): void } {
   let plan = initialPlan;
   const tokens = new Map<string, { id: string; hashed: string; connectionId: string | null }>();
 

@@ -1,12 +1,6 @@
 /**
- * The connected-agent transport (ADR-128): the WebSocket gateway, the HTTP
- * long-poll fallback, and the credential and runnable-target checks both
- * ride on.
- *
- * Composed as one unit because the three share one `AgentSessionService`
- * (register, ack, result, retirement) and one Redis-backed runtime — a
- * process either has all of it or none of it, the same rule the family's own
- * REST mount follows.
+ * The connected-agent transport (ADR-128): the WebSocket gateway, the HTTP long-poll
+ * fallback, and the credential and runnable-target checks both ride on.
  */
 import type { AgentService } from "@langwatch/agent-contract";
 import {
@@ -53,16 +47,7 @@ export type ApiConnectedAgentsCompositionOptions = {
 };
 
 /**
- * The API process's own connected-agent transport, composed rather than
- * received.
- *
- * `installConnectedAgentRedis` runs here, once, before this process serves
- * any request — it is a module-level singleton install
- * (`@langwatch/agent-server`'s `getConnectedAgentRuntime`), so calling it
- * from composition rather than from a request handler is what keeps every
- * caller of that singleton (the WebSocket gateway, the long-poll transport,
- * the `/:id/call` relay, "Test agent", the experiment orchestrator's relay
- * dispatch) reading the SAME store.
+ * The API process's own connected-agent transport, composed rather than received.
  */
 export class ApiConnectedAgentsComposition {
   static tryCompose(

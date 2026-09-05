@@ -1,14 +1,7 @@
 /**
- * The app process's tRPC mounts, owned here rather than in the application
- * being retired: `platform/app` composes them, never the reverse.
- *
- * A mount supplies the process's root, authenticated procedure, policy chain
- * and any process side effects the feature needs; the feature package owns
- * procedure names, schemas and delegation.
+ * The app process's tRPC mounts, owned here rather than in the application being retired:
+ * `platform/app` composes them, never the reverse.
  */
-// The policy chain now lives in `@langwatch/api/trpc` beside
-// `createTrpcApiService`, which is the only thing that composes it. Import it
-// from there rather than re-exporting it through this barrel.
 export {
   createAutomationTrpcRouter,
   createEmailSuppressionTrpcRouter,

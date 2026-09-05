@@ -1,9 +1,6 @@
 /**
- * The credential check a connected-agent session (socket or HTTP) runs
- * before anything else: which kinds of API key may connect, which
- * permission they need, and how an org-scoped key that named no project is
- * told which ones it reaches.
- *
+ * The credential check a connected-agent session (socket or HTTP) runs before anything
+ * else: which kinds of API key may connect, which permission they need, and how an
  * @see specs/agents/connected-agents.feature
  */
 import { AgentRegisterRefusedError } from "@langwatch/agent-contract";
@@ -53,9 +50,7 @@ function build({
       }
     }),
   } as unknown as ApiHandlerManagedCredentials;
-  const projectsReachableBy = vi
-    .fn()
-    .mockResolvedValue([{ id: "project_1", name: "Project One" }]);
+  const projectsReachableBy = vi.fn().mockResolvedValue([{ id: "project_1", name: "Project One" }]);
   const adapter = ApiConnectCredentialAdapter.create({
     apiKeys,
     credentials,
@@ -121,7 +116,12 @@ describe("ApiConnectCredentialAdapter", () => {
         resolved: null,
         org: {
           ok: true,
-          resolved: { type: "apiKey-org", apiKeyId: "apikey_org", userId: null, organizationId: "org_1" },
+          resolved: {
+            type: "apiKey-org",
+            apiKeyId: "apikey_org",
+            userId: null,
+            organizationId: "org_1",
+          },
         },
       });
 
