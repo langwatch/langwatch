@@ -44,6 +44,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@clickhouse/client": "^1.23.0",
+    "@langwatch/test-harness": "workspace:*",
     "@types/node": "^24.0.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"

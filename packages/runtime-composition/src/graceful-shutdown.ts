@@ -25,6 +25,21 @@ export interface ShutdownPhase {
  */
 const DEFAULT_PHASE_TIMEOUT_MS = 10_000;
 
+/**
+ * A phase that outran its budget, as distinct from one that threw. A phase that
+ * threw has FINISHED; one that timed out is still running, so tearing down what
+ * it is using severs live work rather than releasing idle handles.
+ */
+export class ShutdownPhaseTimeoutError extends Error {
+  constructor(
+    readonly phase: string,
+    readonly timeoutMs: number,
+  ) {
+    super(`shutdown phase "${phase}" did not finish within ${timeoutMs}ms`);
+    this.name = "ShutdownPhaseTimeoutError";
+  }
+}
+
 /** The watchdog ceiling for a whole sequence whose caller names none. */
 const DEFAULT_PROCESS_DEADLINE_MS = 45_000;
 
@@ -64,12 +79,7 @@ export async function runShutdownPhases({
         Promise.resolve().then(phase.run),
         new Promise<never>((_, reject) => {
           timer = setTimeout(
-            () =>
-              reject(
-                new Error(
-                  `shutdown phase "${phase.name}" did not finish within ${phaseTimeoutMs}ms`,
-                ),
-              ),
+            () => reject(new ShutdownPhaseTimeoutError(phase.name, phaseTimeoutMs)),
             phaseTimeoutMs,
           );
         }),

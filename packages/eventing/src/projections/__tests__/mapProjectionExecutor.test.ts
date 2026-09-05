@@ -25,6 +25,7 @@ describe("MapProjectionExecutor.execute", () => {
   });
 
   describe("when map returns a record", () => {
+    // @scenario "Event transformation"
     it("appends the record to the store and returns it", async () => {
       const store = createMockAppendStore<{ name: string }>();
 
@@ -52,6 +53,7 @@ describe("MapProjectionExecutor.execute", () => {
   });
 
   describe("when map returns null", () => {
+    // @scenario "Skipping events"
     it("does not call store.append and returns null", async () => {
       const store = createMockAppendStore<{ name: string }>();
 

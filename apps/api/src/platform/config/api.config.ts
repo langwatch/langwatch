@@ -141,6 +141,16 @@ export const apiConfigDefinition = RuntimeConfig.define({
     env: "LANGWATCH_INSTANCE_ADMIN_API_KEY",
   }),
   /**
+   * The shared bearer the internal cron family authenticates its caller with.
+   *
+   * An unvalidated optional string for the same reason the admin credential is:
+   * an operator who exports it blank has NOT configured a secret, and that is a
+   * reason to leave the destructive door off, never to refuse the whole boot.
+   */
+  cronApiKey: Config.value(optionalEnvironmentString, {
+    env: "CRON_API_KEY",
+  }),
+  /**
    * The key the stored-secret cipher runs under, resolved from
    * {@link STORED_SECRET_ENCRYPTION_KEY_ENV_PRECEDENCE}.
    *

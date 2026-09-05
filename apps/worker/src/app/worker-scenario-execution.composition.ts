@@ -158,6 +158,72 @@ export function createWorkerScenarioExecution(input: {
   simulations: SimulationService;
 }): ScenarioProcessorService {
   const { prerequisites: deps, pool, simulations } = input;
+
+  const execution = ScenarioExecutionService.create({
+    pool,
+    cancellations: RedisCancellationPublisherAdapter.create(deps.redis),
+    prefetcher: createWorkerScenarioExecutionPrefetcher({ prerequisites: deps, simulations }),
+    failures: ScenarioFailureHandlerService.create({
+      agents: PostgresAgentAdapter.create({
+        database: deps.connection.client,
+        processName: deps.config.serviceName,
+      }).build(),
+      simulations,
+    }),
+    simulations,
+  });
+
+  return ScenarioProcessorService.create({
+    execution,
+    pool,
+    // A dedicated connection: a client in subscribe mode can issue nothing
+    // else, so sharing the queue's own would silence every other command this
+    // process sends on it.
+    cancellations: RedisCancellationSubscriberAdapter.create(deps.redis.duplicate()),
+    childProcesses: NodeScenarioChildProcessAdapter.create({
+      config: resolveChildProcessConfig(deps),
+      pool,
+    }),
+    metrics: OtelScenarioProcessorMetricsAdapter.create(),
+  });
+}
+
+/**
+ * Everything the PREFETCHER reads, which is narrower than what the executor
+ * needs: it resolves a run's target, models and credentials and touches no
+ * queue and no cancellation channel.
+ *
+ * Named as its own type so a test can compose the real graph — the real
+ * adapters, over a real database — without standing up a Redis the prefetch
+ * never reaches.
+ */
+export type WorkerScenarioPrefetcherPrerequisites = Pick<
+  WorkerScenarioExecutionPrerequisites,
+  | "config"
+  | "connection"
+  | "modelProviders"
+  | "projects"
+  | "resolveClickHouseClient"
+  | "defaultRetentionDays"
+  | "langwatchEndpoint"
+  | "nlpServiceUrl"
+  | "encryptionKey"
+>;
+
+/**
+ * The run prefetcher, over this process's own graph.
+ *
+ * Its own factory rather than an expression inside the executor because it is
+ * the seam a run's model resolution is decided at: whether a project's coding
+ * default reaches a workflow, code or http target is answered here, over the
+ * real resolver and the real provider rows.
+ * @see specs/scenarios/simulation-run-model-resolution.feature
+ */
+export function createWorkerScenarioExecutionPrefetcher(input: {
+  prerequisites: WorkerScenarioPrefetcherPrerequisites;
+  simulations: SimulationService;
+}): ScenarioExecutionPrefetcherService {
+  const { prerequisites: deps, simulations } = input;
   const prisma = deps.connection.client;
   const encryption = AesGcmSecretEncryptionAdapter.create({ key: deps.encryptionKey });
   const secretCipher = new WorkerScenarioSecretCipher(encryption);
@@ -213,49 +279,29 @@ export function createWorkerScenarioExecution(input: {
     reservedNames: RESERVED_PROJECT_SECRET_NAMES,
   }).build();
 
-  const execution = ScenarioExecutionService.create({
-    pool,
-    cancellations: RedisCancellationPublisherAdapter.create(deps.redis),
-    prefetcher: ScenarioExecutionPrefetcherService.create({
-      secretCipher,
-      config: {
-        langwatchEndpoint: deps.langwatchEndpoint,
-        nlpServiceUrl: deps.nlpServiceUrl,
-        legacyDefaultModel: deps.config.infrastructure.execution.defaultModel,
-      },
-      scenarios,
-      suites,
-      prompts,
-      agents,
-      workflows,
-      projects: deps.projects,
-      modelProviders: deps.modelProviders,
-      secrets,
-      traces: composeTraceReads(deps),
-    }),
-    failures: ScenarioFailureHandlerService.create({ agents, simulations }),
-    simulations,
-  });
-
-  return ScenarioProcessorService.create({
-    execution,
-    pool,
-    // A dedicated connection: a client in subscribe mode can issue nothing
-    // else, so sharing the queue's own would silence every other command this
-    // process sends on it.
-    cancellations: RedisCancellationSubscriberAdapter.create(deps.redis.duplicate()),
-    childProcesses: NodeScenarioChildProcessAdapter.create({
-      config: resolveChildProcessConfig(deps),
-      pool,
-    }),
-    metrics: OtelScenarioProcessorMetricsAdapter.create(),
+  return ScenarioExecutionPrefetcherService.create({
+    secretCipher,
+    config: {
+      langwatchEndpoint: deps.langwatchEndpoint,
+      nlpServiceUrl: deps.nlpServiceUrl,
+      legacyDefaultModel: deps.config.infrastructure.execution.defaultModel,
+    },
+    scenarios,
+    suites,
+    prompts,
+    agents,
+    workflows,
+    projects: deps.projects,
+    modelProviders: deps.modelProviders,
+    secrets,
+    traces: composeTraceReads(deps),
   });
 }
 
 /**
  * The trace reads an HTTP target's ingest wait is measured on.
  */
-function composeTraceReads(deps: WorkerScenarioExecutionPrerequisites) {
+function composeTraceReads(deps: WorkerScenarioPrefetcherPrerequisites) {
   return ClickHouseTraceAdapter.create({
     resolveClient: deps.resolveClickHouseClient as never,
     modelProviders: deps.modelProviders,

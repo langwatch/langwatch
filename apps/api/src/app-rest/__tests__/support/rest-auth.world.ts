@@ -58,6 +58,19 @@ export type RestAuthKey = Readonly<{
   apiKeyId?: string;
   role?: BuiltinRoleKey;
   grants?: readonly string[];
+  /**
+   * What the key's OWNER may still do, live (ADR-092 §9). A decision is the
+   * intersection of the key's own grants with this, so a key minted while its
+   * owner was an organization admin stops reaching what the owner lost. Left
+   * out is a key with no owner ceiling — a service key.
+   */
+  ownerGrants?: readonly string[];
+  /**
+   * The projects the owner can still reach, when that is narrower than the
+   * organization. Left out, the owner reaches every project in the key's
+   * organization.
+   */
+  ownerProjectIds?: readonly string[];
 }>;
 
 export type RestAuthWorldOptions = Readonly<{
@@ -93,6 +106,8 @@ type ApiKeyRecord = Required<Pick<RestAuthKey, "token">> & {
   apiKeyId: string;
   role: BuiltinRoleKey;
   grants: readonly string[] | null;
+  ownerGrants: readonly string[] | null;
+  ownerProjectIds: readonly string[] | null;
 };
 
 export class RestAuthWorld {
@@ -127,6 +142,8 @@ export class RestAuthWorld {
             apiKeyId: key.apiKeyId ?? `api-key-${index + 1}`,
             role: key.role ?? "admin",
             grants: key.grants ?? null,
+            ownerGrants: key.ownerGrants ?? null,
+            ownerProjectIds: key.ownerProjectIds ?? null,
           },
         ];
       }),
@@ -160,11 +177,31 @@ export class RestAuthWorld {
     });
   }
 
-  /** Whether this key's ceiling admits the permission at all. */
+  /**
+   * Whether this key's ceiling admits the permission at all.
+   *
+   * The key's own grants INTERSECTED with what its owner may still do: a key
+   * can never exceed its owner's live permissions, so demoting the owner
+   * narrows every key they minted without touching the key rows.
+   * @see specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
+   */
   private permits(key: ApiKeyRecord, permission: string): boolean {
-    return key.grants
+    const byKey = key.grants
       ? permissionSatisfiedBy({ granted: new Set(key.grants), requested: permission })
       : builtinRoleGrants({ role: key.role, permission });
+    if (!byKey) return false;
+    if (!key.ownerGrants) return true;
+    return permissionSatisfiedBy({ granted: new Set(key.ownerGrants), requested: permission });
+  }
+
+  /** Whether the key's owner can still reach this project. */
+  private ownerReaches(key: ApiKeyRecord, projectId: string): boolean {
+    return key.ownerProjectIds ? key.ownerProjectIds.includes(projectId) : true;
+  }
+
+  /** The key directory a family reads directly, the same one the chain resolves through. */
+  apiKeys(): ApiKeyService {
+    return this.apiKeyService();
   }
 
   private apiKeyService(): ApiKeyService {
@@ -217,6 +254,29 @@ export class RestAuthWorld {
           },
         };
       },
+      /**
+       * The projects this key may be shown: its own bindings intersected with
+       * what its owner can still reach. A key bound to the whole organization
+       * whose owner lost a team answers with the rest, not with a refusal.
+       */
+      resolveVisibleProjects: async ({
+        apiKeyId,
+        organizationId,
+      }: {
+        apiKeyId: string;
+        organizationId: string;
+      }) => {
+        const key = [...keys.values()].find((candidate) => candidate.apiKeyId === apiKeyId);
+        if (!key || key.organizationId !== organizationId) return { kind: "some", ids: [] };
+        const inOrganization = [...this.projects.values()]
+          .filter((project) => project.organizationId === organizationId)
+          .map((project) => project.id);
+        if (!key.ownerProjectIds) return { kind: "all" };
+        return {
+          kind: "some",
+          ids: inOrganization.filter((id) => this.ownerReaches(key, id)),
+        };
+      },
       markUsed: ({ id }: { id: string }) => {
         used.push(id);
       },
@@ -240,6 +300,7 @@ export class RestAuthWorld {
         const key = byApiKeyId.get(apiKeyId);
         if (!key || key.organizationId !== organizationId) return false;
         if (scope.type === "project" && !this.reaches(key, scope.id)) return false;
+        if (scope.type === "project" && !this.ownerReaches(key, scope.id)) return false;
         return this.permits(key, permission);
       },
       getApiKeyProjectDecision: async ({
@@ -253,6 +314,7 @@ export class RestAuthWorld {
       }): Promise<{ outcome: "allowed" | "denied" | "project_not_found" }> => {
         const key = byApiKeyId.get(apiKeyId);
         if (!key || !this.reaches(key, projectId)) return { outcome: "project_not_found" };
+        if (!this.ownerReaches(key, projectId)) return { outcome: "denied" };
         return { outcome: this.permits(key, permission) ? "allowed" : "denied" };
       },
     } as unknown as AuthzService;

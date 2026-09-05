@@ -18,7 +18,7 @@ export type WorkerMainOptions = WorkerBootOptions & {
 export type WorkerMainProcessPort = {
   readonly logger: Pick<Logger, "error" | "info">;
   start(): Promise<void>;
-  close(): Promise<void>;
+  close(options?: { terminating?: boolean }): Promise<void>;
 };
 
 type WorkerMainCreateOptions = {
@@ -45,7 +45,7 @@ export class WorkerMain {
       const exit = options.signals?.exit ?? process.exit.bind(process);
       main.signals = WorkerSignalHandlers.install({
         source,
-        close: () => main.close(),
+        close: () => main.close({ terminating: true }),
         logger: options.worker.logger,
         onComplete: async () => {
           exit(0);
@@ -68,14 +68,14 @@ export class WorkerMain {
     return this.worker.start();
   }
 
-  close(): Promise<void> {
-    this.closing ??= this.closeMain();
+  close(options?: { terminating?: boolean }): Promise<void> {
+    this.closing ??= this.closeMain(options);
     return this.closing;
   }
 
-  private async closeMain(): Promise<void> {
+  private async closeMain(options?: { terminating?: boolean }): Promise<void> {
     try {
-      await this.worker.close();
+      await this.worker.close(options);
     } finally {
       this.signals?.dispose();
     }

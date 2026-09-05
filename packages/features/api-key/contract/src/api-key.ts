@@ -133,6 +133,12 @@ export const cliKeyScopeSummarySchema = z
   .object({
     kind: z.enum(["organization", "projects"]),
     projectIds: z.array(z.string().min(1)),
+    /**
+     * The permissions the key was actually minted with, so `whoami` can print
+     * the grain the exchange handed out rather than the caller having to guess
+     * it from the scope kind.
+     */
+    permissions: z.array(z.string().min(1)),
   })
   .strict();
 export type CliKeyScopeSummary = z.infer<typeof cliKeyScopeSummarySchema>;

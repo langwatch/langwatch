@@ -5,6 +5,7 @@ export {
   type RunGracefulShutdownOptions,
   type ShutdownLogger,
   type ShutdownPhase,
+  ShutdownPhaseTimeoutError,
 } from "./graceful-shutdown";
 export { type ResourceCloser, ResourceScope } from "./resource-scope";
 export {

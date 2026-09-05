@@ -368,7 +368,6 @@ const LEGACY_INERT: string[] = [
   "specs/evaluators/workflow-evaluator-editor.feature",
   "packages/eventing/specs/deduplication-strategy.feature",
   "packages/eventing/specs/fold-projection.feature",
-  "packages/eventing/specs/map-projection.feature",
   "packages/eventing/specs/pipeline-model.feature",
   "packages/eventing/specs/process-roles.feature",
   "packages/eventing/specs/redis-fold-cache.feature",

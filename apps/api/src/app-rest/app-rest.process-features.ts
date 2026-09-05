@@ -43,6 +43,8 @@ import type { ApiScimRestPorts } from "../app/api-scim.composition";
 
 import type { ApiLangyRestComposition } from "../features/langy/langy-rest.mount";
 
+import { createCronRestApp, type CronRestPorts } from "../features/cron/cron-rest";
+
 import type { AnalyticsApp } from "@langwatch/analytics-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PromptRestService } from "@langwatch/prompt-server";
@@ -295,6 +297,12 @@ export type ApiProcessRestPorts = Readonly<{
    */
   unsubscribe?: UnsubscribeRestPorts | undefined;
   /**
+   * The internal cron family's collaborators, or none. None where this deployment
+   * configured no shared cron secret or no sweep to run: a destructive door that
+   * cannot authenticate its caller must not exist at all.
+   */
+  cron?: CronRestPorts | undefined;
+  /**
    * The four Langy doors' collaborators, or none. One entry rather than four because they
    * are one graph: the public turn surface and the UI-action surface share a credential
    * chain whose refusal ORDER is the contract, and the two internal doors share a bearer.
@@ -526,6 +534,13 @@ export function createApiProcessRestFeatures(options: {
   const unsubscribe = ports.unsubscribe;
   if (unsubscribe) {
     features.push(createUnsubscribeRestApp({ security, ports: unsubscribe }));
+  }
+
+  // The internal cron family. `/api/cron` is a literal first segment nothing above
+  // claims, and every route on it is gated by the shared secret at the builder level.
+  const cron = ports.cron;
+  if (cron) {
+    features.push(createCronRestApp({ security, ports: cron }));
   }
 
   // The Langy doors. `/api/langy` and `/api/internal/langy` are literal first segments

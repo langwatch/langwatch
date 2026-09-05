@@ -10,6 +10,7 @@ import {
 import {
   ResourceScope,
   runShutdownPhases,
+  ShutdownPhaseTimeoutError,
   type ShutdownPhase,
 } from "@langwatch/runtime-composition";
 import { resolveWorkerConfig, type WorkerConfig } from "./platform/config/worker.config";
@@ -137,22 +138,27 @@ export class WorkerProcess {
     }
   }
 
-  close(): Promise<void> {
-    this.closing ??= this.closeProcess();
+  /**
+   * `terminating` says the process is dying, which decides whether a drain past
+   * its budget may have its connections taken away. Signal handlers pass it; a
+   * host reusing the process does not, because someone must reclaim the handles.
+   */
+  close(options?: { terminating?: boolean }): Promise<void> {
+    this.closing ??= this.closeProcess(options?.terminating === true);
     return this.closing;
   }
 
-  private async closeProcess(): Promise<void> {
+  private async closeProcess(terminating: boolean): Promise<void> {
     // Named phases on one runner, so a teardown that hangs is abandoned with
     // its name in the log rather than holding the whole shutdown open. The
     // backstop sits above any pod grace period: it is a last resort, not the
     // drain budget itself.
-    const phases: ShutdownPhase[] = [
-      {
-        name: "application-drain",
-        timeoutMs: DRAIN_PHASE_TIMEOUT_MS,
-        run: () => this.application.drain(),
-      },
+    const drain: ShutdownPhase = {
+      name: "application-drain",
+      timeoutMs: DRAIN_PHASE_TIMEOUT_MS,
+      run: () => this.application.drain(),
+    };
+    const releases: ShutdownPhase[] = [
       {
         name: "telemetry",
         timeoutMs: DRAIN_PHASE_TIMEOUT_MS,
@@ -170,7 +176,23 @@ export class WorkerProcess {
       },
     ];
 
-    const firstError = await runShutdownPhases({ phases, logger: this.observability.logger });
+    const logger = this.observability.logger;
+    const drainError = await runShutdownPhases({ phases: [drain], logger });
+
+    // A timed-out drain is STILL RUNNING, so closing ClickHouse, Redis and
+    // Prisma under it is the severing this sequence exists to prevent: a
+    // terminating process leaves those handles to teardown. A drain that merely
+    // THREW has finished, and its connections still close.
+    if (terminating && drainError instanceof ShutdownPhaseTimeoutError) {
+      logger.info(
+        { phase: drain.name },
+        "drain outran its budget and is still running; leaving connections to process teardown",
+      );
+      return;
+    }
+
+    const releaseError = await runShutdownPhases({ phases: releases, logger });
+    const firstError = drainError ?? releaseError;
     if (firstError) throw firstError;
   }
 }

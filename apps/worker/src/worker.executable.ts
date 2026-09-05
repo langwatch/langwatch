@@ -76,15 +76,15 @@ export class WorkerExecutable {
     return this.worker.start();
   }
 
-  close(): Promise<void> {
-    this.closing ??= this.closeExecutable();
+  close(options?: { terminating?: boolean }): Promise<void> {
+    this.closing ??= this.closeExecutable(options);
     return this.closing;
   }
 
   private installHandlers(): void {
     this.signals = WorkerSignalHandlers.install({
       source: this.host,
-      close: () => this.close(),
+      close: () => this.close({ terminating: true }),
       logger: this.worker.logger,
       deadlineMs: this.worker.config.shutdown.processDeadlineMs,
       onDeadline: async () => {
@@ -101,9 +101,9 @@ export class WorkerExecutable {
     this.host.onUnhandledRejection(this.unhandledRejection);
   }
 
-  private async closeExecutable(): Promise<void> {
+  private async closeExecutable(options?: { terminating?: boolean }): Promise<void> {
     try {
-      await this.worker.close();
+      await this.worker.close(options);
     } finally {
       this.signals?.dispose();
       this.host.offUncaughtException(this.uncaughtException);

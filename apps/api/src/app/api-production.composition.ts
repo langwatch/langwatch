@@ -383,6 +383,8 @@ import type { ApiSubscriptionMount } from "../api.application";
 import { createSseSubscriptionApp } from "../app-trpc/app-trpc.sse";
 import { ApiHandlerManagedSession } from "./api-handler-managed-session";
 import { createApiProcessRestFeatures } from "../app-rest/app-rest.process-features";
+import type { CronRestPorts } from "../features/cron/cron-rest";
+import { cleanupOldLambdas } from "../features/cron/cleanup-old-lambdas";
 import {
   composeApiPackagedRest,
   LoggedApiPackagedRestAbsence,
@@ -734,6 +736,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * which is handed a request policy rather than a configuration.
    */
   private composedLangyInternalSecret: string | undefined;
+  /** The shared bearer the internal cron family authenticates its caller with, or none. */
+  private composedCronApiKey: string | undefined;
   /**
    * Whether this deployment is the hosted product, held from `compose` for the
    * same reason the Langy secret is: the instance-provisioning family reads it
@@ -1544,6 +1548,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       : undefined;
     const bugReports = this.composeBugReports(tenancy);
     const unsubscribe = this.composeUnsubscribe();
+    const cron = this.composeCron();
     const langyRest = this.composeLangyRest();
     const githubRest = this.composeGithubRest(authz);
     // The back office. Both halves are already open at this line: the operator
@@ -2029,6 +2034,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ...(collector ? { collector } : {}),
         ...(bugReports ? { bugReports } : {}),
         ...(unsubscribe ? { unsubscribe } : {}),
+        ...(cron ? { cron } : {}),
         ...(langyRest ? { langy: langyRest } : {}),
         ...(githubRest ? { github: githubRest } : {}),
         ...(adminRest ? { admin: adminRest } : {}),
@@ -2333,6 +2339,22 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * The one-click unsubscribe door's collaborators, or none. `undefined` where this process
    * composed no automation application.
    */
+  /**
+   * The internal cron family's collaborators, or none.
+   *
+   * None when the deployment configured no `CRON_API_KEY`: the sweep behind
+   * this door deletes Lambda functions, so a door that cannot authenticate its
+   * caller must not be mounted at all rather than mounted and refusing.
+   */
+  private composeCron(): CronRestPorts | undefined {
+    const secret = this.composedCronApiKey;
+    if (!secret) return undefined;
+    return {
+      internalSecret: () => secret,
+      cleanupOldLambdas: () => cleanupOldLambdas(),
+    };
+  }
+
   private composeUnsubscribe(): UnsubscribeRestPorts | undefined {
     const automation = this.composedAutomation.service;
     if (!automation) return undefined;
@@ -2540,6 +2562,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const instanceAdminKey = ApiInstanceAdminKeyAdapter.create({ config: options.config });
     this.composedQueueRedis = queueInfrastructure?.redis;
     this.composedLangyInternalSecret = options.config.langyInternalSecret;
+    this.composedCronApiKey = options.config.cronApiKey;
     return {
       instanceAdminKey: () => instanceAdminKey.read(),
       rateLimit: (request) => this.rateLimiter.consume(request),

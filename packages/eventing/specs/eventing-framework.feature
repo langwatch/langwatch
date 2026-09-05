@@ -34,7 +34,7 @@ Feature: Eventing framework boundary and pipeline authoring
     Then the projection cannot be built
     But prior-state evolution and Postgres options are not offered
 
-  @unit @projection
+  @unimplemented @projection
   Scenario: A ClickHouse map projection replaces its latest keyed document
     Given a built ClickHouse map projection for a stable document key
     When a relevant event is processed successfully

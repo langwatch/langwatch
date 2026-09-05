@@ -1,15 +1,5 @@
 /**
  * @vitest-environment node
- *
- * CliTokenRevocationService — the defense-in-depth that ensures a
- * deactivated user's CLI device-flow tokens stop authenticating immediately
- * rather than waiting up to the 1h access / 30d refresh TTL to expire.
- *
- * The store is a port now (`CliTokenStorePort`), so this drives the service
- * against an in-memory fake rather than real Redis — the key shapes and the
- * "delete every member of the per-user index" behaviour are what is under
- * test, not the transport.
- *
  * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature
  */
 import { describe, expect, it } from "vitest";

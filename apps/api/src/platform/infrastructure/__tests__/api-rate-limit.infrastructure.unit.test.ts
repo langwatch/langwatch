@@ -217,6 +217,7 @@ describe("ApiRateLimitInfrastructure", () => {
   });
 
   describe("given the process has Redis only some of the time", () => {
+    /** @scenario "A request handler resolves the connection when it runs" */
     it("counts wherever the connection port points at the moment of the hit", async () => {
       const redis = fakeRedis();
       const connectionHolder: { current?: RedisConnection } = {};
