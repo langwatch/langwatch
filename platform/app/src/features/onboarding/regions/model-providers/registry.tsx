@@ -156,6 +156,22 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     },
   },
   {
+    key: "orcarouter",
+    backendModelProviderKey: "orcarouter",
+    label: "OrcaRouter",
+    defaultModel: "orcarouter/auto",
+    defaultBaseUrl: "https://api.orcarouter.ai/v1",
+    icon: singleIcon("/images/external-icons/orcarouter.svg", "OrcaRouter"),
+    externalDocsUrl: "https://www.orcarouter.ai",
+    fieldMetadata: {
+      ORCAROUTER_API_KEY: {
+        label: "API Key",
+        description:
+          "Your OrcaRouter API key from https://www.orcarouter.ai (prefix sk-orca-)",
+      },
+    },
+  },
+  {
     key: "groq",
     backendModelProviderKey: "groq",
     label: "Groq",
