@@ -157,6 +157,32 @@ describe("the box the selector draws", () => {
     for (const line of drawn) expect(line.length).toBe(79);
   });
 
+  /** @scenario "A path with no spaces breaks inside the box" */
+  it("breaks a long path inside the frame rather than through it", () => {
+    const path = `/Users/rchaves/Projects/langwatch/.claude/worktrees/${"a".repeat(50)}/acme-support-dogfood`;
+    expect(path.length).toBeGreaterThan(120);
+
+    const drawn = renderBox({
+      card: {
+        title: "Langy wants to work in acme-support-dogfood",
+        subject: "Instrument traces with LangWatch",
+        description: `Project Local Dev Project, asked just now.\n${path}`,
+        question: "Do you want to share this folder?",
+        options: [
+          { value: "approve", label: "Share this folder with Langy" },
+          { value: "cancel", label: "Cancel this request" },
+        ],
+        hint: "Enter or a number to answer",
+      },
+      selected: 0,
+      width: 80,
+    }).map(plain);
+
+    for (const line of drawn) expect(line.length).toBe(80);
+    expect(bodyText(drawn)).toContain("/Users/rchaves/Projects/langwatch/");
+    expect(bodyText(drawn)).toContain("acme-support-dogfood");
+  });
+
   describe("when the first option offers a session grant", () => {
     /** @scenario "The box says what the session grant covers" */
     it("names what every command the grant covers starts with", () => {

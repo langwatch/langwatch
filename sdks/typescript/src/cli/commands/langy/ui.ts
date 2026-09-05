@@ -200,28 +200,62 @@ export function terminalWidth(
  *
  * The terminal wrapped the approve question in the middle of a word ("is
  * requesting cont / rol over"), because the shell wraps on the column and not
- * on the text. A word longer than the width, a path or a url, keeps its own
- * line rather than being cut.
+ * on the text.
+ *
+ * A word wider than the whole line is broken by `breakLongWord`, which is what
+ * keeps a box square: the box draws its right border after the widest line it
+ * was given, so one absolute path pushed that row's border a column out.
  */
 export function wrapWords(text: string, width: number): string[] {
   const lines: string[] = [];
   for (const paragraph of text.split("\n")) {
     let line = "";
-    for (const word of paragraph.split(/ +/).filter((entry) => entry !== "")) {
-      if (line === "") {
-        line = word;
-        continue;
-      }
-      if (line.length + 1 + word.length <= width) {
-        line = `${line} ${word}`;
-        continue;
-      }
+    const push = () => {
       lines.push(line);
-      line = word;
+      line = "";
+    };
+    for (const word of paragraph.split(/ +/).filter((entry) => entry !== "")) {
+      for (const piece of breakLongWord(word, width)) {
+        if (line === "") {
+          line = piece;
+          continue;
+        }
+        if (line.length + 1 + piece.length <= width) {
+          line = `${line} ${piece}`;
+          continue;
+        }
+        lines.push(line);
+        line = piece;
+      }
     }
-    lines.push(line);
+    push();
   }
   return lines;
+}
+
+/**
+ * One word as the pieces it fits in, each no wider than `width`.
+ *
+ * A path is cut after a separator, so each piece still reads as a path and the
+ * reader can follow where it continues. Anything else with no break in it, a
+ * long token or a hash, is cut at the width.
+ *
+ * A link keeps its own line however long it is: the follow-along link is there
+ * to be clicked, and a terminal only makes a link of a whole one.
+ */
+function breakLongWord(word: string, width: number): string[] {
+  if (word.length <= width || width < 4 || word.includes("://")) return [word];
+  const pieces: string[] = [];
+  let rest = word;
+  while (rest.length > width) {
+    const head = rest.slice(0, width);
+    const separator = head.lastIndexOf("/");
+    const cut = separator > 0 ? separator + 1 : width;
+    pieces.push(rest.slice(0, cut));
+    rest = rest.slice(cut);
+  }
+  if (rest !== "") pieces.push(rest);
+  return pieces;
 }
 
 /**

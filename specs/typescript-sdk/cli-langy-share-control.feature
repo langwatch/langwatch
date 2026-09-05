@@ -178,6 +178,16 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       When the terminal asks whether to share the folder
       Then the question is broken at the terminal width on spaces, with no word cut in half
 
+    # An absolute path carries no spaces, so a word boundary is the whole line
+    # and the row ran past the frame: the right border of that one row sat a
+    # column further out than every other row.
+    @unit
+    Scenario: A path with no spaces breaks inside the box
+      Given a request for a folder whose path is wider than the box
+      When the terminal asks whether to share the folder
+      Then the path breaks after a path separator
+      And every row of the box is the same width
+
     @unit
     Scenario: Turning permission checks off is printed in red
       Given a connected folder

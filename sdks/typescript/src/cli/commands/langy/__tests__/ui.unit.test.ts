@@ -607,12 +607,24 @@ describe("when a line is wider than the terminal", () => {
     expect(lines.length).toBeGreaterThan(2);
   });
 
-  it("keeps a word that is wider than the terminal on its own line", () => {
-    const path = `/Users/dev/${"very-long-folder-name-".repeat(4)}`;
-    expect(wrapWords(`control over ${path}`, 20)).toEqual([
-      "control over",
-      path,
-    ]);
+  /** @scenario "A path with no spaces breaks inside the box" */
+  it("breaks a path that is wider than the line after a separator", () => {
+    const path =
+      "/Users/rchaves/Projects/langwatch/.claude/worktrees/langy-local-dev/.claude/tmp/acme-support-dogfood-with-a-long-name";
+    expect(path.length).toBeGreaterThan(80);
+
+    const lines = wrapWords(path, 74);
+
+    expect(lines.length).toBeGreaterThan(1);
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(74);
+    for (const line of lines.slice(0, -1)) expect(line.endsWith("/")).toBe(true);
+    expect(lines.join("")).toBe(path);
+  });
+
+  it("cuts a word with no separator in it at the width", () => {
+    const token = "x".repeat(50);
+    const lines = wrapWords(token, 20);
+    expect(lines).toEqual(["x".repeat(20), "x".repeat(20), "x".repeat(10)]);
   });
 
   it("falls back to eighty columns when the terminal does not report one", () => {
