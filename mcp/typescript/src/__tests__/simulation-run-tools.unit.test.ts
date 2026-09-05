@@ -92,4 +92,25 @@ describe("handleGetSimulationRun()", () => {
       expect(parsed.results?.evaluations).toHaveLength(3);
     });
   });
+
+  describe("when the run is still waiting on its evaluators", () => {
+    /** @scenario "A pending run reads as PENDING_EVALUATION" */
+    it("warns that the verdict is not final yet", async () => {
+      mockGetSimulationRun.mockResolvedValue({
+        ...run,
+        status: "PENDING_EVALUATION",
+      });
+
+      const result = await handleGetSimulationRun({ scenarioRunId: "run_1" });
+
+      expect(result).toContain("**Status**: PENDING_EVALUATION");
+      expect(result).toContain("have not been recorded yet");
+    });
+
+    it("says nothing extra once they are recorded", async () => {
+      const result = await handleGetSimulationRun({ scenarioRunId: "run_1" });
+
+      expect(result).not.toContain("have not been recorded yet");
+    });
+  });
 });

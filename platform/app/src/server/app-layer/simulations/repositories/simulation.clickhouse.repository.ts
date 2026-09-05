@@ -16,6 +16,7 @@ import type {
   ScenarioRunData,
   ScenarioSetData,
 } from "~/server/scenarios/scenario-event.types";
+import { EVALUATION_PENDING_GRACE_MS } from "~/server/scenarios/scenario-run-evaluators";
 import {
   EVALUATION_COLUMNS_SQL,
   EVALUATION_LIST_COLUMNS_SQL,
@@ -61,6 +62,23 @@ const EXPORT_SORT_KEY =
 const RUNNING_STATUSES = "'IN_PROGRESS','PENDING','QUEUED','RUNNING'";
 
 /**
+ * Whether a finished run still owes evaluator results, in SQL.
+ *
+ * The same rule the run mapper applies: pending until the results are
+ * recorded, and no longer than the grace period after the run finished, so a
+ * grading job that never returns cannot leave a batch open for good.
+ *
+ * @see specs/scenarios/scenario-evaluation-pending.feature
+ */
+const AWAITS_EVALUATION = `(EvaluationsPending = 1 AND FinishedAt > now64(3) - toIntervalMillisecond(${EVALUATION_PENDING_GRACE_MS}))`;
+
+/**
+ * Whether a run still owes the batch work: it has not finished, or it has and
+ * its evaluators have not been recorded yet.
+ */
+const STILL_RUNNING = `(Status IN (${RUNNING_STATUSES}) OR ${AWAITS_EVALUATION})`;
+
+/**
  * Leaves the "Test agent" runs out of a list. They are one-off checks of an
  * agent, not results of a scenario, so no set list, batch list or last-result
  * summary shows them. A run is still read by its own id.
@@ -71,17 +89,18 @@ const AGENT_TEST_SET_EXCLUSION = `AND NOT endsWith(ScenarioSetId, '${AGENT_TEST_
  * Batch-level aggregate SELECT list, shared by the batch history page and the
  * single-batch summary so the two queries cannot drift.
  *
- * SettledCount is the complement of RUNNING_STATUSES, never a list of terminal
+ * SettledCount is the complement of STILL_RUNNING, never a list of terminal
  * names: ClickHouse stores a raw FAILURE status that the terminal status enum
  * does not carry, so a positive list would report a failed batch as unfinished
- * forever.
+ * forever. A run whose evaluators have not been recorded counts as running,
+ * so a batch is complete only once every run has been graded.
  */
 const BATCH_AGGREGATE_COLUMNS = `BatchRunId,
         toString(count())                                               AS TotalCount,
-        toString(countIf(Status = 'SUCCESS'))                          AS PassCount,
+        toString(countIf(Status = 'SUCCESS' AND NOT ${AWAITS_EVALUATION})) AS PassCount,
         toString(countIf(Status IN ('FAILED','FAILURE','ERROR','CANCELLED'))) AS FailCount,
-        toString(countIf(Status IN (${RUNNING_STATUSES})))             AS RunningCount,
-        toString(countIf(Status NOT IN (${RUNNING_STATUSES})))         AS SettledCount,
+        toString(countIf(${STILL_RUNNING}))                            AS RunningCount,
+        toString(countIf(NOT ${STILL_RUNNING}))                        AS SettledCount,
         toString(countIf(Status = 'STALLED'))                          AS StalledCount,
         toString(toUnixTimestamp64Milli(max(UpdatedAt)))               AS LastUpdatedAt,
         toString(toUnixTimestamp64Milli(max(CreatedAt)))               AS LastRunAt,
@@ -89,7 +108,7 @@ const BATCH_AGGREGATE_COLUMNS = `BatchRunId,
           minIf(UpdatedAt, Status IN ('SUCCESS','FAILED','FAILURE','ERROR','CANCELLED'))
         )) AS FirstCompletedAt,
         toString(if(
-          countIf(Status IN (${RUNNING_STATUSES})) = 0,
+          countIf(${STILL_RUNNING}) = 0,
           toUnixTimestamp64Milli(max(UpdatedAt)),
           0
         )) AS AllCompletedAt,
@@ -394,6 +413,7 @@ const RUN_COLUMNS = `
   TraceIds,
   Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
   ${EVALUATION_COLUMNS_SQL},
+  EvaluationsPending,
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
   toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,
@@ -432,6 +452,7 @@ const LIST_COLUMNS = `
   MetCriteria, UnmetCriteria,
   CAST(NULL AS Nullable(String)) AS Error,
   ${EVALUATION_LIST_COLUMNS_SQL},
+  EvaluationsPending,
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
   toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,

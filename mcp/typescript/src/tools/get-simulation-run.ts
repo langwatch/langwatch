@@ -1,5 +1,8 @@
 import { getSimulationRun as apiGetSimulationRun } from "../langwatch-api-simulation-runs.js";
-import { formatEvaluations } from "./format-suite-details.js";
+import {
+  formatEvaluations,
+  pendingEvaluationNote,
+} from "./format-suite-details.js";
 
 /**
  * Handles the platform_get_simulation_run MCP tool invocation.
@@ -20,6 +23,7 @@ export async function handleGetSimulationRun(params: {
   lines.push(`**Scenario ID**: ${run.scenarioId}`);
   lines.push(`**Batch ID**: ${run.batchRunId}`);
   lines.push(`**Status**: ${run.status}`);
+  lines.push(...pendingEvaluationNote(run.status));
 
   const duration = run.durationInMs > 0 ? `${(run.durationInMs / 1000).toFixed(1)}s` : "—";
   lines.push(`**Duration**: ${duration}`);

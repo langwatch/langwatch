@@ -27,6 +27,7 @@ import { evaluatorInputSpecsOf } from "~/server/suites/suite-evaluators";
 import type { Span, Trace } from "~/server/tracer/types";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type { EvaluatorAttachment } from "../evaluator-attachments";
+import type { RunEvaluators } from "../scenario-run-evaluators";
 import type { ScenarioEvaluationResult } from "../schemas/event-schemas";
 import { parseScenarioFieldValues } from "../suite-fields";
 import {
@@ -126,9 +127,12 @@ export class TraceDataPendingError extends Error {
 }
 
 /**
- * The evaluator attachments one run reads, and the suite they came from.
- * Shared by the subscriber (to decide whether to queue at all) and the
- * worker (to run them).
+ * The evaluator attachments one run reads, with the suite and the plan they
+ * came from.
+ *
+ * Read when the run is queued, so the set the run is graded with is fixed
+ * before it executes, and again when a run that never passed through the
+ * queue command finishes.
  */
 export async function loadRunAttachments({
   deps,
@@ -140,7 +144,7 @@ export async function loadRunAttachments({
   projectId: string;
   scenarioId: string;
   planId: string | null;
-}): Promise<{ suiteId: string | null; attachments: EvaluatorAttachment[] }> {
+}): Promise<RunEvaluators> {
   const scenario = await deps.scenarios.getById({ projectId, id: scenarioId });
   const suiteId = scenario?.testSuiteId ?? null;
   const attachments = await deps.suites.getRunAttachments({
@@ -148,7 +152,7 @@ export async function loadRunAttachments({
     suiteId,
     planId,
   });
-  return { suiteId, attachments };
+  return { suiteId, planId, attachments };
 }
 
 /**
@@ -515,11 +519,17 @@ export async function runScenarioEvaluations({
     );
     return [];
   }
-  const attachments = await deps.suites.getRunAttachments({
-    projectId,
-    suiteId: scenario.testSuiteId,
-    planId,
-  });
+  // The job carries the attachments the run was queued with, so a suite or a
+  // plan edited while the run executed does not change what it is graded
+  // against, and a retry grades exactly what the first attempt would have.
+  // A payload written before they were carried reads them now instead.
+  const attachments =
+    payload.attachments ??
+    (await deps.suites.getRunAttachments({
+      projectId,
+      suiteId: scenario.testSuiteId,
+      planId,
+    }));
   if (attachments.length === 0) return [];
 
   const [evaluatorsById, runState] = await Promise.all([

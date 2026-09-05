@@ -502,3 +502,58 @@ describe("checkTypeOf", () => {
     expect(checkTypeOf(evaluator({ config: {} }))).toBeNull();
   });
 });
+
+describe("the attachments a job grades with", () => {
+  describe("given a payload that carries the attachments the run was queued with", () => {
+    /** @scenario "The worker grades a run with the attachments its job carries" */
+    it("grades those and never reads the suite or the plan", async () => {
+      const queued = attachment({ id: "att-queued" });
+      const deps = makeDeps({
+        attachments: [attachment({ id: "att-edited-since" })],
+      });
+
+      await runScenarioEvaluations({
+        deps,
+        payload: { ...payload, attachments: [queued] },
+        isFinalAttempt: false,
+      });
+
+      expect(deps.suites.getRunAttachments).not.toHaveBeenCalled();
+      expect(deps.suites.getAttachedEvaluators).toHaveBeenCalledWith({
+        projectId,
+        attachments: [queued],
+      });
+    });
+
+    /** @scenario "A retry grades the run with the same attachments as the first attempt" */
+    it("grades the same set on a retry", async () => {
+      const queued = attachment({ id: "att-queued" });
+      const deps = makeDeps({
+        attachments: [attachment({ id: "att-edited-since" })],
+      });
+
+      await runScenarioEvaluations({
+        deps,
+        payload: { ...payload, attachments: [queued], attempt: 3 },
+        isFinalAttempt: false,
+      });
+
+      expect(recorded(deps)?.evaluations[0]?.evaluatorId).toBe("eval-exact");
+      expect(deps.suites.getRunAttachments).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a payload written before the attachments were carried", () => {
+    it("reads the suite and the plan", async () => {
+      const deps = makeDeps();
+
+      await runScenarioEvaluations({ deps, payload, isFinalAttempt: false });
+
+      expect(deps.suites.getRunAttachments).toHaveBeenCalledWith({
+        projectId,
+        suiteId: "suite-1",
+        planId: "suite-1",
+      });
+    });
+  });
+});

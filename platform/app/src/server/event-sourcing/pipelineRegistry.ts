@@ -213,6 +213,7 @@ import {
   ComputeRunMetricsCommand,
 } from "./pipelines/simulation-processing/commands/computeRunMetrics.command";
 import { FinishRunCommand } from "./pipelines/simulation-processing/commands/finishRun.command";
+import { QueueRunCommand } from "./pipelines/simulation-processing/commands/queueRun.command";
 import { RecordEvaluationsCommand } from "./pipelines/simulation-processing/commands/recordEvaluations.command";
 import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
 import type { SimulationRunExecutionCommands } from "./pipelines/simulation-processing/process-manager";
@@ -1670,8 +1671,21 @@ export class PipelineRegistry {
         "simulation_run",
       );
     };
+    // Resolves the evaluators a run is graded with. Read when the run is
+    // queued, so an edit to the suite or the plan mid-batch cannot change what
+    // an already scheduled run is graded against, and again when a run that
+    // never passed through the queue command finishes.
+    const loadRunEvaluators = (params: {
+      projectId: string;
+      scenarioId: string;
+      planId: string | null;
+    }) => loadRunAttachments({ deps: scenarioEvaluationDeps, ...params });
+    const queueRunCommand = new QueueRunCommand({
+      loadRunAttachments: loadRunEvaluators,
+    });
     const finishRunCommand = new FinishRunCommand({
       loadPriorEvents: loadSimulationRunEvents,
+      loadRunAttachments: loadRunEvaluators,
     });
     const recordEvaluationsCommand = new RecordEvaluationsCommand({
       loadPriorEvents: loadSimulationRunEvents,
@@ -1731,6 +1745,7 @@ export class PipelineRegistry {
         simulationRunStore,
         simulationRunMetricsStore:
           this.deps.repositories.simulationRunMetricsStore,
+        queueRunCommand,
         finishRunCommand,
         recordEvaluationsCommand,
         computeRunMetricsCommand,
@@ -1765,8 +1780,7 @@ export class PipelineRegistry {
           computeRunMetrics: selfComputeRunMetrics.fn,
         },
         scenarioEvaluations: {
-          loadRunAttachments: (params) =>
-            loadRunAttachments({ deps: scenarioEvaluationDeps, ...params }),
+          loadRunAttachments: loadRunEvaluators,
           enqueue: enqueueScenarioEvaluations.fn,
         },
       }),

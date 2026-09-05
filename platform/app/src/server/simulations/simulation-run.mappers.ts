@@ -1,5 +1,6 @@
 import { ScenarioRunStatus, Verdict } from "../scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "../scenarios/scenario-event.types";
+import { evaluationIsStillPending } from "../scenarios/scenario-run-evaluators";
 import {
   type ClickHouseEvaluationColumns,
   columnsToEvaluations,
@@ -34,6 +35,11 @@ export interface ClickHouseSimulationRunRow
   MetCriteria: string[];
   UnmetCriteria: string[];
   Error: string | null;
+  /**
+   * Whether the run finished owing evaluator results. 1 while a required
+   * evaluator may still turn the run red, 0 once the results are recorded.
+   */
+  EvaluationsPending?: number;
   DurationMs: string | null;
   TotalCost: number | null;
   RoleCosts: Record<string, number[]>;
@@ -95,9 +101,15 @@ function mapVerdict(verdict: string | null): Verdict | undefined {
  * Stored status is the only truth: runs without a finish timestamp read as
  * IN_PROGRESS regardless of age — a stalled run reaches terminal ERROR via
  * the process-manager stall watchdog, not a read-time derivation.
+ *
+ * The one exception is a run that finished owing evaluator results. It reads
+ * as PENDING_EVALUATION until they are recorded or the grace period runs out,
+ * so no caller takes the judge's verdict for the final one while a required
+ * evaluator can still fail the run.
  */
 export function mapClickHouseRowToScenarioRunData(
   row: ClickHouseSimulationRunRow,
+  { now = Date.now() }: { now?: number } = {},
 ): ScenarioRunData {
   const baseStatus = mapStatus(row.Status);
   const updatedAt = Number(row.UpdatedAt);
@@ -110,9 +122,19 @@ export function mapClickHouseRowToScenarioRunData(
   const startTimestamp = startedAt ?? createdAt;
 
   // Unfinished runs collapse to IN_PROGRESS; only a finished run keeps its
-  // stored status.
+  // stored status, and a finished run whose evaluators still owe results
+  // reads as PENDING_EVALUATION until they land.
+  const awaitsEvaluation = evaluationIsStillPending({
+    awaitsEvaluation: row.EvaluationsPending === 1,
+    finishedAt,
+    now,
+  });
   const resolvedStatus =
-    finishedAt != null ? baseStatus : ScenarioRunStatus.IN_PROGRESS;
+    finishedAt == null
+      ? ScenarioRunStatus.IN_PROGRESS
+      : awaitsEvaluation
+        ? ScenarioRunStatus.PENDING_EVALUATION
+        : baseStatus;
 
   const verdictEnum = mapVerdict(row.Verdict);
 

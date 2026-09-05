@@ -25,7 +25,11 @@ const scenarioRunResponseSchema = z.object({
   scenarioRunId: z.string(),
   name: z.string().nullable(),
   description: z.string().nullable(),
-  status: z.string(),
+  status: z
+    .string()
+    .describe(
+      "Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final.",
+    ),
   results: z
     .object({
       verdict: z.string().nullable().optional(),

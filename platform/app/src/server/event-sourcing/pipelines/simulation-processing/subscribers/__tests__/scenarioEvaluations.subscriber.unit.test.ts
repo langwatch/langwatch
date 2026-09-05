@@ -60,6 +60,7 @@ function makeDeps(attachments = [attachment]) {
   const deps: ScenarioEvaluationsSubscriberDeps = {
     loadRunAttachments: vi.fn(async () => ({
       suiteId: "suite-1",
+      planId: "plan-1",
       attachments,
     })),
     enqueue: vi.fn(async () => {}),
@@ -88,6 +89,7 @@ describe("scenario evaluations subscriber", () => {
         scenarioId: "scenario-1",
         suiteId: "suite-1",
         planId: "plan-1",
+        attachments: [attachment],
         traceIds: ["trace-1"],
         attempt: 1,
         occurredAt: expect.any(Number),
@@ -104,6 +106,34 @@ describe("scenario evaluations subscriber", () => {
 
       expect(deps.loadRunAttachments).toHaveBeenCalledWith(
         expect.objectContaining({ planId: null }),
+      );
+    });
+  });
+
+  describe("when the finished event carries the run's own attachments", () => {
+    /** @scenario "The evaluation job is queued with the attachments the run carries" */
+    it("queues them without reading the suite or the plan again", async () => {
+      const deps = makeDeps();
+      const queued = { ...attachment, id: "att-queued" };
+
+      await createScenarioEvaluationsSubscriber(deps).handler(
+        finishedEvent({
+          evaluators: {
+            suiteId: "suite-queued",
+            planId: "plan-queued",
+            attachments: [queued],
+          },
+        }),
+        CONTEXT,
+      );
+
+      expect(deps.loadRunAttachments).not.toHaveBeenCalled();
+      expect(deps.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          suiteId: "suite-queued",
+          planId: "plan-queued",
+          attachments: [queued],
+        }),
       );
     });
   });

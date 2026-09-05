@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { runSecretCiphertextSchema } from "~/server/scenarios/run-secret-values";
+import { runEvaluatorsSchema } from "~/server/scenarios/scenario-run-evaluators";
 import { scenarioEvaluationResultSchema } from "~/server/scenarios/schemas/event-schemas";
 import { EventSchema } from "../../../domain/types";
 import {
@@ -42,6 +43,13 @@ export const simulationRunQueuedEventDataSchema = z.object({
       referenceId: z.string(),
     })
     .optional(),
+  /**
+   * The evaluators the run is graded with, resolved from its suite and its
+   * plan when it was queued. Absent on a run scheduled before this was
+   * recorded and on a run driven from code, which never queues here; those
+   * resolve their evaluators when they finish instead.
+   */
+  evaluators: runEvaluatorsSchema.optional(),
 });
 export type SimulationRunQueuedEventData = z.infer<
   typeof simulationRunQueuedEventDataSchema
@@ -123,6 +131,13 @@ export const simulationRunFinishedEventDataSchema = z.object({
   batchRunId: z.string().optional(),
   scenarioSetId: z.string().optional(),
   traceIds: z.array(z.string()).optional(),
+  /**
+   * The evaluators the run is graded with, carried forward from its queued
+   * event so nothing downstream reads the suite or the plan again. Backfilled
+   * by FinishRunCommand, which resolves them live for a run whose events carry
+   * none.
+   */
+  evaluators: runEvaluatorsSchema.optional(),
 });
 export type SimulationRunFinishedEventData = z.infer<
   typeof simulationRunFinishedEventDataSchema

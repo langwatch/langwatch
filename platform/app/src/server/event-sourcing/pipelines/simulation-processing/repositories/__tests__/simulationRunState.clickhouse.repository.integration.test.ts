@@ -113,6 +113,7 @@ function makeStartedState(scenarioRunId: string): SimulationRunState["data"] {
     UnmetCriteria: [],
     Error: null,
     Evaluations: [],
+    EvaluationsPending: false,
     DurationMs: null,
     TotalCost: null,
     RoleCosts: {},

@@ -53,6 +53,8 @@ export interface SimulationProcessingPipelineDeps {
   simulationRunStore: FoldProjectionStore<SimulationRunStateData>;
   /** Append store backing the simulationRunMetrics map projection. */
   simulationRunMetricsStore: AppendStore<SimulationRunMetricsProjectionRecord>;
+  /** Pre-constructed with `loadRunAttachments`, pins the run's evaluators. */
+  queueRunCommand: QueueRunCommand;
   /** Pre-constructed with `loadPriorEvents` for ECST backfill. */
   finishRunCommand: FinishRunCommand;
   /** Pre-constructed with `loadPriorEvents`, reads the run's verdict from its finished event. */
@@ -159,7 +161,7 @@ export function createSimulationProcessingPipeline(
   deps: SimulationProcessingPipelineDeps,
 ) {
   return createSimulationProcessingBuilder(deps)
-    .withCommand("queueRun", QueueRunCommand)
+    .withCommandInstance("queueRun", QueueRunCommand, deps.queueRunCommand)
     .withCommand("startRun", StartRunCommand)
     .withCommand("messageSnapshot", MessageSnapshotCommand)
     .withCommand("textMessageStart", TextMessageStartCommand)

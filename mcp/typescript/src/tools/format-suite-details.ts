@@ -40,6 +40,33 @@ export function formatEvaluatorAttachments(
   return lines;
 }
 
+/**
+ * The status the platform reports while a run's evaluators have not been
+ * recorded yet. The conversation is over and the judge has decided, but a
+ * required evaluator can still turn the run red, so a caller must not read
+ * the verdict as final.
+ */
+export const PENDING_EVALUATION_STATUS = "PENDING_EVALUATION";
+
+/** How a run's status reads in a digest. */
+export function formatRunStatus(status: string): string {
+  if (status === PENDING_EVALUATION_STATUS) return "evaluating";
+  if (status === "SUCCESS") return "pass";
+  if (status === "FAILED") return "FAIL";
+  return status;
+}
+
+/**
+ * The line that warns a caller off a run's verdict while its evaluators are
+ * still to be recorded, or nothing when they already are.
+ */
+export function pendingEvaluationNote(status: string): string[] {
+  if (status !== PENDING_EVALUATION_STATUS) return [];
+  return [
+    "> The evaluators attached to this run have not been recorded yet. A required one may still fail it, so read the verdict again once the status changes.",
+  ];
+}
+
 /** One evaluator's result on a finished run. */
 export interface SimulationRunEvaluation {
   evaluatorId: string;
