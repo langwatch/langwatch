@@ -29,6 +29,7 @@ import { generateText } from "ai";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import type { LangyTrustedMessageReader } from "./langy-message.service";
+import { normalizeLangyConversationTitle } from "./langyConversationTitle";
 
 const logger = createLogger("langwatch:langy:title-generator");
 
@@ -49,28 +50,12 @@ const LANGY_TITLE_FEATURE_KEY = "langy.conversation_title";
 const TITLE_SYSTEM_PROMPT = [
   "You write a very short, specific title for a chat between a user and the",
   "LangWatch assistant. Summarize what the user is trying to do.",
-  `Rules: at most ${LANGY_TITLE_GENERATION.MAX_TITLE_CHARS} characters; no`,
-  "surrounding quotes; no trailing punctuation; Title Case; no prefix like",
+  `Rules: at most ${LANGY_TITLE_GENERATION.MAX_TITLE_CHARS} characters;`,
+  "sentence case, so only the first word starts with a capital, apart from",
+  "product and proper names such as LangWatch, GitHub or Python; no",
+  "surrounding quotes; no trailing period; no prefix like",
   '"Title:". Output ONLY the title, nothing else.',
 ].join(" ");
-
-/** Strip fences/labels/quotes an LLM adds despite instructions, and cap length. */
-function sanitizeTitle(raw: string): string {
-  let out = raw.trim();
-  out = out.replace(/^```[a-zA-Z]*\n?/, "").replace(/\n?```$/, "");
-  out = out.replace(/^(?:title|chat|conversation)\s*[:=]\s*/i, "");
-  if (
-    (out.startsWith('"') && out.endsWith('"')) ||
-    (out.startsWith("'") && out.endsWith("'"))
-  ) {
-    out = out.slice(1, -1);
-  }
-  out = out.replace(/[.\s]+$/, "").trim();
-  if (out.length > LANGY_TITLE_GENERATION.MAX_TITLE_CHARS) {
-    out = out.slice(0, LANGY_TITLE_GENERATION.MAX_TITLE_CHARS).trim();
-  }
-  return out;
-}
 
 /** Render the recent transcript into a compact prompt block. */
 function buildTranscript(
@@ -157,7 +142,7 @@ export function createLangyConversationTitleGenerator(deps: {
       maxRetries: 1,
     });
 
-    const title = sanitizeTitle(text);
+    const title = normalizeLangyConversationTitle(text);
     if (!title) return null;
     // Record the model that actually produced the title, not the request key.
     return { title, model: model.modelId };

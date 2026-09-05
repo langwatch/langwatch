@@ -74,6 +74,7 @@ import { buildFinalAssistantParts } from "./langy-final-parts";
 import { extractTextFromParts } from "./langy-message.service";
 import { LangyTurnAttempt } from "./langy-turn-attempt";
 import { resolveLangyTurnBaseDependencies } from "./langy-turn-base-dependencies";
+import { normalizeLangyConversationTitle } from "./langyConversationTitle";
 import type { LangyTurnAdmissionRepository } from "./repositories/langy-turn-admission.repository";
 
 const logger = createLogger("langwatch:langy:turn-service");
@@ -912,9 +913,11 @@ export class LangyTurnService {
       // started while the previous reply streamed), and those must not become
       // the title.
       const title =
-        extractTextFromParts(
-          messages.find((message) => message.role === "user")?.parts,
-        ).slice(0, 80) || null;
+        normalizeLangyConversationTitle(
+          extractTextFromParts(
+            messages.find((message) => message.role === "user")?.parts,
+          ),
+        ) || null;
 
       // The per-conversation frame-signing key is created from resolved
       // conversation state, never from a caller-supplied "new" flag.

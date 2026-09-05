@@ -39,7 +39,8 @@ beforeEach(() => {
 
 describe("createLangyConversationTitleGenerator", () => {
   describe("given the model answers", () => {
-    it("returns the sanitized title and the model that produced it", async () => {
+    /** @scenario "A title in title case is rewritten in sentence case" */
+    it("returns the normalized title and the model that produced it", async () => {
       generateText.mockResolvedValue({
         text: "Instrument Traces With LangWatch",
       });
@@ -49,7 +50,7 @@ describe("createLangyConversationTitleGenerator", () => {
       });
 
       await expect(generate(args)).resolves.toEqual({
-        title: "Instrument Traces With LangWatch",
+        title: "Instrument traces with LangWatch",
         model: "openai/gpt-5-mini",
       });
     });
