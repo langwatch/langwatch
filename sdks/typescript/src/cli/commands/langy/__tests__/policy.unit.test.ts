@@ -787,3 +787,123 @@ describe("the command reader", () => {
     });
   });
 });
+
+describe("when a command wraps another one in env", () => {
+  /**
+   * The operand grammar of every form of `env` this policy understands. A
+   * form that is not in this table asks, whatever it looks like.
+   */
+  const forms: Array<[string, PolicyDecision["kind"]]> = [
+    ["env", "ask"],
+    ["env -0", "ask"],
+    ["printenv", "ask"],
+    ["printenv PATH", "ask"],
+    ["env ls -la", "run"],
+    ["env -i ls", "run"],
+    ["env -u NODE_ENV ls", "run"],
+    ["env NODE_ENV=test ls", "run"],
+    ["env NODE_ENV=test rm -rf build", "ask"],
+    ["env touch marker", "ask"],
+    ["env --split-string='touch marker'", "ask"],
+    ["env -S 'touch marker'", "ask"],
+    ["env --default-signal=INT ls", "ask"],
+    ["env --ignore-signal=INT ls", "ask"],
+    ["env --block-signal=INT ls", "ask"],
+    // A directory outside the folder is refused before the grammar is read.
+    ["env -C /tmp ls", "refuse"],
+    ["env --chdir=/tmp ls", "refuse"],
+    ["env -C . ls", "ask"],
+  ];
+
+  /** @scenario "An env option that can carry a program asks" */
+  it("runs only the forms that prepare the environment of a read-only command", () => {
+    for (const [command, kind] of forms) {
+      expect(bash(command).kind, command).toBe(kind);
+    }
+  });
+
+  /** @scenario "An env option that can carry a program asks" */
+  it("says the environment may hold secrets when it would be printed", () => {
+    const decision = bash("env");
+    expect(decision.kind).toBe("ask");
+    if (decision.kind === "ask") {
+      expect(decision.reason).toContain("prints the environment");
+    }
+  });
+});
+
+describe("when an allowed command carries an operand that writes", () => {
+  /**
+   * The operand grammar of the read-only commands. A subcommand or an option
+   * that writes takes the command out of the read-only class, whatever the
+   * name in front of it is.
+   */
+  const grammar: Array<[string, PolicyDecision["kind"]]> = [
+    ["git branch", "run"],
+    ["git branch -a", "run"],
+    ["git branch --list", "run"],
+    ["git branch new-branch", "ask"],
+    ["git branch -d old-branch", "ask"],
+    ["git tag", "run"],
+    ["git tag v1.2.0", "ask"],
+    ["git remote", "run"],
+    ["git remote -v", "run"],
+    ["git remote get-url origin", "run"],
+    ["git remote show origin", "ask"],
+    ["git remote add upstream https://example.test/acme.git", "ask"],
+    ["git worktree list", "run"],
+    ["git worktree add ../copy main", "refuse"],
+    ["git status --porcelain", "run"],
+    ["git log -8 --oneline", "run"],
+    ["git rev-parse --abbrev-ref HEAD", "run"],
+    ["sort package.json", "run"],
+    ["sort -o sorted.txt package.json", "ask"],
+    ["sort --output=sorted.txt package.json", "ask"],
+    ["uniq package.json", "run"],
+    ["uniq package.json copy.json", "ask"],
+    ["tree -L 2", "run"],
+    ["tree -o listing.txt", "ask"],
+    ["date", "run"],
+    ["date -s 12:00", "ask"],
+    ["wc -l package.json", "run"],
+    ["head -n 3 package.json", "run"],
+  ];
+
+  /** @scenario "An allowed command with an operand that writes asks" */
+  it("judges the operands and not only the command name", () => {
+    for (const [command, kind] of grammar) {
+      expect(bash(command).kind, command).toBe(kind);
+    }
+  });
+});
+
+describe("when a shell command reads a file that may hold secrets", () => {
+  /** @scenario "A shell command that reads a file which may hold secrets asks" */
+  it("asks for the same file a read of it asks for", () => {
+    const reads: Array<[string, PolicyDecision["kind"]]> = [
+      ["cat .env", "ask"],
+      ["head -n 3 .env.local", "ask"],
+      ["grep KEY .env", "ask"],
+      ["grep KEY .env*", "ask"],
+      ["cat *.pem", "ask"],
+      ["cat config/credentials.json", "ask"],
+      ["cat .npmrc", "ask"],
+      ["cat .env.example", "run"],
+      ["cat package.json", "run"],
+      ["ls -la", "run"],
+      ["cat src/main.py", "run"],
+    ];
+    for (const [command, kind] of reads) {
+      expect(bash(command).kind, command).toBe(kind);
+    }
+
+    // The file tool and the shell answer the same way for the same file.
+    expect(at({ tool: "local_read", params: { path: ".env" } }).kind).toBe("ask");
+    const shell = bash("cat .env");
+    expect(shell.kind).toBe("ask");
+    if (shell.kind === "ask") {
+      expect(shell.reason).toContain(".env may hold secrets");
+      expect(shell.segments?.[0]?.readOnly).toBe(false);
+    }
+  });
+});

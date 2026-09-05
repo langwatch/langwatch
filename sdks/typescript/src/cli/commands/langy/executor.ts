@@ -41,6 +41,44 @@ export const SHELL_ARGS = (command: string): [string, string[]] => [
   ["-c", command],
 ];
 
+/**
+ * The variables a command inherits from this process.
+ *
+ * The terminal that started the CLI carries the developer's own keys, and a
+ * command Langy runs reads every one of them the moment it is handed the
+ * whole environment. What a build needs from the machine is its paths, its
+ * shell and its language; what a project needs is in the project, and the
+ * project's own tools read it from there.
+ */
+export const INHERITED_ENVIRONMENT: ReadonlySet<string> = new Set([
+  "PATH",
+  "HOME",
+  "SHELL",
+  "TERM",
+  "USER",
+  "LOGNAME",
+  "TMPDIR",
+  "TZ",
+  "LANG",
+  // The socket of the key agent, so a push over a signed connection still
+  // works. It carries no key itself.
+  "SSH_AUTH_SOCK",
+]);
+
+/** The environment one command runs with. */
+export function commandEnvironment(
+  source: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const kept: NodeJS.ProcessEnv = {};
+  for (const [name, value] of Object.entries(source)) {
+    if (value === undefined) continue;
+    if (INHERITED_ENVIRONMENT.has(name) || name.startsWith("LC_")) {
+      kept[name] = value;
+    }
+  }
+  return kept;
+}
+
 export interface RunningCommand {
   /** The process group leader, undefined when the spawn failed. */
   pid: number | undefined;
@@ -247,7 +285,7 @@ function startBackground({
   try {
     child = spawn(...SHELL_ARGS(command), {
       cwd: root,
-      env: process.env,
+      env: commandEnvironment(),
       detached: true,
       stdio: ["ignore", fd, fd],
     });
@@ -292,7 +330,7 @@ function startForeground({
   log.on("error", () => undefined);
   const child = spawn(...SHELL_ARGS(command), {
     cwd: root,
-    env: process.env,
+    env: commandEnvironment(),
     detached: true,
     stdio: ["ignore", "pipe", "pipe"],
   });

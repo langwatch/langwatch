@@ -315,6 +315,41 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       Then the ask prints the chain in full, wrapped at the width of the box
       And the answer prints as one short line naming the patterns that were granted
 
+  Rule: The CLI decides what may run, and the command line is parsed
+
+    # The permission rules themselves are in
+    # specs/langy/langy-local-permissions.feature. These are the ways a
+    # command can reach around them, and what the CLI does about each.
+
+    @unit
+    Scenario: An env option that can carry a program asks
+      Given a connected folder
+      When Langy runs a command through env
+      Then only the forms that prepare the environment of a read-only command run
+      And an option that can carry a program, a directory or a signal asks
+      And a bare env asks, because the environment may hold secrets
+
+    @unit
+    Scenario: An allowed command with an operand that writes asks
+      Given a connected folder
+      When Langy runs a read-only command with an operand that writes
+      Then the operand is judged as well as the command name
+      And the command asks
+
+    @unit
+    Scenario: A shell command that reads a file which may hold secrets asks
+      Given a connected folder
+      When Langy reads a file that may hold secrets through a shell command
+      Then it asks the same way a read of that file asks
+      And a name with a wildcard that could stand for such a file asks too
+
+    @unit
+    Scenario: A command runs with the machine's own variables and no more
+      Given a connected folder
+      When Langy runs any command
+      Then the command inherits the paths, the shell and the language of the machine
+      And it does not inherit the keys the command line itself holds
+
   Rule: Exiting is clean
 
     @unit

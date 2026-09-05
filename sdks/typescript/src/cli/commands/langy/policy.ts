@@ -108,15 +108,22 @@ export const READ_ONLY_GIT_SUBCOMMANDS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Git subcommands that read under one verb and write under the others.
+ * Git subcommands whose operands decide what they do.
  *
- * `git worktree list` only prints the worktrees of the repository, and it cost
- * a card whose reason said it changes the repository, which is wrong for that
- * command. Every other worktree verb adds, moves or removes a checkout, so the
- * verb is named rather than the subcommand.
+ * The subcommand alone is not the answer: `git branch` lists the branches and
+ * `git branch new-name` creates one, `git tag` lists the tags and `git tag v1`
+ * writes one, `git remote show origin` reaches the network. Each subcommand
+ * here reads in its bare form, when `bare` is true, and with the verbs named
+ * here. Every other operand asks.
  */
-const READ_ONLY_GIT_VERBS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-  ["worktree", new Set(["list"])],
+const GIT_OPERAND_RULES: ReadonlyMap<
+  string,
+  { bare: boolean; verbs: ReadonlySet<string> }
+> = new Map([
+  ["branch", { bare: true, verbs: new Set<string>() }],
+  ["tag", { bare: true, verbs: new Set<string>() }],
+  ["remote", { bare: true, verbs: new Set(["get-url"]) }],
+  ["worktree", { bare: false, verbs: new Set(["list"]) }],
 ]);
 
 /**
@@ -193,6 +200,33 @@ const WRITE_FLAGS: ReadonlySet<string> = new Set([
   "-okdir",
   "-fls",
   "-fprint",
+]);
+
+/**
+ * Read-only commands whose options or operands write something.
+ *
+ * The command name is not the whole answer: `sort -o out in` writes a file,
+ * `uniq input output` writes its second operand, and `date -s` sets the clock
+ * of the machine.
+ */
+const READ_ONLY_COMMAND_RULES: ReadonlyMap<
+  string,
+  { writeOptions?: ReadonlySet<string>; maxOperands?: number }
+> = new Map([
+  ["sort", { writeOptions: new Set(["-o", "--output"]) }],
+  ["tree", { writeOptions: new Set(["-o"]) }],
+  ["date", { writeOptions: new Set(["-s", "--set", "-f", "--file"]) }],
+  ["uniq", { maxOperands: 1 }],
+]);
+
+/** The `env` options that only change what the command it runs inherits. */
+const ENV_UNDERSTOOD_OPTIONS: ReadonlySet<string> = new Set([
+  "-i",
+  "--ignore-environment",
+  "-0",
+  "--null",
+  "-u",
+  "--unset",
 ]);
 
 /** Flags that point a command at another directory. */
@@ -502,17 +536,7 @@ function isReadOnlyPart(part: CommandPart): boolean {
   if (namesAPath(name)) return false;
   if (args.some((argument) => DIRECTORY_FLAGS.has(argument))) return false;
 
-  if (name === "git") {
-    const words = args.filter((argument) => !argument.startsWith("-"));
-    const subcommand = words[0];
-    if (subcommand === undefined) return VERSION_ARGUMENTS.has(args[0] ?? "");
-    const readOnlyVerbs = READ_ONLY_GIT_VERBS.get(subcommand);
-    if (readOnlyVerbs !== undefined) {
-      return words.length === 2 && readOnlyVerbs.has(words[1]!);
-    }
-    if (!READ_ONLY_GIT_SUBCOMMANDS.has(subcommand)) return false;
-    return !args.some((argument) => GIT_WRITE_ARGUMENTS.has(argument));
-  }
+  if (name === "git") return isReadOnlyGit(args);
 
   if (name === "gh") {
     return READ_ONLY_GH_ARGUMENTS.some(
@@ -526,13 +550,97 @@ function isReadOnlyPart(part: CommandPart): boolean {
 
   if (!READ_ONLY_COMMANDS.has(name)) return false;
 
-  // `env` and `printenv` print the environment with no operand and run
-  // whatever they are given with one.
-  if (name === "env" || name === "printenv") {
-    return !args.some((argument) => !argument.startsWith("-"));
+  // The environment holds the keys of every tool on this machine, so printing
+  // it is a read of secrets whichever command prints it.
+  if (name === "printenv") return false;
+  if (name === "env") return isReadOnlyEnv(part);
+
+  const rule = READ_ONLY_COMMAND_RULES.get(name);
+  if (rule !== undefined) {
+    if (
+      args.some(
+        (argument) => rule.writeOptions?.has(argument.split("=")[0]!) === true,
+      )
+    ) {
+      return false;
+    }
+    const operands = args.filter((argument) => !argument.startsWith("-"));
+    if (rule.maxOperands !== undefined && operands.length > rule.maxOperands) {
+      return false;
+    }
   }
 
   return true;
+}
+
+/**
+ * True when a git command only reads the repository.
+ *
+ * The subcommand is where this starts and the operands are where it ends: a
+ * read-only subcommand with a write operand still writes.
+ */
+export function isReadOnlyGit(args: string[]): boolean {
+  if (args.some((argument) => GIT_WRITE_ARGUMENTS.has(argument))) return false;
+  const words = args.filter((argument) => !argument.startsWith("-"));
+  const [subcommand, ...operands] = words;
+  if (subcommand === undefined) return VERSION_ARGUMENTS.has(args[0] ?? "");
+  const rule = GIT_OPERAND_RULES.get(subcommand);
+  if (rule !== undefined) {
+    if (operands.length === 0) return rule.bare;
+    return operands.length <= 2 && rule.verbs.has(operands[0]!);
+  }
+  return READ_ONLY_GIT_SUBCOMMANDS.has(subcommand);
+}
+
+/**
+ * True when an `env` invocation only prepares the environment of a command
+ * that is itself read-only.
+ *
+ * Every argument of `env --split-string='touch marker'` starts with a dash,
+ * and the program it runs is inside one of them, so "no operand" is not the
+ * same as "prints the environment". The forms written in `envCommandStart`
+ * are the only ones that run without a question.
+ */
+export function isReadOnlyEnv(part: CommandPart): boolean {
+  const start = envCommandStart(part.tokens);
+  if (start === null || start >= part.tokens.length) return false;
+  return isReadOnlyPart({
+    ...part,
+    tokens: part.tokens.slice(start),
+    quoted: part.quoted.slice(start),
+    redirectTarget: part.redirectTarget.slice(start),
+  });
+}
+
+/**
+ * Where the command an `env` runs starts, the length of the tokens when there
+ * is none, and null when the arguments are not understood.
+ *
+ * Understood is a short list on purpose: `-i`, `-0`, `-u NAME` and a
+ * `NAME=value` assignment change what the command inherits and nothing else.
+ * Every other option can carry a program, a directory or a signal handler, so
+ * it asks.
+ */
+export function envCommandStart(tokens: string[]): number | null {
+  let index = 1;
+  while (index < tokens.length) {
+    const token = tokens[index]!;
+    if (!token.startsWith("-")) {
+      if (isEnvironmentAssignment(token)) {
+        index += 1;
+        continue;
+      }
+      return index;
+    }
+    const flag = token.split("=")[0]!;
+    if (!ENV_UNDERSTOOD_OPTIONS.has(flag)) return null;
+    // `-u NAME` and `--unset NAME` name a variable in the next token.
+    if ((flag === "-u" || flag === "--unset") && !token.includes("=")) {
+      index += 1;
+    }
+    index += 1;
+  }
+  return tokens.length;
 }
 
 // ---------------------------------------------------------------------------
@@ -553,6 +661,7 @@ export type CommandEffect =
   | "reaches_network"
   | "installs_packages"
   | "runs_checks"
+  | "reads_environment"
   | "runs_program";
 
 /** The clause each class contributes to the reason sentence. */
@@ -562,6 +671,7 @@ const EFFECT_CLAUSES: Record<CommandEffect, string> = {
   reaches_network: "reaches the network",
   installs_packages: "installs packages",
   runs_checks: "runs the project's own checks",
+  reads_environment: "prints the environment, which may hold secrets",
   runs_program: "runs a program that is not read-only",
 };
 
@@ -571,6 +681,7 @@ const EFFECT_ORDER: readonly CommandEffect[] = [
   "changes_repository",
   "installs_packages",
   "reaches_network",
+  "reads_environment",
   "runs_checks",
   "runs_program",
 ];
@@ -663,6 +774,11 @@ export function effectOf(part: CommandPart): CommandEffect {
   if (args.some((argument) => WRITE_FLAGS.has(argument))) return "writes_files";
 
   const verb = args.find((argument) => !argument.startsWith("-"));
+
+  if (name === "printenv") return "reads_environment";
+  if (name === "env" && envCommandStart(part.tokens) === part.tokens.length) {
+    return "reads_environment";
+  }
 
   if (name === "git") {
     if (verb !== undefined && GIT_NETWORK_SUBCOMMANDS.has(verb)) {
@@ -961,10 +1077,17 @@ function decideBash({
     };
   }
 
+  // A part that names a file which may hold secrets is never read-only, so
+  // the shell asks for the same answer a read of that file asks for.
+  const readsOnly = (part: CommandPart): boolean =>
+    !parsed.hasSubstitution &&
+    isReadOnlyPart(part) &&
+    secretFileRead(part) === null;
+
   const segments: CommandSegment[] = parsed.parts.map((part) => ({
     command: part.text,
     pattern: grantPatternFor({ tokens: part.tokens, quoted: part.quoted }),
-    readOnly: !parsed.hasSubstitution && isReadOnlyPart(part),
+    readOnly: readsOnly(part),
   }));
 
   if (parsed.hasSubstitution) {
@@ -979,7 +1102,7 @@ function decideBash({
     };
   }
 
-  const writing = parsed.parts.filter((part) => !isReadOnlyPart(part));
+  const writing = parsed.parts.filter((part) => !readsOnly(part));
   const unanswered = writing.filter(
     (part) => !grantsAllow({ tokens: part.tokens, quoted: part.quoted, grants }),
   );
@@ -995,6 +1118,9 @@ function decideBash({
       ),
     ),
   ];
+  const secret = unanswered
+    .map((part) => secretFileRead(part))
+    .find((name) => name !== null);
   return {
     kind: "ask",
     summary: command,
@@ -1003,35 +1129,28 @@ function decideBash({
       quoted: unanswered[0]!.quoted,
     }),
     patterns,
-    reason: reasonFor(writing),
+    reason:
+      secret === undefined || secret === null
+        ? reasonFor(writing)
+        : `${secret} may hold secrets, so it is not read for you without an answer.`,
     segments,
   };
 }
 
 /**
- * The path this part would leave the folder through, or null. Every argument
- * that looks like a path is checked, and the argument of `cd`, of a directory
- * flag and of a redirect is checked whatever it looks like.
+ * Every token of this part that names a file or a directory: the arguments
+ * that are written the way a path is written, and the argument of `cd`, of a
+ * directory flag and of a redirect whatever it looks like.
  *
  * The first token is the program, not a path the command reads: `/usr/bin/ls`
  * asks because it is not a bare name, which is a clearer answer than refusing
  * it for living outside the folder.
  *
- * A quoted string a command prints is text, so it is not checked at all, and
- * a bare word of a command with its own vocabulary is a subcommand, a flag or
- * a reference rather than a file. See `isPathCandidate`.
+ * A quoted string a command prints is text, so it is not named at all, and a
+ * bare word of a command with its own vocabulary is a subcommand, a flag or a
+ * reference rather than a file. See `isPathCandidate`.
  */
-function boundaryEscape({
-  part,
-  root,
-  realpath,
-  homedir,
-}: {
-  part: CommandPart;
-  root: string;
-  realpath?: (value: string) => string;
-  homedir?: string;
-}): string | null {
+export function pathTokensOf(part: CommandPart): string[] {
   const name = part.tokens[0] ?? "";
   const named = new Set<string>();
   let afterEndOfOptions = false;
@@ -1068,7 +1187,73 @@ function boundaryEscape({
     }
     if (isPathCandidate({ name, token, afterEndOfOptions })) named.add(token);
   }
-  for (const target of named) {
+  return [...named];
+}
+
+/** File names a wildcard is measured against, for the secret-file rule. */
+const SECRET_FILE_SAMPLES: readonly string[] = [
+  ".env",
+  ".env.local",
+  "id_rsa",
+  "id_ed25519",
+  ".netrc",
+  ".npmrc",
+  ".pypirc",
+  "credentials",
+  "server.key",
+  "key.pem",
+];
+
+/**
+ * True when what the shell expands this name to could be a secret file.
+ *
+ * The expansion happens in the shell, so the name is measured against the
+ * files a secret usually lives in: `.env*` and `*.pem` could each stand for
+ * one, and `*.py` could not.
+ */
+function globCouldMatchSecret(name: string): boolean {
+  if (!/[*?[]/.test(name)) return false;
+  const pattern = name.replace(/[.+^${}()|\\]/g, "\\$&")
+    .replace(/\*/g, ".*")
+    .replace(/\?/g, ".");
+  let expansion: RegExp;
+  try {
+    expansion = new RegExp(`^${pattern}$`);
+  } catch {
+    return true;
+  }
+  return SECRET_FILE_SAMPLES.some((sample) => expansion.test(sample));
+}
+
+/**
+ * The name of a file that may hold secrets this command part would read, or
+ * null when it names none.
+ *
+ * A read of `.env` asks for an answer, and `cat .env` is the same read
+ * through another door, so it asks for the same answer. A wildcard asks too,
+ * because what it stands for is known to the shell and not here.
+ */
+export function secretFileRead(part: CommandPart): string | null {
+  for (const token of pathTokensOf(part)) {
+    const name = path.basename(token);
+    if (isSecretFileName(name) || globCouldMatchSecret(name)) return name;
+  }
+  return null;
+}
+
+/** The path this part would leave the folder through, or null. */
+function boundaryEscape({
+  part,
+  root,
+  realpath,
+  homedir,
+}: {
+  part: CommandPart;
+  root: string;
+  realpath?: (value: string) => string;
+  homedir?: string;
+}): string | null {
+  for (const target of pathTokensOf(part)) {
     const check = resolvePathInsideRoot({ target, root, realpath, homedir });
     if (!check.inside) {
       return outsideMessage({ target, resolved: check.resolved, root });

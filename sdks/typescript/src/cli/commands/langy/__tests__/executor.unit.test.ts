@@ -14,6 +14,7 @@ import { LocalCallFailure } from "../errors";
 import {
   BASH_MAX_TIMEOUT_SECONDS,
   collapseProgressRedraws,
+  commandEnvironment,
   excludeLogDirFromGit,
   killGroup,
   logPathFor,
@@ -303,5 +304,59 @@ describe("collapseProgressRedraws", () => {
         "2 passed\n1 warning\n",
       );
     });
+  });
+});
+
+describe("given the environment a command runs with", () => {
+  let root: string;
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "langy-env-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  /** @scenario "A command runs with the machine's own variables and no more" */
+  it("keeps the paths of the machine and drops everything else", () => {
+    const kept = commandEnvironment({
+      PATH: "/usr/bin",
+      HOME: "/home/dev",
+      LANG: "en_US.UTF-8",
+      LC_ALL: "en_US.UTF-8",
+      TERM: "xterm",
+      SSH_AUTH_SOCK: "/tmp/agent.socket",
+      LANGWATCH_API_KEY: "sk-lw-secret",
+      OPENAI_API_KEY: "sk-secret",
+      AWS_SECRET_ACCESS_KEY: "secret",
+    });
+
+    expect(Object.keys(kept).sort()).toEqual([
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "PATH",
+      "SSH_AUTH_SOCK",
+      "TERM",
+    ]);
+  });
+
+  /** @scenario "A command runs with the machine's own variables and no more" */
+  it("gives a real command no key this process holds", async () => {
+    process.env.LANGY_TEST_SECRET = "sk-lw-do-not-leak";
+    try {
+      const command = startCommand({
+        command: "echo \"key=[${LANGY_TEST_SECRET:-none}]\"",
+        root,
+        callId: "call_env",
+      });
+      const output = await command.result;
+
+      expect(output.stdout).toContain("key=[none]");
+      expect(output.stdout).not.toContain("sk-lw-do-not-leak");
+    } finally {
+      delete process.env.LANGY_TEST_SECRET;
+    }
   });
 });
