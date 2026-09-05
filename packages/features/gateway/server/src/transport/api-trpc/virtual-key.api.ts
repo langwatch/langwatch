@@ -1,6 +1,7 @@
 /**
  * Virtual keys over tRPC, organization-scoped (every procedure takes organizationId). Authorization is per-scope, not org-wide: create needs virtualKeys:manage on EVERY requested scope, mutating needs the operation's permission on AT LEAST ONE scope the key already lives in — data-dependent, so it happens in the resolver, declared here by name. Visibility is separate: a caller SEES a key when one of its scopes intersects their membership set (a plain member can list without virtualKeys:view); an unseen key answers as nonexistent. The plaintext key is returned by exactly create and rotate, exactly once at mint, never as an audited argument — every other procedure answers the DTO (displayPrefix, no secret material). Transport only: per-scope authorization, DTO projection and budget resolvers are the application's, shared with the public REST door.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   virtualKeyApiApplicableBudgetsInputSchema,
@@ -9,6 +10,10 @@ import {
   virtualKeyApiKeyInputSchema,
   virtualKeyApiOrganizationInputSchema,
   virtualKeyApiUpdateInputSchema,
+  virtualKeyApplicableBudgetsSchema,
+  virtualKeyCamelDtoSchema,
+  virtualKeyMintedSchema,
+  virtualKeySpendThisMonthSchema,
   GatewayWindow,
 } from "@langwatch/gateway-contract";
 import {
@@ -49,6 +54,8 @@ type VirtualKeyTrpcProcedures<
     reason: string;
     permissions: readonly AuthzPermission[];
   }): ProcedureDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -77,7 +84,7 @@ export class VirtualKeyTrpcApi {
     procedures: VirtualKeyTrpcProcedures<TContext, TOptions, TRoot>,
     schemas: VirtualKeyTrpcSchemas,
   ) {
-    const { protected: procedure, resolverAuthorizedPolicy } = procedures;
+    const { protected: procedure, resolverAuthorizedPolicy, validateOutput } = procedures;
     // The canonical budget parser the process injects, threaded into the two
     // contract schemas that accept a budget so the write path's decimal regex
     // and positive-amount refinement stay the one definition.
@@ -85,295 +92,390 @@ export class VirtualKeyTrpcApi {
     const createInputSchema = virtualKeyApiCreateInputSchema(budgetInputSchema);
     const updateInputSchema = virtualKeyApiUpdateInputSchema(budgetInputSchema);
 
-    return trpc.router({
-      // Visibility is membership-based, not permission-based: a caller sees a
-      // key when one of its scopes intersects their membership set, so a plain
-      // organization member can list without a coarse organization-wide
-      // `virtualKeys:view` grant they would not hold.
-      list: resolverAuthorizedPolicy({
-        reason: `${RESOLVER_AUTHORIZED}; only keys whose scopes intersect the caller's membership in this organization are returned`,
-        permissions: ["virtualKeys:view"],
-      })(procedure.input(virtualKeyApiOrganizationInputSchema)).query(async ({ ctx, input }) => {
-        const keys = await ctx.app.gateway.listVisibleVirtualKeys({
-          organizationId: input.organizationId,
-          userId: ctx.actor().id,
-        });
-        return ctx.app.gateway.toVirtualKeyCamelDtos({ virtualKeys: keys });
-      }),
+    // Every procedure on this surface delegates its real check to the
+    // resolver, via `resolverAuthorizedPolicy`. The chain's own `policy`
+    // builder is never called; `withCustomPermission` carries the process's
+    // ALREADY-BUILT decorator instead.
+    const policy = (): ProcedureDecorator => {
+      throw new Error(
+        "virtualKeys declares a resolver-authorized check for every procedure; policy() is unused",
+      );
+    };
 
-      get: resolverAuthorizedPolicy({
-        reason: `${RESOLVER_AUTHORIZED}; the key must exist in this organization and intersect the caller's membership set, and a miss is answered as not found`,
-        permissions: ["virtualKeys:view"],
-      })(procedure.input(virtualKeyApiKeyInputSchema)).query(async ({ ctx, input }) => {
-        // A key the caller can't see is indistinguishable from one that
-        // doesn't exist — same NOT_FOUND, no existence leak.
-        const vk = await ctx.app.gateway.requireVisibleVirtualKeyForUser({
-          organizationId: input.organizationId,
-          id: input.id,
-          userId: ctx.actor().id,
-        });
-        return ctx.app.gateway.toVirtualKeyCamelDto(vk);
-      }),
-
-      /**
-       * Spend per key this calendar month, for keys the caller can see — reads the cost path, the same source the Usage tab reads, so the table number matches the page a click lands on. Keys with their own budget also get its limit + CURRENT-PERIOD spend (a different measurement from the month total, e.g. a daily cap), both in this one batched call so the table never asks per row.
-       */
-      spendThisMonth: resolverAuthorizedPolicy({
-        reason: `${RESOLVER_AUTHORIZED}; spend is reported only for keys visible to the caller's membership in this organization`,
-        permissions: ["virtualKeys:view"],
-      })(procedure.input(virtualKeyApiOrganizationInputSchema)).query(async ({ ctx, input }) => {
-        // Without the ClickHouse spend source there is no number to report.
-        // Failing loudly lets the column render "unavailable" instead of a
-        // confident $0.00 that cannot be told apart from a zero-spend key.
-        const spendRepo = ctx.app.gateway.virtualKeySpend;
-        if (!spendRepo) {
-          throw new TRPCError({
-            code: "PRECONDITION_FAILED",
-            message: "spend_source_unavailable",
-          });
-        }
-        const keys = await ctx.app.gateway.listVisibleVirtualKeys({
-          organizationId: input.organizationId,
-          userId: ctx.actor().id,
-        });
-        const now = new Date();
-        const virtualKeyIds = keys.map((k) => k.id);
-        const [spend, directBudgets] = await Promise.all([
-          ctx.app.gateway.spendByVirtualKey({
-            organizationId: input.organizationId,
-            virtualKeyIds,
-            window: { fromDate: GatewayWindow.startOfCurrentMonthUTC(now), toDate: now },
-          }),
-          ctx.app.gateway.loadDirectBudgetsForKeys({
-            organizationId: input.organizationId,
-            virtualKeyIds,
-            now,
-          }),
-        ]);
-        // Every visible key gets a row. With the spend source present, a
-        // missing entry means the key genuinely spent nothing, so zero is
-        // the honest render rather than an ambiguous blank.
-        return keys.map((k) => ({
-          virtualKeyId: k.id,
-          spentUsd: spend.get(k.id)?.spentUsd ?? "0",
-          requests: spend.get(k.id)?.requests ?? 0,
-          budget: directBudgets.get(k.id) ?? null,
-        }));
-      }),
-
-      /**
-       * Every budget that would constrain this key: the "already applies" list under the budget field in create/edit drawers. Takes a draft (picked scopes, no key row yet) so the list is answerable before the key exists.
-       */
-      applicableBudgets: resolverAuthorizedPolicy({
-        reason: `${RESOLVER_AUTHORIZED}; for an existing key, its visibility in this organization, and for a draft, manage on every scope in it, both checked before any budget data is read`,
-        permissions: ["virtualKeys:view", "virtualKeys:manage"],
-      })(procedure.input(virtualKeyApiApplicableBudgetsInputSchema)).query(
-        async ({ ctx, input }) => {
-          // Authorization first — this resolver answers budget names, limits,
-          // live spend and (for a principal) their name, so an org id alone
-          // must not be enough. For an existing key, the caller must SEE it,
-          // and resolution binds to STORED ownership; caller-supplied scopes/
-          // destination/principal are ignored, or a visible org-wide key could leak a sibling's data.
-          if (input.virtualKeyId) {
-            const vk = await ctx.app.gateway.requireVisibleVirtualKeyForUser({
-              organizationId: input.organizationId,
-              id: input.virtualKeyId,
-              userId: ctx.actor().id,
-            });
-            return ctx.app.gateway.resolveApplicableBudgets({
-              target: {
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput,
+      })
+        // Visibility is membership-based, not permission-based: a caller sees a
+        // key when one of its scopes intersects their membership set, so a plain
+        // organization member can list without a coarse organization-wide
+        // `virtualKeys:view` grant they would not hold.
+        .query("list", (p) =>
+          p
+            .withInput(virtualKeyApiOrganizationInputSchema)
+            .withOutput(virtualKeyCamelDtoSchema.array())
+            .withCustomPermission(
+              resolverAuthorizedPolicy({
+                reason: `${RESOLVER_AUTHORIZED}; only keys whose scopes intersect the caller's membership in this organization are returned`,
+                permissions: ["virtualKeys:view"],
+              }),
+              RESOLVER_AUTHORIZED,
+            )
+            .handle(async ({ ctx, input }) => {
+              const keys = await ctx.app.gateway.listVisibleVirtualKeys({
                 organizationId: input.organizationId,
-                virtualKeyId: vk.id,
-                scopes: vk.scopes.map((scope) => ({
-                  scopeType: scope.scopeType,
-                  scopeId: scope.scopeId,
-                })),
-                traceProjectId: vk.traceProjectId,
-                principalUserId: vk.principalUserId,
-              },
-            });
-          }
-          // For a draft (create drawer): the caller must hold
-          // `virtualKeys:manage` on every draft scope AND on the chosen trace
-          // destination — the exact boundary `create` will hold them to when they
-          // submit. Previewing a target's budgets must not be cheaper than
-          // creating a key against it.
-          await ctx.app.gateway.authorizeVirtualKeyScopeSelection({
-            actor: ctx.session,
-            organizationId: input.organizationId,
-            scopes: input.scopes,
-            traceProjectId: input.traceProjectId,
-          });
-          // The principal id is still pinned to the organization: even an
-          // authorized caller must not resolve another tenant's rows.
-          if (input.principalUserId) {
-            const member = await ctx.app.gateway.isOrganizationMember({
-              organizationId: input.organizationId,
-              userId: input.principalUserId,
-            });
-            if (!member) {
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: "principalUserId is not a member of this organization.",
+                userId: ctx.actor().id,
               });
-            }
-          }
-          return ctx.app.gateway.resolveApplicableBudgets({
-            target: {
-              organizationId: input.organizationId,
-              virtualKeyId: null,
-              scopes: input.scopes,
-              traceProjectId: input.traceProjectId ?? null,
-              principalUserId: input.principalUserId ?? null,
-            },
-          });
-        },
-      ),
-
-      create: resolverAuthorizedPolicy({
-        reason: `${RESOLVER_AUTHORIZED}; manage on every requested scope, and every scope anchored to this organization, both before the key is minted`,
-        permissions: ["virtualKeys:manage"],
-      })(procedure.input(createInputSchema)).mutation(async ({ ctx, input }) => {
-        const actorUserId = ctx.actor().id;
-        // The same pre-flight the public REST create runs: manage at every
-        // requested scope, scopes inside the caller's organization, the
-        // destination anchored and manageable, guardrail refs project-local.
-        await ctx.app.gateway.authorizeVirtualKeyCreate({
-          actor: ctx.session,
-          organizationId: input.organizationId,
-          scopes: input.scopes,
-          traceProjectId: input.traceProjectId,
-          guardrailAttachments: input.config?.guardrailAttachments,
-        });
-        const { virtualKey, secret } = await ctx.app.gateway.virtualKeys.create({
-          organizationId: input.organizationId,
-          name: input.name,
-          description: input.description ?? null,
-          principalUserId: input.principalUserId ?? null,
-          scopes: input.scopes,
-          traceProjectId: input.traceProjectId ?? null,
-          routingPolicyId: input.routingPolicyId ?? null,
-          routingMode: input.routingMode,
-          expiresAt: input.expiresAt ?? null,
-          budget: input.budget ?? null,
-          config: input.config,
-          actorUserId,
-        });
-        // The one moment the plaintext key exists on the wire.
-        return { virtualKey: await ctx.app.gateway.toVirtualKeyCamelDto(virtualKey), secret };
-      }),
-
-      update: resolverAuthorizedPolicy({
-        reason: `${RESOLVER_AUTHORIZED}; update on one of the key's existing scopes, plus manage on every new scope when re-scoping`,
-        permissions: ["virtualKeys:update", "virtualKeys:manage"],
-      })(procedure.input(updateInputSchema)).mutation(async ({ ctx, input }) => {
-        const actorUserId = ctx.actor().id;
-        // The same pre-flight the public REST patch runs: update on a scope the
-        // key already lives in, manage on every new scope when re-scoping, the
-        // destination anchored and manageable when it moves, and the guardrail
-        // attachments judged against the project the key resolves to.
-        await ctx.app.gateway.authorizeVirtualKeyUpdate({
-          actor: ctx.session,
-          organizationId: input.organizationId,
-          id: input.id,
-          scopes: input.scopes,
-          traceProjectId: input.traceProjectId,
-          guardrailAttachments: input.config?.guardrailAttachments,
-        });
-        const updated = await ctx.app.gateway.virtualKeys.update({
-          id: input.id,
-          organizationId: input.organizationId,
-          name: input.name,
-          description: input.description,
-          scopes: input.scopes,
-          traceProjectId: input.traceProjectId,
-          routingPolicyId: input.routingPolicyId,
-          routingMode: input.routingMode,
-          expiresAt: input.expiresAt,
-          budget: input.budget,
-          config: input.config,
-          actorUserId,
-        });
-        return ctx.app.gateway.toVirtualKeyCamelDto(updated);
-      }),
-
-      rotate: resolverAuthorizedPolicy({
-        reason: `${RESOLVER_AUTHORIZED}; rotate on one of the key's existing scopes`,
-        permissions: ["virtualKeys:rotate"],
-      })(procedure.input(virtualKeyApiKeyInputSchema)).mutation(async ({ ctx, input }) => {
-        const actorUserId = ctx.actor().id;
-        await ctx.app.gateway.authorizeVirtualKeyOperation({
-          actor: ctx.session,
-          organizationId: input.organizationId,
-          id: input.id,
-          permission: "virtualKeys:rotate",
-        });
-        const { virtualKey, secret } = await ctx.app.gateway.virtualKeys.rotate({
-          id: input.id,
-          organizationId: input.organizationId,
-          actorUserId,
-        });
-        // The second and last moment the plaintext key exists on the wire.
-        return { virtualKey: await ctx.app.gateway.toVirtualKeyCamelDto(virtualKey), secret };
-      }),
-
-      revoke: resolverAuthorizedPolicy({
-        reason: `${RESOLVER_AUTHORIZED}; delete on one of the key's existing scopes`,
-        permissions: ["virtualKeys:delete"],
-      })(procedure.input(virtualKeyApiKeyInputSchema)).mutation(async ({ ctx, input }) => {
-        const actorUserId = ctx.actor().id;
-        await ctx.app.gateway.authorizeVirtualKeyOperation({
-          actor: ctx.session,
-          organizationId: input.organizationId,
-          id: input.id,
-          permission: "virtualKeys:delete",
-        });
-        const updated = await ctx.app.gateway.virtualKeys.revoke({
-          id: input.id,
-          organizationId: input.organizationId,
-          actorUserId,
-        });
-        return ctx.app.gateway.toVirtualKeyCamelDto(updated);
-      }),
-
-      disable: resolverAuthorizedPolicy({
-        reason: `${RESOLVER_AUTHORIZED}; update on one of the key's existing scopes`,
-        permissions: ["virtualKeys:update"],
-      })(procedure.input(virtualKeyApiDisableInputSchema)).mutation(async ({ ctx, input }) => {
-        const actorUserId = ctx.actor().id;
-        await ctx.app.gateway.authorizeVirtualKeyOperation({
-          actor: ctx.session,
-          organizationId: input.organizationId,
-          id: input.id,
-          permission: "virtualKeys:update",
-        });
-        const updated = await ctx.app.gateway.virtualKeys.disable({
-          id: input.id,
-          organizationId: input.organizationId,
-          actorUserId,
-          reason: input.reason ?? null,
-        });
-        return ctx.app.gateway.toVirtualKeyCamelDto(updated);
-      }),
-
-      enable: resolverAuthorizedPolicy({
-        reason: `${RESOLVER_AUTHORIZED}; update on one of the key's existing scopes`,
-        permissions: ["virtualKeys:update"],
-      })(procedure.input(virtualKeyApiKeyInputSchema)).mutation(async ({ ctx, input }) => {
-        const actorUserId = ctx.actor().id;
-        await ctx.app.gateway.authorizeVirtualKeyOperation({
-          actor: ctx.session,
-          organizationId: input.organizationId,
-          id: input.id,
-          permission: "virtualKeys:update",
-        });
-        const updated = await ctx.app.gateway.virtualKeys.enable({
-          id: input.id,
-          organizationId: input.organizationId,
-          actorUserId,
-        });
-        return ctx.app.gateway.toVirtualKeyCamelDto(updated);
-      }),
-    });
+              return ctx.app.gateway.toVirtualKeyCamelDtos({ virtualKeys: keys });
+            }),
+        )
+        .query("get", (p) =>
+          p
+            .withInput(virtualKeyApiKeyInputSchema)
+            .withOutput(virtualKeyCamelDtoSchema)
+            .withCustomPermission(
+              resolverAuthorizedPolicy({
+                reason: `${RESOLVER_AUTHORIZED}; the key must exist in this organization and intersect the caller's membership set, and a miss is answered as not found`,
+                permissions: ["virtualKeys:view"],
+              }),
+              RESOLVER_AUTHORIZED,
+            )
+            .handle(async ({ ctx, input }) => {
+              // A key the caller can't see is indistinguishable from one that
+              // doesn't exist — same NOT_FOUND, no existence leak.
+              const vk = await ctx.app.gateway.requireVisibleVirtualKeyForUser({
+                organizationId: input.organizationId,
+                id: input.id,
+                userId: ctx.actor().id,
+              });
+              return ctx.app.gateway.toVirtualKeyCamelDto(vk);
+            }),
+        )
+        /**
+         * Spend per key this calendar month, for keys the caller can see — reads the cost path, the same source the Usage tab reads, so the table number matches the page a click lands on. Keys with their own budget also get its limit + CURRENT-PERIOD spend (a different measurement from the month total, e.g. a daily cap), both in this one batched call so the table never asks per row.
+         */
+        .query("spendThisMonth", (p) =>
+          p
+            .withInput(virtualKeyApiOrganizationInputSchema)
+            .withOutput(virtualKeySpendThisMonthSchema)
+            .withCustomPermission(
+              resolverAuthorizedPolicy({
+                reason: `${RESOLVER_AUTHORIZED}; spend is reported only for keys visible to the caller's membership in this organization`,
+                permissions: ["virtualKeys:view"],
+              }),
+              RESOLVER_AUTHORIZED,
+            )
+            .handle(async ({ ctx, input }) => {
+              // Without the ClickHouse spend source there is no number to report.
+              // Failing loudly lets the column render "unavailable" instead of a
+              // confident $0.00 that cannot be told apart from a zero-spend key.
+              const spendRepo = ctx.app.gateway.virtualKeySpend;
+              if (!spendRepo) {
+                throw new TRPCError({
+                  code: "PRECONDITION_FAILED",
+                  message: "spend_source_unavailable",
+                });
+              }
+              const keys = await ctx.app.gateway.listVisibleVirtualKeys({
+                organizationId: input.organizationId,
+                userId: ctx.actor().id,
+              });
+              const now = new Date();
+              const virtualKeyIds = keys.map((k) => k.id);
+              const [spend, directBudgets] = await Promise.all([
+                ctx.app.gateway.spendByVirtualKey({
+                  organizationId: input.organizationId,
+                  virtualKeyIds,
+                  window: { fromDate: GatewayWindow.startOfCurrentMonthUTC(now), toDate: now },
+                }),
+                ctx.app.gateway.loadDirectBudgetsForKeys({
+                  organizationId: input.organizationId,
+                  virtualKeyIds,
+                  now,
+                }),
+              ]);
+              // Every visible key gets a row. With the spend source present, a
+              // missing entry means the key genuinely spent nothing, so zero is
+              // the honest render rather than an ambiguous blank.
+              return keys.map((k) => ({
+                virtualKeyId: k.id,
+                spentUsd: spend.get(k.id)?.spentUsd ?? "0",
+                requests: spend.get(k.id)?.requests ?? 0,
+                budget: directBudgets.get(k.id) ?? null,
+              }));
+            }),
+        )
+        /**
+         * Every budget that would constrain this key: the "already applies" list under the budget field in create/edit drawers. Takes a draft (picked scopes, no key row yet) so the list is answerable before the key exists.
+         */
+        .query("applicableBudgets", (p) =>
+          p
+            .withInput(virtualKeyApiApplicableBudgetsInputSchema)
+            .withOutput(virtualKeyApplicableBudgetsSchema)
+            .withCustomPermission(
+              resolverAuthorizedPolicy({
+                reason: `${RESOLVER_AUTHORIZED}; for an existing key, its visibility in this organization, and for a draft, manage on every scope in it, both checked before any budget data is read`,
+                permissions: ["virtualKeys:view", "virtualKeys:manage"],
+              }),
+              RESOLVER_AUTHORIZED,
+            )
+            .handle(async ({ ctx, input }) => {
+              // Authorization first — this resolver answers budget names, limits,
+              // live spend and (for a principal) their name, so an org id alone
+              // must not be enough. For an existing key, the caller must SEE it,
+              // and resolution binds to STORED ownership; caller-supplied scopes/
+              // destination/principal are ignored, or a visible org-wide key could leak a sibling's data.
+              if (input.virtualKeyId) {
+                const vk = await ctx.app.gateway.requireVisibleVirtualKeyForUser({
+                  organizationId: input.organizationId,
+                  id: input.virtualKeyId,
+                  userId: ctx.actor().id,
+                });
+                return ctx.app.gateway.resolveApplicableBudgets({
+                  target: {
+                    organizationId: input.organizationId,
+                    virtualKeyId: vk.id,
+                    scopes: vk.scopes.map((scope) => ({
+                      scopeType: scope.scopeType,
+                      scopeId: scope.scopeId,
+                    })),
+                    traceProjectId: vk.traceProjectId,
+                    principalUserId: vk.principalUserId,
+                  },
+                });
+              }
+              // For a draft (create drawer): the caller must hold
+              // `virtualKeys:manage` on every draft scope AND on the chosen trace
+              // destination — the exact boundary `create` will hold them to when they
+              // submit. Previewing a target's budgets must not be cheaper than
+              // creating a key against it.
+              await ctx.app.gateway.authorizeVirtualKeyScopeSelection({
+                actor: ctx.session,
+                organizationId: input.organizationId,
+                scopes: input.scopes,
+                traceProjectId: input.traceProjectId,
+              });
+              // The principal id is still pinned to the organization: even an
+              // authorized caller must not resolve another tenant's rows.
+              if (input.principalUserId) {
+                const member = await ctx.app.gateway.isOrganizationMember({
+                  organizationId: input.organizationId,
+                  userId: input.principalUserId,
+                });
+                if (!member) {
+                  throw new TRPCError({
+                    code: "BAD_REQUEST",
+                    message: "principalUserId is not a member of this organization.",
+                  });
+                }
+              }
+              return ctx.app.gateway.resolveApplicableBudgets({
+                target: {
+                  organizationId: input.organizationId,
+                  virtualKeyId: null,
+                  scopes: input.scopes,
+                  traceProjectId: input.traceProjectId ?? null,
+                  principalUserId: input.principalUserId ?? null,
+                },
+              });
+            }),
+        )
+        .mutation("create", (p) =>
+          p
+            .withInput(createInputSchema)
+            .withOutput(virtualKeyMintedSchema)
+            .withCustomPermission(
+              resolverAuthorizedPolicy({
+                reason: `${RESOLVER_AUTHORIZED}; manage on every requested scope, and every scope anchored to this organization, both before the key is minted`,
+                permissions: ["virtualKeys:manage"],
+              }),
+              RESOLVER_AUTHORIZED,
+            )
+            .handle(async ({ ctx, input }) => {
+              const actorUserId = ctx.actor().id;
+              // The same pre-flight the public REST create runs: manage at every
+              // requested scope, scopes inside the caller's organization, the
+              // destination anchored and manageable, guardrail refs project-local.
+              await ctx.app.gateway.authorizeVirtualKeyCreate({
+                actor: ctx.session,
+                organizationId: input.organizationId,
+                scopes: input.scopes,
+                traceProjectId: input.traceProjectId,
+                guardrailAttachments: input.config?.guardrailAttachments,
+              });
+              const { virtualKey, secret } = await ctx.app.gateway.virtualKeys.create({
+                organizationId: input.organizationId,
+                name: input.name,
+                description: input.description ?? null,
+                principalUserId: input.principalUserId ?? null,
+                scopes: input.scopes,
+                traceProjectId: input.traceProjectId ?? null,
+                routingPolicyId: input.routingPolicyId ?? null,
+                routingMode: input.routingMode,
+                expiresAt: input.expiresAt ?? null,
+                budget: input.budget ?? null,
+                config: input.config,
+                actorUserId,
+              });
+              // The one moment the plaintext key exists on the wire.
+              return { virtualKey: await ctx.app.gateway.toVirtualKeyCamelDto(virtualKey), secret };
+            }),
+        )
+        .mutation("update", (p) =>
+          p
+            .withInput(updateInputSchema)
+            .withOutput(virtualKeyCamelDtoSchema)
+            .withCustomPermission(
+              resolverAuthorizedPolicy({
+                reason: `${RESOLVER_AUTHORIZED}; update on one of the key's existing scopes, plus manage on every new scope when re-scoping`,
+                permissions: ["virtualKeys:update", "virtualKeys:manage"],
+              }),
+              RESOLVER_AUTHORIZED,
+            )
+            .handle(async ({ ctx, input }) => {
+              const actorUserId = ctx.actor().id;
+              // The same pre-flight the public REST patch runs: update on a scope the
+              // key already lives in, manage on every new scope when re-scoping, the
+              // destination anchored and manageable when it moves, and the guardrail
+              // attachments judged against the project the key resolves to.
+              await ctx.app.gateway.authorizeVirtualKeyUpdate({
+                actor: ctx.session,
+                organizationId: input.organizationId,
+                id: input.id,
+                scopes: input.scopes,
+                traceProjectId: input.traceProjectId,
+                guardrailAttachments: input.config?.guardrailAttachments,
+              });
+              const updated = await ctx.app.gateway.virtualKeys.update({
+                id: input.id,
+                organizationId: input.organizationId,
+                name: input.name,
+                description: input.description,
+                scopes: input.scopes,
+                traceProjectId: input.traceProjectId,
+                routingPolicyId: input.routingPolicyId,
+                routingMode: input.routingMode,
+                expiresAt: input.expiresAt,
+                budget: input.budget,
+                config: input.config,
+                actorUserId,
+              });
+              return ctx.app.gateway.toVirtualKeyCamelDto(updated);
+            }),
+        )
+        .mutation("rotate", (p) =>
+          p
+            .withInput(virtualKeyApiKeyInputSchema)
+            .withOutput(virtualKeyMintedSchema)
+            .withCustomPermission(
+              resolverAuthorizedPolicy({
+                reason: `${RESOLVER_AUTHORIZED}; rotate on one of the key's existing scopes`,
+                permissions: ["virtualKeys:rotate"],
+              }),
+              RESOLVER_AUTHORIZED,
+            )
+            .handle(async ({ ctx, input }) => {
+              const actorUserId = ctx.actor().id;
+              await ctx.app.gateway.authorizeVirtualKeyOperation({
+                actor: ctx.session,
+                organizationId: input.organizationId,
+                id: input.id,
+                permission: "virtualKeys:rotate",
+              });
+              const { virtualKey, secret } = await ctx.app.gateway.virtualKeys.rotate({
+                id: input.id,
+                organizationId: input.organizationId,
+                actorUserId,
+              });
+              // The second and last moment the plaintext key exists on the wire.
+              return { virtualKey: await ctx.app.gateway.toVirtualKeyCamelDto(virtualKey), secret };
+            }),
+        )
+        .mutation("revoke", (p) =>
+          p
+            .withInput(virtualKeyApiKeyInputSchema)
+            .withOutput(virtualKeyCamelDtoSchema)
+            .withCustomPermission(
+              resolverAuthorizedPolicy({
+                reason: `${RESOLVER_AUTHORIZED}; delete on one of the key's existing scopes`,
+                permissions: ["virtualKeys:delete"],
+              }),
+              RESOLVER_AUTHORIZED,
+            )
+            .handle(async ({ ctx, input }) => {
+              const actorUserId = ctx.actor().id;
+              await ctx.app.gateway.authorizeVirtualKeyOperation({
+                actor: ctx.session,
+                organizationId: input.organizationId,
+                id: input.id,
+                permission: "virtualKeys:delete",
+              });
+              const updated = await ctx.app.gateway.virtualKeys.revoke({
+                id: input.id,
+                organizationId: input.organizationId,
+                actorUserId,
+              });
+              return ctx.app.gateway.toVirtualKeyCamelDto(updated);
+            }),
+        )
+        .mutation("disable", (p) =>
+          p
+            .withInput(virtualKeyApiDisableInputSchema)
+            .withOutput(virtualKeyCamelDtoSchema)
+            .withCustomPermission(
+              resolverAuthorizedPolicy({
+                reason: `${RESOLVER_AUTHORIZED}; update on one of the key's existing scopes`,
+                permissions: ["virtualKeys:update"],
+              }),
+              RESOLVER_AUTHORIZED,
+            )
+            .handle(async ({ ctx, input }) => {
+              const actorUserId = ctx.actor().id;
+              await ctx.app.gateway.authorizeVirtualKeyOperation({
+                actor: ctx.session,
+                organizationId: input.organizationId,
+                id: input.id,
+                permission: "virtualKeys:update",
+              });
+              const updated = await ctx.app.gateway.virtualKeys.disable({
+                id: input.id,
+                organizationId: input.organizationId,
+                actorUserId,
+                reason: input.reason ?? null,
+              });
+              return ctx.app.gateway.toVirtualKeyCamelDto(updated);
+            }),
+        )
+        .mutation("enable", (p) =>
+          p
+            .withInput(virtualKeyApiKeyInputSchema)
+            .withOutput(virtualKeyCamelDtoSchema)
+            .withCustomPermission(
+              resolverAuthorizedPolicy({
+                reason: `${RESOLVER_AUTHORIZED}; update on one of the key's existing scopes`,
+                permissions: ["virtualKeys:update"],
+              }),
+              RESOLVER_AUTHORIZED,
+            )
+            .handle(async ({ ctx, input }) => {
+              const actorUserId = ctx.actor().id;
+              await ctx.app.gateway.authorizeVirtualKeyOperation({
+                actor: ctx.session,
+                organizationId: input.organizationId,
+                id: input.id,
+                permission: "virtualKeys:update",
+              });
+              const updated = await ctx.app.gateway.virtualKeys.enable({
+                id: input.id,
+                organizationId: input.organizationId,
+                actorUserId,
+              });
+              return ctx.app.gateway.toVirtualKeyCamelDto(updated);
+            }),
+        )
+        .build()
+    );
   }
 }

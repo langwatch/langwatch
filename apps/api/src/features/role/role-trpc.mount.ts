@@ -163,12 +163,16 @@ export function createRoleTrpcRouter<
     // the team's organization from its id, require manage there, and only then
     // consult the plan.
     assignToUser: withMiddleware(
-      service.policy("organization:manage")(service.protected.input(inputs.assignToUser)),
+      service.policy({ kind: "permission", permission: "organization:manage", via: "teamId" })(
+        service.protected.input(inputs.assignToUser),
+      ),
       assignmentPlanGate(mount.ports),
     ),
-    removeFromUser: service.policy("organization:manage")(
-      service.protected.input(inputs.removeFromUser),
-    ),
+    removeFromUser: service.policy({
+      kind: "permission",
+      permission: "organization:manage",
+      via: "teamId",
+    })(service.protected.input(inputs.removeFromUser)),
   });
 }
 

@@ -36,7 +36,7 @@ function harness({
 
   const router = SpansTrpcApi.create(
     trpc,
-    { protected: trpc.procedure, policy: () => (procedure) => procedure },
+    { protected: trpc.procedure, policy: () => (procedure) => procedure, validateOutput: true },
     { getViewerProtections },
   );
 
@@ -57,6 +57,8 @@ function harness({
 
 const span = (spanId: string, startedAt: number, finishedAt: number) => ({
   span_id: spanId,
+  trace_id: "trace-1",
+  type: "span" as const,
   timestamps: { started_at: startedAt, finished_at: finishedAt },
 });
 
@@ -124,9 +126,36 @@ describe("SpansTrpcApi", () => {
   describe("given the span is an LLM span", () => {
     it("answers with what the prompt studio opens on", async () => {
       const { caller } = harness({
-        tryGetSpanForPromptStudio: vi.fn(async () => ({ spanId: "span-1" })) as ReturnType<
-          typeof vi.fn
-        >,
+        tryGetSpanForPromptStudio: vi.fn(async () => ({
+          spanId: "span-1",
+          traceId: "trace-1",
+          spanName: null,
+          messages: [],
+          llmConfig: {
+            model: null,
+            systemPrompt: null,
+            temperature: null,
+            maxTokens: null,
+            topP: null,
+            frequencyPenalty: null,
+            presencePenalty: null,
+            seed: null,
+            topK: null,
+            minP: null,
+            repetitionPenalty: null,
+            reasoning: null,
+            verbosity: null,
+            litellmParams: {},
+          },
+          vendor: null,
+          error: null,
+          timestamps: undefined,
+          metrics: null,
+          promptHandle: null,
+          promptVersionNumber: null,
+          promptTag: null,
+          promptVariables: null,
+        })) as ReturnType<typeof vi.fn>,
       });
 
       await expect(

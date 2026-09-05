@@ -57,7 +57,7 @@ function mount(modelProviders: Partial<ModelProviderService>) {
     security: permittedSecurity(scopeChecks),
     modelProviders: () => modelProviders as ModelProviderService,
   });
-  return { hono: family.hono, scopeChecks };
+  return { hono: family, scopeChecks };
 }
 
 const WRITE_BODY = JSON.stringify({

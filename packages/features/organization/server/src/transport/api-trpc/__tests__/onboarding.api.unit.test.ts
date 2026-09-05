@@ -73,7 +73,11 @@ function harness(
     ...overrides,
   } as unknown as OnboardingTrpcPorts<typeof SIGN_UP_DATA_SCHEMA>;
 
-  const router = OnboardingTrpcApi.create(trpc, { protected: authenticated, noPermission }, ports);
+  const router = OnboardingTrpcApi.create(
+    trpc,
+    { protected: authenticated, noPermission, validateOutput: true },
+    ports,
+  );
 
   const ctx: TestContext = {
     app: { organizations: { createAndAssign } as unknown as OrganizationApp },

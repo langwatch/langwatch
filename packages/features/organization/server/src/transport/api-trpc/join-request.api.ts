@@ -28,6 +28,7 @@
  * which is composed over the identity ledger, the membership writer and the
  * mailer.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
 import {
   DOMAIN_JOIN_SETTINGS,
@@ -40,6 +41,12 @@ import {
   joinRequestApiOrganizationScopeSchema,
   joinRequestApiRequestInputSchema,
   joinRequestApiWithdrawInputSchema,
+  joinRequestFiledSchema,
+  joinRequestJoiningChangedSchema,
+  joinRequestJoiningSchema,
+  joinRequestMineSchema,
+  joinRequestPendingSchema,
+  joinRequestWriteAckSchema,
 } from "@langwatch/organization-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
@@ -66,6 +73,8 @@ type JoinRequestTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(declaration: AuthzDeclaration): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -220,136 +229,177 @@ export class JoinRequestTrpcApi {
     procedures: JoinRequestTrpcProcedures<TContext, TOptions, TRoot>,
     ports: JoinRequestTrpcPorts,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      /**
-       * Which organizations are open to one of the caller's own verified
-       * addresses. Answers "none" for every closed door — an unverified
-       * address, a consumer mail domain, an organization that turned joining
-       * off, and one that does not exist are all one answer.
-       */
-      lookup: policy(NOT_A_MEMBER_YET)(procedure).query(
-        async ({ ctx }): Promise<JoinLookupDecision> => {
-          const userId = ctx.actor().id;
-          return ports.lookup(ctx, {
-            userId,
-            verifiedEmail: await ports.tryResolveVerifiedEmail(ctx, { userId }),
-          });
-        },
-      ),
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput,
+      })
+        /**
+         * Which organizations are open to one of the caller's own verified
+         * addresses. Answers "none" for every closed door — an unverified
+         * address, a consumer mail domain, an organization that turned joining
+         * off, and one that does not exist are all one answer.
+         */
+        .query("lookup", (p) =>
+          p
+            .withoutInput("the caller's own session identifies the addresses to check")
+            // The identity feature owns the join-matching decision's shape;
+            // this transport forwards it untouched.
+            .withoutOutput(
+              "the identity feature owns the join-matching decision's shape (JoinLookupDecision)",
+            )
+            .withPermission(NOT_A_MEMBER_YET)
+            .handle(async ({ ctx }): Promise<JoinLookupDecision> => {
+              const userId = ctx.actor().id;
+              return ports.lookup(ctx, {
+                userId,
+                verifiedEmail: await ports.tryResolveVerifiedEmail(ctx, { userId }),
+              });
+            }),
+        )
+        /**
+         * Everything this person is waiting on, so a screen can say so rather
+         * than offering them an organization they have already asked.
+         */
+        .query("mine", (p) =>
+          p
+            .withoutInput("the caller's own session identifies whose requests to list")
+            .withOutput(joinRequestMineSchema)
+            .withPermission(OWN_PENDING_REQUESTS)
+            .handle(async ({ ctx }) => {
+              const pending = await ports.pendingForUser(ctx, { userId: ctx.actor().id });
+              return pending.map((request) => ({
+                ...waitingSince(request),
+                organizationId: request.organizationId,
+              }));
+            }),
+        )
+        /** Ask one organization to let you in. */
+        .mutation("request", (p) =>
+          p
+            .withInput(joinRequestApiRequestInputSchema)
+            .withOutput(joinRequestFiledSchema)
+            .withPermission(OFFERED_ORGANIZATION_ONLY)
+            .handle(async ({ ctx, input }) => {
+              const userId = ctx.actor().id;
+              return ports.request(ctx, {
+                userId,
+                verifiedEmail: await ports.tryResolveVerifiedEmail(ctx, { userId }),
+                organizationId: input.organizationId,
+              });
+            }),
+        )
+        /** Give up on a request, so nobody is bothered further. */
+        .mutation("withdraw", (p) =>
+          p
+            .withInput(joinRequestApiWithdrawInputSchema)
+            .withOutput(joinRequestWriteAckSchema)
+            .withPermission(OWN_REQUEST_ONLY)
+            .handle(async ({ ctx, input }) => {
+              await ports.withdraw(ctx, {
+                joinRequestId: input.joinRequestId,
+                userId: ctx.actor().id,
+              });
+              return { success: true };
+            }),
+        )
+        /** What is waiting on this organization, for the members area. */
+        .query("pending", (p) =>
+          p
+            .withInput(joinRequestApiOrganizationScopeSchema)
+            .withOutput(joinRequestPendingSchema)
+            .withPermission(ORGANIZATION_MANAGE)
+            .handle(async ({ ctx, input }) => {
+              const pending = await ports.pendingForOrganization(ctx, {
+                organizationId: input.organizationId,
+              });
+              // Who is asking, by name. The requester's ADDRESS is deliberately
+              // not returned: the domain is what was matched and what the admin is
+              // deciding on, and the local part is not the organization's business
+              // until the person is a member.
+              const names = await ports.listUserNames(ctx, {
+                userIds: pending.map((request) => request.userId),
+              });
+              const nameById = new Map(names.map((user) => [user.id, user.name]));
 
-      /**
-       * Everything this person is waiting on, so a screen can say so rather
-       * than offering them an organization they have already asked.
-       */
-      mine: policy(OWN_PENDING_REQUESTS)(procedure).query(async ({ ctx }) => {
-        const pending = await ports.pendingForUser(ctx, { userId: ctx.actor().id });
-        return pending.map((request) => ({
-          ...waitingSince(request),
-          organizationId: request.organizationId,
-        }));
-      }),
-
-      /** Ask one organization to let you in. */
-      request: policy(OFFERED_ORGANIZATION_ONLY)(
-        procedure.input(joinRequestApiRequestInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const userId = ctx.actor().id;
-        return ports.request(ctx, {
-          userId,
-          verifiedEmail: await ports.tryResolveVerifiedEmail(ctx, { userId }),
-          organizationId: input.organizationId,
-        });
-      }),
-
-      /** Give up on a request, so nobody is bothered further. */
-      withdraw: policy(OWN_REQUEST_ONLY)(
-        procedure.input(joinRequestApiWithdrawInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        await ports.withdraw(ctx, {
-          joinRequestId: input.joinRequestId,
-          userId: ctx.actor().id,
-        });
-        return { success: true };
-      }),
-
-      /** What is waiting on this organization, for the members area. */
-      pending: policy(ORGANIZATION_MANAGE)(
-        procedure.input(joinRequestApiOrganizationScopeSchema),
-      ).query(async ({ ctx, input }) => {
-        const pending = await ports.pendingForOrganization(ctx, {
-          organizationId: input.organizationId,
-        });
-        // Who is asking, by name. The requester's ADDRESS is deliberately
-        // not returned: the domain is what was matched and what the admin is
-        // deciding on, and the local part is not the organization's business
-        // until the person is a member.
-        const names = await ports.listUserNames(ctx, {
-          userIds: pending.map((request) => request.userId),
-        });
-        const nameById = new Map(names.map((user) => [user.id, user.name]));
-
-        return pending.map((request) => ({
-          ...waitingSince(request),
-          userId: request.userId,
-          name: nameById.get(request.userId) ?? "A colleague",
-          domain: request.domain,
-        }));
-      }),
-
-      /**
-       * Approve. No role on this input and never will be: an approval grants
-       * the organization's default role, and an admin who wants to hand over
-       * more sends a formal invitation, which is the flow that owns roles and
-       * teams.
-       */
-      approve: policy(ORGANIZATION_MANAGE)(
-        procedure.input(joinRequestApiDecisionInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        await ports.approve(ctx, {
-          joinRequestId: input.joinRequestId,
-          organizationId: input.organizationId,
-          adminUserId: ctx.actor().id,
-        });
-        return { success: true };
-      }),
-
-      /**
-       * Reject. No reason field: an admin who has to justify a refusal is an
-       * admin who hesitates to make one.
-       */
-      reject: policy(ORGANIZATION_MANAGE)(
-        procedure.input(joinRequestApiDecisionInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        await ports.reject(ctx, {
-          joinRequestId: input.joinRequestId,
-          organizationId: input.organizationId,
-          adminUserId: ctx.actor().id,
-        });
-        return { success: true };
-      }),
-
-      /**
-       * How colleagues on a matching domain currently get in, for the settings
-       * card. Behind `organization:manage` like the write: an organization's
-       * joining posture is not a stranger's business.
-       */
-      joining: policy(ORGANIZATION_MANAGE)(
-        procedure.input(joinRequestApiOrganizationScopeSchema),
-      ).query(async ({ ctx, input }) =>
-        ports.readJoining(ctx, { organizationId: input.organizationId }),
-      ),
-
-      /** How colleagues on a matching domain get in. */
-      setJoining: policy(ORGANIZATION_MANAGE)(procedure.input(setJoiningInputSchema)).mutation(
-        async ({ ctx, input }) =>
-          ports.setJoining(ctx, {
-            organizationId: input.organizationId,
-            domainJoin: input.domainJoin,
-            domains: input.domains,
-          }),
-      ),
-    });
+              return pending.map((request) => ({
+                ...waitingSince(request),
+                userId: request.userId,
+                name: nameById.get(request.userId) ?? "A colleague",
+                domain: request.domain,
+              }));
+            }),
+        )
+        /**
+         * Approve. No role on this input and never will be: an approval grants
+         * the organization's default role, and an admin who wants to hand over
+         * more sends a formal invitation, which is the flow that owns roles and
+         * teams.
+         */
+        .mutation("approve", (p) =>
+          p
+            .withInput(joinRequestApiDecisionInputSchema)
+            .withOutput(joinRequestWriteAckSchema)
+            .withPermission(ORGANIZATION_MANAGE)
+            .handle(async ({ ctx, input }) => {
+              await ports.approve(ctx, {
+                joinRequestId: input.joinRequestId,
+                organizationId: input.organizationId,
+                adminUserId: ctx.actor().id,
+              });
+              return { success: true };
+            }),
+        )
+        /**
+         * Reject. No reason field: an admin who has to justify a refusal is an
+         * admin who hesitates to make one.
+         */
+        .mutation("reject", (p) =>
+          p
+            .withInput(joinRequestApiDecisionInputSchema)
+            .withOutput(joinRequestWriteAckSchema)
+            .withPermission(ORGANIZATION_MANAGE)
+            .handle(async ({ ctx, input }) => {
+              await ports.reject(ctx, {
+                joinRequestId: input.joinRequestId,
+                organizationId: input.organizationId,
+                adminUserId: ctx.actor().id,
+              });
+              return { success: true };
+            }),
+        )
+        /**
+         * How colleagues on a matching domain currently get in, for the settings
+         * card. Behind `organization:manage` like the write: an organization's
+         * joining posture is not a stranger's business.
+         */
+        .query("joining", (p) =>
+          p
+            .withInput(joinRequestApiOrganizationScopeSchema)
+            .withOutput(joinRequestJoiningSchema)
+            .withPermission(ORGANIZATION_MANAGE)
+            .handle(({ ctx, input }) =>
+              ports.readJoining(ctx, { organizationId: input.organizationId }),
+            ),
+        )
+        /** How colleagues on a matching domain get in. */
+        .mutation("setJoining", (p) =>
+          p
+            .withInput(setJoiningInputSchema)
+            .withOutput(joinRequestJoiningChangedSchema)
+            .withPermission(ORGANIZATION_MANAGE)
+            .handle(({ ctx, input }) =>
+              ports.setJoining(ctx, {
+                organizationId: input.organizationId,
+                domainJoin: input.domainJoin,
+                domains: input.domains,
+              }),
+            ),
+        )
+        .build()
+    );
   }
 }

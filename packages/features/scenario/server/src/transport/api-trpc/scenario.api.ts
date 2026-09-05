@@ -28,14 +28,14 @@ export class ScenarioTrpcApi {
     procedures: ScenarioTrpcProcedures<TContext, TOptions, TRoot>,
     ports: ScenarioTrpcPorts,
   ) {
-    return trpc.router({
-      ...createScenarioCrudRouter(trpc, procedures, ports)._def.procedures,
-      ...createScenarioEventsRouter(trpc, procedures)._def.procedures,
-      ...createSimulationRunnerRouter(trpc, procedures)._def.procedures,
-      ...createScenarioCancellationRouter(trpc, procedures)._def.procedures,
-      ...createScenarioVersionRouter(trpc, procedures)._def.procedures,
-      ...createResultAtomsRouter(trpc, procedures)._def.procedures,
-      ...createRunConfigurationsRouter(trpc, procedures)._def.procedures,
-    });
+    return trpc.mergeRouters(
+      createScenarioCrudRouter(trpc, procedures, ports),
+      createScenarioEventsRouter(trpc, procedures),
+      createSimulationRunnerRouter(trpc, procedures),
+      createScenarioCancellationRouter(trpc, procedures),
+      createScenarioVersionRouter(trpc, procedures),
+      createResultAtomsRouter(trpc, procedures),
+      createRunConfigurationsRouter(trpc, procedures),
+    );
   }
 }

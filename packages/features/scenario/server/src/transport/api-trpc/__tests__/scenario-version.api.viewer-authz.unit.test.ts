@@ -22,8 +22,24 @@ function viewerHarness() {
   const trpc = initTRPC.context<ScenarioTrpcContext>().create();
   const listVersions = vi.fn().mockResolvedValue({
     versions: [
-      { version: 2, authorId: null, changedFields: ["situation"] },
-      { version: 1, authorId: null, changedFields: [] },
+      {
+        version: 2,
+        authorId: null,
+        authorLabel: null,
+        changeDescription: null,
+        changedFields: ["situation"],
+        createdAt: new Date("2026-01-02T00:00:00.000Z"),
+        isSynthesized: false,
+      },
+      {
+        version: 1,
+        authorId: null,
+        authorLabel: null,
+        changeDescription: null,
+        changedFields: [],
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        isSynthesized: false,
+      },
     ],
     nextCursor: null,
   });
@@ -37,7 +53,7 @@ function viewerHarness() {
       throw new TRPCError({ code: "FORBIDDEN", message: "insufficient_permissions" });
     }) as never;
   };
-  const procedures = { protected: trpc.procedure, policy } as never;
+  const procedures = { protected: trpc.procedure, policy, validateOutput: true } as never;
 
   const scenarios = {
     listVersions,

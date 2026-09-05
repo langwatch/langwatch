@@ -45,6 +45,8 @@ export type ScenarioTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /**

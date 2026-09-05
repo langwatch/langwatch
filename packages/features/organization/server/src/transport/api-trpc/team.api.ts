@@ -30,15 +30,21 @@
  *
  * Spec: packages/features/organization/specs/organization-service.feature.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   organizationApiScopeSchema,
+  organizationTeamAccessSchema,
+  organizationTeamSchema,
   teamApiCreateWithMembersInputSchema,
   teamApiRemoveMemberInputSchema,
   teamApiSlugSchema,
   teamApiSlugWithOrganizationSchema,
   teamApiTeamScopeSchema,
   teamApiUpdateInputSchema,
+  teamMemberRemovedSchema,
+  teamWithProjectsSchema,
+  teamWriteAckSchema,
 } from "@langwatch/organization-contract";
 import {
   type AnyTRPCRootTypes,
@@ -79,6 +85,8 @@ type TeamTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -129,120 +137,151 @@ export class TeamTrpcApi {
     procedures: TeamTrpcProcedures<TContext, TOptions, TRoot>,
     ports: TeamTrpcPorts,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      getBySlug: policy("organization:view")(procedure.input(teamApiSlugSchema)).query(
-        ({ input, ctx }) => ctx.app.organizations.getTeamBySlugForMember(input, ctx.actor()),
-      ),
-
-      getTeamsWithMembers: policy("organization:view")(
-        procedure.input(organizationApiScopeSchema),
-      ).query(async ({ input, ctx }) => {
-        const callerCanManage = await ports.probeOrganizationPermission(
-          ctx,
-          input.organizationId,
-          "organization:manage",
-        );
-        const [teams, projects] = await Promise.all([
-          ctx.app.organizations.listTeamsWithMembers(
-            { organizationId: input.organizationId, callerCanManage },
-            ctx.actor(),
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("getBySlug", (p) =>
+        p
+          .withInput(teamApiSlugSchema)
+          .withOutput(organizationTeamSchema)
+          .withPermission("organization:view")
+          .handle(({ input, ctx }) =>
+            ctx.app.organizations.getTeamBySlugForMember(input, ctx.actor()),
           ),
-          ctx.app.organizations.listProjectsByOrganization({
-            organizationId: input.organizationId,
-            ...ORGANIZATION_PROJECT_PAGE,
+      )
+      .query("getTeamsWithMembers", (p) =>
+        p
+          .withInput(organizationApiScopeSchema)
+          .withOutput(teamWithProjectsSchema.array())
+          .withPermission("organization:view")
+          .handle(async ({ input, ctx }) => {
+            const callerCanManage = await ports.probeOrganizationPermission(
+              ctx,
+              input.organizationId,
+              "organization:manage",
+            );
+            const [teams, projects] = await Promise.all([
+              ctx.app.organizations.listTeamsWithMembers(
+                { organizationId: input.organizationId, callerCanManage },
+                ctx.actor(),
+              ),
+              ctx.app.organizations.listProjectsByOrganization({
+                organizationId: input.organizationId,
+                ...ORGANIZATION_PROJECT_PAGE,
+              }),
+            ]);
+            return teams.map((team) => ({
+              ...team,
+              projects: projects.data.filter(({ teamId }) => teamId === team.id),
+            }));
           }),
-        ]);
-        return teams.map((team) => ({
-          ...team,
-          projects: projects.data.filter(({ teamId }) => teamId === team.id),
-        }));
-      }),
-
-      getTeamsWithRoleBindings: policy("organization:manage")(
-        procedure.input(organizationApiScopeSchema),
-      ).query(async ({ input, ctx }) => {
-        const projects = await ctx.app.organizations.listProjectsByOrganization({
-          organizationId: input.organizationId,
-          ...ORGANIZATION_PROJECT_PAGE,
-        });
-        return ctx.app.organizations.listTeamAccess({
-          organizationId: input.organizationId,
-          projects: projects.data.map(({ id, name, teamId }) => ({
-            id,
-            name,
-            teamId,
-          })),
-        });
-      }),
-
-      getTeamWithMembers: policy("organization:view")(
-        procedure.input(teamApiSlugWithOrganizationSchema),
-      ).query(async ({ input, ctx }) => {
-        const callerCanManage = await ports.probeOrganizationPermission(
-          ctx,
-          input.organizationId,
-          "organization:manage",
-        );
-        const team = await ctx.app.organizations.getTeamWithMembers(
-          { ...input, callerCanManage },
-          ctx.actor(),
-        );
-        const projects = await ctx.app.organizations.listProjectsByTeam({
-          organizationId: input.organizationId,
-          teamId: team.id,
-        });
-        return { ...team, projects };
-      }),
-
-      update: policy("team:manage")(procedure.input(teamApiUpdateInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const team = await ctx.app.organizations.getTeamById({
-            teamId: input.teamId,
-          });
-          await ports.assertCustomRolesAllowed(ctx, {
-            organizationId: team.organizationId,
-            members: input.members,
-          });
-          await ctx.app.organizations.updateTeamWithMembers(input, ctx.actor());
-          return { success: true as const };
-        },
-      ),
-
-      createTeamWithMembers: policy("organization:manage")(
-        procedure.input(teamApiCreateWithMembersInputSchema),
-      ).mutation(async ({ input, ctx }) => {
-        await ports.assertCustomRolesAllowed(ctx, {
-          organizationId: input.organizationId,
-          members: input.members,
-        });
-        return ctx.app.organizations.createTeamWithMembers(input, ctx.actor());
-      }),
-
-      archiveById: policy("team:manage")(procedure.input(teamApiTeamScopeSchema)).mutation(
-        async ({ input, ctx }) => {
-          const team = await ctx.app.organizations.getTeamById(input);
-          await ctx.app.organizations.archiveTeam({
-            teamId: team.id,
-            organizationId: team.organizationId,
-          });
-          return { success: true as const };
-        },
-      ),
-
-      removeMember: policy("team:manage")(procedure.input(teamApiRemoveMemberInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const team = await ctx.app.organizations.getTeamById({
-            teamId: input.teamId,
-          });
-          await ctx.app.organizations.removeTeamMember(
-            { ...input, organizationId: team.organizationId },
-            ctx.actor(),
-          );
-          return { success: true as const, removedUserId: input.userId };
-        },
-      ),
-    });
+      )
+      .query("getTeamsWithRoleBindings", (p) =>
+        p
+          .withInput(organizationApiScopeSchema)
+          .withOutput(organizationTeamAccessSchema.array())
+          .withPermission("organization:manage")
+          .handle(async ({ input, ctx }) => {
+            const projects = await ctx.app.organizations.listProjectsByOrganization({
+              organizationId: input.organizationId,
+              ...ORGANIZATION_PROJECT_PAGE,
+            });
+            return ctx.app.organizations.listTeamAccess({
+              organizationId: input.organizationId,
+              projects: projects.data.map(({ id, name, teamId }) => ({
+                id,
+                name,
+                teamId,
+              })),
+            });
+          }),
+      )
+      .query("getTeamWithMembers", (p) =>
+        p
+          .withInput(teamApiSlugWithOrganizationSchema)
+          .withOutput(teamWithProjectsSchema)
+          .withPermission("organization:view")
+          .handle(async ({ input, ctx }) => {
+            const callerCanManage = await ports.probeOrganizationPermission(
+              ctx,
+              input.organizationId,
+              "organization:manage",
+            );
+            const team = await ctx.app.organizations.getTeamWithMembers(
+              { ...input, callerCanManage },
+              ctx.actor(),
+            );
+            const projects = await ctx.app.organizations.listProjectsByTeam({
+              organizationId: input.organizationId,
+              teamId: team.id,
+            });
+            return { ...team, projects };
+          }),
+      )
+      .mutation("update", (p) =>
+        p
+          .withInput(teamApiUpdateInputSchema)
+          .withOutput(teamWriteAckSchema)
+          .withPermission("team:manage")
+          .handle(async ({ input, ctx }) => {
+            const team = await ctx.app.organizations.getTeamById({
+              teamId: input.teamId,
+            });
+            await ports.assertCustomRolesAllowed(ctx, {
+              organizationId: team.organizationId,
+              members: input.members,
+            });
+            await ctx.app.organizations.updateTeamWithMembers(input, ctx.actor());
+            return { success: true as const };
+          }),
+      )
+      .mutation("createTeamWithMembers", (p) =>
+        p
+          .withInput(teamApiCreateWithMembersInputSchema)
+          .withOutput(organizationTeamSchema)
+          .withPermission("organization:manage")
+          .handle(async ({ input, ctx }) => {
+            await ports.assertCustomRolesAllowed(ctx, {
+              organizationId: input.organizationId,
+              members: input.members,
+            });
+            return ctx.app.organizations.createTeamWithMembers(input, ctx.actor());
+          }),
+      )
+      .mutation("archiveById", (p) =>
+        p
+          .withInput(teamApiTeamScopeSchema)
+          .withOutput(teamWriteAckSchema)
+          .withPermission("team:manage")
+          .handle(async ({ input, ctx }) => {
+            const team = await ctx.app.organizations.getTeamById(input);
+            await ctx.app.organizations.archiveTeam({
+              teamId: team.id,
+              organizationId: team.organizationId,
+            });
+            return { success: true as const };
+          }),
+      )
+      .mutation("removeMember", (p) =>
+        p
+          .withInput(teamApiRemoveMemberInputSchema)
+          .withOutput(teamMemberRemovedSchema)
+          .withPermission("team:manage")
+          .handle(async ({ input, ctx }) => {
+            const team = await ctx.app.organizations.getTeamById({
+              teamId: input.teamId,
+            });
+            await ctx.app.organizations.removeTeamMember(
+              { ...input, organizationId: team.organizationId },
+              ctx.actor(),
+            );
+            return { success: true as const, removedUserId: input.userId };
+          }),
+      )
+      .build();
   }
 }

@@ -45,6 +45,7 @@ export * from "./trace-media-ref";
 export * from "./trace-media-role";
 export * from "./trace-offload.contract";
 export * from "./trace-read.contract";
+export * from "./trace.responses";
 export * from "./trace-session-group";
 export * from "./trace-share.schemas";
 export * from "./trace-span-io";

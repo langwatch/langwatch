@@ -12,10 +12,12 @@
  *
  * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   gatewayGuardrailDirectionSchema,
   gatewayGuardrailFailureModeSchema,
+  gatewayGuardrailResourceSchema,
 } from "@langwatch/gateway-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
@@ -41,6 +43,8 @@ type GatewayGuardrailTrpcProcedures<
    * applied AFTER this feature's input parser.
    */
   policy(permission: AuthzPermission): ProcedureDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const directionSchema = gatewayGuardrailDirectionSchema;
@@ -59,79 +63,102 @@ export class GatewayGuardrailTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: GatewayGuardrailTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      list: policy("gatewayGuardrails:view")(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) => ctx.app.gateway.budgetDecisions.guardrailList(input.projectId),
-      ),
-
-      get: policy("gatewayGuardrails:view")(procedure.input(guardrailIdSchema)).query(
-        async ({ ctx, input }) =>
-          ctx.app.gateway.budgetDecisions.tryGuardrailGet({
-            id: input.id,
-            projectId: input.projectId,
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("list", (p) =>
+        p
+          .withInput(projectScopeSchema)
+          .withOutput(gatewayGuardrailResourceSchema.array())
+          .withPermission("gatewayGuardrails:view")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.gateway.budgetDecisions.guardrailList(input.projectId),
+          ),
+      )
+      .query("get", (p) =>
+        p
+          .withInput(guardrailIdSchema)
+          .withOutput(gatewayGuardrailResourceSchema.nullable())
+          .withPermission("gatewayGuardrails:view")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.gateway.budgetDecisions.tryGuardrailGet({
+              id: input.id,
+              projectId: input.projectId,
+            }),
+          ),
+      )
+      .mutation("create", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              name: z.string().min(1).max(128),
+              description: z.string().max(512).nullable().optional(),
+              evaluatorId: z.string(),
+              direction: directionSchema,
+              failureMode: failureModeSchema.optional(),
+            }),
+          )
+          .withOutput(gatewayGuardrailResourceSchema)
+          .withPermission("gatewayGuardrails:manage")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.gateway.budgetDecisions.guardrailCreate({
+              projectId: input.projectId,
+              name: input.name,
+              description: input.description ?? null,
+              evaluatorId: input.evaluatorId,
+              direction: input.direction,
+              failureMode: input.failureMode,
+              actorUserId: ctx.actor().id,
+            }),
+          ),
+      )
+      .mutation("update", (p) =>
+        p
+          .withInput(
+            z.object({
+              projectId: z.string(),
+              id: z.string(),
+              name: z.string().min(1).max(128).optional(),
+              description: z.string().max(512).nullable().optional(),
+              evaluatorId: z.string().optional(),
+              direction: directionSchema.optional(),
+              failureMode: failureModeSchema.optional(),
+            }),
+          )
+          .withOutput(gatewayGuardrailResourceSchema)
+          .withPermission("gatewayGuardrails:manage")
+          .handle(async ({ ctx, input }) =>
+            ctx.app.gateway.budgetDecisions.guardrailUpdate({
+              id: input.id,
+              projectId: input.projectId,
+              name: input.name,
+              description: input.description,
+              evaluatorId: input.evaluatorId,
+              direction: input.direction,
+              failureMode: input.failureMode,
+              actorUserId: ctx.actor().id,
+            }),
+          ),
+      )
+      .mutation("archive", (p) =>
+        p
+          .withInput(guardrailIdSchema)
+          .withOutput(z.object({ ok: z.literal(true) }).strict())
+          .withPermission("gatewayGuardrails:manage")
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.gateway.budgetDecisions.guardrailArchive({
+              id: input.id,
+              projectId: input.projectId,
+              actorUserId: ctx.actor().id,
+            });
+            return { ok: true };
           }),
-      ),
-
-      create: policy("gatewayGuardrails:manage")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            name: z.string().min(1).max(128),
-            description: z.string().max(512).nullable().optional(),
-            evaluatorId: z.string(),
-            direction: directionSchema,
-            failureMode: failureModeSchema.optional(),
-          }),
-        ),
-      ).mutation(async ({ ctx, input }) =>
-        ctx.app.gateway.budgetDecisions.guardrailCreate({
-          projectId: input.projectId,
-          name: input.name,
-          description: input.description ?? null,
-          evaluatorId: input.evaluatorId,
-          direction: input.direction,
-          failureMode: input.failureMode,
-          actorUserId: ctx.actor().id,
-        }),
-      ),
-
-      update: policy("gatewayGuardrails:manage")(
-        procedure.input(
-          z.object({
-            projectId: z.string(),
-            id: z.string(),
-            name: z.string().min(1).max(128).optional(),
-            description: z.string().max(512).nullable().optional(),
-            evaluatorId: z.string().optional(),
-            direction: directionSchema.optional(),
-            failureMode: failureModeSchema.optional(),
-          }),
-        ),
-      ).mutation(async ({ ctx, input }) =>
-        ctx.app.gateway.budgetDecisions.guardrailUpdate({
-          id: input.id,
-          projectId: input.projectId,
-          name: input.name,
-          description: input.description,
-          evaluatorId: input.evaluatorId,
-          direction: input.direction,
-          failureMode: input.failureMode,
-          actorUserId: ctx.actor().id,
-        }),
-      ),
-
-      archive: policy("gatewayGuardrails:manage")(procedure.input(guardrailIdSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ctx.app.gateway.budgetDecisions.guardrailArchive({
-            id: input.id,
-            projectId: input.projectId,
-            actorUserId: ctx.actor().id,
-          });
-          return { ok: true };
-        },
-      ),
-    });
+      )
+      .build();
   }
 }

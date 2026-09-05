@@ -18,8 +18,14 @@
  * same functions the legacy trace read applies, and that read has not left the
  * application yet.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { traceEditOverlayPatchSchema, type TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import {
+  traceEditOverlayDtoSchema,
+  traceEditOverlayOrNullSchema,
+  traceEditOverlayPatchSchema,
+  type TraceEditOverlayPatch,
+} from "@langwatch/trace-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { TraceApp } from "#app/trace.app";
@@ -54,6 +60,8 @@ type TraceEditOverlayTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** Whether the chain checks every answer against its declared output schema. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -116,107 +124,121 @@ export class TraceEditOverlayTrpcApi {
     procedures: TraceEditOverlayTrpcProcedures<TContext, TOptions, TRoot>,
     ports: TraceEditOverlayTrpcPorts<TProtections>,
   ) {
-    const { protected: procedure, policy } = procedures;
-
-    return trpc.router({
-      getByTraceId: policy("traces:view")(procedure.input(traceScopeSchema)).query(
-        async ({ ctx, input }) => {
-          const overlay = await ctx.app.traces.readTraceEditOverlay({
-            projectId: input.projectId,
-            traceId: input.traceId,
-          });
-          if (!overlay) return null;
-
-          const protections = await ports.getViewerProtections(ctx, {
-            projectId: input.projectId,
-          });
-          const isWindowRedacted = await ctx.app.traces.isTraceWindowRedacted({
-            projectId: input.projectId,
-            traceId: input.traceId,
-            visibilityCutoffMs: protections.visibilityCutoffMs,
-          });
-
-          return {
-            ...overlay,
-            patch: ports.redactPatchForViewer({
-              patch: overlay.patch,
-              protections,
-              isWindowRedacted,
-            }),
-          };
-        },
-      ),
-
-      /**
-       * Saves the correction, replacing the previous one.
-       *
-       * The saved patch is composed on top of what the read handed the caller,
-       * so the edits withheld from them are carried over rather than dropped,
-       * and the answer that goes back is redacted the same way the read is.
-       * Removing a correction outright stays the separate, deliberate `delete`.
-       */
-      upsert: policy("annotations:update")(procedure.input(upsertInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const stored = await ctx.app.traces.readTraceEditOverlay({
-            projectId: input.projectId,
-            traceId: input.traceId,
-          });
-
-          // The first correction on a trace has nothing to carry over and
-          // nothing to redact: the answer is the caller's own patch.
-          if (!stored) {
-            return ctx.app.traces.saveTraceEditOverlay(
-              {
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures,
+        validateOutput: procedures.validateOutput,
+      })
+        .query("getByTraceId", (p) =>
+          p
+            .withInput(traceScopeSchema)
+            .withOutput(traceEditOverlayOrNullSchema)
+            .withPermission("traces:view")
+            .handle(async ({ ctx, input }) => {
+              const overlay = await ctx.app.traces.readTraceEditOverlay({
                 projectId: input.projectId,
                 traceId: input.traceId,
-                patch: input.patch,
-              },
-              ctx.actor(),
-            );
-          }
+              });
+              if (!overlay) return null;
 
-          const protections = await ports.getViewerProtections(ctx, {
-            projectId: input.projectId,
-          });
-          const isWindowRedacted = await ctx.app.traces.isTraceWindowRedacted({
-            projectId: input.projectId,
-            traceId: input.traceId,
-            visibilityCutoffMs: protections.visibilityCutoffMs,
-          });
+              const protections = await ports.getViewerProtections(ctx, {
+                projectId: input.projectId,
+              });
+              const isWindowRedacted = await ctx.app.traces.isTraceWindowRedacted({
+                projectId: input.projectId,
+                traceId: input.traceId,
+                visibilityCutoffMs: protections.visibilityCutoffMs,
+              });
 
-          const saved = await ctx.app.traces.saveTraceEditOverlay(
-            {
-              projectId: input.projectId,
-              traceId: input.traceId,
-              patch: ports.restoreWithheldEdits({
-                incoming: input.patch,
-                stored: stored.patch,
-                protections,
-                isWindowRedacted,
-              }),
-            },
-            ctx.actor(),
-          );
-
-          return {
-            ...saved,
-            patch: ports.redactPatchForViewer({
-              patch: saved.patch,
-              protections,
-              isWindowRedacted,
+              return {
+                ...overlay,
+                patch: ports.redactPatchForViewer({
+                  patch: overlay.patch,
+                  protections,
+                  isWindowRedacted,
+                }),
+              };
             }),
-          };
-        },
-      ),
+        )
+        /**
+         * Saves the correction, replacing the previous one.
+         *
+         * The saved patch is composed on top of what the read handed the caller,
+         * so the edits withheld from them are carried over rather than dropped,
+         * and the answer that goes back is redacted the same way the read is.
+         * Removing a correction outright stays the separate, deliberate `delete`.
+         */
+        .mutation("upsert", (p) =>
+          p
+            .withInput(upsertInputSchema)
+            .withOutput(traceEditOverlayDtoSchema)
+            .withPermission("annotations:update")
+            .handle(async ({ ctx, input }) => {
+              const stored = await ctx.app.traces.readTraceEditOverlay({
+                projectId: input.projectId,
+                traceId: input.traceId,
+              });
 
-      delete: policy("annotations:update")(procedure.input(traceScopeSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ctx.app.traces.deleteTraceEditOverlay({
-            projectId: input.projectId,
-            traceId: input.traceId,
-          });
-        },
-      ),
-    });
+              // The first correction on a trace has nothing to carry over and
+              // nothing to redact: the answer is the caller's own patch.
+              if (!stored) {
+                return ctx.app.traces.saveTraceEditOverlay(
+                  {
+                    projectId: input.projectId,
+                    traceId: input.traceId,
+                    patch: input.patch,
+                  },
+                  ctx.actor(),
+                );
+              }
+
+              const protections = await ports.getViewerProtections(ctx, {
+                projectId: input.projectId,
+              });
+              const isWindowRedacted = await ctx.app.traces.isTraceWindowRedacted({
+                projectId: input.projectId,
+                traceId: input.traceId,
+                visibilityCutoffMs: protections.visibilityCutoffMs,
+              });
+
+              const saved = await ctx.app.traces.saveTraceEditOverlay(
+                {
+                  projectId: input.projectId,
+                  traceId: input.traceId,
+                  patch: ports.restoreWithheldEdits({
+                    incoming: input.patch,
+                    stored: stored.patch,
+                    protections,
+                    isWindowRedacted,
+                  }),
+                },
+                ctx.actor(),
+              );
+
+              return {
+                ...saved,
+                patch: ports.redactPatchForViewer({
+                  patch: saved.patch,
+                  protections,
+                  isWindowRedacted,
+                }),
+              };
+            }),
+        )
+        .mutation("delete", (p) =>
+          p
+            .withInput(traceScopeSchema)
+            .withOutput(z.void())
+            .withPermission("annotations:update")
+            .handle(async ({ ctx, input }) => {
+              await ctx.app.traces.deleteTraceEditOverlay({
+                projectId: input.projectId,
+                traceId: input.traceId,
+              });
+            }),
+        )
+        .build()
+    );
   }
 }

@@ -17,10 +17,12 @@
  *
  * Spec: specs/ai-gateway/governance/personal-workspace-features.feature.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
 import {
   PersonalProjectNotFoundError,
   PersonalProjectOwnerMismatchError,
+  personalFeaturesSchema,
 } from "@langwatch/organization-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
@@ -59,6 +61,8 @@ type PersonalWorkspaceFeaturesTrpcProcedures<
    * installed before `.input()` would see no input at all.
    */
   policy(declaration: AuthzDeclaration): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const OWNED_BY_ITS_OWNER: AuthzDeclaration = {
@@ -97,47 +101,61 @@ export class PersonalWorkspaceFeaturesTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: PersonalWorkspaceFeaturesTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      get: policy(OWNED_BY_ITS_OWNER)(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) => {
-          try {
-            return await ctx.app.organizations.getPersonalWorkspaceFeatures(
-              { projectId: input.projectId },
-              ctx.actor(),
-            );
-          } catch (err) {
-            return asNotFound(err);
-          }
-        },
-      ),
-
-      enableAll: policy(OWNED_BY_ITS_OWNER)(procedure.input(projectScopeSchema)).mutation(
-        async ({ ctx, input }) => {
-          try {
-            return await ctx.app.organizations.enableAllPersonalWorkspaceFeatures(
-              { projectId: input.projectId },
-              ctx.actor(),
-            );
-          } catch (err) {
-            return asNotFound(err);
-          }
-        },
-      ),
-
-      disableAll: policy(OWNED_BY_ITS_OWNER)(procedure.input(projectScopeSchema)).mutation(
-        async ({ ctx, input }) => {
-          try {
-            return await ctx.app.organizations.disableAllPersonalWorkspaceFeatures(
-              { projectId: input.projectId },
-              ctx.actor(),
-            );
-          } catch (err) {
-            return asNotFound(err);
-          }
-        },
-      ),
-    });
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("get", (p) =>
+        p
+          .withInput(projectScopeSchema)
+          .withOutput(personalFeaturesSchema)
+          .withPermission(OWNED_BY_ITS_OWNER)
+          .handle(async ({ ctx, input }) => {
+            try {
+              return await ctx.app.organizations.getPersonalWorkspaceFeatures(
+                { projectId: input.projectId },
+                ctx.actor(),
+              );
+            } catch (err) {
+              return asNotFound(err);
+            }
+          }),
+      )
+      .mutation("enableAll", (p) =>
+        p
+          .withInput(projectScopeSchema)
+          .withOutput(personalFeaturesSchema)
+          .withPermission(OWNED_BY_ITS_OWNER)
+          .handle(async ({ ctx, input }) => {
+            try {
+              return await ctx.app.organizations.enableAllPersonalWorkspaceFeatures(
+                { projectId: input.projectId },
+                ctx.actor(),
+              );
+            } catch (err) {
+              return asNotFound(err);
+            }
+          }),
+      )
+      .mutation("disableAll", (p) =>
+        p
+          .withInput(projectScopeSchema)
+          .withOutput(personalFeaturesSchema)
+          .withPermission(OWNED_BY_ITS_OWNER)
+          .handle(async ({ ctx, input }) => {
+            try {
+              return await ctx.app.organizations.disableAllPersonalWorkspaceFeatures(
+                { projectId: input.projectId },
+                ctx.actor(),
+              );
+            } catch (err) {
+              return asNotFound(err);
+            }
+          }),
+      )
+      .build();
   }
 }

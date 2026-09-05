@@ -55,7 +55,16 @@ function harness({
 
   const router = DatasetTrpcApi.create(
     trpc,
-    { protected: trpc.procedure, policy: policy as never },
+    {
+      protected: trpc.procedure,
+      policy: policy as never,
+      // This suite's fixtures are deliberately partial across eight procedures
+      // with distinct strict output schemas; validating every handler's answer
+      // here would mean fully hydrating every stub rather than testing what
+      // this file is for — the procedure names, the declared permissions, the
+      // domain-error translation and the source-project probe.
+      validateOutput: false,
+    },
     { probeProjectPermission },
   );
 

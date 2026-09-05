@@ -58,6 +58,13 @@ function harness(dataset: Partial<DatasetService> = {}) {
   const router = DatasetRecordTrpcApi.create(trpc, {
     protected: trpc.procedure,
     policy: policy as never,
+    // This suite's fixtures are deliberately partial (only the fields each
+    // assertion reads) across seven procedures with distinct strict output
+    // schemas; validating every handler's answer here would mean fully
+    // hydrating every stub rather than testing what this file is for — the
+    // procedure names, the declared permissions and the domain-error-to-4xx
+    // mapping.
+    validateOutput: false,
   });
 
   return {

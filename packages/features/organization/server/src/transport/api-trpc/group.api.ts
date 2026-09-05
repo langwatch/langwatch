@@ -33,6 +33,7 @@
  *
  * Spec: packages/features/organization/specs/organization-service.feature.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
 import {
   groupApiAddBindingInputSchema,
@@ -43,7 +44,13 @@ import {
   groupApiMemberScopeSchema,
   groupApiRemoveBindingInputSchema,
   groupApiRenameInputSchema,
+  groupBindingCreatedSchema,
+  groupDetailSchema,
+  groupListItemSchema,
+  groupMembershipViewSchema,
+  groupWriteAckSchema,
   organizationApiScopeSchema,
+  organizationGroupSchema,
 } from "@langwatch/organization-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import type { OrganizationApp } from "#app/organization.app";
@@ -80,6 +87,8 @@ type GroupTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(declaration: AuthzDeclaration): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /** The process capabilities this transport needs that are not the group's own. */
@@ -118,141 +127,179 @@ export class GroupTrpcApi {
     procedures: GroupTrpcProcedures<TContext, TOptions, TRoot>,
     ports: GroupTrpcPorts,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      listAll: policy(ORGANIZATION_MANAGE)(procedure.input(organizationApiScopeSchema)).query(
-        async ({ ctx, input }) => {
-          await ports.assertScimAllowed(ctx, { organizationId: input.organizationId });
-          const page = await ctx.app.organizations.listGroups({
-            organizationId: input.organizationId,
-            ...GROUP_PAGE,
-          });
-          const allBindings = page.data.flatMap(({ bindings }) => bindings);
-          const scopeNames = await ctx.app.organizations.resolveBindingScopeNames({
-            organizationId: input.organizationId,
-            bindings: allBindings,
-          });
-          return page.data.map((group) => ({
-            id: group.id,
-            name: group.name,
-            slug: group.slug,
-            externalId: group.externalId,
-            scimSource: group.scimSource,
-            memberCount: group.memberCount,
-            bindings: group.bindings.map((binding) => ({
-              ...binding,
-              scopeName: scopeNames.get(binding.scopeId) ?? null,
-            })),
-            createdAt: group.createdAt,
-          }));
-        },
-      ),
-
-      getById: policy(ORGANIZATION_MANAGE)(procedure.input(groupApiGroupScopeSchema)).query(
-        async ({ ctx, input }) => {
-          const group = await ctx.app.organizations.getGroup(input);
-          const scopeNames = await ctx.app.organizations.resolveBindingScopeNames({
-            organizationId: input.organizationId,
-            bindings: group.bindings,
-          });
-          return {
-            id: group.id,
-            name: group.name,
-            slug: group.slug,
-            externalId: group.externalId,
-            scimSource: group.scimSource,
-            bindings: group.bindings.map((binding) => ({
-              ...binding,
-              scopeName: scopeNames.get(binding.scopeId) ?? null,
-            })),
-            members: group.members,
-          };
-        },
-      ),
-
-      create: policy(ORGANIZATION_MANAGE)(procedure.input(groupApiCreateInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ports.assertScimAllowed(ctx, { organizationId: input.organizationId });
-          return ctx.app.organizations.createGroup(input, ctx.actor());
-        },
-      ),
-
-      addBinding: policy(ORGANIZATION_MANAGE)(
-        procedure.input(groupApiAddBindingInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const { organizationId, groupId, ...binding } = input;
-        const created = await ctx.app.organizations.addGroupBinding(
-          { organizationId, groupId, binding },
-          ctx.actor(),
-        );
-        return { id: created.id };
-      }),
-
-      removeBinding: policy(ORGANIZATION_MANAGE)(
-        procedure.input(groupApiRemoveBindingInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        await ctx.app.organizations.removeGroupBinding(input, ctx.actor());
-        return { success: true };
-      }),
-
-      addMember: policy(ORGANIZATION_MANAGE)(procedure.input(groupApiMemberInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ctx.app.organizations.addGroupMember(input);
-          return { success: true };
-        },
-      ),
-
-      delete: policy(ORGANIZATION_MANAGE)(procedure.input(groupApiGroupScopeSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ctx.app.organizations.deleteGroup(
-            { ...input, allowScimManaged: true },
-            ctx.actor(),
-          );
-          return { success: true };
-        },
-      ),
-
-      rename: policy(ORGANIZATION_MANAGE)(procedure.input(groupApiRenameInputSchema)).mutation(
-        ({ ctx, input }) => ctx.app.organizations.renameGroup(input),
-      ),
-
-      listForMember: policy(ORGANIZATION_MANAGE)(procedure.input(groupApiMemberScopeSchema)).query(
-        async ({ ctx, input }) => {
-          const groups = await ctx.app.organizations.listGroupsForMember(input);
-          const allBindings = groups.flatMap(({ bindings }) => bindings);
-          const scopeNames = await ctx.app.organizations.resolveBindingScopeNames({
-            organizationId: input.organizationId,
-            bindings: allBindings,
-          });
-          return groups.map((group) => ({
-            id: group.id,
-            name: group.name,
-            scimSource: group.scimSource,
-            bindings: group.bindings.map((binding) => ({
-              id: binding.id,
-              role: binding.role,
-              customRoleName: binding.customRoleName,
-              scopeType: binding.scopeType,
-              scopeName: scopeNames.get(binding.scopeId) ?? binding.scopeId,
-            })),
-          }));
-        },
-      ),
-
-      removeMember: policy(ORGANIZATION_MANAGE)(
-        procedure.input(groupApiMemberInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        await ctx.app.organizations.removeGroupMember(input);
-        return { success: true };
-      }),
-
-      applyEdits: policy(ORGANIZATION_MANAGE)(
-        procedure.input(groupApiApplyEditsInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        await ctx.app.organizations.applyGroupEdits(input, ctx.actor());
-        return { success: true };
-      }),
-    });
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("listAll", (p) =>
+        p
+          .withInput(organizationApiScopeSchema)
+          .withOutput(groupListItemSchema.array())
+          .withPermission(ORGANIZATION_MANAGE)
+          .handle(async ({ ctx, input }) => {
+            await ports.assertScimAllowed(ctx, { organizationId: input.organizationId });
+            const page = await ctx.app.organizations.listGroups({
+              organizationId: input.organizationId,
+              ...GROUP_PAGE,
+            });
+            const allBindings = page.data.flatMap(({ bindings }) => bindings);
+            const scopeNames = await ctx.app.organizations.resolveBindingScopeNames({
+              organizationId: input.organizationId,
+              bindings: allBindings,
+            });
+            return page.data.map((group) => ({
+              id: group.id,
+              name: group.name,
+              slug: group.slug,
+              externalId: group.externalId,
+              scimSource: group.scimSource,
+              memberCount: group.memberCount,
+              bindings: group.bindings.map((binding) => ({
+                ...binding,
+                scopeName: scopeNames.get(binding.scopeId) ?? null,
+              })),
+              createdAt: group.createdAt,
+            }));
+          }),
+      )
+      .query("getById", (p) =>
+        p
+          .withInput(groupApiGroupScopeSchema)
+          .withOutput(groupDetailSchema)
+          .withPermission(ORGANIZATION_MANAGE)
+          .handle(async ({ ctx, input }) => {
+            const group = await ctx.app.organizations.getGroup(input);
+            const scopeNames = await ctx.app.organizations.resolveBindingScopeNames({
+              organizationId: input.organizationId,
+              bindings: group.bindings,
+            });
+            return {
+              id: group.id,
+              name: group.name,
+              slug: group.slug,
+              externalId: group.externalId,
+              scimSource: group.scimSource,
+              bindings: group.bindings.map((binding) => ({
+                ...binding,
+                scopeName: scopeNames.get(binding.scopeId) ?? null,
+              })),
+              members: group.members,
+            };
+          }),
+      )
+      .mutation("create", (p) =>
+        p
+          .withInput(groupApiCreateInputSchema)
+          .withOutput(organizationGroupSchema)
+          .withPermission(ORGANIZATION_MANAGE)
+          .handle(async ({ ctx, input }) => {
+            await ports.assertScimAllowed(ctx, { organizationId: input.organizationId });
+            return ctx.app.organizations.createGroup(input, ctx.actor());
+          }),
+      )
+      .mutation("addBinding", (p) =>
+        p
+          .withInput(groupApiAddBindingInputSchema)
+          .withOutput(groupBindingCreatedSchema)
+          .withPermission(ORGANIZATION_MANAGE)
+          .handle(async ({ ctx, input }) => {
+            const { organizationId, groupId, ...binding } = input;
+            const created = await ctx.app.organizations.addGroupBinding(
+              { organizationId, groupId, binding },
+              ctx.actor(),
+            );
+            return { id: created.id };
+          }),
+      )
+      .mutation("removeBinding", (p) =>
+        p
+          .withInput(groupApiRemoveBindingInputSchema)
+          .withOutput(groupWriteAckSchema)
+          .withPermission(ORGANIZATION_MANAGE)
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.organizations.removeGroupBinding(input, ctx.actor());
+            return { success: true };
+          }),
+      )
+      .mutation("addMember", (p) =>
+        p
+          .withInput(groupApiMemberInputSchema)
+          .withOutput(groupWriteAckSchema)
+          .withPermission(ORGANIZATION_MANAGE)
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.organizations.addGroupMember(input);
+            return { success: true };
+          }),
+      )
+      .mutation("delete", (p) =>
+        p
+          .withInput(groupApiGroupScopeSchema)
+          .withOutput(groupWriteAckSchema)
+          .withPermission(ORGANIZATION_MANAGE)
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.organizations.deleteGroup(
+              { ...input, allowScimManaged: true },
+              ctx.actor(),
+            );
+            return { success: true };
+          }),
+      )
+      .mutation("rename", (p) =>
+        p
+          .withInput(groupApiRenameInputSchema)
+          .withOutput(organizationGroupSchema)
+          .withPermission(ORGANIZATION_MANAGE)
+          .handle(({ ctx, input }) => ctx.app.organizations.renameGroup(input)),
+      )
+      .query("listForMember", (p) =>
+        p
+          .withInput(groupApiMemberScopeSchema)
+          .withOutput(groupMembershipViewSchema.array())
+          .withPermission(ORGANIZATION_MANAGE)
+          .handle(async ({ ctx, input }) => {
+            const groups = await ctx.app.organizations.listGroupsForMember(input);
+            const allBindings = groups.flatMap(({ bindings }) => bindings);
+            const scopeNames = await ctx.app.organizations.resolveBindingScopeNames({
+              organizationId: input.organizationId,
+              bindings: allBindings,
+            });
+            return groups.map((group) => ({
+              id: group.id,
+              name: group.name,
+              scimSource: group.scimSource,
+              bindings: group.bindings.map((binding) => ({
+                id: binding.id,
+                role: binding.role,
+                customRoleName: binding.customRoleName,
+                scopeType: binding.scopeType,
+                scopeName: scopeNames.get(binding.scopeId) ?? binding.scopeId,
+              })),
+            }));
+          }),
+      )
+      .mutation("removeMember", (p) =>
+        p
+          .withInput(groupApiMemberInputSchema)
+          .withOutput(groupWriteAckSchema)
+          .withPermission(ORGANIZATION_MANAGE)
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.organizations.removeGroupMember(input);
+            return { success: true };
+          }),
+      )
+      .mutation("applyEdits", (p) =>
+        p
+          .withInput(groupApiApplyEditsInputSchema)
+          .withOutput(groupWriteAckSchema)
+          .withPermission(ORGANIZATION_MANAGE)
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.organizations.applyGroupEdits(input, ctx.actor());
+            return { success: true };
+          }),
+      )
+      .build();
   }
 }

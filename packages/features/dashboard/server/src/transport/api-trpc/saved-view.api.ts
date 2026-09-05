@@ -18,6 +18,7 @@
  *
  * Spec: packages/features/dashboard/specs/saved-views.feature.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { SavedViewNotFoundError, SavedViewReorderError } from "@langwatch/dashboard-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -67,6 +68,8 @@ type SavedViewTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** Whether the chain checks every answer against its declared output schema. */
+  validateOutput: boolean;
 }>;
 
 /** The stored period a view remembers, exactly as the filter bar writes it. */
@@ -166,103 +169,133 @@ export class SavedViewTrpcApi {
     procedures: SavedViewTrpcProcedures<TContext, TOptions, TRoot>,
     ports: SavedViewTrpcPorts<TView>,
   ) {
-    const { protected: procedure, policy } = procedures;
-
-    return trpc.router({
-      /** Auto-seeds the origin defaults the first time a project asks. */
-      getAll: policy("traces:view")(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) =>
-          await savedViewCall(() =>
-            ports.savedViews.getAll({
-              projectId: input.projectId,
-              userId: ctx.actor().id,
-              ...(input.kind === undefined ? {} : { kind: input.kind }),
-            }),
-          ),
-      ),
-
-      /**
-       * A `myself` view is visible only to its creator; a `project` view — the
-       * default — is shared with everyone on the team.
-       */
-      create: policy("traces:view")(
-        procedure.input(
-          projectScopeSchema.extend({
-            name: nameSchema,
-            filters: z.record(z.string(), z.unknown()),
-            query: z.string().optional(),
-            period: z
-              .object({
-                relativeDays: z.number().optional(),
-                startDate: z.string().optional(),
-                endDate: z.string().optional(),
-              })
-              .optional(),
-            scope: z.enum(["project", "myself"]).default("project"),
-            // Optional client-provided id. Traces v2 generates lens ids locally
-            // so the in-store active id keeps pointing at the same row after the
-            // server roundtrip completes — otherwise the active lens would be
-            // invalidated by the refetch (server id != client id) and the tab
-            // strip would snap back to the first built-in. Accepts strings that
-            // look like client-side lens ids (`custom-...`). The service still
-            // generates one if omitted.
-            id: z.string().min(1).max(128).optional(),
-          }),
-        ),
-      ).mutation(
-        async ({ ctx, input }) =>
-          await savedViewCall(() =>
-            ports.savedViews.create({
-              projectId: input.projectId,
-              ...(input.id === undefined ? {} : { id: input.id }),
-              name: input.name,
-              filters: input.filters,
-              ...(input.query === undefined ? {} : { query: input.query }),
-              ...(input.period === undefined ? {} : { period: input.period }),
-              ...(input.scope === "myself" ? { userId: ctx.actor().id } : {}),
-              ...(input.kind === undefined ? {} : { kind: input.kind }),
-            }),
-          ),
-      ),
-
-      delete: policy("traces:view")(
-        procedure.input(z.object({ projectId: z.string(), viewId: z.string() })),
-      ).mutation(
-        async ({ ctx, input }) =>
-          await savedViewCall(() =>
-            ports.savedViews.delete({
-              projectId: input.projectId,
-              viewId: input.viewId,
-              userId: ctx.actor().id,
-            }),
-          ),
-      ),
-
-      rename: policy("traces:view")(
-        procedure.input(z.object({ projectId: z.string(), viewId: z.string(), name: nameSchema })),
-      ).mutation(
-        async ({ ctx, input }) =>
-          await savedViewCall(() =>
-            ports.savedViews.rename({
-              projectId: input.projectId,
-              viewId: input.viewId,
-              name: input.name,
-              userId: ctx.actor().id,
-            }),
-          ),
-      ),
-
-      reorder: policy("traces:view")(
-        procedure.input(z.object({ projectId: z.string(), viewIds: z.array(z.string()) })),
-      ).mutation(
-        async ({ input }) =>
-          await savedViewCall(() =>
-            ports.savedViews.reorder({
-              projectId: input.projectId,
-              viewIds: input.viewIds,
-            }),
-          ),
-      ),
-    });
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures,
+        validateOutput: procedures.validateOutput,
+      })
+        /** Auto-seeds the origin defaults the first time a project asks. */
+        .query("getAll", (p) =>
+          p
+            .withInput(projectScopeSchema)
+            .withoutOutput(
+              "TView is the host's own saved-view row shape, inferred from its service rather than owned by this feature; see SavedViewsPort's doc-comment",
+            )
+            .withPermission("traces:view")
+            .handle(
+              async ({ ctx, input }) =>
+                await savedViewCall(() =>
+                  ports.savedViews.getAll({
+                    projectId: input.projectId,
+                    userId: ctx.actor().id,
+                    ...(input.kind === undefined ? {} : { kind: input.kind }),
+                  }),
+                ),
+            ),
+        )
+        /**
+         * A `myself` view is visible only to its creator; a `project` view — the
+         * default — is shared with everyone on the team.
+         */
+        .mutation("create", (p) =>
+          p
+            .withInput(
+              projectScopeSchema.extend({
+                name: nameSchema,
+                filters: z.record(z.string(), z.unknown()),
+                query: z.string().optional(),
+                period: z
+                  .object({
+                    relativeDays: z.number().optional(),
+                    startDate: z.string().optional(),
+                    endDate: z.string().optional(),
+                  })
+                  .optional(),
+                scope: z.enum(["project", "myself"]).default("project"),
+                // Optional client-provided id. Traces v2 generates lens ids locally
+                // so the in-store active id keeps pointing at the same row after the
+                // server roundtrip completes — otherwise the active lens would be
+                // invalidated by the refetch (server id != client id) and the tab
+                // strip would snap back to the first built-in. Accepts strings that
+                // look like client-side lens ids (`custom-...`). The service still
+                // generates one if omitted.
+                id: z.string().min(1).max(128).optional(),
+              }),
+            )
+            .withoutOutput(
+              "TView is the host's own saved-view row shape, inferred from its service rather than owned by this feature; see SavedViewsPort's doc-comment",
+            )
+            .withPermission("traces:view")
+            .handle(
+              async ({ ctx, input }) =>
+                await savedViewCall(() =>
+                  ports.savedViews.create({
+                    projectId: input.projectId,
+                    ...(input.id === undefined ? {} : { id: input.id }),
+                    name: input.name,
+                    filters: input.filters,
+                    ...(input.query === undefined ? {} : { query: input.query }),
+                    ...(input.period === undefined ? {} : { period: input.period }),
+                    ...(input.scope === "myself" ? { userId: ctx.actor().id } : {}),
+                    ...(input.kind === undefined ? {} : { kind: input.kind }),
+                  }),
+                ),
+            ),
+        )
+        .mutation("delete", (p) =>
+          p
+            .withInput(z.object({ projectId: z.string(), viewId: z.string() }))
+            .withoutOutput(
+              "TView is the host's own saved-view row shape, inferred from its service rather than owned by this feature; see SavedViewsPort's doc-comment",
+            )
+            .withPermission("traces:view")
+            .handle(
+              async ({ ctx, input }) =>
+                await savedViewCall(() =>
+                  ports.savedViews.delete({
+                    projectId: input.projectId,
+                    viewId: input.viewId,
+                    userId: ctx.actor().id,
+                  }),
+                ),
+            ),
+        )
+        .mutation("rename", (p) =>
+          p
+            .withInput(z.object({ projectId: z.string(), viewId: z.string(), name: nameSchema }))
+            .withoutOutput(
+              "TView is the host's own saved-view row shape, inferred from its service rather than owned by this feature; see SavedViewsPort's doc-comment",
+            )
+            .withPermission("traces:view")
+            .handle(
+              async ({ ctx, input }) =>
+                await savedViewCall(() =>
+                  ports.savedViews.rename({
+                    projectId: input.projectId,
+                    viewId: input.viewId,
+                    name: input.name,
+                    userId: ctx.actor().id,
+                  }),
+                ),
+            ),
+        )
+        .mutation("reorder", (p) =>
+          p
+            .withInput(z.object({ projectId: z.string(), viewIds: z.array(z.string()) }))
+            .withOutput(z.object({ success: z.literal(true) }))
+            .withPermission("traces:view")
+            .handle(
+              async ({ input }) =>
+                await savedViewCall(() =>
+                  ports.savedViews.reorder({
+                    projectId: input.projectId,
+                    viewIds: input.viewIds,
+                  }),
+                ),
+            ),
+        )
+        .build()
+    );
   }
 }

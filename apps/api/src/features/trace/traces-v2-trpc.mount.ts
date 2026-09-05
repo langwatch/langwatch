@@ -52,6 +52,8 @@ type SharedTraceMount<
   publicProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   middlewares: AppTrpcPolicyMiddlewares;
   ports: SharedTraceTrpcPorts;
+  /** @see TrpcApiMount's field of the same name. */
+  validateOutput?: boolean;
 }>;
 
 /**
@@ -69,6 +71,7 @@ export function createSharedTraceTrpcRouter<
     {
       public: mount.publicProcedure,
       noPermission: appTrpcNoPermissionPolicy(mount.middlewares),
+      validateOutput: mount.validateOutput ?? false,
     },
     mount.ports,
   );

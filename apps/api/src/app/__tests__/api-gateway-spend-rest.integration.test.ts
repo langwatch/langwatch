@@ -196,7 +196,7 @@ function buildApp(options?: {
   });
 
   const request = (path: string, init?: RequestInit) =>
-    app.hono.fetch(
+    app.fetch(
       new Request(`http://api.test${path}`, {
         ...init,
         headers: {
@@ -207,7 +207,7 @@ function buildApp(options?: {
       }),
     );
 
-  const anonymous = (path: string) => app.hono.fetch(new Request(`http://api.test${path}`));
+  const anonymous = (path: string) => app.fetch(new Request(`http://api.test${path}`));
 
   return { app, ledger, request, anonymous, markUsed };
 }
@@ -250,7 +250,7 @@ describe("given the gateway spend reconciliation REST surface", () => {
     it("names both the class required and the class presented", async () => {
       const { app } = buildApp();
 
-      const response = await app.hono.fetch(
+      const response = await app.fetch(
         new Request("http://api.test/api/gateway/v1/spend-summaries", {
           headers: { Authorization: `Bearer ${PROJECT_TOKEN}` },
         }),
@@ -271,7 +271,7 @@ describe("given the gateway spend reconciliation REST surface", () => {
     it("says only that a token matching no key was not accepted", async () => {
       const { app } = buildApp();
 
-      const response = await app.hono.fetch(
+      const response = await app.fetch(
         new Request("http://api.test/api/gateway/v1/spend-summaries", {
           headers: { Authorization: "Bearer sk-lw-nosuchkey" },
         }),

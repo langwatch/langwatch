@@ -16,11 +16,8 @@ export const assertNoTraversal = (...parts: string[]): void => {
 };
 
 /**
- * Guard a full storage key (which legitimately contains `/`) before it is
- * path-joined to disk or sent to S3. Defence-in-depth on the staged-object
- * methods (m4): the key is server-minted, but validate anyway - reject any
- * `..` segment and require it to sit under this project's `staging/` prefix so
- * a key can never escape the tenant scope.
+ * Guard a full storage key (which legitimately contains `/`) before it is path-joined to disk
+ * or sent to S3.
  */
 export const assertKeyWithinProject = (projectId: string, key: string): void => {
   assertNoTraversal(projectId);

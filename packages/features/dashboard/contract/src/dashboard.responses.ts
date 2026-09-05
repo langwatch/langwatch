@@ -4,8 +4,27 @@
  */
 import { z } from "zod";
 
-import { dashboardIdSchema, dashboardNameSchema } from "./dashboard";
+import { dashboardIdSchema, dashboardNameSchema, dashboardSchema } from "./dashboard";
 import { graphSchema } from "./graph";
+
+/**
+ * What the `dashboards.*` tRPC transport answers. Unlike the REST responses
+ * below, these carry the stored row untouched (`projectId`, dates as `Date`,
+ * no `platformUrl`) — the tRPC client reads the same shape the service holds.
+ */
+
+/** `getAll`: each dashboard, with the card count the grid renders. */
+export const dashboardTrpcSummarySchema = dashboardSchema.extend({
+  _count: z.object({ graphs: z.number().int().nonnegative() }).strict(),
+});
+
+/** `getById`: one dashboard with its graphs, in grid order. */
+export const dashboardTrpcDetailSchema = dashboardSchema.extend({
+  graphs: z.array(graphSchema),
+});
+
+/** `create` / `rename` / `delete` / `getOrCreateFirst`: the raw stored row. */
+export const dashboardTrpcRowSchema = dashboardSchema;
 
 const dashboardOrderSchema = z.number().int().nonnegative();
 

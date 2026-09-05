@@ -42,7 +42,7 @@ function harness({ experiment = { id: "experiment-1" } as { id: string } | null 
 
   const router = BatchRecordTrpcApi.create(
     trpc,
-    { protected: trpc.procedure, policy: policy as never },
+    { protected: trpc.procedure, policy: policy as never, validateOutput: true },
     { summariseByExperiment, listByExperiment },
   );
 

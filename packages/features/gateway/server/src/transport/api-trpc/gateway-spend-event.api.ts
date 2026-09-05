@@ -10,7 +10,9 @@
  * Resolving virtual-key display names is a persistence read this transport does
  * not own, so the feature's application holds it.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import { gatewaySpendEventPageSchema } from "@langwatch/gateway-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import { spendFiltersSchema } from "../../adapters/gateway-spend-filters.adapter";
@@ -38,6 +40,8 @@ type GatewaySpendEventTrpcProcedures<
    * input.
    */
   policy(permission: AuthzPermission): ProcedureDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const listInputSchema = z.object({
@@ -68,48 +72,58 @@ export class GatewaySpendEventTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: GatewaySpendEventTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      list: policy("gatewayUsage:view")(procedure.input(listInputSchema)).query(
-        async ({ ctx, input }) => {
-          const service = ctx.app.gateway.spendEvents;
-          if (!service) {
-            return {
-              rows: [],
-              nextCursor: null,
-              virtualKeyNames: {} as Record<string, string>,
-              clickHouseDisabled: true,
-            };
-          }
-          const { rows, nextCursor } = await service.getSpendEventsPage({
-            tenantId: input.projectId,
-            fromMs: input.fromMs,
-            toMs: input.toMs,
-            filters: input.filters ?? {},
-            cursor: input.cursor,
-            limit: input.limit ?? 50,
-          });
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("list", (p) =>
+        p
+          .withInput(listInputSchema)
+          .withOutput(gatewaySpendEventPageSchema)
+          .withPermission("gatewayUsage:view")
+          .handle(async ({ ctx, input }) => {
+            const service = ctx.app.gateway.spendEvents;
+            if (!service) {
+              return {
+                rows: [],
+                nextCursor: null,
+                virtualKeyNames: {} as Record<string, string>,
+                clickHouseDisabled: true,
+              };
+            }
+            const { rows, nextCursor } = await service.getSpendEventsPage({
+              tenantId: input.projectId,
+              fromMs: input.fromMs,
+              toMs: input.toMs,
+              filters: input.filters ?? {},
+              cursor: input.cursor,
+              limit: input.limit ?? 50,
+            });
 
-          const vkIds = [...new Set(rows.map((r) => r.virtualKeyId))].filter((id) => id.length > 0);
-          // The ids come from this project's own tenant-filtered spend rows,
-          // and the Project service resolves the owning-organization fence
-          // without exposing Project persistence to this transport.
-          const organizationId = await ctx.app.gateway.projects.tryGetOrganizationId(
-            input.projectId,
-          );
-          const vks =
-            vkIds.length && organizationId
-              ? await ctx.app.gateway.resolveVirtualKeyNames({
-                  organizationId,
-                  virtualKeyIds: vkIds,
-                })
-              : [];
-          const virtualKeyNames = Object.fromEntries(vks.map((vk) => [vk.id, vk.name]));
+            const vkIds = [...new Set(rows.map((r) => r.virtualKeyId))].filter(
+              (id) => id.length > 0,
+            );
+            // The ids come from this project's own tenant-filtered spend rows,
+            // and the Project service resolves the owning-organization fence
+            // without exposing Project persistence to this transport.
+            const organizationId = await ctx.app.gateway.projects.tryGetOrganizationId(
+              input.projectId,
+            );
+            const vks =
+              vkIds.length && organizationId
+                ? await ctx.app.gateway.resolveVirtualKeyNames({
+                    organizationId,
+                    virtualKeyIds: vkIds,
+                  })
+                : [];
+            const virtualKeyNames = Object.fromEntries(vks.map((vk) => [vk.id, vk.name]));
 
-          return { rows, nextCursor, virtualKeyNames, clickHouseDisabled: false };
-        },
-      ),
-    });
+            return { rows, nextCursor, virtualKeyNames, clickHouseDisabled: false };
+          }),
+      )
+      .build();
   }
 }

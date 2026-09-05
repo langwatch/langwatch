@@ -28,9 +28,23 @@ const trigger = {
 
 function harness() {
   const trpc = initTRPC.context<{ app: { dashboard: DashboardApp } }>().create();
+  const graphRow = {
+    id: "graph-1",
+    projectId: "project-1",
+    name: "Errors",
+    graph: {},
+    filters: {},
+    dashboardId: null,
+    gridColumn: 0,
+    gridRow: 0,
+    colSpan: 1,
+    rowSpan: 1,
+    createdAt: new Date("2026-01-01T00:00:00Z"),
+    updatedAt: new Date("2026-01-01T00:00:00Z"),
+  };
   const app = {
-    getGraph: async () => ({ id: "graph-1", name: "Errors", filters: {} }),
-    listGraphs: async () => [{ id: "graph-1", name: "Errors", filters: {} }],
+    getGraph: async () => graphRow,
+    listGraphs: async () => [graphRow],
     getAlertsForGraphs: async () => [trigger],
     tryGetAlertForGraph: async () => trigger,
   } as unknown as DashboardApp;
@@ -40,6 +54,7 @@ function harness() {
     {
       protected: trpc.procedure,
       policy: () => (procedure) => procedure,
+      validateOutput: true,
     },
     {
       filterFieldSchema: z.string(),

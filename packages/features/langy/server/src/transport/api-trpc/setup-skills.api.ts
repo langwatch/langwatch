@@ -3,6 +3,7 @@
  * markdown, so they stay on the server and reach the browser only when a reader opens a setup menu.
  * Spec: specs/skills/empty-state-skill-setup.feature
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import { NotFoundError } from "@langwatch/handled-error";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
@@ -28,6 +29,8 @@ type SetupSkillsTrpcProcedures<
    * declared permission.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** Whether the chain checks every answer against its declared output schema. */
+  validateOutput: boolean;
 }>;
 
 /** Installs the `setupSkills.*` tRPC surface on a process-owned root. */
@@ -40,18 +43,24 @@ export class SetupSkillsTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: SetupSkillsTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
-
-    return trpc.router({
-      getPrompt: policy("project:view")(
-        procedure.input(z.object({ projectId: z.string(), skill: z.string() })),
-      ).query(({ input }: { input: { projectId: string; skill: string } }) => {
-        const skills = SetupSkillsService.create();
-        if (!skills.isSetupSkillId(input.skill)) {
-          throw new NotFoundError("not_found", "Setup guide", input.skill);
-        }
-        return { body: skills.body(input.skill) };
-      }),
-    });
+    return createTrpcService({
+      root: trpc,
+      procedures,
+      validateOutput: procedures.validateOutput,
+    })
+      .query("getPrompt", (p) =>
+        p
+          .withInput(z.object({ projectId: z.string(), skill: z.string() }))
+          .withOutput(z.object({ body: z.string() }).strict())
+          .withPermission("project:view")
+          .handle(({ input }) => {
+            const skills = SetupSkillsService.create();
+            if (!skills.isSetupSkillId(input.skill)) {
+              throw new NotFoundError("not_found", "Setup guide", input.skill);
+            }
+            return { body: skills.body(input.skill) };
+          }),
+      )
+      .build();
   }
 }

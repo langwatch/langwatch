@@ -17,6 +17,7 @@
  * the host until it has a feature of its own. The slug-to-id read IS the
  * application's, and goes through it.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   TRPCError,
@@ -54,6 +55,8 @@ type BatchRecordTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** Whether the chain checks every answer against its declared output schema. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -101,39 +104,52 @@ export class BatchRecordTrpcApi {
     procedures: BatchRecordTrpcProcedures<TContext, TOptions, TRoot>,
     ports: BatchRecordTrpcPorts<TSummaries, TRecords>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    return createTrpcService({
+      root: trpc,
+      procedures,
+      validateOutput: procedures.validateOutput,
+    })
+      .query("getAllByexperimentIdGroup", (p) =>
+        p
+          .withInput(projectScopeSchema)
+          .withoutOutput(
+            "TSummaries is the host's own batch-evaluation summary shape, a generic type parameter this feature does not own",
+          )
+          .withPermission("workflows:view")
+          .handle(async ({ input, ctx }) => {
+            const { projectId } = input;
 
-    return trpc.router({
-      getAllByexperimentIdGroup: policy("workflows:view")(
-        procedure.input(projectScopeSchema),
-      ).query(async ({ input, ctx }) => {
-        const { projectId } = input;
+            return await ports.summariseByExperiment(ctx, { projectId });
+          }),
+      )
+      .query("getAllByexperimentSlug", (p) =>
+        p
+          .withInput(experimentSlugInputSchema)
+          .withoutOutput(
+            "TRecords is the host's own batch-evaluation record shape, a generic type parameter this feature does not own",
+          )
+          .withPermission("workflows:view")
+          .handle(async ({ input, ctx }) => {
+            const { projectId, experimentSlug } = input;
 
-        return await ports.summariseByExperiment(ctx, { projectId });
-      }),
+            const experiment = await ctx.app.dataset.tryGetExperimentBySlug({
+              projectId,
+              slug: experimentSlug,
+            });
 
-      getAllByexperimentSlug: policy("workflows:view")(
-        procedure.input(experimentSlugInputSchema),
-      ).query(async ({ input, ctx }) => {
-        const { projectId, experimentSlug } = input;
+            if (!experiment) {
+              throw new TRPCError({
+                code: "NOT_FOUND",
+                message: "Experiment not found",
+              });
+            }
 
-        const experiment = await ctx.app.dataset.tryGetExperimentBySlug({
-          projectId,
-          slug: experimentSlug,
-        });
-
-        if (!experiment) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Experiment not found",
-          });
-        }
-
-        return await ports.listByExperiment(ctx, {
-          projectId,
-          experimentId: experiment.id,
-        });
-      }),
-    });
+            return await ports.listByExperiment(ctx, {
+              projectId,
+              experimentId: experiment.id,
+            });
+          }),
+      )
+      .build();
   }
 }

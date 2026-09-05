@@ -31,14 +31,17 @@
  *
  * Spec: specs/analytics/lwql-saved-charts.feature.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type {
-  LangWatchQLCaller,
-  LangWatchQLProtections,
-  LangWatchQLTimeWindow,
+import {
+  langWatchQLQueryResultSchema,
+  type LangWatchQLCaller,
+  type LangWatchQLProtections,
+  type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
+import { savedWorkbenchChartSchema } from "@langwatch/dashboard-contract";
 import type { DashboardApp } from "#app/dashboard.app";
 
 /**
@@ -68,6 +71,8 @@ type SavedWorkbenchChartTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** Whether the chain checks every answer against its declared output schema. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -153,7 +158,6 @@ export class SavedWorkbenchChartTrpcApi {
     procedures: SavedWorkbenchChartTrpcProcedures<TContext, TOptions, TRoot>,
     ports: SavedWorkbenchChartTrpcPorts,
   ) {
-    const { protected: procedure, policy } = procedures;
     const { requireWorkbenchEnabled } = ports;
 
     const call = async <T>(run: () => Promise<T>): Promise<T> => {
@@ -164,150 +168,182 @@ export class SavedWorkbenchChartTrpcApi {
       }
     };
 
-    return trpc.router({
-      getAll: requireWorkbenchEnabled(
-        policy("analytics:view")(procedure.input(projectScopeSchema)),
-      ).query(
-        async ({ ctx, input }) =>
-          await call(() =>
-            ctx.app.dashboard.listSavedWorkbenchCharts({ projectId: input.projectId }),
-          ),
-      ),
+    /**
+     * The same declared permission the process's `policy` always builds, with
+     * the workbench's experimental switch composed on top — RBAC first, the
+     * rollout gate second, so a caller who may not touch the project never
+     * learns from the answer whether the experiment is on. Composed here
+     * rather than at each call site so a procedure cannot add itself without
+     * one of the two gates.
+     */
+    const gatedPolicy =
+      (permission: Parameters<typeof procedures.policy>[0]): TrpcPolicyDecorator =>
+      (procedure) =>
+        requireWorkbenchEnabled(procedures.policy(permission)(procedure));
 
-      getById: requireWorkbenchEnabled(
-        policy("analytics:view")(procedure.input(chartScopeSchema)),
-      ).query(
-        async ({ ctx, input }) =>
-          await call(() =>
-            ctx.app.dashboard.getSavedWorkbenchChart({
-              chartId: input.id,
-              projectId: input.projectId,
-            }),
-          ),
-      ),
-
-      create: requireWorkbenchEnabled(
-        policy("analytics:create")(
-          procedure.input(projectScopeSchema.extend({ name: nameSchema, definition: z.unknown() })),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        const protections = await ports.resolveProtections(ctx, {
-          projectId: input.projectId,
-        });
-        const definition = ports.admitDefinition(ctx, {
-          projectId: input.projectId,
-          protections,
-          definition: input.definition,
-        });
-        return await call(() =>
-          ctx.app.dashboard.createSavedWorkbenchChart({
-            projectId: input.projectId,
-            protections,
-            name: input.name,
-            definition,
-          }),
-        );
-      }),
-
-      /**
-       * The author's protections are resolved for THIS request rather than
-       * remembered from the save, so a member whose permissions narrowed cannot
-       * update a chart into naming a column they may no longer read.
-       */
-      update: requireWorkbenchEnabled(
-        policy("analytics:update")(
-          procedure.input(
-            chartScopeSchema.extend({
-              name: nameSchema.optional(),
-              definition: z.unknown().optional(),
-            }),
-          ),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        const definitionUpdate =
-          input.definition === undefined
-            ? undefined
-            : await (async () => {
-                const protections = await ports.resolveProtections(ctx, {
-                  projectId: input.projectId,
-                });
-                return {
-                  protections,
-                  definition: ports.admitDefinition(ctx, {
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedures.protected, policy: gatedPolicy },
+        validateOutput: procedures.validateOutput,
+      })
+        .query("getAll", (p) =>
+          p
+            .withInput(projectScopeSchema)
+            .withOutput(z.array(savedWorkbenchChartSchema))
+            .withPermission("analytics:view")
+            .handle(
+              async ({ ctx, input }) =>
+                await call(() =>
+                  ctx.app.dashboard.listSavedWorkbenchCharts({ projectId: input.projectId }),
+                ),
+            ),
+        )
+        .query("getById", (p) =>
+          p
+            .withInput(chartScopeSchema)
+            .withOutput(savedWorkbenchChartSchema)
+            .withPermission("analytics:view")
+            .handle(
+              async ({ ctx, input }) =>
+                await call(() =>
+                  ctx.app.dashboard.getSavedWorkbenchChart({
+                    chartId: input.id,
                     projectId: input.projectId,
-                    protections,
-                    definition: input.definition,
                   }),
-                };
-              })();
-
-        return await call(() =>
-          ctx.app.dashboard.updateSavedWorkbenchChart({
-            chartId: input.id,
-            projectId: input.projectId,
-            ...(input.name === undefined ? {} : { name: input.name }),
-            ...(definitionUpdate === undefined ? {} : { definitionUpdate }),
-          }),
-        );
-      }),
-
-      /**
-       * Running is reading with execution attached, so it is a sibling of
-       * `getById` rather than a new surface, chained through the same permission
-       * and switch gates. The period and the datapoint step are supplied by this
-       * request, never read out of the stored definition: they are the surface's
-       * to set, which is the whole reserved-parameter contract.
-       *
-       * `onBudgetOverflow` defaults to refusing, so every existing caller keeps
-       * the behaviour it had. A dashboard widget passes `"coarsen"` because its
-       * saved step meets whatever period the dashboard's control is set to:
-       * refusing there would blank a card whose owner changed nothing. The
-       * substitution is reported back as `coarsenedFromSeconds` rather than
-       * applied silently.
-       */
-      run: requireWorkbenchEnabled(
-        policy("analytics:view")(
-          procedure.input(
-            chartScopeSchema.extend({
-              timeWindow: ports.timeWindowSchema.optional(),
-              granularitySeconds: ports.granularityStepSchema.optional(),
-              onBudgetOverflow: z.enum(["refuse", "coarsen"]).optional(),
+                ),
+            ),
+        )
+        .mutation("create", (p) =>
+          p
+            .withInput(projectScopeSchema.extend({ name: nameSchema, definition: z.unknown() }))
+            .withOutput(savedWorkbenchChartSchema)
+            .withPermission("analytics:create")
+            .handle(async ({ ctx, input }) => {
+              const protections = await ports.resolveProtections(ctx, {
+                projectId: input.projectId,
+              });
+              const definition = ports.admitDefinition(ctx, {
+                projectId: input.projectId,
+                protections,
+                definition: input.definition,
+              });
+              return await call(() =>
+                ctx.app.dashboard.createSavedWorkbenchChart({
+                  projectId: input.projectId,
+                  protections,
+                  name: input.name,
+                  definition,
+                }),
+              );
             }),
-          ),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        const { project, protections } = await ports.resolveRunCaller(ctx, {
-          projectId: input.projectId,
-        });
+        )
+        /**
+         * The author's protections are resolved for THIS request rather than
+         * remembered from the save, so a member whose permissions narrowed cannot
+         * update a chart into naming a column they may no longer read.
+         */
+        .mutation("update", (p) =>
+          p
+            .withInput(
+              chartScopeSchema.extend({
+                name: nameSchema.optional(),
+                definition: z.unknown().optional(),
+              }),
+            )
+            .withOutput(savedWorkbenchChartSchema)
+            .withPermission("analytics:update")
+            .handle(async ({ ctx, input }) => {
+              const definitionUpdate =
+                input.definition === undefined
+                  ? undefined
+                  : await (async () => {
+                      const protections = await ports.resolveProtections(ctx, {
+                        projectId: input.projectId,
+                      });
+                      return {
+                        protections,
+                        definition: ports.admitDefinition(ctx, {
+                          projectId: input.projectId,
+                          protections,
+                          definition: input.definition,
+                        }),
+                      };
+                    })();
 
-        return await call(() =>
-          ctx.app.dashboard.runSavedWorkbenchChart({
-            chartId: input.id,
-            projectId: input.projectId,
-            execution: {
-              project,
-              protections,
-              ...(input.timeWindow ? { timeWindow: input.timeWindow } : {}),
-              ...(input.granularitySeconds === undefined
-                ? {}
-                : { granularitySeconds: input.granularitySeconds }),
-              ...(input.onBudgetOverflow ? { onBudgetOverflow: input.onBudgetOverflow } : {}),
-            },
-          }),
-        );
-      }),
+              return await call(() =>
+                ctx.app.dashboard.updateSavedWorkbenchChart({
+                  chartId: input.id,
+                  projectId: input.projectId,
+                  ...(input.name === undefined ? {} : { name: input.name }),
+                  ...(definitionUpdate === undefined ? {} : { definitionUpdate }),
+                }),
+              );
+            }),
+        )
+        /**
+         * Running is reading with execution attached, so it is a sibling of
+         * `getById` rather than a new surface, chained through the same permission
+         * and switch gates. The period and the datapoint step are supplied by this
+         * request, never read out of the stored definition: they are the surface's
+         * to set, which is the whole reserved-parameter contract.
+         *
+         * `onBudgetOverflow` defaults to refusing, so every existing caller keeps
+         * the behaviour it had. A dashboard widget passes `"coarsen"` because its
+         * saved step meets whatever period the dashboard's control is set to:
+         * refusing there would blank a card whose owner changed nothing. The
+         * substitution is reported back as `coarsenedFromSeconds` rather than
+         * applied silently.
+         */
+        .mutation("run", (p) =>
+          p
+            .withInput(
+              chartScopeSchema.extend({
+                timeWindow: ports.timeWindowSchema.optional(),
+                granularitySeconds: ports.granularityStepSchema.optional(),
+                onBudgetOverflow: z.enum(["refuse", "coarsen"]).optional(),
+              }),
+            )
+            .withOutput(langWatchQLQueryResultSchema)
+            .withPermission("analytics:view")
+            .handle(async ({ ctx, input }) => {
+              const { project, protections } = await ports.resolveRunCaller(ctx, {
+                projectId: input.projectId,
+              });
 
-      delete: requireWorkbenchEnabled(
-        policy("analytics:delete")(procedure.input(chartScopeSchema)),
-      ).mutation(async ({ ctx, input }) => {
-        await call(() =>
-          ctx.app.dashboard.deleteSavedWorkbenchChart({
-            chartId: input.id,
-            projectId: input.projectId,
-          }),
-        );
-        return { success: true };
-      }),
-    });
+              return await call(() =>
+                ctx.app.dashboard.runSavedWorkbenchChart({
+                  chartId: input.id,
+                  projectId: input.projectId,
+                  execution: {
+                    project,
+                    protections,
+                    ...(input.timeWindow ? { timeWindow: input.timeWindow } : {}),
+                    ...(input.granularitySeconds === undefined
+                      ? {}
+                      : { granularitySeconds: input.granularitySeconds }),
+                    ...(input.onBudgetOverflow ? { onBudgetOverflow: input.onBudgetOverflow } : {}),
+                  },
+                }),
+              );
+            }),
+        )
+        .mutation("delete", (p) =>
+          p
+            .withInput(chartScopeSchema)
+            .withOutput(z.object({ success: z.literal(true) }))
+            .withPermission("analytics:delete")
+            .handle(async ({ ctx, input }) => {
+              await call(() =>
+                ctx.app.dashboard.deleteSavedWorkbenchChart({
+                  chartId: input.id,
+                  projectId: input.projectId,
+                }),
+              );
+              return { success: true };
+            }),
+        )
+        .build()
+    );
   }
 }

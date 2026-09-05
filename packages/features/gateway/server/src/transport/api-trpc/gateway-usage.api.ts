@@ -15,10 +15,15 @@
  * persistence this transport does not hold, so the feature's application holds
  * them.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import {
+  gatewayUsageSummarySchema,
+  gatewayVirtualKeyUsageSummarySchema,
+  VirtualKeyNotFoundError,
+} from "@langwatch/gateway-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import { VirtualKeyNotFoundError } from "@langwatch/gateway-contract";
 import type { GatewayApp } from "#app/gateway.app";
 
 /** The process supplies authentication; authorization arrives as `policy`. */
@@ -45,6 +50,8 @@ type GatewayUsageTrpcProcedures<
     reason: string;
     permissions: readonly AuthzPermission[];
   }): ProcedureDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const summaryInputSchema = z.object({
@@ -72,63 +79,96 @@ export class GatewayUsageTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: GatewayUsageTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, resolverAuthorizedPolicy } = procedures;
+    const { protected: procedure, resolverAuthorizedPolicy, validateOutput } = procedures;
 
-    return trpc.router({
-      // Membership-based like virtualKeys.list: the summary totals the keys
-      // the caller can see, so its numbers reconcile with the table a click
-      // arrives from. A non-member sees no keys and gets an empty summary.
-      summary: resolverAuthorizedPolicy({
-        reason:
-          "usage is summed only over the keys the caller's membership in this organization makes visible; the membership filter in the resolver is the check",
-        permissions: ["gatewayUsage:view"],
-      })(procedure.input(summaryInputSchema)).query(async ({ ctx, input }) => {
-        const keys = await ctx.app.gateway.listVisibleVirtualKeys({
-          organizationId: input.organizationId,
-          userId: ctx.actor().id,
-        });
-        return ctx.app.gateway.usage.summary({
-          organizationId: input.organizationId,
-          virtualKeyIds: keys.map((k) => k.id),
-          window: {
-            fromDate: new Date(input.fromDate),
-            toDate: new Date(input.toDate),
-          },
-        });
-      }),
+    // Neither procedure holds a fixed permission: both delegate the real
+    // check to the resolver, via `resolverAuthorizedPolicy`. The chain's own
+    // `policy` builder is never called; `withCustomPermission` carries the
+    // process's ALREADY-BUILT decorator instead.
+    const policy = (): ProcedureDecorator => {
+      throw new Error(
+        "gatewayUsage declares a resolver-authorized check for every procedure; policy() is unused",
+      );
+    };
 
-      summaryForVirtualKey: resolverAuthorizedPolicy({
-        reason:
-          "the key is loaded within this organization and must be visible to the caller's membership set; a miss is answered as not found",
-        permissions: ["gatewayUsage:view"],
-      })(procedure.input(summaryForVirtualKeyInputSchema)).query(async ({ ctx, input }) => {
-        // Same visibility rule as virtualKeys.get: a key the caller can't
-        // see is indistinguishable from one that doesn't exist.
-        const vk = await ctx.app.gateway.virtualKeys.tryGetById(
-          input.virtualKeyId,
-          input.organizationId,
-        );
-        if (!vk) {
-          throw new VirtualKeyNotFoundError();
-        }
-        const visible = await ctx.app.gateway.isVirtualKeyVisible({
-          organizationId: input.organizationId,
-          userId: ctx.actor().id,
-          virtualKey: vk,
-        });
-        if (!visible) {
-          throw new VirtualKeyNotFoundError();
-        }
-        return ctx.app.gateway.usage.summaryForVirtualKey({
-          organizationId: input.organizationId,
-          virtualKeyId: input.virtualKeyId,
-          window: {
-            fromDate: new Date(input.fromDate),
-            toDate: new Date(input.toDate),
-          },
-          model: input.model,
-        });
-      }),
-    });
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput,
+      })
+        // Membership-based like virtualKeys.list: the summary totals the keys
+        // the caller can see, so its numbers reconcile with the table a click
+        // arrives from. A non-member sees no keys and gets an empty summary.
+        .query("summary", (p) =>
+          p
+            .withInput(summaryInputSchema)
+            .withOutput(gatewayUsageSummarySchema)
+            .withCustomPermission(
+              resolverAuthorizedPolicy({
+                reason:
+                  "usage is summed only over the keys the caller's membership in this organization makes visible; the membership filter in the resolver is the check",
+                permissions: ["gatewayUsage:view"],
+              }),
+              "usage is summed only over the keys the caller's membership in this organization makes visible; the membership filter in the resolver is the check",
+            )
+            .handle(async ({ ctx, input }) => {
+              const keys = await ctx.app.gateway.listVisibleVirtualKeys({
+                organizationId: input.organizationId,
+                userId: ctx.actor().id,
+              });
+              return ctx.app.gateway.usage.summary({
+                organizationId: input.organizationId,
+                virtualKeyIds: keys.map((k) => k.id),
+                window: {
+                  fromDate: new Date(input.fromDate),
+                  toDate: new Date(input.toDate),
+                },
+              });
+            }),
+        )
+        .query("summaryForVirtualKey", (p) =>
+          p
+            .withInput(summaryForVirtualKeyInputSchema)
+            .withOutput(gatewayVirtualKeyUsageSummarySchema)
+            .withCustomPermission(
+              resolverAuthorizedPolicy({
+                reason:
+                  "the key is loaded within this organization and must be visible to the caller's membership set; a miss is answered as not found",
+                permissions: ["gatewayUsage:view"],
+              }),
+              "the key is loaded within this organization and must be visible to the caller's membership set; a miss is answered as not found",
+            )
+            .handle(async ({ ctx, input }) => {
+              // Same visibility rule as virtualKeys.get: a key the caller can't
+              // see is indistinguishable from one that doesn't exist.
+              const vk = await ctx.app.gateway.virtualKeys.tryGetById(
+                input.virtualKeyId,
+                input.organizationId,
+              );
+              if (!vk) {
+                throw new VirtualKeyNotFoundError();
+              }
+              const visible = await ctx.app.gateway.isVirtualKeyVisible({
+                organizationId: input.organizationId,
+                userId: ctx.actor().id,
+                virtualKey: vk,
+              });
+              if (!visible) {
+                throw new VirtualKeyNotFoundError();
+              }
+              return ctx.app.gateway.usage.summaryForVirtualKey({
+                organizationId: input.organizationId,
+                virtualKeyId: input.virtualKeyId,
+                window: {
+                  fromDate: new Date(input.fromDate),
+                  toDate: new Date(input.toDate),
+                },
+                model: input.model,
+              });
+            }),
+        )
+        .build()
+    );
   }
 }

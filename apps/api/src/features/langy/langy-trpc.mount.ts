@@ -108,6 +108,7 @@ export function createLangyEgressTrpcRouter<
     {
       protected: service.protected,
       policy: langyPolicy((permission) => service.policy(permission), mount.gates),
+      validateOutput: service.validateOutput,
     },
     mount.ports,
   );

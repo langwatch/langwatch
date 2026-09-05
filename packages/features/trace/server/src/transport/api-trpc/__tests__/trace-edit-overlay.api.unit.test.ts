@@ -31,8 +31,8 @@ function harness({ canUpdateAnnotations = true }: { canUpdateAnnotations?: boole
   const saveTraceEditOverlay = vi.fn(async (input: { patch: unknown }, actor: { id: string }) => ({
     traceId: "trace-1",
     patch: input.patch,
-    createdBy: actor,
-    updatedBy: actor,
+    createdBy: { ...actor, name: null, image: null },
+    updatedBy: { ...actor, name: null, image: null },
     createdAt: new Date(),
     updatedAt: new Date(),
   }));
@@ -49,7 +49,11 @@ function harness({ canUpdateAnnotations = true }: { canUpdateAnnotations?: boole
     restoreWithheldEdits: ({ incoming }) => incoming,
   };
 
-  const router = TraceEditOverlayTrpcApi.create(trpc, { protected: authenticated, policy }, ports);
+  const router = TraceEditOverlayTrpcApi.create(
+    trpc,
+    { protected: authenticated, policy, validateOutput: true },
+    ports,
+  );
 
   const caller = router.createCaller({
     app: { traces },

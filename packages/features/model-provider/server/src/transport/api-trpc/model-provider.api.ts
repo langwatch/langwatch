@@ -1,19 +1,26 @@
 /**
  * The Model Provider surface over the process's tRPC transport.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { toCanonicalCustomModelList } from "../../rules/custom-model-list.rules";
 import {
   modelDefaultConfigDeleteTrpcInputSchema,
   modelDefaultConfigSaveTrpcInputSchema,
+  modelDefaultEffectiveSchema,
   modelDefaultFeatureOverrideTrpcInputSchema,
+  modelDefaultInheritedValuesSchema,
   modelDefaultInheritedValuesTrpcInputSchema,
   modelDefaultResolvedTrpcInputSchema,
   modelDefaultRoleAssignmentTrpcInputSchema,
+  modelDefaultSnapshotSchema,
   modelProviderCodexApplyCodingDefaultsTrpcInputSchema,
   modelProviderCodexSignInPollTrpcInputSchema,
+  modelProviderCodexStatusSchema,
+  modelProviderCredentialVerdictSchema,
   modelProviderDeleteTrpcInputSchema,
   modelProviderIsManagedTrpcInputSchema,
+  modelProviderListEntrySchema,
   modelProviderOrganizationTrpcInputSchema,
   modelProviderProjectTrpcInputSchema,
   modelProviderTestConnectionTrpcInputSchema,
@@ -27,6 +34,7 @@ import {
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
+import { z } from "zod";
 import type { ModelProviderApp } from "#app/model-provider.app";
 
 /**
@@ -76,6 +84,8 @@ type ModelProviderTrpcProcedures<
     reason: string;
     permissions: readonly AuthzPermission[];
   }): ProcedureDecorator;
+  /** Whether the chain checks every answer against its declared output schema. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -206,6 +216,31 @@ function toLegacyProviderMap(providers: Record<string, CanonicalProvider>) {
   );
 }
 
+const legacyProviderMapSchema = z.record(z.string(), modelProviderListEntrySchema);
+
+const codexSignInStartSchema = z
+  .object({
+    userCode: z.string(),
+    deviceAuthId: z.string(),
+    verificationUrl: z.string(),
+    intervalSeconds: z.number(),
+  })
+  .strict();
+
+const codexSignInPollSchema = z.union([
+  z.object({ status: z.literal("pending") }).strict(),
+  z
+    .object({
+      status: z.literal("complete"),
+      providerId: z.string().optional(),
+      email: z.string(),
+      plan: z.string(),
+    })
+    .strict(),
+]);
+
+const okAckSchema = z.object({ ok: z.literal(true) }).strict();
+
 /**
  * Installs the complete `modelProvider.*` tRPC surface on a process-owned root. The
  * procedure and the policy bag are injected by the process so its auth, audit, error,
@@ -223,368 +258,468 @@ export class ModelProviderTrpcApi {
     procedures: ModelProviderTrpcProcedures<TContext, TOptions, TRoot>,
     ports: ModelProviderTrpcPorts<TApiKeyValidation, TStoredKeyValidation>,
   ) {
-    const {
-      protected: procedure,
-      policy,
-      tenantWritePolicy,
-      credentialProbePolicy,
-      serviceAuthorizedPolicy,
-    } = procedures;
+    const { tenantWritePolicy, credentialProbePolicy, serviceAuthorizedPolicy } = procedures;
 
-    return trpc.router({
-      // tRPC responses land in the browser, so every query here must go
-      // through the masking service method — decrypted customKeys are only
-      // for server-internal callers of `getExecutionProviders`.
-      getAllForProject: policy("project:view")(
-        procedure.input(modelProviderProjectTrpcInputSchema),
-      ).query(async ({ input, ctx }) => {
-        const providers = await ctx.app.modelProviders.getForProject({
-          projectId: input.projectId,
-        });
-        return toLegacyProviderMap(providers);
-      }),
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures,
+        validateOutput: procedures.validateOutput,
+      })
+        // tRPC responses land in the browser, so every query here must go
+        // through the masking service method — decrypted customKeys are only
+        // for server-internal callers of `getExecutionProviders`.
+        .query("getAllForProject", (p) =>
+          p
+            .withInput(modelProviderProjectTrpcInputSchema)
+            .withOutput(legacyProviderMapSchema)
+            .withPermission("project:view")
+            .handle(async ({ input, ctx }) => {
+              const providers = await ctx.app.modelProviders.getForProject({
+                projectId: input.projectId,
+              });
+              return toLegacyProviderMap(providers);
+            }),
+        )
+        .query("getAllForProjectForFrontend", (p) =>
+          p
+            .withInput(modelProviderProjectTrpcInputSchema)
+            .withOutput(legacyProviderMapSchema)
+            .withPermission("project:view")
+            .handle(async ({ input, ctx }) => {
+              return toLegacyProviderMap(
+                await ctx.app.modelProviders.getForProject({ projectId: input.projectId }),
+              );
+            }),
+        )
+        /**
+         * List shape: one entry per stored ModelProvider row, no collapsing by provider key. Use this for surfaces that need to render every row
+         * (the settings page Model Providers table) rather than the narrowest-scope-per-provider view returned by `getAllForProjectForFrontend`.
+         * Multi-instance setups (e.g. two "OpenAI" rows at different scopes) appear as two distinct entries.
+         */
+        .query("listAllForProjectForFrontend", (p) =>
+          p
+            .withInput(modelProviderProjectTrpcInputSchema)
+            .withOutput(z.array(modelProviderListEntrySchema))
+            .withPermission("project:view")
+            .handle(async ({ input, ctx }): Promise<ModelProviderListAllForProjectTrpcOutput> => {
+              return (
+                await ctx.app.modelProviders.listForProject({ projectId: input.projectId })
+              ).map(toLegacyProvider);
+            }),
+        )
+        /**
+         * Org-wide variant: returns every ModelProvider attached anywhere inside the organization (org + every team +
+         * every project), including env-fed pseudo-rows. The model-providers settings page uses this for the "All you can
+         * see" view so an admin sees the providers a sibling project's owner has configured.
+         */
+        .query("listAllForOrganizationForFrontend", (p) =>
+          p
+            .withInput(modelProviderOrganizationTrpcInputSchema)
+            .withOutput(z.array(modelProviderListEntrySchema))
+            .withPermission("organization:view")
+            .handle(async ({ input, ctx }) => {
+              return (
+                await ctx.app.modelProviders.listForOrganization({
+                  organizationId: input.organizationId,
+                })
+              ).map(toLegacyProvider);
+            }),
+        )
+        .mutation("update", (p) =>
+          p
+            .withInput(modelProviderUpdateTrpcInputSchema)
+            .withOutput(modelProviderListEntrySchema)
+            .withCustomPermission(
+              tenantWritePolicy("project:update"),
+              "the tenant gate for a provider write that may arrive with either handle: the project permission when a project is named, organization membership otherwise",
+            )
+            .handle(async ({ input, ctx }) => {
+              const result = await ctx.app.modelProviders.upsert(
+                {
+                  id: input.id,
+                  projectId: input.projectId,
+                  organizationId: input.organizationId,
+                  provider: input.provider,
+                  name: input.name,
+                  enabled: input.enabled,
+                  customKeys: input.customKeys as Record<string, unknown> | null | undefined,
+                  customModels: toCanonicalCustomModelList(input.customModels, "chat"),
+                  customEmbeddingsModels: toCanonicalCustomModelList(
+                    input.customEmbeddingsModels,
+                    "embedding",
+                  ),
+                  extraHeaders: input.extraHeaders,
+                  defaultModel: input.defaultModel,
+                  routingHandle: input.routingHandle,
+                  scopes:
+                    input.scopes ??
+                    (input.scopeType && input.scopeId
+                      ? [{ scopeType: input.scopeType, scopeId: input.scopeId }]
+                      : undefined),
+                  rateLimitRpm: input.rateLimitRpm,
+                  rateLimitTpm: input.rateLimitTpm,
+                  rateLimitRpd: input.rateLimitRpd,
+                  fallbackPriorityGlobal: input.fallbackPriorityGlobal,
+                  providerConfig: input.providerConfig as
+                    | Record<string, unknown>
+                    | null
+                    | undefined,
+                },
+                ctx.actor(),
+              );
 
-      getAllForProjectForFrontend: policy("project:view")(
-        procedure.input(modelProviderProjectTrpcInputSchema),
-      ).query(async ({ input, ctx }) => {
-        return toLegacyProviderMap(
-          await ctx.app.modelProviders.getForProject({ projectId: input.projectId }),
-        );
-      }),
+              return toLegacyProvider(result);
+            }),
+        )
+        .mutation("delete", (p) =>
+          p
+            .withInput(modelProviderDeleteTrpcInputSchema)
+            .withOutput(z.void())
+            .withCustomPermission(
+              tenantWritePolicy("project:delete"),
+              "the tenant gate for a provider write that may arrive with either handle: the project permission when a project is named, organization membership otherwise",
+            )
+            .handle(async ({ input, ctx }) => {
+              return await ctx.app.modelProviders.delete(input, ctx.actor());
+            }),
+        )
+        /**
+         * Validates an API key for a given model provider.
+         */
+        .mutation("validateApiKey", (p) =>
+          p
+            .withInput(modelProviderValidateApiKeyTrpcInputSchema)
+            .withoutOutput(
+              "TApiKeyValidation is the process's own outbound credential-probe verdict shape, a generic type parameter this feature does not own",
+            )
+            .withCustomPermission(
+              credentialProbePolicy,
+              "the credential probe IS the authorization — nothing downstream re-checks it, since the handler goes straight out to the provider with caller-supplied keys",
+            )
+            .handle(async ({ input }) => {
+              const { provider, customKeys } = input;
+              return ports.validateProviderApiKey(provider, customKeys);
+            }),
+        )
+        /**
+         * Checks a credential that is already saved.
+         */
+        .mutation("testConnection", (p) =>
+          p
+            .withInput(modelProviderTestConnectionTrpcInputSchema)
+            .withOutput(modelProviderCredentialVerdictSchema)
+            .withCustomPermission(
+              tenantWritePolicy("project:update"),
+              "the tenant gate for a provider write that may arrive with either handle: the project permission when a project is named, organization membership otherwise",
+            )
+            .handle(async ({ input, ctx }) => {
+              return await ctx.app.modelProviders.testConnection(input, ctx.actor());
+            }),
+        )
+        /**
+         * Codex sign-in, step 1: ask OpenAI for a device code. Nothing is stored — the pending sign-in's identifiers
+         * travel to the client and come back on every poll, so polling works across server instances.
+         * Spec: specs/model-providers/codex-account-provider.feature
+         */
+        .mutation("codexSignInStart", (p) =>
+          p
+            .withInput(modelProviderProjectTrpcInputSchema)
+            .withOutput(codexSignInStartSchema)
+            .withPermission("project:update")
+            .handle(async () => {
+              return await ports.startCodexDeviceSignIn();
+            }),
+        )
+        /**
+         * Codex sign-in, step 2..n: one poll of the pending device authorization. While the user hasn't approved yet this returns `{ status: "pending" }`. On approval it
+         * exchanges the code, saves the provider row with the encrypted token set at the requested scopes (service authz fails closed on any non-manageable scope), and —
+         * when the caller asks — writes the coding-assistant defaults so Langy and the tiny assists start using the account immediately.
+         */
+        .mutation("codexSignInPoll", (p) =>
+          p
+            .withInput(modelProviderCodexSignInPollTrpcInputSchema)
+            .withOutput(codexSignInPollSchema)
+            .withPermission("project:update")
+            .handle(async ({ input, ctx }) => {
+              const poll = await ports.pollCodexDeviceSignIn({
+                deviceAuthId: input.deviceAuthId,
+                userCode: input.userCode,
+              });
+              if (poll.status === "pending") {
+                return { status: "pending" as const };
+              }
 
-      /**
-       * List shape: one entry per stored ModelProvider row, no collapsing by provider key. Use this for surfaces that need to render every row
-       * (the settings page Model Providers table) rather than the narrowest-scope-per-provider view returned by `getAllForProjectForFrontend`.
-       * Multi-instance setups (e.g. two "OpenAI" rows at different scopes) appear as two distinct entries.
-       */
-      listAllForProjectForFrontend: policy("project:view")(
-        procedure.input(modelProviderProjectTrpcInputSchema),
-      ).query(async ({ input, ctx }): Promise<ModelProviderListAllForProjectTrpcOutput> => {
-        return (await ctx.app.modelProviders.listForProject({ projectId: input.projectId })).map(
-          toLegacyProvider,
-        );
-      }),
+              const actor = ctx.actor();
+              const actorId = actor.id;
+              const saved = await ctx.app.modelProviders.upsert(
+                {
+                  projectId: input.projectId,
+                  provider: "openai_codex",
+                  enabled: true,
+                  customKeys: poll.keys,
+                  scopes: input.scopes,
+                },
+                actor,
+              );
 
-      /**
-       * Org-wide variant: returns every ModelProvider attached anywhere inside the organization (org + every team +
-       * every project), including env-fed pseudo-rows. The model-providers settings page uses this for the "All you can
-       * see" view so an admin sees the providers a sibling project's owner has configured.
-       */
-      listAllForOrganizationForFrontend: policy("organization:view")(
-        procedure.input(modelProviderOrganizationTrpcInputSchema),
-      ).query(async ({ input, ctx }) => {
-        return (
-          await ctx.app.modelProviders.listForOrganization({
-            organizationId: input.organizationId,
-          })
-        ).map(toLegacyProvider);
-      }),
+              if (input.setAsCodingDefaults) {
+                await ctx.app.modelProviders.applyCodexCodingDefaults(
+                  { scopes: input.scopes },
+                  actor,
+                );
+              }
 
-      update: tenantWritePolicy("project:update")(
-        procedure.input(modelProviderUpdateTrpcInputSchema),
-      ).mutation(async ({ input, ctx }) => {
-        const result = await ctx.app.modelProviders.upsert(
-          {
-            id: input.id,
-            projectId: input.projectId,
-            organizationId: input.organizationId,
-            provider: input.provider,
-            name: input.name,
-            enabled: input.enabled,
-            customKeys: input.customKeys as Record<string, unknown> | null | undefined,
-            customModels: toCanonicalCustomModelList(input.customModels, "chat"),
-            customEmbeddingsModels: toCanonicalCustomModelList(
-              input.customEmbeddingsModels,
-              "embedding",
-            ),
-            extraHeaders: input.extraHeaders,
-            defaultModel: input.defaultModel,
-            routingHandle: input.routingHandle,
-            scopes:
-              input.scopes ??
-              (input.scopeType && input.scopeId
-                ? [{ scopeType: input.scopeType, scopeId: input.scopeId }]
-                : undefined),
-            rateLimitRpm: input.rateLimitRpm,
-            rateLimitTpm: input.rateLimitTpm,
-            rateLimitRpd: input.rateLimitRpd,
-            fallbackPriorityGlobal: input.fallbackPriorityGlobal,
-            providerConfig: input.providerConfig as Record<string, unknown> | null | undefined,
-          },
-          ctx.actor(),
-        );
+              // The response hands the connector their own account email (PII), so
+              // the connect event is audit-logged: who, where, and which scopes. The
+              // email itself deliberately stays out of the log row.
+              ports.recordAudit({
+                userId: actorId,
+                projectId: input.projectId,
+                action: "modelProvider.codexConnect",
+                targetKind: "modelProvider",
+                targetId: saved?.id,
+                args: {
+                  scopes: input.scopes,
+                  setAsCodingDefaults: input.setAsCodingDefaults,
+                  plan: poll.keys.CODEX_PLAN,
+                },
+              });
 
-        return toLegacyProvider(result);
-      }),
-
-      delete: tenantWritePolicy("project:delete")(
-        procedure.input(modelProviderDeleteTrpcInputSchema),
-      ).mutation(async ({ input, ctx }) => {
-        return await ctx.app.modelProviders.delete(input, ctx.actor());
-      }),
-
-      /**
-       * Validates an API key for a given model provider.
-       */
-      validateApiKey: credentialProbePolicy(
-        procedure.input(modelProviderValidateApiKeyTrpcInputSchema),
-      ).mutation(async ({ input }) => {
-        const { provider, customKeys } = input;
-        return ports.validateProviderApiKey(provider, customKeys);
-      }),
-
-      /**
-       * Checks a credential that is already saved.
-       */
-      testConnection: tenantWritePolicy("project:update")(
-        procedure.input(modelProviderTestConnectionTrpcInputSchema),
-      ).mutation(async ({ input, ctx }) => {
-        return await ctx.app.modelProviders.testConnection(input, ctx.actor());
-      }),
-
-      /**
-       * Codex sign-in, step 1: ask OpenAI for a device code. Nothing is stored — the pending sign-in's identifiers
-       * travel to the client and come back on every poll, so polling works across server instances.
-       * Spec: specs/model-providers/codex-account-provider.feature
-       */
-      codexSignInStart: policy("project:update")(
-        procedure.input(modelProviderProjectTrpcInputSchema),
-      ).mutation(async () => {
-        return await ports.startCodexDeviceSignIn();
-      }),
-
-      /**
-       * Codex sign-in, step 2..n: one poll of the pending device authorization. While the user hasn't approved yet this returns `{ status: "pending" }`. On approval it
-       * exchanges the code, saves the provider row with the encrypted token set at the requested scopes (service authz fails closed on any non-manageable scope), and —
-       * when the caller asks — writes the coding-assistant defaults so Langy and the tiny assists start using the account immediately.
-       */
-      codexSignInPoll: policy("project:update")(
-        procedure.input(modelProviderCodexSignInPollTrpcInputSchema),
-      ).mutation(async ({ input, ctx }) => {
-        const poll = await ports.pollCodexDeviceSignIn({
-          deviceAuthId: input.deviceAuthId,
-          userCode: input.userCode,
-        });
-        if (poll.status === "pending") {
-          return { status: "pending" as const };
-        }
-
-        const actor = ctx.actor();
-        const actorId = actor.id;
-        const saved = await ctx.app.modelProviders.upsert(
-          {
-            projectId: input.projectId,
-            provider: "openai_codex",
-            enabled: true,
-            customKeys: poll.keys,
-            scopes: input.scopes,
-          },
-          actor,
-        );
-
-        if (input.setAsCodingDefaults) {
-          await ctx.app.modelProviders.applyCodexCodingDefaults({ scopes: input.scopes }, actor);
-        }
-
-        // The response hands the connector their own account email (PII), so
-        // the connect event is audit-logged: who, where, and which scopes. The
-        // email itself deliberately stays out of the log row.
-        ports.recordAudit({
-          userId: actorId,
-          projectId: input.projectId,
-          action: "modelProvider.codexConnect",
-          targetKind: "modelProvider",
-          targetId: saved?.id,
-          args: {
-            scopes: input.scopes,
-            setAsCodingDefaults: input.setAsCodingDefaults,
-            plan: poll.keys.CODEX_PLAN,
-          },
-        });
-
-        return {
-          status: "complete" as const,
-          providerId: saved?.id,
-          email: poll.keys.CODEX_EMAIL,
-          plan: poll.keys.CODEX_PLAN,
-        };
-      }),
-
-      /**
-       * Point the coding-assistant roles (LANGY + FAST) at the codex model, after the fact. The
-       * settings-page connect flow doesn't write defaults during sign-in; it asks with a dialog once
-       * connected and calls this on "yes" — the same role writes the Langy/onboarding flows perform inline.
-       */
-      codexApplyCodingDefaults: policy("project:update")(
-        procedure.input(modelProviderCodexApplyCodingDefaultsTrpcInputSchema),
-      ).mutation(async ({ input, ctx }) => {
-        const actor = ctx.actor();
-        await ctx.app.modelProviders.applyCodexCodingDefaults({ scopes: input.scopes }, actor);
-        ports.recordAudit({
-          userId: actor.id,
-          projectId: input.projectId,
-          action: "modelProvider.codexApplyCodingDefaults",
-          args: { scopes: input.scopes },
-        });
-        return { applied: true as const };
-      }),
-
-      /**
-       * The connected Codex account for a project, for the setup surfaces' connected state. Never returns tokens, and deliberately NOT the account email:
-       * this is a project:view query, so a plain member must not read the (often personal) OpenAI address the connecting admin signed in with. The plan tier
-       * is non-identifying. The connector still sees their own email at connect time from the sign-in mutation's result.
-       */
-      codexStatus: policy("project:view")(
-        procedure.input(modelProviderProjectTrpcInputSchema),
-      ).query(async ({ input, ctx }) => {
-        return ctx.app.modelProviders.getCodexStatus(input);
-      }),
-
-      isManagedProvider: policy("organization:view")(
-        procedure.input(modelProviderIsManagedTrpcInputSchema),
-      ).query(({ input, ctx }) => {
-        return {
-          managed: ctx.app.modelProviders.isManagedProvider(input),
-        };
-      }),
-
-      /**
-       * Validates a stored or env var API key against a custom or default base URL.
-       * Gets API key from DB or env var and validates against the provided URL (or default if not provided).
-       */
-      validateKeyWithCustomUrl: policy("project:update")(
-        procedure.input(modelProviderValidateKeyWithCustomUrlTrpcInputSchema),
-      ).query(async ({ input, ctx }) => {
-        const { projectId, provider, customBaseUrl } = input;
-        return ports.validateKeyWithCustomUrl({
-          projectId,
-          provider,
-          customBaseUrl,
-          // The probe is written against the service, so the application hands
-          // over the one it was composed with rather than this transport
-          // holding a second.
-          modelProviders: ctx.app.modelProviders.providerService,
-        });
-      }),
-
-      // ──────────────────────────────────────────────────────────────────────── Role + feature-keyed
-      // default models (Area B3.2). Writes go through The canonical Model Provider service so they land in
-      // the new `ModelDefault` table; the legacy Organization/Team/Project scalar columns become read-only
-      // fallback during the compat window. See specs/model-providers/role-based-default-models.feature.
-      // ────────────────────────────────────────────────────────────────────────
-
-      /**
-       * Cascade-resolve a single feature key for a project. Wraps `resolveModelForFeature` for frontend consumers that used to read
-       * `project.defaultModel` / etc directly. Returns null when nothing is configured at any scope rather than throwing, so the
-       * caller can render a placeholder selector + a "configure a default" hint without an exception-based control flow.
-       */
-      getResolvedDefault: policy("project:view")(
-        procedure.input(modelDefaultResolvedTrpcInputSchema),
-      ).query(async ({ input, ctx }): Promise<ModelDefaultResolvedTrpcOutput> => {
-        return ctx.app.modelProviders.tryGetResolvedDefault({
-          projectId: input.projectId,
-          featureKey: input.featureKey,
-        });
-      }),
-
-      /**
-       * Snapshot for the Default Models settings page.
-       */
-      getDefaultModelsForProject: policy("project:view")(
-        procedure.input(modelProviderProjectTrpcInputSchema),
-      ).query(async ({ input, ctx }) => {
-        return ctx.app.modelProviders.getDefaultSnapshot(
-          { projectId: input.projectId },
-          ctx.actor(),
-        );
-      }),
-
-      /**
-       * Single-key writers used by the provider-create "Set as default" flow and any tactical "change just this role at
-       * this scope" UI. Both go through the canonical Model Provider service which finds the (newest) config attached at
-       * the scope and updates the matching key in place, or creates a new config if none exists.
-       */
-      setRoleAssignmentForScope: serviceAuthorizedPolicy({
-        reason:
-          "the tier is data: the scope the caller names decides the permission, and the service's assertCanWriteDefault is what checks it",
-        permissions: ["organization:manage", "team:manage", "project:manage"],
-      })(procedure.input(modelDefaultRoleAssignmentTrpcInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          await ctx.app.modelProviders.setDefault(
-            {
-              scope: { scopeType: input.scopeType, scopeId: input.scopeId },
-              key: input.role,
-              model: input.model,
-            },
-            ctx.actor(),
-          );
-          return { ok: true };
-        },
-      ),
-
-      setFeatureOverrideForScope: serviceAuthorizedPolicy({
-        reason:
-          "the tier is data: the scope the caller names decides the permission, and the service's assertCanWriteDefault is what checks it",
-        permissions: ["organization:manage", "team:manage", "project:manage"],
-      })(procedure.input(modelDefaultFeatureOverrideTrpcInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          await ctx.app.modelProviders.setDefault(
-            {
-              scope: { scopeType: input.scopeType, scopeId: input.scopeId },
-              key: input.featureKey,
-              model: input.model,
-            },
-            ctx.actor(),
-          );
-          return { ok: true };
-        },
-      ),
-
-      /**
-       * Full-config writer: save (create or update) a whole policy including its
-       * scope attachments. The drawer's "Save" button funnels through here.
-       */
-      saveDefaultModelsConfig: serviceAuthorizedPolicy({
-        reason:
-          "the tier is data: each scope the caller picks decides its own permission, and the service's assertCanWriteDefault is what checks them",
-        permissions: ["organization:manage", "team:manage", "project:manage"],
-      })(procedure.input(modelDefaultConfigSaveTrpcInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          const saved = await ctx.app.modelProviders.saveDefaultConfig(input, ctx.actor());
-          return { id: saved.id };
-        },
-      ),
-
-      /**
-       * Delete a config (and all its scope attachments cascade). The
-       * caller must hold the matching manage permission on every scope
-       * the config is currently attached to.
-       */
-      deleteDefaultModelsConfig: serviceAuthorizedPolicy({
-        reason:
-          "the scopes are the stored row's, not the caller's input, so only the service can know which permissions to require",
-        permissions: ["organization:manage", "team:manage", "project:manage"],
-      })(procedure.input(modelDefaultConfigDeleteTrpcInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          await ctx.app.modelProviders.deleteDefaultConfig({ id: input.id }, ctx.actor());
-          return { ok: true };
-        },
-      ),
-
-      /**
-       * "What would the cascade hand back for these scopes if I had no value here?"
-       * — drives the drawer's inherited-as-placeholder + the "Inherit (from
-       * organization) [openai/gpt-5.5]" dropdown entry.
-       */
-      getInheritedValuesForScopes: policy("project:view")(
-        procedure.input(modelDefaultInheritedValuesTrpcInputSchema),
-      ).query(async ({ input, ctx }) => {
-        return ctx.app.modelProviders.getInheritedValues({
-          projectId: input.projectId,
-          scopes: input.scopes,
-          excludeConfigId: input.excludeConfigId,
-        });
-      }),
-    });
+              return {
+                status: "complete" as const,
+                providerId: saved?.id,
+                email: poll.keys.CODEX_EMAIL,
+                plan: poll.keys.CODEX_PLAN,
+              };
+            }),
+        )
+        /**
+         * Point the coding-assistant roles (LANGY + FAST) at the codex model, after the fact. The
+         * settings-page connect flow doesn't write defaults during sign-in; it asks with a dialog once
+         * connected and calls this on "yes" — the same role writes the Langy/onboarding flows perform inline.
+         */
+        .mutation("codexApplyCodingDefaults", (p) =>
+          p
+            .withInput(modelProviderCodexApplyCodingDefaultsTrpcInputSchema)
+            .withOutput(z.object({ applied: z.literal(true) }).strict())
+            .withPermission("project:update")
+            .handle(async ({ input, ctx }) => {
+              const actor = ctx.actor();
+              await ctx.app.modelProviders.applyCodexCodingDefaults(
+                { scopes: input.scopes },
+                actor,
+              );
+              ports.recordAudit({
+                userId: actor.id,
+                projectId: input.projectId,
+                action: "modelProvider.codexApplyCodingDefaults",
+                args: { scopes: input.scopes },
+              });
+              return { applied: true as const };
+            }),
+        )
+        /**
+         * The connected Codex account for a project, for the setup surfaces' connected state. Never returns tokens, and deliberately NOT the account email:
+         * this is a project:view query, so a plain member must not read the (often personal) OpenAI address the connecting admin signed in with. The plan tier
+         * is non-identifying. The connector still sees their own email at connect time from the sign-in mutation's result.
+         */
+        .query("codexStatus", (p) =>
+          p
+            .withInput(modelProviderProjectTrpcInputSchema)
+            .withOutput(modelProviderCodexStatusSchema)
+            .withPermission("project:view")
+            .handle(async ({ input, ctx }) => {
+              return ctx.app.modelProviders.getCodexStatus(input);
+            }),
+        )
+        .query("isManagedProvider", (p) =>
+          p
+            .withInput(modelProviderIsManagedTrpcInputSchema)
+            .withOutput(z.object({ managed: z.boolean() }).strict())
+            .withPermission("organization:view")
+            .handle(({ input, ctx }) => {
+              return {
+                managed: ctx.app.modelProviders.isManagedProvider(input),
+              };
+            }),
+        )
+        /**
+         * Validates a stored or env var API key against a custom or default base URL.
+         * Gets API key from DB or env var and validates against the provided URL (or default if not provided).
+         */
+        .query("validateKeyWithCustomUrl", (p) =>
+          p
+            .withInput(modelProviderValidateKeyWithCustomUrlTrpcInputSchema)
+            .withoutOutput(
+              "TStoredKeyValidation is the process's own outbound credential-probe verdict shape, a generic type parameter this feature does not own",
+            )
+            .withPermission("project:update")
+            .handle(async ({ input, ctx }) => {
+              const { projectId, provider, customBaseUrl } = input;
+              return ports.validateKeyWithCustomUrl({
+                projectId,
+                provider,
+                customBaseUrl,
+                // The probe is written against the service, so the application hands
+                // over the one it was composed with rather than this transport
+                // holding a second.
+                modelProviders: ctx.app.modelProviders.providerService,
+              });
+            }),
+        )
+        // ──────────────────────────────────────────────────────────────────────── Role + feature-keyed
+        // default models (Area B3.2). Writes go through The canonical Model Provider service so they land in
+        // the new `ModelDefault` table; the legacy Organization/Team/Project scalar columns become read-only
+        // fallback during the compat window. See specs/model-providers/role-based-default-models.feature.
+        // ────────────────────────────────────────────────────────────────────────
+        /**
+         * Cascade-resolve a single feature key for a project. Wraps `resolveModelForFeature` for frontend consumers that used to read
+         * `project.defaultModel` / etc directly. Returns null when nothing is configured at any scope rather than throwing, so the
+         * caller can render a placeholder selector + a "configure a default" hint without an exception-based control flow.
+         */
+        .query("getResolvedDefault", (p) =>
+          p
+            .withInput(modelDefaultResolvedTrpcInputSchema)
+            .withOutput(modelDefaultEffectiveSchema.nullable())
+            .withPermission("project:view")
+            .handle(async ({ input, ctx }): Promise<ModelDefaultResolvedTrpcOutput> => {
+              return ctx.app.modelProviders.tryGetResolvedDefault({
+                projectId: input.projectId,
+                featureKey: input.featureKey,
+              });
+            }),
+        )
+        /**
+         * Snapshot for the Default Models settings page.
+         */
+        .query("getDefaultModelsForProject", (p) =>
+          p
+            .withInput(modelProviderProjectTrpcInputSchema)
+            .withOutput(modelDefaultSnapshotSchema)
+            .withPermission("project:view")
+            .handle(async ({ input, ctx }) => {
+              return ctx.app.modelProviders.getDefaultSnapshot(
+                { projectId: input.projectId },
+                ctx.actor(),
+              );
+            }),
+        )
+        /**
+         * Single-key writers used by the provider-create "Set as default" flow and any tactical "change just this role at
+         * this scope" UI. Both go through the canonical Model Provider service which finds the (newest) config attached at
+         * the scope and updates the matching key in place, or creates a new config if none exists.
+         */
+        .mutation("setRoleAssignmentForScope", (p) =>
+          p
+            .withInput(modelDefaultRoleAssignmentTrpcInputSchema)
+            .withOutput(okAckSchema)
+            .withCustomPermission(
+              serviceAuthorizedPolicy({
+                reason:
+                  "the tier is data: the scope the caller names decides the permission, and the service's assertCanWriteDefault is what checks it",
+                permissions: ["organization:manage", "team:manage", "project:manage"],
+              }),
+              "the tier is data: the scope the caller names decides the permission, and the service's assertCanWriteDefault is what checks it",
+            )
+            .handle(async ({ input, ctx }) => {
+              await ctx.app.modelProviders.setDefault(
+                {
+                  scope: { scopeType: input.scopeType, scopeId: input.scopeId },
+                  key: input.role,
+                  model: input.model,
+                },
+                ctx.actor(),
+              );
+              return { ok: true };
+            }),
+        )
+        .mutation("setFeatureOverrideForScope", (p) =>
+          p
+            .withInput(modelDefaultFeatureOverrideTrpcInputSchema)
+            .withOutput(okAckSchema)
+            .withCustomPermission(
+              serviceAuthorizedPolicy({
+                reason:
+                  "the tier is data: the scope the caller names decides the permission, and the service's assertCanWriteDefault is what checks it",
+                permissions: ["organization:manage", "team:manage", "project:manage"],
+              }),
+              "the tier is data: the scope the caller names decides the permission, and the service's assertCanWriteDefault is what checks it",
+            )
+            .handle(async ({ input, ctx }) => {
+              await ctx.app.modelProviders.setDefault(
+                {
+                  scope: { scopeType: input.scopeType, scopeId: input.scopeId },
+                  key: input.featureKey,
+                  model: input.model,
+                },
+                ctx.actor(),
+              );
+              return { ok: true };
+            }),
+        )
+        /**
+         * Full-config writer: save (create or update) a whole policy including its
+         * scope attachments. The drawer's "Save" button funnels through here.
+         */
+        .mutation("saveDefaultModelsConfig", (p) =>
+          p
+            .withInput(modelDefaultConfigSaveTrpcInputSchema)
+            .withOutput(z.object({ id: z.string() }).strict())
+            .withCustomPermission(
+              serviceAuthorizedPolicy({
+                reason:
+                  "the tier is data: each scope the caller picks decides its own permission, and the service's assertCanWriteDefault is what checks them",
+                permissions: ["organization:manage", "team:manage", "project:manage"],
+              }),
+              "the tier is data: each scope the caller picks decides its own permission, and the service's assertCanWriteDefault is what checks them",
+            )
+            .handle(async ({ input, ctx }) => {
+              const saved = await ctx.app.modelProviders.saveDefaultConfig(input, ctx.actor());
+              return { id: saved.id };
+            }),
+        )
+        /**
+         * Delete a config (and all its scope attachments cascade). The
+         * caller must hold the matching manage permission on every scope
+         * the config is currently attached to.
+         */
+        .mutation("deleteDefaultModelsConfig", (p) =>
+          p
+            .withInput(modelDefaultConfigDeleteTrpcInputSchema)
+            .withOutput(okAckSchema)
+            .withCustomPermission(
+              serviceAuthorizedPolicy({
+                reason:
+                  "the scopes are the stored row's, not the caller's input, so only the service can know which permissions to require",
+                permissions: ["organization:manage", "team:manage", "project:manage"],
+              }),
+              "the scopes are the stored row's, not the caller's input, so only the service can know which permissions to require",
+            )
+            .handle(async ({ input, ctx }) => {
+              await ctx.app.modelProviders.deleteDefaultConfig({ id: input.id }, ctx.actor());
+              return { ok: true };
+            }),
+        )
+        /**
+         * "What would the cascade hand back for these scopes if I had no value here?"
+         * — drives the drawer's inherited-as-placeholder + the "Inherit (from
+         * organization) [openai/gpt-5.5]" dropdown entry.
+         */
+        .query("getInheritedValuesForScopes", (p) =>
+          p
+            .withInput(modelDefaultInheritedValuesTrpcInputSchema)
+            .withOutput(modelDefaultInheritedValuesSchema)
+            .withPermission("project:view")
+            .handle(async ({ input, ctx }) => {
+              return ctx.app.modelProviders.getInheritedValues({
+                projectId: input.projectId,
+                scopes: input.scopes,
+                excludeConfigId: input.excludeConfigId,
+              });
+            }),
+        )
+        .build()
+    );
   }
 }

@@ -52,7 +52,13 @@ function harness({
 
   const router = TeamTrpcApi.create(
     trpc,
-    { protected: authenticated, policy: () => (procedure) => procedure },
+    {
+      protected: authenticated,
+      policy: () => (procedure) => procedure,
+      // This suite's stub teams/projects are partial stand-ins, not full
+      // rows matching `teamWithProjectsSchema` / `organizationTeamSchema`.
+      validateOutput: false,
+    },
     {
       probeOrganizationPermission,
       assertCustomRolesAllowed: assertCustomRoles,
@@ -104,6 +110,7 @@ describe("TeamTrpcApi", () => {
                   return next();
                 },
               ) as TProcedure,
+          validateOutput: false,
         },
         {
           probeOrganizationPermission: async () => true,

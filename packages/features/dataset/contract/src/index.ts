@@ -1,4 +1,5 @@
 export * from "./dataset";
+export * from "./dataset.responses";
 export * from "./dataset-file";
 export * from "./dataset-record-count";
 export * from "./dataset-chunks";

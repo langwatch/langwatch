@@ -33,7 +33,11 @@ export function createDatasetTrpcRouter<
   const service = createTrpcApiService(mount);
   return DatasetTrpcApi.create(
     mount.root,
-    { protected: service.protected, policy: (permission) => service.policy(permission) },
+    {
+      protected: service.protected,
+      policy: (permission) => service.policy(permission),
+      validateOutput: service.validateOutput,
+    },
     mount.ports,
   );
 }
@@ -48,6 +52,7 @@ export function createDatasetRecordTrpcRouter<
   return DatasetRecordTrpcApi.create(mount.root, {
     protected: service.protected,
     policy: (permission) => service.policy(permission),
+    validateOutput: service.validateOutput,
   });
 }
 
@@ -71,7 +76,11 @@ export function createBatchRecordTrpcRouter<
   const service = createTrpcApiService(mount);
   return BatchRecordTrpcApi.create(
     mount.root,
-    { protected: service.protected, policy: (permission) => service.policy(permission) },
+    {
+      protected: service.protected,
+      policy: (permission) => service.policy(permission),
+      validateOutput: service.validateOutput,
+    },
     mount.ports,
   );
 }

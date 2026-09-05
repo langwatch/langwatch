@@ -12,8 +12,9 @@
  * plan provider. WHICH provider answers (a signed licence, a subscription
  * row, or the unlicensed baseline) is a deployment decision the process makes.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { Plan, PlanProvider } from "@langwatch/entitlement-contract";
+import { planSchema, type Plan, type PlanProvider } from "@langwatch/entitlement-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
@@ -46,6 +47,8 @@ type PlanTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** Whether the chain checks every answer against its declared output schema. */
+  validateOutput: boolean;
 }>;
 
 const organizationScopeSchema = z.object({ organizationId: z.string() });
@@ -60,16 +63,24 @@ export class PlanTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: PlanTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
-
-    return trpc.router({
-      getActivePlan: policy("organization:view")(procedure.input(organizationScopeSchema)).query(
-        async ({ input, ctx }): Promise<Plan> =>
-          await ctx.app.planProvider.getActivePlan({
-            organizationId: input.organizationId,
-            user: ctx.session?.user,
-          }),
-      ),
-    });
+    return createTrpcService({
+      root: trpc,
+      procedures,
+      validateOutput: procedures.validateOutput,
+    })
+      .query("getActivePlan", (p) =>
+        p
+          .withInput(organizationScopeSchema)
+          .withOutput(planSchema)
+          .withPermission("organization:view")
+          .handle(
+            async ({ input, ctx }): Promise<Plan> =>
+              await ctx.app.planProvider.getActivePlan({
+                organizationId: input.organizationId,
+                user: ctx.session?.user,
+              }),
+          ),
+      )
+      .build();
   }
 }

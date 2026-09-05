@@ -1,6 +1,7 @@
 /**
  * Gateway budget administration over tRPC. A budget is always org-scoped, but constrains one of ORGANIZATION/TEAM/PROJECT/VIRTUAL_KEY/PRINCIPAL/GROUP; normalising a screen's (scope kind, target id) onto scopeType + the typed column is the service's job, not this transport's. Transport only: procedure names, input parsing, wire DTO, delegation to the one budget-decision service. The two non-budget reads (org existence, provider/group label resolution) arrive as ports, not a Prisma client, so no persistence reaches the transport.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   gatewayBudgetApiBudgetInputSchema,
@@ -9,6 +10,10 @@ import {
   gatewayBudgetApiProjectInputSchema,
   gatewayBudgetApiResetInputSchema,
   gatewayBudgetApiUpdateInputSchema,
+  gatewayBudgetDetailSchema,
+  gatewayBudgetDtoResponseSchema,
+  gatewayBudgetGroupTargetsSchema,
+  gatewayBudgetListSchema,
   scopeTargetKey,
   type GatewayBudgetWithSeats,
   effectiveBudgetPeriod,
@@ -45,6 +50,8 @@ type GatewayBudgetTrpcProcedures<
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   /** Tracing, logging, error shaping, scope lineage, the check, and audit. */
   policy(permission: AuthzPermission): ProcedureDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 function toDto(b: GatewayBudgetWithSeats) {
@@ -90,149 +97,187 @@ export class GatewayBudgetTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: GatewayBudgetTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      list: policy("gatewayBudgets:view")(
-        procedure.input(gatewayBudgetApiOrganizationInputSchema),
-      ).query(async ({ ctx, input }) => {
-        await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-        const { budgets, spendAvailable, scopeReach } =
-          await ctx.app.gateway.budgetDecisions.listWithHealth(input.organizationId);
-        const scopeTargets = await ctx.app.gateway.budgetDecisions.resolveScopeTargets(
-          budgets,
-          input.organizationId,
-        );
-        const providerLabels = await ctx.app.gateway.resolveProviderLabels(budgets);
-        return {
-          spendAvailable,
-          budgets: budgets.map((b) => ({
-            ...toDto(b),
-            spendAvailable,
-            unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
-            scopeTarget: scopeTargets.get(scopeTargetKey(b.scopeType, b.scopeId)) ?? null,
-            providerLabel: providerLabelAdapter.labelFor(providerLabels, b.providerKey),
-          })),
-        };
-      }),
-
-      listForProject: policy("gatewayBudgets:view")(
-        procedure.input(gatewayBudgetApiProjectInputSchema),
-      ).query(async ({ ctx, input }) => {
-        const { budgets, spendAvailable, scopeReach } =
-          await ctx.app.gateway.budgetDecisions.listForProjectWithHealth(input.projectId);
-        // The organization the project belongs to, so VIRTUAL_KEY / GROUP /
-        // PRINCIPAL targets resolve inside the right tenant. Read through the
-        // Project service rather than a Prisma client, which this transport
-        // does not hold.
-        const organizationId = await ctx.app.gateway.projects.tryGetOrganizationId(input.projectId);
-        const scopeTargets = await ctx.app.gateway.budgetDecisions.resolveScopeTargets(
-          budgets,
-          organizationId ?? null,
-        );
-        const providerLabels = await ctx.app.gateway.resolveProviderLabels(budgets);
-        return {
-          spendAvailable,
-          budgets: budgets.map((b) => ({
-            ...toDto(b),
-            spendAvailable,
-            unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
-            scopeTarget: scopeTargets.get(scopeTargetKey(b.scopeType, b.scopeId)) ?? null,
-            providerLabel: providerLabelAdapter.labelFor(providerLabels, b.providerKey),
-          })),
-        };
-      }),
-
-      get: policy("gatewayBudgets:view")(procedure.input(gatewayBudgetApiBudgetInputSchema)).query(
-        async ({ ctx, input }) => {
-          await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-          const detail = await ctx.app.gateway.budgetDecisions.tryGetDetail({
-            id: input.id,
-            organizationId: input.organizationId,
-          });
-          if (!detail) {
-            throw new TRPCError({ code: "NOT_FOUND", message: "budget not found" });
-          }
-          const providerLabels = await ctx.app.gateway.resolveProviderLabels([detail.budget]);
-          return {
-            ...toDto(detail.budget),
-            spendAvailable: detail.spendAvailable,
-            unreachableByAnyKey: detail.unreachableByAnyKey,
-            scopeTarget: detail.scopeTarget,
-            providerLabel: providerLabelAdapter.labelFor(providerLabels, detail.budget.providerKey),
-            recentLedger: detail.recentLedger.map((l) => ({
-              id: l.id,
-              virtualKeyId: l.virtualKeyId,
-              virtualKeyName: l.virtualKey?.name ?? l.virtualKeyId,
-              virtualKeyPrefix: l.virtualKey?.displayPrefix ?? "",
-              amountUsd: l.amountUsd.toString(),
-              model: l.model,
-              status: l.status,
-              occurredAt: l.occurredAt.toISOString(),
-            })),
-          };
-        },
-      ),
-
-      /**
-       * Groups a budget can target, for whoever may create budgets. group.listAll exposes role-binding maps and demands organization:manage; a budget creator only needs names and sizes, so this stays gated by the same permission as the create it serves.
-       */
-      groupTargets: policy("gatewayBudgets:create")(
-        procedure.input(gatewayBudgetApiOrganizationInputSchema),
-      ).query(async ({ ctx, input }) => ctx.app.gateway.listGroupTargets(input.organizationId)),
-
-      create: policy("gatewayBudgets:create")(
-        procedure.input(gatewayBudgetApiCreateInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const row = await ctx.app.gateway.budgetDecisions.create({
-          organizationId: input.organizationId,
-          scope: input.scope,
-          name: input.name,
-          description: input.description ?? null,
-          window: input.window,
-          limitUsd: input.limitUsd,
-          onBreach: input.onBreach,
-          timezone: input.timezone ?? null,
-          providerKey: input.providerKey ?? null,
-          cycleAnchorAt: input.cycleAnchorAt ?? null,
-          allowUnreachable: input.allowUnreachable,
-          actorUserId: ctx.actor().id,
-        });
-        return toDto(row);
-      }),
-
-      update: policy("gatewayBudgets:update")(
-        procedure.input(gatewayBudgetApiUpdateInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const row = await ctx.app.gateway.budgetDecisions.update({
-          ...input,
-          actorUserId: ctx.actor().id,
-        });
-        return toDto(row);
-      }),
-
-      archive: policy("gatewayBudgets:delete")(
-        procedure.input(gatewayBudgetApiBudgetInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const row = await ctx.app.gateway.budgetDecisions.archive({
-          ...input,
-          actorUserId: ctx.actor().id,
-        });
-        return toDto(row);
-      }),
-
-      reset: policy("gatewayBudgets:update")(
-        procedure.input(gatewayBudgetApiResetInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const row = await ctx.app.gateway.budgetDecisions.reset({
-          id: input.id,
-          organizationId: input.organizationId,
-          actorUserId: ctx.actor().id,
-          endUserId: input.endUserId ?? null,
-          reason: input.reason ?? null,
-        });
-        return toDto(row);
-      }),
-    });
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput,
+      })
+        .query("list", (p) =>
+          p
+            .withInput(gatewayBudgetApiOrganizationInputSchema)
+            .withOutput(gatewayBudgetListSchema)
+            .withPermission("gatewayBudgets:view")
+            .handle(async ({ ctx, input }) => {
+              await ctx.app.gateway.assertOrganizationExists(input.organizationId);
+              const { budgets, spendAvailable, scopeReach } =
+                await ctx.app.gateway.budgetDecisions.listWithHealth(input.organizationId);
+              const scopeTargets = await ctx.app.gateway.budgetDecisions.resolveScopeTargets(
+                budgets,
+                input.organizationId,
+              );
+              const providerLabels = await ctx.app.gateway.resolveProviderLabels(budgets);
+              return {
+                spendAvailable,
+                budgets: budgets.map((b) => ({
+                  ...toDto(b),
+                  spendAvailable,
+                  unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
+                  scopeTarget: scopeTargets.get(scopeTargetKey(b.scopeType, b.scopeId)) ?? null,
+                  providerLabel: providerLabelAdapter.labelFor(providerLabels, b.providerKey),
+                })),
+              };
+            }),
+        )
+        .query("listForProject", (p) =>
+          p
+            .withInput(gatewayBudgetApiProjectInputSchema)
+            .withOutput(gatewayBudgetListSchema)
+            .withPermission("gatewayBudgets:view")
+            .handle(async ({ ctx, input }) => {
+              const { budgets, spendAvailable, scopeReach } =
+                await ctx.app.gateway.budgetDecisions.listForProjectWithHealth(input.projectId);
+              // The organization the project belongs to, so VIRTUAL_KEY / GROUP /
+              // PRINCIPAL targets resolve inside the right tenant. Read through the
+              // Project service rather than a Prisma client, which this transport
+              // does not hold.
+              const organizationId = await ctx.app.gateway.projects.tryGetOrganizationId(
+                input.projectId,
+              );
+              const scopeTargets = await ctx.app.gateway.budgetDecisions.resolveScopeTargets(
+                budgets,
+                organizationId ?? null,
+              );
+              const providerLabels = await ctx.app.gateway.resolveProviderLabels(budgets);
+              return {
+                spendAvailable,
+                budgets: budgets.map((b) => ({
+                  ...toDto(b),
+                  spendAvailable,
+                  unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
+                  scopeTarget: scopeTargets.get(scopeTargetKey(b.scopeType, b.scopeId)) ?? null,
+                  providerLabel: providerLabelAdapter.labelFor(providerLabels, b.providerKey),
+                })),
+              };
+            }),
+        )
+        .query("get", (p) =>
+          p
+            .withInput(gatewayBudgetApiBudgetInputSchema)
+            .withOutput(gatewayBudgetDetailSchema)
+            .withPermission("gatewayBudgets:view")
+            .handle(async ({ ctx, input }) => {
+              await ctx.app.gateway.assertOrganizationExists(input.organizationId);
+              const detail = await ctx.app.gateway.budgetDecisions.tryGetDetail({
+                id: input.id,
+                organizationId: input.organizationId,
+              });
+              if (!detail) {
+                throw new TRPCError({ code: "NOT_FOUND", message: "budget not found" });
+              }
+              const providerLabels = await ctx.app.gateway.resolveProviderLabels([detail.budget]);
+              return {
+                ...toDto(detail.budget),
+                spendAvailable: detail.spendAvailable,
+                unreachableByAnyKey: detail.unreachableByAnyKey,
+                scopeTarget: detail.scopeTarget,
+                providerLabel: providerLabelAdapter.labelFor(
+                  providerLabels,
+                  detail.budget.providerKey,
+                ),
+                recentLedger: detail.recentLedger.map((l) => ({
+                  id: l.id,
+                  virtualKeyId: l.virtualKeyId,
+                  virtualKeyName: l.virtualKey?.name ?? l.virtualKeyId,
+                  virtualKeyPrefix: l.virtualKey?.displayPrefix ?? "",
+                  amountUsd: l.amountUsd.toString(),
+                  model: l.model,
+                  status: l.status,
+                  occurredAt: l.occurredAt.toISOString(),
+                })),
+              };
+            }),
+        )
+        /**
+         * Groups a budget can target, for whoever may create budgets. group.listAll exposes role-binding maps and demands organization:manage; a budget creator only needs names and sizes, so this stays gated by the same permission as the create it serves.
+         */
+        .query("groupTargets", (p) =>
+          p
+            .withInput(gatewayBudgetApiOrganizationInputSchema)
+            .withOutput(gatewayBudgetGroupTargetsSchema)
+            .withPermission("gatewayBudgets:create")
+            .handle(async ({ ctx, input }) =>
+              ctx.app.gateway.listGroupTargets(input.organizationId),
+            ),
+        )
+        .mutation("create", (p) =>
+          p
+            .withInput(gatewayBudgetApiCreateInputSchema)
+            .withOutput(gatewayBudgetDtoResponseSchema)
+            .withPermission("gatewayBudgets:create")
+            .handle(async ({ ctx, input }) => {
+              const row = await ctx.app.gateway.budgetDecisions.create({
+                organizationId: input.organizationId,
+                scope: input.scope,
+                name: input.name,
+                description: input.description ?? null,
+                window: input.window,
+                limitUsd: input.limitUsd,
+                onBreach: input.onBreach,
+                timezone: input.timezone ?? null,
+                providerKey: input.providerKey ?? null,
+                cycleAnchorAt: input.cycleAnchorAt ?? null,
+                allowUnreachable: input.allowUnreachable,
+                actorUserId: ctx.actor().id,
+              });
+              return toDto(row);
+            }),
+        )
+        .mutation("update", (p) =>
+          p
+            .withInput(gatewayBudgetApiUpdateInputSchema)
+            .withOutput(gatewayBudgetDtoResponseSchema)
+            .withPermission("gatewayBudgets:update")
+            .handle(async ({ ctx, input }) => {
+              const row = await ctx.app.gateway.budgetDecisions.update({
+                ...input,
+                actorUserId: ctx.actor().id,
+              });
+              return toDto(row);
+            }),
+        )
+        .mutation("archive", (p) =>
+          p
+            .withInput(gatewayBudgetApiBudgetInputSchema)
+            .withOutput(gatewayBudgetDtoResponseSchema)
+            .withPermission("gatewayBudgets:delete")
+            .handle(async ({ ctx, input }) => {
+              const row = await ctx.app.gateway.budgetDecisions.archive({
+                ...input,
+                actorUserId: ctx.actor().id,
+              });
+              return toDto(row);
+            }),
+        )
+        .mutation("reset", (p) =>
+          p
+            .withInput(gatewayBudgetApiResetInputSchema)
+            .withOutput(gatewayBudgetDtoResponseSchema)
+            .withPermission("gatewayBudgets:update")
+            .handle(async ({ ctx, input }) => {
+              const row = await ctx.app.gateway.budgetDecisions.reset({
+                id: input.id,
+                organizationId: input.organizationId,
+                actorUserId: ctx.actor().id,
+                endUserId: input.endUserId ?? null,
+                reason: input.reason ?? null,
+              });
+              return toDto(row);
+            }),
+        )
+        .build()
+    );
   }
 }

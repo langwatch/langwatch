@@ -35,12 +35,8 @@ export class DatasetNotFoundError extends Error {
 }
 
 /**
- * A column-type change was requested on a dataset whose storage format cannot
- * rewrite every chunk's keys yet (Decision 6 defers that migration). It's a
- * user-actionable precondition, not a server fault, and there is a way to get
- * where the caller was going (add a column of the type you need and move the
- * values across) — so it crosses the boundary as a stable code the client keys
- * its copy off, under `dataset_column_type_change_unsupported`.
+ * A column-type change was requested on a dataset whose storage format cannot rewrite every
+ * chunk's keys yet (Decision 6 defers that migration).
  */
 export class ColumnTypeChangeNotSupportedError extends HandledError {
   declare readonly code: "dataset_column_type_change_unsupported";
@@ -59,16 +55,9 @@ export class ColumnTypeChangeNotSupportedError extends HandledError {
 }
 
 /**
- * Which conflict a `DatasetConflictError` is. Both are 409s from PostgreSQL's
- * point of view, but they are different failures to a person: one is fixed by
- * choosing another name, the other by reloading the editor. Mapping both to
- * "that name is taken" handed the second one advice that cannot resolve it.
- *
- * A discriminant rather than a second class on purpose: the REST layer
- * dispatches dataset domain errors by `error.name`
- * (`src/transport/api-rest/dataset.error-handler.ts`), so a distinct class would
- * silently drop out of the 409 mapping at every route that never learned about
- * it. One class, one name, one HTTP status; the tRPC boundary reads `reason`.
+ * Which conflict a `DatasetConflictError` is. Both are 409s from PostgreSQL's point of view,
+ * but they are different failures to a person: one is fixed by choosing another name, the other
+ * by reloading the editor.
  */
 export type DatasetConflictReason = "name_taken" | "stale_columns";
 
@@ -87,12 +76,6 @@ export class DatasetConflictError extends Error {
 
 /**
  * The handled-error form of `DatasetConflictError` (ADR-045).
- *
- * A duplicate dataset name is a failure we can name and the caller can act on
- * — rename and save again — so it crosses the boundary as a stable code the
- * client keys its copy off, not as prose the client has to match on. The
- * domain layer still throws `DatasetConflictError`; the tRPC boundary
- * (`withDatasetErrorHandling`) promotes it to this.
  */
 export class DatasetNameTakenError extends HandledError {
   declare readonly code: "dataset_name_taken";
@@ -107,14 +90,9 @@ export class DatasetNameTakenError extends HandledError {
 }
 
 /**
- * The editor's view of the dataset's columns is behind the stored one — a
- * concurrent column edit already rewrote the chunks — so the write is refused
- * before anything is written (optimistic concurrency, no partial rewrite).
- *
- * Its own code rather than sharing `dataset_name_taken`: the remedy is to
- * reload and redo the change, and telling this person to pick a different name
- * is advice that cannot resolve their failure. Raised from the same
- * `DatasetConflictError` the name clash uses, discriminated by `reason`.
+ * The editor's view of the dataset's columns is behind the stored one — a concurrent column
+ * edit already rewrote the chunks — so the write is refused before anything is written
+ * (optimistic concurrency, no partial rewrite).
  */
 export class DatasetStaleColumnsError extends HandledError {
   declare readonly code: "dataset_stale_columns";
@@ -129,12 +107,7 @@ export class DatasetStaleColumnsError extends HandledError {
 }
 
 /**
- * Thrown when a write would persist two rows with the same id. The legacy PG
- * layout enforced this with a PK on `(id, datasetId, projectId)` (I-PG); the
- * s3_jsonl layout has no such constraint, so a batch carrying a duplicate
- * caller-supplied id is rejected here instead — otherwise both rows persist and
- * a later edit/delete (first-match by id) silently targets only one, leaving the
- * other an unreachable ghost.
+ * Thrown when a write would persist two rows with the same id.
  */
 export class DuplicateRecordIdError extends Error {
   constructor(id: string) {
@@ -215,10 +188,9 @@ export class UploadNotPendingError extends Error {
 }
 
 /**
- * Thrown when the staged object a finalize references is missing or incomplete
- * (never uploaded, NoSuchKey/NotFound, or a HEAD with no ContentLength). The
- * route maps it to 422; the dataset is flipped to `failed` so a never-completed
- * upload doesn't sit stuck in `uploading`.
+ * Thrown when the staged object a finalize references is missing or incomplete (never uploaded,
+ * NoSuchKey/NotFound, or a HEAD with no ContentLength). The route maps it to 422; the dataset
+ * is flipped to `failed` so a never-completed upload doesn't sit stuck in `uploading`.
  */
 export class StagedUploadNotFoundError extends Error {
   constructor(message = "Uploaded object not found") {
@@ -230,14 +202,6 @@ export class StagedUploadNotFoundError extends Error {
 /**
  * Thrown when a read consumer tries to read a dataset that is not yet `ready`
  * (still `uploading`/`processing`, or `failed`). ADR-032 Decision 6 / I-READY:
- * every read consumer gates on `status='ready'` so a half-normalized or failed
- * dataset is never served as if empty.
- *
- * Handled (`dataset_not_ready`, 425 Too Early): waiting is a real action, so
- * this is a failure the caller can act on, and the lifecycle `status` rides in
- * `meta` where a client decides between "poll" (`processing`) and "stop"
- * (`failed`). `statusError` stays a field rather than `meta` — it is the
- * normalizer's own diagnostic, for the log line, not the customer.
  */
 export class DatasetNotReadyError extends HandledError {
   declare readonly code: "dataset_not_ready";
@@ -258,11 +222,9 @@ export class DatasetNotReadyError extends HandledError {
 }
 
 /**
- * Thrown when a manual normalize retry is requested on a dataset that can't be
- * re-run: it's not in a recoverable state (`failed`/`processing`) or it carries
- * no staging key to re-read (no source to normalize). The route maps it to 409
- * Conflict. ADR-032 I-RECOVER: a stuck dataset is recoverable, but only when
- * there's something to recover from.
+ * Thrown when a manual normalize retry is requested on a dataset that can't
+ * be re-run: not in a recoverable state, or no staging key to re-read. Maps to 409 Conflict.
+ * ADR-032 I-RECOVER: a stuck dataset is recoverable, but only when there's something to recover from.
  */
 export class DatasetNotRetryableError extends Error {
   constructor(message = "Dataset cannot be retried") {
@@ -272,12 +234,8 @@ export class DatasetNotRetryableError extends Error {
 }
 
 /**
- * Thrown when a chunk rewrite (edit) would produce a single chunk object larger
- * than `CHUNK_MAX_BYTES`, breaking the size invariant (Decision 2). An edit can
- * replace a small row with a large value, so a rewrite CAN grow a chunk past the
- * cap — splitting/rebalancing the chunk under the lock is the fuller fix and is
- * out of scope for this rung, so we reject (safe + correct) rather than write an
- * oversized object. Surfaced to the edit caller as a clear 4xx, not a 500.
+ * Thrown when a chunk rewrite (edit) would produce a single chunk object larger than
+ * `CHUNK_MAX_BYTES`, breaking the size invariant (Decision 2).
  */
 export class ChunkTooLargeError extends Error {
   readonly byteSize: number;
@@ -292,13 +250,8 @@ export class ChunkTooLargeError extends Error {
 }
 
 /**
- * Thrown when a full (unbounded) export of an s3_jsonl dataset would have to
- * materialize more bytes than `DATASET_FULL_EXPORT_MAX_BYTES` in heap. The
- * bounded reads in this rung truncate at a byte budget; a download asks for the
- * whole dataset (`limitMb: null`), which on a multi-GB dataset would OOM the pod
- * (I-MEM). Reject with a clear, actionable message until the streaming-export
- * fast-follow epic ships. The route maps it to a 4xx (client must wait for
- * streaming export), not a 500.
+ * Thrown when a full (unbounded) export of an s3_jsonl dataset would have to materialize more
+ * bytes than `DATASET_FULL_EXPORT_MAX_BYTES` in heap.
  */
 export class DatasetTooLargeToExportError extends Error {
   readonly sizeBytes: number;
@@ -313,13 +266,9 @@ export class DatasetTooLargeToExportError extends Error {
 }
 
 /**
- * Changing a column's type on an `s3_jsonl` dataset rewrites every chunk (rename
- * + type-convert) by buffering the dataset's rows in memory for the duration of
+ * Changing a column's type on an `s3_jsonl` dataset rewrites every chunk (rename +
+ * type-convert) by buffering the dataset's rows in memory for the duration of
  * the advisory-locked transaction (ADR-032 v19). That buffer is bounded ONLY by
- * this cap: at/under it the edit proceeds, above it we refuse (this error)
- * rather than risk OOMing the shared worker mid-rewrite. The deferred streaming
- * chunk-by-chunk rewrite removes the buffering and lifts the cap. The route maps
- * it to 413 (client can't have this served as-is), not a 500.
  */
 export class DatasetTooLargeToEditColumnsError extends Error {
   readonly sizeBytes: number;
@@ -336,15 +285,9 @@ export class DatasetTooLargeToEditColumnsError extends Error {
 }
 
 /**
- * A chunk that the PG-authoritative `chunkCount` claims must exist is missing
- * from object storage. From a read's perspective this is corruption, not
- * emptiness, so the read paths (`readChunks`/`readChunk`) throw it rather than
- * silently truncate. The I-COUNT repair (`recomputeDatasetCounts`) does NOT
- * swallow it either: trailing-chunk compaction is logical-only (it lowers
- * `chunkCount` without deleting any object), so nothing reaps a chunk mid-flight
- * and any gap is genuine corruption. The repair propagates it (loud) rather than
- * re-derive a smaller `chunkCount`, which would mask a lost middle chunk whose
- * successors still survive.
+ * A chunk that the PG-authoritative `chunkCount` claims must exist is missing from object
+ * storage. From a read's perspective this is corruption, not emptiness, so the read paths
+ * (`readChunks`/`readChunk`) throw it rather than silently truncate.
  */
 export class MissingChunkError extends Error {
   readonly key: string;
@@ -357,14 +300,9 @@ export class MissingChunkError extends Error {
 }
 
 /**
- * An s3_jsonl dataset is `ready` but its PG-authoritative `chunkCount` is null —
- * an I-COUNT integrity violation (a transiently-failed `UPDATE` after migrate /
- * normalize, never a valid resting state). Read paths must NOT coerce it via
- * `chunkCount ?? 0`, which would loop zero times and serve an EMPTY dataset
- * against a positive `rowCount` — silent, undiagnosable data loss for the UI,
- * SDK, and experiments. Throwing surfaces the drift loudly so it can be repaired
- * (`recomputeDatasetCounts`) rather than masked. Maps to a 500 (server-side data
- * bug, not user-actionable).
+ * An s3_jsonl dataset is `ready` but its PG-authoritative `chunkCount` is null — an I-COUNT
+ * integrity violation (a transiently-failed `UPDATE` after migrate / normalize, never a valid
+ * resting state).
  */
 export class DatasetChunkCountMissingError extends Error {
   readonly datasetId: string;
@@ -377,18 +315,9 @@ export class DatasetChunkCountMissingError extends Error {
 }
 
 /**
- * The local-FS storage root is not writable (EACCES/EROFS/EPERM) — born-on-
- * storage made a writable backend mandatory, so this is a deployment-config
- * error, not a transient failure. We can name the cause and we can name the
+ * The local-FS storage root is not writable (EACCES/EROFS/EPERM) — born-on- storage made a
+ * writable backend mandatory, so this is a deployment-config error, not a transient failure.
  * fix, so per ADR-045 it crosses the boundary as a handled error under
- * `storage_not_writable` rather than as an unattributed 500.
- *
- * `fault: "platform"`, because provisioning object storage is ours: nothing
- * the caller changes about the request makes the write land.
- *
- * The message is customer-safe by construction. The storage root and the
- * environment variables that set it are operator detail: they ride the log
- * line at the throw site and the remediation tips, never the response body.
  */
 export class StorageNotWritableError extends HandledError {
   declare readonly code: "storage_not_writable";

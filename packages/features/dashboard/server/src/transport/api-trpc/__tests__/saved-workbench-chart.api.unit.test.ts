@@ -37,7 +37,19 @@ function recordingDashboard() {
     },
     getSavedWorkbenchChart: async () => {
       reached.push("getSavedWorkbenchChart");
-      return { id: "chart-1" };
+      return {
+        id: "chart-1",
+        projectId: "project-1",
+        name: "Chart",
+        definition: { version: 1, sql: "select 1", parameters: {} },
+        dashboardId: null,
+        gridColumn: 0,
+        gridRow: 0,
+        colSpan: 1,
+        rowSpan: 1,
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+        updatedAt: new Date("2026-01-01T00:00:00Z"),
+      };
     },
     deleteSavedWorkbenchChart: async () => {
       reached.push("deleteSavedWorkbenchChart");
@@ -70,6 +82,7 @@ function harness() {
         declared.push(permission);
         return (procedure) => procedure;
       },
+      validateOutput: true,
     },
     ports,
   );

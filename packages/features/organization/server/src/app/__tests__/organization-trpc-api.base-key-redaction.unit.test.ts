@@ -135,6 +135,10 @@ function harness({ canUpdateProject }: { canUpdateProject: boolean }) {
       protected: authenticated,
       policy: () => (procedure) => procedure,
       auditLogPolicy: (procedure) => procedure,
+      // The fixtures below are partial stand-ins for FullyLoadedOrganization,
+      // not full rows, and `getAll` is `withoutOutput` regardless — nothing
+      // here exercises output validation.
+      validateOutput: false,
     },
     wiredPorts,
   );

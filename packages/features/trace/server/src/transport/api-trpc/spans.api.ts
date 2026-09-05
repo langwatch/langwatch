@@ -18,7 +18,9 @@
  * project's data-privacy policy and the plan's visibility window) and handed to
  * the read unchanged.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import { promptStudioSpanSchema, spansForTraceSchema } from "@langwatch/trace-contract";
 import {
   TRPCError,
   type AnyTRPCRootTypes,
@@ -54,6 +56,8 @@ type SpansTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** Whether the chain checks every answer against its declared output schema. */
+  validateOutput: boolean;
 }>;
 
 /** The process capabilities this transport needs that Trace does not own. */
@@ -81,45 +85,54 @@ export class SpansTrpcApi {
     procedures: SpansTrpcProcedures<TContext, TOptions, TRoot>,
     ports: SpansTrpcPorts,
   ) {
-    const { protected: procedure, policy } = procedures;
-
-    return trpc.router({
-      getAllForTrace: policy("traces:view")(procedure.input(traceScopeSchema)).query(
-        async ({ ctx, input }) => {
-          const protections = await ports.getViewerProtections(ctx, {
-            projectId: input.projectId,
-          });
-
-          return ctx.app.traces.readOrderedSpansForTrace({
-            projectId: input.projectId,
-            traceId: input.traceId,
-            protections,
-          });
-        },
-      ),
-
-      getForPromptStudio: policy("traces:view")(procedure.input(spanScopeSchema)).query(
-        async ({ ctx, input }) => {
-          const { projectId, spanId } = input;
-
-          const protections = await ports.getViewerProtections(ctx, { projectId });
-
-          const result = await ctx.app.traces.readPromptStudioSpan({
-            projectId,
-            spanId,
-            protections,
-          });
-
-          if (!result) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Span not found or is not an LLM span.",
+    return createTrpcService({
+      root: trpc,
+      procedures,
+      validateOutput: procedures.validateOutput,
+    })
+      .query("getAllForTrace", (p) =>
+        p
+          .withInput(traceScopeSchema)
+          .withOutput(spansForTraceSchema)
+          .withPermission("traces:view")
+          .handle(async ({ ctx, input }) => {
+            const protections = await ports.getViewerProtections(ctx, {
+              projectId: input.projectId,
             });
-          }
 
-          return result;
-        },
-      ),
-    });
+            return ctx.app.traces.readOrderedSpansForTrace({
+              projectId: input.projectId,
+              traceId: input.traceId,
+              protections,
+            });
+          }),
+      )
+      .query("getForPromptStudio", (p) =>
+        p
+          .withInput(spanScopeSchema)
+          .withOutput(promptStudioSpanSchema)
+          .withPermission("traces:view")
+          .handle(async ({ ctx, input }) => {
+            const { projectId, spanId } = input;
+
+            const protections = await ports.getViewerProtections(ctx, { projectId });
+
+            const result = await ctx.app.traces.readPromptStudioSpan({
+              projectId,
+              spanId,
+              protections,
+            });
+
+            if (!result) {
+              throw new TRPCError({
+                code: "NOT_FOUND",
+                message: "Span not found or is not an LLM span.",
+              });
+            }
+
+            return result;
+          }),
+      )
+      .build();
   }
 }

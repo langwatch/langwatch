@@ -8,6 +8,7 @@
  *
  * Transport only: gate, input parsing and delegation to `ModelProviderApp`.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { featureByKey, type ModelRole } from "@langwatch/model-provider-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
@@ -50,6 +51,8 @@ type TranslateTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** Whether the chain checks every answer against its declared output schema. */
+  validateOutput: boolean;
 }>;
 
 /** The process capability this transport needs; the failure policy is the app's. */
@@ -81,39 +84,47 @@ export class TranslateTrpcApi {
     procedures: TranslateTrpcProcedures<TContext, TOptions, TRoot>,
     ports: TranslateTrpcPorts,
   ) {
-    const { protected: procedure, policy } = procedures;
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures,
+        validateOutput: procedures.validateOutput,
+      })
+        // Translation reads content the caller can already see — gate on the
+        // same permission that grants viewing the trace, so read-only members
+        // (VIEWER, demo/public view) aren't shown an action that then 403s.
+        .mutation("translate", (p) =>
+          p
+            .withInput(translateInputSchema)
+            .withOutput(z.object({ translation: z.string() }))
+            .withPermission("traces:view")
+            .handle(async ({ ctx, input }) => {
+              const feature = featureByKey(TRANSLATE_FEATURE_KEY);
+              // A missing registry entry is a build-time mistake in the process
+              // that composed this surface, not a cause a customer can act on, so
+              // it stays an ordinary error and degrades to an unknown failure
+              // carrying a trace id rather than being dressed up as handled.
+              if (!feature) {
+                throw new Error(`${TRANSLATE_FEATURE_KEY} feature is not registered`);
+              }
 
-    return trpc.router({
-      // Translation reads content the caller can already see — gate on the
-      // same permission that grants viewing the trace, so read-only members
-      // (VIEWER, demo/public view) aren't shown an action that then 403s.
-      translate: policy("traces:view")(procedure.input(translateInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const feature = featureByKey(TRANSLATE_FEATURE_KEY);
-          // A missing registry entry is a build-time mistake in the process
-          // that composed this surface, not a cause a customer can act on, so
-          // it stays an ordinary error and degrades to an unknown failure
-          // carrying a trace id rather than being dressed up as handled.
-          if (!feature) {
-            throw new Error(`${TRANSLATE_FEATURE_KEY} feature is not registered`);
-          }
+              // Any provider/SDK failure during the call surfaces as a typed
+              // AiCallFailedError → "double-check your model configuration" toast
+              // carrying the real (truncated) provider error message. `wrapAiCall`
+              // truncates that message to the first line for the client and logs
+              // the FULL underlying error server-side — the later lines (provider
+              // status bodies, gateway 404 detail) are what prod triage needs.
+              const { translation } = await ports.wrapAiCall(feature, () =>
+                ctx.app.modelProviders.translate({
+                  projectId: input.projectId,
+                  text: input.textToTranslate,
+                }),
+              );
 
-          // Any provider/SDK failure during the call surfaces as a typed
-          // AiCallFailedError → "double-check your model configuration" toast
-          // carrying the real (truncated) provider error message. `wrapAiCall`
-          // truncates that message to the first line for the client and logs
-          // the FULL underlying error server-side — the later lines (provider
-          // status bodies, gateway 404 detail) are what prod triage needs.
-          const { translation } = await ports.wrapAiCall(feature, () =>
-            ctx.app.modelProviders.translate({
-              projectId: input.projectId,
-              text: input.textToTranslate,
+              return { translation };
             }),
-          );
-
-          return { translation };
-        },
-      ),
-    });
+        )
+        .build()
+    );
   }
 }

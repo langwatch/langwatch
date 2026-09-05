@@ -8,7 +8,12 @@
  *
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import { createLogger } from "@langwatch/observability";
+import {
+  scenarioCancelBatchRunResultSchema,
+  scenarioCancelJobResultSchema,
+} from "@langwatch/scenario-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import { projectSchema } from "../../rules/scenario-schemas.rules";
@@ -39,37 +44,48 @@ export function createScenarioCancellationRouter<
   trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
   procedures: ScenarioTrpcProcedures<TContext, TOptions, TRoot>,
 ) {
-  const { protected: procedure, policy } = procedures;
+  const { protected: procedure, policy, validateOutput } = procedures;
 
-  return trpc.router({
-    cancelJob: policy("scenarios:manage")(procedure.input(cancelJobSchema)).mutation(
-      async ({ ctx, input }) => {
-        logger.info(
-          {
-            projectId: input.projectId,
-            scenarioRunId: input.scenarioRunId,
-            batchRunId: input.batchRunId,
-          },
-          "Cancel job request received",
-        );
+  return createTrpcService({
+    root: trpc,
+    procedures: { protected: procedure, policy },
+    validateOutput,
+  })
+    .mutation("cancelJob", (p) =>
+      p
+        .withInput(cancelJobSchema)
+        .withOutput(scenarioCancelJobResultSchema)
+        .withPermission("scenarios:manage")
+        .handle(async ({ ctx, input }) => {
+          logger.info(
+            {
+              projectId: input.projectId,
+              scenarioRunId: input.scenarioRunId,
+              batchRunId: input.batchRunId,
+            },
+            "Cancel job request received",
+          );
 
-        return ctx.app.scenarios.cancelJob(input);
-      },
-    ),
+          return ctx.app.scenarios.cancelJob(input);
+        }),
+    )
+    .mutation("cancelBatchRun", (p) =>
+      p
+        .withInput(cancelBatchRunSchema)
+        .withOutput(scenarioCancelBatchRunResultSchema)
+        .withPermission("scenarios:manage")
+        .handle(async ({ ctx, input }) => {
+          logger.info(
+            {
+              projectId: input.projectId,
+              scenarioSetId: input.scenarioSetId,
+              batchRunId: input.batchRunId,
+            },
+            "Cancel batch run request received",
+          );
 
-    cancelBatchRun: policy("scenarios:manage")(procedure.input(cancelBatchRunSchema)).mutation(
-      async ({ ctx, input }) => {
-        logger.info(
-          {
-            projectId: input.projectId,
-            scenarioSetId: input.scenarioSetId,
-            batchRunId: input.batchRunId,
-          },
-          "Cancel batch run request received",
-        );
-
-        return ctx.app.scenarios.cancelBatchRun(input);
-      },
-    ),
-  });
+          return ctx.app.scenarios.cancelBatchRun(input);
+        }),
+    )
+    .build();
 }

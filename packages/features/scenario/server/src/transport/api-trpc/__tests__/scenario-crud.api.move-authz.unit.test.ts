@@ -17,6 +17,7 @@ function harness(permitted: boolean) {
     trpc,
     {
       protected: trpc.procedure,
+      validateOutput: true,
       policy: () => (procedure) => {
         if (permitted) return procedure as never;
         return trpc.procedure.use(async () => {

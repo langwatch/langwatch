@@ -30,7 +30,10 @@
  *
  * Spec: specs/features/onboarding/intent-fork.feature.
  */
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import {
+  onboardingWriteAckSchema,
+  organizationInitializedSchema,
   organizationIntentSchema,
   type OrganizationIntent,
 } from "@langwatch/organization-contract";
@@ -88,6 +91,8 @@ type OnboardingTrpcProcedures<
    * declaration is what keeps them reviewable rather than merely unchecked.
    */
   noPermission(declaration: { reason: string }): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /** What the two sign-up notifications carry. */
@@ -238,7 +243,7 @@ export class OnboardingTrpcApi {
     procedures: OnboardingTrpcProcedures<TContext, TOptions, TRoot>,
     ports: OnboardingTrpcPorts<TSignUpDataSchema>,
   ) {
-    const { protected: procedure, noPermission } = procedures;
+    const { protected: procedure, noPermission, validateOutput } = procedures;
 
     /**
      * The one input built here rather than in the contract: `signUpData` is a
@@ -259,154 +264,177 @@ export class OnboardingTrpcApi {
       framework: z.string().default("other"),
     });
 
-    return trpc.router({
-      initializeOrganization: noPermission(BEFORE_MEMBERSHIP)(
-        procedure.input(initializeOrganizationInputSchema),
-      ).mutation(async ({ input, ctx }) => {
-        const user = sessionUser(ctx);
-        // Opaque all the way through: the questionnaire's shape is the
-        // process's, and every consumer of it below is a port back into the
-        // process.
-        const signUpData = input.signUpData as unknown as Record<string, unknown> | undefined;
+    /**
+     * Neither procedure holds a permission — both run before the caller
+     * belongs to any organization — so the chain's own `policy` builder is
+     * never called. `withCustomPermission` is what carries the process's
+     * ALREADY-BUILT `noPermission` decorator instead.
+     */
+    const policy = (): TrpcPolicyDecorator => {
+      throw new Error("onboarding declares no-permission for every procedure; policy() is unused");
+    };
 
-        try {
-          const orgResult = await ctx.app.organizations.createAndAssign(
-            {
-              orgName: input.orgName,
-              phoneNumber: input.phoneNumber,
-              signUpData,
-              primaryIntent: input.primaryIntent,
-              userDisplayName: user.name,
-            },
-            { id: user.id },
-          );
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput,
+      })
+        .mutation("initializeOrganization", (p) =>
+          p
+            .withInput(initializeOrganizationInputSchema)
+            .withOutput(organizationInitializedSchema)
+            .withCustomPermission(noPermission(BEFORE_MEMBERSHIP), BEFORE_MEMBERSHIP.reason)
+            .handle(async ({ input, ctx }) => {
+              const user = sessionUser(ctx);
+              // Opaque all the way through: the questionnaire's shape is the
+              // process's, and every consumer of it below is a port back into the
+              // process.
+              const signUpData = input.signUpData as unknown as Record<string, unknown> | undefined;
 
-          // Every new organization gets the standard catalogue at creation,
-          // whatever the intent, so the portal renders tiles on its first
-          // load. Non-fatal: the portal's own read provisions the same set.
-          try {
-            await ports.ensureDefaultAiToolCatalog(ctx, {
-              organizationId: orgResult.organization.id,
-            });
-          } catch (error) {
-            ports.reportError(error, {
-              extra: {
-                origin: "onboarding.initializeOrganization.ensureDefaultCatalog",
-                organizationId: orgResult.organization.id,
-              },
-            });
-          }
+              try {
+                const orgResult = await ctx.app.organizations.createAndAssign(
+                  {
+                    orgName: input.orgName,
+                    phoneNumber: input.phoneNumber,
+                    signUpData,
+                    primaryIntent: input.primaryIntent,
+                    userDisplayName: user.name,
+                  },
+                  { id: user.id },
+                );
 
-          // Coding-agent signups get their personal workspace here rather than
-          // on the first CLI login. That is where their usage lands, so
-          // provisioning it now is what makes the page the track ends on show
-          // something instead of an empty shell whose contents depend on a
-          // command the user has not run yet.
-          //
-          // Non-fatal, matching `organization.acceptInvite`: a failure must not
-          // cost the user the organization they just created, and the lazy
-          // backfill recovers on their next session.
-          if (input.primaryIntent === CODING_AGENT_INTENT) {
-            try {
-              await ports.ensurePersonalWorkspace(ctx, {
-                userId: user.id,
-                organizationId: orgResult.organization.id,
-                displayName: user.name,
-                displayEmail: user.email,
-              });
-            } catch (error) {
-              ports.reportError(error, {
-                extra: {
-                  origin: "onboarding.initializeOrganization",
+                // Every new organization gets the standard catalogue at creation,
+                // whatever the intent, so the portal renders tiles on its first
+                // load. Non-fatal: the portal's own read provisions the same set.
+                try {
+                  await ports.ensureDefaultAiToolCatalog(ctx, {
+                    organizationId: orgResult.organization.id,
+                  });
+                } catch (error) {
+                  ports.reportError(error, {
+                    extra: {
+                      origin: "onboarding.initializeOrganization.ensureDefaultCatalog",
+                      organizationId: orgResult.organization.id,
+                    },
+                  });
+                }
+
+                // Coding-agent signups get their personal workspace here rather than
+                // on the first CLI login. That is where their usage lands, so
+                // provisioning it now is what makes the page the track ends on show
+                // something instead of an empty shell whose contents depend on a
+                // command the user has not run yet.
+                //
+                // Non-fatal, matching `organization.acceptInvite`: a failure must not
+                // cost the user the organization they just created, and the lazy
+                // backfill recovers on their next session.
+                if (input.primaryIntent === CODING_AGENT_INTENT) {
+                  try {
+                    await ports.ensurePersonalWorkspace(ctx, {
+                      userId: user.id,
+                      organizationId: orgResult.organization.id,
+                      displayName: user.name,
+                      displayEmail: user.email,
+                    });
+                  } catch (error) {
+                    ports.reportError(error, {
+                      extra: {
+                        origin: "onboarding.initializeOrganization",
+                        organizationId: orgResult.organization.id,
+                      },
+                    });
+                  }
+                }
+
+                // The first project, skipped for the coding-agent track (ADR-038
+                // v6): those users live on the personal portal, and a project is
+                // created only when the organization later flips to LLMOps.
+                let projectSlug: string | null = null;
+                if (input.primaryIntent !== CODING_AGENT_INTENT) {
+                  const projectResult = await ports.createProject(ctx, {
+                    organizationId: orgResult.organization.id,
+                    teamId: orgResult.team.id,
+                    // The organization's own team names the project when the
+                    // customer did not name one: at this point in the ceremony it is
+                    // the only name they have given us.
+                    name: input.projectName ?? orgResult.team.name,
+                    language: input.language,
+                    framework: input.framework,
+                  });
+                  if (!projectResult.success) {
+                    throw new TRPCError({
+                      code: "INTERNAL_SERVER_ERROR",
+                      message: "Failed to create project",
+                    });
+                  }
+                  projectSlug = projectResult.projectSlug;
+                }
+
+                try {
+                  const signupPayload = {
+                    userName: user.name,
+                    userEmail: user.email,
+                    organizationName: orgResult.organization.name,
+                    phoneNumber: input.phoneNumber,
+                    signUpData,
+                  };
+
+                  await Promise.all([
+                    ports.sendSlackSignupEvent(ctx, signupPayload),
+                    ports.sendHubspotSignupForm(ctx, signupPayload),
+                  ]);
+                } catch (error) {
+                  ports.reportError(error);
+                }
+
+                ports.fireSignupNurturing({
+                  userId: user.id,
+                  email: user.email,
+                  name: user.name,
                   organizationId: orgResult.organization.id,
-                },
+                  organizationName: orgResult.organization.name,
+                  signUpData,
+                  primaryIntent: input.primaryIntent,
+                });
+
+                // `projectSlug` is null for the coding-agent track, which is how the
+                // client knows to land on the personal portal instead of a project.
+                return {
+                  success: true,
+                  teamSlug: orgResult.team.slug,
+                  teamName: orgResult.team.name,
+                  teamId: orgResult.team.id,
+                  organizationId: orgResult.organization.id,
+                  projectSlug,
+                };
+              } catch (error) {
+                ports.reportError(error);
+                throw error;
+              }
+            }),
+        )
+        /**
+         * Records the flavour the customer picked.
+         *
+         * Separate from `initializeOrganization` because the organization is
+         * created BEFORE the flavour screen is shown.
+         */
+        .mutation("setIntegrationMethod", (p) =>
+          p
+            .withInput(z.object({ integrationMethod: onboardingIntegrationMethodSchema }))
+            .withOutput(onboardingWriteAckSchema)
+            .withCustomPermission(noPermission(BEFORE_MEMBERSHIP), BEFORE_MEMBERSHIP.reason)
+            .handle(({ input, ctx }) => {
+              ports.recordIntegrationMethod({
+                userId: sessionUser(ctx).id,
+                selection: input.integrationMethod,
               });
-            }
-          }
 
-          // The first project, skipped for the coding-agent track (ADR-038
-          // v6): those users live on the personal portal, and a project is
-          // created only when the organization later flips to LLMOps.
-          let projectSlug: string | null = null;
-          if (input.primaryIntent !== CODING_AGENT_INTENT) {
-            const projectResult = await ports.createProject(ctx, {
-              organizationId: orgResult.organization.id,
-              teamId: orgResult.team.id,
-              // The organization's own team names the project when the
-              // customer did not name one: at this point in the ceremony it is
-              // the only name they have given us.
-              name: input.projectName ?? orgResult.team.name,
-              language: input.language,
-              framework: input.framework,
-            });
-            if (!projectResult.success) {
-              throw new TRPCError({
-                code: "INTERNAL_SERVER_ERROR",
-                message: "Failed to create project",
-              });
-            }
-            projectSlug = projectResult.projectSlug;
-          }
-
-          try {
-            const signupPayload = {
-              userName: user.name,
-              userEmail: user.email,
-              organizationName: orgResult.organization.name,
-              phoneNumber: input.phoneNumber,
-              signUpData,
-            };
-
-            await Promise.all([
-              ports.sendSlackSignupEvent(ctx, signupPayload),
-              ports.sendHubspotSignupForm(ctx, signupPayload),
-            ]);
-          } catch (error) {
-            ports.reportError(error);
-          }
-
-          ports.fireSignupNurturing({
-            userId: user.id,
-            email: user.email,
-            name: user.name,
-            organizationId: orgResult.organization.id,
-            organizationName: orgResult.organization.name,
-            signUpData,
-            primaryIntent: input.primaryIntent,
-          });
-
-          // `projectSlug` is null for the coding-agent track, which is how the
-          // client knows to land on the personal portal instead of a project.
-          return {
-            success: true,
-            teamSlug: orgResult.team.slug,
-            teamName: orgResult.team.name,
-            teamId: orgResult.team.id,
-            organizationId: orgResult.organization.id,
-            projectSlug,
-          };
-        } catch (error) {
-          ports.reportError(error);
-          throw error;
-        }
-      }),
-
-      /**
-       * Records the flavour the customer picked.
-       *
-       * Separate from `initializeOrganization` because the organization is
-       * created BEFORE the flavour screen is shown.
-       */
-      setIntegrationMethod: noPermission(BEFORE_MEMBERSHIP)(
-        procedure.input(z.object({ integrationMethod: onboardingIntegrationMethodSchema })),
-      ).mutation(({ input, ctx }) => {
-        ports.recordIntegrationMethod({
-          userId: sessionUser(ctx).id,
-          selection: input.integrationMethod,
-        });
-
-        return { success: true };
-      }),
-    });
+              return { success: true };
+            }),
+        )
+        .build()
+    );
   }
 }

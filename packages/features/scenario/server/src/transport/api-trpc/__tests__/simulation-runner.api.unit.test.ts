@@ -25,7 +25,8 @@ vi.mock("@langwatch/scenario-contract", async (importOriginal) => ({
   generateScenarioRunId: vi.fn().mockReturnValue("scenariorun_test_456"),
 }));
 
-vi.mock("@langwatch/observability", () => ({
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal()),
   createLogger: vi.fn().mockReturnValue({
     info: vi.fn(),
     warn: vi.fn(),
@@ -67,6 +68,7 @@ function createTestCaller() {
   const trpc = initTRPC.context<ScenarioTrpcContext>().create();
   const router = createSimulationRunnerRouter(trpc, {
     protected: trpc.procedure,
+    validateOutput: true,
     policy: () => (procedure) => procedure,
   });
 

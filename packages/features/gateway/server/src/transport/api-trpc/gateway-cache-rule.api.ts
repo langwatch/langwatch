@@ -9,8 +9,10 @@
  * application, which holds the cache-rule capability because it is built over
  * persistence this transport does not hold.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
+  gatewayCacheRuleDtoSchema,
   GatewayCacheRuleNotFoundError,
   type GatewayCacheRuleResource,
 } from "@langwatch/gateway-contract";
@@ -46,6 +48,8 @@ type GatewayCacheRuleTrpcProcedures<
    * `.input()` would read no input, and so no scope id, at all.
    */
   policy(permission: AuthzPermission): ProcedureDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 const matchersSchema = z
@@ -101,98 +105,118 @@ export class GatewayCacheRuleTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: GatewayCacheRuleTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    const { protected: procedure, policy, validateOutput } = procedures;
 
-    return trpc.router({
-      list: policy("gatewayCacheRules:view")(procedure.input(organizationScopeSchema)).query(
-        async ({ ctx, input }) => {
-          await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-          const rows = await ctx.app.gateway.budgetDecisions.cacheRuleList(input.organizationId);
-          return rows.map(toDto);
-        },
-      ),
-
-      get: policy("gatewayCacheRules:view")(procedure.input(cacheRuleIdSchema)).query(
-        async ({ ctx, input }) => {
-          await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-          const row = await ctx.app.gateway.budgetDecisions.tryCacheRuleGet({
-            id: input.id,
-            organizationId: input.organizationId,
-          });
-          if (!row) {
-            throw new GatewayCacheRuleNotFoundError();
-          }
-          return toDto(row);
-        },
-      ),
-
-      create: policy("gatewayCacheRules:create")(
-        procedure.input(
-          z.object({
-            organizationId: z.string(),
-            name: z.string().min(1).max(128),
-            description: z.string().max(512).nullable().optional(),
-            priority: z.number().int().min(0).max(1_000).optional(),
-            enabled: z.boolean().optional(),
-            matchers: matchersSchema,
-            action: actionSchema,
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      .query("list", (p) =>
+        p
+          .withInput(organizationScopeSchema)
+          .withOutput(gatewayCacheRuleDtoSchema.array())
+          .withPermission("gatewayCacheRules:view")
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.gateway.assertOrganizationExists(input.organizationId);
+            const rows = await ctx.app.gateway.budgetDecisions.cacheRuleList(input.organizationId);
+            return rows.map(toDto);
           }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-        const row = await ctx.app.gateway.budgetDecisions.cacheRuleCreate({
-          organizationId: input.organizationId,
-          name: input.name,
-          description: input.description ?? null,
-          priority: input.priority,
-          enabled: input.enabled,
-          matchers: input.matchers,
-          action: input.action,
-          actorUserId: ctx.actor().id,
-        });
-        return toDto(row);
-      }),
-
-      update: policy("gatewayCacheRules:update")(
-        procedure.input(
-          z.object({
-            organizationId: z.string(),
-            id: z.string(),
-            name: z.string().min(1).max(128).optional(),
-            description: z.string().max(512).nullable().optional(),
-            priority: z.number().int().min(0).max(1_000).optional(),
-            enabled: z.boolean().optional(),
-            matchers: matchersSchema.optional(),
-            action: actionSchema.optional(),
+      )
+      .query("get", (p) =>
+        p
+          .withInput(cacheRuleIdSchema)
+          .withOutput(gatewayCacheRuleDtoSchema)
+          .withPermission("gatewayCacheRules:view")
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.gateway.assertOrganizationExists(input.organizationId);
+            const row = await ctx.app.gateway.budgetDecisions.tryCacheRuleGet({
+              id: input.id,
+              organizationId: input.organizationId,
+            });
+            if (!row) {
+              throw new GatewayCacheRuleNotFoundError();
+            }
+            return toDto(row);
           }),
-        ),
-      ).mutation(async ({ ctx, input }) => {
-        await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-        const row = await ctx.app.gateway.budgetDecisions.cacheRuleUpdate({
-          id: input.id,
-          organizationId: input.organizationId,
-          name: input.name,
-          description: input.description,
-          priority: input.priority,
-          enabled: input.enabled,
-          matchers: input.matchers,
-          action: input.action,
-          actorUserId: ctx.actor().id,
-        });
-        return toDto(row);
-      }),
-
-      archive: policy("gatewayCacheRules:delete")(procedure.input(cacheRuleIdSchema)).mutation(
-        async ({ ctx, input }) => {
-          await ctx.app.gateway.assertOrganizationExists(input.organizationId);
-          const row = await ctx.app.gateway.budgetDecisions.cacheRuleArchive({
-            id: input.id,
-            organizationId: input.organizationId,
-            actorUserId: ctx.actor().id,
-          });
-          return toDto(row);
-        },
-      ),
-    });
+      )
+      .mutation("create", (p) =>
+        p
+          .withInput(
+            z.object({
+              organizationId: z.string(),
+              name: z.string().min(1).max(128),
+              description: z.string().max(512).nullable().optional(),
+              priority: z.number().int().min(0).max(1_000).optional(),
+              enabled: z.boolean().optional(),
+              matchers: matchersSchema,
+              action: actionSchema,
+            }),
+          )
+          .withOutput(gatewayCacheRuleDtoSchema)
+          .withPermission("gatewayCacheRules:create")
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.gateway.assertOrganizationExists(input.organizationId);
+            const row = await ctx.app.gateway.budgetDecisions.cacheRuleCreate({
+              organizationId: input.organizationId,
+              name: input.name,
+              description: input.description ?? null,
+              priority: input.priority,
+              enabled: input.enabled,
+              matchers: input.matchers,
+              action: input.action,
+              actorUserId: ctx.actor().id,
+            });
+            return toDto(row);
+          }),
+      )
+      .mutation("update", (p) =>
+        p
+          .withInput(
+            z.object({
+              organizationId: z.string(),
+              id: z.string(),
+              name: z.string().min(1).max(128).optional(),
+              description: z.string().max(512).nullable().optional(),
+              priority: z.number().int().min(0).max(1_000).optional(),
+              enabled: z.boolean().optional(),
+              matchers: matchersSchema.optional(),
+              action: actionSchema.optional(),
+            }),
+          )
+          .withOutput(gatewayCacheRuleDtoSchema)
+          .withPermission("gatewayCacheRules:update")
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.gateway.assertOrganizationExists(input.organizationId);
+            const row = await ctx.app.gateway.budgetDecisions.cacheRuleUpdate({
+              id: input.id,
+              organizationId: input.organizationId,
+              name: input.name,
+              description: input.description,
+              priority: input.priority,
+              enabled: input.enabled,
+              matchers: input.matchers,
+              action: input.action,
+              actorUserId: ctx.actor().id,
+            });
+            return toDto(row);
+          }),
+      )
+      .mutation("archive", (p) =>
+        p
+          .withInput(cacheRuleIdSchema)
+          .withOutput(gatewayCacheRuleDtoSchema)
+          .withPermission("gatewayCacheRules:delete")
+          .handle(async ({ ctx, input }) => {
+            await ctx.app.gateway.assertOrganizationExists(input.organizationId);
+            const row = await ctx.app.gateway.budgetDecisions.cacheRuleArchive({
+              id: input.id,
+              organizationId: input.organizationId,
+              actorUserId: ctx.actor().id,
+            });
+            return toDto(row);
+          }),
+      )
+      .build();
   }
 }

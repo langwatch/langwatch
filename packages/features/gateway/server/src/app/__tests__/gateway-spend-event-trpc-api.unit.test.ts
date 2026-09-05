@@ -88,6 +88,7 @@ function harness({ clickHouse = true } = {}) {
         }
         return next();
       }) as typeof procedure,
+    validateOutput: true,
   });
 
   return router.createCaller({

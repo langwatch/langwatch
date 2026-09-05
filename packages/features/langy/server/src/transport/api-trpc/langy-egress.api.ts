@@ -26,11 +26,16 @@
  * Langy's sandbox may reach — to anyone with an account. `langy:*` is not
  * demo-granted, and the explicit refusal keeps it that way if that ever changes.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { langyEgressAllowlistSchema } from "@langwatch/langy-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { LangyApp } from "#app/langy.app";
+
+const langyEgressStateSchema = z
+  .object({ allowlist: langyEgressAllowlistSchema, enforcing: z.boolean() })
+  .strict();
 
 /**
  * The process supplies authentication; authorization arrives as `policy`.
@@ -62,6 +67,8 @@ type LangyEgressTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** Whether the chain checks every answer against its declared output schema. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -111,35 +118,46 @@ export class LangyEgressTrpcApi {
     procedures: LangyEgressTrpcProcedures<TContext, TOptions, TRoot>,
     ports: LangyEgressTrpcPorts,
   ) {
-    const { protected: procedure, policy } = procedures;
-
-    return trpc.router({
-      get: policy("langy:view")(procedure.input(egressProjectSchema)).query(
-        // Monitor-only is decided on the application, not here: the editor
-        // renders an empty list + the "leave empty to watch without blocking"
-        // hint when `enforcing` is false.
-        async ({ ctx, input }) =>
-          await ctx.app.langy.egressAllowlist({ projectId: input.projectId }),
-      ),
-
-      set: policy("langy:manage")(procedure.input(egressSetSchema)).mutation(
-        async ({ ctx, input }) => {
-          const saved = await ctx.app.langy.setEgressAllowlist({
-            projectId: input.projectId,
-            allowlist: input.allowlist,
-          });
-          await ports.recordAudit({
-            userId: ctx.actor().id,
-            projectId: input.projectId,
-            action: "langy.egress.setAllowlist",
-            // The host list travels further than the UI (SIEM, tickets); log only
-            // its shape, mirroring how the conversation surface logs the model
-            // allow-list.
-            metadata: { entryCount: saved.allowlist.length, enforcing: saved.enforcing },
-          });
-          return saved;
-        },
-      ),
-    });
+    return createTrpcService({
+      root: trpc,
+      procedures,
+      validateOutput: procedures.validateOutput,
+    })
+      .query("get", (p) =>
+        p
+          .withInput(egressProjectSchema)
+          .withOutput(langyEgressStateSchema)
+          .withPermission("langy:view")
+          // Monitor-only is decided on the application, not here: the editor
+          // renders an empty list + the "leave empty to watch without blocking"
+          // hint when `enforcing` is false.
+          .handle(
+            async ({ ctx, input }) =>
+              await ctx.app.langy.egressAllowlist({ projectId: input.projectId }),
+          ),
+      )
+      .mutation("set", (p) =>
+        p
+          .withInput(egressSetSchema)
+          .withOutput(langyEgressStateSchema)
+          .withPermission("langy:manage")
+          .handle(async ({ ctx, input }) => {
+            const saved = await ctx.app.langy.setEgressAllowlist({
+              projectId: input.projectId,
+              allowlist: input.allowlist,
+            });
+            await ports.recordAudit({
+              userId: ctx.actor().id,
+              projectId: input.projectId,
+              action: "langy.egress.setAllowlist",
+              // The host list travels further than the UI (SIEM, tickets); log only
+              // its shape, mirroring how the conversation surface logs the model
+              // allow-list.
+              metadata: { entryCount: saved.allowlist.length, enforcing: saved.enforcing },
+            });
+            return saved;
+          }),
+      )
+      .build();
   }
 }

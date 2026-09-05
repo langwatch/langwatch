@@ -31,6 +31,7 @@ import {
   type SharedTraceDto,
   type TraceResourceInfoDto,
 } from "@langwatch/trace-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
@@ -92,6 +93,8 @@ type SharedTraceTrpcProcedures<
    * rather than merely unchecked.
    */
   noPermission(declaration: { reason: string }): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** Whether the chain checks every answer against its declared output schema. */
+  validateOutput: boolean;
 }>;
 
 /** The process capabilities this transport needs that Trace does not own. */
@@ -190,227 +193,242 @@ export class SharedTraceTrpcApi {
   ) {
     const { public: procedure, noPermission } = procedures;
 
-    return trpc.router({
-      /**
-       * Resolve a share token and return the complete read-only trace payload.
-       * Every resolve consumes one view and enforces expiry, view cap, audience
-       * and the sharing kill switch — all in `resolveForViewer`. A page load still
-       * counts once because every client caller shares this query's React Query
-       * key, deduping onto a single request.
-       */
-      get: noPermission({
-        reason: "the share token in the input is the whole authorization; see ADR-057",
-      })(procedure.input(z.object({ token: z.string() })))
-        // `.output()` comes after the policy: the app's permission builder
-        // exposes only `input`/`use` so every procedure is forced through the
-        // permission middleware, and it is that `use` which hands back the
-        // full tRPC builder.
-        .output(sharedTraceDtoSchema)
-        .query(async ({ input, ctx }) => {
-          const viewer: ShareViewer = ctx.session?.user
-            ? { type: "user", id: ctx.session.user.id }
-            : { type: "anonymous" };
+    // The share-safe DTO's field stripping is a security guarantee (ADR-057:
+    // a new column on an internal read must be dropped at the share boundary,
+    // not silently published), and the chain's own `withOutput` deliberately
+    // never strips — it only validates. So the real tRPC `.output()` stays
+    // applied to the base procedure itself, and `withOutput` below is the
+    // chain's own declaration/validation on top of that unchanged behaviour.
+    const outputBoundProcedure = procedure.output(sharedTraceDtoSchema);
 
-          // This is the one trace read the open internet can drive, and each call
-          // costs five ClickHouse reads plus a view write. Limit per token AND per
-          // IP: per-token alone lets one host spread load across many leaked
-          // tokens, per-IP alone lets a distributed caller hammer a single link.
-          const clientIp = ports.getClientIp(ctx.req);
-          await enforceShareReadLimit({
-            token: input.token,
-            clientIp,
-            rateLimit: ports.rateLimit,
-          });
+    /** `noPermission` is a pre-built decorator; `policy` here is never called. */
+    const policy = (): TrpcPolicyDecorator => {
+      throw new Error(
+        "sharedTrace declares its access via noPermission for every procedure; policy() is unused",
+      );
+    };
 
-          // Identifies one viewer well enough to collapse their refreshes into a
-          // single viewing. Hashed and held only for the dedupe window, never
-          // stored or logged; absent when we cannot see an IP, in which case every
-          // request counts as a viewing (the stricter behaviour).
-          const viewerKey = clientIp
-            ? createHash("sha256")
-                .update(`${clientIp}|${ctx.req?.headers?.["user-agent"] ?? ""}`)
-                .digest("hex")
-                .slice(0, 32)
-            : undefined;
-
-          // Throws typed share HandledErrors on any failure — handledErrorMiddleware
-          // maps them to wire codes (not_found/kill-switch → 404, expired and
-          // exhausted → 403, out-of-audience → 401).
-          const share = await ctx.app.traces.resolveShareForViewer({
-            token: input.token,
-            viewer,
-            ...(viewerKey !== undefined ? { viewerKey } : {}),
-          });
-
-          if (share.resourceType !== "TRACE") {
-            // The read-only viewer only renders traces; a THREAD-typed share has no
-            // renderable payload here.
-            throw new ShareLinkNotFoundError();
-          }
-
-          const projectId = share.projectId;
-          const traceId = share.resourceId;
-
-          // Share viewers read with the project's protections computed for the
-          // presented session: captured content follows the data-privacy policy and
-          // the plan visibility cutoff, and restricted resource/event attributes are
-          // stripped. Cost visibility follows the viewer's OWN `cost:view`
-          // permission (an anonymous viewer sees none), so a signed-in member
-          // resolving an org/project-scoped link may see spend — sharing never
-          // widens what a viewer could already see in-app. See ADR-057.
-          //
-          // A missing or archived project resolves like a bad token (generic
-          // NOT_FOUND) rather than surfacing a raw database error.
-          const protections = await ports.tryGetShareViewerProtections({
-            projectId,
-            session: ctx.session,
-          });
-          if (!protections) throw new ShareLinkNotFoundError();
-
-          const app = ctx.app.traces;
-
-          // Cache lookup happens AFTER the token resolved and protections were
-          // computed — never before. Authorization is re-run on every request, so
-          // a revoked, expired or exhausted link stops serving immediately no
-          // matter what is cached, and the key carries a protections fingerprint
-          // so two viewers with different redactions can never share an entry.
-          const cached = await app.readCachedSharePayload({
-            token: input.token,
-            protections,
-          });
-          if (cached) {
-            // Re-parsed through the same output schema rather than trusted: a
-            // stale entry written by an older deploy is stripped to today's share
-            // contract instead of replaying a field since removed from it.
-            const revalidated = sharedTraceDtoSchema.safeParse(cached);
-            if (revalidated.success) return revalidated.data;
-          }
-
-          // The summary is fetched first: it locates the trace in time, so every
-          // remaining ClickHouse read carries an OccurredAt hint and prunes to the
-          // trace's partitions instead of scanning cold storage — this endpoint is
-          // unauthenticated, so an unhinted scan would be an easy resource sink.
-          // A share whose trace no longer exists (retention, deletion) resolves to
-          // the same generic NOT_FOUND as a bad token.
-          let summary;
-          try {
-            summary = await app.readTraceSummary({
-              projectId,
-              traceId,
-              visibilityCutoffMs: protections.visibilityCutoffMs ?? null,
-            });
-          } catch (error) {
-            if (ports.isTraceNotFound(error)) throw new ShareLinkNotFoundError();
-            throw error;
-          }
-          const occurredAtMs = summary.occurredAt;
-
-          const [
-            project,
-            summaryRows,
-            fullSpans,
-            signalRows,
-            resourceRows,
-            eventRows,
-            evaluationsByTrace,
-          ] = await Promise.all([
-            app.readProject(projectId),
-            app.readSpanSummaries({ projectId, traceId, occurredAtMs }),
-            app.readSpans({
-              projectId,
-              traceId,
-              occurredAtMs,
-              visibilityCutoffMs: protections.visibilityCutoffMs ?? null,
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: outputBoundProcedure, policy },
+      validateOutput: procedures.validateOutput,
+    })
+      .query("get", (p) =>
+        p
+          .withInput(z.object({ token: z.string() }))
+          .withOutput(sharedTraceDtoSchema)
+          .withCustomPermission(
+            noPermission({
+              reason: "the share token in the input is the whole authorization; see ADR-057",
             }),
-            app.readLangwatchSignals({ projectId, traceId, occurredAtMs }),
-            app.readSpanResources({ projectId, traceId, occurredAtMs }),
-            app.readTraceEvents({ projectId, traceId, occurredAtMs }),
-            app.readEvaluations({ projectId, traceIds: [traceId], protections }),
-          ]);
+            "the share token in the input is the whole authorization; see ADR-057",
+          )
+          .handle(async ({ input, ctx }) => {
+            const viewer: ShareViewer = ctx.session?.user
+              ? { type: "user", id: ctx.session.user.id }
+              : { type: "anonymous" };
 
-          // Header (spend stripped; the DROP banner derives exactly as the
-          // internal `tracesV2.header` read derives it, so a drop-policy trace
-          // explains its missing content on the share page too).
-          const rawHeader = mapTraceSummaryToHeader(summary);
-          const header = gateHeaderCost({
-            header: redactV2Content(rawHeader, protections, ports.mappers.contentPrivacy),
-            protections,
-          });
-          header.privacy = await deriveTraceDropPrivacy(
-            rawHeader,
-            projectId,
-            ports.mappers.contentPrivacy,
-          );
+            // This is the one trace read the open internet can drive, and each call
+            // costs five ClickHouse reads plus a view write. Limit per token AND per
+            // IP: per-token alone lets one host spread load across many leaked
+            // tokens, per-IP alone lets a distributed caller hammer a single link.
+            const clientIp = ports.getClientIp(ctx.req);
+            await enforceShareReadLimit({
+              token: input.token,
+              clientIp,
+              rateLimit: ports.rateLimit,
+            });
 
-          // Span waterfall (spend stripped).
-          const spanTree = gateTreeCost({
-            nodes: summaryRows.map(mapLegacySpanSummaryToTreeNode),
-            protections,
-          });
+            // Identifies one viewer well enough to collapse their refreshes into a
+            // single viewing. Hashed and held only for the dedupe window, never
+            // stored or logged; absent when we cannot see an IP, in which case every
+            // request counts as a viewing (the stricter behaviour).
+            const viewerKey = clientIp
+              ? createHash("sha256")
+                  .update(`${clientIp}|${ctx.req?.headers?.["user-agent"] ?? ""}`)
+                  .digest("hex")
+                  .slice(0, 32)
+              : undefined;
 
-          // Full span detail — the SAME pipeline as the internal
-          // `tracesV2.spansFull` read (span protections, content + spend
-          // redaction, privacy annotations), shared so the anonymous surface can
-          // never drift behind an in-app redaction.
-          //
-          // Capped: this endpoint is unauthenticated, and a wide agent trace would
-          // otherwise assemble every span's input/output into one unbounded
-          // response. The waterfall stays complete; only per-span detail stops,
-          // and the payload says so rather than rendering an empty detail pane.
-          const isSpanDetailTruncated = fullSpans.length > SHARE_MAX_FULL_SPANS;
-          const spansFull = mapSpansToDetailDtos(
-            isSpanDetailTruncated ? fullSpans.slice(0, SHARE_MAX_FULL_SPANS) : fullSpans,
-            protections,
-            ports.mappers,
-          );
+            // Throws typed share HandledErrors on any failure — handledErrorMiddleware
+            // maps them to wire codes (not_found/kill-switch → 404, expired and
+            // exhausted → 403, out-of-audience → 401).
+            const share = await ctx.app.traces.resolveShareForViewer({
+              token: input.token,
+              viewer,
+              ...(viewerKey !== undefined ? { viewerKey } : {}),
+            });
 
-          const resources: TraceResourceInfoDto = gateResources({
-            resources: buildResourceInfo(resourceRows),
-            protections,
-          });
+            if (share.resourceType !== "TRACE") {
+              // The read-only viewer only renders traces; a THREAD-typed share has no
+              // renderable payload here.
+              throw new ShareLinkNotFoundError();
+            }
 
-          const evaluations = gateEvaluations({
-            evaluations: evaluationsByTrace[traceId] ?? [],
-            protections,
-          });
+            const projectId = share.projectId;
+            const traceId = share.resourceId;
 
-          const dto: SharedTraceDto = {
-            project: {
-              id: projectId,
-              name: project?.name ?? "",
-              slug: project?.slug ?? "",
-              language: project?.language ?? "",
-              framework: project?.framework ?? "",
-            },
-            // `langwatch.user_id` identifies the end user behind the trace — PII
-            // that reaches the payload only via the header. The read-only share
-            // viewer never renders it and sharing must not disclose it, so it is
-            // nulled here AND pinned to `z.null()` on the output schema, which
-            // turns a future regression into a parse failure rather than a quiet
-            // leak. It is not gated by cost/content protections. See ADR-057.
-            header: { ...header, userId: null },
-            spanTree,
-            spansFull,
-            spanSignals: signalRows.map((row) => ({
-              spanId: row.spanId,
-              signals: row.signals,
-            })),
-            resources,
-            events: ports.mappers.spanProtection.applyDerivedTraceEventProtections(
-              eventRows,
+            // Share viewers read with the project's protections computed for the
+            // presented session: captured content follows the data-privacy policy and
+            // the plan visibility cutoff, and restricted resource/event attributes are
+            // stripped. Cost visibility follows the viewer's OWN `cost:view`
+            // permission (an anonymous viewer sees none), so a signed-in member
+            // resolving an org/project-scoped link may see spend — sharing never
+            // widens what a viewer could already see in-app. See ADR-057.
+            //
+            // A missing or archived project resolves like a bad token (generic
+            // NOT_FOUND) rather than surfacing a raw database error.
+            const protections = await ports.tryGetShareViewerProtections({
+              projectId,
+              session: ctx.session,
+            });
+            if (!protections) throw new ShareLinkNotFoundError();
+
+            const app = ctx.app.traces;
+
+            // Cache lookup happens AFTER the token resolved and protections were
+            // computed — never before. Authorization is re-run on every request, so
+            // a revoked, expired or exhausted link stops serving immediately no
+            // matter what is cached, and the key carries a protections fingerprint
+            // so two viewers with different redactions can never share an entry.
+            const cached = await app.readCachedSharePayload({
+              token: input.token,
               protections,
-            ),
-            isSpanDetailTruncated,
-            evaluations,
-          };
-          // Best-effort: a cache write failure is logged, never fatal to the read.
-          await app.writeCachedSharePayload({
-            token: input.token,
-            protections,
-            payload: dto,
-          });
-          return dto;
-        }),
-    });
+            });
+            if (cached) {
+              // Re-parsed through the same output schema rather than trusted: a
+              // stale entry written by an older deploy is stripped to today's share
+              // contract instead of replaying a field since removed from it.
+              const revalidated = sharedTraceDtoSchema.safeParse(cached);
+              if (revalidated.success) return revalidated.data;
+            }
+
+            // The summary is fetched first: it locates the trace in time, so every
+            // remaining ClickHouse read carries an OccurredAt hint and prunes to the
+            // trace's partitions instead of scanning cold storage — this endpoint is
+            // unauthenticated, so an unhinted scan would be an easy resource sink.
+            // A share whose trace no longer exists (retention, deletion) resolves to
+            // the same generic NOT_FOUND as a bad token.
+            let summary;
+            try {
+              summary = await app.readTraceSummary({
+                projectId,
+                traceId,
+                visibilityCutoffMs: protections.visibilityCutoffMs ?? null,
+              });
+            } catch (error) {
+              if (ports.isTraceNotFound(error)) throw new ShareLinkNotFoundError();
+              throw error;
+            }
+            const occurredAtMs = summary.occurredAt;
+
+            const [
+              project,
+              summaryRows,
+              fullSpans,
+              signalRows,
+              resourceRows,
+              eventRows,
+              evaluationsByTrace,
+            ] = await Promise.all([
+              app.readProject(projectId),
+              app.readSpanSummaries({ projectId, traceId, occurredAtMs }),
+              app.readSpans({
+                projectId,
+                traceId,
+                occurredAtMs,
+                visibilityCutoffMs: protections.visibilityCutoffMs ?? null,
+              }),
+              app.readLangwatchSignals({ projectId, traceId, occurredAtMs }),
+              app.readSpanResources({ projectId, traceId, occurredAtMs }),
+              app.readTraceEvents({ projectId, traceId, occurredAtMs }),
+              app.readEvaluations({ projectId, traceIds: [traceId], protections }),
+            ]);
+
+            // Header (spend stripped; the DROP banner derives exactly as the
+            // internal `tracesV2.header` read derives it, so a drop-policy trace
+            // explains its missing content on the share page too).
+            const rawHeader = mapTraceSummaryToHeader(summary);
+            const header = gateHeaderCost({
+              header: redactV2Content(rawHeader, protections, ports.mappers.contentPrivacy),
+              protections,
+            });
+            header.privacy = await deriveTraceDropPrivacy(
+              rawHeader,
+              projectId,
+              ports.mappers.contentPrivacy,
+            );
+
+            // Span waterfall (spend stripped).
+            const spanTree = gateTreeCost({
+              nodes: summaryRows.map(mapLegacySpanSummaryToTreeNode),
+              protections,
+            });
+
+            // Full span detail — the SAME pipeline as the internal
+            // `tracesV2.spansFull` read (span protections, content + spend
+            // redaction, privacy annotations), shared so the anonymous surface can
+            // never drift behind an in-app redaction.
+            //
+            // Capped: this endpoint is unauthenticated, and a wide agent trace would
+            // otherwise assemble every span's input/output into one unbounded
+            // response. The waterfall stays complete; only per-span detail stops,
+            // and the payload says so rather than rendering an empty detail pane.
+            const isSpanDetailTruncated = fullSpans.length > SHARE_MAX_FULL_SPANS;
+            const spansFull = mapSpansToDetailDtos(
+              isSpanDetailTruncated ? fullSpans.slice(0, SHARE_MAX_FULL_SPANS) : fullSpans,
+              protections,
+              ports.mappers,
+            );
+
+            const resources: TraceResourceInfoDto = gateResources({
+              resources: buildResourceInfo(resourceRows),
+              protections,
+            });
+
+            const evaluations = gateEvaluations({
+              evaluations: evaluationsByTrace[traceId] ?? [],
+              protections,
+            });
+
+            const dto: SharedTraceDto = {
+              project: {
+                id: projectId,
+                name: project?.name ?? "",
+                slug: project?.slug ?? "",
+                language: project?.language ?? "",
+                framework: project?.framework ?? "",
+              },
+              // `langwatch.user_id` identifies the end user behind the trace — PII
+              // that reaches the payload only via the header. The read-only share
+              // viewer never renders it and sharing must not disclose it, so it is
+              // nulled here AND pinned to `z.null()` on the output schema, which
+              // turns a future regression into a parse failure rather than a quiet
+              // leak. It is not gated by cost/content protections. See ADR-057.
+              header: { ...header, userId: null },
+              spanTree,
+              spansFull,
+              spanSignals: signalRows.map((row) => ({
+                spanId: row.spanId,
+                signals: row.signals,
+              })),
+              resources,
+              events: ports.mappers.spanProtection.applyDerivedTraceEventProtections(
+                eventRows,
+                protections,
+              ),
+              isSpanDetailTruncated,
+              evaluations,
+            };
+            // Best-effort: a cache write failure is logged, never fatal to the read.
+            await app.writeCachedSharePayload({
+              token: input.token,
+              protections,
+              payload: dto,
+            });
+            return dto;
+          }),
+      )
+      .build();
   }
 }

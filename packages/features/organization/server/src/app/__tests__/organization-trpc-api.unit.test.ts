@@ -128,6 +128,11 @@ function harness({
       protected: authenticated,
       policy: () => (procedure) => procedure,
       auditLogPolicy: (procedure) => procedure,
+      // This suite's fixtures are partial stand-ins for the feature's rows,
+      // not full ones — several procedures on this surface are themselves
+      // `withoutOutput` (see organization.responses.ts), and the rest are
+      // proven by the dedicated onboarding/scenario-style suites instead.
+      validateOutput: false,
     },
     ports,
   );
@@ -164,6 +169,7 @@ describe("OrganizationTrpcApi", () => {
               },
             ) as typeof procedure,
           auditLogPolicy: (procedure) => procedure,
+          validateOutput: false,
         },
         stubPorts(),
       );

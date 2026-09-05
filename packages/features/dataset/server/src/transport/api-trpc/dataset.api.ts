@@ -25,6 +25,7 @@
  *
  * Spec: packages/features/dataset/specs/dataset-service.feature.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type {
   DatasetApiFindNextNameOutput,
@@ -43,6 +44,9 @@ import {
   datasetApiUpsertBaseInputSchema,
   datasetApiUpsertTargetInputSchema,
   datasetApiValidateNameInputSchema,
+  datasetNameResultSchema,
+  datasetSchema,
+  datasetSummarySchema,
 } from "@langwatch/dataset-contract";
 import {
   TRPCError,
@@ -50,11 +54,9 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
+import { z } from "zod";
 import type { DatasetApp } from "#app/dataset.app";
-import {
-  DatasetNameTakenError,
-  DatasetStaleColumnsError,
-} from "@langwatch/dataset-contract";
+import { DatasetNameTakenError, DatasetStaleColumnsError } from "@langwatch/dataset-contract";
 
 /**
  * The host supplies authentication; authorization arrives as `policy`.
@@ -84,6 +86,8 @@ type DatasetTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** Whether the chain checks every answer against its declared output schema. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -211,129 +215,179 @@ export class DatasetTrpcApi {
     procedures: DatasetTrpcProcedures<TContext, TOptions, TRoot>,
     ports: DatasetTrpcPorts,
   ) {
-    const { protected: procedure, policy } = procedures;
+    // The chain has no `.use()` seam for a raw tRPC middleware, so the
+    // translation `datasetErrorHandler` performs at the middleware layer is
+    // done here as a plain try/catch around the handler body instead — the
+    // same `translateDatasetError`, applied to whatever the handler itself
+    // throws rather than to a middleware's `{ ok, error }` result. Behaviour
+    // is identical: the same domain errors are promoted to the same
+    // `HandledError` subclasses, and everything else re-throws unchanged.
+    const withDatasetErrorTranslation = async <T>(run: () => Promise<T>): Promise<T> => {
+      try {
+        return await run();
+      } catch (error) {
+        throw translateDatasetError(error);
+      }
+    };
 
-    return trpc.router({
-      /** Creates a new dataset or replaces an existing one's shape. */
-      upsert: policy("datasets:manage")(
-        procedure.input(datasetApiUpsertBaseInputSchema).input(datasetApiUpsertTargetInputSchema),
-      )
-        .use(datasetErrorHandler)
-        .mutation(async ({ ctx, input }): Promise<DatasetApiUpsertOutput> => {
-          // Borrowing the experiment's name when the caller named one is the
-          // application's rule, not this transport's: the REST patch fills the
-          // same hole from the dataset it is replacing, and one upsert decides
-          // both.
-          return await ctx.app.dataset.upsertDataset({
-            projectId: input.projectId,
-            name: "name" in input ? input.name : undefined,
-            experimentId: "experimentId" in input ? input.experimentId : undefined,
-            columnTypes: input.columnTypes,
-            datasetId: "datasetId" in input ? input.datasetId : undefined,
-            datasetRecords: input.datasetRecords,
-          });
-        }),
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures,
+        validateOutput: procedures.validateOutput,
+      })
+        /** Creates a new dataset or replaces an existing one's shape. */
+        .mutation("upsert", (p) =>
+          p
+            .withInput(datasetApiUpsertBaseInputSchema.and(datasetApiUpsertTargetInputSchema))
+            .withOutput(datasetSchema)
+            .withPermission("datasets:manage")
+            .handle(
+              async ({ ctx, input }): Promise<DatasetApiUpsertOutput> =>
+                await withDatasetErrorTranslation(() =>
+                  // Borrowing the experiment's name when the caller named one is the
+                  // application's rule, not this transport's: the REST patch fills the
+                  // same hole from the dataset it is replacing, and one upsert decides
+                  // both.
+                  ctx.app.dataset.upsertDataset({
+                    projectId: input.projectId,
+                    name: "name" in input ? input.name : undefined,
+                    experimentId: "experimentId" in input ? input.experimentId : undefined,
+                    columnTypes: input.columnTypes,
+                    datasetId: "datasetId" in input ? input.datasetId : undefined,
+                    datasetRecords: input.datasetRecords,
+                  }),
+                ),
+            ),
+        )
+        /** The slug a proposed name would get, and whether it is available. */
+        .query("validateDatasetName", (p) =>
+          p
+            .withInput(datasetApiValidateNameInputSchema)
+            .withOutput(datasetNameResultSchema)
+            .withPermission("datasets:view")
+            .handle(
+              async ({ input, ctx }): Promise<DatasetApiValidateNameOutput> =>
+                await withDatasetErrorTranslation(() => ctx.app.dataset.validateDatasetName(input)),
+            ),
+        )
+        /** Every dataset in the project, for the list and picker surfaces. */
+        .query("getAll", (p) =>
+          p
+            .withInput(datasetApiProjectInputSchema)
+            .withOutput(z.array(datasetSummarySchema))
+            .withPermission("datasets:view")
+            .handle(async ({ input, ctx }): Promise<DatasetApiGetAllOutput> => {
+              const result = await ctx.app.dataset.listDatasets({
+                projectId: input.projectId,
+                page: 1,
+                limit: 200,
+              });
+              return result.data;
+            }),
+        )
+        /**
+         * One dataset by id or slug. An archived or missing one reads as null
+         * rather than failing the page that asked for it.
+         */
+        .query("getById", (p) =>
+          p
+            .withInput(datasetApiDatasetInputSchema)
+            .withOutput(datasetSchema.nullable())
+            .withPermission("datasets:view")
+            .handle(async ({ input, ctx }): Promise<DatasetApiGetByIdOutput> => {
+              try {
+                return await ctx.app.dataset.getBySlugOrId({
+                  projectId: input.projectId,
+                  slugOrId: input.datasetId,
+                });
+              } catch (error) {
+                if (error instanceof Error && error.name === "DatasetNotFoundError") return null;
+                throw error;
+              }
+            }),
+        )
+        /** Archives a dataset, or restores one the caller just archived. */
+        .mutation("deleteById", (p) =>
+          p
+            .withInput(datasetApiDeleteInputSchema)
+            .withOutput(z.object({ success: z.literal(true) }).strict())
+            .withPermission("datasets:delete")
+            .handle(async ({ ctx, input }) => {
+              if (input.undo) {
+                await ctx.app.dataset.restoreDataset({
+                  datasetId: input.datasetId,
+                  projectId: input.projectId,
+                });
+                return { success: true as const };
+              }
+              await ctx.app.dataset.archiveDataset({
+                slugOrId: input.datasetId,
+                projectId: input.projectId,
+              });
+              return { success: true as const };
+            }),
+        )
+        /** The trace and thread mapping a dataset is filled from. */
+        .mutation("updateMapping", (p) =>
+          p
+            .withInput(datasetApiUpdateMappingInputSchema)
+            .withOutput(datasetSchema)
+            .withPermission("datasets:update")
+            .handle(async ({ ctx, input }) => {
+              return ctx.app.dataset.updateMapping(input);
+            }),
+        )
+        /** The next free name for a proposed one. */
+        .query("findNextName", (p) =>
+          p
+            .withInput(datasetApiFindNextNameInputSchema)
+            .withOutput(z.string())
+            .withPermission("datasets:view")
+            .handle(
+              async ({ input, ctx }): Promise<DatasetApiFindNextNameOutput> =>
+                await withDatasetErrorTranslation(() =>
+                  ctx.app.dataset.findNextAvailableName(input),
+                ),
+            ),
+        )
+        /**
+         * Copies a dataset into another project, records and all. Name clashes
+         * in the target get a suffix.
+         */
+        .mutation("copy", (p) =>
+          p
+            .withInput(datasetApiCopyInputSchema)
+            .withOutput(datasetSchema)
+            .withPermission("datasets:create")
+            .handle(async ({ ctx, input }) =>
+              withDatasetErrorTranslation(async () => {
+                // The declared check covers `projectId`, the TARGET. The source is a
+                // second project the caller also named, so it is probed here —
+                // holding create on a project implies being able to read its
+                // datasets, which is what a copy does.
+                const hasSourcePermission = await ports.probeProjectPermission(
+                  ctx,
+                  input.sourceProjectId,
+                  "datasets:create",
+                );
 
-      /** The slug a proposed name would get, and whether it is available. */
-      validateDatasetName: policy("datasets:view")(
-        procedure.input(datasetApiValidateNameInputSchema),
-      )
-        .use(datasetErrorHandler)
-        .query(async ({ input, ctx }): Promise<DatasetApiValidateNameOutput> => {
-          return await ctx.app.dataset.validateDatasetName(input);
-        }),
+                if (!hasSourcePermission) {
+                  throw new TRPCError({
+                    code: "UNAUTHORIZED",
+                    message: "You do not have permission to view datasets in the source project",
+                  });
+                }
 
-      /** Every dataset in the project, for the list and picker surfaces. */
-      getAll: policy("datasets:view")(procedure.input(datasetApiProjectInputSchema)).query(
-        async ({ input, ctx }): Promise<DatasetApiGetAllOutput> => {
-          const result = await ctx.app.dataset.listDatasets({
-            projectId: input.projectId,
-            page: 1,
-            limit: 200,
-          });
-          return result.data;
-        },
-      ),
-
-      /**
-       * One dataset by id or slug. An archived or missing one reads as null
-       * rather than failing the page that asked for it.
-       */
-      getById: policy("datasets:view")(procedure.input(datasetApiDatasetInputSchema)).query(
-        async ({ input, ctx }): Promise<DatasetApiGetByIdOutput> => {
-          try {
-            return await ctx.app.dataset.getBySlugOrId({
-              projectId: input.projectId,
-              slugOrId: input.datasetId,
-            });
-          } catch (error) {
-            if (error instanceof Error && error.name === "DatasetNotFoundError") return null;
-            throw error;
-          }
-        },
-      ),
-
-      /** Archives a dataset, or restores one the caller just archived. */
-      deleteById: policy("datasets:delete")(procedure.input(datasetApiDeleteInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          if (input.undo) {
-            return ctx.app.dataset.restoreDataset({
-              datasetId: input.datasetId,
-              projectId: input.projectId,
-            });
-          }
-          await ctx.app.dataset.archiveDataset({
-            slugOrId: input.datasetId,
-            projectId: input.projectId,
-          });
-          return { success: true as const };
-        },
-      ),
-
-      /** The trace and thread mapping a dataset is filled from. */
-      updateMapping: policy("datasets:update")(
-        procedure.input(datasetApiUpdateMappingInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        return ctx.app.dataset.updateMapping(input);
-      }),
-
-      /** The next free name for a proposed one. */
-      findNextName: policy("datasets:view")(procedure.input(datasetApiFindNextNameInputSchema))
-        .use(datasetErrorHandler)
-        .query(async ({ input, ctx }): Promise<DatasetApiFindNextNameOutput> => {
-          return await ctx.app.dataset.findNextAvailableName(input);
-        }),
-
-      /**
-       * Copies a dataset into another project, records and all. Name clashes
-       * in the target get a suffix.
-       */
-      copy: policy("datasets:create")(procedure.input(datasetApiCopyInputSchema))
-        .use(datasetErrorHandler)
-        .mutation(async ({ ctx, input }) => {
-          // The declared check covers `projectId`, the TARGET. The source is a
-          // second project the caller also named, so it is probed here —
-          // holding create on a project implies being able to read its
-          // datasets, which is what a copy does.
-          const hasSourcePermission = await ports.probeProjectPermission(
-            ctx,
-            input.sourceProjectId,
-            "datasets:create",
-          );
-
-          if (!hasSourcePermission) {
-            throw new TRPCError({
-              code: "UNAUTHORIZED",
-              message: "You do not have permission to view datasets in the source project",
-            });
-          }
-
-          return await ctx.app.dataset.copyDataset({
-            sourceDatasetId: input.datasetId,
-            sourceProjectId: input.sourceProjectId,
-            targetProjectId: input.projectId,
-          });
-        }),
-    });
+                return await ctx.app.dataset.copyDataset({
+                  sourceDatasetId: input.datasetId,
+                  sourceProjectId: input.sourceProjectId,
+                  targetProjectId: input.projectId,
+                });
+              }),
+            ),
+        )
+        .build()
+    );
   }
 }

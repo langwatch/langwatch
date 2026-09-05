@@ -1,6 +1,7 @@
 /**
  * Running scenarios against targets, over the process's tRPC transport.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import { createLogger } from "@langwatch/observability";
 import {
   generateBatchRunId,
@@ -9,6 +10,7 @@ import {
   isInternalSetId,
   runNoteSchema,
   runParameterValuesSchema,
+  scenarioRunScheduledSchema,
   ScenarioNotFoundError,
   ScenarioReservedSetIdError,
   type RunActor,
@@ -143,96 +145,108 @@ export function createSimulationRunnerRouter<
   trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
   procedures: ScenarioTrpcProcedures<TContext, TOptions, TRoot>,
 ) {
-  const { protected: procedure, policy } = procedures;
+  const { protected: procedure, policy, validateOutput } = procedures;
 
-  return trpc.router({
-    /**
-     * Run a scenario against a target.
-     *
-     * Schedules the scenario for async execution and returns immediately
-     * with the batch run ID for tracking. Does NOT return success/failure
-     * of scenario execution - that happens asynchronously.
-     */
-    run: policy("scenarios:manage")(procedure.input(runScenarioSchema)).mutation(
-      async ({ ctx, input }) => {
-        const setId = input.setId ?? getOnPlatformSetId(input.projectId);
-        assertWritableSetId({ setId, projectId: input.projectId });
-        const batchRunId = input.batchRunId ?? generateBatchRunId();
-        const actor: RunActor = { id: ctx.actor().id, label: "user" };
+  return (
+    createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput,
+    })
+      /**
+       * Run a scenario against a target.
+       *
+       * Schedules the scenario for async execution and returns immediately
+       * with the batch run ID for tracking. Does NOT return success/failure
+       * of scenario execution - that happens asynchronously.
+       */
+      .mutation("run", (p) =>
+        p
+          .withInput(runScenarioSchema)
+          .withOutput(scenarioRunScheduledSchema)
+          .withPermission("scenarios:manage")
+          .handle(async ({ ctx, input }) => {
+            const setId = input.setId ?? getOnPlatformSetId(input.projectId);
+            assertWritableSetId({ setId, projectId: input.projectId });
+            const batchRunId = input.batchRunId ?? generateBatchRunId();
+            const actor: RunActor = { id: ctx.actor().id, label: "user" };
 
-        const { parameters, secretParameters, scenarioVersion } = await resolveParametersForRun({
-          app: ctx.app.scenarios,
-          projectId: input.projectId,
-          scenarioId: input.scenarioId,
-          values: input.parameters,
-        });
+            const { parameters, secretParameters, scenarioVersion } = await resolveParametersForRun(
+              {
+                app: ctx.app.scenarios,
+                projectId: input.projectId,
+                scenarioId: input.scenarioId,
+                values: input.parameters,
+              },
+            );
 
-        const prefetchResult = await ctx.app.scenarios.prefetchExecution({
-          context: {
-            projectId: input.projectId,
-            scenarioId: input.scenarioId,
-            setId,
-            batchRunId,
-            parameters,
-            secretParameters,
-          },
-          target: input.target,
-        });
+            const prefetchResult = await ctx.app.scenarios.prefetchExecution({
+              context: {
+                projectId: input.projectId,
+                scenarioId: input.scenarioId,
+                setId,
+                batchRunId,
+                parameters,
+                secretParameters,
+              },
+              target: input.target,
+            });
 
-        if (!prefetchResult.success) {
-          logger.warn(
-            {
+            if (!prefetchResult.success) {
+              logger.warn(
+                {
+                  projectId: input.projectId,
+                  scenarioId: input.scenarioId,
+                  error: prefetchResult.error,
+                },
+                "Scenario validation failed",
+              );
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: prefetchResult.error,
+              });
+            }
+
+            const scenarioRunId = generateScenarioRunId();
+
+            logger.info(
+              {
+                projectId: input.projectId,
+                scenarioId: input.scenarioId,
+                batchRunId,
+                scenarioRunId,
+              },
+              "Scheduling scenario execution",
+            );
+
+            await queueRun(ctx.app.scenarios, {
               projectId: input.projectId,
               scenarioId: input.scenarioId,
-              error: prefetchResult.error,
-            },
-            "Scenario validation failed",
-          );
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: prefetchResult.error,
-          });
-        }
+              scenarioRunId,
+              batchRunId,
+              setId,
+              name: prefetchResult.data.scenario.name,
+              target: input.target,
+              parameters,
+              secretParameters,
+              note: input.note,
+              scenarioVersion,
+              actor,
+              resolvedModels: prefetchResult.resolvedModels,
+            });
 
-        const scenarioRunId = generateScenarioRunId();
+            // No explicit job scheduling — the execution subscriber picks up the queued
+            // event via the GroupQueue and spawns the child process.
+            logger.info({ batchRunId, scenarioRunId }, "Scenario queued via event-sourcing");
 
-        logger.info(
-          {
-            projectId: input.projectId,
-            scenarioId: input.scenarioId,
-            batchRunId,
-            scenarioRunId,
-          },
-          "Scheduling scenario execution",
-        );
-
-        await queueRun(ctx.app.scenarios, {
-          projectId: input.projectId,
-          scenarioId: input.scenarioId,
-          scenarioRunId,
-          batchRunId,
-          setId,
-          name: prefetchResult.data.scenario.name,
-          target: input.target,
-          parameters,
-          secretParameters,
-          note: input.note,
-          scenarioVersion,
-          actor,
-          resolvedModels: prefetchResult.resolvedModels,
-        });
-
-        // No explicit job scheduling — the execution subscriber picks up the queued
-        // event via the GroupQueue and spawns the child process.
-        logger.info({ batchRunId, scenarioRunId }, "Scenario queued via event-sourcing");
-
-        return {
-          scheduled: true,
-          setId,
-          batchRunId,
-          scenarioRunId,
-        };
-      },
-    ),
-  });
+            return {
+              scheduled: true,
+              setId,
+              batchRunId,
+              scenarioRunId,
+            };
+          }),
+      )
+      .build()
+  );
 }

@@ -20,6 +20,7 @@
  * Transport only: gate, input parsing and delegation to the process's spend
  * reader.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   TRPCError,
@@ -51,6 +52,8 @@ type CostTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** Whether the chain checks every answer against its declared output schema. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -97,27 +100,35 @@ export class CostTrpcApi {
     procedures: CostTrpcProcedures<TContext, TOptions, TRoot>,
     ports: CostTrpcPorts<TRollup>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    return createTrpcService({
+      root: trpc,
+      procedures,
+      validateOutput: procedures.validateOutput,
+    })
+      .query("getAggregatedCostsForOrganization", (p) =>
+        p
+          .withInput(aggregatedCostsInputSchema)
+          .withoutOutput(
+            "TRollup is the process's own cost-rollup row shape, a generic type parameter this feature does not own",
+          )
+          .withPermission("organization:view")
+          .handle(async ({ input, ctx }) => {
+            const user = ctx.session?.user;
+            // `protectedProcedure` has already refused an anonymous caller; this
+            // only narrows the type.
+            if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
-    return trpc.router({
-      getAggregatedCostsForOrganization: policy("organization:view")(
-        procedure.input(aggregatedCostsInputSchema),
-      ).query(async ({ input, ctx }) => {
-        const user = ctx.session?.user;
-        // `protectedProcedure` has already refused an anonymous caller; this
-        // only narrows the type.
-        if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+            const now = Date.now();
+            const endDate = now - input.endDate < RECENT_WINDOW_MS ? now : input.endDate;
 
-        const now = Date.now();
-        const endDate = now - input.endDate < RECENT_WINDOW_MS ? now : input.endDate;
-
-        return ports.readOrganizationSpend({
-          organizationId: input.organizationId,
-          userId: user.id,
-          startDate: input.startDate,
-          endDate,
-        });
-      }),
-    });
+            return ports.readOrganizationSpend({
+              organizationId: input.organizationId,
+              userId: user.id,
+              startDate: input.startDate,
+              endDate,
+            });
+          }),
+      )
+      .build();
   }
 }

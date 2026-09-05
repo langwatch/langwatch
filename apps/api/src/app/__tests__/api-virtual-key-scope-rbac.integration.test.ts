@@ -99,7 +99,11 @@ function buildRouter(gateway: ReturnType<typeof buildGateway>) {
   const trpc = initTRPC.context<VirtualKeyTrpcContext>().create();
   return VirtualKeyTrpcApi.create(
     trpc,
-    { protected: trpc.procedure, resolverAuthorizedPolicy: () => (procedure) => procedure },
+    {
+      protected: trpc.procedure,
+      resolverAuthorizedPolicy: () => (procedure) => procedure,
+      validateOutput: true,
+    },
     gateway.app.schemas,
   );
 }

@@ -17,8 +17,16 @@
  *
  * Spec: packages/features/dataset/specs/dataset-service.feature.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { newDatasetEntriesSchema } from "@langwatch/dataset-contract";
+import {
+  datasetPageSchema,
+  datasetRecordEditorReadSchema,
+  datasetRecordHeadReadSchema,
+  datasetRecordMutationResultSchema,
+  datasetRecordSchema,
+  newDatasetEntriesSchema,
+} from "@langwatch/dataset-contract";
 // From the server's own error module, not the contract's. Both declare classes
 // with these names; only these are ever thrown — the storage adapters raise
 // `ChunkTooLargeError({ byteSize, maxBytes })`, and `instanceof` against the
@@ -68,6 +76,8 @@ type DatasetRecordTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** Whether the chain checks every answer against its declared output schema. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -161,145 +171,171 @@ export class DatasetRecordTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: DatasetRecordTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures,
+        validateOutput: procedures.validateOutput,
+      })
+        .mutation("create", (p) =>
+          p
+            .withInput(createInputSchema)
+            .withOutput(z.array(datasetRecordSchema))
+            .withPermission("datasets:create")
+            .handle(async ({ ctx, input }) => {
+              try {
+                return await ctx.app.dataset.batchCreateRecords({
+                  slugOrId: input.datasetId,
+                  projectId: input.projectId,
+                  entries: input.entries,
+                });
+              } catch (error) {
+                return rethrowDatasetNotReadyAsTRPC(error);
+              }
+            }),
+        )
+        .mutation("update", (p) =>
+          p
+            .withInput(updateInputSchema)
+            .withOutput(datasetRecordMutationResultSchema)
+            .withPermission("datasets:update")
+            .handle(async ({ ctx, input }) => {
+              const { recordId, updatedRecord } = input;
 
-    return trpc.router({
-      create: policy("datasets:create")(procedure.input(createInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          try {
-            return await ctx.app.dataset.batchCreateRecords({
-              slugOrId: input.datasetId,
-              projectId: input.projectId,
-              entries: input.entries,
-            });
-          } catch (error) {
-            return rethrowDatasetNotReadyAsTRPC(error);
-          }
-        },
-      ),
-
-      update: policy("datasets:update")(procedure.input(updateInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const { recordId, updatedRecord } = input;
-
-          try {
-            return await ctx.app.dataset.upsertRecord({
-              recordId,
-              updatedRecord,
-              slugOrId: input.datasetId,
-              projectId: input.projectId,
-            });
-          } catch (error) {
-            return rethrowDatasetNotReadyAsTRPC(error);
-          }
-        },
-      ),
-
-      getAll: policy("datasets:view")(procedure.input(datasetLookupSchema)).query(
-        async ({ input, ctx }) => {
-          try {
-            const result = await ctx.app.dataset.getDatasetWithRecords({
-              slugOrId: input.datasetId,
-              projectId: input.projectId,
-              limitMb: DATASET_EDITOR_READ_LIMIT_MB,
-            });
-            return {
-              ...result.dataset,
-              datasetRecords: result.records,
-              truncated: result.truncated,
-            };
-          } catch (error) {
-            // Defense: a not-ready read surfaces as PRECONDITION_FAILED instead of
-            // INTERNAL_SERVER_ERROR (the UI already gates, but downstream consumers
-            // rely on a clean 4xx — see useGetDatasetData / useSavedDatasetLoader).
-            return rethrowDatasetNotReadyAsTRPC(error);
-          }
-        },
-      ),
-
-      /**
-       * One page of a dataset for the editor (classic page N of M). Replaces the
-       * editor's whole-dataset `getAll` read — which truncated past a byte cap and
-       * silently hid the rest — with a bounded windowed read (s3_jsonl reads only
-       * the chunks overlapping the page; PG paginates by skip/take). Total is the
-       * PG-authoritative `count`. Editing still works on the visible page because
-       * record mutations target each record by its own id.
-       */
-      listPaginated: policy("datasets:view")(procedure.input(listPaginatedInputSchema)).query(
-        async ({ ctx, input }) => {
-          try {
-            return await ctx.app.dataset.getDatasetPage({
-              slugOrId: input.datasetId,
-              projectId: input.projectId,
-              page: input.page,
-              limit: input.limit,
-            });
-          } catch (error) {
-            // Parity with getAll/getFullDataset: an archived/missing dataset reads
-            // as null (the editor surfaces "no longer available"), not a 500. A
-            // still-preparing dataset maps to PRECONDITION_FAILED like the others.
-            if (error instanceof DatasetNotFoundError) return null;
-            return rethrowDatasetNotReadyAsTRPC(error);
-          }
-        },
-      ),
-
-      download: policy("datasets:view")(procedure.input(datasetLookupSchema)).mutation(
-        async ({ input, ctx }) => {
-          try {
-            const result = await ctx.app.dataset.getDatasetWithRecords({
-              slugOrId: input.datasetId,
-              projectId: input.projectId,
-              limitMb: null,
-            });
-            return {
-              ...result.dataset,
-              datasetRecords: result.records,
-              truncated: result.truncated,
-            };
-          } catch (error) {
-            // Defense: a not-ready download surfaces as PRECONDITION_FAILED instead
-            // of INTERNAL_SERVER_ERROR, matching getAll/getHead and the REST 425.
-            return rethrowDatasetNotReadyAsTRPC(error);
-          }
-        },
-      ),
-
-      getHead: policy("datasets:view")(procedure.input(datasetLookupSchema)).query(
-        async ({ input, ctx }) => {
-          try {
-            const result = await ctx.app.dataset.getDatasetHead({
-              slugOrId: input.datasetId,
-              projectId: input.projectId,
-            });
-            return {
-              dataset: {
-                ...result.dataset,
-                datasetRecords: result.records,
-              },
-              total: result.total,
-            };
-          } catch (error) {
-            // Defense: surface a not-ready read as PRECONDITION_FAILED (4xx) rather
-            // than INTERNAL_SERVER_ERROR, matching the REST 425 mapping.
-            return rethrowDatasetNotReadyAsTRPC(error);
-          }
-        },
-      ),
-
-      deleteMany: policy("datasets:delete")(procedure.input(deleteManyInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          try {
-            return await ctx.app.dataset.deleteRecords({
-              recordIds: input.recordIds,
-              slugOrId: input.datasetId,
-              projectId: input.projectId,
-            });
-          } catch (error) {
-            return rethrowDatasetNotReadyAsTRPC(error);
-          }
-        },
-      ),
-    });
+              try {
+                return await ctx.app.dataset.upsertRecord({
+                  recordId,
+                  updatedRecord,
+                  slugOrId: input.datasetId,
+                  projectId: input.projectId,
+                });
+              } catch (error) {
+                return rethrowDatasetNotReadyAsTRPC(error);
+              }
+            }),
+        )
+        .query("getAll", (p) =>
+          p
+            .withInput(datasetLookupSchema)
+            .withOutput(datasetRecordEditorReadSchema)
+            .withPermission("datasets:view")
+            .handle(async ({ input, ctx }) => {
+              try {
+                const result = await ctx.app.dataset.getDatasetWithRecords({
+                  slugOrId: input.datasetId,
+                  projectId: input.projectId,
+                  limitMb: DATASET_EDITOR_READ_LIMIT_MB,
+                });
+                return {
+                  ...result.dataset,
+                  datasetRecords: result.records,
+                  truncated: result.truncated,
+                };
+              } catch (error) {
+                // Defense: a not-ready read surfaces as PRECONDITION_FAILED instead of
+                // INTERNAL_SERVER_ERROR (the UI already gates, but downstream consumers
+                // rely on a clean 4xx — see useGetDatasetData / useSavedDatasetLoader).
+                return rethrowDatasetNotReadyAsTRPC(error);
+              }
+            }),
+        )
+        /**
+         * One page of a dataset for the editor (classic page N of M). Replaces the
+         * editor's whole-dataset `getAll` read — which truncated past a byte cap and
+         * silently hid the rest — with a bounded windowed read (s3_jsonl reads only
+         * the chunks overlapping the page; PG paginates by skip/take). Total is the
+         * PG-authoritative `count`. Editing still works on the visible page because
+         * record mutations target each record by its own id.
+         */
+        .query("listPaginated", (p) =>
+          p
+            .withInput(listPaginatedInputSchema)
+            .withOutput(datasetPageSchema.nullable())
+            .withPermission("datasets:view")
+            .handle(async ({ ctx, input }) => {
+              try {
+                return await ctx.app.dataset.getDatasetPage({
+                  slugOrId: input.datasetId,
+                  projectId: input.projectId,
+                  page: input.page,
+                  limit: input.limit,
+                });
+              } catch (error) {
+                // Parity with getAll/getFullDataset: an archived/missing dataset reads
+                // as null (the editor surfaces "no longer available"), not a 500. A
+                // still-preparing dataset maps to PRECONDITION_FAILED like the others.
+                if (error instanceof DatasetNotFoundError) return null;
+                return rethrowDatasetNotReadyAsTRPC(error);
+              }
+            }),
+        )
+        .mutation("download", (p) =>
+          p
+            .withInput(datasetLookupSchema)
+            .withOutput(datasetRecordEditorReadSchema)
+            .withPermission("datasets:view")
+            .handle(async ({ input, ctx }) => {
+              try {
+                const result = await ctx.app.dataset.getDatasetWithRecords({
+                  slugOrId: input.datasetId,
+                  projectId: input.projectId,
+                  limitMb: null,
+                });
+                return {
+                  ...result.dataset,
+                  datasetRecords: result.records,
+                  truncated: result.truncated,
+                };
+              } catch (error) {
+                // Defense: a not-ready download surfaces as PRECONDITION_FAILED instead
+                // of INTERNAL_SERVER_ERROR, matching getAll/getHead and the REST 425.
+                return rethrowDatasetNotReadyAsTRPC(error);
+              }
+            }),
+        )
+        .query("getHead", (p) =>
+          p
+            .withInput(datasetLookupSchema)
+            .withOutput(datasetRecordHeadReadSchema)
+            .withPermission("datasets:view")
+            .handle(async ({ input, ctx }) => {
+              try {
+                const result = await ctx.app.dataset.getDatasetHead({
+                  slugOrId: input.datasetId,
+                  projectId: input.projectId,
+                });
+                return {
+                  dataset: {
+                    ...result.dataset,
+                    datasetRecords: result.records,
+                  },
+                  total: result.total,
+                };
+              } catch (error) {
+                // Defense: surface a not-ready read as PRECONDITION_FAILED (4xx) rather
+                // than INTERNAL_SERVER_ERROR, matching the REST 425 mapping.
+                return rethrowDatasetNotReadyAsTRPC(error);
+              }
+            }),
+        )
+        .mutation("deleteMany", (p) =>
+          p
+            .withInput(deleteManyInputSchema)
+            .withOutput(z.object({ count: z.number() }).strict())
+            .withPermission("datasets:delete")
+            .handle(async ({ ctx, input }) => {
+              try {
+                return await ctx.app.dataset.deleteRecords({
+                  recordIds: input.recordIds,
+                  slugOrId: input.datasetId,
+                  projectId: input.projectId,
+                });
+              } catch (error) {
+                return rethrowDatasetNotReadyAsTRPC(error);
+              }
+            }),
+        )
+        .build()
+    );
   }
 }

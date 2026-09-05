@@ -22,8 +22,9 @@
  * reader and its notifier, both of which are composed over the deployment's
  * billing store.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { UsageStats } from "@langwatch/entitlement-contract";
+import { usageStatsSchema, type UsageStats } from "@langwatch/entitlement-contract";
 import {
   TRPCError,
   type AnyTRPCRootTypes,
@@ -61,6 +62,8 @@ type LimitsTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** Whether the chain checks every answer against its declared output schema. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -119,37 +122,54 @@ export class LimitsTrpcApi {
     procedures: LimitsTrpcProcedures<TContext, TOptions, TRoot>,
     ports: TPorts,
   ) {
-    const { protected: procedure, policy } = procedures;
+    return createTrpcService({
+      root: trpc,
+      procedures,
+      validateOutput: procedures.validateOutput,
+    })
+      .query("getUsage", (p) =>
+        p
+          .withInput(organizationScopeSchema)
+          .withOutput(usageStatsSchema)
+          .withPermission("organization:view")
+          .handle(async ({ input, ctx }): Promise<UsageStats> => {
+            const user = ctx.session?.user;
+            // `protectedProcedure` has already refused an anonymous caller;
+            // this only narrows the type.
+            if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+            return ports.getUsageStats(ctx, {
+              organizationId: input.organizationId,
+              user,
+            });
+          }),
+      )
+      .mutation("checkAndSendUsageLimitNotification", (p) =>
+        p
+          .withInput(usageLimitNotificationInputSchema)
+          .withOutput(
+            z
+              .object({
+                sent: z.boolean(),
+                notificationId: z.string().optional(),
+                sentAt: z.date().nullable().optional(),
+              })
+              .strict(),
+          )
+          .withPermission("organization:manage")
+          .handle(async ({ input, ctx }) => {
+            const notification = await ports.tryCheckAndSendWarning(ctx, {
+              organizationId: input.organizationId,
+              currentMonthMessagesCount: input.currentMonthMessagesCount,
+              maxMonthlyUsageLimit: input.maxMonthlyUsageLimit,
+            });
 
-    return trpc.router({
-      getUsage: policy("organization:view")(procedure.input(organizationScopeSchema)).query(
-        async ({ input, ctx }) => {
-          const user = ctx.session?.user;
-          // `protectedProcedure` has already refused an anonymous caller;
-          // this only narrows the type.
-          if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
-          return ports.getUsageStats(ctx, {
-            organizationId: input.organizationId,
-            user,
-          });
-        },
-      ),
-
-      checkAndSendUsageLimitNotification: policy("organization:manage")(
-        procedure.input(usageLimitNotificationInputSchema),
-      ).mutation(async ({ input, ctx }) => {
-        const notification = await ports.tryCheckAndSendWarning(ctx, {
-          organizationId: input.organizationId,
-          currentMonthMessagesCount: input.currentMonthMessagesCount,
-          maxMonthlyUsageLimit: input.maxMonthlyUsageLimit,
-        });
-
-        return {
-          sent: notification !== null && notification !== undefined,
-          notificationId: notification?.id,
-          sentAt: notification?.sentAt,
-        };
-      }),
-    });
+            return {
+              sent: notification !== null && notification !== undefined,
+              notificationId: notification?.id,
+              sentAt: notification?.sentAt,
+            };
+          }),
+      )
+      .build();
   }
 }

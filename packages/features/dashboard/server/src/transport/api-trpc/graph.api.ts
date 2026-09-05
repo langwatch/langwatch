@@ -3,8 +3,9 @@
  * `customGraphId` as of ADR-034 Phase 5.2, and the bell opens the automations
  * Spec: packages/features/dashboard/specs/dashboard-service.feature.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
+import { triggerSchema, type Trigger } from "@langwatch/automation-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { Trigger } from "@langwatch/automation-contract";
 import {
   graphApiBatchUpdateLayoutsInputSchema,
   graphApiCreateInputSchema,
@@ -12,11 +13,58 @@ import {
   graphApiListInputSchema,
   graphApiUpdateInputSchema,
   graphApiUpdateLayoutInputSchema,
+  graphSchema,
   type Graph,
 } from "@langwatch/dashboard-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { DashboardApp } from "#app/dashboard.app";
+
+/**
+ * The `legacyGraph` compatibility shape this transport answers with: the
+ * stored row plus the discriminator the old Prisma transport exposed. Kept
+ * local to this file rather than in `@langwatch/dashboard-contract` because it
+ * embeds `@langwatch/automation-contract`'s `Trigger` shape (`getAll`'s
+ * per-graph alert), and this server package already depends on both — adding
+ * that dependency to the contract package too, mid-migration, would touch the
+ * shared lockfile for a shape only this transport answers with.
+ */
+const legacyGraphSchema = graphSchema.extend({ kind: z.literal("builder") });
+
+const filterValueSchema = z.union([z.array(z.string()), z.record(z.string(), z.array(z.string()))]);
+
+const alertActionParamsSchema = z
+  .object({
+    members: z.array(z.string()).optional(),
+    seriesName: z.string().optional(),
+  })
+  .strict();
+
+const graphAlertSchema = z
+  .object({
+    enabled: z.literal(true),
+    threshold: z.number(),
+    operator: z.string(),
+    timePeriod: z.number(),
+    seriesName: z.string(),
+    type: triggerSchema.shape.alertType,
+    action: triggerSchema.shape.action,
+    actionParams: alertActionParamsSchema,
+    triggerId: z.string(),
+  })
+  .strict();
+
+const graphListItemSchema = legacyGraphSchema.extend({
+  trigger: triggerSchema
+    .extend({ actionParams: z.record(z.string(), z.unknown()) })
+    .strict()
+    .nullable(),
+});
+
+const graphDetailSchema = legacyGraphSchema.extend({
+  filters: z.record(z.string(), filterValueSchema).optional(),
+  alert: graphAlertSchema.optional(),
+});
 
 /**
  * The host supplies authentication; authorization arrives as `policy`.
@@ -35,6 +83,8 @@ type GraphTrpcProcedures<
    * declared permission.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** Whether the chain checks every answer against its declared output schema. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -84,199 +134,227 @@ export class GraphTrpcApi {
     procedures: GraphTrpcProcedures<TContext, TOptions, TRoot>,
     ports: GraphTrpcPorts<TFilterField>,
   ) {
-    const { protected: procedure, policy } = procedures;
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures,
+        validateOutput: procedures.validateOutput,
+      })
+        .mutation("create", (p) =>
+          p
+            .withInput(graphApiCreateInputSchema)
+            .withOutput(legacyGraphSchema)
+            .withPermission("analytics:create")
+            .handle(async ({ ctx, input }) => {
+              const graph = JSON.parse(input.graph) as Record<string, unknown>;
 
-    return trpc.router({
-      create: policy("analytics:create")(procedure.input(graphApiCreateInputSchema)).mutation(
-        async ({ ctx, input }) => {
-          const graph = JSON.parse(input.graph) as Record<string, unknown>;
-
-          return legacyGraph(
-            await ctx.app.dashboard.createGraph({
-              projectId: input.projectId,
-              name: input.name,
-              graph,
-              filters: input.filterParams?.filters ?? {},
-              ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
-              layout: {
-                gridColumn: input.gridColumn ?? 0,
-                ...(input.gridRow === undefined ? {} : { gridRow: input.gridRow }),
-                colSpan: input.colSpan ?? 1,
-                rowSpan: input.rowSpan ?? 1,
-              },
+              return legacyGraph(
+                await ctx.app.dashboard.createGraph({
+                  projectId: input.projectId,
+                  name: input.name,
+                  graph,
+                  filters: input.filterParams?.filters ?? {},
+                  ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
+                  layout: {
+                    gridColumn: input.gridColumn ?? 0,
+                    ...(input.gridRow === undefined ? {} : { gridRow: input.gridRow }),
+                    colSpan: input.colSpan ?? 1,
+                    rowSpan: input.rowSpan ?? 1,
+                  },
+                }),
+              );
             }),
-          );
-        },
-      ),
+        )
+        /**
+         * `listGraphs` returns chart-builder rows only, so a member's stored
+         * LangWatchQL definition never reaches this payload — the service filters
+         * on the kind discriminator, which is why nothing is stripped here.
+         */
+        .query("getAll", (p) =>
+          p
+            .withInput(graphApiListInputSchema)
+            .withOutput(z.array(graphListItemSchema))
+            .withPermission("analytics:view")
+            .handle(async ({ ctx, input }) => {
+              const { projectId, dashboardId } = input;
+              const graphs = await ctx.app.dashboard.listGraphs({
+                projectId,
+                ...(dashboardId === undefined ? {} : { dashboardId }),
+              });
 
-      /**
-       * `listGraphs` returns chart-builder rows only, so a member's stored
-       * LangWatchQL definition never reaches this payload — the service filters
-       * on the kind discriminator, which is why nothing is stripped here.
-       */
-      getAll: policy("analytics:view")(procedure.input(graphApiListInputSchema)).query(
-        async ({ ctx, input }) => {
-          const { projectId, dashboardId } = input;
-          const graphs = await ctx.app.dashboard.listGraphs({
-            projectId,
-            ...(dashboardId === undefined ? {} : { dashboardId }),
-          });
+              const triggers = await ctx.app.dashboard.getAlertsForGraphs({
+                projectId,
+                customGraphIds: graphs.map((graph) => graph.id),
+              });
+              const triggerByGraphId = new Map(
+                triggers.flatMap((trigger) =>
+                  trigger.customGraphId === null ? [] : [[trigger.customGraphId, trigger] as const],
+                ),
+              );
 
-          const triggers = await ctx.app.dashboard.getAlertsForGraphs({
-            projectId,
-            customGraphIds: graphs.map((graph) => graph.id),
-          });
-          const triggerByGraphId = new Map(
-            triggers.flatMap((trigger) =>
-              trigger.customGraphId === null ? [] : [[trigger.customGraphId, trigger] as const],
+              return graphs.map((graph) => {
+                const trigger = triggerByGraphId.get(graph.id) ?? null;
+                return {
+                  ...legacyGraph(graph),
+                  trigger: trigger
+                    ? {
+                        ...trigger,
+                        actionParams: ports.redactActionParams(
+                          trigger.action,
+                          (trigger.actionParams ?? {}) as Record<string, unknown>,
+                        ),
+                      }
+                    : null,
+                };
+              });
+            }),
+        )
+        .mutation("delete", (p) =>
+          p
+            .withInput(graphApiGraphInputSchema)
+            .withOutput(legacyGraphSchema)
+            .withPermission("analytics:delete")
+            .handle(async ({ ctx, input }) =>
+              legacyGraph(
+                await ctx.app.dashboard.deleteGraph({
+                  projectId: input.projectId,
+                  graphId: input.id,
+                }),
+              ),
             ),
-          );
+        )
+        .query("getById", (p) =>
+          p
+            .withInput(graphApiGraphInputSchema)
+            .withOutput(graphDetailSchema)
+            .withPermission("analytics:view")
+            .handle(async ({ ctx, input }) => {
+              const graph = await ctx.app.dashboard.getGraph({
+                projectId: input.projectId,
+                graphId: input.id,
+              });
 
-          return graphs.map((graph) => {
-            const trigger = triggerByGraphId.get(graph.id) ?? null;
-            return {
-              ...legacyGraph(graph),
-              trigger: trigger
-                ? {
-                    ...trigger,
-                    actionParams: ports.redactActionParams(
-                      trigger.action,
-                      (trigger.actionParams ?? {}) as Record<string, unknown>,
-                    ),
+              // Basic validation to ensure filters have the expected structure: a
+              // stored graph can name a field the registry no longer offers.
+              let validatedFilters:
+                | Record<TFilterField, string[] | Record<string, string[]>>
+                | undefined;
+
+              if (graph.filters && typeof graph.filters === "object") {
+                const validFilters: Record<string, unknown> = {};
+
+                for (const [key, value] of Object.entries(graph.filters)) {
+                  if (
+                    ports.filterFieldSchema.safeParse(key).success &&
+                    (Array.isArray(value) || (typeof value === "object" && value !== null))
+                  ) {
+                    validFilters[key] = value;
                   }
-                : null,
-            };
-          });
-        },
-      ),
+                }
 
-      delete: policy("analytics:delete")(procedure.input(graphApiGraphInputSchema)).mutation(
-        async ({ ctx, input }) =>
-          legacyGraph(
-            await ctx.app.dashboard.deleteGraph({
-              projectId: input.projectId,
-              graphId: input.id,
-            }),
-          ),
-      ),
-
-      getById: policy("analytics:view")(procedure.input(graphApiGraphInputSchema)).query(
-        async ({ ctx, input }) => {
-          const graph = await ctx.app.dashboard.getGraph({
-            projectId: input.projectId,
-            graphId: input.id,
-          });
-
-          // Basic validation to ensure filters have the expected structure: a
-          // stored graph can name a field the registry no longer offers.
-          let validatedFilters:
-            | Record<TFilterField, string[] | Record<string, string[]>>
-            | undefined;
-
-          if (graph.filters && typeof graph.filters === "object") {
-            const validFilters: Record<string, unknown> = {};
-
-            for (const [key, value] of Object.entries(graph.filters)) {
-              if (
-                ports.filterFieldSchema.safeParse(key).success &&
-                (Array.isArray(value) || (typeof value === "object" && value !== null))
-              ) {
-                validFilters[key] = value;
+                validatedFilters =
+                  Object.keys(validFilters).length > 0
+                    ? (validFilters as Record<TFilterField, string[] | Record<string, string[]>>)
+                    : undefined;
               }
-            }
 
-            validatedFilters =
-              Object.keys(validFilters).length > 0
-                ? (validFilters as Record<TFilterField, string[] | Record<string, string[]>>)
-                : undefined;
-          }
+              const trigger = await ctx.app.dashboard.tryGetAlertForGraph({
+                customGraphId: input.id,
+                projectId: input.projectId,
+              });
 
-          const trigger = await ctx.app.dashboard.tryGetAlertForGraph({
-            customGraphId: input.id,
-            projectId: input.projectId,
-          });
+              let alertData = undefined;
+              if (trigger?.active && !trigger.deleted) {
+                const actionParams = trigger.actionParams as unknown as AlertActionParams & {
+                  threshold: number;
+                  operator: string;
+                  timePeriod: number;
+                };
+                // Through the same port the list runs: a Slack incoming-webhook URL
+                // is a bearer credential, and hand-picking fields off the raw
+                // trigger is how it reached the browser from this read alone.
+                const visibleParams = ports.redactActionParams(
+                  trigger.action,
+                  (trigger.actionParams ?? {}) as Record<string, unknown>,
+                );
+                alertData = {
+                  enabled: true as const,
+                  threshold: actionParams.threshold,
+                  operator: actionParams.operator,
+                  timePeriod: actionParams.timePeriod,
+                  seriesName: actionParams.seriesName || "",
+                  type: trigger.alertType,
+                  action: trigger.action,
+                  actionParams: {
+                    members: visibleParams.members as string[] | undefined,
+                    seriesName: actionParams.seriesName,
+                  },
+                  triggerId: trigger.id,
+                };
+              }
 
-          let alertData = undefined;
-          if (trigger?.active && !trigger.deleted) {
-            const actionParams = trigger.actionParams as unknown as AlertActionParams & {
-              threshold: number;
-              operator: string;
-              timePeriod: number;
-            };
-            // Through the same port the list runs: a Slack incoming-webhook URL
-            // is a bearer credential, and hand-picking fields off the raw
-            // trigger is how it reached the browser from this read alone.
-            const visibleParams = ports.redactActionParams(
-              trigger.action,
-              (trigger.actionParams ?? {}) as Record<string, unknown>,
-            );
-            alertData = {
-              enabled: true,
-              threshold: actionParams.threshold,
-              operator: actionParams.operator,
-              timePeriod: actionParams.timePeriod,
-              seriesName: actionParams.seriesName || "",
-              type: trigger.alertType,
-              action: trigger.action,
-              actionParams: {
-                members: visibleParams.members as string[] | undefined,
-                seriesName: actionParams.seriesName,
-              },
-              triggerId: trigger.id,
-            };
-          }
-
-          return { ...legacyGraph(graph), filters: validatedFilters, alert: alertData };
-        },
-      ),
-
-      updateById: policy("analytics:update")(procedure.input(graphApiUpdateInputSchema)).mutation(
-        async ({ ctx, input }) =>
-          legacyGraph(
-            await ctx.app.dashboard.updateGraph({
-              projectId: input.projectId,
-              graphId: input.graphId,
-              name: input.name,
-              graph: JSON.parse(input.graph) as Record<string, unknown>,
-              filters: input.filterParams?.filters ?? {},
+              return { ...legacyGraph(graph), filters: validatedFilters, alert: alertData };
             }),
-          ),
-      ),
-
-      updateLayout: policy("analytics:update")(
-        procedure.input(graphApiUpdateLayoutInputSchema),
-      ).mutation(async ({ ctx, input }) =>
-        legacyGraph(
-          await ctx.app.dashboard.updateGraphLayout({
-            projectId: input.projectId,
-            graphId: input.graphId,
-            layout: {
-              gridColumn: input.gridColumn,
-              gridRow: input.gridRow,
-              colSpan: input.colSpan,
-              rowSpan: input.rowSpan,
-            },
-          }),
-        ),
-      ),
-
-      batchUpdateLayouts: policy("analytics:update")(
-        procedure.input(graphApiBatchUpdateLayoutsInputSchema),
-      ).mutation(
-        async ({ ctx, input }) =>
-          await ctx.app.dashboard.batchUpdateGraphLayouts({
-            projectId: input.projectId,
-            layouts: input.layouts.map((layout) => ({
-              graphId: layout.graphId,
-              layout: {
-                gridColumn: layout.gridColumn,
-                gridRow: layout.gridRow,
-                colSpan: layout.colSpan,
-                rowSpan: layout.rowSpan,
-              },
-            })),
-          }),
-      ),
-    });
+        )
+        .mutation("updateById", (p) =>
+          p
+            .withInput(graphApiUpdateInputSchema)
+            .withOutput(legacyGraphSchema)
+            .withPermission("analytics:update")
+            .handle(async ({ ctx, input }) =>
+              legacyGraph(
+                await ctx.app.dashboard.updateGraph({
+                  projectId: input.projectId,
+                  graphId: input.graphId,
+                  name: input.name,
+                  graph: JSON.parse(input.graph) as Record<string, unknown>,
+                  filters: input.filterParams?.filters ?? {},
+                }),
+              ),
+            ),
+        )
+        .mutation("updateLayout", (p) =>
+          p
+            .withInput(graphApiUpdateLayoutInputSchema)
+            .withOutput(legacyGraphSchema)
+            .withPermission("analytics:update")
+            .handle(async ({ ctx, input }) =>
+              legacyGraph(
+                await ctx.app.dashboard.updateGraphLayout({
+                  projectId: input.projectId,
+                  graphId: input.graphId,
+                  layout: {
+                    gridColumn: input.gridColumn,
+                    gridRow: input.gridRow,
+                    colSpan: input.colSpan,
+                    rowSpan: input.rowSpan,
+                  },
+                }),
+              ),
+            ),
+        )
+        .mutation("batchUpdateLayouts", (p) =>
+          p
+            .withInput(graphApiBatchUpdateLayoutsInputSchema)
+            .withOutput(z.object({ success: z.literal(true) }))
+            .withPermission("analytics:update")
+            .handle(
+              async ({ ctx, input }) =>
+                await ctx.app.dashboard.batchUpdateGraphLayouts({
+                  projectId: input.projectId,
+                  layouts: input.layouts.map((layout) => ({
+                    graphId: layout.graphId,
+                    layout: {
+                      gridColumn: layout.gridColumn,
+                      gridRow: layout.gridRow,
+                      colSpan: layout.colSpan,
+                      rowSpan: layout.rowSpan,
+                    },
+                  })),
+                }),
+            ),
+        )
+        .build()
+    );
   }
 }

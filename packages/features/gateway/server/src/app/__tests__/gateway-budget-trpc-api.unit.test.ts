@@ -99,6 +99,7 @@ function callerFor(budgets: Array<Record<string, unknown>>) {
   const router = GatewayBudgetTrpcApi.create(trpc, {
     protected: trpc.procedure,
     policy: () => (procedure) => procedure,
+    validateOutput: true,
   });
 
   return router.createCaller({
@@ -132,7 +133,7 @@ beforeEach(() => {
       ],
       [
         `ATTRIBUTED_USER:${ANCHOR_PROJECT_ID}`,
-        { kind: "ATTRIBUTED_USER", id: ANCHOR_PROJECT_ID, name: "gateway-demo" },
+        { kind: "ATTRIBUTED_USER", id: ANCHOR_PROJECT_ID, name: "gateway-demo", secondary: null },
       ],
     ]),
   );

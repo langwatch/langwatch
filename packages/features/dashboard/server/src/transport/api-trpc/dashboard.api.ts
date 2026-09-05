@@ -22,7 +22,14 @@
  *
  * Spec: packages/features/dashboard/specs/dashboard-service.feature.
  */
+import { createTrpcService } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import {
+  dashboardReorderResponseSchema,
+  dashboardTrpcDetailSchema,
+  dashboardTrpcRowSchema,
+  dashboardTrpcSummarySchema,
+} from "@langwatch/dashboard-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { DashboardApp } from "#app/dashboard.app";
@@ -55,6 +62,8 @@ type DashboardTrpcProcedures<
    * check installed before `.input()` would see no input at all.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  /** Whether the chain checks every answer against its declared output schema. */
+  validateOutput: boolean;
 }>;
 
 const projectScopeSchema = z.object({ projectId: z.string() });
@@ -74,80 +83,112 @@ export class DashboardTrpcApi {
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: DashboardTrpcProcedures<TContext, TOptions, TRoot>,
   ) {
-    const { protected: procedure, policy } = procedures;
-
-    return trpc.router({
-      /**
-       * The card count is the `builder` scope because the detail read below
-       * returns builder graphs and nothing else: a list that counted the
-       * workbench charts too would promise cards the grid never draws.
-       *
-       * `_count.graphs` is the shape the pages have always read, kept here
-       * rather than pushed into the service, which speaks `graphCount`.
-       */
-      getAll: policy("analytics:view")(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) => {
-          const dashboards = await ctx.app.dashboard.getAll({
-            projectId: input.projectId,
-            graphCountScope: "builder",
-          });
-          return dashboards.map(({ graphCount, ...dashboard }) => ({
-            ...dashboard,
-            _count: { graphs: graphCount },
-          }));
-        },
-      ),
-
-      getById: policy("analytics:view")(procedure.input(dashboardScopeSchema)).query(
-        async ({ ctx, input }) =>
-          await ctx.app.dashboard.getById({
-            projectId: input.projectId,
-            dashboardId: input.dashboardId,
-          }),
-      ),
-
-      create: policy("analytics:create")(
-        procedure.input(projectScopeSchema.extend({ name: z.string() })),
-      ).mutation(
-        async ({ ctx, input }) =>
-          await ctx.app.dashboard.create({ projectId: input.projectId, name: input.name }),
-      ),
-
-      rename: policy("analytics:update")(
-        procedure.input(dashboardScopeSchema.extend({ name: z.string() })),
-      ).mutation(
-        async ({ ctx, input }) =>
-          await ctx.app.dashboard.rename({
-            projectId: input.projectId,
-            dashboardId: input.dashboardId,
-            name: input.name,
-          }),
-      ),
-
-      /** Cascades to the dashboard's graphs. */
-      delete: policy("analytics:delete")(procedure.input(dashboardScopeSchema)).mutation(
-        async ({ ctx, input }) =>
-          await ctx.app.dashboard.delete({
-            projectId: input.projectId,
-            dashboardId: input.dashboardId,
-          }),
-      ),
-
-      reorderDashboards: policy("analytics:update")(
-        procedure.input(projectScopeSchema.extend({ dashboardIds: z.array(z.string()) })),
-      ).mutation(
-        async ({ ctx, input }) =>
-          await ctx.app.dashboard.reorder({
-            projectId: input.projectId,
-            dashboardIds: input.dashboardIds,
-          }),
-      ),
-
-      /** Every project has at least one dashboard once this has been asked. */
-      getOrCreateFirst: policy("analytics:view")(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) =>
-          await ctx.app.dashboard.getOrCreateFirst({ projectId: input.projectId }),
-      ),
-    });
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures,
+        validateOutput: procedures.validateOutput,
+      })
+        /**
+         * The card count is the `builder` scope because the detail read below
+         * returns builder graphs and nothing else: a list that counted the
+         * workbench charts too would promise cards the grid never draws.
+         *
+         * `_count.graphs` is the shape the pages have always read, kept here
+         * rather than pushed into the service, which speaks `graphCount`.
+         */
+        .query("getAll", (p) =>
+          p
+            .withInput(projectScopeSchema)
+            .withOutput(z.array(dashboardTrpcSummarySchema))
+            .withPermission("analytics:view")
+            .handle(async ({ ctx, input }) => {
+              const dashboards = await ctx.app.dashboard.getAll({
+                projectId: input.projectId,
+                graphCountScope: "builder",
+              });
+              return dashboards.map(({ graphCount, ...dashboard }) => ({
+                ...dashboard,
+                _count: { graphs: graphCount },
+              }));
+            }),
+        )
+        .query("getById", (p) =>
+          p
+            .withInput(dashboardScopeSchema)
+            .withOutput(dashboardTrpcDetailSchema)
+            .withPermission("analytics:view")
+            .handle(
+              async ({ ctx, input }) =>
+                await ctx.app.dashboard.getById({
+                  projectId: input.projectId,
+                  dashboardId: input.dashboardId,
+                }),
+            ),
+        )
+        .mutation("create", (p) =>
+          p
+            .withInput(projectScopeSchema.extend({ name: z.string() }))
+            .withOutput(dashboardTrpcRowSchema)
+            .withPermission("analytics:create")
+            .handle(
+              async ({ ctx, input }) =>
+                await ctx.app.dashboard.create({ projectId: input.projectId, name: input.name }),
+            ),
+        )
+        .mutation("rename", (p) =>
+          p
+            .withInput(dashboardScopeSchema.extend({ name: z.string() }))
+            .withOutput(dashboardTrpcRowSchema)
+            .withPermission("analytics:update")
+            .handle(
+              async ({ ctx, input }) =>
+                await ctx.app.dashboard.rename({
+                  projectId: input.projectId,
+                  dashboardId: input.dashboardId,
+                  name: input.name,
+                }),
+            ),
+        )
+        /** Cascades to the dashboard's graphs. */
+        .mutation("delete", (p) =>
+          p
+            .withInput(dashboardScopeSchema)
+            .withOutput(dashboardTrpcRowSchema)
+            .withPermission("analytics:delete")
+            .handle(
+              async ({ ctx, input }) =>
+                await ctx.app.dashboard.delete({
+                  projectId: input.projectId,
+                  dashboardId: input.dashboardId,
+                }),
+            ),
+        )
+        .mutation("reorderDashboards", (p) =>
+          p
+            .withInput(projectScopeSchema.extend({ dashboardIds: z.array(z.string()) }))
+            .withOutput(dashboardReorderResponseSchema)
+            .withPermission("analytics:update")
+            .handle(
+              async ({ ctx, input }) =>
+                await ctx.app.dashboard.reorder({
+                  projectId: input.projectId,
+                  dashboardIds: input.dashboardIds,
+                }),
+            ),
+        )
+        /** Every project has at least one dashboard once this has been asked. */
+        .query("getOrCreateFirst", (p) =>
+          p
+            .withInput(projectScopeSchema)
+            .withOutput(dashboardTrpcRowSchema)
+            .withPermission("analytics:view")
+            .handle(
+              async ({ ctx, input }) =>
+                await ctx.app.dashboard.getOrCreateFirst({ projectId: input.projectId }),
+            ),
+        )
+        .build()
+    );
   }
 }

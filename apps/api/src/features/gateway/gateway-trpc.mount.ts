@@ -78,6 +78,7 @@ export function createGatewayTrpcRouters<
   const resolverAuthorized = {
     protected: service.protected,
     resolverAuthorizedPolicy: service.serviceAuthorized,
+    validateOutput: service.validateOutput,
   };
 
   return {

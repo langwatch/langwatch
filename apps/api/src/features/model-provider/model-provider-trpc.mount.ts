@@ -78,6 +78,7 @@ export function createModelProviderTrpcRouter<
       tenantWritePolicy: (permission) => service.custom(mount.checks.tenantWrite(permission)),
       credentialProbePolicy: service.custom(mount.checks.credentialProbe),
       serviceAuthorizedPolicy: (options) => service.serviceAuthorized(options),
+      validateOutput: service.validateOutput,
     },
     mount.ports,
   );
@@ -106,6 +107,7 @@ export function createLlmModelCostTrpcRouter<
           permissions: ["project:update", "team:manage", "organization:manage"],
           enforces,
         }),
+      validateOutput: service.validateOutput,
     },
     mount.ports,
   );
