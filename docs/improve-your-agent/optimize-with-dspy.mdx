@@ -2,12 +2,12 @@
 title: Optimize with DSPy Using Scenarios as the Metric
 sidebarTitle: Optimize with DSPy
 keywords: langwatch, dspy, gepa, miprov2, prompt optimization, tool optimization, agent optimization, scenarios, metric, optimizer
-description: Use your scenario suite as the metric of a DSPy optimizer, so it scores every candidate on full multi-turn conversations with your agent, on the cases that matter to you.
+description: Scores every candidate on full multi-turn conversations with your agent, running the agent improvement loop automatically with DSPy algorithms.
 ---
 
 Writing a metric for an agent is hard, because a reply has no single expected output to compare against.
 
-Your scenario suite is already that metric: it runs the whole conversation with a simulated user and judges it on the criteria you wrote, so the optimizer runs the [improvement loop](/improve-your-agent/overview) for you, one candidate after another, against the same suite you use as the quality gate.
+Your scenario suite is already that metric: it runs the whole conversation with a simulated user and judges it on the criteria you wrote, so the optimizer runs the [improvement loop](/improve-your-agent/overview) one candidate after another, against the same suite you use as the quality gate.
 
 To run a DSPy optimizer you give it a program and a metric. The program is a `dspy.ReAct` module, whose instructions contain every tool description, so rewriting the instructions rewrites the tool descriptions too.
 
