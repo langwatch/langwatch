@@ -1,4 +1,5 @@
 export {
+  activeTraceContext,
   HandledError,
   NotFoundError,
   ValidationError,

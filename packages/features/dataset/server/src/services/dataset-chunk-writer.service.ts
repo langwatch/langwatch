@@ -16,7 +16,7 @@ import {
   type ChunkMeta,
   chunkedMeta,
   chunkMetaOf,
-} from "./dataset-chunking.service";
+} from "../rules/dataset-chunking.rules";
 import type { DatasetStorage } from "../ports/dataset-storage.port";
 
 /**
@@ -31,7 +31,15 @@ import type { DatasetStorage } from "../ports/dataset-storage.port";
  * id is assigned per-record here so this stays streaming (never builds an
  * in-memory array of the whole source).
  */
-export class StreamingChunkWriter {
+export class StreamingChunkWriterService {
+  static create(deps: {
+    storage: DatasetStorage;
+    projectId: string;
+    datasetId: string;
+  }): StreamingChunkWriterService {
+    return new StreamingChunkWriterService(deps);
+  }
+
   private buffer: unknown[] = [];
   private bufferBytes = 0;
   private nextIndex = 0;
@@ -52,7 +60,7 @@ export class StreamingChunkWriter {
    */
   private readonly chunkMetas: ChunkMeta[] = [];
 
-  constructor(
+  private constructor(
     private readonly deps: {
       storage: DatasetStorage;
       projectId: string;

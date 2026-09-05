@@ -13,11 +13,11 @@ export interface LangyResourceLinkStore {
   resolve(input: { conversationId: string; id: string }): Promise<string | null>;
 }
 
-export class LangyResourceLinksStore implements LangyResourceLinkStore {
+export class LangyResourceLinksAdapter implements LangyResourceLinkStore {
   private constructor(private readonly redis: LangyLinkRedis) {}
 
-  static create(options: { redis: LangyLinkRedis }): LangyResourceLinksStore {
-    return new LangyResourceLinksStore(options.redis);
+  static create(options: { redis: LangyLinkRedis }): LangyResourceLinksAdapter {
+    return new LangyResourceLinksAdapter(options.redis);
   }
 
   async remember(input: {

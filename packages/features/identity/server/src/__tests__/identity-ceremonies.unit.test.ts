@@ -1,6 +1,6 @@
 import { IdentityPrimaryMustDemoteFirstError } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
-import { IdentityCeremonies } from "../adapters/better-auth.identity-ceremonies.adapter";
+import { IdentityCeremoniesAdapter } from "../adapters/better-auth.identity-ceremonies.adapter";
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository";
 import { fact, InMemoryHeads, T0, USER } from "./support/in-memory-heads";
 
@@ -43,7 +43,7 @@ function harness(options?: {
     eraseUser: vi.fn(async () => []),
   };
   let minted = 0;
-  const ceremonies = new IdentityCeremonies(
+  const ceremonies = IdentityCeremoniesAdapter.create(
     heads,
     users,
     identity as never,

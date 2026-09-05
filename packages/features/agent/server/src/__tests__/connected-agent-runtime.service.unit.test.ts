@@ -6,11 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CALL_ENVELOPE_KEYS, RESULT_TTL_SECONDS } from "@langwatch/agent-contract";
 
-import {
-  buildCallEnvelope,
-  type StoredResult,
-  storedCallSchema,
-} from "../services/connected-agent-envelope.service";
+import { buildCallEnvelope, type StoredResult, storedCallSchema } from "@langwatch/agent-contract";
 import type { InstanceMeta } from "../ports/connected-agent-runtime.port";
 import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter";
 import {

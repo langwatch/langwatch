@@ -1,7 +1,7 @@
 import type { DataPrivacyPolicy, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
 import type { DataPrivacyProjectPort } from "../ports/data-privacy.port";
 import type { DataPrivacyPolicyRepository } from "../repositories/data-privacy.repository";
-import { DataPrivacyPolicyCache } from "./data-privacy-cache.service";
+import { DataPrivacyPolicyCacheService } from "./data-privacy-cache.service";
 
 /**
  * The policy a scope resolves to, and the two reads that support it. Three operations that
@@ -10,20 +10,21 @@ import { DataPrivacyPolicyCache } from "./data-privacy-cache.service";
 export class DataPrivacyResolutionService {
   private constructor(
     private readonly repository: DataPrivacyPolicyRepository,
-    private readonly cache: DataPrivacyPolicyCache,
+    private readonly cache: DataPrivacyPolicyCacheService,
     private readonly projects: DataPrivacyProjectPort,
   ) {}
 
   static create(options: {
     repository: DataPrivacyPolicyRepository;
     projects: DataPrivacyProjectPort;
-    cache?: DataPrivacyPolicyCache;
+    cache?: DataPrivacyPolicyCacheService;
     ttlMs?: number;
     now?: () => number;
   }): DataPrivacyResolutionService {
     return new DataPrivacyResolutionService(
       options.repository,
-      options.cache ?? new DataPrivacyPolicyCache(options.repository, options.ttlMs, options.now),
+      options.cache ??
+        DataPrivacyPolicyCacheService.create(options.repository, options.ttlMs, options.now),
       options.projects,
     );
   }

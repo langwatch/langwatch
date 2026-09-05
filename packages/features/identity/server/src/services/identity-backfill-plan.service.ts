@@ -4,7 +4,7 @@ import {
   identifierProviderFor,
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
-import { deriveIdentifierId } from "../adapters/crypto.identifier-identity.adapter";
+import type { IdentifierIdentityPort } from "../ports/identifier-identity.port";
 import type {
   BackfillAccountRow,
   BackfillUserRow,
@@ -49,54 +49,62 @@ export type PlannedIdentifier = ExpectedIdentifier & {
  * in (R8). Business time is each row's own `createdAt`, so live emission of
  * the same fact derives the same identifier id.
  */
-export function planIdentifiers({
-  user,
-  accounts,
-}: {
-  user: BackfillUserRow & { email: string };
-  accounts: BackfillAccountRow[];
-}): PlannedIdentifier[] {
-  const normalizedValue = normalizeIdentifierValue(user.email);
-  const planned = [
-    {
-      provider: "email" as const,
-      providerId: null,
-      issuer: null,
-      providerAccountId: null,
-      accountId: null,
-      occurredAtMs: user.createdAtMs,
-      commandId: adoptUserEmailCommandId({ userId: user.id }),
-      value: normalizedValue,
-      expectedState: user.emailVerified ? ("VERIFIED" as const) : ("ATTACHED" as const),
-    },
-    ...accounts.map((account) => {
-      const provider = identifierProviderFor(account.provider);
+export class IdentityBackfillPlanService {
+  static create(identifiers: IdentifierIdentityPort): IdentityBackfillPlanService {
+    return new IdentityBackfillPlanService(identifiers);
+  }
 
-      return {
-        provider,
-        providerId: account.provider,
-        // The row's own issuer, adopted rather than re-derived. Deriving it
-        // here would overwrite a real OIDC issuer with a synthetic one and
-        // re-key the very account the adoption is supposed to preserve.
-        issuer: account.issuer,
-        providerAccountId: account.providerAccountId,
-        accountId: account.id,
-        occurredAtMs: account.createdAtMs,
-        commandId: adoptAccountCommandId({ accountId: account.id }),
+  private constructor(private readonly identifiers: IdentifierIdentityPort) {}
+
+  planIdentifiers({
+    user,
+    accounts,
+  }: {
+    user: BackfillUserRow & { email: string };
+    accounts: BackfillAccountRow[];
+  }): PlannedIdentifier[] {
+    const normalizedValue = normalizeIdentifierValue(user.email);
+    const planned = [
+      {
+        provider: "email" as const,
+        providerId: null,
+        issuer: null,
+        providerAccountId: null,
+        accountId: null,
+        occurredAtMs: user.createdAtMs,
+        commandId: adoptUserEmailCommandId({ userId: user.id }),
         value: normalizedValue,
-        expectedState: arrivalStateForProvider(provider),
-      };
-    }),
-  ];
+        expectedState: user.emailVerified ? ("VERIFIED" as const) : ("ATTACHED" as const),
+      },
+      ...accounts.map((account) => {
+        const provider = identifierProviderFor(account.provider);
 
-  return planned.map((plan) => ({
-    ...plan,
-    identifierId: deriveIdentifierId({
-      userId: user.id,
-      provider: plan.provider,
-      providerAccountId: plan.providerAccountId,
-      normalizedValue,
-      occurredAtMs: plan.occurredAtMs,
-    }),
-  }));
+        return {
+          provider,
+          providerId: account.provider,
+          // The row's own issuer, adopted rather than re-derived. Deriving it
+          // here would overwrite a real OIDC issuer with a synthetic one and
+          // re-key the very account the adoption is supposed to preserve.
+          issuer: account.issuer,
+          providerAccountId: account.providerAccountId,
+          accountId: account.id,
+          occurredAtMs: account.createdAtMs,
+          commandId: adoptAccountCommandId({ accountId: account.id }),
+          value: normalizedValue,
+          expectedState: arrivalStateForProvider(provider),
+        };
+      }),
+    ];
+
+    return planned.map((plan) => ({
+      ...plan,
+      identifierId: this.identifiers.deriveIdentifierId({
+        userId: user.id,
+        provider: plan.provider,
+        providerAccountId: plan.providerAccountId,
+        normalizedValue,
+        occurredAtMs: plan.occurredAtMs,
+      }),
+    }));
+  }
 }

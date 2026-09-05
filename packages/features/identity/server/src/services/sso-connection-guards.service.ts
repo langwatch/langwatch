@@ -45,7 +45,7 @@ import {
   type VerifyDomainCommandData,
 } from "@langwatch/identity-contract";
 import {
-  SsoConnectionGuardChecks,
+  SsoConnectionGuardChecksService,
   type SsoConnectionGuardsDeps,
 } from "./sso-connection-guard-checks.service";
 import { grandfatheredConnectionFacts } from "../rules/sso-connection-grandfather-facts.rules";
@@ -66,11 +66,15 @@ import { grandfatheredConnectionFacts } from "../rules/sso-connection-grandfathe
  * Facts come back without their envelope; the ledger stamps business time,
  * tenancy and idempotency from the command that produced them.
  */
-export class SsoConnectionGuards {
-  private readonly checks: SsoConnectionGuardChecks;
+export class SsoConnectionGuardsService {
+  static create(deps: SsoConnectionGuardsDeps): SsoConnectionGuardsService {
+    return new SsoConnectionGuardsService(deps);
+  }
 
-  constructor(deps: SsoConnectionGuardsDeps) {
-    this.checks = new SsoConnectionGuardChecks(deps);
+  private readonly checks: SsoConnectionGuardChecksService;
+
+  private constructor(deps: SsoConnectionGuardsDeps) {
+    this.checks = SsoConnectionGuardChecksService.create(deps);
   }
 
   async registerConnection(data: RegisterConnectionCommandData): Promise<SsoConnectionFactInput[]> {

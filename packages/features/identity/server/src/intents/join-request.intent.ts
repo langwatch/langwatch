@@ -16,7 +16,7 @@ import {
   type WithdrawJoinCommandData,
   withdrawJoinCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { JoinRequestGuards } from "../services/join-request-guards.service";
+import type { JoinRequestGuardsService } from "../services/join-request-guards.service";
 import type { ZodTypeAny, z } from "zod";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import { JoinRequestStateFoldProjection } from "../projections/join-request-state.projection";
@@ -29,10 +29,12 @@ import type { JoinRequestEvent } from "../projections/join-request-state.project
  */
 
 type GuardVerb = {
-  [K in keyof JoinRequestGuards]: JoinRequestGuards[K] extends (data: never) => Promise<unknown>
+  [K in keyof JoinRequestGuardsService]: JoinRequestGuardsService[K] extends (
+    data: never,
+  ) => Promise<unknown>
     ? K
     : never;
-}[keyof JoinRequestGuards];
+}[keyof JoinRequestGuardsService];
 
 function joinRequestCommand<Schema extends ZodTypeAny>({
   type,
@@ -58,7 +60,7 @@ function joinRequestCommand<Schema extends ZodTypeAny>({
       return payload.joinRequestId;
     }
 
-    constructor(private readonly guards: JoinRequestGuards) {}
+    constructor(private readonly guards: JoinRequestGuardsService) {}
 
     async handle(command: Command<Data>): Promise<JoinRequestEvent[]> {
       const data = command.data as never;

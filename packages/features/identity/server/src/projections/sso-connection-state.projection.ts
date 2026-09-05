@@ -316,7 +316,7 @@ export class SsoConnectionStateFoldProjection
 
   /**
    * The ONE place a connection fact becomes a framework event: the guards
-   * (`SsoConnectionGuards`) decide what a command states, and this stamps the
+   * (`SsoConnectionGuardsService`) decide what a command states, and this stamps the
    * envelope, so every producer stamps a fact identically.
    */
   static eventsFor({

@@ -41,7 +41,7 @@
 
 import { createFeatureApi } from "@langwatch/platform-api-client";
 import type { CodingAgentUsageTotals } from "@langwatch/coding-agent-contract";
-import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
+import type { AiToolEntry } from "../model/ai-tool-catalog";
 
 /** An acknowledgement, for the writes whose only answer is that they happened. */
 export type PersonalAcknowledgement = { ok: boolean };

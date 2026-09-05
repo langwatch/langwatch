@@ -7,7 +7,7 @@ import {
   type JoinRequestState,
 } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
-import { JoinRequestGuards } from "../services/join-request-guards.service";
+import { JoinRequestGuardsService } from "../services/join-request-guards.service";
 import type { JoinRequestReadRepository } from "../repositories/join-request.repository";
 
 /**
@@ -59,11 +59,11 @@ const command = {
 
 describe("given nobody has asked yet", () => {
   let requests: FakeRequests;
-  let guards: JoinRequestGuards;
+  let guards: JoinRequestGuardsService;
 
   beforeEach(() => {
     requests = new FakeRequests();
-    guards = new JoinRequestGuards({ requests });
+    guards = JoinRequestGuardsService.create({ requests });
   });
 
   describe("when somebody asks on a company domain", () => {
@@ -138,12 +138,12 @@ describe("given nobody has asked yet", () => {
 
 describe("given a pending request", () => {
   let requests: FakeRequests;
-  let guards: JoinRequestGuards;
+  let guards: JoinRequestGuardsService;
 
   beforeEach(() => {
     requests = new FakeRequests();
     requests.held = stateIn("PENDING");
-    guards = new JoinRequestGuards({ requests });
+    guards = JoinRequestGuardsService.create({ requests });
   });
 
   describe("when an administrator approves it", () => {
@@ -193,7 +193,7 @@ describe("given a request that already ended", () => {
       for (const ended of ["REJECTED", "EXPIRED", "WITHDRAWN"] as const) {
         const requests = new FakeRequests();
         requests.held = stateIn(ended);
-        const guards = new JoinRequestGuards({ requests });
+        const guards = JoinRequestGuardsService.create({ requests });
 
         await expect(
           guards.approveJoin({
@@ -216,7 +216,7 @@ describe("given a request that already ended", () => {
     it("expires nothing rather than refusing, because no person is waiting", async () => {
       const requests = new FakeRequests();
       requests.held = stateIn("APPROVED");
-      const guards = new JoinRequestGuards({ requests });
+      const guards = JoinRequestGuardsService.create({ requests });
 
       // A wake is not somebody to refuse: the request ended by another route
       // and there is nothing left to do.
@@ -234,7 +234,7 @@ describe("given an approval that already landed", () => {
         resolvedByType: "user",
         resolvedById: "user_ana",
       });
-      const guards = new JoinRequestGuards({ requests });
+      const guards = JoinRequestGuardsService.create({ requests });
 
       // The retry leg. The membership attach behind it is idempotent too, so
       // a retry after a partial failure finishes the job rather than leaving
@@ -255,7 +255,7 @@ describe("given an approval that already landed", () => {
         resolvedByType: "user",
         resolvedById: "user_ana",
       });
-      const guards = new JoinRequestGuards({ requests });
+      const guards = JoinRequestGuardsService.create({ requests });
 
       await expect(
         guards.approveJoin({

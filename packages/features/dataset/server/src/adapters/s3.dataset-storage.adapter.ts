@@ -35,7 +35,7 @@ import {
   parseJsonl,
   toJsonlChunks,
   toSingleJsonl,
-} from "../services/dataset-chunking.service";
+} from "../rules/dataset-chunking.rules";
 import type {
   DatasetStorage,
   PresignedUpload,
@@ -47,7 +47,7 @@ import {
   MissingChunkError,
   StagedUploadNotFoundError,
 } from "@langwatch/dataset-contract";
-import { stagingUploadKey, UPLOAD_TTL_SECONDS } from "../services/presigned-upload.service";
+import { stagingUploadKey, UPLOAD_TTL_SECONDS } from "../rules/presigned-upload.rules";
 
 export class S3DatasetStorageAdapter implements DatasetStorage {
   static create(resolver: DatasetS3ClientResolver): S3DatasetStorageAdapter {

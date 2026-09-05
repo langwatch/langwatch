@@ -1,4 +1,4 @@
-import { reportNurturingFailure, tryNurturingSink } from "../adapters/nurturing-sink.adapter";
+import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -48,7 +48,7 @@ export class NurturingActivityTrackingService {
     /** When false, the user hasn't completed onboarding yet — skip identify to avoid ghost people in Customer.io. */
     hasOrganization?: boolean;
   }): void {
-    const nurturing = tryNurturingSink();
+    const nurturing = NurturingSinkRegistryService.trySink();
     if (!nurturing) {
       return;
     }
@@ -74,7 +74,7 @@ export class NurturingActivityTrackingService {
       })
       .catch((error) => {
         lastActivitySentAt.delete(userId);
-        reportNurturingFailure(error);
+        NurturingSinkRegistryService.reportFailure(error);
       });
   }
 

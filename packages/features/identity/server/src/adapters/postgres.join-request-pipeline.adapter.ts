@@ -1,4 +1,4 @@
-import { JoinRequestGuards } from "../services/join-request-guards.service";
+import { JoinRequestGuardsService } from "../services/join-request-guards.service";
 import type { JoinRequestMailPort } from "../ports/join-request-mail.port";
 import { JoinRequestService } from "../services/join-request.service";
 import { PostgresJoinRequestNotificationAdapter } from "./postgres.join-request-notification.adapter";
@@ -48,9 +48,9 @@ export class PostgresJoinRequestPipelineAdapter {
     const { database, eventSourcing, mail } = this.options;
     const head = new PrismaJoinRequestProjectionRepository(database);
     const reads = new PrismaJoinRequestReadRepository(database);
-    const guards = new JoinRequestGuards({ requests: reads });
+    const guards = JoinRequestGuardsService.create({ requests: reads });
 
-    const requests = new JoinRequestService(
+    const requests = JoinRequestService.create(
       guards,
       EventingJoinRequestLedgerAdapter.create({
         projectionStore: head,

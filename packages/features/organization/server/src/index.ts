@@ -39,10 +39,9 @@ export {
   isTeamRoleAllowedForOrganizationRole,
   ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
-} from "./services/member-role-constraints.service";
+} from "./rules/member-role-constraints.rules";
 export {
-  assertNoPersonalTeamScope,
-  assertPersonalTeamScopesOwnedBy,
+  PersonalTeamScopeService,
   type PersonalTeamScopeReader,
   type RoleBindingScope,
 } from "./services/personal-team-scope.service";
@@ -132,21 +131,8 @@ export {
   type InviteDisplayStatus,
 } from "./rules/invite-display-status.rules";
 export {
-  AlreadyOrganizationMemberError,
-  DuplicateInviteError,
-  INVITE_ALREADY_ACCEPTED_MESSAGE,
-  INVITE_NOT_READY_MESSAGE,
-  InviteExpiredError,
-  InviteNotFoundError,
-  InviteNotReadyError,
-  InviteThrottledError,
-  InviteWrongAccountError,
-  OrganizationNotFoundError,
-  TeamNotInOrganizationError,
-} from "./services/invite-errors.service";
-export {
   LITE_MEMBER_VIEWER_ONLY_ERROR,
-  computeEffectiveTeamRoleUpdates,
+  EffectiveTeamRoleUpdatesService,
   type CurrentTeamMembership,
   type EffectiveTeamRoleUpdate,
   type TeamRoleUpdate,

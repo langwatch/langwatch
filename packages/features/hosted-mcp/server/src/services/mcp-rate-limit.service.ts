@@ -17,7 +17,11 @@ export class McpRateLimitService {
   private readonly windowMs: number;
   private readonly maxRequests: number;
 
-  constructor({ windowMs, maxRequests }: { windowMs: number; maxRequests: number }) {
+  static create(budget: { windowMs: number; maxRequests: number }): McpRateLimitService {
+    return new McpRateLimitService(budget);
+  }
+
+  private constructor({ windowMs, maxRequests }: { windowMs: number; maxRequests: number }) {
     this.windowMs = windowMs;
     this.maxRequests = maxRequests;
   }

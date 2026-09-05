@@ -8,12 +8,8 @@
  * browser package may not import a server one even for a type, so the Langy
  * dock could not name the entries it decodes.
  *
- * DECLARED HERE, AND THE SERVER'S OWN COPY STILL STANDS. Repointing the token
- * buffer at this module is a `packages/features/langy/server` edit, which the
- * slice that moved the dock was not allowed to make; until someone does, the
- * two declarations must be kept in step by hand, exactly as
- * `@langwatch/enterprise-billing-contract` says of its Prisma enum copies. The
- * server's is `streaming/langy-token-buffer.ts`.
+ * THE ONLY DECLARATION. The server's token-buffer port imports it from here,
+ * so the two ends of the wire cannot drift.
  *
  * `delta` carries buffered tokens; `status`/`progress` are ephemeral live-only
  * ticks; `milestone` mirrors a durable milestone to the live UI (the durable

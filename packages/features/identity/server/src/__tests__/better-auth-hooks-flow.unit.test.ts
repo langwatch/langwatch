@@ -8,8 +8,8 @@ import type { BetterAuthOptions } from "better-auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { beforeEach, describe, expect, it } from "vitest";
-import { IdentityCeremonies } from "../adapters/better-auth.identity-ceremonies.adapter";
-import { IdentityGuards } from "../services/identity-guards.service";
+import { IdentityCeremoniesAdapter } from "../adapters/better-auth.identity-ceremonies.adapter";
+import { IdentityGuardsService } from "../services/identity-guards.service";
 import { newIdentityCommandId } from "../rules/identity-command-id.rules";
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository";
 import { IdentityService } from "../services/identity.service";
@@ -19,6 +19,7 @@ import {
 } from "./support/in-memory-event-store";
 import { InMemoryHeads, T0 } from "./support/in-memory-heads";
 import { InMemoryReservations } from "./support/in-memory-reservations";
+import { CryptoIdentifierIdentityAdapter } from "../adapters/crypto.identifier-identity.adapter";
 
 type MemoryDB = Record<string, Record<string, unknown>[]>;
 
@@ -51,14 +52,25 @@ function harness() {
     },
   };
 
-  const identity = new IdentityService(
-    new IdentityGuards(heads, users, new InMemoryReservations()),
+  const identity = IdentityService.create(
+    IdentityGuardsService.create(
+      heads,
+      users,
+      new InMemoryReservations(),
+      CryptoIdentifierIdentityAdapter.create(),
+    ),
     ledger,
   );
-  const ceremonies = new IdentityCeremonies(heads, users, identity, async () => gateOpen.value, {
-    now: () => T0,
-    newCommandId: newIdentityCommandId,
-  });
+  const ceremonies = IdentityCeremoniesAdapter.create(
+    heads,
+    users,
+    identity,
+    async () => gateOpen.value,
+    {
+      now: () => T0,
+      newCommandId: newIdentityCommandId,
+    },
+  );
 
   const auth = betterAuth({
     baseURL: "http://localhost:3000",

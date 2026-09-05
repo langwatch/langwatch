@@ -61,10 +61,14 @@ export interface JoinRequestGuardsDeps {
   requests: JoinRequestReadRepository;
 }
 
-export class JoinRequestGuards {
+export class JoinRequestGuardsService {
+  static create(deps: JoinRequestGuardsDeps): JoinRequestGuardsService {
+    return new JoinRequestGuardsService(deps);
+  }
+
   private readonly requests: JoinRequestReadRepository;
 
-  constructor(deps: JoinRequestGuardsDeps) {
+  private constructor(deps: JoinRequestGuardsDeps) {
     this.requests = deps.requests;
   }
 

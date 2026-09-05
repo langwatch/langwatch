@@ -1,6 +1,12 @@
 import { TRPCClientError, type TRPCClientErrorLike } from "@trpc/client";
 import type { AppRouter } from "./studio-host/api";
-import type { LimitType } from "@langwatch/enterprise-licensing-contract";
+
+/**
+ * The seat levers a licence caps, written out here rather than imported from
+ * `@langwatch/enterprise-licensing-contract`: this package is core and may not
+ * depend on enterprise. `limitTypes` in that contract is the source of truth.
+ */
+type LimitType = "members" | "membersLite";
 
 export const isNotFound = (error: TRPCClientErrorLike<AppRouter> | null) => {
   if (error && error instanceof TRPCClientError && error.data?.httpStatus === 404) {

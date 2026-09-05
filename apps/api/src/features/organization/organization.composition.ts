@@ -25,37 +25,39 @@ import {
 } from "@langwatch/entitlement-server";
 import { HandledError } from "@langwatch/handled-error";
 import {
-  EmailJoinRequestNotifier,
+  EmailJoinRequestNotifierAdapter,
   IdentityEventingPort,
-  JoinRequestGuards,
+  JoinRequestGuardsService,
   JoinRequestLedgerWriterAdapter,
   JoinRequestService,
   JoinRequestsService,
   PostgresIdentityEmailAdapter,
   PrismaJoinCandidateRepository,
-  PrismaJoinMembership,
+  PrismaJoinMembershipAdapter,
   PrismaJoinRequestProjectionRepository,
   PrismaJoinRequestReadRepository,
-  PrismaJoinSettings,
+  PrismaJoinSettingsAdapter,
 } from "@langwatch/identity-server";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import {
+  INVITE_ALREADY_ACCEPTED_MESSAGE,
+  INVITE_NOT_READY_MESSAGE,
+  InviteExpiredError,
+  InviteNotFoundError,
+  InviteWrongAccountError,
+  OrganizationNotFoundError,
+  type OrganizationService,
+} from "@langwatch/organization-contract";
 import {
   LITE_MEMBER_VIEWER_ONLY_ERROR,
   MemberSeatLimitReachedError,
-  OrganizationNotFoundError,
-  assertNoPersonalTeamScope,
+  PersonalTeamScopeService,
   PostgresPersonalTeamScopeAdapter,
   buildInviteAcceptUrl,
   isCustomRole,
   isTeamRoleAllowedForOrganizationRole,
   OrganizationMembershipService,
   resolveInviteDisplayStatus,
-  InviteExpiredError,
-  InviteNotFoundError,
-  InviteWrongAccountError,
-  INVITE_ALREADY_ACCEPTED_MESSAGE,
-  INVITE_NOT_READY_MESSAGE,
   OrganizationApp,
   OrganizationGrantCachePort,
   OrganizationPromptSeedPort,
@@ -405,8 +407,9 @@ function organizationPorts(
         ),
       ),
     assertNoPersonalTeamScope: async (_ctx, { teamId }) => {
-      await assertNoPersonalTeamScope({
-        reader: PostgresPersonalTeamScopeAdapter.create({ database: prisma }),
+      await PersonalTeamScopeService.create(
+        PostgresPersonalTeamScopeAdapter.create({ database: prisma }),
+      ).assertNoPersonalTeamScope({
         scopes: [{ scopeType: RoleBindingScopeType.TEAM, scopeId: teamId }],
       });
     },
@@ -714,8 +717,8 @@ function composeMembershipHalf(options: {
   }
 
   const joinRequests = JoinRequestsService.create({
-    requests: new JoinRequestService(
-      new JoinRequestGuards({ requests: new PrismaJoinRequestReadRepository(prisma) }),
+    requests: JoinRequestService.create(
+      JoinRequestGuardsService.create({ requests: new PrismaJoinRequestReadRepository(prisma) }),
       JoinRequestLedgerWriterAdapter.create({
         projectionStore: new PrismaJoinRequestProjectionRepository(prisma),
         eventing,
@@ -723,9 +726,9 @@ function composeMembershipHalf(options: {
     ),
     reads: new PrismaJoinRequestReadRepository(prisma),
     candidates: new PrismaJoinCandidateRepository(prisma),
-    membership: new PrismaJoinMembership(prisma, grants),
+    membership: PrismaJoinMembershipAdapter.create(prisma, grants),
     notifier: mail
-      ? new EmailJoinRequestNotifier(prisma, mail)
+      ? EmailJoinRequestNotifierAdapter.create(prisma, mail)
       : {
           // Fire-and-forget by construction: a request that could not be
           // announced is still recorded, and the admin finds it on the members
@@ -737,7 +740,7 @@ function composeMembershipHalf(options: {
           requestExpired: async () => notifyNothing("a join request expired"),
           joinedAutomatically: async () => notifyNothing("somebody joined automatically"),
         },
-    settings: new PrismaJoinSettings(prisma),
+    settings: PrismaJoinSettingsAdapter.create(prisma),
     // The licence asymmetry, stated once: the gate that has always held single
     // sign-on holds AUTOMATIC joining, because that is federation. This process
     // holds no licence gate, so automatic joining is denied and ASKING is not —

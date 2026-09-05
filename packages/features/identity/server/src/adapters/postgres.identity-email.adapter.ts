@@ -81,7 +81,7 @@ export class PostgresIdentityEmailAdapter {
   private constructor(private readonly options: PostgresIdentityEmailAdapterOptions) {}
 
   build(): IdentityEmailService {
-    this.service ??= new IdentityEmailService(
+    this.service ??= IdentityEmailService.create(
       PrismaIdentityHeadsRepository.create(this.options.database),
       CachedIdentityLatch.create({
         repository: PrismaIdentityLatchRepository.create(this.options.database),

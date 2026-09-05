@@ -243,11 +243,16 @@ export class LangyDispatchRejectedError extends HandledError {
 /** The agent/transport is temporarily unavailable (HTTP 503). */
 export class LangyAgentUnavailableError extends HandledError {
   declare readonly code: "langy_agent_unavailable";
-  constructor(message = "Agent is temporarily unavailable. Please try again shortly.") {
+  /** `status` is the HTTP status when the manager answered with one - a bare status code, safe to show. */
+  constructor(
+    message = "Agent is temporarily unavailable. Please try again shortly.",
+    options: { status?: number } = {},
+  ) {
     super("langy_agent_unavailable", message, {
       httpStatus: 503,
       fault: "platform",
       ...remediation("langy_agent_unavailable"),
+      meta: options.status !== undefined ? { status: options.status } : {},
     });
     this.name = "LangyAgentUnavailableError";
   }

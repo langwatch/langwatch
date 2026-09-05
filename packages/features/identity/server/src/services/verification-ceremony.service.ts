@@ -7,12 +7,7 @@ import {
 } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import {
-  mintVerificationToken,
-  s256Challenge,
-  safeEqual,
-  sha256Hex,
-} from "../adapters/crypto.pkce.adapter";
+import { mintVerificationToken, s256Challenge, safeEqual, sha256Hex } from "../rules/pkce.rules";
 import { newIdentityCommandId } from "../rules/identity-command-id.rules";
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository";
 import type { IdentityVerificationRepository } from "../repositories/identity-verification.repository";
@@ -68,7 +63,16 @@ export interface VerificationCeremonyDeps {
 export class VerificationCeremonyService {
   private readonly now: () => number;
 
-  constructor(
+  static create(
+    store: IdentityVerificationRepository,
+    heads: IdentityHeadsRepository,
+    identity: IdentityVerificationWrites,
+    deps: VerificationCeremonyDeps,
+  ): VerificationCeremonyService {
+    return new VerificationCeremonyService(store, heads, identity, deps);
+  }
+
+  private constructor(
     private readonly store: IdentityVerificationRepository,
     private readonly heads: IdentityHeadsRepository,
     private readonly identity: IdentityVerificationWrites,

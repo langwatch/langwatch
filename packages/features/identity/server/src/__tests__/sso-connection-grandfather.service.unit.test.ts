@@ -2,7 +2,7 @@ import type { RoutableConnection } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { SignInDomainRoutingPort } from "../services/signin-router.service";
 import { SsoConnectionGrandfatherService } from "../services/sso-connection-grandfather.service";
-import { SsoConnectionGuards } from "../services/sso-connection-guards.service";
+import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service";
 import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules";
 import { SsoConnectionService } from "../services/sso-connection.service";
 import {
@@ -75,8 +75,8 @@ function inMemoryLedger(store: InMemoryConnections): SsoConnectionLedger {
 }
 
 function serviceOf(store: InMemoryConnections): SsoConnectionService {
-  return new SsoConnectionService(
-    new SsoConnectionGuards({
+  return SsoConnectionService.create(
+    SsoConnectionGuardsService.create({
       connections: store,
       breakGlass: new StubBreakGlassBindings(true),
       stranding: new StubStranding([]),
@@ -97,7 +97,7 @@ function grandfatherOf({
   connectionRouting: SignInDomainRoutingPort;
   ssoDomain?: string;
 }) {
-  return new SsoConnectionGrandfatherService({
+  return SsoConnectionGrandfatherService.create({
     connections: serviceOf(connections),
     legacy: {
       tryFindLegacySso: async () => ({ ssoDomain, ssoProvider: "okta" }),

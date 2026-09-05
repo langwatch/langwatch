@@ -1,9 +1,16 @@
 import { TRPCClientError, type TRPCClientErrorLike } from "@trpc/client";
+
+/**
+ * The seat levers a licence caps, written out here rather than imported from
+ * `@langwatch/enterprise-licensing-contract`: this package is core and may not
+ * depend on enterprise. `limitTypes` in that contract is the source of truth.
+ */
+type LimitType = "members" | "membersLite";
+
 /**
  * The router type a tRPC client error is typed by.
  */
 type AppRouter = any;
-import type { LimitType } from "@langwatch/enterprise-licensing-contract";
 
 export const isNotFound = (error: TRPCClientErrorLike<AppRouter> | null) => {
   if (error && error instanceof TRPCClientError && error.data?.httpStatus === 404) {

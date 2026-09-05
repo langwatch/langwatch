@@ -89,7 +89,11 @@ export interface IdentitySecretCarryOutcome {
  * rewriting every credential row it looks at.
  */
 export class IdentitySecretCarryService {
-  constructor(private readonly reads: IdentitySecretCarryRepository) {}
+  static create(reads: IdentitySecretCarryRepository): IdentitySecretCarryService {
+    return new IdentitySecretCarryService(reads);
+  }
+
+  private constructor(private readonly reads: IdentitySecretCarryRepository) {}
 
   async carryForUser({ userId }: { userId: string }): Promise<IdentitySecretCarryOutcome> {
     const outcome: IdentitySecretCarryOutcome = { carried: 0, healed: 0 };

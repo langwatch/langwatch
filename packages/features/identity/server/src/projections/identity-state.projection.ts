@@ -212,7 +212,7 @@ export class IdentityStateFoldProjection
 
   /**
    * The ONE place an identity fact becomes a framework event: the guards
-   * (`IdentityGuards`) decide what a command states, and this stamps the
+   * (`IdentityGuardsService`) decide what a command states, and this stamps the
    * envelope, so both the staged re-run and the calling path stamp identically.
    */
   static eventsFor({

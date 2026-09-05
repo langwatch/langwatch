@@ -26,13 +26,11 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import { AGENT_CHAT_TIMEOUT_MS } from "../../services/langy-turn-errors.service";
+import { AGENT_CHAT_TIMEOUT_MS } from "@langwatch/langy-contract";
 import { ADOPTABLE_CONVERSATION_ID } from "../../services/langy-conversation.service";
 import type { LangyChatMessageInput } from "../../services/langy-turn-shared.service";
-import type {
-  LangyStreamEntry,
-  LangyTokenBuffer,
-} from "../../adapters/redis.langy-token-buffer.adapter";
+import type { LangyStreamEntry } from "@langwatch/langy-contract";
+import type { LangyTokenBufferAdapter } from "../../adapters/redis.langy-token-buffer.adapter";
 import { LangySessionRequiredError, type LangyApp } from "#app/langy.app";
 
 const logger = createLogger("langwatch:langy:router");
@@ -210,7 +208,7 @@ async function* followMissedTerminal({
   conversationId: string;
   turnId: string;
   userId: string;
-  buffer: LangyTokenBuffer;
+  buffer: LangyTokenBufferAdapter;
   fromId: string;
   signal: AbortSignal;
 }): AsyncGenerator<LangyStreamEntry> {

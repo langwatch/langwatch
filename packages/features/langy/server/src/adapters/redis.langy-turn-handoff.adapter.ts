@@ -1,23 +1,9 @@
-import { langyWorkerCredentialsSchema } from "@langwatch/langy-contract";
-import { z } from "zod";
-
-const langyTurnHandoffSchema = z
-  .object({
-    projectId: z.string().min(1),
-    conversationId: z.string().min(1),
-    turnId: z.string().min(1),
-    actorUserId: z.string().min(1),
-    prompt: z.string(),
-    system: z.string(),
-    historySeed: z.string().optional(),
-    modelOverride: z.string().optional(),
-    credentials: langyWorkerCredentialsSchema,
-    runToken: z.string().min(1),
-    permitReserved: z.boolean(),
-    resumeToken: z.string().optional(),
-  })
-  .strict();
-export type LangyTurnHandoff = z.infer<typeof langyTurnHandoffSchema>;
+import {
+  LANGY_HANDOFF_TTL_SECONDS,
+  type LangyTurnHandoff,
+  LangyTurnHandoffPort,
+  langyTurnHandoffSchema,
+} from "../ports/langy-turn-handoff.port";
 
 export interface LangyHandoffRedis {
   set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
@@ -25,13 +11,14 @@ export interface LangyHandoffRedis {
   expire(key: string, ttl: number): Promise<number>;
 }
 
-export const LANGY_HANDOFF_TTL_SECONDS = 300;
+/** Redis-backed turn handoff, parked for `LANGY_HANDOFF_TTL_SECONDS`. */
+export class LangyTurnHandoffAdapter extends LangyTurnHandoffPort {
+  static create(options: { redis: LangyHandoffRedis }): LangyTurnHandoffAdapter {
+    return new LangyTurnHandoffAdapter(options.redis);
+  }
 
-export class LangyTurnHandoffStore {
-  private constructor(private readonly redis: LangyHandoffRedis) {}
-
-  static create(options: { redis: LangyHandoffRedis }): LangyTurnHandoffStore {
-    return new LangyTurnHandoffStore(options.redis);
+  private constructor(private readonly redis: LangyHandoffRedis) {
+    super();
   }
 
   async stash(handoff: LangyTurnHandoff): Promise<void> {

@@ -16,7 +16,6 @@ import {
   AzureBlobStoredObjectDriverAdapter,
   LocalFilesystemStoredObjectDriverAdapter,
   PrometheusStoredObjectsTelemetryAdapter,
-  resolveAzureCredentials,
   S3StoredObjectDriverAdapter,
   StoredObjectApp,
   StoredObjectDestinationPolicyAdapter,
@@ -28,6 +27,7 @@ import {
   StoredObjectsService,
   type StoredObjectS3Target,
   type StoredObjectsClickHouseClient,
+  AzureBlobCredentialsAdapter,
 } from "@langwatch/stored-object-server";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
@@ -191,7 +191,7 @@ function composeStoredObjects(
         // operator who migrated OFF Azure keep reading what was written before.
         "azure-blob": () =>
           AzureBlobStoredObjectDriverAdapter.create(
-            resolveAzureCredentials({
+            AzureBlobCredentialsAdapter.resolveAzureCredentials({
               config: storage.azure,
               purpose: "read",
               identity: storage.azure.identity,

@@ -14,7 +14,7 @@ import type { PlanProvider } from "@langwatch/entitlement-contract";
 import {
   newScimSyncCommandId,
   PrismaScimSyncProjectionRepository,
-  ScimSyncGuards,
+  ScimSyncGuardsService,
   ScimSyncLedgerWriterAdapter,
   type IdentityEventingPort,
 } from "@langwatch/identity-server";
@@ -110,7 +110,9 @@ export function composeApiScimRest(
     governance,
     entitlements: plans,
     lifecycle: ScimSyncLifecycleAdapter.create({
-      guards: new ScimSyncGuards({ syncs: new PrismaScimSyncProjectionRepository(prisma) }),
+      guards: ScimSyncGuardsService.create({
+        syncs: new PrismaScimSyncProjectionRepository(prisma),
+      }),
       ledger: ScimSyncLedgerWriterAdapter.create({ eventing }),
       newCommandId: newScimSyncCommandId,
     }),

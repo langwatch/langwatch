@@ -1,4 +1,4 @@
-import { reportNurturingFailure, tryNurturingSink } from "../adapters/nurturing-sink.adapter";
+import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service";
 import type { OrganizationIntent } from "@langwatch/organization-contract";
 
 import type { CioPersonTraits } from "@langwatch/enterprise-billing-contract";
@@ -66,7 +66,7 @@ export class NurturingSignupIdentificationService {
     /** ADR-038 org intent — explicit trait; deliberately NOT part of signupData. */
     primaryIntent?: OrganizationIntent | null;
   }): void {
-    const nurturing = tryNurturingSink();
+    const nurturing = NurturingSinkRegistryService.trySink();
     if (!nurturing) {
       return;
     }
@@ -98,7 +98,9 @@ export class NurturingSignupIdentificationService {
       createdAt: new Date().toISOString(),
     };
 
-    void nurturing.identifyUser({ userId, traits }).catch(reportNurturingFailure);
+    void nurturing
+      .identifyUser({ userId, traits })
+      .catch(NurturingSinkRegistryService.reportFailure);
 
     void nurturing
       .groupUser({
@@ -110,7 +112,7 @@ export class NurturingSignupIdentificationService {
           plan: "free",
         },
       })
-      .catch(reportNurturingFailure);
+      .catch(NurturingSinkRegistryService.reportFailure);
 
     void nurturing
       .trackEvent({
@@ -121,6 +123,6 @@ export class NurturingSignupIdentificationService {
           primary_intent: primaryIntent?.toLowerCase(),
         }),
       })
-      .catch(reportNurturingFailure);
+      .catch(NurturingSinkRegistryService.reportFailure);
   }
 }

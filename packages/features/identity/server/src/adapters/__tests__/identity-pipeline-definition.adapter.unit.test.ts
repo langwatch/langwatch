@@ -3,7 +3,7 @@ import {
   type IdentifierFact,
   type IdentityHeads,
 } from "@langwatch/identity-contract";
-import { IdentityGuards } from "../../services/identity-guards.service";
+import { IdentityGuardsService } from "../../services/identity-guards.service";
 import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository";
 import { describe, expect, it } from "vitest";
 import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing";
@@ -14,6 +14,7 @@ import { EraseUserCommand } from "../../intents/erase-user.intent";
 import { MarkPrimaryCommand } from "../../intents/mark-primary.intent";
 import { VerifyIdentifierCommand } from "../../intents/verify-identifier.intent";
 import { IdentityPipelineDefinitionAdapter } from "../identity-pipeline-definition.adapter";
+import { CryptoIdentifierIdentityAdapter } from "../crypto.identifier-identity.adapter";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };
@@ -94,10 +95,11 @@ describe("identity event aggregate type", () => {
       {
         label: "attach",
         handler: new AttachIdentifierCommand(
-          new IdentityGuards(
+          IdentityGuardsService.create(
             new HeadsOf(emptyIdentityHeads({ userId: USER })),
             inMemoryIdentityUsers(),
             inMemoryIdentityReservations(),
+            CryptoIdentifierIdentityAdapter.create(),
           ),
         ),
         data: {
@@ -115,7 +117,7 @@ describe("identity event aggregate type", () => {
       {
         label: "verify",
         handler: new VerifyIdentifierCommand(
-          new IdentityGuards(
+          IdentityGuardsService.create(
             new HeadsOf({
               userId: USER,
               identifiers: {
@@ -124,6 +126,7 @@ describe("identity event aggregate type", () => {
             }),
             inMemoryIdentityUsers(),
             inMemoryIdentityReservations(),
+            CryptoIdentifierIdentityAdapter.create(),
           ),
         ),
         data: {
@@ -137,10 +140,11 @@ describe("identity event aggregate type", () => {
       {
         label: "mark primary",
         handler: new MarkPrimaryCommand(
-          new IdentityGuards(
+          IdentityGuardsService.create(
             new HeadsOf(held),
             inMemoryIdentityUsers(),
             inMemoryIdentityReservations(),
+            CryptoIdentifierIdentityAdapter.create(),
           ),
         ),
         data: { ...base, commandId: "idcmd_3", identifierId: "idf_1" },
@@ -148,10 +152,11 @@ describe("identity event aggregate type", () => {
       {
         label: "detach",
         handler: new DetachIdentifierCommand(
-          new IdentityGuards(
+          IdentityGuardsService.create(
             new HeadsOf(held),
             inMemoryIdentityUsers(),
             inMemoryIdentityReservations(),
+            CryptoIdentifierIdentityAdapter.create(),
           ),
         ),
         data: { ...base, commandId: "idcmd_4", identifierId: "idf_2" },
@@ -159,10 +164,11 @@ describe("identity event aggregate type", () => {
       {
         label: "erase",
         handler: new EraseUserCommand(
-          new IdentityGuards(
+          IdentityGuardsService.create(
             new HeadsOf(held),
             inMemoryIdentityUsers(),
             inMemoryIdentityReservations(),
+            CryptoIdentifierIdentityAdapter.create(),
           ),
         ),
         data: { ...base, commandId: "idcmd_5" },
@@ -187,10 +193,11 @@ describe("identity event aggregate type", () => {
     /** @scenario "A retried command dedupes at the event store" */
     it("keys idempotency as commandId:index so a retry dedupes", async () => {
       const handler = new AttachIdentifierCommand(
-        new IdentityGuards(
+        IdentityGuardsService.create(
           new HeadsOf(emptyIdentityHeads({ userId: USER })),
           inMemoryIdentityUsers(),
           inMemoryIdentityReservations(),
+          CryptoIdentifierIdentityAdapter.create(),
         ),
       );
       const data = {

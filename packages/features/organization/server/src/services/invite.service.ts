@@ -13,7 +13,7 @@ import {
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository";
 import type { RoleService } from "@langwatch/role-contract";
 import { isCustomRole } from "../rules/custom-role-naming.rules";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "./member-role-constraints.service";
+import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules";
 import {
   CustomRoleNotAssignableError,
   MemberSeatLimitReachedError,
@@ -25,7 +25,7 @@ import {
   InviteNotReadyError,
   OrganizationNotFoundError,
   TeamNotInOrganizationError,
-} from "./invite-errors.service";
+} from "@langwatch/organization-contract";
 
 /**
  * The KSUID resource prefix a role binding is minted under, restated the way the membership repository

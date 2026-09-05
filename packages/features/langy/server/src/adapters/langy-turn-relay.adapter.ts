@@ -1,5 +1,5 @@
 /**
- * LangyTurnRelay — the control-plane consumer of one worker→relay frame stream the successor to
+ * LangyTurnRelayAdapter — the control-plane consumer of one worker→relay frame stream the successor to
  * `runTurn`'s streaming role. One instance per pushed connection (one turn).
  */
 import {
@@ -18,7 +18,7 @@ import {
   LangyCliEnvelopeService,
   type LangyToolFrame,
 } from "../services/langy-cli-envelope.service";
-import { LangyTurnErrors } from "../services/langy-turn-errors.service";
+import { LangyTurnErrors } from "@langwatch/langy-contract";
 import { verifyFrame } from "../ports/langy-frame-auth.port";
 import {
   type LangyFrameEnvelope,
@@ -27,16 +27,13 @@ import {
   langyRelayFrameSchema,
 } from "../rules/langy-relay-frame.rules";
 import type { LangyLinkRedis, LangyResourceLinkStore } from "./redis.langy-resource-links.adapter";
-import { LangyFrameDedupStore } from "./redis.langy-frame-dedup.adapter";
+import { LangyFrameDedupAdapter } from "./redis.langy-frame-dedup.adapter";
 import type { LangyFrameDedupRedis } from "./redis.langy-frame-dedup.adapter";
-import { LangyResourceLinksStore } from "./redis.langy-resource-links.adapter";
-import { LangyTurnHandoffStore } from "./redis.langy-turn-handoff.adapter";
+import { LangyResourceLinksAdapter } from "./redis.langy-resource-links.adapter";
+import { LangyTurnHandoffAdapter } from "./redis.langy-turn-handoff.adapter";
 import type { LangyHandoffRedis } from "./redis.langy-turn-handoff.adapter";
-import {
-  LANGY_EMPTY_TURN_FALLBACK,
-  LangyTokenBuffer,
-  type LangyStreamRedis,
-} from "./redis.langy-token-buffer.adapter";
+import { LangyTokenBufferAdapter } from "./redis.langy-token-buffer.adapter";
+import { LANGY_EMPTY_TURN_FALLBACK, type LangyStreamRedis } from "../ports/langy-token-buffer.port";
 
 type PlatformProgress = { headline: string };
 
@@ -283,7 +280,7 @@ export type LangyRelayOutcome =
  * line; it is safe to call after a terminal (further frames are dropped as
  * duplicates or wrong-turn) and after a rejection.
  */
-export class LangyTurnRelay {
+export class LangyTurnRelayAdapter {
   private runToken: string | null | undefined; // undefined = not yet loaded
   private pinned: {
     projectId: string;
@@ -329,16 +326,17 @@ export class LangyTurnRelay {
     resolveResourceUrl?: LangyTurnRelayDeps["resolveResourceUrl"];
     resolveCapabilityProgress?: (name: string) => PlatformProgress | null;
     logger?: LangyTurnRelayDeps["logger"];
-  }): LangyTurnRelay {
+  }): LangyTurnRelayAdapter {
     const redis = options.redis;
-    const buffer = options.buffer ?? (redis ? LangyTokenBuffer.create({ redis }) : undefined);
+    const buffer =
+      options.buffer ?? (redis ? LangyTokenBufferAdapter.create({ redis }) : undefined);
     if (!buffer) {
       throw new Error("Langy relay requires Redis or a buffer");
     }
-    const frameDedup = redis ? LangyFrameDedupStore.create({ redis }) : null;
-    const handoff = redis ? LangyTurnHandoffStore.create({ redis }) : null;
+    const frameDedup = redis ? LangyFrameDedupAdapter.create({ redis }) : null;
+    const handoff = redis ? LangyTurnHandoffAdapter.create({ redis }) : null;
     const resourceLinks =
-      options.resourceLinks ?? (redis ? LangyResourceLinksStore.create({ redis }) : undefined);
+      options.resourceLinks ?? (redis ? LangyResourceLinksAdapter.create({ redis }) : undefined);
     if (!resourceLinks) {
       throw new Error("Langy relay requires Redis or resource links");
     }
@@ -347,7 +345,7 @@ export class LangyTurnRelay {
     if (!reserveFrameNonce) {
       throw new Error("Langy relay requires frame nonce deduplication");
     }
-    return new LangyTurnRelay({
+    return new LangyTurnRelayAdapter({
       conversations: options.conversations,
       buffer,
       reserveFrameNonce,

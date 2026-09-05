@@ -23,12 +23,12 @@ import { IDENTITY_PIPELINE_NAME } from "@langwatch/identity-contract";
 import type { IdentityEvent } from "../projections/identity-state.projection";
 import type { IdentityFoldState } from "../projections/identity-state.projection";
 import { IdentityStateFoldProjection } from "../projections/identity-state.projection";
-import {
-  identityCommitDurationSeconds,
-  identityProjectionConvergenceTimeoutsTotal,
-} from "./metrics.identity-ledger.adapter";
+import { MetricsIdentityLedgerAdapter } from "./metrics.identity-ledger.adapter";
 
 const logger = createLogger("langwatch:identity:ledger");
+
+/** The ledger's own metrics, composed once: the counters are process-wide. */
+const LEDGER_METRICS = MetricsIdentityLedgerAdapter.create();
 
 /** The read-your-writes window, the grants ledger's convergence shape. */
 export const IDENTITY_CONVERGENCE_TIMEOUT_MS = 2_000;
@@ -91,7 +91,7 @@ export class IdentityLedgerWriterAdapter implements IdentityLedger {
   }): Promise<IdentityFact[]> {
     const events = IdentityStateFoldProjection.eventsFor({ command, facts });
     if (events.length === 0) return [];
-    const done = identityCommitDurationSeconds.startTimer();
+    const done = LEDGER_METRICS.startCommitTimer();
     try {
       await this.stageAndAwait({ command, events });
       return events;
@@ -155,7 +155,7 @@ export class IdentityLedgerWriterAdapter implements IdentityLedger {
     for (;;) {
       if (await this.foldReached({ userId, context, last })) return;
       if (Date.now() >= deadline) {
-        identityProjectionConvergenceTimeoutsTotal.inc();
+        LEDGER_METRICS.recordProjectionConvergenceTimeout();
         logger.warn(
           { userId, commandCount: events.length },
           "identity projection did not land a ceremony's events within the read-your-writes window; the command is queued and the fold will converge",

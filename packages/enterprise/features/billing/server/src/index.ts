@@ -157,15 +157,7 @@ export {
   type CancelledSubscription,
   type SubscriptionWithOrg,
 } from "./ports/billing-webhook-subscription.port";
-export {
-  setNurturingProfiles,
-  setNurturingOrganizationAdminResolver,
-  setNurturingSink,
-  tryNurturingProfiles,
-  tryNurturingOrganizationAdminResolver,
-  tryNurturingSink,
-  type OrganizationAdminResolver,
-} from "./adapters/nurturing-sink.adapter";
+export { NurturingSinkRegistryService } from "./services/nurturing-sink-registry.service";
 export { PostgresNurturingProfileAdapter } from "./adapters/postgres.nurturing-profile.adapter";
 export type {
   NurturingProfile,

@@ -34,8 +34,12 @@ const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
  * the organization-scoped grant, the SAME two-step shape invitation
  * acceptance and SSO auto-join already use (ADR-092).
  */
-export class PrismaJoinMembership implements JoinMembershipPort {
-  constructor(
+export class PrismaJoinMembershipAdapter implements JoinMembershipPort {
+  static create(prisma: PrismaClient, writer: AuthzGrantsService): PrismaJoinMembershipAdapter {
+    return new PrismaJoinMembershipAdapter(prisma, writer);
+  }
+
+  private constructor(
     private readonly prisma: PrismaClient,
     private readonly writer: AuthzGrantsService,
   ) {}
@@ -98,8 +102,12 @@ export class PrismaJoinMembership implements JoinMembershipPort {
  * configuration an administrator sets, like every other organization setting, and the thing that
  * needs a history is the requests it produces rather than the switch itself.
  */
-export class PrismaJoinSettings implements JoinSettingPort {
-  constructor(private readonly prisma: PrismaClient) {}
+export class PrismaJoinSettingsAdapter implements JoinSettingPort {
+  static create(prisma: PrismaClient): PrismaJoinSettingsAdapter {
+    return new PrismaJoinSettingsAdapter(prisma);
+  }
+
+  private constructor(private readonly prisma: PrismaClient) {}
 
   async read({ organizationId }: { organizationId: string }): Promise<{
     domainJoin: DomainJoinSetting;
@@ -138,8 +146,15 @@ export class PrismaJoinSettings implements JoinSettingPort {
  * gives: one bouncing admin address must not silence the rest. A mail that cannot be sent is logged
  * and the request stands — the durable fact is the request, not the notification.
  */
-export class EmailJoinRequestNotifier implements JoinRequestNotifier {
-  constructor(
+export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
+  static create(
+    prisma: PrismaClient,
+    mail: JoinRequestNotificationMailPort,
+  ): EmailJoinRequestNotifierAdapter {
+    return new EmailJoinRequestNotifierAdapter(prisma, mail);
+  }
+
+  private constructor(
     private readonly prisma: PrismaClient,
     private readonly mail: JoinRequestNotificationMailPort,
   ) {}
@@ -354,8 +369,16 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
  * `expireJoin` command. A command rather than a projection write, and that is the point — the
  * process manager decides WHEN, the guard still decides WHETHER.
  */
-export class JoinRequestLifecycleDispatcher implements JoinRequestLifecyclePort {
-  constructor(
+export class JoinRequestLifecycleDispatcherAdapter implements JoinRequestLifecyclePort {
+  static create(
+    prisma: PrismaClient,
+    notifier: JoinRequestNotifier,
+    joinRequests: () => JoinRequestService,
+  ): JoinRequestLifecycleDispatcherAdapter {
+    return new JoinRequestLifecycleDispatcherAdapter(prisma, notifier, joinRequests);
+  }
+
+  private constructor(
     private readonly prisma: PrismaClient,
     private readonly notifier: JoinRequestNotifier,
     private readonly joinRequests: () => JoinRequestService,

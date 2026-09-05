@@ -8,10 +8,18 @@ import {
 
 type Entry = { value: ResolvedDataPrivacy; expiresAt: number };
 
-export class DataPrivacyPolicyCache {
+export class DataPrivacyPolicyCacheService {
+  static create(
+    repository: DataPrivacyPolicyRepository,
+    ttlMs = 60_000,
+    now: () => number = () => Date.now(),
+  ): DataPrivacyPolicyCacheService {
+    return new DataPrivacyPolicyCacheService(repository, ttlMs, now);
+  }
+
   private readonly entries = new Map<string, Entry>();
 
-  constructor(
+  private constructor(
     private readonly repository: DataPrivacyPolicyRepository,
     private readonly ttlMs = 60_000,
     private readonly now: () => number = () => Date.now(),

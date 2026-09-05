@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import type {
-  LangyStreamEntry,
-  LangyStreamRead,
-} from "../../adapters/redis.langy-token-buffer.adapter";
+import type { LangyStreamEntry } from "@langwatch/langy-contract";
+import type { LangyStreamRead } from "../../ports/langy-token-buffer.port";
 import type { TurnHealth } from "../../rules/langy-turn-settlement.rules";
 import { WEDGED_TURN_PATIENCE_MS } from "../../rules/langy-turn-settlement.rules";
-import { streamTurnEntries, type TurnTailBuffer } from "../langy-turn-tail.service";
+import { LangyTurnTailService, type TurnTailBuffer } from "../langy-turn-tail.service";
+
+const tailService = LangyTurnTailService.create();
 
 const CONVERSATION = { conversationId: "conv_1", turnId: "turn_1" };
 
@@ -98,7 +98,7 @@ describe("streamTurnEntries", () => {
       const beating: TurnHealth = { isStale: false, terminal: null };
 
       const { received, done } = pump(
-        streamTurnEntries({
+        tailService.streamTurnEntries({
           ...CONVERSATION,
           buffer: createBuffer({ live }),
           readHealth: async () => {
@@ -142,7 +142,7 @@ describe("streamTurnEntries", () => {
       const wedged: TurnHealth = { isStale: true, terminal: null };
 
       const { received, done } = pump(
-        streamTurnEntries({
+        tailService.streamTurnEntries({
           ...CONVERSATION,
           buffer: createBuffer({
             tail: [{ type: "status", status: "thinking" }],
@@ -169,7 +169,7 @@ describe("streamTurnEntries", () => {
       let polls = 0;
 
       const { done } = pump(
-        streamTurnEntries({
+        tailService.streamTurnEntries({
           ...CONVERSATION,
           buffer: createBuffer({ live }),
           readHealth: async () => {
@@ -195,7 +195,7 @@ describe("streamTurnEntries", () => {
       const reader = new AbortController();
 
       const { received, done } = pump(
-        streamTurnEntries({
+        tailService.streamTurnEntries({
           ...CONVERSATION,
           buffer: createBuffer({ live }),
           readHealth: async () => ({ isStale: false, terminal: null }),
@@ -222,7 +222,7 @@ describe("streamTurnEntries", () => {
       const release = vi.fn();
 
       const { received, done } = pump(
-        streamTurnEntries({
+        tailService.streamTurnEntries({
           ...CONVERSATION,
           buffer: {
             ...createBuffer({

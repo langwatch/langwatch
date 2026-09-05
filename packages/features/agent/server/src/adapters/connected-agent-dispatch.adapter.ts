@@ -31,7 +31,7 @@ import {
   type StoredCall,
   type StoredResultError,
   storedResultSchema,
-} from "../services/connected-agent-envelope.service";
+} from "@langwatch/agent-contract";
 import {
   callKey,
   INSTANCE_GONE_CHANNEL,

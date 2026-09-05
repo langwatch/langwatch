@@ -89,9 +89,7 @@ function decodePythonStringBody(body: string, constant: string): string {
 function parseShippedJudgePrompts(pythonSource: string): Record<string, string> {
   const prompts: Record<string, string> = {};
 
-  PYTHON_PROMPT_DECLARATION.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = PYTHON_PROMPT_DECLARATION.exec(pythonSource)) !== null) {
+  for (const match of pythonSource.matchAll(PYTHON_PROMPT_DECLARATION)) {
     const [, name, body] = match;
     if (name === undefined || body === undefined) continue;
     prompts[name] = decodePythonStringBody(body, name);

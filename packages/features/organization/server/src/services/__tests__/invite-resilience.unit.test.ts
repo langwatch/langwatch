@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import { InviteNotFoundError } from "../invite-errors.service";
+import { InviteNotFoundError } from "@langwatch/organization-contract";
 import { InviteService } from "../invite.service";
 import { resolveInviteDisplayStatus } from "../../rules/invite-display-status.rules";
 import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository";

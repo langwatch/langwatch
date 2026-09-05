@@ -2,10 +2,11 @@ import {
   LangyConversationNotOwnedError,
   LangyTurnNotStoppableError,
 } from "@langwatch/langy-contract";
-import {
-  reconstructPartialAnswer,
-  type LangyTurnServiceDependencies,
-} from "./langy-turn-shared.service";
+import { type LangyTurnServiceDependencies } from "./langy-turn-shared.service";
+import { LangyTurnSharedService } from "./langy-turn-shared.service";
+
+/** The shared turn helpers. Stateless: one instance for the module. */
+const LANGY_TURN_SHARED = LangyTurnSharedService.create();
 
 /** Private control collaborator for the durable Stop workflow. */
 export class LangyTurnStopService {
@@ -51,7 +52,7 @@ export class LangyTurnStopService {
     }
 
     const partialText = tokenBuffer
-      ? await reconstructPartialAnswer(tokenBuffer, { conversationId, turnId })
+      ? await LANGY_TURN_SHARED.reconstructPartialAnswer(tokenBuffer, { conversationId, turnId })
       : "";
     await conversations.finalizeTurn({
       projectId,

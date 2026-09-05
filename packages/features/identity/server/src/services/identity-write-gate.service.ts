@@ -4,16 +4,30 @@
  * engine gate (ADR-110: finishing the migration IS the switch). `migrated`
  */
 import { createLogger } from "@langwatch/observability";
-import { perSubjectCachedFlag } from "./per-subject-cached-gate.service";
-import { identityWriteGateReadFailuresTotal } from "../adapters/metrics.identity-ledger.adapter";
+import { Counter, register } from "prom-client";
+import { PerSubjectCachedGateService } from "./per-subject-cached-gate.service";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../rules/identity-migration-names.rules";
 import type { IdentityWriteGateStatePort } from "../ports/identity-write-gate-state.port";
 
 const logger = createLogger("langwatch:identity:write-gate");
 
+// Removed first so a hot reload re-registers rather than throwing.
+register.removeSingleMetric("identity_write_gate_read_failures_total");
+
+/**
+ * This gate's migration-state read failed: for up to the negative-cache TTL
+ * the user's ceremonies emit no events regardless of their true backfill
+ * status. Protocol behaviour is unaffected - the gap is event history, which
+ * the backfill's next pass adopts.
+ */
+const readFailuresTotal = new Counter({
+  name: "identity_write_gate_read_failures_total",
+  help: "Failed reads of a user's identifier-backfill migration state; ceremonies emit no events for the negative-cache TTL.",
+});
+
 export const IDENTITY_WRITE_GATE_TTL_MS = 60_000;
 
-const gate = perSubjectCachedFlag({
+const gate = PerSubjectCachedGateService.create({
   name: "identity-identifier-write-gate",
   ttlMs: IDENTITY_WRITE_GATE_TTL_MS,
   // The gate keys by USER, not organization — cardinality is the fleet's
@@ -24,7 +38,7 @@ const gate = perSubjectCachedFlag({
 /**
  * The pre-rollout short-circuit.
  */
-const anyoneGate = perSubjectCachedFlag({
+const anyoneGate = PerSubjectCachedGateService.create({
   name: "identity-identifier-anyone-finalized",
   ttlMs: IDENTITY_WRITE_GATE_TTL_MS,
   maxEntries: 1,
@@ -97,7 +111,7 @@ export class IdentityWriteGateService {
         { userId, error, ttlMs: IDENTITY_WRITE_GATE_TTL_MS },
         "could not read the identifier-backfill state; this user's ceremonies emit no events until the cache expires",
       );
-      identityWriteGateReadFailuresTotal.inc();
+      readFailuresTotal.inc();
 
       return false;
     }
@@ -116,7 +130,7 @@ export class IdentityWriteGateService {
         { error, ttlMs: IDENTITY_WRITE_GATE_TTL_MS },
         "could not read whether any user has finalized the identifier backfill; the gate stays closed until the cache expires",
       );
-      identityWriteGateReadFailuresTotal.inc();
+      readFailuresTotal.inc();
 
       return false;
     }

@@ -3,14 +3,14 @@ import {
   type AttachIdentifierCommandData,
   attachIdentifierCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { IdentityGuards } from "../services/identity-guards.service";
+import type { IdentityGuardsService } from "../services/identity-guards.service";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import { IdentityStateFoldProjection } from "../projections/identity-state.projection";
 import type { IdentityEvent } from "../projections/identity-state.projection";
 
 /**
  * The staged re-run of an attach: the same guard the calling path ran
- * (`IdentityGuards`, one implementation), the same envelope. A fact the
+ * (`IdentityGuardsService`, one implementation), the same envelope. A fact the
  * heads already carry states nothing here, so a re-run costs no row.
  */
 export class AttachIdentifierCommand implements CommandHandler<
@@ -27,7 +27,7 @@ export class AttachIdentifierCommand implements CommandHandler<
     return payload.userId;
   }
 
-  constructor(private readonly guards: IdentityGuards) {}
+  constructor(private readonly guards: IdentityGuardsService) {}
 
   async handle(command: Command<AttachIdentifierCommandData>): Promise<IdentityEvent[]> {
     const facts = await this.guards.attachIdentifier(command.data);

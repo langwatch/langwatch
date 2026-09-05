@@ -3,14 +3,15 @@
  * @vitest-environment node
  * The born-finalized entrance's SEQUENCE (ADR-116 §3).
  */
-import { IdentityGuards } from "../identity-guards.service";
-import { IdentityEngineUnavailableError } from "../../adapters/better-auth.identity-birth.adapter";
+import { IdentityGuardsService } from "../identity-guards.service";
+import { IdentityEngineUnavailableError } from "../../ports/identity-birth.port";
 import { describe, expect, it, vi } from "vitest";
 import type { IdentityEvent } from "../../projections/identity-state.projection";
 import { IdentityBirthService } from "../identity-birth.service";
 import type { IdentityBirthLedgerPort } from "../../ports/identity-birth-ledger.port";
 import type { IdentityNewbornRepository } from "../../repositories/identity-newborn.repository";
 import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing";
+import { CryptoIdentifierIdentityAdapter } from "../../adapters/crypto.identifier-identity.adapter";
 
 const EMAIL = "newborn@acme.com";
 const T0 = 1_690_000_000_000;
@@ -64,7 +65,12 @@ function harness(overrides?: {
   const forgetGate = vi.fn();
 
   const service = IdentityBirthService.create({
-    guards: new IdentityGuards(heads, inMemoryIdentityUsers(), reservations),
+    guards: IdentityGuardsService.create(
+      heads,
+      inMemoryIdentityUsers(),
+      reservations,
+      CryptoIdentifierIdentityAdapter.create(),
+    ),
     ledger,
     rows,
     reservations,

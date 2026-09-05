@@ -3,7 +3,7 @@ import {
   type EraseUserCommandData,
   eraseUserCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { IdentityGuards } from "../services/identity-guards.service";
+import type { IdentityGuardsService } from "../services/identity-guards.service";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import { IdentityStateFoldProjection } from "../projections/identity-state.projection";
 import type { IdentityEvent } from "../projections/identity-state.projection";
@@ -23,7 +23,7 @@ export class EraseUserCommand implements CommandHandler<
     return payload.userId;
   }
 
-  constructor(private readonly guards: IdentityGuards) {}
+  constructor(private readonly guards: IdentityGuardsService) {}
 
   async handle(command: Command<EraseUserCommandData>): Promise<IdentityEvent[]> {
     const facts = await this.guards.eraseUser(command.data);

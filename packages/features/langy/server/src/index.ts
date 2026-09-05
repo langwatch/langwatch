@@ -29,7 +29,7 @@ export type {
   LangyConversationCommands,
   LangyConversationEventsReader,
   LangyConversationRuntime,
-  LangyRelayCompositionOptions,
+  OpenLangyRelay,
 } from "./services/langy.service";
 export type { LangyTurnAdmissionCapability } from "@langwatch/langy-contract";
 export {
@@ -88,12 +88,7 @@ export {
 export { LangyCliEnvelopeService } from "./services/langy-cli-envelope.service";
 export type { LangyToolFrame } from "./services/langy-cli-envelope.service";
 export { LangyFinalPartsService } from "./services/langy-final-parts.service";
-export {
-  AGENT_CHAT_TIMEOUT_MS,
-  LangyTurnErrors,
-  LangyWorkerStoppedError,
-} from "./services/langy-turn-errors.service";
-export type { LangyConversationProcessingEvent } from "./adapters/eventing.langy-conversation-events.adapter";
+export type { LangyConversationProcessingEvent } from "./projections/langy-conversation-state.projection";
 export {
   computeFrameMac,
   mintRunToken,
@@ -192,40 +187,41 @@ export type {
   LangyGenerateTitleIntent,
   LangyWorkerDispatchIntent,
 } from "./ports/langy-conversation-process.port";
-export { LangyFrameDedupStore } from "./adapters/redis.langy-frame-dedup.adapter";
+export { LangyFrameDedupAdapter } from "./adapters/redis.langy-frame-dedup.adapter";
 export type {
   LangyFrameDedup,
   LangyFrameDedupRedis,
 } from "./adapters/redis.langy-frame-dedup.adapter";
-export { LangyResourceLinksStore } from "./adapters/redis.langy-resource-links.adapter";
+export { LangyResourceLinksAdapter } from "./adapters/redis.langy-resource-links.adapter";
 export type {
   LangyLinkRedis,
   LangyResourceLinkStore,
 } from "./adapters/redis.langy-resource-links.adapter";
+export { LangyTurnAccessAdapter } from "./adapters/redis.langy-turn-access.adapter";
 export {
-  LangyTurnAccessStore,
   LANGY_TURN_ACCESS_TTL_SECONDS,
-} from "./adapters/redis.langy-turn-access.adapter";
-export type { LangyTurnAccess } from "./adapters/redis.langy-turn-access.adapter";
+  type LangyTurnAccess,
+  LangyTurnAccessPort,
+} from "./ports/langy-turn-access.port";
+export { LangyTurnHandoffAdapter } from "./adapters/redis.langy-turn-handoff.adapter";
+export type { LangyHandoffRedis } from "./adapters/redis.langy-turn-handoff.adapter";
 export {
-  LangyTurnHandoffStore,
   LANGY_HANDOFF_TTL_SECONDS,
-} from "./adapters/redis.langy-turn-handoff.adapter";
-export type {
-  LangyHandoffRedis,
-  LangyTurnHandoff,
-} from "./adapters/redis.langy-turn-handoff.adapter";
-export { LangyTokenBuffer } from "./adapters/redis.langy-token-buffer.adapter";
-export type { LangyStreamEntry } from "./adapters/redis.langy-token-buffer.adapter";
+  type LangyTurnHandoff,
+  LangyTurnHandoffPort,
+} from "./ports/langy-turn-handoff.port";
+export { LangyTokenBufferAdapter } from "./adapters/redis.langy-token-buffer.adapter";
 export {
-  abortableDelay,
-  awaitTurnSettlement,
-  settlementFromEvents,
-} from "./services/langy-turn-settlement-waiter.service";
+  LANGY_EMPTY_TURN_FALLBACK,
+  type LangyStreamRead,
+  type LangyStreamRedis,
+  LangyTokenBufferPort,
+} from "./ports/langy-token-buffer.port";
+export { LangyTurnSettlementWaiterService } from "./services/langy-turn-settlement-waiter.service";
 export { decideSyntheticTerminal } from "./rules/langy-turn-settlement.rules";
 export type {
   LangyTurnSettlementReader,
-  LangyTurnSettlementRedis,
+  OpenLangyTurnBuffer,
   TurnSettlement,
 } from "./services/langy-turn-settlement-waiter.service";
 

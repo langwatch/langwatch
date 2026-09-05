@@ -1,28 +1,23 @@
-import { z } from "zod";
-
-/** Synchronous actor authorization record for Langy's live turn stream. */
-export const LANGY_TURN_ACCESS_TTL_SECONDS = 300;
-
-const langyTurnAccessSchema = z
-  .object({
-    projectId: z.string().min(1),
-    conversationId: z.string().min(1),
-    turnId: z.string().min(1),
-    userId: z.string().min(1),
-  })
-  .strict();
-export type LangyTurnAccess = z.infer<typeof langyTurnAccessSchema>;
+import {
+  LANGY_TURN_ACCESS_TTL_SECONDS,
+  type LangyTurnAccess,
+  LangyTurnAccessPort,
+  langyTurnAccessSchema,
+} from "../ports/langy-turn-access.port";
 
 interface LangyAccessRedis {
   get(key: string): Promise<string | null>;
   set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
 }
 
-export class LangyTurnAccessStore {
-  private constructor(private readonly redis: LangyAccessRedis) {}
+/** Redis-backed turn access, keyed by conversation so a turn's slot hashes together. */
+export class LangyTurnAccessAdapter extends LangyTurnAccessPort {
+  static create(options: { redis: LangyAccessRedis }): LangyTurnAccessAdapter {
+    return new LangyTurnAccessAdapter(options.redis);
+  }
 
-  static create(options: { redis: LangyAccessRedis }): LangyTurnAccessStore {
-    return new LangyTurnAccessStore(options.redis);
+  private constructor(private readonly redis: LangyAccessRedis) {
+    super();
   }
 
   async grant(access: LangyTurnAccess): Promise<void> {

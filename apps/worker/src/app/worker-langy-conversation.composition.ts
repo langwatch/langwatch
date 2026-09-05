@@ -5,9 +5,9 @@ import {
   LangyAnalyticsEventStorageAdapter,
   NullLangyWorkerMetricsAdapter,
   PostgresLangyAdapter,
-  LangyTokenBuffer,
+  LangyTokenBufferAdapter,
   LangyTitleGeneratorService,
-  LangyTurnHandoffStore,
+  LangyTurnHandoffAdapter,
   UnavailableLangyWorkerAdapter,
   type LangyAnalyticsClickHouseClientResolver,
   type LangyBroadcastPort,
@@ -80,8 +80,8 @@ export function createWorkerLangyConversation(
     }),
     broadcast: new WorkerLangyTenantBroadcastAdapter(options.broadcast),
     admissions: persistence.langyTurnAdmission,
-    buffer: LangyTokenBuffer.create({ redis: options.redis }),
-    handoffStore: LangyTurnHandoffStore.create({ redis: options.redis }),
+    buffer: LangyTokenBufferAdapter.create({ redis: options.redis }),
+    handoffStore: LangyTurnHandoffAdapter.create({ redis: options.redis }),
     worker: options.config.langy
       ? LangyWorkerHttpAdapter.create({
           agentUrl: options.config.langy.agentUrl,

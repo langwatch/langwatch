@@ -2,7 +2,7 @@
   "name": "@langwatch/identity-server",
   "version": "0.1.0",
   "private": true,
-  "description": "The server-side runtime of the identity platform (ADR-101, ADR-115, ADR-116, ADR-117): IdentityGuards, IdentityService, the verification ceremony, the backfill pass, the better-auth ceremonies, and the folded-in event-sourcing layer - the envelope, the command handlers, the folds, the two process managers and the four pipeline definitions the worker registers, behind postgres.*.adapter seams.",
+  "description": "The server-side runtime of the identity platform (ADR-101, ADR-115, ADR-116, ADR-117): IdentityGuardsService, IdentityService, the verification ceremony, the backfill pass, the better-auth ceremonies, and the folded-in event-sourcing layer - the envelope, the command handlers, the folds, the two process managers and the four pipeline definitions the worker registers, behind postgres.*.adapter seams.",
   "license": "MIT",
   "files": [
     "src"

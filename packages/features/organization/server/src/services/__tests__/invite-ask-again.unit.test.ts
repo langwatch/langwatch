@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { InviteNotFoundError, InviteThrottledError } from "../invite-errors.service";
+import { InviteNotFoundError, InviteThrottledError } from "@langwatch/organization-contract";
 import { InviteService } from "../invite.service";
 import { InviteSendThrottleService } from "../invite-send-throttle.service";
 import type {

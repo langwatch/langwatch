@@ -7,7 +7,7 @@ import { IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME } from "../rules/identit
  * `SystemMigration` contract over `SsoConnectionGrandfatherService`.
  * Spec: specs/identity/sso-connection-lifecycle.feature.
  */
-export class IdentitySsoConnectionGrandfatherMigration implements SystemMigration {
+export class IdentitySsoConnectionGrandfatherMigrationAdapter implements SystemMigration {
   // Never rename: the stable state-table key.
   readonly name = IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME;
   readonly title = "Enterprise SSO connection history";
@@ -30,8 +30,8 @@ export class IdentitySsoConnectionGrandfatherMigration implements SystemMigratio
 
   static create(
     grandfather: Pick<SsoConnectionGrandfatherService, "migrateOrganization">,
-  ): IdentitySsoConnectionGrandfatherMigration {
-    return new IdentitySsoConnectionGrandfatherMigration(grandfather);
+  ): IdentitySsoConnectionGrandfatherMigrationAdapter {
+    return new IdentitySsoConnectionGrandfatherMigrationAdapter(grandfather);
   }
 
   constructor(

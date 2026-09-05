@@ -1,34 +1,18 @@
 /**
  * Langy turn-execution domain errors + the failure classifier (ADR-045/046).
- * @see src/features/langy/logic/langyErrorExplainer.ts (the copy for each kind)
  * @see app-layer/langyagent/app/app.go (the error frames the manager emits)
  */
 
-import { HandledError, type SerializedHandledError } from "@langwatch/handled-error";
-import { trace } from "@opentelemetry/api";
-import { LangyModelNotConfiguredError, remediation } from "@langwatch/langy-contract";
+import {
+  activeTraceContext,
+  HandledError,
+  type SerializedHandledError,
+} from "@langwatch/handled-error";
+import { LangyAgentUnavailableError, LangyModelNotConfiguredError } from "./langy.errors";
+import { remediation } from "./langy.error-remediation";
 
 /** How long we give the manager to answer one turn before we give up. */
 export const AGENT_CHAT_TIMEOUT_MS = 120_000;
-
-/**
- * The manager could not be reached, or answered with a non-2xx: it is down,
- * mid-deploy, misconfigured, or refusing the turn. `meta.status` is the HTTP
- * status when we got one (a bare status code — safe to show).
- */
-export class LangyAgentUnavailableError extends HandledError {
-  declare readonly code: "langy_agent_unavailable";
-
-  constructor(message: string, options: { status?: number } = {}) {
-    super("langy_agent_unavailable", message, {
-      httpStatus: 503,
-      fault: "platform",
-      ...remediation("langy_agent_unavailable"),
-      meta: options.status !== undefined ? { status: options.status } : {},
-    });
-    this.name = "LangyAgentUnavailableError";
-  }
-}
 
 /**
  * Every Langy worker slot is taken (`ErrMaxWorkers` → the manager's
@@ -254,15 +238,15 @@ export class LangyTurnErrors {
    * span — so every failure, in every conversation, showed the user the SAME id.
    */
   private static unhandledShape(): SerializedHandledError {
-    const spanContext = trace.getActiveSpan()?.spanContext();
+    const { traceId, spanId } = activeTraceContext();
 
     return {
       code: "unknown",
       // Deprecated back-compat alias of `code` — see SerializedHandledError.kind.
       kind: "unknown",
       meta: {},
-      traceId: spanContext?.traceId,
-      spanId: spanContext?.spanId,
+      traceId,
+      spanId,
       httpStatus: 500,
       // An unclassified failure is potentially ours — log it like an incident.
       fault: "platform",
@@ -368,5 +352,21 @@ export class LangyTurnErrors {
    */
   static serialize(error: unknown): string {
     return JSON.stringify(LangyTurnErrors.classify(error));
+  }
+}
+
+/**
+ * The intentional retry signal for a Langy worker dispatch.
+ *
+ * Initial dispatch runs through the process outbox; heartbeat recovery runs as
+ * an event subscriber. Throwing leaves retry ownership with the active durable
+ * delivery mechanism instead of emitting a second domain event. Dispatch is
+ * idempotent on turnId (Go `ClaimTurn`), so a retry that races a now-live worker
+ * is a benign no-op.
+ */
+export class LangyTurnDispatchRetry extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LangyTurnDispatchRetry";
   }
 }

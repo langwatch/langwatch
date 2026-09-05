@@ -24,10 +24,8 @@ import {
   userErasureFacts,
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
-import {
-  computeIdentifierHash,
-  deriveIdentifierId,
-} from "../adapters/crypto.identifier-identity.adapter";
+import type { IdentifierIdentityPort } from "../ports/identifier-identity.port";
+import { computeIdentifierHash } from "../rules/identifier-hash.rules";
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository";
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository";
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository";
@@ -53,11 +51,21 @@ import type { IdentityUsersRepository } from "../repositories/identity-users.rep
  * address LOCK: claimed atomically before any fact is stated, which is what
  * keeps a losing verification out of the log and its proof unburned.
  */
-export class IdentityGuards {
-  constructor(
+export class IdentityGuardsService {
+  static create(
+    heads: IdentityHeadsRepository,
+    users: IdentityUsersRepository,
+    reservations: IdentityReservationRepository,
+    identifiers: IdentifierIdentityPort,
+  ): IdentityGuardsService {
+    return new IdentityGuardsService(heads, users, reservations, identifiers);
+  }
+
+  private constructor(
     private readonly heads: IdentityHeadsRepository,
     private readonly users: IdentityUsersRepository,
     private readonly reservations: IdentityReservationRepository,
+    private readonly identifiers: IdentifierIdentityPort,
   ) {}
 
   /**
@@ -177,7 +185,7 @@ export class IdentityGuards {
       actor,
     } = data;
     const normalizedValue = normalizeIdentifierValue(value);
-    const identifierId = deriveIdentifierId({
+    const identifierId = this.identifiers.deriveIdentifierId({
       userId,
       provider,
       providerAccountId,

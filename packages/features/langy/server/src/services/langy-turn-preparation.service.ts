@@ -17,14 +17,16 @@ import {
 import { LangyTurnAttemptService } from "./langy-turn-attempt.service";
 import { LangyTurnOverrideService } from "./langy-turn-override.service";
 import {
-  buildWorkerProbeArgs,
-  composeLangyTurnPrompt,
   LANGY_OVERRIDE,
   LANGY_USER_MESSAGE_LABEL,
   type LangyTurnServiceDependencies,
   type StartConversationTurnInput,
 } from "./langy-turn-shared.service";
+import { LangyTurnSharedService } from "./langy-turn-shared.service";
 import { mintRunToken } from "../ports/langy-frame-auth.port";
+
+/** The shared turn helpers. Stateless: one instance for the module. */
+const LANGY_TURN_SHARED = LangyTurnSharedService.create();
 
 const logger = createLogger("langwatch:langy:turn-start");
 
@@ -65,7 +67,7 @@ export class LangyTurnPreparationService {
     const earlyWorkerProbe = args.credentials.githubToken
       ? null
       : args.worker.probe(
-          buildWorkerProbeArgs({
+          LANGY_TURN_SHARED.buildWorkerProbeArgs({
             projectId: args.projectId,
             actorUserId: args.userId,
             conversationId: args.conversation.id,
@@ -224,7 +226,7 @@ export class LangyTurnPreparationService {
   ) {
     const workerAvailable = await (earlyWorkerProbe ??
       args.worker.probe(
-        buildWorkerProbeArgs({
+        LANGY_TURN_SHARED.buildWorkerProbeArgs({
           projectId: args.projectId,
           actorUserId: args.userId,
           conversationId: args.conversation.id,
@@ -288,7 +290,7 @@ export class LangyTurnPreparationService {
     // same answer the resolver would have given.
     const isUiActionSurfaceOpen =
       uiActionsOpenResult.status === "fulfilled" ? uiActionsOpenResult.value : false;
-    const { prompt, labelled } = composeLangyTurnPrompt({
+    const { prompt, labelled } = LANGY_TURN_SHARED.composeLangyTurnPrompt({
       contextBlock: this.deps.context.tryRender({
         context: args.turnContext,
         isUiActionSurfaceOpen,

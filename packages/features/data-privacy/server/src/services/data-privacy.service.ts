@@ -12,7 +12,7 @@ import {
 } from "@langwatch/data-privacy-contract";
 import safe from "safe-regex2";
 import type { DataPrivacyPolicyRepository } from "../repositories/data-privacy.repository";
-import { DataPrivacyPolicyCache } from "./data-privacy-cache.service";
+import { DataPrivacyPolicyCacheService } from "./data-privacy-cache.service";
 import { DataPrivacyResolutionService } from "./data-privacy-resolution.service";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -20,7 +20,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 export class DataPrivacyService extends DataPrivacyServiceContract {
   private constructor(
     private readonly repository: DataPrivacyPolicyRepository,
-    private readonly cache: DataPrivacyPolicyCache,
+    private readonly cache: DataPrivacyPolicyCacheService,
     private readonly resolution: DataPrivacyResolutionService,
     private readonly projects: ProjectService,
     private readonly organizations: OrganizationService,
@@ -35,7 +35,11 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
     ttlMs?: number;
     now?: () => number;
   }): DataPrivacyService {
-    const cache = new DataPrivacyPolicyCache(options.repository, options.ttlMs, options.now);
+    const cache = DataPrivacyPolicyCacheService.create(
+      options.repository,
+      options.ttlMs,
+      options.now,
+    );
 
     return new DataPrivacyService(
       options.repository,

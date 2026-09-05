@@ -21,10 +21,7 @@ import {
   type SavedWorkbenchChartRestService,
 } from "@langwatch/analytics-server";
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
-import {
-  mapDashboardSavedWorkbenchChartError,
-  type DashboardApp,
-} from "@langwatch/dashboard-server";
+import { type DashboardApp, SavedWorkbenchChartErrorsAdapter } from "@langwatch/dashboard-server";
 
 import { createPlatformUrlBuilder } from "../../app/api-rest-ports";
 
@@ -47,7 +44,8 @@ export function mountLangWatchQLRest(options: {
       ...options.collaborators,
       charts: () => options.dashboard() as unknown as SavedWorkbenchChartRestService,
       platformUrl: createPlatformUrlBuilder(options.publicBaseUrl),
-      mapSavedChartError: (error) => mapDashboardSavedWorkbenchChartError(error),
+      mapSavedChartError: (error) =>
+        SavedWorkbenchChartErrorsAdapter.mapDashboardSavedWorkbenchChartError(error),
     },
   });
 }

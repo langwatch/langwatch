@@ -7,7 +7,7 @@ import type {
 } from "../repositories/trace-summary.repository";
 
 import type { TraceBlobStoreService } from "./trace-blob-store.service";
-import { TraceNotFoundError } from "./trace-read-errors.service";
+import { TraceNotFoundError } from "@langwatch/trace-contract";
 import type { SpanStorageRepository } from "../repositories/span-storage.repository";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service";
 import type { TraceSummaryData } from "@langwatch/trace-contract";

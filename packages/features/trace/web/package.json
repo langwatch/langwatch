@@ -146,7 +146,6 @@
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/dataset-web": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/evaluator-web": "workspace:*",

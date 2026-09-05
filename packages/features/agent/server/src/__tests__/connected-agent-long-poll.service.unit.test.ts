@@ -16,7 +16,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter";
 import type { AgentStateStorePort } from "../ports/agent-state-store.port";
 import { callKey, httpSessionKey, pendingKey } from "../rules/connected-agent-keys.rules";
-import type { StoredCall } from "../services/connected-agent-envelope.service";
+import type { StoredCall } from "@langwatch/agent-contract";
 import type { AgentRepository } from "../repositories/agent.repository";
 import type { ConnectCredentialPort } from "../ports/connect-credential.port";
 import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter";

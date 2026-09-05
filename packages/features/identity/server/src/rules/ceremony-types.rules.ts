@@ -20,7 +20,7 @@ export interface CeremonyAccountRow {
 
 /**
  * What the identity storage adapter needs a ceremony to do, as a named
- * contract rather than a `Pick<IdentityCeremonies, …>` (the reason
+ * contract rather than a `Pick<IdentityCeremoniesAdapter, …>` (the reason
  * `identity-writes.ts` gives for every other role slice).
  *
  * The adapter's `account` writes are the same two ceremonies better-auth's
@@ -31,7 +31,9 @@ export interface CeremonyAccountRow {
  * carry states nothing, and so does a detach of a tombstone.
  */
 export interface IdentityAccountCeremonies {
-  tryBeforeAccountCreate(account: CeremonyAccountRow): Promise<{ data: { id: string } } | undefined>;
+  tryBeforeAccountCreate(
+    account: CeremonyAccountRow,
+  ): Promise<{ data: { id: string } } | undefined>;
   beforeAccountDelete(account: CeremonyAccountRow): Promise<void>;
   /**
    * A `user` update that touches `email`, on the identity branch (ADR-116

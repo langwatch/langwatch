@@ -6,7 +6,7 @@ import {
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
-import { s256Challenge } from "../adapters/crypto.pkce.adapter";
+import { s256Challenge } from "../rules/pkce.rules";
 import type {
   IdentityVerificationRecord,
   IdentityVerificationRepository,
@@ -59,7 +59,7 @@ function harness(options?: {
   const verifyIdentifier = vi.fn(
     async (_data: VerifyIdentifierCommandData): Promise<unknown[]> => options?.emits?.() ?? [],
   );
-  const service = new VerificationCeremonyService(
+  const service = VerificationCeremonyService.create(
     store,
     {
       tryFindIdentifier: async ({ identifierId }) =>

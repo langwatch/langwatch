@@ -12,16 +12,16 @@ import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import {
   organizationSettingsSchema,
   updateOrganizationSettingsInputSchema,
+  AlreadyOrganizationMemberError,
+  DuplicateInviteError,
+  InviteNotFoundError,
   PersonalWorkspaceNotManagedHereError,
   type OrganizationSettings,
 } from "@langwatch/organization-contract";
 import {
-  AlreadyOrganizationMemberError,
   CannotDisableSelfError,
   CannotRemoveLastAdminError,
   CannotRemoveSelfError,
-  DuplicateInviteError,
-  InviteNotFoundError,
   MemberNotFoundError,
   type OrganizationRestInviteService,
   type OrganizationRestMemberSummary,

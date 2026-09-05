@@ -1,4 +1,4 @@
-import type { JoinRequestGuards } from "../services/join-request-guards.service";
+import type { JoinRequestGuardsService } from "../services/join-request-guards.service";
 import {
   defineAggregate,
   defineEvents,
@@ -59,9 +59,9 @@ const JOIN_REQUEST_COMMANDS = [
 export interface JoinRequestPipelineDeps {
   joinRequestProjectionStore: StateProjectionStore<JoinRequestFoldState>;
   /** The guards every command handler runs — `@langwatch/identity-server`'s
-   *  JoinRequestGuards over the app's projection reads, the same instance
+   *  JoinRequestGuardsService over the app's projection reads, the same instance
    *  shape the calling path uses. */
-  joinRequestGuards: JoinRequestGuards;
+  joinRequestGuards: JoinRequestGuardsService;
   /** How the reminder and expiry wakes reach the world. */
   lifecycle: JoinRequestLifecyclePort;
 }

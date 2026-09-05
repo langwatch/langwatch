@@ -26,7 +26,10 @@ import {
   resolveLangyRestCaller,
   type LangyRestCredentialPorts,
 } from "./langy-rest-credentials.api";
-import { awaitTurnSettlement } from "#services/langy-turn-settlement-waiter.service";
+import {
+  type LangyTurnBufferWatch,
+  LangyTurnSettlementWaiterService,
+} from "#services/langy-turn-settlement-waiter.service";
 
 const AUTH_REASON =
   "project API key resolved by the process's credential port and checked against the API-key ceiling, then bridged to an owning user by resolveLangyKeyIdentity";
@@ -56,13 +59,11 @@ export type LangyTurnsRestPorts = LangyRestCredentialPorts &
     /** The SAME application the browser's Langy procedures resolve on. */
     langy: () => LangyApp;
     /**
-     * The process's Redis, or null.
-     *
-     * `Prefer: wait` reads the live turn buffer through a duplicated
-     * connection; without one the hold is served by fold reads alone, which is
-     * slower and correct rather than absent.
+     * One turn's live buffer, opened for the length of a `Prefer: wait` hold,
+     * or null when this process composed no Redis: the hold is then served by
+     * fold reads alone, which is slower and correct rather than absent.
      */
-    redis: () => { duplicate(): { disconnect(): void } } | null;
+    openTurnBuffer: () => LangyTurnBufferWatch | null;
   }>;
 
 /**
@@ -204,9 +205,9 @@ export function createLangyTurnsRestApp(options: {
     if (waitSeconds && waitSeconds > 0) {
       // Client disconnect and the wait deadline are one signal: an abandoned
       // hold stops consuming fold reads (and its blocking Redis read) at once.
-      const settlement = await awaitTurnSettlement({
+      const settlement = await LangyTurnSettlementWaiterService.awaitTurnSettlement({
         langy: langy.langyService,
-        redis: ports.redis(),
+        openBuffer: ports.openTurnBuffer,
         projectId: caller.projectId,
         conversationId: result.conversationId,
         turnId: result.turnId,

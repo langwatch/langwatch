@@ -7,7 +7,7 @@ import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../rules/identity-m
  * `SystemMigration` contract over `IdentityBackfillService`.
  * Spec: specs/identity/identifier-model.feature.
  */
-export class IdentityIdentifierBackfillMigration implements SystemMigration {
+export class IdentityIdentifierBackfillMigrationAdapter implements SystemMigration {
   // Never rename: the stable state-table key. The write gate reads exactly
   // this record, so the latch and the migration share the one constant.
   readonly name = IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME;
@@ -30,8 +30,8 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
 
   static create(
     backfill: Pick<IdentityBackfillService, "migrateUser">,
-  ): IdentityIdentifierBackfillMigration {
-    return new IdentityIdentifierBackfillMigration(backfill);
+  ): IdentityIdentifierBackfillMigrationAdapter {
+    return new IdentityIdentifierBackfillMigrationAdapter(backfill);
   }
 
   constructor(private readonly backfill: Pick<IdentityBackfillService, "migrateUser">) {}

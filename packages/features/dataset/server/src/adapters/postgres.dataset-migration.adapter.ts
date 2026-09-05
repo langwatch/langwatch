@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
-import { StreamingChunkWriter } from "../services/dataset-chunk-writer.service";
+import { StreamingChunkWriterService } from "../services/dataset-chunk-writer.service";
 import {
   DATASET_MUTATION_TXN_MAX_WAIT_MS,
   DATASET_MUTATION_TXN_TIMEOUT_MS,
@@ -83,7 +83,7 @@ export class PostgresDatasetMigrationAdapter {
 
     const baseline = await this.readFingerprint(this.options.database.datasetRecord, input);
     const storage = await this.options.storage.forProject(input.projectId);
-    const writer = new StreamingChunkWriter({
+    const writer = StreamingChunkWriterService.create({
       storage,
       projectId: input.projectId,
       datasetId: input.datasetId,

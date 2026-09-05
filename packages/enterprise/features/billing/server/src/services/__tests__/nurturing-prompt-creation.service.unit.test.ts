@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NurturingPromptCountRepository } from "../../repositories/nurturing-prompt-count.repository";
 import { NurturingPromptCreationService } from "../nurturing-prompt-creation.service";
-import { setNurturingOrganizationAdminResolver } from "../../adapters/nurturing-sink.adapter";
+import { NurturingSinkRegistryService } from "../nurturing-sink-registry.service";
 import {
   registerNoNurturingSink,
   registerNurturingSink,
@@ -27,7 +27,7 @@ function repositoryCounting(orgPromptCount: number): NurturingPromptCountReposit
 beforeEach(() => vi.clearAllMocks());
 afterEach(() => {
   registerNoNurturingSink();
-  setNurturingOrganizationAdminResolver(null);
+  NurturingSinkRegistryService.setOrganizationAdminResolver(null);
 });
 
 describe("NurturingPromptCreationService.firePromptCreated", () => {
@@ -97,7 +97,7 @@ describe("NurturingPromptCreationService.afterPromptCreated", () => {
       /** @scenario "Prompt creation tracked regardless of whether created via platform UI or API" */
       it("resolves the organization admin and reports the milestone all the same", async () => {
         const sink = registerNurturingSink();
-        setNurturingOrganizationAdminResolver(async () => ({
+        NurturingSinkRegistryService.setOrganizationAdminResolver(async () => ({
           userId: "admin-1",
           organizationId: "org-1",
         }));

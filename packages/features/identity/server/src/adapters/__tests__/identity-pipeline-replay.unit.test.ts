@@ -1,5 +1,5 @@
 import { emptyIdentityHeads } from "@langwatch/identity-contract";
-import { IdentityGuards } from "../../services/identity-guards.service";
+import { IdentityGuardsService } from "../../services/identity-guards.service";
 import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository";
 import { describe, expect, it } from "vitest";
 import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing";
@@ -14,6 +14,7 @@ import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { IdentityPipelineDefinitionAdapter } from "../identity-pipeline-definition.adapter";
 import type { IdentityFoldState } from "../../projections/identity-state.projection";
 import { USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
+import { CryptoIdentifierIdentityAdapter } from "../crypto.identifier-identity.adapter";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };
@@ -89,10 +90,11 @@ describe("identity pipeline", () => {
       const pipeline = eventSourcing.register(
         IdentityPipelineDefinitionAdapter.create({
           identityProjectionStore: store,
-          identityGuards: new IdentityGuards(
+          identityGuards: IdentityGuardsService.create(
             new ProjectionHeads(store),
             inMemoryIdentityUsers(),
             inMemoryIdentityReservations(),
+            CryptoIdentifierIdentityAdapter.create(),
           ),
           // Two-step verification rides this same pipeline (D06); this test
           // exercises the identifier half, so its store is never reached.

@@ -6,7 +6,7 @@ import {
   reduceMfaEnrollment,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
-import { MfaGuards } from "../services/mfa-guards.service";
+import { MfaGuardsService } from "../services/mfa-guards.service";
 import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository";
 
 const USER = "user_sam";
@@ -66,10 +66,10 @@ function confirmData(enrollmentId = ENROLLMENT, backupCodeCount = 10) {
 
 async function enabled(backupCodeCount = 10): Promise<{
   repo: InMemoryEnrollments;
-  guards: MfaGuards;
+  guards: MfaGuardsService;
 }> {
   const repo = new InMemoryEnrollments();
-  const guards = new MfaGuards(repo);
+  const guards = MfaGuardsService.create(repo);
   repo.fold(await guards.enrollMfa(enrollData()));
   repo.fold(await guards.confirmMfa(confirmData(ENROLLMENT, backupCodeCount)));
   return { repo, guards };
@@ -80,7 +80,7 @@ describe("the two-step verification guards", () => {
     /** @scenario "Starting a setup records the fact and never the secret" */
     it("states the enrollment under the person's own tenancy", async () => {
       const repo = new InMemoryEnrollments();
-      const facts = await new MfaGuards(repo).enrollMfa(enrollData());
+      const facts = await MfaGuardsService.create(repo).enrollMfa(enrollData());
 
       expect(facts).toEqual([
         {
@@ -98,7 +98,7 @@ describe("the two-step verification guards", () => {
     /** @scenario "Two setup attempts at once leave one setup" */
     it("refuses the second attempt rather than replacing the first", async () => {
       const repo = new InMemoryEnrollments();
-      const guards = new MfaGuards(repo);
+      const guards = MfaGuardsService.create(repo);
       repo.fold(await guards.enrollMfa(enrollData("mfaenr_first")));
 
       // Replacing it would invalidate a secret the person may already have
@@ -117,7 +117,7 @@ describe("the two-step verification guards", () => {
     /** @scenario "A correct code finishes the setup" */
     it("states the confirmation with the number of codes issued", async () => {
       const repo = new InMemoryEnrollments();
-      const guards = new MfaGuards(repo);
+      const guards = MfaGuardsService.create(repo);
       repo.fold(await guards.enrollMfa(enrollData()));
 
       expect(await guards.confirmMfa(confirmData())).toEqual([
@@ -131,7 +131,7 @@ describe("the two-step verification guards", () => {
     /** @scenario "Entering a code for an expired setup says so and offers the way forward" */
     it("separates an expired setup from a wrong code", async () => {
       const repo = new InMemoryEnrollments();
-      const guards = new MfaGuards(repo);
+      const guards = MfaGuardsService.create(repo);
       repo.fold(await guards.enrollMfa(enrollData()));
       repo.fold(
         await guards.expireMfaEnrollment({
@@ -159,7 +159,7 @@ describe("the two-step verification guards", () => {
     /** @scenario "A setup left unfinished expires on its own" */
     it("expires a pending setup and leaves a finished one alone", async () => {
       const repo = new InMemoryEnrollments();
-      const guards = new MfaGuards(repo);
+      const guards = MfaGuardsService.create(repo);
       repo.fold(await guards.enrollMfa(enrollData()));
 
       const expire = {
@@ -395,7 +395,7 @@ describe("the two-step verification guards", () => {
 
       // Probing for another person's account must not leave rows behind.
       expect(
-        await new MfaGuards(repo).recordVerificationFailure({
+        await MfaGuardsService.create(repo).recordVerificationFailure({
           tenantId: USER,
           userId: USER,
           commandId: "mfacmd_12",

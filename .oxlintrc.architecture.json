@@ -212,21 +212,21 @@
     // ------------------------------------------------------------------
     {
       "files": [
-        "packages/features/analytics/server/src/clickhouse/filter-translator.ts",
-        "packages/features/analytics/server/src/services/analytics.tripwire.ts",
-        "packages/features/experiment/web/src/batch-evaluation-results.types.ts",
-        "packages/features/experiment/web/src/batch-results/comparison-charts.tsx",
-        "packages/features/langy/web/src/behaviour/langy-choices-timeline.ts",
+        "packages/features/analytics/server/src/repositories/clickhouse/clickhouse.filter-translator.mapper.ts",
+        "packages/features/analytics/server/src/services/analytics-tripwire.service.ts",
+        "packages/features/experiment/web/src/ui/sections/batch-evaluation-results.types.ts",
+        "packages/features/experiment/web/src/ui/sections/batch-results/comparison-charts.tsx",
+        "packages/features/langy/web/src/model/langy-choices-timeline.ts",
         "packages/features/ops/server/src/repositories/redis/queue.repository.ts",
         "packages/features/trace/contract/src/trace-query-analysis.ts",
-        "packages/features/trace/server/src/services/canonical-extraction.rules.ts",
-        "packages/features/trace/server/src/services/canonicalisation/mastra.canonicaliser.ts",
-        "packages/features/trace/server/src/services/gen-ai-span.rules.ts",
-        "packages/features/trace/server/src/services/langwatch-value.rules.ts",
-        "packages/features/trace/server/src/services/trace-attribute-cap.rules.ts",
-        "packages/features/trace/web/src/prompt-attributes.ts",
-        "packages/features/trace/web/src/transcript/block-stack-items.ts",
-        "packages/features/trace/web/src/transcript/content-parser.ts"
+        "packages/features/trace/server/src/rules/canonical-extraction.rules.ts",
+        "packages/features/trace/server/src/rules/langwatch-value.rules.ts",
+        "packages/features/trace/server/src/services/gen-ai-span.service.ts",
+        "packages/features/trace/server/src/services/mastra-canonicaliser.service.ts",
+        "packages/features/trace/server/src/services/trace-attribute-cap.service.ts",
+        "packages/features/trace/web/src/behavior/transcript/content-parser.ts",
+        "packages/features/trace/web/src/model/prompt-attributes.ts",
+        "packages/features/trace/web/src/model/transcript/block-stack-items.ts"
       ],
       "rules": {
         "max-depth": ["error", { "max": 6 }]

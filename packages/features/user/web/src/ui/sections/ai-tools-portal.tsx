@@ -7,7 +7,7 @@ import { ExternalToolTile } from "../blocks/external-tool-tile";
 import { CodingAssistantTile } from "./coding-assistant-tile";
 import { GovernanceGettingStartedBanner } from "./governance-getting-started-banner";
 import { ModelProviderTile } from "./model-provider-tile";
-import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
+import type { AiToolEntry } from "../../model/ai-tool-catalog";
 import type { AiToolConfigOf } from "../../model/ai-tool-config";
 
 const SECTION_LABELS: Record<AiToolEntry["type"], string> = {
@@ -48,8 +48,8 @@ export function AiToolsPortal() {
     [availabilityQuery.data],
   );
 
-  // No cast: the read hands over the contract's own `AiToolEntry`, which is
-  // what the procedure map declares and what these tiles now name.
+  // No cast: the procedure map declares the same `AiToolEntry` these tiles
+  // name, so the read lands typed.
   const entries: AiToolEntry[] = listQuery.data ?? [];
 
   const grouped = useMemo(() => {

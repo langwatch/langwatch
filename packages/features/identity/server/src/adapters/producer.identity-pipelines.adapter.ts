@@ -1,11 +1,11 @@
 /**
  * The four identity pipelines as a PRODUCER registers them. One definition, two registrations.
  */
-import { IdentityGuards } from "../services/identity-guards.service";
-import { JoinRequestGuards } from "../services/join-request-guards.service";
-import { MfaGuards } from "../services/mfa-guards.service";
-import { ScimSyncGuards } from "../services/scim-sync-guards.service";
-import { SsoConnectionGuards } from "../services/sso-connection-guards.service";
+import { IdentityGuardsService } from "../services/identity-guards.service";
+import { JoinRequestGuardsService } from "../services/join-request-guards.service";
+import { MfaGuardsService } from "../services/mfa-guards.service";
+import { ScimSyncGuardsService } from "../services/scim-sync-guards.service";
+import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service";
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository";
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository";
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository";
@@ -39,6 +39,7 @@ import type { ScimSyncFoldState } from "../projections/scim-sync-state.projectio
 import { SsoConnectionPipelineDefinitionAdapter } from "./sso-connection-pipeline-definition.adapter";
 import type { ConnectionTeardownPort } from "../processes/connection-teardown.process";
 import type { SsoConnectionFoldState } from "../projections/sso-connection-state.projection";
+import { CryptoIdentifierIdentityAdapter } from "./crypto.identifier-identity.adapter";
 
 /** Why every stand-in below refuses, in the process's own words. */
 function producerOnly(input: { processName: string; pipeline: string; capability: string }): Error {
@@ -155,7 +156,7 @@ export class IdentityProducerPipelinesAdapter {
         pipeline,
         "identifier",
       ),
-      identityGuards: new IdentityGuards(
+      identityGuards: IdentityGuardsService.create(
         producerOnlyReads<IdentityHeadsRepository>({
           processName: this.processName,
           pipeline,
@@ -171,13 +172,14 @@ export class IdentityProducerPipelinesAdapter {
           pipeline,
           name: "identifier reservations",
         }),
+        CryptoIdentifierIdentityAdapter.create(),
       ),
       mfaProjectionStore: new ProducerOnlyStateProjectionStore<MfaFoldState>(
         this.processName,
         pipeline,
         "two-step enrollment",
       ),
-      mfaGuards: new MfaGuards(
+      mfaGuards: MfaGuardsService.create(
         producerOnlyReads<MfaEnrollmentRepository>({
           processName: this.processName,
           pipeline,
@@ -196,7 +198,7 @@ export class IdentityProducerPipelinesAdapter {
         pipeline,
         "join request",
       ),
-      joinRequestGuards: new JoinRequestGuards({
+      joinRequestGuards: JoinRequestGuardsService.create({
         requests: producerOnlyReads<JoinRequestReadRepository>({
           processName: this.processName,
           pipeline,
@@ -216,7 +218,7 @@ export class IdentityProducerPipelinesAdapter {
         pipeline,
         "single sign-on connection",
       ),
-      connectionGuards: new SsoConnectionGuards({
+      connectionGuards: SsoConnectionGuardsService.create({
         connections: producerOnlyReads<SsoConnectionReadRepository>({
           processName: this.processName,
           pipeline,
@@ -253,7 +255,7 @@ export class IdentityProducerPipelinesAdapter {
         pipeline,
         "directory sync",
       ),
-      scimSyncGuards: new ScimSyncGuards({
+      scimSyncGuards: ScimSyncGuardsService.create({
         syncs: producerOnlyReads<ScimSyncReadRepository>({
           processName: this.processName,
           pipeline,

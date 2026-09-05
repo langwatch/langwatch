@@ -12,11 +12,14 @@ import { LangyTurnAttemptService } from "./langy-turn-attempt.service";
 import { LangyTurnBaseDependenciesService } from "./langy-turn-base-dependencies.service";
 import { LangyTurnPreparationService } from "./langy-turn-preparation.service";
 import {
-  langyTurnIdentity,
   type LangyTurnServiceDependencies,
   type StartConversationTurnInput,
 } from "./langy-turn-shared.service";
+import { LangyTurnSharedService } from "./langy-turn-shared.service";
 import { LangySessionKeyScopeError } from "../ports/langy-turn-runtime.port";
+
+/** The shared turn helpers. Stateless: one instance for the module. */
+const LANGY_TURN_SHARED = LangyTurnSharedService.create();
 
 type ClaimedTurn = {
   conversation: { id: string; isNew: boolean };
@@ -106,7 +109,7 @@ export class LangyTurnStartService {
       userId,
       lastUserMessage,
       userText,
-      identity: langyTurnIdentity({
+      identity: LANGY_TURN_SHARED.langyTurnIdentity({
         userId,
         idempotencyKey: input.idempotencyKey,
         messages: input.messages,

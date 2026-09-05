@@ -46,156 +46,162 @@ type GateState = {
 
 /** One cached boolean per subject (an organization for authz, a user for
  *  identity), both directions on one bound. */
-export function perSubjectCachedFlag({
-  name,
-  ttlMs,
-  maxEntries = MAX_CACHE_ENTRIES,
-}: {
-  /** Identifies the gate in the warn log - never used to key the cache
-   *  (each gate gets its own map by having its own closure over this call). */
-  name: string;
-  ttlMs: number;
-  /**
-   * Hard cap on distinct subjects this gate holds at once (default `MAX_CACHE_ENTRIES`).
-   */
-  maxEntries?: number;
-}): PerSubjectCachedFlag {
-  const state: GateState = {
+export class PerSubjectCachedGateService implements PerSubjectCachedFlag {
+  static create({
     name,
     ttlMs,
-    maxEntries,
-    cached: new Map(),
-    inFlight: new Map(),
-  };
+    maxEntries = MAX_CACHE_ENTRIES,
+  }: {
+    /** Identifies the gate in the warn log - never used to key the cache
+     *  (each gate has its own maps by being its own instance). */
+    name: string;
+    ttlMs: number;
+    /** Hard cap on distinct subjects this gate holds at once. */
+    maxEntries?: number;
+  }): PerSubjectCachedGateService {
+    return new PerSubjectCachedGateService({
+      name,
+      ttlMs,
+      maxEntries,
+      cached: new Map(),
+      inFlight: new Map(),
+    });
+  }
 
-  return {
-    get: (args) => get({ state, ...args }),
-    invalidate: ({ subject }) => invalidate({ state, subject }),
-    resetForTesting: () => {
-      state.cached.clear();
-      // Same reason `invalidate` marks: a read still in flight must not
-      // land in the map the reset just emptied.
-      for (const pending of state.inFlight.values()) {
-        pending.isStale = true;
+  private constructor(private readonly state: GateState) {}
+
+  get(args: { subject: string; read: () => Promise<boolean> }): Promise<boolean> {
+    return PerSubjectCachedGateService.read({ state: this.state, ...args });
+  }
+
+  invalidate({ subject }: { subject: string }): void {
+    PerSubjectCachedGateService.forget({ state: this.state, subject });
+  }
+
+  resetForTesting(): void {
+    this.state.cached.clear();
+    // Same reason `invalidate` marks: a read still in flight must not
+    // land in the map the reset just emptied.
+    for (const pending of this.state.inFlight.values()) {
+      pending.isStale = true;
+    }
+
+    this.state.inFlight.clear();
+  }
+
+  private static async read({
+    state,
+    subject,
+    read,
+  }: {
+    state: GateState;
+    subject: string;
+    read: () => Promise<boolean>;
+  }): Promise<boolean> {
+    const entry = state.cached.get(subject);
+    if (entry !== undefined) {
+      if (Date.now() < entry.expiresAt) {
+        return entry.isOn;
       }
 
-      state.inFlight.clear();
-    },
-  };
-}
-
-async function get({
-  state,
-  subject,
-  read,
-}: {
-  state: GateState;
-  subject: string;
-  read: () => Promise<boolean>;
-}): Promise<boolean> {
-  const entry = state.cached.get(subject);
-  if (entry !== undefined) {
-    if (Date.now() < entry.expiresAt) {
-      return entry.isOn;
+      state.cached.delete(subject);
     }
 
-    state.cached.delete(subject);
-  }
+    const pending = state.inFlight.get(subject);
+    if (pending !== undefined) {
+      return pending.promise;
+    }
 
-  const pending = state.inFlight.get(subject);
-  if (pending !== undefined) {
-    return pending.promise;
-  }
-
-  const flight: InFlightEntry = {
-    isStale: false,
-    promise: Promise.resolve(false),
-  };
-  flight.promise = settle({ state, subject, read, flight });
-  state.inFlight.set(subject, flight);
-  try {
-    return await flight.promise;
-  } finally {
-    // An invalidation may already have removed this flight and a NEWER one
-    // may have taken the slot - deleting unconditionally would tear that
-    // newer read's coalescing down.
-    if (state.inFlight.get(subject) === flight) {
-      state.inFlight.delete(subject);
+    const flight: InFlightEntry = {
+      isStale: false,
+      promise: Promise.resolve(false),
+    };
+    flight.promise = PerSubjectCachedGateService.settle({ state, subject, read, flight });
+    state.inFlight.set(subject, flight);
+    try {
+      return await flight.promise;
+    } finally {
+      // An invalidation may already have removed this flight and a NEWER one
+      // may have taken the slot - deleting unconditionally would tear that
+      // newer read's coalescing down.
+      if (state.inFlight.get(subject) === flight) {
+        state.inFlight.delete(subject);
+      }
     }
   }
-}
 
-async function settle({
-  state,
-  subject,
-  read,
-  flight,
-}: {
-  state: GateState;
-  subject: string;
-  read: () => Promise<boolean>;
-  flight: InFlightEntry;
-}): Promise<boolean> {
-  let isOn: boolean;
-  try {
-    isOn = await read();
-  } catch (error) {
-    // Fail safe: the caller's `read` already means "false is the safe
-    // direction" for its own gate (legacy stays on, not cut over yet), so
-    // the fallback here is the same value either gate wants - only the
-    // silence is new, and it is gone.
-    logger.warn(
-      { subject, gate: state.name, error },
-      "could not read the per-subject gate; caching the failure briefly and answering false",
-    );
-    isOn = false;
-  }
+  private static async settle({
+    state,
+    subject,
+    read,
+    flight,
+  }: {
+    state: GateState;
+    subject: string;
+    read: () => Promise<boolean>;
+    flight: InFlightEntry;
+  }): Promise<boolean> {
+    let isOn: boolean;
+    try {
+      isOn = await read();
+    } catch (error) {
+      // Fail safe: the caller's `read` already means "false is the safe
+      // direction" for its own gate (legacy stays on, not cut over yet), so
+      // the fallback here is the same value either gate wants - only the
+      // silence is new, and it is gone.
+      logger.warn(
+        { subject, gate: state.name, error },
+        "could not read the per-subject gate; caching the failure briefly and answering false",
+      );
+      isOn = false;
+    }
 
-  // Invalidated while this read was in flight: the value predates the
-  // write that invalidated it, so hand it to the callers already waiting
-  // (they coalesced before the invalidation) but never cache it - the next
-  // `get` re-reads the source.
-  if (flight.isStale) {
+    // Invalidated while this read was in flight: the value predates the
+    // write that invalidated it, so hand it to the callers already waiting
+    // (they coalesced before the invalidation) but never cache it - the next
+    // `get` re-reads the source.
+    if (flight.isStale) {
+      return isOn;
+    }
+
+    if (state.cached.size >= state.maxEntries) {
+      PerSubjectCachedGateService.evictUntilUnderCap({ state });
+    }
+
+    state.cached.set(subject, { isOn, expiresAt: Date.now() + state.ttlMs });
+
     return isOn;
   }
 
-  if (state.cached.size >= state.maxEntries) {
-    evictUntilUnderCap({ state });
-  }
+  /**
+   * Amortized-sweep expired entries, then fall back to evicting the oldest
+   * (by insertion order) until the map is back under the cap - see
+   * `MAX_CACHE_ENTRIES` for why the map is bounded at all.
+   */
+  private static evictUntilUnderCap({ state }: { state: GateState }): void {
+    const now = Date.now();
+    for (const [key, entry] of state.cached) {
+      if (entry.expiresAt <= now) {
+        state.cached.delete(key);
+      }
+    }
 
-  state.cached.set(subject, { isOn, expiresAt: Date.now() + state.ttlMs });
+    while (state.cached.size >= state.maxEntries) {
+      const oldestKey: string | undefined = state.cached.keys().next().value;
+      if (oldestKey === undefined) {
+        break;
+      }
 
-  return isOn;
-}
-
-/**
- * Amortized-sweep expired entries, then fall back to evicting the oldest
- * (by insertion order) until the map is back under the cap - see
- * `MAX_CACHE_ENTRIES` for why the map is bounded at all.
- */
-function evictUntilUnderCap({ state }: { state: GateState }): void {
-  const now = Date.now();
-  for (const [key, entry] of state.cached) {
-    if (entry.expiresAt <= now) {
-      state.cached.delete(key);
+      state.cached.delete(oldestKey);
     }
   }
 
-  while (state.cached.size >= state.maxEntries) {
-    const oldestKey: string | undefined = state.cached.keys().next().value;
-    if (oldestKey === undefined) {
-      break;
+  private static forget({ state, subject }: { state: GateState; subject: string }): void {
+    state.cached.delete(subject);
+    const pending = state.inFlight.get(subject);
+    if (pending !== undefined) {
+      pending.isStale = true;
+      state.inFlight.delete(subject);
     }
-
-    state.cached.delete(oldestKey);
-  }
-}
-
-function invalidate({ state, subject }: { state: GateState; subject: string }): void {
-  state.cached.delete(subject);
-  const pending = state.inFlight.get(subject);
-  if (pending !== undefined) {
-    pending.isStale = true;
-    state.inFlight.delete(subject);
   }
 }

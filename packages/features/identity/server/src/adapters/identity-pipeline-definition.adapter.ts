@@ -1,5 +1,5 @@
-import type { IdentityGuards } from "../services/identity-guards.service";
-import type { MfaGuards } from "../services/mfa-guards.service";
+import type { IdentityGuardsService } from "../services/identity-guards.service";
+import type { MfaGuardsService } from "../services/mfa-guards.service";
 import {
   defineAggregate,
   defineEvents,
@@ -37,13 +37,13 @@ import { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch
 export interface IdentityPipelineDeps {
   identityProjectionStore: StateProjectionStore<IdentityFoldState>;
   /** The guards every command handler runs — `@langwatch/identity-server`'s
-   *  IdentityGuards over the app's heads repository, the same instance shape
+   *  IdentityGuardsService over the app's heads repository, the same instance shape
    *  the calling path uses. */
-  identityGuards: IdentityGuards;
+  identityGuards: IdentityGuardsService;
   /** The `MfaEnrollment` head + cursor (D06), folded on this same pipeline. */
   mfaProjectionStore: StateProjectionStore<MfaFoldState>;
   /** The two-step verification guards, over the same person's state. */
-  mfaGuards: MfaGuards;
+  mfaGuards: MfaGuardsService;
 }
 
 /**

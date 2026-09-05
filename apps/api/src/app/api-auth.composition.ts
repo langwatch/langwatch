@@ -1,7 +1,10 @@
 import type { AuthService, VerifiedBrowserSession } from "@langwatch/auth-contract";
 import { PostgresAuthAdapter, type SignUpVerificationPort } from "@langwatch/auth-server";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import { issuerForProviderId, PostgresIdentityEmailAdapter } from "@langwatch/identity-server";
+import {
+  BetterAuthAccountQueriesAdapter,
+  PostgresIdentityEmailAdapter,
+} from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
@@ -197,7 +200,7 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
       // format, so it is minted by the package that owns the format rather
       // than restated here — a root that spelled the prefix out would write
       // rows the other tier's queries do not find.
-      credentialIssuer: issuerForProviderId("credential"),
+      credentialIssuer: BetterAuthAccountQueriesAdapter.issuerForProviderId("credential"),
       organizations: options.organizations,
       avatarStorage:
         options.avatarStorage ??

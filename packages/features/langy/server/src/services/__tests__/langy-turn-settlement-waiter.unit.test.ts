@@ -2,21 +2,13 @@ import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGetEventsAfter = vi.fn();
-const mockDuplicate = vi.fn();
 const mockDisconnect = vi.fn();
 const mockReadTail = vi.fn();
 const mockFollow = vi.fn();
 
-vi.mock("../../adapters/redis.langy-token-buffer.adapter", () => ({
-  LangyTokenBuffer: {
-    create: vi.fn(() => ({
-      readTail: mockReadTail,
-      follow: mockFollow,
-    })),
-  },
-}));
-
-const { awaitTurnSettlement } = await import("../langy-turn-settlement-waiter.service");
+const { LangyTurnSettlementWaiterService } =
+  await import("../langy-turn-settlement-waiter.service");
+const awaitTurnSettlement = LangyTurnSettlementWaiterService.awaitTurnSettlement;
 
 const emptyPage = {
   events: [],
@@ -48,7 +40,10 @@ const settledPage = {
 
 const args = {
   langy: { getEventsAfter: mockGetEventsAfter },
-  redis: { duplicate: mockDuplicate },
+  openBuffer: () => ({
+    buffer: { readTail: mockReadTail, follow: mockFollow } as never,
+    release: mockDisconnect,
+  }),
   projectId: "project-1",
   conversationId: "conv-1",
   turnId: "turn-1",
@@ -58,7 +53,6 @@ const args = {
 describe("awaitTurnSettlement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockDuplicate.mockReturnValue({ disconnect: mockDisconnect });
     mockReadTail.mockResolvedValue({ reads: [], lastId: "0" });
   });
 

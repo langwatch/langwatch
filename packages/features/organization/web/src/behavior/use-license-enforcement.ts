@@ -4,13 +4,19 @@
  * worst case is a refusal one round trip later.
  */
 
-import type { LimitType } from "@langwatch/enterprise-licensing-contract";
 // The upgrade modal is a shared zustand singleton: opening it here and
 // mounting it elsewhere is one modal, not a copy.
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
 import { useCallback } from "react";
 import { api } from "./organization-api";
 import { useOrganizationTeamProject } from "./use-organization-team-project";
+
+/**
+ * The seat levers a licence caps, written out here rather than imported from
+ * `@langwatch/enterprise-licensing-contract`: this package is core and may not
+ * depend on enterprise. `limitTypes` in that contract is the source of truth.
+ */
+type LimitType = "members" | "membersLite";
 
 /** Click-then-modal license enforcement: `checkAndProceed` runs the action or shows the upgrade modal. */
 export function useLicenseEnforcement(limitType: LimitType) {

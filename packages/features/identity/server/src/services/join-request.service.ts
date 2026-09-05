@@ -18,7 +18,7 @@ import {
   type WithdrawJoinCommandData,
   withdrawJoinCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { JoinRequestGuards } from "./join-request-guards.service";
+import type { JoinRequestGuardsService } from "./join-request-guards.service";
 import type { JoinRequestLedger } from "../rules/join-request-ledger.rules";
 
 /**
@@ -39,8 +39,12 @@ import type { JoinRequestLedger } from "../rules/join-request-ledger.rules";
  * acceptance rather than in a history of its own.
  */
 export class JoinRequestService {
-  constructor(
-    private readonly guards: JoinRequestGuards,
+  static create(guards: JoinRequestGuardsService, ledger: JoinRequestLedger): JoinRequestService {
+    return new JoinRequestService(guards, ledger);
+  }
+
+  private constructor(
+    private readonly guards: JoinRequestGuardsService,
     private readonly ledger: JoinRequestLedger,
   ) {}
 

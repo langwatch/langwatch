@@ -5,9 +5,8 @@ import {
   type DatasetNormalizePayload,
   type DatasetNormalizationSender,
 } from "@langwatch/dataset-contract";
-import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
 import { DatasetContentRepository } from "../repositories/dataset-content.repository";
-import { createDatasetNormalizeHandler } from "../adapters/dataset-normalize.adapter";
+import type { DatasetNormalizePort } from "../ports/dataset-normalize.port";
 import { UploadNotPendingError } from "@langwatch/dataset-contract";
 
 /**
@@ -19,26 +18,21 @@ export class DatasetNormalizationService
   extends DatasetNormalizeQueuePort
   implements DatasetNormalizationWorkerPort
 {
-  private readonly processPayload: DatasetNormalizationSender;
   private readonly inlineChains = new Map<string, Promise<void>>();
   private sender: DatasetNormalizationSender | null = null;
 
   private constructor(
     private readonly datasets: DatasetContentRepository,
-    storage: DatasetStorageResolver,
+    private readonly normalize: DatasetNormalizePort,
   ) {
     super();
-    this.processPayload = createDatasetNormalizeHandler({
-      repository: datasets,
-      getStorage: (projectId) => storage.forProject(projectId),
-    });
   }
 
   static create(options: {
     datasets: DatasetContentRepository;
-    storage: DatasetStorageResolver;
+    normalize: DatasetNormalizePort;
   }): DatasetNormalizationService {
-    return new DatasetNormalizationService(options.datasets, options.storage);
+    return new DatasetNormalizationService(options.datasets, options.normalize);
   }
 
   connect(sender: DatasetNormalizationSender): void {
@@ -46,7 +40,7 @@ export class DatasetNormalizationService
   }
 
   process(payload: DatasetNormalizePayload): Promise<void> {
-    return this.processPayload(datasetNormalizePayloadSchema.parse(payload));
+    return this.normalize.normalize(datasetNormalizePayloadSchema.parse(payload));
   }
 
   async enqueueNormalize(input: { datasetId: string; projectId: string }): Promise<void> {
@@ -79,7 +73,7 @@ export class DatasetNormalizationService
   private runInline(payload: DatasetNormalizePayload): Promise<void> {
     const key = `${payload.projectId}:${payload.datasetId}`;
     const prior = this.inlineChains.get(key) ?? Promise.resolve();
-    const next = prior.catch(() => undefined).then(() => this.processPayload(payload));
+    const next = prior.catch(() => undefined).then(() => this.normalize.normalize(payload));
     this.inlineChains.set(key, next);
     void next.finally(() => {
       if (this.inlineChains.get(key) === next) {

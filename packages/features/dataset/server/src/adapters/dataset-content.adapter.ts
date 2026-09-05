@@ -12,12 +12,9 @@ import {
 import { DatasetContentPort } from "../ports/dataset.port";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
 import { DatasetContentRepository } from "../repositories/dataset-content.repository";
-import type { ChunkOffset } from "../services/dataset-chunking.service";
+import type { ChunkOffset } from "../rules/dataset-chunking.rules";
 import { DatasetChunkService } from "../services/dataset-chunk.service";
-import {
-  DatasetChunkCountMissingError,
-  DatasetNotReadyError,
-} from "@langwatch/dataset-contract";
+import { DatasetChunkCountMissingError, DatasetNotReadyError } from "@langwatch/dataset-contract";
 
 /** Object-backed Dataset content; all storage selection is injected at boot. */
 export class DatasetContentAdapter extends DatasetContentPort {

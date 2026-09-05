@@ -6,10 +6,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { IdentityCeremonyClock } from "../rules/ceremony-types.rules";
 import type { IdentityLinkProposalWrites } from "../rules/identity-writes.rules";
-import {
-  IdentityJitDisabledError,
-  IdentityLinkProposedError,
-} from "@langwatch/identity-contract";
+import { IdentityJitDisabledError, IdentityLinkProposedError } from "@langwatch/identity-contract";
 
 /**
  * What happens when an SSO callback comes back (ADR-117 §3), in one place and
@@ -137,13 +134,17 @@ export interface SignInCallbackLinkingDeps {
 }
 
 export class SignInCallbackLinkingService {
+  static create(deps: SignInCallbackLinkingDeps): SignInCallbackLinkingService {
+    return new SignInCallbackLinkingService(deps);
+  }
+
   private readonly directory: SignInCallbackDirectoryPort;
   private readonly proposals: IdentityLinkProposalWrites;
   private readonly audit: SignInCallbackAudit;
   private readonly clock: IdentityCeremonyClock;
   private readonly newProposalId: () => string;
 
-  constructor(deps: SignInCallbackLinkingDeps) {
+  private constructor(deps: SignInCallbackLinkingDeps) {
     this.directory = deps.directory;
     this.proposals = deps.proposals;
     this.audit = deps.audit;

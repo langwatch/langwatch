@@ -1,6 +1,7 @@
 export * from "./group";
 export * from "./group.trpc-schemas";
 export * from "./group.errors";
+export * from "./invite.errors";
 export * from "./join-request.trpc-schemas";
 export * from "./organization";
 export * from "./organization.trpc-schemas";

@@ -2,7 +2,6 @@ import { Counter, Histogram, register } from "prom-client";
 
 // Remove existing metrics if they exist (for hot reload)
 const metricNames = [
-  "identity_write_gate_read_failures_total",
   "identity_projection_convergence_timeouts_total",
   "identity_commit_duration_seconds",
 ] as const;
@@ -36,3 +35,26 @@ export const identityCommitDurationSeconds = new Histogram({
   help: "Duration of an identity ledger commit: durable append, queue staging, and the read-your-writes wait.",
   buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
 });
+
+/**
+ * What the ledger adapter records as it commits. A class rather than three
+ * bare counters because the ledger names an operation, not a metric: what a
+ * commit costs and when a wait expired are this module's to decide.
+ */
+export class MetricsIdentityLedgerAdapter {
+  static create(): MetricsIdentityLedgerAdapter {
+    return new MetricsIdentityLedgerAdapter();
+  }
+
+  private constructor() {}
+
+  /** Starts the commit timer; the returned call stops and records it. */
+  startCommitTimer(): () => void {
+    return identityCommitDurationSeconds.startTimer();
+  }
+
+  /** One ceremony returned before the fold carried its events. */
+  recordProjectionConvergenceTimeout(): void {
+    identityProjectionConvergenceTimeoutsTotal.inc();
+  }
+}

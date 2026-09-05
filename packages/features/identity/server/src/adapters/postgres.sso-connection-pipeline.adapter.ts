@@ -4,7 +4,7 @@ import {
 } from "../repositories/prisma/prisma.sso-platform-operators.repository";
 import type { PlatformOperatorPort } from "../ports/platform-operator.port";
 import { LocalDoorBreakGlassBindingAdapter } from "./local-door-break-glass-binding.adapter";
-import { SsoConnectionGuards } from "../services/sso-connection-guards.service";
+import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service";
 import { SsoConnectionService } from "../services/sso-connection.service";
 import type { EventSourcing } from "@langwatch/eventing";
 import { SsoConnectionPipelineDefinitionAdapter } from "./sso-connection-pipeline-definition.adapter";
@@ -70,14 +70,14 @@ export class PostgresSsoConnectionPipelineAdapter {
   build(): ReturnType<typeof SsoConnectionPipelineDefinitionAdapter.create> {
     const { database, eventSourcing, operators } = this.options;
     const head = PrismaSsoConnectionProjectionRepository.create(database);
-    const guards = new SsoConnectionGuards({
+    const guards = SsoConnectionGuardsService.create({
       connections: PrismaSsoConnectionReadRepository.create(database),
       breakGlass: LocalDoorBreakGlassBindingAdapter.create(),
       stranding: PrismaSsoConnectionStrandingRepository.create(database),
       platformOperators: AdminEmailPlatformOperatorsRepository.create({ database, operators }),
     });
 
-    const connections = new SsoConnectionService(
+    const connections = SsoConnectionService.create(
       guards,
       SsoConnectionLedgerWriterAdapter.create({
         projectionStore: head,

@@ -13,8 +13,8 @@ import {
   type LangyConversationCommands,
   type LangyConversationEventsReader,
   type LangyConversationRuntime,
-  type LangyRelayCompositionOptions,
 } from "../services/langy.service";
+import { LangyTurnRelayAdapter, type LangyRelayRedis } from "./langy-turn-relay.adapter";
 import {
   LangyFeedbackPromptPolicy,
   type LangyFeedbackPromptRedis,
@@ -72,6 +72,18 @@ export class LangyEventingPorts {
     readonly trustedMessages: LangyTrustedMessagePort,
   ) {}
 }
+
+/** How this process's Langy relay reaches Redis, and what it resolves for the agent. */
+export type LangyRelayCompositionOptions = {
+  redis: LangyRelayRedis;
+  baseHost: string;
+  resolveResourceUrl?: (input: { projectId: string; resourceId: string }) => Promise<string | null>;
+  resolveCapabilityProgress?: (name: string) => { headline: string } | null;
+  logger?: {
+    warn(o: unknown, message: string): void;
+    debug?(o: unknown, message: string): void;
+  };
+};
 
 export type LangyServiceCompositionOptions = {
   turns: LangyTurnTechnicalPorts;
@@ -185,6 +197,7 @@ export class PostgresLangyAdapter {
       messages: this.repositories.messages,
       admission: this.repositories.admission,
     });
+    const relay = options.relay;
     this.service = LangyService.create({
       conversations,
       turns,
@@ -193,7 +206,23 @@ export class PostgresLangyAdapter {
       feedbackPrompt: LangyFeedbackPromptPolicy.create({
         redis: options.feedbackPromptRedis ?? null,
       }),
-      relayOptions: options.relay,
+      ...(relay
+        ? {
+            openRelay: (langyService) =>
+              LangyTurnRelayAdapter.create({
+                conversations: langyService,
+                redis: relay.redis,
+                baseHost: relay.baseHost,
+                ...(relay.resolveResourceUrl
+                  ? { resolveResourceUrl: relay.resolveResourceUrl }
+                  : {}),
+                ...(relay.resolveCapabilityProgress
+                  ? { resolveCapabilityProgress: relay.resolveCapabilityProgress }
+                  : {}),
+                ...(relay.logger ? { logger: relay.logger } : {}),
+              }),
+          }
+        : {}),
     });
     return this.service;
   }

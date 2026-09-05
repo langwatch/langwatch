@@ -3,7 +3,7 @@ import {
   emptyIdentityHeads,
   reduceIdentity,
 } from "@langwatch/identity-contract";
-import { IdentityGuards } from "../../services/identity-guards.service";
+import { IdentityGuardsService } from "../../services/identity-guards.service";
 import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository";
 import { IdentityService } from "../../services/identity.service";
 import { describe, expect, it, vi } from "vitest";
@@ -18,6 +18,7 @@ import type {
 import { IdentityLedgerWriterAdapter } from "../identity-ledger.adapter";
 import { identityProjectionConvergenceTimeoutsTotal } from "../metrics.identity-ledger.adapter";
 import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing";
+import { CryptoIdentifierIdentityAdapter } from "../crypto.identifier-identity.adapter";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };
@@ -119,10 +120,11 @@ function harness(overrides?: {
   const appended: IdentityEvent[][] = [];
   const staged: unknown[] = [];
   const order: string[] = [];
-  const guards = new IdentityGuards(
+  const guards = IdentityGuardsService.create(
     new ProjectionHeads(store),
     inMemoryIdentityUsers(),
     inMemoryIdentityReservations(),
+    CryptoIdentifierIdentityAdapter.create(),
   );
 
   const sender = {
@@ -132,7 +134,7 @@ function harness(overrides?: {
       staged.push(data);
       if (overrides?.foldNeverLands) return undefined;
       const facts = await guards.attachIdentifier(
-        data as Parameters<IdentityGuards["attachIdentifier"]>[0],
+        data as Parameters<IdentityGuardsService["attachIdentifier"]>[0],
       );
       if (facts.length === 0) return undefined;
       const events = IdentityStateFoldProjection.eventsFor({
@@ -162,7 +164,7 @@ function harness(overrides?: {
     stagedSender: async () => (overrides?.noSender ? null : sender),
     convergence: { timeoutMs: 40, pollMs: 5 },
   });
-  const identity = new IdentityService(guards, ledger);
+  const identity = IdentityService.create(guards, ledger);
 
   return { identity, store, appended, staged, order, sender };
 }

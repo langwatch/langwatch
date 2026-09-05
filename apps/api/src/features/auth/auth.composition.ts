@@ -17,11 +17,8 @@ import {
   SsoConnectionDomainRoutingRepository,
   SignInMethodPolicyService,
 } from "@langwatch/identity-server";
-import {
-  InviteExpiredError,
-  InviteNotFoundError,
-  resolveInviteDisplayStatus,
-} from "@langwatch/organization-server";
+import { InviteExpiredError, InviteNotFoundError } from "@langwatch/organization-contract";
+import { resolveInviteDisplayStatus } from "@langwatch/organization-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { UserService } from "@langwatch/user-contract";
 
@@ -105,7 +102,7 @@ export function composeAuthFeature(options: {
    */
   const resolveAuthProvider = () => Promise.resolve(deployment.authProvider ?? "email");
 
-  const signInRouter = new SignInRouterService({
+  const signInRouter = SignInRouterService.create({
     // The projection-backed lookup when the deployment named a provider, the
     // legacy string columns otherwise. Both answer "which connection routes
     // this domain"; `configured` is whether THIS deployment mounted the method

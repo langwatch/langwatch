@@ -81,9 +81,13 @@ export interface SsoConnectionGrandfatherDeps {
 }
 
 export class SsoConnectionGrandfatherService {
+  static create(deps: SsoConnectionGrandfatherDeps): SsoConnectionGrandfatherService {
+    return new SsoConnectionGrandfatherService(deps);
+  }
+
   private readonly deps: SsoConnectionGrandfatherDeps;
 
-  constructor(deps: SsoConnectionGrandfatherDeps) {
+  private constructor(deps: SsoConnectionGrandfatherDeps) {
     this.deps = deps;
   }
 

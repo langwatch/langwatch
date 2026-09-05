@@ -15,9 +15,9 @@ import type { AuthzBindingForSynthesis } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { PersonalWorkspaceNotManagedHereError } from "@langwatch/organization-contract";
 import slugify from "slugify";
-import { computeEffectiveTeamRoleUpdates } from "./compute-effective-team-role-updates.service";
+import { EffectiveTeamRoleUpdatesService } from "./compute-effective-team-role-updates.service";
 import { isCustomRole } from "../rules/custom-role-naming.rules";
-import type { TeamRoleValue } from "./member-role-constraints.service";
+import type { TeamRoleValue } from "../rules/member-role-constraints.rules";
 import {
   CannotDisableSelfError,
   CannotRemoveSelfError,
@@ -658,11 +658,12 @@ export class OrganizationMembershipService {
       return acc;
     }, []);
 
-    const effectiveTeamRoleUpdates = computeEffectiveTeamRoleUpdates({
-      requestedTeamRoleUpdates,
-      currentMemberships,
-      newOrganizationRole: role,
-    });
+    const effectiveTeamRoleUpdates =
+      EffectiveTeamRoleUpdatesService.create().computeEffectiveTeamRoleUpdates({
+        requestedTeamRoleUpdates,
+        currentMemberships,
+        newOrganizationRole: role,
+      });
 
     return await this.repo.updateMemberRole({
       organizationId,

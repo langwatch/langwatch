@@ -16,6 +16,7 @@
  * has no such dependency — `Prefer: wait` degrades to fold reads — so it mounts
  * either way.
  */
+import { LangyTokenBufferAdapter } from "@langwatch/langy-server";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import {
@@ -119,7 +120,15 @@ export function composeApiLangyRest(
     turns: {
       ...credentials,
       langy: () => langy,
-      redis: () => redis ?? null,
+      openTurnBuffer: () => {
+        if (!redis) return null;
+        const blocking = redis.duplicate();
+
+        return {
+          buffer: LangyTokenBufferAdapter.create({ redis, blockingRedis: blocking }),
+          release: () => blocking.disconnect(),
+        };
+      },
     },
     internal,
     ...(redis

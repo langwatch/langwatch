@@ -1,8 +1,4 @@
-import {
-  reportNurturingFailure,
-  tryNurturingProfiles,
-  tryNurturingSink,
-} from "../adapters/nurturing-sink.adapter";
+import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service";
 
 async function syncSubscriptionTrait({
   organizationId,
@@ -11,12 +7,12 @@ async function syncSubscriptionTrait({
   organizationId: string;
   hasSubscription: boolean;
 }): Promise<void> {
-  const nurturing = tryNurturingSink();
+  const nurturing = NurturingSinkRegistryService.trySink();
   if (!nurturing) {
     return;
   }
 
-  const profiles = tryNurturingProfiles();
+  const profiles = NurturingSinkRegistryService.tryProfiles();
   if (!profiles) {
     return;
   }
@@ -48,11 +44,13 @@ export class NurturingSubscriptionSyncService {
     organizationId: string;
     hasSubscription: boolean;
   }): void {
-    const nurturing = tryNurturingSink();
+    const nurturing = NurturingSinkRegistryService.trySink();
     if (!nurturing) {
       return;
     }
 
-    void syncSubscriptionTrait({ organizationId, hasSubscription }).catch(reportNurturingFailure);
+    void syncSubscriptionTrait({ organizationId, hasSubscription }).catch(
+      NurturingSinkRegistryService.reportFailure,
+    );
   }
 }

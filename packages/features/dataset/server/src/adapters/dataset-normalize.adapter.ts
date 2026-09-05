@@ -40,9 +40,10 @@ import {
 } from "@langwatch/dataset-contract";
 import type { DatasetNormalizePayload } from "@langwatch/dataset-contract";
 import type { DatasetContentRepository as DatasetRepository } from "../repositories/dataset-content.repository";
-import { StreamingChunkWriter } from "../services/dataset-chunk-writer.service";
+import { StreamingChunkWriterService } from "../services/dataset-chunk-writer.service";
+import { DatasetNormalizePort } from "../ports/dataset-normalize.port";
 import type { DatasetStorage } from "../ports/dataset-storage.port";
-import { UPLOAD_MAX_BYTES } from "../services/presigned-upload.service";
+import { UPLOAD_MAX_BYTES } from "../rules/presigned-upload.rules";
 
 /**
  * A single staged `.json` array can't be parsed without buffering the whole
@@ -175,7 +176,7 @@ const applyRename = (
 const parseInto = async (params: {
   stream: Readable;
   format: FileFormat;
-  writer: StreamingChunkWriter;
+  writer: StreamingChunkWriterService;
   sizeBytes: number;
   /**
    * User-confirmed columns from the upload step (ADR-032 v19). When the confirm
@@ -411,24 +412,31 @@ const deriveColumnTypes = (headers: string[]): DatasetColumns =>
   }));
 
 /**
- * Build the `datasetNormalize` handler over its injected boundaries.
+ * The `datasetNormalize` work, over its injected boundaries.
  *
- * Returns the GroupQueue process function. On success the dataset flips to
- * `ready` with PG-authoritative counters; on any failure it flips to `failed`
- * (staging file preserved for manual retry) and rethrows so the queue records
- * the failure.
+ * On success the dataset flips to `ready` with PG-authoritative counters; on
+ * any failure it flips to `failed` (staging file preserved for manual retry)
+ * and rethrows so the queue records the failure.
  */
-export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
-  return async (payload: DatasetNormalizePayload): Promise<void> => {
+export class DatasetNormalizeAdapter extends DatasetNormalizePort {
+  static create(deps: DatasetNormalizeDeps): DatasetNormalizeAdapter {
+    return new DatasetNormalizeAdapter(deps);
+  }
+
+  private constructor(private readonly deps: DatasetNormalizeDeps) {
+    super();
+  }
+
+  async normalize(payload: DatasetNormalizePayload): Promise<void> {
     const { projectId, datasetId, stagingKey, filename } = payload;
 
-    const dataset = await deps.repository.tryFindOne({ id: datasetId, projectId });
+    const dataset = await this.deps.repository.tryFindOne({ id: datasetId, projectId });
     // Idempotent re-drive guard (I-IDEM): only a `processing` dataset is
     // normalizable. A re-enqueue after success (ready) or a concurrent finalize
     // race is a no-op.
     if (dataset?.status !== "processing") return;
 
-    const storage = await deps.getStorage(projectId);
+    const storage = await this.deps.getStorage(projectId);
 
     try {
       // Defense-in-depth fast reject (I-MEM): finalize already capped this, but
@@ -443,7 +451,7 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
 
       const format = detectFileFormat(filename);
       const stream = await storage.streamStaged({ projectId, key: stagingKey });
-      const writer = new StreamingChunkWriter({
+      const writer = StreamingChunkWriterService.create({
         storage,
         projectId,
         datasetId,
@@ -483,7 +491,7 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
         fromIndex: meta.chunkCount,
       });
 
-      await deps.repository.update({
+      await this.deps.repository.update({
         id: datasetId,
         projectId,
         data: {
@@ -521,12 +529,12 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
       // Mark failed and rethrow so the queue records the failure; the staging
       // object is intentionally NOT deleted so a manual retry can re-run.
       const statusError = error instanceof Error ? error.message : "Normalize failed";
-      await deps.repository.update({
+      await this.deps.repository.update({
         id: datasetId,
         projectId,
         data: { status: "failed", statusError },
       });
       throw error;
     }
-  };
-};
+  }
+}

@@ -20,7 +20,7 @@ import { reduceIdentifier } from "./identifier-aggregate";
  *
  * Facts are accepted: the reducer never refuses, it folds. The guards that
  * can refuse (a PRIMARY detach, a uniqueness race) run before any fact
- * exists (`@langwatch/identity-server`'s IdentityGuards). A fact the heads
+ * exists (`@langwatch/identity-server`'s IdentityGuardsService). A fact the heads
  * cannot apply cleanly (a verify for an unknown identifier — possible only
  * from a partial replay window) is folded conservatively rather than
  * dropped.

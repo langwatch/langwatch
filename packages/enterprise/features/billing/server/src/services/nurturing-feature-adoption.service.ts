@@ -1,4 +1,4 @@
-import { reportNurturingFailure, tryNurturingSink } from "../adapters/nurturing-sink.adapter";
+import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service";
 
 export class NurturingFeatureAdoptionService {
   static create(): NurturingFeatureAdoptionService {
@@ -17,14 +17,14 @@ export class NurturingFeatureAdoptionService {
     teamMemberCount: number;
     role: string;
   }): void {
-    const nurturing = tryNurturingSink();
+    const nurturing = NurturingSinkRegistryService.trySink();
     if (!nurturing) {
       return;
     }
 
     void nurturing
       .identifyUser({ userId, traits: { team_member_count: teamMemberCount } })
-      .catch(reportNurturingFailure);
+      .catch(NurturingSinkRegistryService.reportFailure);
 
     void nurturing
       .trackEvent({
@@ -34,7 +34,7 @@ export class NurturingFeatureAdoptionService {
           role,
         },
       })
-      .catch(reportNurturingFailure);
+      .catch(NurturingSinkRegistryService.reportFailure);
   }
 
   /**
@@ -51,14 +51,14 @@ export class NurturingFeatureAdoptionService {
     workflowId: string;
     projectId: string;
   }): void {
-    const nurturing = tryNurturingSink();
+    const nurturing = NurturingSinkRegistryService.trySink();
     if (!nurturing) {
       return;
     }
 
     void nurturing
       .identifyUser({ userId, traits: { workflow_count: workflowCount } })
-      .catch(reportNurturingFailure);
+      .catch(NurturingSinkRegistryService.reportFailure);
 
     void nurturing
       .trackEvent({
@@ -69,7 +69,7 @@ export class NurturingFeatureAdoptionService {
           project_id: projectId,
         },
       })
-      .catch(reportNurturingFailure);
+      .catch(NurturingSinkRegistryService.reportFailure);
   }
 
   /**
@@ -86,14 +86,14 @@ export class NurturingFeatureAdoptionService {
     scenarioId: string;
     projectId: string;
   }): void {
-    const nurturing = tryNurturingSink();
+    const nurturing = NurturingSinkRegistryService.trySink();
     if (!nurturing) {
       return;
     }
 
     void nurturing
       .identifyUser({ userId, traits: { scenario_count: scenarioCount } })
-      .catch(reportNurturingFailure);
+      .catch(NurturingSinkRegistryService.reportFailure);
 
     void nurturing
       .trackEvent({
@@ -104,7 +104,7 @@ export class NurturingFeatureAdoptionService {
           project_id: projectId,
         },
       })
-      .catch(reportNurturingFailure);
+      .catch(NurturingSinkRegistryService.reportFailure);
   }
 
   /**
@@ -121,7 +121,7 @@ export class NurturingFeatureAdoptionService {
     experimentId?: string;
     projectId: string;
   }): void {
-    const nurturing = tryNurturingSink();
+    const nurturing = NurturingSinkRegistryService.trySink();
     if (!nurturing) {
       return;
     }
@@ -135,6 +135,6 @@ export class NurturingFeatureAdoptionService {
           project_id: projectId,
         },
       })
-      .catch(reportNurturingFailure);
+      .catch(NurturingSinkRegistryService.reportFailure);
   }
 }

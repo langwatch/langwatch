@@ -20,7 +20,7 @@
  * Everything else on the stream — status, progress, reasoning, plan, navigate,
  * ui — is live-only signal and holds no place in the record.
  */
-import type { LangyStreamEntry } from "../adapters/redis.langy-token-buffer.adapter";
+import type { LangyStreamEntry } from "@langwatch/langy-contract";
 
 /** One thing the turn did, in the order it did it. */
 export type LangyTurnSegment = { kind: "text"; text: string } | { kind: "tool"; id: string };
@@ -32,35 +32,49 @@ export type LangyTurnSegment = { kind: "text"; text: string } | { kind: "tool"; 
  * still takes a place (the harness may only report a completed call), but an
  * `end` that follows its own `start` does not take a second one.
  */
-export function turnOrderFromStream(entries: readonly LangyStreamEntry[]): LangyTurnSegment[] {
-  const order: LangyTurnSegment[] = [];
-  const placed = new Set<string>();
+export class LangyTurnOrderService implements LangyTurnOrderReader {
+  static create(buffer: LangyTurnStreamTail): LangyTurnOrderService {
+    return new LangyTurnOrderService(buffer);
+  }
 
-  for (const entry of entries) {
-    if (entry.type === "delta") {
-      const open = order.at(-1);
-      if (open?.kind === "text") {
-        open.text += entry.text;
+  private constructor(private readonly buffer: LangyTurnStreamTail) {}
+
+  async readTurnOrder(at: { conversationId: string; turnId: string }): Promise<LangyTurnSegment[]> {
+    const { reads } = await this.buffer.readTail(at);
+
+    return LangyTurnOrderService.turnOrderFromStream(reads.map(({ entry }) => entry));
+  }
+
+  static turnOrderFromStream(entries: readonly LangyStreamEntry[]): LangyTurnSegment[] {
+    const order: LangyTurnSegment[] = [];
+    const placed = new Set<string>();
+
+    for (const entry of entries) {
+      if (entry.type === "delta") {
+        const open = order.at(-1);
+        if (open?.kind === "text") {
+          open.text += entry.text;
+          continue;
+        }
+
+        order.push({ kind: "text", text: entry.text });
         continue;
       }
 
-      order.push({ kind: "text", text: entry.text });
-      continue;
+      if (entry.type !== "tool") {
+        continue;
+      }
+
+      if (placed.has(entry.id)) {
+        continue;
+      }
+
+      placed.add(entry.id);
+      order.push({ kind: "tool", id: entry.id });
     }
 
-    if (entry.type !== "tool") {
-      continue;
-    }
-
-    if (placed.has(entry.id)) {
-      continue;
-    }
-
-    placed.add(entry.id);
-    order.push({ kind: "tool", id: entry.id });
+    return order;
   }
-
-  return order;
 }
 
 /** The live edge, as the order read needs it: the whole turn, from the start. */
@@ -78,14 +92,4 @@ export interface LangyTurnStreamTail {
  */
 export interface LangyTurnOrderReader {
   readTurnOrder(a: { conversationId: string; turnId: string }): Promise<LangyTurnSegment[]>;
-}
-
-export function createLangyTurnOrderReader(buffer: LangyTurnStreamTail): LangyTurnOrderReader {
-  return {
-    async readTurnOrder(at) {
-      const { reads } = await buffer.readTail(at);
-
-      return turnOrderFromStream(reads.map(({ entry }) => entry));
-    },
-  };
 }

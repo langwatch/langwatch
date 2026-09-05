@@ -38,7 +38,7 @@ import {
   exceedsUploadCap,
   stagingUploadKey,
   UPLOAD_MAX_BYTES,
-} from "../services/presigned-upload.service";
+} from "../rules/presigned-upload.rules";
 import { DatasetChunkService } from "../services/dataset-chunk.service";
 import { stripNullBytes } from "../rules/dataset-sanitize.rules";
 

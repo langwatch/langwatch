@@ -66,21 +66,22 @@ export {
   type DatasetMigrationRunResult,
   type DatasetMigrationSummary,
 } from "./adapters/postgres.dataset-migration.adapter";
-export { createDatasetNormalizeHandler } from "./adapters/dataset-normalize.adapter";
+export { DatasetNormalizeAdapter } from "./adapters/dataset-normalize.adapter";
+export { DatasetNormalizePort } from "./ports/dataset-normalize.port";
 export { DatasetNormalizationService } from "./services/dataset-normalization.service";
 export { DatasetContentRepository } from "./repositories/dataset-content.repository";
 export {
   PrismaDatasetContentRepository,
   type DatasetContentDatabase,
 } from "./repositories/prisma/prisma.dataset-content.repository";
-export * from "./services/dataset-chunking.service";
+export * from "./rules/dataset-chunking.rules";
 export { DatasetChunkService } from "./services/dataset-chunk.service";
 export type {
   DatasetMutationRecord,
   RecomputedDatasetCounts,
 } from "./services/dataset-chunk.service";
 export { MAX_INMEMORY_COLUMN_EDIT_BYTES } from "./services/dataset-chunk.service";
-export * from "./services/presigned-upload.service";
+export * from "./rules/presigned-upload.rules";
 export * from "./rules/dataset-sanitize.rules";
 export * from "@langwatch/dataset-contract";
 export {

@@ -13,7 +13,7 @@ import {
   chunkedMeta,
   chunkMetaOf,
   toSingleJsonl,
-} from "./dataset-chunking.service";
+} from "../rules/dataset-chunking.rules";
 import { type DatasetStorage } from "../ports/dataset-storage.port";
 import {
   DatasetConflictError,

@@ -12,8 +12,8 @@ import type {
 import type { LangyAnalyticsEventProjectionRecord } from "../projections/langy-analytics-event.projection";
 import type { LangyTitleGenerator } from "../ports/langy-effect.port";
 import type { LangySessionKeyService } from "../services/langy-session-key.service";
-import type { LangyTokenBuffer } from "./redis.langy-token-buffer.adapter";
-import type { LangyTurnHandoffStore } from "./redis.langy-turn-handoff.adapter";
+import type { LangyTokenBufferAdapter } from "./redis.langy-token-buffer.adapter";
+import type { LangyTurnHandoffAdapter } from "./redis.langy-turn-handoff.adapter";
 import type { LangyBroadcastPort } from "../subscribers/langy-conversation.subscriber";
 import { NullLangyWorkerMetricsAdapter } from "./null-langy-worker-metrics.adapter";
 import { UnavailableLangyWorkerAdapter } from "./unavailable-langy-worker.adapter";
@@ -71,12 +71,12 @@ function buildLangyConversationProducerPipeline(input: { processName: string }) 
     confirmAccepted: refuse("confirm a turn admission"),
     release: refuse("release a turn admission"),
   };
-  const buffer: Pick<LangyTokenBuffer, "liveness" | "appendStatus" | "markError"> = {
+  const buffer: Pick<LangyTokenBufferAdapter, "liveness" | "appendStatus" | "markError"> = {
     liveness: refuse("read a turn's live buffer"),
     appendStatus: refuse("append a turn status frame"),
     markError: refuse("mark a turn errored"),
   };
-  const handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash"> = {
+  const handoffStore: Pick<LangyTurnHandoffAdapter, "read" | "stash"> = {
     read: refuse("read a turn handoff"),
     stash: refuse("stash a turn handoff"),
   };

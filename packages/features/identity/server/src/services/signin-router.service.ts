@@ -99,12 +99,16 @@ export interface SignInRouteRequest {
 }
 
 export class SignInRouterService {
+  static create(deps: SignInRouterDeps): SignInRouterService {
+    return new SignInRouterService(deps);
+  }
+
   private readonly domains: SignInDomainRoutingPort;
   private readonly policy: SignInMethodPolicyPort;
   private readonly breakGlass: SignInBreakGlassLimiter;
   private readonly recorder: SignInRoutingRecorder;
 
-  constructor(deps: SignInRouterDeps) {
+  private constructor(deps: SignInRouterDeps) {
     this.domains = deps.domains;
     this.policy = deps.policy;
     this.breakGlass = deps.breakGlass;

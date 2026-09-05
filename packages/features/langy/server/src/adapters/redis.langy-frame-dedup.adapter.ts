@@ -12,7 +12,7 @@ export interface LangyFrameDedup {
   }): Promise<boolean>;
 }
 
-export class LangyFrameDedupStore implements LangyFrameDedup {
+export class LangyFrameDedupAdapter implements LangyFrameDedup {
   private constructor(
     private readonly redis: LangyFrameDedupRedis,
     private readonly ttlSeconds: number,
@@ -21,8 +21,8 @@ export class LangyFrameDedupStore implements LangyFrameDedup {
   static create(options: {
     redis: LangyFrameDedupRedis;
     ttlSeconds?: number;
-  }): LangyFrameDedupStore {
-    return new LangyFrameDedupStore(options.redis, options.ttlSeconds ?? 3600);
+  }): LangyFrameDedupAdapter {
+    return new LangyFrameDedupAdapter(options.redis, options.ttlSeconds ?? 3600);
   }
 
   async reserveFrameNonce(input: {

@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 import { modelProviderIcons } from "./model-provider-marks";
 import { ASSISTANT_PRESETS, type AssistantKind } from "@langwatch/coding-agent-web";
-import type { AiToolType } from "@langwatch/enterprise-governance-contract";
+import type { AiToolType } from "../../model/ai-tool-catalog";
 import { resolveToolPreset, TOOL_PRESETS } from "./tool-presets";
 
 const FALLBACK_ICONS: Record<AiToolType, ReactNode> = {

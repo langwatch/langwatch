@@ -11,7 +11,7 @@ import {
   VERIFICATION_REQUESTED_EVENT_TYPE,
 } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
-import { SsoConnectionGuards } from "../services/sso-connection-guards.service";
+import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
@@ -48,7 +48,7 @@ const IDP = {
 let connections: InMemoryConnections;
 let breakGlass: StubBreakGlassBindings;
 let stranding: StubStranding;
-let guards: SsoConnectionGuards;
+let guards: SsoConnectionGuardsService;
 
 /** Run a verb and fold what it states, the way the pipeline does. */
 async function run(
@@ -90,7 +90,7 @@ beforeEach(() => {
   connections = new InMemoryConnections();
   breakGlass = new StubBreakGlassBindings(true);
   stranding = new StubStranding([]);
-  guards = new SsoConnectionGuards({
+  guards = SsoConnectionGuardsService.create({
     connections,
     breakGlass,
     stranding,

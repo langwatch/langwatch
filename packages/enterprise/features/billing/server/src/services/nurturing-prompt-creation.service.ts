@@ -1,8 +1,4 @@
-import {
-  reportNurturingFailure,
-  tryNurturingOrganizationAdminResolver,
-  tryNurturingSink,
-} from "../adapters/nurturing-sink.adapter";
+import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service";
 import { createLogger } from "@langwatch/observability";
 import type { NurturingPromptCountRepository } from "../repositories/nurturing-prompt-count.repository";
 
@@ -27,7 +23,7 @@ export class NurturingPromptCreationService {
     projectId: string;
     orgPromptCount: number;
   }): void {
-    const nurturing = tryNurturingSink();
+    const nurturing = NurturingSinkRegistryService.trySink();
     if (!nurturing) {
       return;
     }
@@ -37,7 +33,7 @@ export class NurturingPromptCreationService {
         userId,
         traits: { has_prompts: true, prompt_count: orgPromptCount },
       })
-      .catch(reportNurturingFailure);
+      .catch(NurturingSinkRegistryService.reportFailure);
 
     if (orgPromptCount === 1) {
       void nurturing
@@ -46,7 +42,7 @@ export class NurturingPromptCreationService {
           event: "first_prompt_created",
           properties: { project_id: projectId },
         })
-        .catch(reportNurturingFailure);
+        .catch(NurturingSinkRegistryService.reportFailure);
     }
   }
 
@@ -71,7 +67,7 @@ export class NurturingPromptCreationService {
         let organizationId: string | undefined;
 
         if (!resolvedUserId) {
-          const resolveOrgAdmin = tryNurturingOrganizationAdminResolver();
+          const resolveOrgAdmin = NurturingSinkRegistryService.tryOrganizationAdminResolver();
           const resolution = await resolveOrgAdmin?.(projectId);
           resolvedUserId = resolution?.userId;
           organizationId = resolution?.organizationId ?? undefined;
@@ -110,7 +106,7 @@ export class NurturingPromptCreationService {
         });
       } catch (error) {
         logger.error({ projectId, error }, "Failed to fire prompt creation nurturing — non-fatal");
-        reportNurturingFailure(error);
+        NurturingSinkRegistryService.reportFailure(error);
       }
     })();
   }

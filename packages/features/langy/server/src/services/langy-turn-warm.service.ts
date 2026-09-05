@@ -1,11 +1,12 @@
 import { stripGithubCredentials } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { LangyTurnBaseDependenciesService } from "./langy-turn-base-dependencies.service";
-import {
-  buildWorkerProbeArgs,
-  type LangyTurnServiceDependencies,
-} from "./langy-turn-shared.service";
+import { type LangyTurnServiceDependencies } from "./langy-turn-shared.service";
+import { LangyTurnSharedService } from "./langy-turn-shared.service";
 import { LangySessionKeyScopeError } from "../ports/langy-turn-runtime.port";
+
+/** The shared turn helpers. Stateless: one instance for the module. */
+const LANGY_TURN_SHARED = LangyTurnSharedService.create();
 
 const logger = createLogger("langwatch:langy:turn-warm");
 
@@ -92,7 +93,7 @@ export class LangyTurnWarmService {
     }
 
     const alive = await worker.probe(
-      buildWorkerProbeArgs({
+      LANGY_TURN_SHARED.buildWorkerProbeArgs({
         projectId,
         actorUserId: userId,
         conversationId,

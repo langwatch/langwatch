@@ -3,7 +3,7 @@ import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
 } from "@langwatch/langy-contract";
-import type { LangyConversationProcessingEvent } from "../../eventing.langy-conversation-events.adapter";
+import type { LangyConversationProcessingEvent } from "../../../projections/langy-conversation-state.projection";
 import {
   LangyAgentRespondedEventSchema,
   LangyAgentResponseFailedEventSchema,
@@ -18,7 +18,7 @@ import {
   LangyPlanUpdatedEventSchema,
   LangyToolCallInitiatedEventSchema,
   LangyToolCallSucceededEventSchema,
-} from "../../eventing.langy-conversation-events.adapter";
+} from "../../../projections/langy-conversation-state.projection";
 
 import { buildLangyProcessEventView } from "../../../processes/langy-conversation.process";
 

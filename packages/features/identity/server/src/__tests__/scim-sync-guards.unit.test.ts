@@ -9,7 +9,10 @@ import {
   type ScimSyncState,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
-import { SCIM_APPLY_MAX_ATTEMPTS, ScimSyncGuards } from "../services/scim-sync-guards.service";
+import {
+  SCIM_APPLY_MAX_ATTEMPTS,
+  ScimSyncGuardsService,
+} from "../services/scim-sync-guards.service";
 
 const CONNECTION = "conn_okta_primary";
 const ORGANIZATION = "org_acme";
@@ -27,7 +30,7 @@ const commandIdentity = {
 };
 
 function guardsOver(state: ScimSyncState | null) {
-  return new ScimSyncGuards({
+  return ScimSyncGuardsService.create({
     syncs: { tryFindSync: async () => state },
   });
 }
@@ -42,7 +45,7 @@ function syncing(overrides: Partial<ScimSyncState> = {}): ScimSyncState {
   };
 }
 
-describe("ScimSyncGuards", () => {
+describe("ScimSyncGuardsService", () => {
   describe("when a token is minted", () => {
     describe("given the connection has no sync yet", () => {
       it("states that the sync began", async () => {

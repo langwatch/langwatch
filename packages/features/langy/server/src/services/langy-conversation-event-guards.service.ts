@@ -15,13 +15,19 @@ import type {
   LangyToolCallFailedEvent,
   LangyToolCallInitiatedEvent,
   LangyToolCallSucceededEvent,
-} from "../adapters/eventing.langy-conversation-events.adapter";
+} from "../projections/langy-conversation-state.projection";
 
 /**
  * Which event a `LangyConversationProcessingEvent` actually is. Fourteen narrowings of one union,
  * each a single comparison against the event type constant.
  */
-export class LangyEventGuards {
+export class LangyEventGuardsService {
+  static create(): LangyEventGuardsService {
+    return new LangyEventGuardsService();
+  }
+
+  private constructor() {}
+
   static isLangyConversationStartedEvent(
     event: LangyConversationProcessingEvent,
   ): event is LangyConversationStartedEvent {

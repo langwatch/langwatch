@@ -111,10 +111,10 @@ export function composeUserFeature(options: {
 
   // The identifier ledger, and the ceremony that spends a magic link.
   const guards = PostgresIdentityGuardsAdapter.create({ database: prisma }).build();
-  const verificationCeremony = new VerificationCeremonyService(
+  const verificationCeremony = VerificationCeremonyService.create(
     new PrismaIdentityVerificationRepository(prisma),
     PrismaIdentityHeadsRepository.create(prisma),
-    new IdentityService(
+    IdentityService.create(
       guards.identityGuards,
       IdentityLedgerWriterAdapter.create({
         // The SAME address lock the guards claim through (ADR-116 §6): the

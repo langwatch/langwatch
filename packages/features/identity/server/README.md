@@ -18,7 +18,7 @@ package.
  IdentityUsersRepository (interface)          the guarded userHashKey write and the
                                               user's email a ceremony records
 
- IdentityGuards                veto-before-write; shared by the calling path and
+ IdentityGuardsService                veto-before-write; shared by the calling path and
                                the queue's staged re-run. A promotion and an
                                erasure also ROUTE: they read the whole person and
                                state one fact per stream that has to move, which

@@ -1,6 +1,9 @@
 /**
- * Custom error types for invite domain.
- * These are framework-agnostic and can be mapped to tRPC/HTTP errors in the router layer.
+ * The invite domain's named failures.
+ *
+ * In the contract because both transports and the client presentation registry
+ * read them: the server throws, the tRPC router maps, and the REST surface
+ * answers the code directly.
  */
 import { HandledError, remediation } from "@langwatch/handled-error";
 
@@ -159,12 +162,5 @@ export class InviteNotReadyError extends Error {
   constructor(inviteId: string, status: string) {
     super(`Cannot apply invite ${inviteId}: status is ${status}, expected PENDING`);
     this.name = "InviteNotReadyError";
-  }
-}
-
-export class OrganizationNotFoundError extends Error {
-  constructor() {
-    super("Organization not found");
-    this.name = "OrganizationNotFoundError";
   }
 }

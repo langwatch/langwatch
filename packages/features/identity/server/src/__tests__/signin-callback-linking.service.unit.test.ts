@@ -39,7 +39,7 @@ function build({
   const proposals = { proposeLink: vi.fn().mockResolvedValue([]) };
   const audit = { linkAttempted: vi.fn(), linkRecorded: vi.fn() };
   let minted = 0;
-  const service = new SignInCallbackLinkingService({
+  const service = SignInCallbackLinkingService.create({
     directory,
     proposals,
     audit,

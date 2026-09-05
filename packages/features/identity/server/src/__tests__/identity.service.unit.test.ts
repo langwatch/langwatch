@@ -5,12 +5,13 @@ import {
   VERIFY_IDENTIFIER_COMMAND_TYPE,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
-import { IdentityGuards } from "../services/identity-guards.service";
+import { IdentityGuardsService } from "../services/identity-guards.service";
 import type { IdentityLedger } from "../rules/identity-ledger.rules";
 import { IdentityService } from "../services/identity.service";
 import { ACTOR, attachData, InMemoryHeads, T0, USER } from "./support/in-memory-heads";
 import { InMemoryUsers } from "./support/in-memory-users";
 import { InMemoryReservations } from "./support/in-memory-reservations";
+import { CryptoIdentifierIdentityAdapter } from "../adapters/crypto.identifier-identity.adapter";
 
 /** No legacy holder: this suite is about the service's sequencing, not the
  *  cross-population collision guard. */
@@ -31,8 +32,13 @@ class RecordingLedger implements IdentityLedger {
 function harness() {
   const heads = new InMemoryHeads();
   const ledger = new RecordingLedger();
-  const service = new IdentityService(
-    new IdentityGuards(heads, users, new InMemoryReservations()),
+  const service = IdentityService.create(
+    IdentityGuardsService.create(
+      heads,
+      users,
+      new InMemoryReservations(),
+      CryptoIdentifierIdentityAdapter.create(),
+    ),
     ledger,
   );
   return { heads, ledger, service };

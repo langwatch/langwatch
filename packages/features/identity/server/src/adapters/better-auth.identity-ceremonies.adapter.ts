@@ -5,7 +5,7 @@ import type { IdentityHeadsRepository } from "../repositories/identity-heads.rep
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository";
 import type { IdentityUserGate } from "../rules/identity-user-gate.rules";
 import type { IdentityCeremonyWrites } from "../rules/identity-writes.rules";
-import { issuerForProviderId } from "./better-auth.account-queries.adapter";
+import { BetterAuthAccountQueriesAdapter } from "./better-auth.account-queries.adapter";
 import type {
   CeremonyAccountRow,
   IdentityAccountCeremonies,
@@ -34,25 +34,42 @@ const logger = createLogger("langwatch:better-auth:identity-ceremonies");
  * The predicate is the adapter's own routing question, handed in rather than
  * re-derived: two collaborators forking on one question must ask it once.
  */
-export function bridgeAccountCeremonies({
-  ceremonies,
-  routesToIdentity,
-}: {
-  ceremonies: IdentityAccountCeremonies;
-  routesToIdentity: IdentityUserGate;
-}): Pick<IdentityAccountCeremonies, "tryBeforeAccountCreate" | "beforeAccountDelete"> {
-  const deferred = async (userId: unknown): Promise<boolean> =>
-    typeof userId === "string" && (await routesToIdentity({ userId }));
-  return {
-    async tryBeforeAccountCreate(account) {
-      if (await deferred(account.userId)) return;
-      return ceremonies.tryBeforeAccountCreate(account);
+export class BetterAuthCeremonyBridgeAdapter implements Pick<
+  IdentityAccountCeremonies,
+  "tryBeforeAccountCreate" | "beforeAccountDelete"
+> {
+  static create(deps: {
+    ceremonies: IdentityAccountCeremonies;
+    routesToIdentity: IdentityUserGate;
+  }): BetterAuthCeremonyBridgeAdapter {
+    return new BetterAuthCeremonyBridgeAdapter(deps);
+  }
+
+  private constructor(
+    private readonly deps: {
+      ceremonies: IdentityAccountCeremonies;
+      routesToIdentity: IdentityUserGate;
     },
-    async beforeAccountDelete(account) {
-      if (await deferred(account.userId)) return;
-      await ceremonies.beforeAccountDelete(account);
-    },
-  };
+  ) {}
+
+  async tryBeforeAccountCreate(
+    account: Parameters<IdentityAccountCeremonies["tryBeforeAccountCreate"]>[0],
+  ): ReturnType<IdentityAccountCeremonies["tryBeforeAccountCreate"]> {
+    if (await this.deferred(account.userId)) return;
+
+    return this.deps.ceremonies.tryBeforeAccountCreate(account);
+  }
+
+  async beforeAccountDelete(
+    account: Parameters<IdentityAccountCeremonies["beforeAccountDelete"]>[0],
+  ): Promise<void> {
+    if (await this.deferred(account.userId)) return;
+    await this.deps.ceremonies.beforeAccountDelete(account);
+  }
+
+  private async deferred(userId: unknown): Promise<boolean> {
+    return typeof userId === "string" && (await this.deps.routesToIdentity({ userId }));
+  }
 }
 
 /** The `User` fields a ceremony reads. */
@@ -104,8 +121,18 @@ interface UserRow {
  * rejected was *endpoint* hooks firing AFTER the row write; the database
  * hooks used here fire before it and can refuse.
  */
-export class IdentityCeremonies implements IdentityAccountCeremonies {
-  constructor(
+export class IdentityCeremoniesAdapter implements IdentityAccountCeremonies {
+  static create(
+    heads: IdentityHeadsRepository,
+    users: IdentityUsersRepository,
+    identity: IdentityCeremonyWrites,
+    isLatched: IdentityUserGate,
+    clock: IdentityCeremonyClock,
+  ): IdentityCeremoniesAdapter {
+    return new IdentityCeremoniesAdapter(heads, users, identity, isLatched, clock);
+  }
+
+  private constructor(
     private readonly heads: IdentityHeadsRepository,
     private readonly users: IdentityUsersRepository,
     private readonly identity: IdentityCeremonyWrites,
@@ -155,7 +182,7 @@ export class IdentityCeremonies implements IdentityAccountCeremonies {
       issuer:
         typeof account.issuer === "string" && account.issuer.length > 0
           ? account.issuer
-          : issuerForProviderId(providerId),
+          : BetterAuthAccountQueriesAdapter.issuerForProviderId(providerId),
       providerAccountId: typeof account.accountId === "string" ? account.accountId : null,
       value,
       occurredAtMs:

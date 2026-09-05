@@ -88,14 +88,6 @@ export {
 } from "./adapters/connected-agent-dispatch.adapter";
 export { ConnectedAgentRegistryAdapter } from "./adapters/connected-agent-registry.adapter";
 export {
-  buildCallEnvelope,
-  jsonByteLength,
-  resultCapViolation,
-  type StoredCall,
-  type StoredResult,
-  type StoredResultError,
-} from "./services/connected-agent-envelope.service";
-export {
   ConnectedAgentParameterSpecService,
   type NormalizedParameters,
 } from "./services/connected-agent-parameter-spec.service";

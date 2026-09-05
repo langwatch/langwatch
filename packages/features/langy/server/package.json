@@ -41,10 +41,6 @@
       "types": "./src/rules/langy-turn-settlement.rules.ts",
       "default": "./src/rules/langy-turn-settlement.rules.ts"
     },
-    "./services/langy-turn-dispatch-retry": {
-      "types": "./src/services/langy-turn-dispatch-retry.service.ts",
-      "default": "./src/services/langy-turn-dispatch-retry.service.ts"
-    },
     "./langy.ids": {
       "types": "./src/ports/langy-ids.port.ts",
       "default": "./src/ports/langy-ids.port.ts"

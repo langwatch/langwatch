@@ -28,7 +28,7 @@ import {
   parseJsonl,
   toJsonlChunks,
   toSingleJsonl,
-} from "../services/dataset-chunking.service";
+} from "../rules/dataset-chunking.rules";
 import type {
   DatasetStorage,
   PresignedUpload,
@@ -40,7 +40,7 @@ import {
   StagedUploadNotFoundError,
   UploadTooLargeError,
 } from "@langwatch/dataset-contract";
-import { localStagingUploadPath, stagingUploadKey } from "../services/presigned-upload.service";
+import { localStagingUploadPath, stagingUploadKey } from "../rules/presigned-upload.rules";
 
 /**
  * Reads a Readable fully as a utf-8 string (chunk objects are JSONL text).

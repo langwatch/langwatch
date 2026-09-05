@@ -60,8 +60,12 @@ import type { ScimSyncReadRepository } from "../repositories/scim-sync.repositor
  */
 export const SCIM_APPLY_MAX_ATTEMPTS = 5;
 
-export class ScimSyncGuards {
-  constructor(private readonly deps: { syncs: ScimSyncReadRepository }) {}
+export class ScimSyncGuardsService {
+  static create(deps: { syncs: ScimSyncReadRepository }): ScimSyncGuardsService {
+    return new ScimSyncGuardsService(deps);
+  }
+
+  private constructor(private readonly deps: { syncs: ScimSyncReadRepository }) {}
 
   /**
    * A token was minted for this connection. Idempotent by state: a second

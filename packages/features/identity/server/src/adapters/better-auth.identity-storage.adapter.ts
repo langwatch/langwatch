@@ -16,18 +16,12 @@ import type { IdentityUserGate } from "../rules/identity-user-gate.rules";
 import {
   type AccountQuery,
   type AccountWhere,
+  BetterAuthAccountQueriesAdapter,
   IdentityUnsupportedStorageQueryError,
-  issuerForProviderId,
-  parseAccountQuery,
 } from "./better-auth.account-queries.adapter";
 import type { IdentityAccountCeremonies } from "../rules/ceremony-types.rules";
-import {
-  anyBornInThisRequest,
-  birthAwareGate,
-  currentIdentityBirth,
-  type IdentityBirthPort,
-  recordIdentityBirth,
-} from "./better-auth.identity-birth.adapter";
+import { BetterAuthIdentityBirthAdapter } from "./better-auth.identity-birth.adapter";
+import type { IdentityBirthPort } from "../ports/identity-birth.port";
 import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
@@ -105,7 +99,9 @@ const isLinkageRestatementField = (field: string): field is LinkageRestatementFi
  * that is the value better-auth is echoing back.
  */
 const linkageValueOf = (row: IdentityAccountRow, field: LinkageRestatementField): string =>
-  field === "issuer" ? (row.issuer ?? issuerForProviderId(row.providerId)) : row[field];
+  field === "issuer"
+    ? (row.issuer ?? BetterAuthAccountQueriesAdapter.issuerForProviderId(row.providerId))
+    : row[field];
 
 export interface IdentityStorageAdapterDeps {
   /**
@@ -182,17 +178,24 @@ export interface IdentityStorageAdapterDeps {
  * cross-branch transactional promise, and preserving the existing behavior
  * exactly is the point.
  */
-export function createIdentityStorageAdapter(
-  deps: IdentityStorageAdapterDeps,
-): AdapterFactory<BetterAuthOptions> {
-  return (options) =>
-    createAdapterFactory({
-      config: identityAdapterConfig,
-      adapter: identityCustomAdapter({
-        ...deps,
-        legacy: deps.legacyEngine(options),
-      }),
-    })(options);
+export class BetterAuthIdentityStorageAdapter {
+  static create(deps: IdentityStorageAdapterDeps): BetterAuthIdentityStorageAdapter {
+    return new BetterAuthIdentityStorageAdapter(deps);
+  }
+
+  private constructor(private readonly deps: IdentityStorageAdapterDeps) {}
+
+  /** The better-auth adapter factory this branch installs. */
+  factory(): AdapterFactory<BetterAuthOptions> {
+    return (options) =>
+      createAdapterFactory({
+        config: identityAdapterConfig,
+        adapter: identityCustomAdapter({
+          ...this.deps,
+          legacy: this.deps.legacyEngine(options),
+        }),
+      })(options);
+  }
 }
 
 /**
@@ -239,11 +242,11 @@ function identityCustomAdapter({
      * application that composes the adapter without wrapping still cannot
      * route a newborn's account write to the legacy table.
      */
-    const routesToIdentity = birthAwareGate(isUserOnIdentityWrites);
+    const routesToIdentity = BetterAuthIdentityBirthAdapter.birthAwareGate(isUserOnIdentityWrites);
 
     /** The same fork asked of the fleet, for a query that names nobody. */
     const anyoneRoutesToIdentity = async (): Promise<boolean> =>
-      anyBornInThisRequest() || (await isAnyoneOnIdentityWrites());
+      BetterAuthIdentityBirthAdapter.anyBornInThisRequest() || (await isAnyoneOnIdentityWrites());
 
     const toCanonicalKeys = (model: string, data: Row): Row =>
       Object.fromEntries(
@@ -387,7 +390,7 @@ function identityCustomAdapter({
      */
     const withIssuer = (row: IdentityAccountRow): IdentityAccountRow => ({
       ...row,
-      issuer: row.issuer ?? issuerForProviderId(row.providerId),
+      issuer: row.issuer ?? BetterAuthAccountQueriesAdapter.issuerForProviderId(row.providerId),
     });
 
     const serveAccounts = async (query: AccountQuery): Promise<IdentityAccountRow[] | null> => {
@@ -480,7 +483,7 @@ function identityCustomAdapter({
       }
       let query: AccountQuery;
       try {
-        query = parseAccountQuery({ operation, where: canonical });
+        query = BetterAuthAccountQueriesAdapter.parseAccountQuery({ operation, where: canonical });
       } catch (error) {
         throw refused(error);
       }
@@ -611,7 +614,7 @@ function identityCustomAdapter({
      * from and takes the legacy branch, marker or not.
      */
     const bearOnIdentityBranch = async (canonical: Row): Promise<Row | null> => {
-      if (currentIdentityBirth() === undefined) return null;
+      if (BetterAuthIdentityBirthAdapter.currentIdentityBirth() === undefined) return null;
       const { email, createdAt } = canonical;
       if (typeof email !== "string" || email.length === 0) {
         logger.warn(
@@ -629,7 +632,8 @@ function identityCustomAdapter({
       // the gate — which cannot see a state row written moments ago on
       // another connection — is answered by the marker instead.
       const bornId = born.id;
-      if (typeof bornId === "string") recordIdentityBirth({ userId: bornId });
+      if (typeof bornId === "string")
+        BetterAuthIdentityBirthAdapter.recordIdentityBirth({ userId: bornId });
       return born;
     };
 

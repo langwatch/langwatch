@@ -10,7 +10,7 @@ export const IDENTITY_SECRET_HEAL_MIGRATION_NAME = "identity-d01-secret-heal" as
  * FINALIZED, and `finalized` is terminal: the runner skips a tenant whose record is terminal,
  * The reverse leg of the bridge mirror, as a pass (ADR-116 §4).
  */
-export class IdentitySecretHealMigration implements SystemMigration {
+export class IdentitySecretHealMigrationAdapter implements SystemMigration {
   readonly name = IDENTITY_SECRET_HEAL_MIGRATION_NAME;
   readonly title = "Sign-in credential repair";
   readonly description =
@@ -27,8 +27,8 @@ export class IdentitySecretHealMigration implements SystemMigration {
 
   static create(
     secrets: Pick<IdentitySecretCarryService, "carryForUser">,
-  ): IdentitySecretHealMigration {
-    return new IdentitySecretHealMigration(secrets);
+  ): IdentitySecretHealMigrationAdapter {
+    return new IdentitySecretHealMigrationAdapter(secrets);
   }
 
   constructor(private readonly secrets: Pick<IdentitySecretCarryService, "carryForUser">) {}

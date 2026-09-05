@@ -411,7 +411,7 @@ function mountTurns(world: ReturnType<typeof langyWorld>) {
     "/",
     createLangyTurnsRestApp({
       security: passThroughSecurity(),
-      ports: { ...credentialPorts(world), langy: () => world.langy, redis: () => null },
+      ports: { ...credentialPorts(world), langy: () => world.langy, openTurnBuffer: () => null },
     }),
   );
   return honoFetch(hono);

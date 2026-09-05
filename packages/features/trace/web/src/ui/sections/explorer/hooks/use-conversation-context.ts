@@ -4,7 +4,6 @@ import { api } from "../../../../behavior/trace-api";
 import { useSharedTrace } from "../context/shared-trace-context";
 import { isPreviewTraceId } from "../../../../index";
 import type { ConversationTurn } from "../../../../model/explorer/conversation-turn";
-import type { TraceListItem } from "../types/trace";
 import { useDrawerProjectId } from "./use-drawer-project-id";
 
 export interface ConversationContextResult {

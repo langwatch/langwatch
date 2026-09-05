@@ -7,7 +7,7 @@ import {
   type SsoConnectionState,
 } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
-import { SsoConnectionGuards } from "../services/sso-connection-guards.service";
+import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
@@ -56,7 +56,7 @@ const IDP = {
 
 let connections: InMemoryConnections;
 let breakGlass: StubBreakGlassBindings;
-let guards: SsoConnectionGuards;
+let guards: SsoConnectionGuardsService;
 
 async function run(
   verb: () => Promise<SsoConnectionFactInput[]>,
@@ -95,7 +95,7 @@ async function reachApproved(): Promise<void> {
 beforeEach(() => {
   connections = new InMemoryConnections();
   breakGlass = new StubBreakGlassBindings(true);
-  guards = new SsoConnectionGuards({
+  guards = SsoConnectionGuardsService.create({
     connections,
     breakGlass,
     stranding: new StubStranding([]),

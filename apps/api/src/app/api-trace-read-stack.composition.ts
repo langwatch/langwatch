@@ -44,6 +44,7 @@ import type { TopicService } from "@langwatch/topic-contract";
 import {
   buildDisplayInput,
   stringifySpanIO,
+  TraceNotFoundError,
   type Span,
   type Trace,
   type TraceService as TraceTreeService,
@@ -73,7 +74,6 @@ import {
   TraceListClickHouseRepository,
   TraceListService,
   TraceLegacyReadService,
-  TraceNotFoundError,
   TraceFullIoPort,
   TracePayloadReaderPort,
   TraceQueryClassificationAdapter,

@@ -15,7 +15,7 @@ import {
 } from "@langwatch/agent-contract";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import WebSocket from "ws";
-import { resultCapViolation } from "../../../services/connected-agent-envelope.service";
+import { resultCapViolation } from "../../../rules/connected-agent-caps.rules";
 import { ConnectedAgentRuntimeAdapter } from "../../../adapters/connected-agent-runtime.adapter";
 import { ConnectedAgentStateAdapter } from "../../../adapters/connected-agent-state.adapter";
 import { AgentSessionService } from "../../../services/connected-agent-session.service";

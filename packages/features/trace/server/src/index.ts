@@ -61,7 +61,6 @@ export {
   TrackedEventSync,
 } from "./subscribers/tracked-event-sync.subscriber";
 export { OtlpAttributeFlatteningService } from "./services/otlp-attribute-flattening.service";
-export { TraceNotFoundError } from "./services/trace-read-errors.service";
 export { SpanRecordIdentityService } from "./services/span-record-identity.service";
 export { TraceListClickHouseRepository } from "./repositories/clickhouse/trace-list.repository";
 export { TraceSummaryClickHouseRepository } from "./repositories/clickhouse/trace-summary.repository";

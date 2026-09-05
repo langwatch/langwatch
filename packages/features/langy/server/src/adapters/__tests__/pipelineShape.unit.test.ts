@@ -17,7 +17,7 @@ import {
   type LangyConversationProcessingPipelineDeps,
 } from "../eventing.langy-conversation.adapter";
 import type { LangyAnalyticsEventProjectionRecord } from "../../projections/langy-analytics-event.projection";
-import type { LangyConversationProcessingEvent } from "../eventing.langy-conversation-events.adapter";
+import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection";
 
 /**
  * Proves the FINAL Langy pipeline shape from the public static definition (conversation + turn)

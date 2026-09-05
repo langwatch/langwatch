@@ -10,7 +10,7 @@
  * scheme, the size cap and the presign TTL. The SDK wrappers (presigned PUT,
  * HEAD, delete) live in `S3DatasetStorage`, which composes these helpers.
  */
-import { assertNoTraversal } from "./dataset-chunking.service";
+import { assertNoTraversal } from "@langwatch/dataset-contract";
 
 /**
  * Hard upload size cap (~5 GiB). Above the 2–3 GB target use case; enforced at

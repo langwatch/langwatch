@@ -31,7 +31,11 @@ const logger = createLogger("langwatch:identity:email");
  * against their legacy rows, so reads and writes flip together.
  */
 export class IdentityEmailService extends IdentityEmailCapability {
-  constructor(
+  static create(heads: IdentityHeadsReader, isOnIdentity: IdentityUserGate): IdentityEmailService {
+    return new IdentityEmailService(heads, isOnIdentity);
+  }
+
+  private constructor(
     private readonly heads: IdentityHeadsReader,
     private readonly isOnIdentity: IdentityUserGate,
   ) {

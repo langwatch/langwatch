@@ -4,8 +4,8 @@
  * which live nowhere else once the stream lapses.
  */
 import { describe, expect, it } from "vitest";
-import type { LangyStreamEntry } from "../../adapters/redis.langy-token-buffer.adapter";
-import { turnOrderFromStream } from "../langy-turn-order.service";
+import type { LangyStreamEntry } from "@langwatch/langy-contract";
+import { LangyTurnOrderService } from "../langy-turn-order.service";
 
 const delta = (text: string) => ({ type: "delta", text }) as LangyStreamEntry;
 const tool = (id: string, phase: "start" | "end", name = "bash") =>
@@ -16,7 +16,7 @@ describe("turnOrderFromStream", () => {
     /** @scenario "The record keeps the paragraphs written between the calls" */
     it("returns the paragraphs and the calls in the order they happened", () => {
       expect(
-        turnOrderFromStream([
+        LangyTurnOrderService.turnOrderFromStream([
           delta("Reading the failed rows."),
           tool("c1", "start"),
           tool("c1", "end"),
@@ -35,9 +35,13 @@ describe("turnOrderFromStream", () => {
 
   describe("given prose that arrived in several chunks", () => {
     it("joins the chunks into the one paragraph they were written as", () => {
-      expect(turnOrderFromStream([delta("Reading "), delta("the "), delta("rows.")])).toEqual([
-        { kind: "text", text: "Reading the rows." },
-      ]);
+      expect(
+        LangyTurnOrderService.turnOrderFromStream([
+          delta("Reading "),
+          delta("the "),
+          delta("rows."),
+        ]),
+      ).toEqual([{ kind: "text", text: "Reading the rows." }]);
     });
   });
 
@@ -45,7 +49,7 @@ describe("turnOrderFromStream", () => {
     /** @scenario "A card is recorded where the work began" */
     it("keeps the call at the point it started, above that text", () => {
       expect(
-        turnOrderFromStream([
+        LangyTurnOrderService.turnOrderFromStream([
           tool("c1", "start"),
           delta("Waiting on the run."),
           tool("c1", "end"),
@@ -62,7 +66,9 @@ describe("turnOrderFromStream", () => {
 
   describe("given a call reported only as finished", () => {
     it("still gives it a place, where it was reported", () => {
-      expect(turnOrderFromStream([delta("Checking."), tool("c9", "end")])).toEqual([
+      expect(
+        LangyTurnOrderService.turnOrderFromStream([delta("Checking."), tool("c9", "end")]),
+      ).toEqual([
         { kind: "text", text: "Checking." },
         { kind: "tool", id: "c9" },
       ]);
@@ -72,7 +78,7 @@ describe("turnOrderFromStream", () => {
   describe("given calls that overlapped", () => {
     it("records each one once, where it began", () => {
       expect(
-        turnOrderFromStream([
+        LangyTurnOrderService.turnOrderFromStream([
           tool("a", "start"),
           tool("b", "start"),
           tool("a", "end"),
@@ -88,7 +94,7 @@ describe("turnOrderFromStream", () => {
   describe("given the live-only signals a turn also carries", () => {
     it("holds no place for anything the record does not keep", () => {
       expect(
-        turnOrderFromStream([
+        LangyTurnOrderService.turnOrderFromStream([
           { type: "status", status: "Thinking…" } as LangyStreamEntry,
           { type: "reasoning", text: "hmm" } as LangyStreamEntry,
           delta("Answer."),
@@ -100,7 +106,7 @@ describe("turnOrderFromStream", () => {
 
   describe("given a turn with no stream to read", () => {
     it("returns no account, which is what the fallback shape reads as", () => {
-      expect(turnOrderFromStream([])).toEqual([]);
+      expect(LangyTurnOrderService.turnOrderFromStream([])).toEqual([]);
     });
   });
 });

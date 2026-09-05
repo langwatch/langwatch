@@ -180,7 +180,7 @@ export class JoinRequestStateFoldProjection
 
   /**
    * The ONE place a join-request fact becomes a framework event: the guards
-   * (`JoinRequestGuards`) decide what a command states, and this stamps the
+   * (`JoinRequestGuardsService`) decide what a command states, and this stamps the
    * envelope, so every producer stamps a fact identically.
    */
   static eventsFor({

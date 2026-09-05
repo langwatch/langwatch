@@ -47,7 +47,7 @@ function build({
   const records: SignInRoutingRecord[] = [];
   const tryFindConnectionForDomain = vi.fn().mockResolvedValue(byDomain);
   const listActiveConnections = vi.fn().mockResolvedValue(active);
-  const service = new SignInRouterService({
+  const service = SignInRouterService.create({
     domains: { tryFindConnectionForDomain, listActiveConnections },
     policy: { resolvePolicy: async () => policy },
     breakGlass: { allow: async () => breakGlassAllowed },

@@ -14,9 +14,10 @@ export function mintVerificationToken(): string {
   return randomBytes(32).toString("base64url");
 }
 
+/** Constant-time string comparison. Unequal lengths answer false without a compare. */
 export function safeEqual(a: string, b: string): boolean {
-  const encoder = new TextEncoder();
-  const bytesA = encoder.encode(a);
-  const bytesB = encoder.encode(b);
+  const bytesA = Buffer.from(a, "utf8");
+  const bytesB = Buffer.from(b, "utf8");
+
   return bytesA.length === bytesB.length && timingSafeEqual(bytesA, bytesB);
 }

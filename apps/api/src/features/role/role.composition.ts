@@ -9,7 +9,7 @@ import { authzPermissionSchema, bindingScopeCanGrantPermission } from "@langwatc
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
-  assertNoPersonalTeamScope,
+  PersonalTeamScopeService,
   PostgresPersonalTeamScopeAdapter,
   type TeamTrpcPorts,
 } from "@langwatch/organization-server";
@@ -233,10 +233,9 @@ class ApiRoleScope extends RoleScopePort {
   async assertNoPersonalTeamScope(input: {
     scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
   }): Promise<void> {
-    await assertNoPersonalTeamScope({
-      reader: PostgresPersonalTeamScopeAdapter.create({ database: this.prisma }),
-      scopes: input.scopes,
-    });
+    await PersonalTeamScopeService.create(
+      PostgresPersonalTeamScopeAdapter.create({ database: this.prisma }),
+    ).assertNoPersonalTeamScope({ scopes: input.scopes });
   }
 }
 

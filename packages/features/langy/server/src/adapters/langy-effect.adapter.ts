@@ -1,10 +1,11 @@
 import { createLogger } from "@langwatch/observability";
 import { LangyDispatchRejectedError } from "@langwatch/langy-contract";
-import { LangyTurnErrors } from "../services/langy-turn-errors.service";
+import { LangyTurnErrors } from "@langwatch/langy-contract";
 import type { LangyEffectPorts, LangyTitleGenerator } from "../ports/langy-effect.port";
-import { LangyTurnDispatchRetry } from "../services/langy-turn-dispatch-retry.service";
+import { LangyTurnDispatchRetry } from "@langwatch/langy-contract";
 import type { LangyWorkerPort } from "../ports/langy-turn-runtime.port";
-import type { LangyTurnHandoff, LangyTurnHandoffStore } from "./redis.langy-turn-handoff.adapter";
+import type { LangyTurnHandoffAdapter } from "./redis.langy-turn-handoff.adapter";
+import type { LangyTurnHandoff } from "../ports/langy-turn-handoff.port";
 import type { LangyFailTurnCommandPort } from "../subscribers/langy-conversation.subscriber";
 
 const logger = createLogger("langwatch:langy:process-effects");
@@ -15,7 +16,7 @@ const logger = createLogger("langwatch:langy:process-effects");
  */
 
 export interface CreateLangyEffectPortsOptions {
-  handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash">;
+  handoffStore: Pick<LangyTurnHandoffAdapter, "read" | "stash">;
   worker: LangyWorkerPort;
   mintSessionKey: (args: {
     userId: string;

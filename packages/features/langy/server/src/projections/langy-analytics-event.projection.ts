@@ -35,7 +35,7 @@ import {
   LangyToolCallInitiatedEventSchema,
   type LangyToolCallSucceededEvent,
   LangyToolCallSucceededEventSchema,
-} from "../adapters/eventing.langy-conversation-events.adapter";
+} from "./langy-conversation-state.projection";
 
 export interface LangyAnalyticsEventProjectionRecord {
   eventId: string;

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   LANGY_HANDOFF_TTL_SECONDS,
-  LangyTurnHandoffStore,
+  LangyTurnHandoffAdapter,
   type LangyHandoffRedis,
 } from "@langwatch/langy-server";
 
@@ -39,10 +39,10 @@ const handoff = {
   permitReserved: false,
 };
 
-describe("LangyTurnHandoffStore", () => {
+describe("LangyTurnHandoffAdapter", () => {
   it("round-trips a handoff by conversation and turn", async () => {
     const redis = fakeRedis();
-    const store = LangyTurnHandoffStore.create({ redis });
+    const store = LangyTurnHandoffAdapter.create({ redis });
 
     await store.stash(handoff);
 
@@ -53,7 +53,7 @@ describe("LangyTurnHandoffStore", () => {
 
   it("returns null for a missing or corrupt handoff", async () => {
     const redis = fakeRedis();
-    const store = LangyTurnHandoffStore.create({ redis });
+    const store = LangyTurnHandoffAdapter.create({ redis });
 
     await expect(
       store.read({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
@@ -77,7 +77,7 @@ describe("LangyTurnHandoffStore", () => {
     const redis = fakeRedis();
     const expire = vi.spyOn(redis, "expire");
     const set = vi.spyOn(redis, "set");
-    const store = LangyTurnHandoffStore.create({ redis });
+    const store = LangyTurnHandoffAdapter.create({ redis });
     await store.stash(handoff);
     set.mockClear();
 
@@ -93,7 +93,7 @@ describe("LangyTurnHandoffStore", () => {
 
   it("does not recreate an expired handoff", async () => {
     const redis = fakeRedis();
-    const store = LangyTurnHandoffStore.create({ redis });
+    const store = LangyTurnHandoffAdapter.create({ redis });
 
     await expect(
       store.refresh({ conversationId: handoff.conversationId, turnId: handoff.turnId }),

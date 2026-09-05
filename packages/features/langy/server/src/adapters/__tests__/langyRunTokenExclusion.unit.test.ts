@@ -12,7 +12,7 @@ import {
   type LangyConversationTurnData,
 } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
-import type { LangyConversationProcessingEvent } from "../eventing.langy-conversation-events.adapter";
+import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection";
 import { LangyConversationStateFoldProjection } from "../../projections/langy-conversation-state.projection";
 import { LangyConversationTurnFoldProjection } from "../../projections/langy-conversation-turn.projection";
 

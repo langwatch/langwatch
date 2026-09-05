@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type {
   AnalyticsFeedbacksResult,
-  AnalyticsTimeseriesBucket,
   AnalyticsTimeseriesResult,
   AnalyticsTopDocumentsResult,
 } from "@langwatch/analytics-contract";

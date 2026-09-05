@@ -1,7 +1,15 @@
 import { Readable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { toJsonlChunks } from "../../services/dataset-chunking.service";
-import { createDatasetNormalizeHandler } from "../dataset-normalize.adapter";
+import { toJsonlChunks } from "../../rules/dataset-chunking.rules";
+import { DatasetNormalizeAdapter } from "../dataset-normalize.adapter";
+import type { DatasetNormalizeDeps } from "../dataset-normalize.adapter";
+import type { DatasetNormalizePayload } from "@langwatch/dataset-contract";
+
+/** The adapter's one operation, as the queue calls it. */
+const normalizeHandler =
+  (deps: DatasetNormalizeDeps) =>
+  (payload: DatasetNormalizePayload): Promise<void> =>
+    DatasetNormalizeAdapter.create(deps).normalize(payload);
 
 /**
  * Unit test the normalize handler at its boundaries: a fake `DatasetStorage` (streamStaged →
@@ -51,7 +59,7 @@ const basePayload = {
 
 beforeEach(() => vi.clearAllMocks());
 
-describe("createDatasetNormalizeHandler()", () => {
+describe("DatasetNormalizeAdapter", () => {
   describe("when a processing JSONL dataset normalizes successfully", () => {
     /** @scenario "Both CSV and JSONL files are accepted" */
     it("writes chunks and flips the dataset to ready with counters and columnTypes", async () => {
@@ -62,7 +70,7 @@ describe("createDatasetNormalizeHandler()", () => {
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
-      const handler = createDatasetNormalizeHandler({
+      const handler = normalizeHandler({
         repository: repo as any,
         getStorage: async () => storage as any,
       });
@@ -93,7 +101,7 @@ describe("createDatasetNormalizeHandler()", () => {
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
-      const handler = createDatasetNormalizeHandler({
+      const handler = normalizeHandler({
         repository: repo as any,
         getStorage: async () => storage as any,
       });
@@ -131,7 +139,7 @@ describe("createDatasetNormalizeHandler()", () => {
         streamStaged: vi.fn().mockResolvedValue(Readable.from(pieces)),
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
-      const handler = createDatasetNormalizeHandler({
+      const handler = normalizeHandler({
         repository: repo as any,
         getStorage: async () => storage as any,
       });
@@ -168,7 +176,7 @@ describe("createDatasetNormalizeHandler()", () => {
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
-      const handler = createDatasetNormalizeHandler({
+      const handler = normalizeHandler({
         repository: repo as any,
         getStorage: async () => storage as any,
       });
@@ -204,7 +212,7 @@ describe("createDatasetNormalizeHandler()", () => {
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
-      const handler = createDatasetNormalizeHandler({
+      const handler = normalizeHandler({
         repository: repo as any,
         getStorage: async () => storage as any,
       });
@@ -239,7 +247,7 @@ describe("createDatasetNormalizeHandler()", () => {
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
-      const handler = createDatasetNormalizeHandler({
+      const handler = normalizeHandler({
         repository: repo as any,
         getStorage: async () => storage as any,
       });
@@ -277,7 +285,7 @@ describe("createDatasetNormalizeHandler()", () => {
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
-      const handler = createDatasetNormalizeHandler({
+      const handler = normalizeHandler({
         repository: repo as any,
         getStorage: async () => storage as any,
       });
@@ -306,7 +314,7 @@ describe("createDatasetNormalizeHandler()", () => {
         });
         const repo = makeRepo({ id: "d1", status: "processing" });
 
-        const handler = createDatasetNormalizeHandler({
+        const handler = normalizeHandler({
           repository: repo as any,
           getStorage: async () => storage as any,
         });
@@ -335,7 +343,7 @@ describe("createDatasetNormalizeHandler()", () => {
       });
       const repo = makeRepo({ id: "d1", status: "ready" });
 
-      const handler = createDatasetNormalizeHandler({
+      const handler = normalizeHandler({
         repository: repo as any,
         getStorage: async () => storage as any,
       });
@@ -351,7 +359,7 @@ describe("createDatasetNormalizeHandler()", () => {
       const { storage } = makeStorage({ streamStaged: vi.fn() });
       const repo = makeRepo(null);
 
-      const handler = createDatasetNormalizeHandler({
+      const handler = normalizeHandler({
         repository: repo as any,
         getStorage: async () => storage as any,
       });
@@ -369,7 +377,7 @@ describe("createDatasetNormalizeHandler()", () => {
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
-      const handler = createDatasetNormalizeHandler({
+      const handler = normalizeHandler({
         repository: repo as any,
         getStorage: async () => storage as any,
       });
@@ -391,7 +399,7 @@ describe("createDatasetNormalizeHandler()", () => {
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
-      const handler = createDatasetNormalizeHandler({
+      const handler = normalizeHandler({
         repository: repo as any,
         getStorage: async () => storage as any,
       });
@@ -413,7 +421,7 @@ describe("createDatasetNormalizeHandler()", () => {
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
-      const handler = createDatasetNormalizeHandler({
+      const handler = normalizeHandler({
         repository: repo as any,
         getStorage: async () => storage as any,
       });
@@ -462,7 +470,7 @@ describe("createDatasetNormalizeHandler()", () => {
           ],
         });
 
-        const handler = createDatasetNormalizeHandler({
+        const handler = normalizeHandler({
           repository: repo as any,
           getStorage: async () => storage as any,
         });
@@ -499,7 +507,7 @@ describe("createDatasetNormalizeHandler()", () => {
           ],
         });
 
-        const handler = createDatasetNormalizeHandler({
+        const handler = normalizeHandler({
           repository: repo as any,
           getStorage: async () => storage as any,
         });
@@ -531,7 +539,7 @@ describe("createDatasetNormalizeHandler()", () => {
           ],
         });
 
-        const handler = createDatasetNormalizeHandler({
+        const handler = normalizeHandler({
           repository: repo as any,
           getStorage: async () => storage as any,
         });
@@ -577,7 +585,7 @@ describe("createDatasetNormalizeHandler()", () => {
             ],
           });
 
-          const handler = createDatasetNormalizeHandler({
+          const handler = normalizeHandler({
             repository: repo as any,
             getStorage: async () => storage as any,
           });
@@ -618,7 +626,7 @@ describe("createDatasetNormalizeHandler()", () => {
             ],
           });
 
-          const handler = createDatasetNormalizeHandler({
+          const handler = normalizeHandler({
             repository: repo as any,
             getStorage: async () => storage as any,
           });
@@ -653,7 +661,7 @@ describe("createDatasetNormalizeHandler()", () => {
             ],
           });
 
-          const handler = createDatasetNormalizeHandler({
+          const handler = normalizeHandler({
             repository: repo as any,
             getStorage: async () => storage as any,
           });
@@ -688,7 +696,7 @@ describe("createDatasetNormalizeHandler()", () => {
             ],
           });
 
-          const handler = createDatasetNormalizeHandler({
+          const handler = normalizeHandler({
             repository: repo as any,
             getStorage: async () => storage as any,
           });
@@ -721,7 +729,7 @@ describe("createDatasetNormalizeHandler()", () => {
             ],
           });
 
-          const handler = createDatasetNormalizeHandler({
+          const handler = normalizeHandler({
             repository: repo as any,
             getStorage: async () => storage as any,
           });
@@ -755,7 +763,7 @@ describe("createDatasetNormalizeHandler()", () => {
             ],
           });
 
-          const handler = createDatasetNormalizeHandler({
+          const handler = normalizeHandler({
             repository: repo as any,
             getStorage: async () => storage as any,
           });
@@ -791,7 +799,7 @@ describe("createDatasetNormalizeHandler()", () => {
             ],
           });
 
-          const handler = createDatasetNormalizeHandler({
+          const handler = normalizeHandler({
             repository: repo as any,
             getStorage: async () => storage as any,
           });
@@ -828,7 +836,7 @@ describe("createDatasetNormalizeHandler()", () => {
             ],
           });
 
-          const handler = createDatasetNormalizeHandler({
+          const handler = normalizeHandler({
             repository: repo as any,
             getStorage: async () => storage as any,
           });
@@ -865,7 +873,7 @@ describe("createDatasetNormalizeHandler()", () => {
             columnTypes: [{ name: "a", type: "string", sourceHeader: "a" }],
           });
 
-          const handler = createDatasetNormalizeHandler({
+          const handler = normalizeHandler({
             repository: repo as any,
             getStorage: async () => storage as any,
           });
@@ -893,7 +901,7 @@ describe("createDatasetNormalizeHandler()", () => {
             columnTypes: [],
           });
 
-          const handler = createDatasetNormalizeHandler({
+          const handler = normalizeHandler({
             repository: repo as any,
             getStorage: async () => storage as any,
           });
@@ -926,7 +934,7 @@ describe("createDatasetNormalizeHandler()", () => {
           columnTypes: [{ name: "a", type: "number" }],
         });
 
-        const handler = createDatasetNormalizeHandler({
+        const handler = normalizeHandler({
           repository: repo as any,
           getStorage: async () => storage as any,
         });
@@ -953,7 +961,7 @@ describe("createDatasetNormalizeHandler()", () => {
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
-      const handler = createDatasetNormalizeHandler({
+      const handler = normalizeHandler({
         repository: repo as any,
         getStorage: async () => storage as any,
       });
@@ -973,7 +981,7 @@ describe("createDatasetNormalizeHandler()", () => {
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
-      const handler = createDatasetNormalizeHandler({
+      const handler = normalizeHandler({
         repository: repo as any,
         getStorage: async () => storage as any,
       });
@@ -1004,7 +1012,7 @@ describe("createDatasetNormalizeHandler()", () => {
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
-      const handler = createDatasetNormalizeHandler({
+      const handler = normalizeHandler({
         repository: repo as any,
         getStorage: async () => storage as any,
       });

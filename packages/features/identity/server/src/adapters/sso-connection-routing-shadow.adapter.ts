@@ -70,12 +70,16 @@ export interface SsoConnectionRoutingShadowDeps {
   recorder?: SsoConnectionRoutingShadowRecorder;
 }
 
-export class ShadowComparingDomainRoutingRepository implements SignInDomainRoutingPort {
+export class ShadowComparingDomainRoutingAdapter implements SignInDomainRoutingPort {
+  static create(deps: SsoConnectionRoutingShadowDeps): ShadowComparingDomainRoutingAdapter {
+    return new ShadowComparingDomainRoutingAdapter(deps);
+  }
+
   private readonly deciding: SignInDomainRoutingPort;
   private readonly shadow: SignInDomainRoutingPort;
   private readonly recorder: SsoConnectionRoutingShadowRecorder;
 
-  constructor(deps: SsoConnectionRoutingShadowDeps) {
+  private constructor(deps: SsoConnectionRoutingShadowDeps) {
     this.deciding = deps.deciding;
     this.shadow = deps.shadow;
     this.recorder = deps.recorder ?? defaultRecorder;

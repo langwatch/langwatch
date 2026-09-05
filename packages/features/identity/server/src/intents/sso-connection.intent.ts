@@ -43,7 +43,7 @@ import {
   type VerifyDomainCommandData,
   verifyDomainCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { SsoConnectionGuards } from "../services/sso-connection-guards.service";
+import type { SsoConnectionGuardsService } from "../services/sso-connection-guards.service";
 import type { ZodTypeAny, z } from "zod";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import { SsoConnectionStateFoldProjection } from "../projections/sso-connection-state.projection";
@@ -56,10 +56,12 @@ import type { SsoConnectionEvent } from "../projections/sso-connection-state.pro
  */
 
 type GuardVerb = {
-  [K in keyof SsoConnectionGuards]: SsoConnectionGuards[K] extends (data: never) => Promise<unknown>
+  [K in keyof SsoConnectionGuardsService]: SsoConnectionGuardsService[K] extends (
+    data: never,
+  ) => Promise<unknown>
     ? K
     : never;
-}[keyof SsoConnectionGuards];
+}[keyof SsoConnectionGuardsService];
 
 function connectionCommand<Schema extends ZodTypeAny>({
   type,
@@ -85,7 +87,7 @@ function connectionCommand<Schema extends ZodTypeAny>({
       return payload.connectionId;
     }
 
-    constructor(private readonly guards: SsoConnectionGuards) {}
+    constructor(private readonly guards: SsoConnectionGuardsService) {}
 
     async handle(command: Command<Data>): Promise<SsoConnectionEvent[]> {
       const data = command.data as never;

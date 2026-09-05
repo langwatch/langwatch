@@ -7,7 +7,7 @@ import {
   reduceMfaEnrollment,
 } from "@langwatch/identity-contract";
 import type { MfaEnrollmentRepository } from "../../repositories/mfa-enrollment.repository";
-import { MfaGuards } from "../../services/mfa-guards.service";
+import { MfaGuardsService } from "../../services/mfa-guards.service";
 import { describe, expect, it } from "vitest";
 import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
 import {
@@ -106,7 +106,7 @@ describe("two-step verification event aggregate type", () => {
       {
         label: "enroll",
         handler: new EnrollMfaCommand(
-          new MfaGuards(new EnrollmentOf(emptyMfaEnrollment({ userId: USER }))),
+          MfaGuardsService.create(new EnrollmentOf(emptyMfaEnrollment({ userId: USER }))),
         ),
         data: {
           ...base,
@@ -117,7 +117,7 @@ describe("two-step verification event aggregate type", () => {
       },
       {
         label: "confirm",
-        handler: new ConfirmMfaCommand(new MfaGuards(new EnrollmentOf(PENDING))),
+        handler: new ConfirmMfaCommand(MfaGuardsService.create(new EnrollmentOf(PENDING))),
         data: {
           ...base,
           commandId: "mfacmd_2",
@@ -127,7 +127,7 @@ describe("two-step verification event aggregate type", () => {
       },
       {
         label: "expire",
-        handler: new ExpireMfaEnrollmentCommand(new MfaGuards(new EnrollmentOf(PENDING))),
+        handler: new ExpireMfaEnrollmentCommand(MfaGuardsService.create(new EnrollmentOf(PENDING))),
         data: {
           tenantId: USER,
           userId: USER,
@@ -138,7 +138,7 @@ describe("two-step verification event aggregate type", () => {
       },
       {
         label: "disable",
-        handler: new DisableMfaCommand(new MfaGuards(new EnrollmentOf(ENABLED))),
+        handler: new DisableMfaCommand(MfaGuardsService.create(new EnrollmentOf(ENABLED))),
         data: {
           ...base,
           commandId: "mfacmd_4",
@@ -148,7 +148,7 @@ describe("two-step verification event aggregate type", () => {
       },
       {
         label: "consume backup code",
-        handler: new ConsumeBackupCodeCommand(new MfaGuards(new EnrollmentOf(ENABLED))),
+        handler: new ConsumeBackupCodeCommand(MfaGuardsService.create(new EnrollmentOf(ENABLED))),
         data: {
           tenantId: USER,
           userId: USER,
@@ -159,12 +159,16 @@ describe("two-step verification event aggregate type", () => {
       },
       {
         label: "regenerate backup codes",
-        handler: new RegenerateBackupCodesCommand(new MfaGuards(new EnrollmentOf(ENABLED))),
+        handler: new RegenerateBackupCodesCommand(
+          MfaGuardsService.create(new EnrollmentOf(ENABLED)),
+        ),
         data: { ...base, commandId: "mfacmd_6", backupCodeCount: 10 },
       },
       {
         label: "record failure",
-        handler: new RecordMfaVerificationFailureCommand(new MfaGuards(new EnrollmentOf(ENABLED))),
+        handler: new RecordMfaVerificationFailureCommand(
+          MfaGuardsService.create(new EnrollmentOf(ENABLED)),
+        ),
         data: {
           tenantId: USER,
           userId: USER,
@@ -178,7 +182,7 @@ describe("two-step verification event aggregate type", () => {
         identityProjectionStore: noopStore,
         identityGuards: null as never,
         mfaProjectionStore: noopStore,
-        mfaGuards: new MfaGuards(new EnrollmentOf(ENABLED)),
+        mfaGuards: MfaGuardsService.create(new EnrollmentOf(ENABLED)),
       }).metadata.aggregateType;
 
       const events = await handler.handle(command(data) as never);
@@ -193,7 +197,7 @@ describe("two-step verification event aggregate type", () => {
     /** @scenario "Starting a setup records the fact and never the secret" */
     it("appends under the person as both aggregate and tenant", async () => {
       const handler = new EnrollMfaCommand(
-        new MfaGuards(new EnrollmentOf(emptyMfaEnrollment({ userId: USER }))),
+        MfaGuardsService.create(new EnrollmentOf(emptyMfaEnrollment({ userId: USER }))),
       );
 
       const [event] = await handler.handle(
@@ -228,7 +232,7 @@ describe("two-step verification event aggregate type", () => {
       // to an identifier-vocabulary bump and leave every identifier event
       // claiming a version nothing in it had changed.
       const [mfaEvent] = await new EnrollMfaCommand(
-        new MfaGuards(new EnrollmentOf(emptyMfaEnrollment({ userId: USER }))),
+        MfaGuardsService.create(new EnrollmentOf(emptyMfaEnrollment({ userId: USER }))),
       ).handle(
         command({
           ...base,

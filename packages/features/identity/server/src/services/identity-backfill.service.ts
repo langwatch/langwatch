@@ -5,7 +5,10 @@ import {
   orphanedIdentifierRows,
 } from "@langwatch/identity-contract";
 import { mintUserHashKey } from "../rules/user-hash-key.rules";
-import { type PlannedIdentifier, planIdentifiers } from "./identity-backfill-plan.service";
+import {
+  IdentityBackfillPlanService,
+  type PlannedIdentifier,
+} from "./identity-backfill-plan.service";
 import type {
   BackfillAccountRow,
   IdentityBackfillRepository,
@@ -67,13 +70,25 @@ export interface IdentityBackfillServiceDeps {
  * Remediation is the operator's.
  */
 export class IdentityBackfillService {
+  static create(
+    reads: IdentityBackfillRepository,
+    users: IdentityUsersRepository,
+    identity: IdentityAdoptionWrites,
+    secrets: IdentitySecretCarryService,
+    plan: IdentityBackfillPlanService,
+    deps: IdentityBackfillServiceDeps = {},
+  ): IdentityBackfillService {
+    return new IdentityBackfillService(reads, users, identity, secrets, plan, deps);
+  }
+
   private readonly now: () => number;
 
-  constructor(
+  private constructor(
     private readonly reads: IdentityBackfillRepository,
     private readonly users: IdentityUsersRepository,
     private readonly identity: IdentityAdoptionWrites,
     private readonly secrets: IdentitySecretCarryService,
+    private readonly plan: IdentityBackfillPlanService,
     deps: IdentityBackfillServiceDeps = {},
   ) {
     this.now = deps.now ?? Date.now;
@@ -105,7 +120,7 @@ export class IdentityBackfillService {
     }
 
     const accounts = await this.reads.findAccountRows({ userId });
-    const planned = planIdentifiers({
+    const planned = this.plan.planIdentifiers({
       user: { ...user, email: user.email },
       accounts,
     });

@@ -1,6 +1,7 @@
-import { IdentityGuards } from "../services/identity-guards.service";
+import { CryptoIdentifierIdentityAdapter } from "./crypto.identifier-identity.adapter";
+import { IdentityGuardsService } from "../services/identity-guards.service";
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository";
-import { MfaGuards } from "../services/mfa-guards.service";
+import { MfaGuardsService } from "../services/mfa-guards.service";
 import {
   PrismaIdentityHeadsRepository,
   type PrismaIdentityHeadsDatabase,
@@ -41,8 +42,8 @@ export type PostgresIdentityGuardsOptions = {
  * own would have to reach past this seam to do it.
  */
 export type IdentityGuardsComposition = {
-  identityGuards: IdentityGuards;
-  mfaGuards: MfaGuards;
+  identityGuards: IdentityGuardsService;
+  mfaGuards: MfaGuardsService;
   reservations: IdentityReservationRepository;
 };
 
@@ -68,12 +69,13 @@ export class PostgresIdentityGuardsAdapter {
     const { database } = this.options;
     const reservations = PrismaIdentityReservationRepository.create(database);
     return {
-      identityGuards: new IdentityGuards(
+      identityGuards: IdentityGuardsService.create(
         PrismaIdentityHeadsRepository.create(database),
         PrismaIdentityUsersRepository.create(database),
         reservations,
+        CryptoIdentifierIdentityAdapter.create(),
       ),
-      mfaGuards: new MfaGuards(PrismaMfaEnrollmentRepository.create(database)),
+      mfaGuards: MfaGuardsService.create(PrismaMfaEnrollmentRepository.create(database)),
       reservations,
     };
   }

@@ -1,5 +1,5 @@
 import { emptyScimSync, type ScimSyncState, scimSyncIdFor } from "@langwatch/identity-contract";
-import { ScimSyncGuards } from "../../services/scim-sync-guards.service";
+import { ScimSyncGuardsService } from "../../services/scim-sync-guards.service";
 import { describe, expect, it } from "vitest";
 import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
 import {
@@ -17,7 +17,7 @@ const SYNC = scimSyncIdFor({ connectionId: CONNECTION });
 const T0 = 1_690_000_000_000;
 
 function guardsOver(state: ScimSyncState | null) {
-  return new ScimSyncGuards({ syncs: { tryFindSync: async () => state } });
+  return ScimSyncGuardsService.create({ syncs: { tryFindSync: async () => state } });
 }
 
 const syncing: ScimSyncState = {

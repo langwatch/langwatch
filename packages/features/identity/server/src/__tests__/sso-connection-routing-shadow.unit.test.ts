@@ -2,7 +2,7 @@ import type { RoutableConnection } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 import type { SignInDomainRoutingPort } from "../services/signin-router.service";
 import {
-  ShadowComparingDomainRoutingRepository,
+  ShadowComparingDomainRoutingAdapter,
   type SsoConnectionRoutingShadowRecord,
 } from "../adapters/sso-connection-routing-shadow.adapter";
 
@@ -55,7 +55,7 @@ describe("sso connection routing shadow mode", () => {
     it("runs both lookups and returns the string-based answer", async () => {
       const { records, recorder } = recorderOf();
       const strings = routable({ connectionId: "org:org_acme" });
-      const port = new ShadowComparingDomainRoutingRepository({
+      const port = ShadowComparingDomainRoutingAdapter.create({
         deciding: new StubRouting(strings),
         shadow: new StubRouting(routable({ connectionId: "ssoc_1" })),
         recorder,
@@ -80,7 +80,7 @@ describe("sso connection routing shadow mode", () => {
     it("logs both answers and still lets the strings decide", async () => {
       const { records, recorder } = recorderOf();
       const strings = routable({ connectionId: "org:org_acme" });
-      const port = new ShadowComparingDomainRoutingRepository({
+      const port = ShadowComparingDomainRoutingAdapter.create({
         deciding: new StubRouting(strings),
         // The projection has the connection paused; the strings carry no
         // lifecycle at all, so they say it is serving traffic.
@@ -103,7 +103,7 @@ describe("sso connection routing shadow mode", () => {
     /** @scenario "Shadow mode compares connection routing against string routing" */
     it("ignores the connection id, which differs for every organization", async () => {
       const { records, recorder } = recorderOf();
-      const port = new ShadowComparingDomainRoutingRepository({
+      const port = ShadowComparingDomainRoutingAdapter.create({
         deciding: new StubRouting(routable({ connectionId: "org:org_acme" })),
         shadow: new StubRouting(routable({ connectionId: "ssoc_gf_org_acme" })),
         recorder,
@@ -120,7 +120,7 @@ describe("sso connection routing shadow mode", () => {
     it("records the failure instead of counting it as agreement", async () => {
       const { records, recorder } = recorderOf();
       const strings = routable({ connectionId: "org:org_acme" });
-      const port = new ShadowComparingDomainRoutingRepository({
+      const port = ShadowComparingDomainRoutingAdapter.create({
         deciding: new StubRouting(strings),
         shadow: new StubRouting(null, new Error("projection unreadable")),
         recorder,
@@ -143,7 +143,7 @@ describe("sso connection routing shadow mode", () => {
     it("compares the sole connection each side would auto-redirect to", async () => {
       const { records, recorder } = recorderOf();
       const strings = routable({ connectionId: "env:okta" });
-      const port = new ShadowComparingDomainRoutingRepository({
+      const port = ShadowComparingDomainRoutingAdapter.create({
         deciding: new StubRouting(strings),
         shadow: new StubRouting(null),
         recorder,

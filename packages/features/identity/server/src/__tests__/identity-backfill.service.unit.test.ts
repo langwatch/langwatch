@@ -10,13 +10,16 @@ import {
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
-import { deriveIdentifierId } from "../adapters/crypto.identifier-identity.adapter";
+import { CryptoIdentifierIdentityAdapter } from "../adapters/crypto.identifier-identity.adapter";
 import type {
   BackfillAccountRow,
   BackfillUserRow,
 } from "../repositories/identity-backfill.repository";
+import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service";
 import { IdentityBackfillService } from "../services/identity-backfill.service";
 import { IdentitySecretCarryService } from "../services/identity-secret-carry.service";
+
+const identifierIdentity = CryptoIdentifierIdentityAdapter.create();
 
 const USER = "user_sam";
 const USER_CREATED_AT = Date.UTC(2023, 2, 14, 9, 30);
@@ -69,7 +72,7 @@ function harness(options?: {
   const attachIdentifier = vi.fn(async (data: AttachIdentifierCommandData) => {
     if (!apply) return [];
     const normalizedValue = normalizeIdentifierValue(data.value);
-    const id = deriveIdentifierId({
+    const id = identifierIdentity.deriveIdentifierId({
       userId: data.userId,
       provider: data.provider,
       providerAccountId: data.providerAccountId,
@@ -110,7 +113,7 @@ function harness(options?: {
   });
 
   const carried: string[] = [];
-  const service = new IdentityBackfillService(
+  const service = IdentityBackfillService.create(
     {
       tryFindUser: async () => user,
       findAccountRows: async () => accounts,
@@ -130,7 +133,7 @@ function harness(options?: {
     // The latch's secret carry (ADR-116 §4). Recorded rather than performed:
     // WHEN it runs is this pass's contract — only for a user the proof
     // finalized — and WHAT it copies is its own suite's.
-    new IdentitySecretCarryService({
+    IdentitySecretCarryService.create({
       findAccountSecretPairs: async () => {
         carried.push("looked");
         return [];
@@ -138,6 +141,7 @@ function harness(options?: {
       insertCredentialIfMissing: async () => true,
       overwriteCredential: async () => undefined,
     }),
+    IdentityBackfillPlanService.create(identifierIdentity),
     { now: () => 1_800_000_000_000 },
   );
 
@@ -261,7 +265,7 @@ describe("the identifier backfill pass", () => {
 
     it("a dead-ended email identifier holds the user instead of parking them", async () => {
       const normalizedValue = normalizeIdentifierValue("Sam.J@Acme.com");
-      const emailId = deriveIdentifierId({
+      const emailId = identifierIdentity.deriveIdentifierId({
         userId: USER,
         provider: "email",
         providerAccountId: null,
@@ -289,7 +293,7 @@ describe("the identifier backfill pass", () => {
   });
 
   describe("when the projection carries a live row nothing implies", () => {
-    const staleId = deriveIdentifierId({
+    const staleId = identifierIdentity.deriveIdentifierId({
       userId: USER,
       provider: "email",
       providerAccountId: null,

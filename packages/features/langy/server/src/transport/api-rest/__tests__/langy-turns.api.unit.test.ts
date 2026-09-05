@@ -139,7 +139,7 @@ function buildApi(options: { surfaceOpen?: boolean } = {}) {
         },
       }) as never,
     langy: () => fakeLangyApp({ startConversationTurn, getEventsAfter }),
-    redis: () => null,
+    openTurnBuffer: () => null,
   };
 
   const app = createLangyTurnsRestApp({ security: passThroughSecurity(), ports });

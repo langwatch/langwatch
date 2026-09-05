@@ -1,4 +1,4 @@
-import { reportNurturingFailure, tryNurturingSink } from "../adapters/nurturing-sink.adapter";
+import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service";
 
 export class NurturingSsoAutoAddService {
   static create(): NurturingSsoAutoAddService {
@@ -22,7 +22,7 @@ export class NurturingSsoAutoAddService {
     organizationId: string;
     organizationName: string;
   }): void {
-    const nurturing = tryNurturingSink();
+    const nurturing = NurturingSinkRegistryService.trySink();
     if (!nurturing) {
       return;
     }
@@ -41,7 +41,7 @@ export class NurturingSsoAutoAddService {
           createdAt: new Date().toISOString(),
         },
       })
-      .catch(reportNurturingFailure);
+      .catch(NurturingSinkRegistryService.reportFailure);
 
     void nurturing
       .groupUser({
@@ -49,7 +49,7 @@ export class NurturingSsoAutoAddService {
         groupId: organizationId,
         traits: { name: organizationName },
       })
-      .catch(reportNurturingFailure);
+      .catch(NurturingSinkRegistryService.reportFailure);
 
     void nurturing
       .trackEvent({
@@ -60,6 +60,6 @@ export class NurturingSsoAutoAddService {
           organization_name: organizationName,
         },
       })
-      .catch(reportNurturingFailure);
+      .catch(NurturingSinkRegistryService.reportFailure);
   }
 }

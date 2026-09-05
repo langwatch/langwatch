@@ -17,115 +17,18 @@
  * TTL, not the event log (ADR-044 part 2).
  */
 
-import type { CliResultDigest, CliToolResult } from "@langwatch/langy-contract";
 import {
   LANGY_LIVENESS,
   LANGY_STREAM,
   LANGY_STREAMING,
 } from "../rules/langy-streaming-constants.rules";
-
-/**
- * A decoded stream entry. `delta` carries buffered tokens; `status`/`progress`
- * are ephemeral live-only ticks; `milestone` mirrors a durable milestone to the
- * live UI (the durable event is dispatched separately); `end`/`error` are
- * terminal markers the reader stops on.
- */
-export type LangyStreamEntry =
-  | { type: "delta"; text: string }
-  | { type: "reasoning"; text: string }
-  | { type: "status"; status: string }
-  | {
-      type: "progress";
-      message?: string;
-      progress?: number;
-      current?: number;
-      total?: number;
-      batchItems?: number;
-      batchDurationMs?: number;
-    }
-  | { type: "milestone"; kind: string; detail?: string }
-  // A full snapshot of the agent's plan (todo list), mirrored to the live UI as
-  // a checklist. Ephemeral on this buffer — the durable `plan_updated` event is
-  // dispatched separately; the client prefers this typed snapshot over parsing
-  // the raw `todowrite` tool part.
-  | {
-      type: "plan";
-      items: Array<{ content: string; status: string }>;
-    }
-  // A tool call the agent ran, mirrored onto the live edge so the UI renders a
-  // card as the tool starts and updates it when it returns. `phase:"start"`
-  // carries the name + input; `phase:"end"` carries the result (`output`, a
-  // string), `isError`, and — for a LangWatch CLI call — the result `digest`
-  // the relay's envelope computed (the reference the card hydrates fresh data
-  // from). The durable `tool_call_started`/`tool_call_completed` events are
-  // dispatched separately (this is best-effort live UI, not the source of
-  // truth).
-  | {
-      type: "tool";
-      id: string;
-      name: string;
-      phase: "start" | "end";
-      title?: string;
-      input?: unknown;
-      output?: string;
-      isError?: boolean;
-      digest?: CliResultDigest;
-      result?: CliToolResult;
-    }
-  // The agent navigating the browser to a resource it surfaced, e.g. "show me
-  // the run" → the run's own detail view. `href` is ALWAYS platform-computed
-  // and already stripped to a same-app relative path — never something the
-  // agent authored (see LangyTurnRelay's resource-link cache). LIVE-ONLY by
-  // design: never a durable event, so reopening a past conversation (which
-  // reads the durable fold, not this buffer) never replays a navigation.
-  | { type: "navigate"; href: string }
-  // The agent asking the OPEN PAGE to carry out one typed action (duplicate a
-  // workbench column, edit a prompt draft, start a run). `kind` names an entry
-  // in a page's action manifest and `payload` has already passed that entry's
-  // schema server-side before it was appended — the browser re-parses with the
-  // same schema and never executes anything else. LIVE-ONLY like `navigate`:
-  // never a durable event, so reopening a past conversation can never replay
-  // an action. `actionId` is the server-minted claim/result key, which makes
-  // the whole round trip at-most-once.
-  | { type: "ui"; actionId: string; kind: string; payload: unknown }
-  | { type: "end" }
-  | { type: "error"; error: string };
-
-/**
- * What the panel says when a turn finishes without the agent writing anything.
- * Names the state and hands the user their next move, rather than apologising
- * for an internal detail they cannot act on. It points at the cards instead of
- * inviting a blind repeat, because a silent turn can still have completed a
- * write, and the cards are where that write is visible.
- */
-export const LANGY_EMPTY_TURN_FALLBACK =
-  "I finished this turn without writing a reply. Check the cards above for what ran before you ask again.";
-
-/** An entry paired with the Redis stream id it was read at. */
-export interface LangyStreamRead {
-  id: string;
-  entry: LangyStreamEntry;
-}
-
-/**
- * The minimal Redis surface the buffer uses. Injected so unit tests can drive a
- * fake without a live server; production adapts the shared ioredis connection.
- * `blocking` is a duplicated connection dedicated to `XREAD BLOCK` so a follow
- * read never wedges the shared client.
- */
-export interface LangyStreamRedis {
-  xadd(key: string, ...args: (string | number)[]): Promise<string | null>;
-  xrange(key: string, start: string, end: string): Promise<Array<[string, string[]]>>;
-  expire(key: string, seconds: number): Promise<number>;
-  set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
-  get(key: string): Promise<string | null>;
-  /** Dedicated connection for blocking reads. Falls back to `this` if absent. */
-  blocking?: {
-    xread(
-      ...args: (string | number)[]
-    ): Promise<Array<[string, Array<[string, string[]]>]>> | null | Promise<null>;
-  };
-}
+import type { CliResultDigest, CliToolResult, LangyStreamEntry } from "@langwatch/langy-contract";
+import {
+  LANGY_EMPTY_TURN_FALLBACK,
+  type LangyStreamRead,
+  type LangyStreamRedis,
+  LangyTokenBufferPort,
+} from "../ports/langy-token-buffer.port";
 
 const PAYLOAD_FIELD = "p";
 
@@ -148,7 +51,7 @@ function decodeFields(fields: string[]): LangyStreamEntry | null {
   return null;
 }
 
-export class LangyTokenBuffer {
+export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
   private readonly redis: LangyStreamRedis;
   /** Per-turn token accumulator, flushed on the hybrid size/time policy. */
   private readonly pending = new Map<string, string>();
@@ -169,15 +72,16 @@ export class LangyTokenBuffer {
   private readonly reasoningFlushTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   private constructor(deps: { redis: LangyStreamRedis }) {
+    super();
     this.redis = deps.redis;
   }
 
-  static create(deps: { redis: unknown; blockingRedis?: unknown }): LangyTokenBuffer {
+  static create(deps: { redis: unknown; blockingRedis?: unknown }): LangyTokenBufferAdapter {
     const redis = deps.redis as LangyStreamRedis;
     if (deps.blockingRedis) {
       redis.blocking = deps.blockingRedis as LangyStreamRedis["blocking"];
     }
-    return new LangyTokenBuffer({ redis });
+    return new LangyTokenBufferAdapter({ redis });
   }
 
   private streamKey(conversationId: string, turnId: string): string {
@@ -427,7 +331,7 @@ export class LangyTokenBuffer {
 
   /**
    * Push a live-only navigate instruction. `href` must already be a
-   * same-app relative path — the caller (LangyTurnRelay) resolves it from a
+   * same-app relative path — the caller (LangyTurnRelayAdapter) resolves it from a
    * platform-computed link before ever calling this, so nothing agent-authored
    * reaches the stream. No durable event is ever written for this: a navigate
    * fires at most once, on the live edge, and reopening a past conversation

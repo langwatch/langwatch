@@ -15,7 +15,7 @@ import {
   recordMfaVerificationFailureCommandDataSchema,
   regenerateBackupCodesCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { MfaGuards } from "../services/mfa-guards.service";
+import type { MfaGuardsService } from "../services/mfa-guards.service";
 import type { ZodTypeAny, z } from "zod";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import { MfaEnrollmentStateFoldProjection } from "../projections/mfa-enrollment-state.projection";
@@ -28,8 +28,10 @@ import type { MfaEvent } from "../projections/mfa-enrollment-state.projection";
  */
 
 type GuardVerb = {
-  [K in keyof MfaGuards]: MfaGuards[K] extends (data: never) => Promise<unknown> ? K : never;
-}[keyof MfaGuards];
+  [K in keyof MfaGuardsService]: MfaGuardsService[K] extends (data: never) => Promise<unknown>
+    ? K
+    : never;
+}[keyof MfaGuardsService];
 
 function mfaCommand<Schema extends ZodTypeAny>({
   type,
@@ -53,7 +55,7 @@ function mfaCommand<Schema extends ZodTypeAny>({
       return payload.userId;
     }
 
-    constructor(private readonly guards: MfaGuards) {}
+    constructor(private readonly guards: MfaGuardsService) {}
 
     async handle(command: Command<Data>): Promise<MfaEvent[]> {
       const data = command.data as never;

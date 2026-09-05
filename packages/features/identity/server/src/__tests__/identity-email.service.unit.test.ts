@@ -14,7 +14,7 @@ function harness(options?: { onIdentity?: boolean }) {
       }),
     },
   });
-  const service = new IdentityEmailService(heads, async () => options?.onIdentity ?? true);
+  const service = IdentityEmailService.create(heads, async () => options?.onIdentity ?? true);
   return { service, heads };
 }
 
@@ -52,7 +52,7 @@ describe("the identity email read fork", () => {
   describe("when the gate itself cannot be read", () => {
     it("answers null: a read fork must never break sign-in", async () => {
       const heads = new InMemoryHeads();
-      const service = new IdentityEmailService(heads, async () => {
+      const service = IdentityEmailService.create(heads, async () => {
         throw new Error("migration state unavailable");
       });
 

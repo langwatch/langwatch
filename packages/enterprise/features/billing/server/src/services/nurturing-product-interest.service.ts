@@ -1,4 +1,4 @@
-import { reportNurturingFailure, tryNurturingSink } from "../adapters/nurturing-sink.adapter";
+import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service";
 import type { CioPersonTraits } from "@langwatch/enterprise-billing-contract";
 
 /**
@@ -39,7 +39,7 @@ export class NurturingProductInterestService {
     userId: string;
     integrationMethod: IntegrationMethodValue;
   }): void {
-    const nurturing = tryNurturingSink();
+    const nurturing = NurturingSinkRegistryService.trySink();
     if (!nurturing) {
       return;
     }
@@ -51,6 +51,6 @@ export class NurturingProductInterestService {
           integration_method: integrationMethod,
         } as Partial<CioPersonTraits>,
       })
-      .catch(reportNurturingFailure);
+      .catch(NurturingSinkRegistryService.reportFailure);
   }
 }

@@ -11,7 +11,7 @@ import {
   outputSchema,
   resultErrorSchema,
   sessionSchema,
-} from "@langwatch/agent-contract";
+} from "./connected-agent.protocol";
 
 /** The value under `agent_call:v1:<callId>`. */
 export const storedCallSchema = z.object({
@@ -115,46 +115,4 @@ export function buildCallEnvelope(fields: {
   }
 
   return envelope;
-}
-
-/** The size of a JSON value on the wire, in bytes. */
-export function jsonByteLength(value: unknown): number {
-  return Buffer.byteLength(JSON.stringify(value ?? null), "utf8");
-}
-
-/**
- * The cap a result breaks, or nothing when it fits.
- */
-export function resultCapViolation({
-  output,
-  session,
-  caps,
-}: {
-  output: unknown;
-  session: unknown;
-  caps: { resultBytes: number; sessionBytes: number };
-}): {
-  what: "result" | "session";
-  sizeBytes: number;
-  limitBytes: number;
-} | null {
-  const sessionBytes = session === undefined ? 0 : jsonByteLength(session);
-  if (session !== undefined && sessionBytes > caps.sessionBytes) {
-    return {
-      what: "session",
-      sizeBytes: sessionBytes,
-      limitBytes: caps.sessionBytes,
-    };
-  }
-
-  const resultBytes = jsonByteLength(output) + sessionBytes;
-  if (resultBytes > caps.resultBytes) {
-    return {
-      what: "result",
-      sizeBytes: resultBytes,
-      limitBytes: caps.resultBytes,
-    };
-  }
-
-  return null;
 }

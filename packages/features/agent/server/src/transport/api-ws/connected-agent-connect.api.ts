@@ -18,10 +18,7 @@ import {
 } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
 import { WebSocket, WebSocketServer } from "ws";
-import {
-  type InstanceNudge,
-  instanceNudgeSchema,
-} from "../../services/connected-agent-envelope.service";
+import { type InstanceNudge, instanceNudgeSchema } from "@langwatch/agent-contract";
 import { instanceChannel, pendingKey } from "../../rules/connected-agent-keys.rules";
 import {
   AgentSessionService,

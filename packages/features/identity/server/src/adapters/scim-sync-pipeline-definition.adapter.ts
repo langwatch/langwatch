@@ -1,4 +1,4 @@
-import type { ScimSyncGuards } from "../services/scim-sync-guards.service";
+import type { ScimSyncGuardsService } from "../services/scim-sync-guards.service";
 import {
   defineAggregate,
   defineEvents,
@@ -35,9 +35,9 @@ const SCIM_SYNC_COMMANDS = [
 export interface ScimSyncPipelineDeps {
   scimSyncProjectionStore: StateProjectionStore<ScimSyncFoldState>;
   /** The guards every command handler runs — `@langwatch/identity-server`'s
-   *  ScimSyncGuards over the app's projection reads, the same instance shape
+   *  ScimSyncGuardsService over the app's projection reads, the same instance shape
    *  the calling path uses. */
-  scimSyncGuards: ScimSyncGuards;
+  scimSyncGuards: ScimSyncGuardsService;
 }
 
 /**

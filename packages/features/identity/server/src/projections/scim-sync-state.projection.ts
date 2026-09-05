@@ -214,7 +214,7 @@ export class ScimSyncStateFoldProjection
 
   /**
    * The ONE place a directory-sync fact becomes a framework event: the guards
-   * (`ScimSyncGuards`) decide what a command states, and this stamps the
+   * (`ScimSyncGuardsService`) decide what a command states, and this stamps the
    * envelope, so every producer stamps a fact identically.
    */
   static eventsFor({

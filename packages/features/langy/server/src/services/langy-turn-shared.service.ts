@@ -18,9 +18,9 @@ import {
   type LangyWorkerProbeInput,
   LangyWorkerPort,
 } from "../ports/langy-turn-runtime.port";
-import type { LangyTurnAccessStore } from "../adapters/redis.langy-turn-access.adapter";
-import type { LangyTurnHandoffStore } from "../adapters/redis.langy-turn-handoff.adapter";
-import type { LangyTokenBuffer } from "../adapters/redis.langy-token-buffer.adapter";
+import type { LangyTurnAccessPort } from "../ports/langy-turn-access.port";
+import type { LangyTurnHandoffPort } from "../ports/langy-turn-handoff.port";
+import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port";
 import { LangyConversationService } from "./langy-conversation.service";
 import { LangyCredentialService } from "./langy-credential.service";
 import { LangyMessageRepository } from "../repositories/langy-message.repository";
@@ -53,7 +53,7 @@ export interface LangyTurnServiceDeps {
   promptProjectId?: string;
   models: LangyModelPort;
   worker: LangyWorkerPort | null;
-  tokenBuffer: LangyTokenBuffer | null;
+  tokenBuffer: LangyTokenBufferPort | null;
   permits: LangyGithubPermitPort;
   harness?: LangyHarnessPort;
   perDayPrCap: number;
@@ -62,8 +62,8 @@ export interface LangyTurnServiceDeps {
   uiActionSurface: LangyUiActionSurfacePort;
   metrics: LangyTurnMetricsPort;
   admission: LangyTurnAdmissionRepository;
-  accessStore: LangyTurnAccessStore | null;
-  handoffStore: LangyTurnHandoffStore | null;
+  accessStore: LangyTurnAccessPort | null;
+  handoffStore: LangyTurnHandoffPort | null;
   messages: LangyMessageRepository | null;
 }
 
@@ -77,7 +77,7 @@ export type LangyTurnTechnicalPorts = {
   promptProjectId?: string;
   models: LangyModelPort;
   worker: LangyWorkerPort | null;
-  tokenBuffer: LangyTokenBuffer | null;
+  tokenBuffer: LangyTokenBufferPort | null;
   permits: LangyGithubPermitPort;
   harness?: LangyHarnessPort;
   perDayPrCap: number;
@@ -85,93 +85,102 @@ export type LangyTurnTechnicalPorts = {
   context: LangyTurnContextPort;
   uiActionSurface: LangyUiActionSurfacePort;
   metrics: LangyTurnMetricsPort;
-  accessStore: LangyTurnAccessStore | null;
-  handoffStore: LangyTurnHandoffStore | null;
+  accessStore: LangyTurnAccessPort | null;
+  handoffStore: LangyTurnHandoffPort | null;
 };
-
-export function langyTurnIdentity(input: {
-  userId: string;
-  idempotencyKey: string;
-  messages: unknown;
-  modelOverride?: string;
-}): { turnId: string; messageId: string } {
-  const digest = createHash("sha256")
-    .update(input.userId)
-    .update("\u0000")
-    .update(input.idempotencyKey)
-    .update("\u0000")
-    .update(JSON.stringify(input.messages))
-    .update("\u0000")
-    .update(input.modelOverride ?? "")
-    .digest("hex")
-    .slice(0, 32);
-
-  return { turnId: `langyturn_${digest}`, messageId: `langymsg_${digest}` };
-}
 
 export const LANGY_USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";
 
-export function composeLangyTurnPrompt({
-  contextBlock,
-  capNote,
-  userText,
-}: {
-  contextBlock: string | null;
-  capNote: string;
-  userText: string;
-}): { prompt: string; labelled: boolean } {
-  const preamble = [contextBlock, capNote]
-    .map((block) => (block ?? "").trim())
-    .filter((block) => block.length > 0);
-  if (preamble.length === 0) {
-    return { prompt: userText, labelled: false };
+/** The pieces every Langy turn path shares: its identity, its prompt, its probe. */
+export class LangyTurnSharedService {
+  static create(): LangyTurnSharedService {
+    return new LangyTurnSharedService();
   }
 
-  return {
-    prompt: [...preamble, `${LANGY_USER_MESSAGE_LABEL}\n${userText}`].join("\n\n"),
-    labelled: true,
-  };
-}
+  private constructor() {}
 
-export function buildWorkerProbeArgs({
-  projectId,
-  actorUserId,
-  conversationId,
-  model,
-  credentials,
-}: {
-  projectId: string;
-  actorUserId: string;
-  conversationId: string;
-  model: string;
-  credentials: LangyCredentials;
-}): LangyWorkerProbeInput {
-  return {
+  langyTurnIdentity(input: {
+    userId: string;
+    idempotencyKey: string;
+    messages: unknown;
+    modelOverride?: string;
+  }): { turnId: string; messageId: string } {
+    const digest = createHash("sha256")
+      .update(input.userId)
+      .update("\u0000")
+      .update(input.idempotencyKey)
+      .update("\u0000")
+      .update(JSON.stringify(input.messages))
+      .update("\u0000")
+      .update(input.modelOverride ?? "")
+      .digest("hex")
+      .slice(0, 32);
+
+    return { turnId: `langyturn_${digest}`, messageId: `langymsg_${digest}` };
+  }
+
+  composeLangyTurnPrompt({
+    contextBlock,
+    capNote,
+    userText,
+  }: {
+    contextBlock: string | null;
+    capNote: string;
+    userText: string;
+  }): { prompt: string; labelled: boolean } {
+    const preamble = [contextBlock, capNote]
+      .map((block) => (block ?? "").trim())
+      .filter((block) => block.length > 0);
+    if (preamble.length === 0) {
+      return { prompt: userText, labelled: false };
+    }
+
+    return {
+      prompt: [...preamble, `${LANGY_USER_MESSAGE_LABEL}\n${userText}`].join("\n\n"),
+      labelled: true,
+    };
+  }
+
+  buildWorkerProbeArgs({
     projectId,
     actorUserId,
     conversationId,
     model,
-    hasGithubAuth: !!credentials.githubToken,
-    ...(credentials.githubRepoScopeKey
-      ? { githubRepoScopeKey: credentials.githubRepoScopeKey }
-      : {}),
-    ...(credentials.egressAllowlist ? { egressAllowlist: credentials.egressAllowlist } : {}),
-    ...(credentials.mirrorTier ? { mirrorTier: credentials.mirrorTier } : {}),
-    ...(credentials.harness ? { harness: credentials.harness } : {}),
-  };
-}
-
-export async function reconstructPartialAnswer(
-  tokenBuffer: LangyTokenBuffer,
-  { conversationId, turnId }: { conversationId: string; turnId: string },
-): Promise<string> {
-  const { reads } = await tokenBuffer.readTail({ conversationId, turnId });
-  let text = "";
-  for (const { entry } of reads) {
-    if (entry.type === "delta") {
-      text += entry.text;
-    }
+    credentials,
+  }: {
+    projectId: string;
+    actorUserId: string;
+    conversationId: string;
+    model: string;
+    credentials: LangyCredentials;
+  }): LangyWorkerProbeInput {
+    return {
+      projectId,
+      actorUserId,
+      conversationId,
+      model,
+      hasGithubAuth: !!credentials.githubToken,
+      ...(credentials.githubRepoScopeKey
+        ? { githubRepoScopeKey: credentials.githubRepoScopeKey }
+        : {}),
+      ...(credentials.egressAllowlist ? { egressAllowlist: credentials.egressAllowlist } : {}),
+      ...(credentials.mirrorTier ? { mirrorTier: credentials.mirrorTier } : {}),
+      ...(credentials.harness ? { harness: credentials.harness } : {}),
+    };
   }
 
-  return text;
+  async reconstructPartialAnswer(
+    tokenBuffer: LangyTokenBufferPort,
+    { conversationId, turnId }: { conversationId: string; turnId: string },
+  ): Promise<string> {
+    const { reads } = await tokenBuffer.readTail({ conversationId, turnId });
+    let text = "";
+    for (const { entry } of reads) {
+      if (entry.type === "delta") {
+        text += entry.text;
+      }
+    }
+
+    return text;
+  }
 }

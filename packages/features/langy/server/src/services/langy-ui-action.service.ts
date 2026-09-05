@@ -8,7 +8,7 @@ import {
   LangyUiTimeoutError,
   LangyUiTurnInactiveError,
 } from "@langwatch/langy-contract";
-import type { LangyTokenBuffer } from "../adapters/redis.langy-token-buffer.adapter";
+import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port";
 import type {
   LangyUiActionCatalogPort,
   LangyUiActionDefinition,
@@ -111,7 +111,7 @@ export interface UiActionConversations {
 export type LangyUiActionServiceDependencies = {
   redis: UiActionRedis;
   conversations: UiActionConversations;
-  buffer: Pick<LangyTokenBuffer, "appendUiAction">;
+  buffer: Pick<LangyTokenBufferPort, "appendUiAction">;
   /**
    * Which kinds exist and what each one's payload must look like. A port rather than an import: the
    * only catalogue that exists is the experiments workbench's, and a Langy server package may not
@@ -128,7 +128,7 @@ export class LangyUiActionService {
 
   private readonly redis: UiActionRedis;
   private readonly conversations: UiActionConversations;
-  private readonly buffer: Pick<LangyTokenBuffer, "appendUiAction">;
+  private readonly buffer: Pick<LangyTokenBufferPort, "appendUiAction">;
   private readonly actions: LangyUiActionCatalogPort;
   private readonly backendRunner?: UiActionBackendRunner;
 

@@ -45,7 +45,7 @@ import {
   type VerifyDomainCommandData,
   verifyDomainCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { SsoConnectionGuards } from "./sso-connection-guards.service";
+import type { SsoConnectionGuardsService } from "./sso-connection-guards.service";
 import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules";
 
 /**
@@ -62,8 +62,15 @@ import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules";
  * actor rides on every command, so the history says who did it.
  */
 export class SsoConnectionService {
-  constructor(
-    private readonly guards: SsoConnectionGuards,
+  static create(
+    guards: SsoConnectionGuardsService,
+    ledger: SsoConnectionLedger,
+  ): SsoConnectionService {
+    return new SsoConnectionService(guards, ledger);
+  }
+
+  private constructor(
+    private readonly guards: SsoConnectionGuardsService,
     private readonly ledger: SsoConnectionLedger,
   ) {}
 

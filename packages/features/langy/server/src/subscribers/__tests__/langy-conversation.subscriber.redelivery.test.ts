@@ -9,7 +9,7 @@ import {
   LANGY_CONVERSATION_STATUS,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { LangyConversationProcessingEvent } from "../../adapters/eventing.langy-conversation-events.adapter";
+import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection";
 import type { LangyConversationLivenessRecord } from "../langy-conversation.subscriber";
 import {
   createAgentTurnLivenessSubscriber,

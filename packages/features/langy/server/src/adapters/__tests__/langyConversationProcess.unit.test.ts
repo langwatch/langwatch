@@ -7,7 +7,7 @@ import {
   type ProcessRef,
 } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { LangyConversationProcessingEvent } from "../eventing.langy-conversation-events.adapter";
+import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection";
 
 import {
   LANGY_CONVERSATION_PROCESS_NAME,

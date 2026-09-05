@@ -64,13 +64,17 @@ export interface SsoConnectionGuardsDeps {
   platformOperators: SsoPlatformOperatorRepository;
 }
 
-export class SsoConnectionGuardChecks {
+export class SsoConnectionGuardChecksService {
+  static create(deps: SsoConnectionGuardsDeps): SsoConnectionGuardChecksService {
+    return new SsoConnectionGuardChecksService(deps);
+  }
+
   private readonly connections: SsoConnectionReadRepository;
   private readonly breakGlass: SsoBreakGlassBindingRepository;
   private readonly stranding: SsoConnectionStrandingRepository;
   private readonly platformOperators: SsoPlatformOperatorRepository;
 
-  constructor(deps: SsoConnectionGuardsDeps) {
+  private constructor(deps: SsoConnectionGuardsDeps) {
     this.connections = deps.connections;
     this.breakGlass = deps.breakGlass;
     this.stranding = deps.stranding;

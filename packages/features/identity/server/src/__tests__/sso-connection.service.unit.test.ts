@@ -1,6 +1,6 @@
 import type { SsoConnectionCommand, SsoConnectionFactInput } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
-import { SsoConnectionGuards } from "../services/sso-connection-guards.service";
+import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service";
 import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules";
 import { SsoConnectionService } from "../services/sso-connection.service";
 import {
@@ -57,8 +57,8 @@ beforeEach(() => {
       }));
     },
   };
-  service = new SsoConnectionService(
-    new SsoConnectionGuards({
+  service = SsoConnectionService.create(
+    SsoConnectionGuardsService.create({
       connections,
       breakGlass: new StubBreakGlassBindings(true),
       stranding: new StubStranding([]),

@@ -23,7 +23,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { type InstanceNudge, instanceNudgeSchema } from "./connected-agent-envelope.service";
+import { type InstanceNudge, instanceNudgeSchema } from "@langwatch/agent-contract";
 import {
   callDeliveredKey,
   callKey,

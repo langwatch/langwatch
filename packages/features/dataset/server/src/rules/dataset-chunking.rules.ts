@@ -13,9 +13,9 @@
  * reimplement them. Keeping the math pure lets the ADR invariants (I-NULL,
  * I-COUNT) be unit-tested in isolation.
  */
-import { stripNullBytes } from "../rules/dataset-sanitize.rules";
+import { stripNullBytes } from "./dataset-sanitize.rules";
 
-export { chunkKey } from "@langwatch/dataset-contract";
+export { assertKeyWithinProject, assertNoTraversal, chunkKey } from "@langwatch/dataset-contract";
 
 /**
  * ADR-032 CHUNK_MAX_BYTES — byte cap per JSONL chunk object (~16 MB, v5).
@@ -162,33 +162,6 @@ export const chunkedMeta = (chunks: ChunkMeta[]): ChunkedDatasetMeta => ({
     byteSize: c.byteSize,
   })),
 });
-
-/**
- * Guard against `..` / `/` in an id segment before it is interpolated into
- * an object key or filesystem path. Shared by every storage impl so the
- * traversal invariant (I-TENANT) is enforced in exactly one place.
- */
-export const assertNoTraversal = (...parts: string[]): void => {
-  for (const part of parts) {
-    if (part.includes("..") || part.includes("/")) {
-      throw new Error("Invalid id: path traversal attempt detected");
-    }
-  }
-};
-
-/**
- * Guard a full storage key (which legitimately contains `/`) before it is
- * path-joined to disk or sent to S3. Defense-in-depth on the staged-object
- * methods (m4): the key is server-minted, but validate anyway — reject any
- * `..` segment and require it to sit under this project's `staging/` prefix so
- * a key can never escape the tenant scope.
- */
-export const assertKeyWithinProject = (projectId: string, key: string): void => {
-  assertNoTraversal(projectId);
-  if (key.includes("..") || key.startsWith("/") || !key.startsWith(`staging/${projectId}/`)) {
-    throw new Error("Invalid key: path traversal attempt detected");
-  }
-};
 
 /** Parse a JSONL blob into rows, ignoring blank lines. */
 export const parseJsonl = (jsonl: string): unknown[] =>

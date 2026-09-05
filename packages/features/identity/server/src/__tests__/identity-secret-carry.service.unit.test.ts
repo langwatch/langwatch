@@ -21,7 +21,7 @@ function harness(pairs: AccountSecretPair[]) {
     overwriteCredential,
   };
   return {
-    service: new IdentitySecretCarryService(reads),
+    service: IdentitySecretCarryService.create(reads),
     insertCredentialIfMissing,
     overwriteCredential,
   };

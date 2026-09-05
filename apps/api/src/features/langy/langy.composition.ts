@@ -8,9 +8,9 @@ import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import {
   FeatureFlagLangyUiActionSurfaceAdapter,
   LangyApp,
-  LangyTokenBuffer,
-  LangyTurnAccessStore,
-  LangyTurnHandoffStore,
+  LangyTokenBufferAdapter,
+  LangyTurnAccessAdapter,
+  LangyTurnHandoffAdapter,
   LangyUiActionCatalogPort,
   LangyUiActionService,
   PostgresLangyAdapter,
@@ -193,7 +193,7 @@ function composeLangy(options: LangyFeatureCollaborators): LangyApp {
     },
     // No agent manager on a web process: dispatching is the worker's.
     worker: null,
-    tokenBuffer: redis ? LangyTokenBuffer.create({ redis }) : null,
+    tokenBuffer: redis ? LangyTokenBufferAdapter.create({ redis }) : null,
     permits: {
       reserve: () =>
         Promise.reject(new ApiLangyUnavailableError("Reserving a Langy pull-request permit")),
@@ -213,8 +213,8 @@ function composeLangy(options: LangyFeatureCollaborators): LangyApp {
     context: { tryRender: renderLangyTurnContext },
     uiActionSurface: FeatureFlagLangyUiActionSurfaceAdapter.create(options.featureFlags),
     metrics: { count: () => undefined },
-    accessStore: redis ? LangyTurnAccessStore.create({ redis }) : null,
-    handoffStore: redis ? LangyTurnHandoffStore.create({ redis }) : null,
+    accessStore: redis ? LangyTurnAccessAdapter.create({ redis }) : null,
+    handoffStore: redis ? LangyTurnHandoffAdapter.create({ redis }) : null,
   };
 
   const service = adapter.build({
@@ -263,7 +263,7 @@ function composeLangyPorts(options: LangyFeatureCollaborators, langy: LangyApp):
       conversations: {
         findByIdVisible: (args) => langy.tryFindVisible(args),
       },
-      buffer: LangyTokenBuffer.create({ redis: options.redis }),
+      buffer: LangyTokenBufferAdapter.create({ redis: options.redis }),
       actions: new UnavailableApiLangyUiActionCatalog(),
     });
 

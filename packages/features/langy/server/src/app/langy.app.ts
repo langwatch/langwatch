@@ -37,15 +37,13 @@ import {
   type LangyEventCursor,
   type LangyMessageRow,
   type LangyService,
+  type LangyStreamEntry,
 } from "@langwatch/langy-contract";
 import type { LangyChatMessageInput } from "../services/langy-turn-shared.service";
-import {
-  LangyTokenBuffer,
-  type LangyStreamEntry,
-} from "../adapters/redis.langy-token-buffer.adapter";
-import { LangyTurnAccessStore } from "../adapters/redis.langy-turn-access.adapter";
+import { LangyTokenBufferAdapter } from "../adapters/redis.langy-token-buffer.adapter";
+import { LangyTurnAccessAdapter } from "../adapters/redis.langy-turn-access.adapter";
 import { decideSyntheticTerminal } from "../rules/langy-turn-settlement.rules";
-import { abortableDelay } from "../services/langy-turn-settlement-waiter.service";
+import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service";
 import { SETTLEMENT_CONFIRM_POLLS, SETTLEMENT_POLL_MS } from "../services/langy-turn-tail.service";
 
 /**
@@ -107,7 +105,7 @@ export interface LangyEgressState {
 
 /** One live turn's durable buffer, plus the connection it borrowed. */
 export interface LangyTurnStream {
-  buffer: LangyTokenBuffer;
+  buffer: LangyTokenBufferAdapter;
   /** Releases the dedicated blocking connection. Always call it. */
   close(): void;
 }
@@ -390,7 +388,7 @@ export class LangyApp {
     const { projectId, conversationId, turnId, userId } = input;
     const { redis, langy } = this.dependencies;
     if (redis) {
-      const access = LangyTurnAccessStore.create({ redis });
+      const access = LangyTurnAccessAdapter.create({ redis });
       if (await access.isTurnActor({ projectId, conversationId, turnId, userId })) {
         return true;
       }
@@ -414,7 +412,7 @@ export class LangyApp {
     if (!connection) return null;
     const blocking = connection.duplicate();
     return {
-      buffer: LangyTokenBuffer.create({ redis: connection, blockingRedis: blocking }),
+      buffer: LangyTokenBufferAdapter.create({ redis: connection, blockingRedis: blocking }),
       close: () => blocking.disconnect(),
     };
   }
@@ -441,7 +439,8 @@ export class LangyApp {
     const { projectId, conversationId, turnId, userId, buffer, signal } = input;
     let settledStreak = 0;
     while (!signal.aborted) {
-      if (!(await abortableDelay(SETTLEMENT_POLL_MS, signal))) return null;
+      if (!(await LangyTurnSettlementWaiterService.abortableDelay(SETTLEMENT_POLL_MS, signal)))
+        return null;
       const [conversation, liveness] = await Promise.all([
         this.dependencies.langy
           .getById({ id: conversationId, projectId, userId })

@@ -1,5 +1,5 @@
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy-contract";
-import type { LangyStreamEntry } from "../adapters/redis.langy-token-buffer.adapter";
+import type { LangyStreamEntry } from "@langwatch/langy-contract";
 import { LANGY_LIVENESS } from "./langy-streaming-constants.rules";
 
 /** Decides a safe synthetic terminal when the live stream missed one. */

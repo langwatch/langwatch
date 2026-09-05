@@ -3,7 +3,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import {
   AzureBlobStoredObjectDriverAdapter,
-  resolveAzureCredentials,
+  AzureBlobCredentialsAdapter,
 } from "@langwatch/stored-object-server";
 import type {
   StoredObjectStorageDriver,
@@ -53,7 +53,11 @@ export function createWorkerAzureBlobDriver(
 ): AzureBlobStoredObjectDriverAdapter | undefined {
   if (!azure.accountName) return undefined;
   return AzureBlobStoredObjectDriverAdapter.create(
-    resolveAzureCredentials({ config: azure, purpose: "write", identity: azure.identity }),
+    AzureBlobCredentialsAdapter.resolveAzureCredentials({
+      config: azure,
+      purpose: "write",
+      identity: azure.identity,
+    }),
   );
 }
 

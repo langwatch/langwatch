@@ -2,23 +2,23 @@ import { type IdentityCommand, normalizeIdentifierValue } from "@langwatch/ident
 import type { BetterAuthOptions } from "better-auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
-import { deriveNewbornUserId } from "../../adapters/crypto.identifier-identity.adapter";
+import { CryptoIdentifierIdentityAdapter } from "../../adapters/crypto.identifier-identity.adapter";
+import { deriveNewbornUserId } from "../../rules/identifier-hash.rules";
+import { BetterAuthIdentityBirthAdapter } from "../../adapters/better-auth.identity-birth.adapter";
 import {
-  birthAwareGate,
   type IdentityBirthPort,
   IdentityEngineUnavailableError,
-  runWithIdentityBirth,
-} from "../../adapters/better-auth.identity-birth.adapter";
+} from "../../ports/identity-birth.port";
 import {
-  bridgeAccountCeremonies,
-  IdentityCeremonies,
+  BetterAuthCeremonyBridgeAdapter,
+  IdentityCeremoniesAdapter,
 } from "../../adapters/better-auth.identity-ceremonies.adapter";
-import { createIdentityStorageAdapter } from "../../adapters/better-auth.identity-storage.adapter";
+import { BetterAuthIdentityStorageAdapter } from "../../adapters/better-auth.identity-storage.adapter";
 import type {
   IdentityAccountsPort,
   IdentityResolutionPort,
 } from "../../rules/identity-storage-ports.rules";
-import { IdentityGuards } from "../../services/identity-guards.service";
+import { IdentityGuardsService } from "../../services/identity-guards.service";
 import {
   adoptUserEmailCommandId,
   newIdentityCommandId,
@@ -165,16 +165,24 @@ export function identityStack({
     (db.user ?? []).some((row) => typeof row.id === "string" && gate.open(row.id)) ||
     [...migrationState.values()].includes("finalized");
 
-  const identity = new IdentityService(new IdentityGuards(heads, users, reservations), ledger);
+  const identity = IdentityService.create(
+    IdentityGuardsService.create(
+      heads,
+      users,
+      reservations,
+      CryptoIdentifierIdentityAdapter.create(),
+    ),
+    ledger,
+  );
 
-  const ceremonies = new IdentityCeremonies(
+  const ceremonies = IdentityCeremoniesAdapter.create(
     heads,
     users,
     identity,
     // The ceremonies fork on the SAME question the adapter does, and a
     // newborn whose adapter routed to identity while their ceremony declined
     // would get a legacy `Account` row anyway (ADR-116 §3).
-    birthAwareGate(isUserOnIdentityWrites),
+    BetterAuthIdentityBirthAdapter.birthAwareGate(isUserOnIdentityWrites),
     { now: () => T0, newCommandId: newIdentityCommandId },
   );
 
@@ -218,12 +226,12 @@ export function identityStack({
   const accounts: IdentityAccountsPort = inert ? inertIdentityPorts.accounts : storage;
   const resolution: IdentityResolutionPort = inert ? inertIdentityPorts.resolution : storage;
 
-  const bridge = bridgeAccountCeremonies({
+  const bridge = BetterAuthCeremonyBridgeAdapter.create({
     ceremonies,
-    routesToIdentity: birthAwareGate(isUserOnIdentityWrites),
+    routesToIdentity: BetterAuthIdentityBirthAdapter.birthAwareGate(isUserOnIdentityWrites),
   });
   const auth = authOver(
-    createIdentityStorageAdapter({
+    BetterAuthIdentityStorageAdapter.create({
       legacyEngine: memoryAdapter(db),
       accounts,
       resolution,
@@ -231,7 +239,7 @@ export function identityStack({
       isUserOnIdentityWrites,
       isAnyoneOnIdentityWrites,
       birth,
-    }),
+    }).factory(),
     // The application's own wiring, verbatim: the account ceremonies bound to
     // better-auth's `databaseHooks` alongside the adapter that also runs them.
     withDatabaseHooks
@@ -272,7 +280,7 @@ export async function signUp(auth: AuthUnderTest, email: string): Promise<string
  * §3). Nothing below the marker re-decides the flag.
  */
 export function flaggedSignUp(auth: AuthUnderTest, email: string): Promise<string> {
-  return runWithIdentityBirth(() => signUp(auth, email));
+  return BetterAuthIdentityBirthAdapter.runWithIdentityBirth(() => signUp(auth, email));
 }
 
 /**
@@ -281,7 +289,7 @@ export function flaggedSignUp(auth: AuthUnderTest, email: string): Promise<strin
  * that a refusal kept its handled code all the way out.
  */
 export function flaggedSignUpOrThrow(auth: AuthUnderTest, email: string): Promise<unknown> {
-  return runWithIdentityBirth(() =>
+  return BetterAuthIdentityBirthAdapter.runWithIdentityBirth(() =>
     auth.api.signUpEmail({
       body: { email, password: PASSWORD, name: "Sam" },
     }),

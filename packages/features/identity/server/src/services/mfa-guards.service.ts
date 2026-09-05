@@ -24,7 +24,7 @@ import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.rep
 
 /**
  * The two-step verification guards (D06): what runs BEFORE any fact exists.
- * Same contract as `IdentityGuards` — read the projection, refuse what the
+ * Same contract as `IdentityGuardsService` — read the projection, refuse what the
  * state machine forbids, and state only what the projection does not
  * already carry, because the store's dedupe is read-side and a restated
  * fact is still a row written.
@@ -36,8 +36,12 @@ import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.rep
  * the LIFECYCLE, and translate the plugin's refusals into codes a customer
  * can be shown.
  */
-export class MfaGuards {
-  constructor(private readonly enrollments: MfaEnrollmentRepository) {}
+export class MfaGuardsService {
+  static create(enrollments: MfaEnrollmentRepository): MfaGuardsService {
+    return new MfaGuardsService(enrollments);
+  }
+
+  private constructor(private readonly enrollments: MfaEnrollmentRepository) {}
 
   /**
    * Start a setup. Two attempts at once leave ONE setup: the second is

@@ -11,7 +11,7 @@ import {
   revokeScimSyncCommandDataSchema,
   type ScimSyncCommand,
 } from "@langwatch/identity-contract";
-import type { ScimSyncGuards } from "../services/scim-sync-guards.service";
+import type { ScimSyncGuardsService } from "../services/scim-sync-guards.service";
 import type { ZodTypeAny, z } from "zod";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import { ScimSyncStateFoldProjection } from "../projections/scim-sync-state.projection";
@@ -24,10 +24,12 @@ import type { ScimSyncEvent } from "../projections/scim-sync-state.projection";
  */
 
 type GuardVerb = {
-  [K in keyof ScimSyncGuards]: ScimSyncGuards[K] extends (data: never) => Promise<unknown>
+  [K in keyof ScimSyncGuardsService]: ScimSyncGuardsService[K] extends (
+    data: never,
+  ) => Promise<unknown>
     ? K
     : never;
-}[keyof ScimSyncGuards];
+}[keyof ScimSyncGuardsService];
 
 function scimSyncCommand<Schema extends ZodTypeAny>({
   type,
@@ -51,7 +53,7 @@ function scimSyncCommand<Schema extends ZodTypeAny>({
       return payload.scimSyncId;
     }
 
-    constructor(private readonly guards: ScimSyncGuards) {}
+    constructor(private readonly guards: ScimSyncGuardsService) {}
 
     async handle(command: Command<Data>): Promise<ScimSyncEvent[]> {
       const data = command.data as never;

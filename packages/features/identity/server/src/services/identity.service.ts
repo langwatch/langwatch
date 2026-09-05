@@ -20,7 +20,7 @@ import {
   type VerifyIdentifierCommandData,
   verifyIdentifierCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { IdentityGuards } from "./identity-guards.service";
+import type { IdentityGuardsService } from "./identity-guards.service";
 import type { IdentityLedger } from "../rules/identity-ledger.rules";
 import type {
   IdentityAdoptionWrites,
@@ -44,8 +44,12 @@ export class IdentityService
     IdentityAdoptionWrites,
     IdentityLinkProposalWrites
 {
-  constructor(
-    private readonly guards: IdentityGuards,
+  static create(guards: IdentityGuardsService, ledger: IdentityLedger): IdentityService {
+    return new IdentityService(guards, ledger);
+  }
+
+  private constructor(
+    private readonly guards: IdentityGuardsService,
     private readonly ledger: IdentityLedger,
   ) {}
 
@@ -102,7 +106,7 @@ export class IdentityService
 
   private async commit(
     command: IdentityCommand,
-    facts: Awaited<ReturnType<IdentityGuards["attachIdentifier"]>>,
+    facts: Awaited<ReturnType<IdentityGuardsService["attachIdentifier"]>>,
   ): Promise<IdentityFact[]> {
     if (facts.length === 0) {
       return [];

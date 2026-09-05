@@ -7,7 +7,7 @@ import type {
   PrismaClient,
   RoleBindingScopeType,
 } from "@langwatch/prisma-client/generated";
-import { tryFindPersonalTeamInScopes } from "./prisma.personal-team-scope.repository";
+import { PrismaPersonalTeamScopeRepository } from "./prisma.personal-team-scope.repository";
 import {
   OrganizationInviteRepository,
   type InviteWithOrganization,
@@ -132,7 +132,10 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
   }: {
     scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
   }): Promise<{ name: string } | null> {
-    return tryFindPersonalTeamInScopes({ client: this.prisma, scopes });
+    return PrismaPersonalTeamScopeRepository.create().tryFindPersonalTeamInScopes({
+      client: this.prisma,
+      scopes,
+    });
   }
 
   createPendingInvite(input: WriteInviteInput): Promise<OrganizationInvite> {

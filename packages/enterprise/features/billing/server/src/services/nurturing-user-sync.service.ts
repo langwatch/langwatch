@@ -1,8 +1,4 @@
-import {
-  reportNurturingFailure,
-  tryNurturingProfiles,
-  tryNurturingSink,
-} from "../adapters/nurturing-sink.adapter";
+import { NurturingSinkRegistryService } from "./nurturing-sink-registry.service";
 import type { CioOrgTraits, CioPersonTraits } from "@langwatch/enterprise-billing-contract";
 
 /**
@@ -15,12 +11,12 @@ const syncedUserIds = new Set<string>();
  * Only called on first login per process lifetime.
  */
 async function performFullSync({ userId }: { userId: string }): Promise<void> {
-  const nurturing = tryNurturingSink();
+  const nurturing = NurturingSinkRegistryService.trySink();
   if (!nurturing) {
     return;
   }
 
-  const profiles = tryNurturingProfiles();
+  const profiles = NurturingSinkRegistryService.tryProfiles();
   if (!profiles) {
     return;
   }
@@ -75,7 +71,7 @@ export class NurturingUserSyncService {
     userId: string;
     hasOrganization: boolean;
   }): void {
-    const nurturing = tryNurturingSink();
+    const nurturing = NurturingSinkRegistryService.trySink();
     if (!nurturing) {
       return;
     }
@@ -95,7 +91,7 @@ export class NurturingUserSyncService {
 
     void performFullSync({ userId }).catch((error) => {
       syncedUserIds.delete(userId);
-      reportNurturingFailure(error);
+      NurturingSinkRegistryService.reportFailure(error);
     });
   }
 

@@ -29,13 +29,13 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import {
   AnalyticsSavedWorkbenchChartPolicyAdapter,
   DashboardApp,
-  mapDashboardSavedWorkbenchChartError,
   PostgresDashboardAdapter,
   WorkbenchAccessPort,
   WorkbenchAwareGraphVisibilityAdapter,
   type DashboardGraphAlertLookup,
   type GraphTrpcPorts,
   type SavedWorkbenchChartTrpcPorts,
+  SavedWorkbenchChartErrorsAdapter,
 } from "@langwatch/dashboard-server";
 import {
   isContentVisible,
@@ -314,7 +314,7 @@ export function composeAnalyticsFeature(
           protections: input.protections,
           definition: input.definition,
         }),
-      mapError: mapDashboardSavedWorkbenchChartError,
+      mapError: SavedWorkbenchChartErrorsAdapter.mapDashboardSavedWorkbenchChartError,
     },
   } as AnalyticsFeaturePorts;
 
@@ -406,7 +406,7 @@ export function refusingAnalyticsFeature(): ComposedAnalyticsFeature {
       resolveProtections: refuseAsync,
       resolveRunCaller: refuseAsync,
       admitDefinition: refuseAsync,
-      mapError: mapDashboardSavedWorkbenchChartError,
+      mapError: SavedWorkbenchChartErrorsAdapter.mapDashboardSavedWorkbenchChartError,
     },
   };
 

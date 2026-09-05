@@ -31,14 +31,14 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { AgentPlatformUrlBuilder } from "../transport/api-rest/agent-legacy.api";
+import { resultCapViolation } from "../rules/connected-agent-caps.rules";
 import {
   type InstanceGone,
   type ReplyNudge,
-  resultCapViolation,
   type StoredCall,
   type StoredResult,
   storedCallSchema,
-} from "./connected-agent-envelope.service";
+} from "@langwatch/agent-contract";
 import {
   callAckKey,
   callKey,

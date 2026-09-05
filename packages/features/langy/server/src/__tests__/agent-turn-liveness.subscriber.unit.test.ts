@@ -7,7 +7,7 @@ import {
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { LangyTurnHandoff } from "@langwatch/langy-server";
-import type { LangyConversationProcessingEvent } from "../adapters/eventing.langy-conversation-events.adapter";
+import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection";
 import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules";
 
 import {

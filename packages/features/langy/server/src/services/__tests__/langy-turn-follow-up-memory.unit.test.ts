@@ -63,7 +63,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
       mint: vi.fn(async () => ({ token: "sk", apiKeyId: "key-1" })),
       revoke: vi.fn(async () => undefined),
     },
-    context: { render: vi.fn(() => null) },
+    context: { tryRender: vi.fn(() => null) },
     uiActionSurface: { resolve: vi.fn(async () => true) },
     metrics: { count: vi.fn() },
     admission: {

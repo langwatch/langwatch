@@ -289,15 +289,15 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   // Rate limiters. Registration and token exchange get a budget each: a
   // client that just registered immediately exchanges a code, so one shared
   // bucket makes the second call pay for the first.
-  const registerRateLimiter = new McpRateLimitService({
+  const registerRateLimiter = McpRateLimitService.create({
     windowMs: 60_000,
     maxRequests: 30,
   });
-  const tokenRateLimiter = new McpRateLimitService({
+  const tokenRateLimiter = McpRateLimitService.create({
     windowMs: 60_000,
     maxRequests: 30,
   });
-  const authFailRateLimiter = new McpRateLimitService({
+  const authFailRateLimiter = McpRateLimitService.create({
     windowMs: 60_000,
     maxRequests: 20,
   });

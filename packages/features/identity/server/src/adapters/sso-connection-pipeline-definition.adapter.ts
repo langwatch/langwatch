@@ -1,4 +1,4 @@
-import type { SsoConnectionGuards } from "../services/sso-connection-guards.service";
+import type { SsoConnectionGuardsService } from "../services/sso-connection-guards.service";
 import {
   defineAggregate,
   defineEvents,
@@ -72,9 +72,9 @@ const CONNECTION_COMMANDS = [
 export interface SsoConnectionPipelineDeps {
   connectionProjectionStore: StateProjectionStore<SsoConnectionFoldState>;
   /** The guards every command handler runs — `@langwatch/identity-server`'s
-   *  SsoConnectionGuards over the app's projection reads, the same instance
+   *  SsoConnectionGuardsService over the app's projection reads, the same instance
    *  shape the calling path uses. */
-  connectionGuards: SsoConnectionGuards;
+  connectionGuards: SsoConnectionGuardsService;
   /** How the teardown wake dispatches its completion command. */
   teardown: ConnectionTeardownPort;
 }

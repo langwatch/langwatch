@@ -27,19 +27,16 @@ import {
 import { LangyMessageService, type LangyTrustedMessageReader } from "./langy-message.service";
 import { LangyTurnService } from "./langy-turn.service";
 import { LangyCredentialService } from "./langy-credential.service";
-import { LangyTurnRelay, type LangyRelayRedis } from "../adapters/langy-turn-relay.adapter";
 import { LangyFeedbackPromptPolicy } from "../ports/langy-feedback-prompt.port";
 
-export type LangyRelayCompositionOptions = {
-  redis: LangyRelayRedis;
-  baseHost: string;
-  resolveResourceUrl?: (input: { projectId: string; resourceId: string }) => Promise<string | null>;
-  resolveCapabilityProgress?: (name: string) => { headline: string } | null;
-  logger?: {
-    warn(o: unknown, message: string): void;
-    debug?(o: unknown, message: string): void;
-  };
-};
+/**
+ * How this process opens a relay connection for a conversation runtime.
+ *
+ * A callback rather than the relay's own options because the relay is a Redis
+ * adapter: which connection it rides and how it is configured is the composing
+ * process's business, and this service only decides WHEN one is opened.
+ */
+export type OpenLangyRelay = (conversations: LangyService) => LangyRelayConnection;
 
 export type {
   LangyConversationCommands,
@@ -57,7 +54,7 @@ export class LangyService extends LangyServiceContract {
     private readonly turns: LangyTurnService,
     private readonly messages: LangyMessageService,
     private readonly credentials: LangyCredentialService,
-    private readonly relayOptions: LangyRelayCompositionOptions | null = null,
+    private readonly openRelay: OpenLangyRelay | null = null,
   ) {
     super();
   }
@@ -69,7 +66,7 @@ export class LangyService extends LangyServiceContract {
     messages: LangyMessageService;
     credentials: LangyCredentialService;
     feedbackPrompt: LangyFeedbackPromptPolicy;
-    relayOptions?: LangyRelayCompositionOptions;
+    openRelay?: OpenLangyRelay;
   }): LangyService {
     return new LangyService(
       options.feedbackPrompt,
@@ -77,29 +74,16 @@ export class LangyService extends LangyServiceContract {
       options.turns,
       options.messages,
       options.credentials,
-      options.relayOptions ?? null,
+      options.openRelay ?? null,
     );
   }
 
   openRelayConnection(): LangyRelayConnection {
-    if (!this.relayOptions) {
+    if (!this.openRelay) {
       throw new Error("Langy relay is not configured");
     }
 
-    return LangyTurnRelay.create({
-      conversations: this,
-      redis: this.relayOptions.redis,
-      baseHost: this.relayOptions.baseHost,
-      ...(this.relayOptions.resolveResourceUrl
-        ? {
-            resolveResourceUrl: this.relayOptions.resolveResourceUrl,
-          }
-        : {}),
-      ...(this.relayOptions.resolveCapabilityProgress
-        ? { resolveCapabilityProgress: this.relayOptions.resolveCapabilityProgress }
-        : {}),
-      ...(this.relayOptions.logger ? { logger: this.relayOptions.logger } : {}),
-    });
+    return this.openRelay(this);
   }
 
   async stopTurn(input: LangyStopTurnInput & { userId: string }): Promise<void> {

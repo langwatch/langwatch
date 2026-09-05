@@ -22,7 +22,7 @@ import {
   type UiActionBackendRunner,
   type UiActionRedis,
 } from "#services/langy-ui-action.service";
-import { LangyTokenBuffer } from "#adapters/redis.langy-token-buffer.adapter";
+import { LangyTokenBufferAdapter } from "#adapters/redis.langy-token-buffer.adapter";
 import { LANGY_UI_ACTIONS_FLAG } from "#ports/langy-turn-runtime.port";
 import {
   resolveLangyRestCaller,
@@ -104,7 +104,7 @@ export function createLangyUiActionsRestApp(options: {
       conversations: {
         findByIdVisible: (args) => langy.tryFindVisible(args),
       },
-      buffer: LangyTokenBuffer.create({ redis }),
+      buffer: LangyTokenBufferAdapter.create({ redis }),
       actions: ports.actions(),
       ...(ports.backendRunner ? { backendRunner: ports.backendRunner } : {}),
     });

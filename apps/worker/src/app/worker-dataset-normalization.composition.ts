@@ -11,6 +11,7 @@ import {
   DatasetAzureConfigResolver,
   PrismaDatasetContentRepository,
   DatasetNormalizationService,
+  DatasetNormalizeAdapter,
   DatasetS3ClientResolver,
   DatasetStorageResolver,
   LocalDatasetStorageAdapter,
@@ -39,10 +40,16 @@ export function createWorkerDatasetNormalization(options: {
   database: DatasetContentDatabase;
   storage: WorkerDatasetObjectStorage;
 }): DatasetNormalizationWorkerPort {
+  const datasets = PrismaDatasetContentRepository.create(options.database);
+  const storage = new WorkerDatasetStorageResolver(options.storage);
+
   return new WorkerDatasetNormalizationAdapter(
     DatasetNormalizationService.create({
-      datasets: PrismaDatasetContentRepository.create(options.database),
-      storage: new WorkerDatasetStorageResolver(options.storage),
+      datasets,
+      normalize: DatasetNormalizeAdapter.create({
+        repository: datasets,
+        getStorage: (projectId) => storage.forProject(projectId),
+      }),
     }),
   );
 }

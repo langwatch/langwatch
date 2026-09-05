@@ -19,16 +19,17 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
-import {
-  tryFindPersonalTeamInScopes,
-  findSharedTeamIds,
-} from "./prisma.personal-team-scope.repository";
-import { projectAdminUserIdsWithoutDirectRole } from "./prisma.effective-team-admins.repository";
+import { PrismaPersonalTeamScopeRepository } from "./prisma.personal-team-scope.repository";
+import { PrismaEffectiveTeamAdminsRepository } from "./prisma.effective-team-admins.repository";
+
+/** The two shared read helpers this repository leans on. Stateless; the client rides on each call. */
+const personalTeamScope = PrismaPersonalTeamScopeRepository.create();
+const effectiveTeamAdmins = PrismaEffectiveTeamAdminsRepository.create();
 import {
   isTeamRoleAllowedForOrganizationRole,
   ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
-} from "../../services/member-role-constraints.service";
+} from "../../rules/member-role-constraints.rules";
 import { isCustomRole } from "../../rules/custom-role-naming.rules";
 import { CustomRoleNotAssignableError } from "@langwatch/organization-contract";
 import {
@@ -278,11 +279,14 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   tryFindPersonalTeamInScopes(params: {
     scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
   }): Promise<{ name: string } | null> {
-    return tryFindPersonalTeamInScopes({ client: this.prisma, scopes: params.scopes });
+    return personalTeamScope.tryFindPersonalTeamInScopes({
+      client: this.prisma,
+      scopes: params.scopes,
+    });
   }
 
   findSharedTeamIds({ organizationId }: { organizationId: string }): Promise<string[]> {
-    return findSharedTeamIds({ client: this.prisma, organizationId });
+    return personalTeamScope.findSharedTeamIds({ client: this.prisma, organizationId });
   }
 
   async findTeamRoleBindings({
@@ -1114,7 +1118,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       // themselves has one admin, its owner, so a downgrade that reached it
       // would trip the last-admin guard below and roll this transaction back,
       // taking the organization role change with it.
-      const organizationTeamIds = await findSharedTeamIds({
+      const organizationTeamIds = await personalTeamScope.findSharedTeamIds({
         client: tx,
         organizationId,
       });
@@ -1185,7 +1189,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
           currentMembership.role === TeamUserRole.ADMIN && nextRole !== TeamUserRole.ADMIN;
 
         if (wouldDemoteAdmin) {
-          const adminsAfter = await projectAdminUserIdsWithoutDirectRole({
+          const adminsAfter = await effectiveTeamAdmins.projectAdminUserIdsWithoutDirectRole({
             tx,
             organizationId,
             teamId,
@@ -1368,7 +1372,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         // is one of the places somebody gets promoted back, so the team form's
         // carve-out holds for the member dialog too.
         if (isTargetUserAdmin) {
-          const adminsAfter = await projectAdminUserIdsWithoutDirectRole({
+          const adminsAfter = await effectiveTeamAdmins.projectAdminUserIdsWithoutDirectRole({
             tx,
             organizationId: team.organizationId,
             teamId,
@@ -1446,7 +1450,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         // an admin can shrink the admin set, so the projection is the whole
         // guard and an orphaned team stays editable and repairable.
         if (wouldDemoteAdmin) {
-          const adminsAfter = await projectAdminUserIdsWithoutDirectRole({
+          const adminsAfter = await effectiveTeamAdmins.projectAdminUserIdsWithoutDirectRole({
             tx,
             organizationId: team.organizationId,
             teamId,

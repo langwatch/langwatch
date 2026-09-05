@@ -9,7 +9,7 @@
  * without anything here changing.
  */
 
-import type { AiToolConfigEnvelope } from "@langwatch/enterprise-governance-contract";
+import type { AiToolConfigEnvelope } from "./ai-tool-catalog";
 
 /** The `config` shape a tile of the given type stores. */
 export type AiToolConfigOf<TType extends AiToolConfigEnvelope["type"]> = Extract<

@@ -1,5 +1,5 @@
 /**
- * LangyTurnRelay is the successor to runTurn's streaming role and a SECURITY boundary: it verifies
+ * LangyTurnRelayAdapter is the successor to runTurn's streaming role and a SECURITY boundary: it verifies
  * each pushed frame, pins it to the connection's turn, dedups replays, and fans it to the live
  * buffer + the durable event log.
  */
@@ -9,7 +9,7 @@ import { mintRunToken, signFrame } from "@langwatch/langy-server/streaming/langy
 import {
   type LangyRelayBuffer,
   type LangyRelayConversations,
-  LangyTurnRelay,
+  LangyTurnRelayAdapter,
 } from "../../adapters/langy-turn-relay.adapter";
 
 const RUN_TOKEN = mintRunToken();
@@ -142,7 +142,7 @@ function makeRelay(
   const resourceLinks = over.resourceLinks ?? fakeResourceLinks();
   const reserveFrameNonce = vi.fn(async () => over.fresh ?? true);
   const refreshHandoffTtl = over.refreshHandoffTtl ?? vi.fn(async () => undefined);
-  const relay = LangyTurnRelay.create({
+  const relay = LangyTurnRelayAdapter.create({
     buffer,
     conversations,
     reserveFrameNonce,
@@ -168,7 +168,7 @@ function makeRelay(
 const frame = (payload: unknown, identity = IDENTITY, runToken = RUN_TOKEN) =>
   signFrame(runToken, identity, JSON.stringify(payload));
 
-describe("LangyTurnRelay", () => {
+describe("LangyTurnRelayAdapter", () => {
   describe("given ephemeral frames", () => {
     it("appends a token delta to the live buffer only", async () => {
       const { relay, buffer, conversations } = makeRelay();

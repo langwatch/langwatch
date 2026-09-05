@@ -28,7 +28,7 @@ import {
   langyToolCallSucceededEventDataSchema,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
-import type { LangyConversationProcessingEvent } from "../adapters/eventing.langy-conversation-events.adapter";
+import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection";
 import type { LangyEffectPorts } from "../ports/langy-effect.port";
 import {
   langyGenerateTitleIntentSchema,

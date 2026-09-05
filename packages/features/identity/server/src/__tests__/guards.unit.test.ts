@@ -6,7 +6,7 @@ import {
   IdentityCommandRefusedError,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
-import { IdentityGuards } from "../services/identity-guards.service";
+import { IdentityGuardsService } from "../services/identity-guards.service";
 import {
   ACTOR,
   attachData,
@@ -18,6 +18,7 @@ import {
 } from "./support/in-memory-heads";
 import { InMemoryReservations } from "./support/in-memory-reservations";
 import { InMemoryUsers } from "./support/in-memory-users";
+import { CryptoIdentifierIdentityAdapter } from "../adapters/crypto.identifier-identity.adapter";
 
 /** No legacy user holds anything, which is what every test below assumes
  *  unless it says otherwise — the cross-population collision guard has its
@@ -30,10 +31,11 @@ describe("attachIdentifier guard", () => {
     it("states the normalized email, domain, and HMAC hash as a VERIFIED arrival", async () => {
       const heads = new InMemoryHeads();
       heads.hashKeys.set(USER, "key_material");
-      const facts = await new IdentityGuards(
+      const facts = await IdentityGuardsService.create(
         heads,
         users,
         new InMemoryReservations(),
+        CryptoIdentifierIdentityAdapter.create(),
       ).attachIdentifier(attachData());
       expect(facts).toHaveLength(1);
       const attached = facts[0]!;
@@ -71,19 +73,21 @@ describe("attachIdentifier guard", () => {
     });
 
     it("records a null hash when the user's hash key is not yet minted", async () => {
-      const facts = await new IdentityGuards(
+      const facts = await IdentityGuardsService.create(
         new InMemoryHeads(),
         users,
         new InMemoryReservations(),
+        CryptoIdentifierIdentityAdapter.create(),
       ).attachIdentifier(attachData());
       expect(facts[0]?.data).toMatchObject({ identifierHash: null });
     });
 
     it("attaches email-provider identifiers ATTACHED, awaiting the ceremony", async () => {
-      const facts = await new IdentityGuards(
+      const facts = await IdentityGuardsService.create(
         new InMemoryHeads(),
         users,
         new InMemoryReservations(),
+        CryptoIdentifierIdentityAdapter.create(),
       ).attachIdentifier(
         attachData({
           provider: "email",
@@ -110,9 +114,12 @@ describe("attachIdentifier guard", () => {
         identifierId: "idf_theirs",
         commandId: "idcmd_theirs",
       });
-      const facts = await new IdentityGuards(heads, users, reservations).attachIdentifier(
-        attachData(),
-      );
+      const facts = await IdentityGuardsService.create(
+        heads,
+        users,
+        reservations,
+        CryptoIdentifierIdentityAdapter.create(),
+      ).attachIdentifier(attachData());
       // No caller to refuse on this side: an IdP callback that failed would
       // tell the customer nothing they could act on (D01).
       expect(facts).toHaveLength(2);
@@ -134,9 +141,12 @@ describe("attachIdentifier guard", () => {
         identifierId: "idf_mine",
         commandId: "idcmd_mine",
       });
-      const facts = await new IdentityGuards(heads, users, reservations).attachIdentifier(
-        attachData(),
-      );
+      const facts = await IdentityGuardsService.create(
+        heads,
+        users,
+        reservations,
+        CryptoIdentifierIdentityAdapter.create(),
+      ).attachIdentifier(attachData());
       expect(facts).toHaveLength(1);
       expect(facts[0]!.data).toMatchObject({ state: "VERIFIED" });
     });
@@ -149,7 +159,12 @@ describe("attachIdentifier guard", () => {
       // when the projection is read.
       const heads = new InMemoryHeads();
       const reservations = new InMemoryReservations();
-      const guards = new IdentityGuards(heads, users, reservations);
+      const guards = IdentityGuardsService.create(
+        heads,
+        users,
+        reservations,
+        CryptoIdentifierIdentityAdapter.create(),
+      );
       const other = "user_other";
 
       const [mine, theirs] = [
@@ -191,7 +206,12 @@ describe("attachIdentifier guard", () => {
     /** @scenario "An email attach takes no address lock" */
     it("takes no lock for an ATTACHED arrival, so nobody can squat an address", async () => {
       const reservations = new InMemoryReservations();
-      await new IdentityGuards(new InMemoryHeads(), users, reservations).attachIdentifier(
+      await IdentityGuardsService.create(
+        new InMemoryHeads(),
+        users,
+        reservations,
+        CryptoIdentifierIdentityAdapter.create(),
+      ).attachIdentifier(
         attachData({
           provider: "email",
           providerId: null,
@@ -206,7 +226,12 @@ describe("attachIdentifier guard", () => {
   describe("when the same fact is stated twice", () => {
     /** @scenario "Identifier ids are deterministic so backfill and live emission converge" */
     it("derives the same identifier id whatever the command id", async () => {
-      const guards = new IdentityGuards(new InMemoryHeads(), users, new InMemoryReservations());
+      const guards = IdentityGuardsService.create(
+        new InMemoryHeads(),
+        users,
+        new InMemoryReservations(),
+        CryptoIdentifierIdentityAdapter.create(),
+      );
       const first = await guards.attachIdentifier(attachData());
       const second = await guards.attachIdentifier(attachData({ commandId: "idcmd_2" }));
       expect((first[0]!.data as { identifierId: string }).identifierId).toBe(
@@ -219,7 +244,12 @@ describe("attachIdentifier guard", () => {
     /** @scenario "A fact the heads already carry is not stated again" */
     it("states nothing, whatever the command id", async () => {
       const heads = new InMemoryHeads();
-      const guards = new IdentityGuards(heads, users, new InMemoryReservations());
+      const guards = IdentityGuardsService.create(
+        heads,
+        users,
+        new InMemoryReservations(),
+        CryptoIdentifierIdentityAdapter.create(),
+      );
       heads.fold(USER, await guards.attachIdentifier(attachData()));
 
       const restated = await guards.attachIdentifier(attachData({ commandId: "backfill:acc_1" }));
@@ -228,7 +258,12 @@ describe("attachIdentifier guard", () => {
 
     it("still states an identifier the heads lack", async () => {
       const heads = new InMemoryHeads();
-      const guards = new IdentityGuards(heads, users, new InMemoryReservations());
+      const guards = IdentityGuardsService.create(
+        heads,
+        users,
+        new InMemoryReservations(),
+        CryptoIdentifierIdentityAdapter.create(),
+      );
       const first = await guards.attachIdentifier(attachData());
       heads.fold(USER, first);
 
@@ -245,7 +280,12 @@ describe("attachIdentifier guard", () => {
 
 describe("verifyIdentifier guard", () => {
   const verify = (heads: InMemoryHeads, identifierId = "idf_work") =>
-    new IdentityGuards(heads, users, new InMemoryReservations()).verifyIdentifier({
+    IdentityGuardsService.create(
+      heads,
+      users,
+      new InMemoryReservations(),
+      CryptoIdentifierIdentityAdapter.create(),
+    ).verifyIdentifier({
       tenantId: USER,
       userId: USER,
       commandId: "idcmd_v1",
@@ -285,7 +325,12 @@ describe("verifyIdentifier guard", () => {
       heads.heads.set(USER, headsWith(fact({ state: "ATTACHED", verifiedAtMs: null })));
 
       await expect(
-        new IdentityGuards(heads, users, reservations).verifyIdentifier({
+        IdentityGuardsService.create(
+          heads,
+          users,
+          reservations,
+          CryptoIdentifierIdentityAdapter.create(),
+        ).verifyIdentifier({
           tenantId: USER,
           userId: USER,
           commandId: "idcmd_v1",
@@ -310,7 +355,12 @@ describe("verifyIdentifier guard", () => {
       const heads = new InMemoryHeads();
       heads.heads.set(USER, headsWith(fact({ state: "ATTACHED", verifiedAtMs: null })));
 
-      const facts = await new IdentityGuards(heads, users, reservations).verifyIdentifier({
+      const facts = await IdentityGuardsService.create(
+        heads,
+        users,
+        reservations,
+        CryptoIdentifierIdentityAdapter.create(),
+      ).verifyIdentifier({
         tenantId: USER,
         userId: USER,
         commandId: "idcmd_v1",
@@ -372,7 +422,12 @@ describe("verifyIdentifier guard", () => {
       });
 
       await expect(
-        new IdentityGuards(heads, legacy, new InMemoryReservations()).verifyIdentifier({
+        IdentityGuardsService.create(
+          heads,
+          legacy,
+          new InMemoryReservations(),
+          CryptoIdentifierIdentityAdapter.create(),
+        ).verifyIdentifier({
           tenantId: USER,
           userId: USER,
           commandId: "idcmd_v1",
@@ -397,10 +452,11 @@ describe("verifyIdentifier guard", () => {
         email: "sam@acme.com",
       });
 
-      const facts = await new IdentityGuards(
+      const facts = await IdentityGuardsService.create(
         heads,
         legacy,
         new InMemoryReservations(),
+        CryptoIdentifierIdentityAdapter.create(),
       ).verifyIdentifier({
         tenantId: USER,
         userId: USER,
@@ -424,7 +480,12 @@ describe("verifyIdentifier guard", () => {
       });
 
       await expect(
-        new IdentityGuards(heads, legacy, new InMemoryReservations()).verifyIdentifier({
+        IdentityGuardsService.create(
+          heads,
+          legacy,
+          new InMemoryReservations(),
+          CryptoIdentifierIdentityAdapter.create(),
+        ).verifyIdentifier({
           tenantId: USER,
           userId: USER,
           commandId: "idcmd_v1",
@@ -461,7 +522,12 @@ describe("markPrimary guard", () => {
           fact({ identifierId: "idf_personal", state: "PRIMARY", value: "sam@personal.dev" }),
         ),
       );
-      const facts = await new IdentityGuards(heads, users, new InMemoryReservations()).markPrimary({
+      const facts = await IdentityGuardsService.create(
+        heads,
+        users,
+        new InMemoryReservations(),
+        CryptoIdentifierIdentityAdapter.create(),
+      ).markPrimary({
         tenantId: USER,
         userId: USER,
         commandId: "idcmd_p1",
@@ -491,7 +557,12 @@ describe("markPrimary guard", () => {
           fact({ identifierId: "idf_b", state: "PRIMARY", value: "sam@b.dev" }),
         ),
       );
-      const facts = await new IdentityGuards(heads, users, new InMemoryReservations()).markPrimary({
+      const facts = await IdentityGuardsService.create(
+        heads,
+        users,
+        new InMemoryReservations(),
+        CryptoIdentifierIdentityAdapter.create(),
+      ).markPrimary({
         tenantId: USER,
         userId: USER,
         commandId: "idcmd_p2",
@@ -516,7 +587,12 @@ describe("markPrimary guard", () => {
     it("states one promotion naming no previous", async () => {
       const heads = new InMemoryHeads();
       heads.heads.set(USER, headsWith(fact({ identifierId: "idf_work", state: "VERIFIED" })));
-      const facts = await new IdentityGuards(heads, users, new InMemoryReservations()).markPrimary({
+      const facts = await IdentityGuardsService.create(
+        heads,
+        users,
+        new InMemoryReservations(),
+        CryptoIdentifierIdentityAdapter.create(),
+      ).markPrimary({
         tenantId: USER,
         userId: USER,
         commandId: "idcmd_p3",
@@ -535,7 +611,12 @@ describe("markPrimary guard", () => {
       const heads = new InMemoryHeads();
       heads.heads.set(USER, headsWith(fact({ state: "ATTACHED", verifiedAtMs: null })));
       await expect(
-        new IdentityGuards(heads, users, new InMemoryReservations()).markPrimary({
+        IdentityGuardsService.create(
+          heads,
+          users,
+          new InMemoryReservations(),
+          CryptoIdentifierIdentityAdapter.create(),
+        ).markPrimary({
           tenantId: USER,
           userId: USER,
           commandId: "idcmd_p1",
@@ -568,7 +649,12 @@ describe("markPrimary guard", () => {
       });
 
       await expect(
-        new IdentityGuards(heads, legacy, new InMemoryReservations()).markPrimary({
+        IdentityGuardsService.create(
+          heads,
+          legacy,
+          new InMemoryReservations(),
+          CryptoIdentifierIdentityAdapter.create(),
+        ).markPrimary({
           tenantId: USER,
           userId: USER,
           commandId: "idcmd_p1",
@@ -589,7 +675,12 @@ describe("markPrimary guard", () => {
 
 describe("detachIdentifier guard", () => {
   const detach = (heads: InMemoryHeads, identifierId: string) =>
-    new IdentityGuards(heads, users, new InMemoryReservations()).detachIdentifier({
+    IdentityGuardsService.create(
+      heads,
+      users,
+      new InMemoryReservations(),
+      CryptoIdentifierIdentityAdapter.create(),
+    ).detachIdentifier({
       tenantId: USER,
       userId: USER,
       commandId: "idcmd_d1",
@@ -615,7 +706,12 @@ describe("detachIdentifier guard", () => {
     /** @scenario "A detached identifier is a tombstone, forever resolvable" */
     it("states the detach; a second detach states nothing", async () => {
       const heads = new InMemoryHeads();
-      const guards = new IdentityGuards(heads, users, new InMemoryReservations());
+      const guards = IdentityGuardsService.create(
+        heads,
+        users,
+        new InMemoryReservations(),
+        CryptoIdentifierIdentityAdapter.create(),
+      );
       const attached = await guards.attachIdentifier(attachData());
       const identifierId = (attached[0]!.data as { identifierId: string }).identifierId;
       heads.fold(USER, attached);
@@ -656,7 +752,12 @@ describe("eraseUser guard", () => {
         USER,
         headsWith(fact({ identifierId: "idf_a" }), fact({ identifierId: "idf_b" })),
       );
-      const facts = await new IdentityGuards(heads, users, new InMemoryReservations()).eraseUser({
+      const facts = await IdentityGuardsService.create(
+        heads,
+        users,
+        new InMemoryReservations(),
+        CryptoIdentifierIdentityAdapter.create(),
+      ).eraseUser({
         tenantId: USER,
         userId: USER,
         commandId: "idcmd_e1",
@@ -672,7 +773,12 @@ describe("eraseUser guard", () => {
 
 describe("detachIdentifier strands guard", () => {
   const detach = (heads: InMemoryHeads, identifierId: string) =>
-    new IdentityGuards(heads, users, new InMemoryReservations()).detachIdentifier({
+    IdentityGuardsService.create(
+      heads,
+      users,
+      new InMemoryReservations(),
+      CryptoIdentifierIdentityAdapter.create(),
+    ).detachIdentifier({
       tenantId: USER,
       userId: USER,
       commandId: "idcmd_d2",

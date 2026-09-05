@@ -394,3 +394,15 @@ export class ValidationError extends HandledError {
     });
   }
 }
+
+/**
+ * The active span's ids, for a failure shape that is not itself a
+ * `HandledError` and so cannot pick them up from its own constructor. An
+ * unclassified failure still has to be correlatable, and this is the one
+ * place that reads the ambient span.
+ */
+export function activeTraceContext(): { traceId?: string; spanId?: string } {
+  const ctx = trace.getActiveSpan()?.spanContext();
+
+  return { traceId: ctx?.traceId, spanId: ctx?.spanId };
+}

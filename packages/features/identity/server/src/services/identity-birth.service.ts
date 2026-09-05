@@ -7,15 +7,15 @@ import {
   type IdentityFactInput,
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
-import { deriveNewbornUserId } from "../adapters/crypto.identifier-identity.adapter";
-import { type IdentityGuards } from "./identity-guards.service";
+import { deriveNewbornUserId } from "../rules/identifier-hash.rules";
+import { type IdentityGuardsService } from "./identity-guards.service";
 import { adoptUserEmailCommandId } from "../rules/identity-command-id.rules";
 import { type IdentityReservationRepository } from "../repositories/identity-reservations.repository";
 import {
+  IdentityBirthPort,
   IdentityEngineUnavailableError,
-  type IdentityBirthPort,
   type IdentityNewborn,
-} from "../adapters/better-auth.identity-birth.adapter";
+} from "../ports/identity-birth.port";
 import { createLogger } from "@langwatch/observability";
 import type { IdentityEvent } from "../projections/identity-state.projection";
 import { IdentityStateFoldProjection } from "../projections/identity-state.projection";
@@ -25,7 +25,7 @@ import type { IdentityNewbornRepository } from "../repositories/identity-newborn
 const logger = createLogger("langwatch:identity:birth");
 
 export interface IdentityBirthServiceDeps {
-  guards: IdentityGuards;
+  guards: IdentityGuardsService;
   ledger: IdentityBirthLedgerPort;
   rows: IdentityNewbornRepository;
   /** The address lock (ADR-116 §6): the entrance and the verification

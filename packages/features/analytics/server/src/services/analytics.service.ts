@@ -52,6 +52,25 @@ function currentAndPreviousDates(
   return { startDate, endDate, previousPeriodStartDate };
 }
 
+/**
+ * "full" is one bucket for the whole range and passes through; only a numeric
+ * scale that would produce more than the cap collapses to daily.
+ */
+function adjustTimeScaleForBucketCap({
+  timeScale,
+  startDate,
+  endDate,
+}: {
+  timeScale: number | "full" | undefined;
+  startDate: Date;
+  endDate: Date;
+}): number | "full" {
+  if (timeScale === undefined) return MINUTES_PER_DAY;
+  if (timeScale === "full") return timeScale;
+  const estimatedBuckets = (endDate.getTime() - startDate.getTime()) / MS_PER_MINUTE / timeScale;
+  return estimatedBuckets > MAX_TIMESERIES_BUCKETS ? MINUTES_PER_DAY : timeScale;
+}
+
 export class AnalyticsService extends AnalyticsServiceContract {
   static create(options: {
     repository: AnalyticsRepository;
@@ -120,16 +139,11 @@ export class AnalyticsService extends AnalyticsServiceContract {
       endDate,
       typeof parsed.timeScale === "number" ? parsed.timeScale : undefined,
     );
-    const estimatedBuckets =
-      parsed.timeScale === undefined || parsed.timeScale === "full"
-        ? Number.POSITIVE_INFINITY
-        : (endDate.getTime() - startDate.getTime()) / MS_PER_MINUTE / parsed.timeScale;
-    const adjustedTimeScale =
-      parsed.timeScale === undefined
-        ? MINUTES_PER_DAY
-        : estimatedBuckets > MAX_TIMESERIES_BUCKETS
-          ? MINUTES_PER_DAY
-          : parsed.timeScale;
+    const adjustedTimeScale = adjustTimeScaleForBucketCap({
+      timeScale: parsed.timeScale,
+      startDate,
+      endDate,
+    });
     const table = this.repository.tableFor(parsed);
     const query = {
       table,

@@ -42,7 +42,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { type OrganizationUserRole, RoleBindingScopeType } from "../../model/prisma-types";
 import { useDrawer } from "../../behavior/use-drawer";
 import { useMemberDisableAction } from "../../behavior/use-member-disable-action";
-import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
+import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
 import { CopyInput } from "../../ui/elements/copy-input";
 import { DomainJoinCard } from "../../ui/blocks/domain-join-card";
 import { InvitesTable } from "../../ui/sections/invites-table";
