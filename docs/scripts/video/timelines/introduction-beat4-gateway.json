@@ -1,0 +1,148 @@
+{
+  "input": "../../../../.claude/tmp/video/raw/gateway/gateway.webm",
+  "output": "../../../../.claude/tmp/video/hero/beat4.webm",
+  "fps": 30,
+  "page": {
+    "width": 1440,
+    "height": 900
+  },
+  "size": {
+    "width": 1664,
+    "height": 1040
+  },
+  "frame": {
+    "background": "backgrounds/default.webp",
+    "fit": "native"
+  },
+  "quality": {
+    "crf": 38,
+    "cpuUsed": 2
+  },
+  "cut": {
+    "speed": 2,
+    "segments": [
+      [
+        8.2,
+        12.6
+      ],
+      [
+        17.0,
+        25.2
+      ],
+      [
+        34.4,
+        36.6
+      ],
+      [
+        374.3,
+        377.6
+      ]
+    ]
+  },
+  "cursor": {
+    "start": {
+      "x": 760,
+      "y": 430
+    }
+  },
+  "beats": [
+    {
+      "tRaw": 8.45,
+      "x": 1330,
+      "y": 97,
+      "zoom": 1.9,
+      "zoomAt": {
+        "x": 1230,
+        "y": 130
+      },
+      "hold": 0.4,
+      "pause": {
+        "before": 0.8,
+        "after": 0.6
+      },
+      "note": "New virtual key"
+    },
+    {
+      "tRaw": 11.6,
+      "x": 1176,
+      "y": 123,
+      "zoom": 1.7,
+      "zoomAt": {
+        "x": 1170,
+        "y": 260
+      },
+      "hold": 2.0,
+      "note": "name it, the camera holds while it types"
+    },
+    {
+      "tRaw": 18.98,
+      "x": 1215,
+      "y": 559,
+      "zoom": 1.7,
+      "zoomAt": {
+        "x": 1170,
+        "y": 570
+      },
+      "hold": 0.3,
+      "note": "a budget, per month"
+    },
+    {
+      "tRaw": 20.39,
+      "x": 1100,
+      "y": 595,
+      "zoom": 1.7,
+      "zoomAt": {
+        "x": 1170,
+        "y": 570
+      },
+      "hold": 0.7,
+      "click": false,
+      "arc": 0,
+      "note": "max $50 a month, resets on the 1st"
+    },
+    {
+      "tRaw": 23.78,
+      "x": 1375,
+      "y": 859,
+      "zoom": 1.7,
+      "zoomAt": {
+        "x": 1170,
+        "y": 660
+      },
+      "hold": 0.2,
+      "note": "create it"
+    },
+    {
+      "tRaw": 34.5,
+      "x": 700,
+      "y": 354,
+      "zoom": 1.55,
+      "zoomAt": {
+        "x": 720,
+        "y": 290
+      },
+      "hold": 0.8,
+      "click": false,
+      "arc": 0,
+      "note": "the secret, shown once, and the base URL the SDK points at"
+    },
+    {
+      "tRaw": 374.0,
+      "x": 1075,
+      "y": 253,
+      "zoom": 1.35,
+      "zoomAt": {
+        "x": 820,
+        "y": 300
+      },
+      "hold": 2.4,
+      "click": false,
+      "arc": 0,
+      "note": "the spend of its first request has already landed on the key"
+    },
+    {
+      "tRaw": 378.8,
+      "hide": true
+    }
+  ]
+}

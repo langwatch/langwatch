@@ -1,0 +1,125 @@
+{
+  "input": "../../../../.claude/tmp/video/raw/traces/traces.webm",
+  "output": "../../../../.claude/tmp/video/hero/beat1.webm",
+  "fps": 30,
+  "page": {
+    "width": 1440,
+    "height": 900
+  },
+  "size": {
+    "width": 1664,
+    "height": 1040
+  },
+  "frame": {
+    "background": "backgrounds/default.webp",
+    "fit": "native"
+  },
+  "quality": {
+    "crf": 36,
+    "cpuUsed": 2
+  },
+  "cut": {
+    "speed": 2,
+    "segments": [
+      [
+        17.6,
+        21.8
+      ],
+      [
+        26.6,
+        30.6
+      ],
+      [
+        35.0,
+        46.0
+      ]
+    ]
+  },
+  "cursor": {
+    "start": {
+      "x": 700,
+      "y": 500
+    }
+  },
+  "beats": [
+    {
+      "tRaw": 18.6,
+      "x": 900,
+      "y": 223,
+      "zoom": 1,
+      "click": false,
+      "arc": 0,
+      "note": "every conversation the agent had, with its origin, latency, cost and token count"
+    },
+    {
+      "tRaw": 20.94,
+      "x": 404,
+      "y": 190,
+      "zoom": 1,
+      "note": "open one of them"
+    },
+    {
+      "tRaw": 27.5,
+      "x": 745,
+      "y": 66,
+      "zoom": 1.9,
+      "zoomAt": {
+        "x": 880,
+        "y": 80
+      },
+      "hold": 0.1,
+      "click": false,
+      "arc": 0,
+      "note": "the cost of the conversation"
+    },
+    {
+      "tRaw": 29.2,
+      "x": 1000,
+      "y": 66,
+      "zoom": 1.9,
+      "zoomAt": {
+        "x": 880,
+        "y": 80
+      },
+      "hold": 1.1,
+      "click": false,
+      "arc": 0,
+      "note": "and the tokens it spent, in and out"
+    },
+    {
+      "tRaw": 31.9,
+      "x": 657,
+      "y": 161,
+      "zoom": 1,
+      "note": "the Trace tab"
+    },
+    {
+      "tRaw": 35.74,
+      "x": 892,
+      "y": 199,
+      "zoom": 1.6,
+      "zoomAt": {
+        "x": 800,
+        "y": 260
+      },
+      "hold": 0.2,
+      "pause": {
+        "before": 0.6
+      },
+      "note": "the sequence diagram"
+    },
+    {
+      "tRaw": 43.0,
+      "x": 700,
+      "y": 500,
+      "zoom": 1,
+      "click": false,
+      "arc": 0,
+      "note": "a supervisor hands the case to a refunds specialist, which calls the model, a tool, then the model again"
+    },
+    {
+      "tRaw": 47.4,
+      "hide": true
+    }
+  ]
+}

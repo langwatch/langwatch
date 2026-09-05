@@ -1,0 +1,114 @@
+{
+  "input": "../../../../.claude/tmp/video/raw/experiments/experiments.webm",
+  "output": "../../../../.claude/tmp/video/hero/beat2.webm",
+  "fps": 30,
+  "page": {
+    "width": 1440,
+    "height": 900
+  },
+  "size": {
+    "width": 1664,
+    "height": 1040
+  },
+  "frame": {
+    "background": "backgrounds/default.webp",
+    "fit": "native"
+  },
+  "quality": {
+    "crf": 36,
+    "cpuUsed": 2
+  },
+  "cut": {
+    "speed": 2,
+    "segments": [
+      [
+        12.5,
+        16.5
+      ],
+      [
+        24.0,
+        28.0
+      ],
+      [
+        55.0,
+        62.5
+      ],
+      [
+        78.0,
+        83.5
+      ]
+    ]
+  },
+  "cursor": {
+    "start": {
+      "x": 700,
+      "y": 480
+    }
+  },
+  "beats": [
+    {
+      "tRaw": 15.26,
+      "x": 1382,
+      "y": 93,
+      "zoom": 1.9,
+      "zoomAt": {
+        "x": 1240,
+        "y": 120
+      },
+      "hold": 0.3,
+      "pause": {
+        "before": 0.7,
+        "after": 0.4
+      },
+      "note": "run the whole dataset against both prompts, a corner, so it earns the zoom"
+    },
+    {
+      "tRaw": 26.0,
+      "x": 1000,
+      "y": 520,
+      "zoom": 1,
+      "click": false,
+      "arc": 0,
+      "note": "both columns fill live, each with its own progress"
+    },
+    {
+      "tRaw": 57.5,
+      "x": 1000,
+      "y": 191,
+      "zoom": 1.5,
+      "zoomAt": {
+        "x": 880,
+        "y": 240
+      },
+      "hold": 0.6,
+      "click": false,
+      "arc": 0,
+      "note": "the score summary: 60% on each prompt, with its latency"
+    },
+    {
+      "tRaw": 61.6,
+      "x": 1194,
+      "y": 93,
+      "zoom": 1,
+      "note": "Results"
+    },
+    {
+      "tRaw": 80.5,
+      "x": 760,
+      "y": 240,
+      "zoom": 1.25,
+      "zoomAt": {
+        "x": 860,
+        "y": 300
+      },
+      "hold": 1.3,
+      "click": false,
+      "arc": 0,
+      "note": "the two prompts side by side: total cost and average latency, and every answer next to the other"
+    },
+    {
+      "tRaw": 83.1,
+      "hide": true
+    }
+  ]
+}
