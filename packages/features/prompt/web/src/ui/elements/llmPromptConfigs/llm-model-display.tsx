@@ -5,7 +5,7 @@ import { modelProviderIcons } from "@langwatch/model-provider-web/surfaces/provi
 import {
   allModelOptions,
   useModelSelectionOptions,
-} from "@langwatch/model-provider-web/components/ModelSelector";
+} from "@langwatch/model-provider-web/surfaces/model-selector";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { MODEL_ICON_SIZE } from "../../../model/llmPromptConfigs/constants";

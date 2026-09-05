@@ -1,5 +1,5 @@
 import { Badge, HStack, Text } from "@chakra-ui/react";
-import { useFilterStore } from "../../../../../../../index";
+import { useFilterStore } from "../../../../../../../behavior/filter.store";
 import { getColorPaletteForString } from "../../../../../../../model/rotating-colors";
 import type { TraceListItem } from "../../../../types/trace";
 import type { CellDef } from "../../types";

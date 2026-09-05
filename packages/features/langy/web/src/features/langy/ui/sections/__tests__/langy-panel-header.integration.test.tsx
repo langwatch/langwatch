@@ -127,8 +127,8 @@ vi.mock("../../../../../behavior/langy-api", async () => {
 });
 
 import { LangySidecar } from "../langy-panel";
-import { LangyProvider } from "../langy-context";
-import { useLangyStore } from "../../../../../index";
+import { LangyProvider } from "../../../../../ui/sections/langy-page-context";
+import { useLangyStore } from "../../../../../behavior/langy.store";
 import {
   LangyHostPort,
   LangyHostProvider,
@@ -234,7 +234,9 @@ describe("given the Langy panel is open", () => {
       const minimise = await screen.findByRole("button", { name: "Minimise Langy" });
 
       expect(newChat).not.toBe(minimise);
-      expect(newChat.compareDocumentPosition(minimise) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(
+        newChat.compareDocumentPosition(minimise) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
     });
   });
 });
@@ -269,9 +271,10 @@ describe("given the Langy panel is open", () => {
       await user.click(row);
 
       expect(screen.queryByText("Recent chats")).not.toBeInTheDocument();
-      expect(
-        await screen.findByRole("button", { name: "Recent chats" }),
-      ).toHaveAttribute("aria-pressed", "false");
+      expect(await screen.findByRole("button", { name: "Recent chats" })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
     });
 
     /** @scenario "Leaving the recents list without choosing" */
@@ -283,9 +286,10 @@ describe("given the Langy panel is open", () => {
       await user.click(await screen.findByRole("button", { name: "Back to chat" }));
 
       expect(screen.queryByText("Recent chats")).not.toBeInTheDocument();
-      expect(
-        await screen.findByRole("button", { name: "Recent chats" }),
-      ).toHaveAttribute("aria-pressed", "false");
+      expect(await screen.findByRole("button", { name: "Recent chats" })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
     });
   });
 });

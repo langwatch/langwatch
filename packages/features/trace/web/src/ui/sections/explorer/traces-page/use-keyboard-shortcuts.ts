@@ -1,11 +1,9 @@
 import { useEffect } from "react";
-import {
-  useDensityStore,
-  useDrawerStore,
-  useFindStore,
-  useSelectionStore,
-  useUIStore,
-} from "../../../../index";
+import { useDensityStore } from "../../../../behavior/density.store";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
+import { useFindStore } from "../../../../behavior/find-store";
+import { useSelectionStore } from "../../../../behavior/selection.store";
+import { useUIStore } from "../../../../behavior/ui.store";
 
 const isTextInput = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false;

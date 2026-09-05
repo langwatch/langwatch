@@ -44,7 +44,7 @@ import type { TargetValue } from "../../../model/scenario-target";
 import { CaseVersionChip } from "../../elements/agent-testing/shared/case-version-chip";
 import { api } from "../../../behavior/scenario-api";
 import { KSUID_RESOURCES } from "@langwatch/workflow-contract";
-import { PromptEditorDrawer } from "@langwatch/prompt-web/components/prompts/PromptEditorDrawer";
+import { PromptEditorDrawer } from "@langwatch/prompt-web/surfaces/prompt-editor-drawer";
 import { hasScenarioInputMapping } from "../../elements/suites/scenario-input-mapping-section";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { TagList } from "../../elements/tag-list";

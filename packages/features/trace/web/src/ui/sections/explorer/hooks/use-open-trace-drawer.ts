@@ -9,7 +9,8 @@ import {
   buildRichArrivalTraceDetail,
   RICH_ARRIVAL_TRACE_ID,
 } from "../onboarding/data/sample-preview-traces";
-import { isPreviewTraceId, useDrawerStore } from "../../../../index";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
+import { isPreviewTraceId } from "../../../../model/preview-trace-id";
 import type { TraceListItem } from "../types/trace";
 import { spanTreeQueryFn, spanTreeQueryKey } from "./span-tree-paged-query";
 

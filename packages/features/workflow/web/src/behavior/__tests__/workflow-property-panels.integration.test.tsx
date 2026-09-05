@@ -4,18 +4,18 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { Node } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Component, End, Entry } from "@langwatch/workflow-contract";
+import { CodePropertiesPanel } from "../../ui/sections/properties/workflow-code-properties-panel";
+import { EndPropertiesPanel } from "../../ui/sections/properties/workflow-end-properties-panel";
+import { EntryPointPropertiesPanel } from "../../ui/sections/properties/workflow-entry-point-properties-panel";
+import { IfElsePropertiesPanel } from "../../ui/sections/properties/workflow-if-else-properties-panel";
+import { PromptingTechniquePropertiesPanel } from "../../ui/sections/properties/workflow-prompting-technique-properties-panel";
 import {
-  CodePropertiesPanel,
-  EndPropertiesPanel,
-  EntryPointPropertiesPanel,
-  IfElsePropertiesPanel,
-  PromptingTechniquePropertiesPanel,
-  RetrievePropertiesPanel,
   type WorkflowBasePropertiesPanelProps,
   type WorkflowCodeEditorProps,
   type WorkflowOutputsProps,
   type WorkflowVariablesProps,
-} from "../../index";
+} from "../../ui/sections/properties/workflow-properties.ports";
+import { RetrievePropertiesPanel } from "../../ui/sections/properties/workflow-retrieve-properties-panel";
 import { _useWorkflowStore } from "../use-workflow-store";
 
 vi.mock("@xyflow/react", async (importOriginal) => ({

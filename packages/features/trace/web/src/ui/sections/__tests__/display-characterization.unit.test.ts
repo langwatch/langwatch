@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
-  NON_BILLABLE_ATTR,
-  extractPromptReference,
-  formatPreview,
-  resolveNonBilledCost,
-} from "../../../index";
+import { formatPreview } from "../../../behavior/preview-formatter";
+import { NON_BILLABLE_ATTR, resolveNonBilledCost } from "../../../model/cost-attribution";
+import { extractPromptReference } from "../../../model/prompt-attributes";
 
 describe("trace display toolkit characterization", () => {
   it("keeps preview unwrap, markdown, and newline-display semantics together", () => {

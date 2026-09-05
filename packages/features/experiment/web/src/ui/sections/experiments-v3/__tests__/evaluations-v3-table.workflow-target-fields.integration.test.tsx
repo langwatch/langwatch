@@ -46,7 +46,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   setFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("@langwatch/prompt-web/prompts/hooks/useLatestPromptVersion", () => ({
+vi.mock("@langwatch/prompt-web/surfaces/latest-prompt-version", () => ({
   useLatestPromptVersion: () => ({
     currentVersion: undefined,
     latestVersion: undefined,
@@ -98,7 +98,7 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   },
 }));
 
-vi.mock("@langwatch/dataset-web/components/AddOrEditDatasetDrawer", () => ({
+vi.mock("@langwatch/dataset-web/surfaces/dataset-drawer", () => ({
   AddOrEditDatasetDrawer: () => null,
 }));
 

@@ -41,19 +41,21 @@ import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { AddRowsFromCSVModal } from "../add-rows-from-csv-modal";
 import { downloadCsv } from "@langwatch/csv/download";
 import {
-  type AutosaveState,
-  type DatasetTableContextValue,
-  DatasetTableProvider,
-  type DatasetTableRowData,
-  formatRecordCount,
-  datasetTableCss,
   createDatasetEditorStore,
   type EditorColumn,
   type EditorRecord,
   rekeyEditorRecords,
-  useTableKeyboardNavigation,
-  VirtualizedTableBody,
-} from "@langwatch/dataset-web";
+} from "../../../../behavior/use-dataset-editor-store";
+import { useTableKeyboardNavigation } from "../../../../behavior/use-table-keyboard-navigation";
+import { formatRecordCount } from "../../../../model/dataset-editor-copy";
+import {
+  type AutosaveState,
+  type DatasetTableContextValue,
+  DatasetTableProvider,
+  type DatasetTableRowData,
+} from "../../../../model/dataset-table-context";
+import { datasetTableCss } from "../../../../model/dataset-table-styles";
+import { VirtualizedTableBody } from "../../../blocks/virtualized-table-body";
 import { useDatasetRecordSync } from "../../../../behavior/datasets/editor/use-dataset-record-sync";
 
 export type InMemoryDataset = {

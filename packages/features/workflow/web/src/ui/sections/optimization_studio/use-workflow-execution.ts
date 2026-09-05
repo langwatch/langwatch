@@ -5,7 +5,7 @@ import { generateOtelTraceId } from "@langwatch/trace-contract";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { usePostEvent } from "./use-post-event";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store";
 
 const logger = createLogger("langwatch:studio:execution");
 

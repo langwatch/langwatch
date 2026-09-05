@@ -16,7 +16,7 @@ let mockWorkflowState: any = {
 
 const mockGetWorkflow = vi.fn(() => mockWorkflowState);
 
-vi.mock("@langwatch/workflow-web", () => ({
+vi.mock("../../../../behavior/use-workflow-store", () => ({
   useWorkflowStore: (selector: any) =>
     selector({
       getWorkflow: mockGetWorkflow,

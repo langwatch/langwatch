@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { computeBTLeaderboard } from "@langwatch/experiment-web";
-import { winMatrixHasPairwiseDetail } from "@langwatch/experiment-web";
+import { computeBTLeaderboard } from "../model/batch-evaluation-results.bt-leaderboard";
+import { winMatrixHasPairwiseDetail } from "../model/batch-evaluation-results.win-matrix";
 
 /**
  * @see specs/experiments/comparison-leaderboard.feature

@@ -7,7 +7,7 @@ import { useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 
-vi.mock("@langwatch/model-provider-web/hooks/useModelLimits", () => ({
+vi.mock("@langwatch/model-provider-web/surfaces/model-limits", () => ({
   useModelLimits: () => ({ limits: null }),
 }));
 

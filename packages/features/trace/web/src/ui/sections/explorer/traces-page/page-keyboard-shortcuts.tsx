@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { LuSearch } from "react-icons/lu";
-import { useUIStore } from "../../../../index";
+import { useUIStore } from "../../../../behavior/ui.store";
 import { useAskLangyFromSearch } from "../search-bar/use-ask-langy-from-search";
 import { KeyboardShortcutsHelp, type ShortcutGroup } from "../trace-drawer/keyboard-shortcuts-help";
 

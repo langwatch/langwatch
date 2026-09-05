@@ -1,7 +1,7 @@
 import { Box, HStack, List, Stack, Text } from "@chakra-ui/react";
 import { AlertCircle } from "lucide-react";
 
-import { isHandledByGlobalHandler } from "../../../behavior/trpc-error";
+import { isHandledByGlobalHandler } from "@langwatch/ui-host/errors";
 
 import { resolveErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy";
 

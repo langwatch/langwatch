@@ -23,7 +23,7 @@ import { useDrawer } from "../../../../../behavior/use-drawer";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
 import { api } from "../../../../../behavior/trace-api";
 import { useConversationTurns } from "../../hooks/use-conversation-turns";
-import { isPreviewTraceId } from "../../../../../index";
+import { isPreviewTraceId } from "../../../../../model/preview-trace-id";
 import { enterTraceEditMode } from "../../utils/trace-edit-mode";
 
 interface TraceOverflowMenuProps {

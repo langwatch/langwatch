@@ -1,42 +1,6 @@
 /**
  * The procedures this package calls, and the hooks that call them.
- *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED, exactly as `gateway-api.ts` and
- * `governance-api.ts` say of their own maps: the procedures live in
- * `@langwatch/user-server`, `@langwatch/organization-server`,
- * `@langwatch/project-server`, `@langwatch/coding-agent-server` and
- * `@langwatch/enterprise-governance-server`, none of which a web package may
- * import even for a type, and the router type does not exist until a process
- * instantiates it. Emitting this file from the mounted router is the fix;
- * writing it by hand is the interim, and it is honest only because the payload
- * types below are the contract's wherever the contract has them.
- *
- * THE SEGMENT NAMES ARE LOAD-BEARING. `user`, `personalVirtualKeys`,
- * `personalSessions` and the rest are mount points on the root router, and tRPC
- * hashes that path into the React Query cache key; spell one differently and
- * these hooks quietly stop sharing a cache with the `api.user.*` call sites
- * that have not moved.
- *
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/platform-api-client`, and the
- * import below is the only one in the package. It buys a content-faithful move:
- * every `api.x.y.useQuery(...)` call site in the seven screens is the line it
- * was in `platform/app`. Recorded here so the finding it raises is a decision
- * rather than a surprise.
- *
- * DATE, STRING OR NUMBER IS NOT A CHOICE THIS FILE MAKES. The routers behind
- * these procedures disagree about how an instant reaches the browser, and the
- * disagreement is what the screens already render against: the personal
- * verticals project through DTOs that hand over EPOCH MILLISECONDS
- * (`createdAtMs`, `lastSeenMs`); the budget overview calls `.toISOString()`, so
- * `resetsAt` is a STRING; and `organization.getAll` answers with the stored
- * Prisma rows over superjson, so everything on it is a DATE. Every entry below
- * states which, because getting it wrong typechecks here and fails at the call
- * site.
- *
- * ADD A PROCEDURE when a hook in this package needs one. Do not add one
- * speculatively: every entry is a promise that the router still mounts it under
- * that name, and nothing checks that promise until the generator exists.
  */
 
 import { createFeatureApi } from "@langwatch/platform-api-client";
@@ -47,11 +11,9 @@ import type { AiToolEntry } from "../model/ai-tool-catalog";
 export type PersonalAcknowledgement = { ok: boolean };
 
 /**
- * The workspace a person is given inside an organization.
- *
- * `EnsuredPersonalWorkspace` in `@langwatch/organization-contract`, written out
- * here rather than imported: three fields, against a dependency this package
- * would otherwise not have. Both `createdAtMs` fields are EPOCH MILLISECONDS.
+ * The workspace a person is given inside an organization. `EnsuredPersonalWorkspace` in
+ * `@langwatch/organization-contract`, written out here rather than imported: three fields,
+ * against a dependency this package would otherwise not have.
  */
 export type PersonalWorkspaceContext = {
   workspace: {
@@ -94,11 +56,9 @@ export type PersonalUsageRollup = {
 };
 
 /**
- * The budget that binds this person, as the banners read it.
- *
- * A union, and the narrow arm is a real answer: an organization with no
- * applicable budget collapses to `{ status: "ok" }` with none of the figures.
- * The amounts are DECIMAL STRINGS, because the ledger's are.
+ * The budget that binds this person, as the banners read it. A union, and the narrow arm is a
+ * real answer: an organization with no applicable budget collapses to `{ status: "ok" }` with
+ * none of the figures. The amounts are DECIMAL STRINGS, because the ledger's are.
  */
 export type PersonalBudgetState =
   | { status: "ok" }
@@ -144,12 +104,8 @@ export type PersonalBudgetOverviewPayload = {
 };
 
 /**
- * A personal virtual key as this vertical hands it over.
- *
- * DELIBERATELY NOT the gateway's `VirtualKeyView`: that one stringifies every
- * instant and carries a dozen more columns. This one is EPOCH MILLISECONDS and
- * eleven fields, and a consumer holding both would have two meanings for one
- * word.
+ * A personal virtual key as this vertical hands it over. DELIBERATELY NOT the gateway's
+ * `VirtualKeyView`: that one stringifies every instant and carries a dozen more columns.
  */
 export type PersonalVirtualKeyView = {
   id: string;
@@ -240,14 +196,9 @@ export type PersonaResolutionView = {
 };
 
 /**
- * The organization graph, narrowed to what this family reads.
- *
- * The procedure answers with the stored Prisma rows — every organization
- * column, every team column, every project column, and every instant as a real
- * `Date` over superjson. Four of those fields are what the personal workspace
- * asks about, plus the caller's own membership row, which is what tells a
- * view-only member why their workspace refuses writes. Declaring the rest would
- * be declaring columns nothing here renders.
+ * The organization graph, narrowed to what this family reads. The procedure answers with the
+ * stored Prisma rows — every organization column, every team column, every project column, and
+ * every instant as a real `Date` over superjson.
  */
 export type PersonalOrganizationGraph = {
   id: string;
@@ -260,12 +211,8 @@ export type PersonalOrganizationGraph = {
    */
   members: Array<{ userId: string; role: string }>;
   /**
-   * The single sign-on provider the organization is pinned to, if any.
-   *
-   * A staff-set string column, not a licence fact. Sign-in methods reads it for
-   * one decision: an organization on enterprise single sign-on may not link
-   * additional methods, because a second way in would route around the
-   * provider the organization chose.
+   * The single sign-on provider the organization is pinned to, if any. A staff-set string
+   * column, not a licence fact.
    */
   ssoProvider?: string | null;
   teams: Array<{
@@ -328,25 +275,16 @@ export type PersonalWorkspaceApiMap = {
       mutation: { input: { path: string | null }; output: { ok: boolean } };
     };
 
-    // -- the reader's own sign-in methods ------------------------------------
-    //
-    // Settings > Authentication, and every one of them is keyed on the
-    // session's own user id rather than on a scope: `policy(OWN_ACCOUNT)` on
-    // the transport, no organization named in any input. That is why the
-    // page has never carried a permission guard.
-    //
-    // NOTHING BELOW CARRIES CREDENTIAL MATERIAL BACK. `getLinkedAccounts`
-    // answers the PROVIDER and its account id, never a token; `hasPassword`
-    // answers a boolean and never the hash; and the two password writes carry
-    // a plaintext OUT and answer nothing at all. `sign-in-methods.unit.test.ts`
-    // asserts that rather than assuming it.
+    // -- the reader's own sign-in methods ------------------------------------ Settings >
+    // Authentication, and every one of them is keyed on the session's own user id rather than
+    // on a scope: `policy(OWN_ACCOUNT)` on the transport, no organization named in any input.
+    // That is why the page has never carried a permission guard. NOTHING BELOW CARRIES
+    // CREDENTIAL MATERIAL BACK.
 
     /**
-     * Which sign-in methods this account holds.
-     *
-     * `providerAccountId` is the identifier at the provider — under Auth0 it is
-     * the `strategy|id` string the display name is derived from — and is not a
-     * secret. There is no token on this shape and there never has been.
+     * Which sign-in methods this account holds. `providerAccountId` is the identifier at the
+     * provider — under Auth0 it is the `strategy|id` string the display name is derived from —
+     * and is not a secret. There is no token on this shape and there never has been.
      */
     getLinkedAccounts: {
       query: {
@@ -356,23 +294,16 @@ export type PersonalWorkspaceApiMap = {
     };
 
     /**
-     * Removes one sign-in method.
-     *
-     * Refuses the LAST one: the count and the delete run in one serializable
-     * transaction on the server, so two concurrent unlinks cannot both observe
-     * two accounts and leave the reader with no way in.
+     * Removes one sign-in method. Refuses the LAST one: the count and the delete run in one
+     * serializable transaction on the server, so two concurrent unlinks cannot both observe two
+     * accounts and leave the reader with no way in.
      */
     unlinkAccount: {
       mutation: { input: { accountId: string }; output: PersonalAcknowledgement };
     };
 
     /**
-     * Whether this account has a password at all.
-     *
-     * The boolean, never the hash. Which of two offers the section makes turns
-     * on it, and the section assumes `true` until it arrives — flickering
-     * "Set a password" in front of somebody who has one reads as their password
-     * having been lost.
+     * Whether this account has a password at all. The boolean, never the hash.
      */
     hasPassword: {
       query: { input: Record<string, never>; output: { hasPassword: boolean } };
@@ -394,13 +325,7 @@ export type PersonalWorkspaceApiMap = {
 
   /**
    * Which sign-in mode this deployment is in.
-   *
-   * A ROOT-LEVEL procedure rather than a namespaced one, which is what the
-   * shape below says: `publicEnv` is mounted at the root of the router, and the
    * cache key is that one segment. ADR-027 makes it the single source of truth
-   * for the mode — a deployment whose licence gate denies single sign-on is
-   * told to render the email form, and reading the environment variable
-   * directly would disagree with it.
    */
   publicEnv: {
     query: {
@@ -410,16 +335,8 @@ export type PersonalWorkspaceApiMap = {
   };
 
   /**
-   * Why a deployment configured for single sign-on is not using it.
-   *
-   * AN ENTERPRISE PROCEDURE PATH, AND ONLY A PATH. `license.*` is mounted from
-   * `@langwatch/enterprise-licensing-server`, and a core package may not depend
-   * on an enterprise one — but a procedure map names STRINGS, so addressing it
-   * costs no dependency and raises no `enterprise-direction` finding. The
-   * gateway family's map does the same for `routingPolicy`.
-   *
-   * `configuredProvider: null` means the deployment is in email mode, which is
-   * not a fault and renders nothing.
+   * Why a deployment configured for single sign-on is not using it. AN ENTERPRISE PROCEDURE
+   * PATH, AND ONLY A PATH.
    */
   license: {
     getSsoGateStatus: {
@@ -431,10 +348,8 @@ export type PersonalWorkspaceApiMap = {
   };
 
   /**
-   * Which plan the organization is on.
-   *
-   * Read for one boolean — whether a license unlocks the capabilities the
-   * self-hosted discovery section lists — so only `activePlan.type` is named.
+   * Which plan the organization is on. Read for one boolean — whether a license unlocks the
+   * capabilities the self-hosted discovery section lists — so only `activePlan.type` is named.
    * The rest of the usage payload belongs to the billing surfaces.
    */
   limits: {
@@ -557,11 +472,6 @@ export type PersonalWorkspaceApiMap = {
   organization: {
     /**
      * The organization graph the scope is resolved out of.
-     *
-     * Read by the frontend feature that mounts these screens rather than by a
-     * screen, and declared here so it lands on the same cache entry as the
-     * application shell's own read of it: the graph is fetched once per
-     * document however many halves of the product want it.
      */
     getAll: {
       query: {
@@ -573,20 +483,14 @@ export type PersonalWorkspaceApiMap = {
 };
 
 /**
- * The personal workspace's typed tRPC hooks. Same machinery, same transport and
- * same React Query cache as the application's `api` proxy — see
- * `createFeatureApi` for why separate instances still share cache entries.
- *
- * INTERNAL to this package by convention: hooks here call it, and other
- * packages call the hooks. It is exported from `screens/personal-workspace`
- * only so the process shell can mount `personalWorkspaceApi.Provider`.
+ * The personal workspace's typed tRPC hooks. Same machinery, same transport and same React
+ * Query cache as the application's `api` proxy — see `createFeatureApi` for why separate
+ * instances still share cache entries.
  */
 export const personalWorkspaceApi = createFeatureApi<PersonalWorkspaceApiMap>();
 
 /**
- * The name the screens call it by.
- *
- * They were written against the application's `api` proxy and are moved
- * unchanged; the import line is what tells them which one they have.
+ * The name the screens call it by. They were written against the application's `api` proxy and
+ * are moved unchanged; the import line is what tells them which one they have.
  */
 export const api = personalWorkspaceApi;

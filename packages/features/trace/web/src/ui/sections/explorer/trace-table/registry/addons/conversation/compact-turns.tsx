@@ -6,13 +6,13 @@ import type { ReactNode } from "react";
 import { useDrawer, useDrawerParams } from "../../../../../../../behavior/use-drawer";
 import type { DensityTokens } from "../../../../hooks/use-density-tokens";
 import { useOpenTraceDrawer } from "../../../../hooks/use-open-trace-drawer";
+import { useTimeFormatStore } from "../../../../../../../behavior/time-format.store";
 import {
   formatCost,
   formatDuration,
   formatISOTimestamp,
   formatTokens,
-  useTimeFormatStore,
-} from "../../../../../../../index";
+} from "../../../../../../../model/display-formatters";
 import type { TraceListItem } from "../../../../types/trace";
 import { useRelativeTime } from "../../../../utils/use-relative-time";
 import { TraceIdPeek } from "../../../../trace-id-peek";

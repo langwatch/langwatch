@@ -31,7 +31,8 @@ vi.mock("../../../hooks/use-spans-full", () => ({
   applyOverlayToSpansFull: ({ spans }: { spans: unknown[] }) => spans,
 }));
 
-import { useDrawerStore, useTraceEditStore } from "../../../../../../index";
+import { useDrawerStore } from "../../../../../../behavior/drawer.store";
+import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store";
 import { EditedOriginalToggle } from "../edited-original-toggle";
 
 const patch: TraceEditOverlayPatch = {

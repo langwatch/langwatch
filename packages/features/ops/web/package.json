@@ -27,8 +27,8 @@
       "default": "./src/screens/drawers.ts"
     },
     "./surfaces/keyboard-key": {
-      "types": "./src/ui/sections/keyboard-key.surface.ts",
-      "default": "./src/ui/sections/keyboard-key.surface.ts"
+      "types": "./src/surfaces/keyboard-key/index.ts",
+      "default": "./src/surfaces/keyboard-key/index.ts"
     }
   },
   "scripts": {

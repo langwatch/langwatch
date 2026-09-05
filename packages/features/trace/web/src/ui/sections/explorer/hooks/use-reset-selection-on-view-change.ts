@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
-import { useFilterStore, useSelectionStore, useViewStore } from "../../../../index";
+import { useFilterStore } from "../../../../behavior/filter.store";
+import { useSelectionStore } from "../../../../behavior/selection.store";
+import { useViewStore } from "../../../../behavior/view.store";
 
 /**
  * Clears the bulk-selection set whenever the meaning of a row could shift underneath

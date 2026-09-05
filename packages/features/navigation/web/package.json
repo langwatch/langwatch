@@ -13,8 +13,8 @@
       "default": "./src/ui/index.ts"
     },
     "./surfaces/command-bar": {
-      "types": "./src/ui/sections/command-bar.surface.ts",
-      "default": "./src/ui/sections/command-bar.surface.ts"
+      "types": "./src/surfaces/command-bar/index.ts",
+      "default": "./src/surfaces/command-bar/index.ts"
     },
     "./screens/navigation": {
       "types": "./src/screens/navigation/index.ts",

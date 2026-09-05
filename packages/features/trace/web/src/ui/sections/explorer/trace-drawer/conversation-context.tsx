@@ -15,12 +15,9 @@ import type { ConversationTurn } from "../../../../model/explorer/conversation-t
 import { useConversationContext } from "../hooks/use-conversation-context";
 import { type UseTextTranslationResult, useTextTranslation } from "../hooks/use-text-translation";
 import { useTraceDrawerNavigation } from "../hooks/use-trace-drawer-navigation";
-import {
-  formatPreview,
-  getDrawerDensityTokens,
-  useDensityStore,
-  useDrawerStore,
-} from "../../../../index";
+import { getDrawerDensityTokens, useDensityStore } from "../../../../behavior/density.store";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
+import { formatPreview } from "../../../../behavior/preview-formatter";
 import { useDisplayRoleVisuals } from "./scenario-roles";
 
 interface ConversationContextProps {

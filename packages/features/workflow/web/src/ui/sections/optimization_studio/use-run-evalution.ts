@@ -12,7 +12,8 @@ import { hasDSLChanged } from "@langwatch/workflow-contract";
 import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { usePostEvent } from "./use-post-event";
 
-import { serializeWorkflow, useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store";
+import { serializeWorkflow } from "../../../behavior/workflow-store";
 
 const logger = createLogger("langwatch:studio:evaluation");
 

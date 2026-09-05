@@ -3,7 +3,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { useFindMatchCycling } from "../../../index";
+import { useFindMatchCycling } from "../../../behavior/find-match-cycling";
 
 describe("trace find match cycling", () => {
   it("wraps next and previous navigation and resets when matches change", () => {

@@ -47,7 +47,7 @@ vi.mock("../../add-to-annotation-queue-dialog", () => ({
   },
 }));
 
-import { useSelectionStore } from "../../../../../index";
+import { useSelectionStore } from "../../../../../behavior/selection.store";
 import { BulkActionBar } from "../bulk-action-bar";
 
 const renderBar = () =>

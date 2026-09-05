@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { BTLeaderboard, BTLeaderboardEntry } from "@langwatch/experiment-web";
-import { computeLeaderboardVerdict, findCheaperTiedAlternative } from "@langwatch/experiment-web";
-import type { VariantMetrics } from "@langwatch/experiment-web";
+import type {
+  BTLeaderboard,
+  BTLeaderboardEntry,
+} from "../model/batch-evaluation-results.bt-leaderboard";
+import {
+  computeLeaderboardVerdict,
+  findCheaperTiedAlternative,
+} from "../ui/sections/batch-evaluation-results.verdict";
+import type { VariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics";
 
 const makeEntry = ({
   variantId,

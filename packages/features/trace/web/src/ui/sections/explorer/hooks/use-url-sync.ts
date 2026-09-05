@@ -3,17 +3,18 @@
  */
 import { useCallback, useEffect, useRef } from "react";
 import { useLocation } from "react-router";
-import type { BarStateOverrides, FragmentState, LensConfig, TimeRange } from "../../../../index";
+import type { TimeRange } from "../../../../behavior/filter.store";
+import type { LensConfig } from "../../../../behavior/view.store";
+import type { BarStateOverrides, FragmentState } from "../../../../model/url-state";
+import { useFilterStore } from "../../../../behavior/filter.store";
+import { getPresetById } from "../../../../behavior/time-range-presets";
+import { getPersistedActiveLensId, useViewStore } from "../../../../behavior/view.store";
 import {
   buildFragment,
   computeOverrides,
-  getPersistedActiveLensId,
-  getPresetById,
   isOverridesEmpty,
   parseFragment,
-  useFilterStore,
-  useViewStore,
-} from "../../../../index";
+} from "../../../../model/url-state";
 
 const DEFAULT_LENS_ID = "all-traces";
 const DEFAULT_PRESET_ID = "30d";

@@ -1,21 +1,5 @@
 /**
  * The people in an organization, at `/settings/members`.
- *
- * ONE TABLE AND THREE LISTS BESIDE IT: the members, the invitations that have
- * not been accepted, the requests from the organization's own verified domain,
- * and the domain-join setting that decides whether those requests happen at
- * all.
- *
- * A SEAT IS FREED TWO WAYS, and the difference is the whole point of having
- * both: removing a member is permanent, and disabling one is reversible while
- * still releasing the licence seat. Both invalidate the licence check and the
- * usage read, which is what the seat banner elsewhere counts.
- *
- * WHEN THE DEPLOYMENT CANNOT SEND EMAIL the page offers the invitation LINK
- * instead of claiming a message went out — the honest failure, not a silent one.
- *
- * The screen carries no chrome: the settings frame is applied by whichever
- * application serves the address.
  */
 
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
@@ -508,14 +492,9 @@ function MembersList({
 }
 
 /**
- * Inline invite box: the moment someone starts typing an email here, hand off
- * to the invite drawer carrying what they typed, so the box is a fast launcher
- * rather than a second, competing invite form.
- */
-/**
- * Row actions for a member. Disable is the reversible one, and is how an
- * organization gets back within its licensed seats; delete removes the
- * membership outright. See seat-reconciliation.feature.
+ * Row actions for a member. Disable is the reversible one, and is how an organization gets back
+ * within its licensed seats; delete removes the membership outright. See
+ * seat-reconciliation.feature.
  */
 function MemberRowActions({
   member,

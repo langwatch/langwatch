@@ -10,6 +10,10 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
+    "./surfaces/github-connect-popup": {
+      "types": "./src/behavior/github-connect-popup.ts",
+      "default": "./src/behavior/github-connect-popup.ts"
+    },
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"

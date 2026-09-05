@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useDrawerStore } from "../../../../index";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import type { PresenceLocation } from "@langwatch/presence-contract";
 import {

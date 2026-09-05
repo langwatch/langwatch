@@ -1,7 +1,7 @@
 import type { Row } from "@tanstack/react-table";
 import type { ReactNode } from "react";
 import type { DensityTokens } from "../../hooks/use-density-tokens";
-import type { Density } from "../../../../../index";
+import type { Density } from "../../../../../behavior/density.store";
 import type { RowStyle } from "../status-row";
 
 export interface RowActions {

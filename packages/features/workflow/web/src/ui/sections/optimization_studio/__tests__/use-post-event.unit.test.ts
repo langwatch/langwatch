@@ -4,7 +4,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
-import type { WorkflowStore } from "@langwatch/workflow-web";
+import type { WorkflowStore } from "../../../../behavior/workflow-store";
 
 // Mock toaster
 vi.mock("@langwatch/ui-host/toaster", () => ({

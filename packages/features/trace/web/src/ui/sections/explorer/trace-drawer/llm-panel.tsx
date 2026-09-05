@@ -5,13 +5,11 @@ import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useSpansFull } from "../hooks/use-spans-full";
 import { useTraceEvents } from "../hooks/use-trace-events";
 import { buildTraceMarkdown, splitTraceMarkdown } from "./markdown-view";
-import type { MarkdownConfig } from "../../../../index";
-import {
-  DEFAULT_MARKDOWN_CONFIG,
-  MarkdownConfigurePopover,
-  MarkdownCopyButton,
-  RenderedMarkdown,
-} from "../../../../index";
+import type { MarkdownConfig } from "../../../../model/markdown/types";
+import { DEFAULT_MARKDOWN_CONFIG } from "../../../../model/markdown/types";
+import { RenderedMarkdown } from "../../../blocks/markdown/rendered-markdown";
+import { MarkdownConfigurePopover } from "../../../elements/markdown/markdown-configure-popover";
+import { MarkdownCopyButton } from "../../../elements/markdown/markdown-copy-button";
 
 interface LlmPanelProps {
   trace: TraceHeader;

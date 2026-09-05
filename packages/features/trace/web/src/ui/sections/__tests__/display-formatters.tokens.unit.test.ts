@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { formatTokens } from "../../../index";
+import { formatTokens } from "../../../model/display-formatters";
 
 describe("formatTokens", () => {
   describe("given nothing counted", () => {

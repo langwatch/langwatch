@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { computeBTLeaderboard } from "@langwatch/experiment-web";
-import { computeLeaderboardVerdict, findCheaperTiedAlternative } from "@langwatch/experiment-web";
-import { computeSampleAdequacy } from "@langwatch/experiment-web";
-import type { BTLeaderboard, BTLeaderboardEntry, VariantMetrics } from "@langwatch/experiment-web";
+import { computeBTLeaderboard } from "../model/batch-evaluation-results.bt-leaderboard";
+import {
+  computeLeaderboardVerdict,
+  findCheaperTiedAlternative,
+} from "../ui/sections/batch-evaluation-results.verdict";
+import { computeSampleAdequacy } from "../model/batch-evaluation-results.sample-adequacy";
+import type {
+  BTLeaderboard,
+  BTLeaderboardEntry,
+} from "../model/batch-evaluation-results.bt-leaderboard";
+import type { VariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics";
 
 const metricStats = (avg: number, count: number) => ({
   min: avg,

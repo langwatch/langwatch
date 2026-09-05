@@ -2,8 +2,11 @@
  * Tests for computeBatchAggregates - aggregate statistics computation
  */
 import { describe, expect, it } from "vitest";
-import { computeBatchTargetAggregates } from "@langwatch/experiment-web";
-import type { BatchResultRow, BatchTargetColumn } from "@langwatch/experiment-web";
+import { computeBatchTargetAggregates } from "../ui/sections/batch-evaluation-results.aggregates";
+import type {
+  BatchResultRow,
+  BatchTargetColumn,
+} from "../ui/sections/batch-evaluation-results.types";
 
 describe("computeBatchTargetAggregates", () => {
   const createTargetColumn = (id: string): BatchTargetColumn => ({

@@ -4,7 +4,7 @@ import { toaster } from "@langwatch/ui-host/toaster";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { usePostEvent } from "./use-post-event";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store";
 
 export const useEvaluationExecution = () => {
   const { postEvent, socketStatus } = usePostEvent();

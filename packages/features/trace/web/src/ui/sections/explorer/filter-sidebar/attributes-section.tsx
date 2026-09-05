@@ -2,7 +2,7 @@ import { Button, Input, Link, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { AttributeKeyRow } from "./attribute-key-row";
-import { MAX_VISIBLE_ATTRIBUTE_KEYS } from "../../../../index";
+import { MAX_VISIBLE_ATTRIBUTE_KEYS } from "../../../../behavior/facet-constants";
 import { SidebarSection } from "../../../elements/explorer/filter-sidebar/sidebar-section";
 import type {
   AttributeKey,

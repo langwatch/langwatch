@@ -9,8 +9,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import type { LensConfig } from "../../../../../index";
-import { useDrawerStore } from "../../../../../index";
+import type { LensConfig } from "../../../../../behavior/view.store";
+import { useDrawerStore } from "../../../../../behavior/drawer.store";
 import type { SessionGroupPayloadItem } from "../../../../../model/explorer/session-group-payload";
 import { mapSessionGroupToConversationGroup } from "../../utils/map-session-groups-payload";
 import { ConversationLensBody } from "../conversation-lens-body";

@@ -1,7 +1,7 @@
 import { Box, chakra, HStack, Icon, Text } from "@chakra-ui/react";
 import { Ban, Minus } from "lucide-react";
 import { memo, useCallback } from "react";
-import { useFacetHoverStore } from "../../../../index";
+import { useFacetHoverStore } from "../../../../behavior/facet-hover.store";
 import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button";
 import type {
   FacetItem,

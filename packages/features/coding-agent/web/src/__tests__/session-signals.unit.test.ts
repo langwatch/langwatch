@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CodingAgentSessionDisplay } from "@langwatch/coding-agent-web";
-import {
-  deriveSessionSignals,
-  formatCompact,
-  formatShortDuration,
-} from "@langwatch/coding-agent-web";
+import type { CodingAgentSessionDisplay } from "../trace/session-display";
+import { deriveSessionSignals, formatCompact, formatShortDuration } from "../trace/session-signals";
 
 /** A healthy session: nothing to report. */
 function session(

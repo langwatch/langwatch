@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import type { BTLeaderboard, BTLeaderboardEntry } from "@langwatch/experiment-web";
-import type { JudgeIndependence, VerbosityProfile } from "@langwatch/experiment-web";
-import type { SampleAdequacy } from "@langwatch/experiment-web";
+import type {
+  BTLeaderboard,
+  BTLeaderboardEntry,
+} from "../../../../model/batch-evaluation-results.bt-leaderboard";
+import type {
+  JudgeIndependence,
+  VerbosityProfile,
+} from "../../batch-evaluation-results.judge-bias";
+import type { SampleAdequacy } from "../../../../model/batch-evaluation-results.sample-adequacy";
 import { buildTrustChecks, type LeaderboardTrustPanelProps } from "../leaderboard-trust-panel";
 import { DEFAULT_WARN_THRESHOLD } from "../pairwise-leaderboard";
 

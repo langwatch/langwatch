@@ -26,7 +26,7 @@ vi.mock("../../elements/langy-model-pill", () => ({
 }));
 
 import { Composer } from "../composer";
-import { useLangyStore } from "../../../../../index";
+import { useLangyStore } from "../../../../../behavior/langy.store";
 
 const MID_TURN_PLACEHOLDER = "Langy is working. You can send when it stops.";
 const IDLE_PLACEHOLDER = "Ask Langy or describe what you want…";

@@ -13,13 +13,13 @@ import {
   SURFACE_LABEL,
   SURFACE_PATH,
   withDecidedCard,
-} from "../../../../index";
+} from "../../../../model/langy-capability-registry";
 import type {
   CapabilityCardInput,
   CapabilityDescriptor,
   CapabilityProgress,
   CliCapability,
-} from "../../../../index";
+} from "../../../../model/langy-capability-registry";
 import { featureForCliCommand } from "../../../../model/shared/langy/feature-map";
 
 const featureMap = { featureForCliCommand };

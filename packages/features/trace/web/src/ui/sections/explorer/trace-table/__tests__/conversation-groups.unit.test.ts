@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LENS_CAPABILITIES } from "../../../../../index";
+import { LENS_CAPABILITIES } from "../../../../../behavior/lens-capabilities";
 import type { TraceListItem } from "../../types/trace";
 import { type ConversationGroup, sortConversationGroups } from "../conversation-groups";
 

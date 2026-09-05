@@ -7,7 +7,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import type { TraceListItem } from "@langwatch/trace-web/explorer/types/trace";
+import type { TraceListItem } from "@langwatch/trace-web/surfaces/explorer-trace-types";
 
 interface ConversationViewProps {
   conversationId: string | null;
@@ -71,7 +71,7 @@ vi.mock("../../../ui/elements/tasks-done-icon", () => ({
 
 // Stands in for the conversation so the props the page hands it are readable,
 // and so picking a turn can be triggered the way a reader would.
-vi.mock("@langwatch/trace-web/explorer/components/TraceDrawer/conversationView", () => ({
+vi.mock("@langwatch/trace-web/surfaces/conversation-view", () => ({
   ConversationView: (props: ConversationViewProps) => {
     mocks.conversationProps = props;
     return (
@@ -96,7 +96,7 @@ vi.mock("@langwatch/trace-web", async (importOriginal) => ({
  * this for free: the page and the conversation hook were on ONE tRPC client, so a mocked
  * `tracesV2.list` answered both.
  */
-vi.mock("@langwatch/trace-web/explorer/hooks/useConversationTurns", () => ({
+vi.mock("@langwatch/trace-web/surfaces/conversation-turns", () => ({
   useConversationTurns: () => ({
     data: mocks.conversationTurns,
     isLoading: mocks.conversationTurnsLoading,

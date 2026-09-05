@@ -2,7 +2,7 @@
  * The credential half of the onboarding model provider step.
  */
 
-import { EditModelProviderForm } from "@langwatch/model-provider-web/components/EditModelProviderForm";
+import { EditModelProviderForm } from "@langwatch/model-provider-web/surfaces/edit-model-provider-form";
 import type React from "react";
 import { useOnboardingHost } from "../../../model/onboarding-host";
 

@@ -8,7 +8,7 @@ import {
   tokenStreamText,
   useLangyDevLog,
 } from "../langy-dev-log";
-import { useLangyStore } from "../../../../../index";
+import { useLangyStore } from "../../../../../behavior/langy.store";
 
 /**
  * The inspector's tape: four lanes on one ring, recorded only while armed, and a REPLAY

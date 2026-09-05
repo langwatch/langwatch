@@ -19,8 +19,9 @@ import {
   CommandBarTrigger,
   getCommandBarShortcut,
   openCommandBar,
-} from "@langwatch/navigation-web/command-bar";
-import { LangyMark, LangyMarkGradientDefs, useLangyStore } from "@langwatch/langy-web";
+} from "@langwatch/navigation-web/surfaces/command-bar";
+import { LangyMark, LangyMarkGradientDefs } from "@langwatch/langy-web/surfaces/langy-mark";
+import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useCallback, useMemo, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";

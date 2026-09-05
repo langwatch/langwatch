@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { page, userEvent } from "vitest/browser";
 
 import { BatchTargetCell } from "../batch-target-cell";
-import type { BatchTargetOutput } from "@langwatch/experiment-web";
+import type { BatchTargetOutput } from "../../batch-evaluation-results.types";
 
 const longError =
   "gateway chat/completions: provider_error: the upstream model returned an " +

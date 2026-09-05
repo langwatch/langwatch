@@ -1,6 +1,7 @@
 import { isValidElement, type ReactElement } from "react";
 import { describe, expect, it } from "vitest";
-import { FACET_COLORS, ORIGIN_DISPLAY } from "../../../../../index";
+import { FACET_COLORS } from "../../../../../behavior/facet-constants";
+import { ORIGIN_DISPLAY } from "../../../../../model/origin-display";
 import { facetLabel, paletteFromColor } from "../utils";
 import { OriginCell } from "../../trace-table/registry/cells/trace/simple-cells";
 import type { TraceListItem } from "../../types/trace";

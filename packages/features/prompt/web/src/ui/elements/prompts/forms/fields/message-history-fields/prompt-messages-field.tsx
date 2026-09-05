@@ -17,8 +17,8 @@ import {
   type PromptTextAreaOnAddMention,
   PromptTextAreaWithVariables,
   type Variable,
-} from "@langwatch/prompt-web/surfaces/variables";
-import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
+} from "../../../../../../surfaces/variables";
+import type { PromptConfigFormValues } from "../../../../../../surfaces/prompt-form";
 import { useLayoutMode } from "../../../../../../model/layout-mode";
 import {
   EditingModeTitle,

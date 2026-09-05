@@ -11,8 +11,8 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { BatchTargetHeader } from "../batch-target-header";
-import type { BatchTargetAggregate } from "@langwatch/experiment-web";
-import type { BatchTargetColumn } from "@langwatch/experiment-web";
+import type { BatchTargetAggregate } from "../../batch-evaluation-results.aggregates";
+import type { BatchTargetColumn } from "../../batch-evaluation-results.types";
 
 // Wrapper with Chakra provider
 const Wrapper = ({ children }: { children: ReactNode }) => (

@@ -13,8 +13,8 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { GroupRowsButton } from "../batch-evaluation-results-table";
 import { ComparisonTable } from "../comparison-table";
-import type { ComparisonRunData } from "@langwatch/experiment-web";
-import { useResultsGrouping } from "@langwatch/experiment-web";
+import type { ComparisonRunData } from "../../batch-evaluation-results.types";
+import { useResultsGrouping } from "../../use-results-grouping";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

@@ -6,7 +6,7 @@ import type { AnnotationByTrace } from "../../use-annotations-by-trace-ids";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import type { RestrictedAttribute } from "@langwatch/trace-contract";
 import { compileAttributePattern } from "@langwatch/data-privacy-contract";
-import type { PinnedAttributeSource } from "../../../../index";
+import type { PinnedAttributeSource } from "../../../../behavior/pinned-attributes.store";
 import { sameAttributeValue, useCopyToClipboard } from "../../../../index";
 import { usePinnedAttributes } from "../hooks/use-pinned-attributes";
 import {

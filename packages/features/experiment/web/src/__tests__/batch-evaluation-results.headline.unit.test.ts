@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { LeaderboardVerdict } from "@langwatch/experiment-web";
-import { formatLeaderboardHeadline } from "@langwatch/experiment-web";
+import type { LeaderboardVerdict } from "../ui/sections/batch-evaluation-results.verdict";
+import { formatLeaderboardHeadline } from "../ui/sections/batch-evaluation-results.headline";
 
 const NAMES = { a: "warm", b: "warm-premium", c: "blunt" };
 

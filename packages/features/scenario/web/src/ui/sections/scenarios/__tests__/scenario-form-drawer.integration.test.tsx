@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
 
 // Mock heavy sub-components that pull in generated types
-vi.mock("@langwatch/prompt-web/components/prompts/PromptEditorDrawer", () => ({
+vi.mock("@langwatch/prompt-web/surfaces/prompt-editor-drawer", () => ({
   PromptEditorDrawer: () => null,
 }));
 vi.mock("../save-and-run-menu", () => ({

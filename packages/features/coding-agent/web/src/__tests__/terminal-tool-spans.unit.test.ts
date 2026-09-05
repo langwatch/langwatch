@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SpanDetail } from "@langwatch/trace-contract";
-import { indexToolSpansBySpanId, parsePatchHunks } from "@langwatch/coding-agent-web";
+import { indexToolSpansBySpanId, parsePatchHunks } from "../trace/terminal-tool-spans";
 
 /**
  * Claude Code's real tool spans, and the `tool.output` span event they carry

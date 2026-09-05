@@ -1,3 +1,4 @@
+import { readUiStorage } from "@langwatch/ui-host/storage";
 import qs from "qs";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { URL_QS_PARSE_OPTIONS } from "../../model/utils/qs-parse-options";
@@ -30,7 +31,7 @@ function applyCachedViewById(
   projectId: string,
   viewId: string,
 ): void {
-  const raw = localStorage.getItem(`langwatch-saved-views-cache-${projectId}`);
+  const raw = readUiStorage(`langwatch-saved-views-cache-${projectId}`);
   if (!raw) return;
   const cached = JSON.parse(raw) as Array<{
     id: string;
@@ -106,8 +107,8 @@ export const useFilterParams = () => {
   if (!hasUrlFilterOrDateParams && project?.id) {
     try {
       const viewId =
-        localStorage.getItem(`langwatch-saved-views-selected-${project.id}`) ??
-        localStorage.getItem(`langwatch-selected-view-${project.id}`);
+        readUiStorage(`langwatch-saved-views-selected-${project.id}`) ??
+        readUiStorage(`langwatch-selected-view-${project.id}`);
 
       if (viewId && viewId !== "all-traces") {
         applyCachedViewById(filters, project.id, viewId);

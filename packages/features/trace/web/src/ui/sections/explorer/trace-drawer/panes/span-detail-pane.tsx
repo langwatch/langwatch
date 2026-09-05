@@ -2,7 +2,7 @@ import { Box } from "@chakra-ui/react";
 import { memo } from "react";
 import { IsolatedErrorBoundary } from "../../../isolated-error-boundary";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { useDrawerStore } from "../../../../../index";
+import { useDrawerStore } from "../../../../../behavior/drawer.store";
 import { SpanTabBar } from "../span-tab-bar";
 import { TraceAccordions } from "../trace-accordions";
 

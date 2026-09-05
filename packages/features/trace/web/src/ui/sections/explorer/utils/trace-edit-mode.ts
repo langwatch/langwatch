@@ -1,9 +1,5 @@
-import {
-  isUneditableViewMode,
-  selectIsTraceEditDirty,
-  useDrawerStore,
-  useTraceEditStore,
-} from "../../../../index";
+import { isUneditableViewMode, useDrawerStore } from "../../../../behavior/drawer.store";
+import { selectIsTraceEditDirty, useTraceEditStore } from "../../../../behavior/trace-edit.store";
 
 /**
  * Starts correcting a trace: the drawer flips into edit mode (which the URL

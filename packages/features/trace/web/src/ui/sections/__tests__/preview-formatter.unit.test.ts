@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPreview } from "../../../index";
+import { formatPreview } from "../../../behavior/preview-formatter";
 
 const opts = { maxChars: 80 };
 

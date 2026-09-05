@@ -42,14 +42,14 @@ import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { NumericMode } from "../../../../index";
+import type { NumericMode } from "../../../../behavior/numeric-mode.store";
 import {
   FACET_PERSPECTIVES,
   getFacetGroupId,
   orderedGroupDefsForPerspective,
-  useFacetLensStore,
-  useUIStore,
-} from "../../../../index";
+} from "../../../../behavior/facet-constants";
+import { useFacetLensStore } from "../../../../behavior/facet-lens.store";
+import { useUIStore } from "../../../../behavior/ui.store";
 
 // Default expanded sidebar width (mirrors SIDEBAR_WIDTH_EXPANDED in
 // TracesPage). Below this + a little slack the "shown / total" count chip

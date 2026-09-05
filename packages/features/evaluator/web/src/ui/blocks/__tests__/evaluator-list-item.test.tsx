@@ -3,7 +3,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Evaluator } from "@langwatch/evaluator-contract";
-import { EvaluatorListEmptyState, EvaluatorListItem } from "../../..";
+import { EvaluatorListEmptyState } from "../../elements/evaluator-list-empty-state";
+import { EvaluatorListItem } from "../evaluator-list-item";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

@@ -1,6 +1,6 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { memo } from "react";
-import { hashColor } from "../../../../index";
+import { hashColor } from "../../../../model/display-formatters";
 import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button";
 import type { FacetValueState } from "../../../../behavior/explorer/filter-sidebar/types";
 import { paletteFromColor } from "./utils";

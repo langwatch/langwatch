@@ -23,7 +23,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ColorfulBlockIcon } from "@langwatch/workflow-web/surfaces/workflow-icons";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { VersionBadge } from "@langwatch/prompt-web/surfaces/prompt-version";
-import { useLatestPromptVersion } from "@langwatch/prompt-web/prompts/hooks/useLatestPromptVersion";
+import { useLatestPromptVersion } from "@langwatch/prompt-web/surfaces/latest-prompt-version";
 import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../../../model/experiments-v3/constants";
 
 import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store";

@@ -30,7 +30,7 @@ import {
   type TraceHostUser,
   type TraceRouteReading,
   type TraceSuccessNotice,
-} from "@langwatch/trace-web/screens/traces";
+} from "@langwatch/trace-web/surfaces/trace-host";
 import { useMemo, type ReactNode } from "react";
 
 import { useAnnotationHost, type AnnotationHostPort } from "../../model/annotation-host";

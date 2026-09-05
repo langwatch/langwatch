@@ -15,7 +15,7 @@ vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));
 
-vi.mock("@langwatch/trace-web/components/SetupWithAgentButton", () => ({
+vi.mock("@langwatch/trace-web/surfaces/setup-with-agent-button", () => ({
   SetupWithAgentButton: () => null,
 }));
 
@@ -23,7 +23,7 @@ vi.mock("@langwatch/trace-web/surfaces/page-visibility", () => ({
   usePageVisibility: () => true,
 }));
 
-vi.mock("@langwatch/trace-web/hooks/useSSESubscription", () => ({
+vi.mock("@langwatch/trace-web/surfaces/sse-subscription", () => ({
   useSSESubscription: vi.fn(() => ({
     connectionState: "disconnected",
     isConnected: false,

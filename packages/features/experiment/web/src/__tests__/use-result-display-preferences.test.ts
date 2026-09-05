@@ -6,7 +6,7 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { useResultDisplayPreferences } from "@langwatch/experiment-web";
+import { useResultDisplayPreferences } from "../behavior/use-result-display-preferences";
 
 describe("useResultDisplayPreferences", () => {
   beforeEach(() => {

@@ -4,8 +4,8 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
 import { memo } from "react";
 import { getFacetValueState, getRangeValue } from "@langwatch/trace-contract";
-import type { NumericMode } from "../../../../index";
-import { NONE_TOGGLE_VALUE } from "../../../../index";
+import type { NumericMode } from "../../../../behavior/numeric-mode.store";
+import { NONE_TOGGLE_VALUE } from "../../../../behavior/facet-constants";
 import { AttributesSection } from "./attributes-section";
 import { EvaluatorDrilldown } from "./evaluator-drilldown";
 import { EventDrilldown } from "./event-drilldown";
@@ -84,11 +84,7 @@ const ExpandChevron: React.FC<{
     }}
     _hover={{ color: "fg.muted", background: "bg.muted" }}
   >
-    <Box
-      as={isExpanded ? ChevronDown : ChevronRight}
-      width="12px"
-      height="12px"
-    />
+    <Box as={isExpanded ? ChevronDown : ChevronRight} width="12px" height="12px" />
   </Box>
 );
 
@@ -159,11 +155,7 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
     // toggle.
     const renderInactiveRowExtras =
       section.key === "event"
-        ? (
-            item: FacetItem,
-            isExpanded: boolean,
-            onToggleExpand: () => void,
-          ) => {
+        ? (item: FacetItem, isExpanded: boolean, onToggleExpand: () => void) => {
             // No metrics on this event type → no expand affordance (same
             // gating the evaluator applies via `aggregates`).
             if (!item.eventMetrics) return null;
@@ -176,20 +168,12 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
                 />
               ),
               below: isExpanded ? (
-                <EventDrilldown
-                  item={item}
-                  ast={ast}
-                  toggleFacet={toggleFacet}
-                />
+                <EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} />
               ) : null,
             };
           }
         : section.key === "evaluator"
-          ? (
-              item: FacetItem,
-              isExpanded: boolean,
-              onToggleExpand: () => void,
-            ) => {
+          ? (item: FacetItem, isExpanded: boolean, onToggleExpand: () => void) => {
               if (!item.aggregates) return null;
               // Picking a verdict / score / label on an inactive evaluator
               // also enables the `evaluator:<id>` anchor — the group mutation
@@ -221,9 +205,7 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
                         to,
                       })
                     }
-                    removeScoreRange={() =>
-                      removeEvaluatorScoreRange({ evaluatorId: item.value })
-                    }
+                    removeScoreRange={() => removeEvaluatorScoreRange({ evaluatorId: item.value })}
                   />
                 ) : null,
               };

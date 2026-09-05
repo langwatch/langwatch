@@ -1,7 +1,7 @@
 import { Box, chakra, Grid, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { motion } from "motion/react";
 import { type MouseEvent, useEffect, useRef, useState } from "react";
-import { LangyPanelSurface } from "@langwatch/langy-web/asaplangy";
+import { LangyPanelSurface } from "@langwatch/langy-web/surfaces/asaplangy";
 import type { StatusCell } from "../types";
 import { useProjectHomeHost } from "../../../../model/project-home-host";
 

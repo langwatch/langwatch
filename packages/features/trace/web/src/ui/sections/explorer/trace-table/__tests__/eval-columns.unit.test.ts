@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { formatEvalColumnId, isEvalColumnId, parseEvalColumnId } from "../../../../../index";
+import {
+  formatEvalColumnId,
+  isEvalColumnId,
+  parseEvalColumnId,
+} from "../../../../../model/lens-eval-column-id";
 import type { TraceEvalResult, TraceListItem } from "../../types/trace";
 import {
   buildEvalColumnDef,

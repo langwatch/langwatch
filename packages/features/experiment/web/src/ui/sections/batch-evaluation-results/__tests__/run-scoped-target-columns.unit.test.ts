@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { transformBatchEvaluationData } from "@langwatch/experiment-web";
+import { transformBatchEvaluationData } from "../../batch-evaluation-results.types";
 
 const TARGETS = [
   { id: "target-classifier", name: "classifier", type: "prompt" },

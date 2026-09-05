@@ -9,7 +9,7 @@ import {
   isTurnRailDraft,
   type OpenAnnotationDraftParams,
   useAnnotationDraftStore,
-} from "../../../../../index";
+} from "../../../../../behavior/annotation-draft.store";
 import { AnnotationCard } from "./annotation-card";
 import { AnnotationEditorCard } from "./annotation-editor-card";
 

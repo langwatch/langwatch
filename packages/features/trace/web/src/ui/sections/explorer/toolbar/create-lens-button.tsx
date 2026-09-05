@@ -2,7 +2,7 @@ import { Box, Button, Text } from "@chakra-ui/react";
 import type React from "react";
 import { LuPlus } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useViewStore } from "../../../../index";
+import { useViewStore } from "../../../../behavior/view.store";
 import { LensNamePopover } from "../../../elements/explorer/toolbar/lens-name-popover";
 
 const BETA_TOOLTIP =

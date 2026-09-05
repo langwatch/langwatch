@@ -13,13 +13,11 @@ import type { AiActionError } from "@langwatch/trace-contract";
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 import { useTraceFacets } from "../hooks/use-trace-facets";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active";
-import {
-  editorStyles,
-  useFacetHoverStore,
-  useFilterStore,
-  useFloatRect,
-  useGlobalAiShortcut,
-} from "../../../../index";
+import { editorStyles } from "../../../../behavior/editor-styles";
+import { useFacetHoverStore } from "../../../../behavior/facet-hover.store";
+import { useFilterStore } from "../../../../behavior/filter.store";
+import { useFloatRect } from "../../../../behavior/use-float-rect";
+import { useGlobalAiShortcut } from "../../../../behavior/use-global-ai-shortcut";
 import { AskAiButton } from "../ai/ask-ai-button";
 import { ActiveSearchEditor } from "./active-search-editor";
 import { AiErrorDetails, hasAiErrorDetails } from "./error-banner-detail";

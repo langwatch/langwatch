@@ -6,11 +6,11 @@ import {
   buildCustomModelDisplayNames,
   LATEST_ALIAS_PROVIDERS,
 } from "@langwatch/model-provider-contract";
-import { modelSelectorOptions } from "@langwatch/model-provider-web/components/ModelSelector";
+import { modelSelectorOptions } from "@langwatch/model-provider-web/surfaces/model-selector";
 import {
   INHERIT_SENTINEL,
   ProviderModelSelector,
-} from "@langwatch/model-provider-web/components/ProviderModelSelector";
+} from "@langwatch/model-provider-web/surfaces/provider-model-selector";
 
 /**
  * Model picker for the scenario user-simulator and judge roles.

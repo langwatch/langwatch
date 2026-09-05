@@ -15,7 +15,7 @@ import {
   computeGroupSummary,
 } from "@langwatch/suite-web/surfaces/run-formatters";
 import type { RunGroup } from "@langwatch/suite-web/surfaces/run-formatters";
-import { makeScenarioRunData } from "@langwatch/suite-web/surfaces/test-doubles";
+import { makeScenarioRunData } from "@langwatch/suite-web/testing";
 
 vi.mock("../use-prefetch-run-state", () => ({
   usePrefetchRunState: () => vi.fn(),

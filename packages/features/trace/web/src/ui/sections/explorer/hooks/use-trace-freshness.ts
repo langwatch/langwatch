@@ -3,7 +3,9 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import { useSSESubscription } from "../../../../behavior/use-sse-subscription";
 import { useTraceUpdateListener } from "../../use-trace-update-listener";
 import { api } from "../../../../behavior/trace-api";
-import { useDrawerStore, useRowPulseStore, useSseStatusStore } from "../../../../index";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
+import { useRowPulseStore } from "../../../../behavior/row-pulse.store";
+import { useSseStatusStore } from "../../../../behavior/sse-status.store";
 import { useVisibleTraceIds } from "./use-visible-trace-ids";
 
 // Facets (`tracesV2.discover`) are ~10x more expensive than the table list

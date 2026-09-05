@@ -7,7 +7,7 @@ import { toaster } from "@langwatch/ui-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { captureException, toError } from "../../model/posthog-error-capture";
-import { isNotFound as isTrpcNotFound } from "@langwatch/trace-web/utils/trpcError";
+import { isNotFoundError as isTrpcNotFound } from "@langwatch/ui-host/errors";
 import { AUTOSAVE_OUT_OF_DATE_REASON } from "../../model/experiments-v3/constants";
 import { createInitialState, type EvaluationsV3State } from "../../model/experiments-v3/types";
 import {

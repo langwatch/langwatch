@@ -8,16 +8,18 @@ import {
   IdentityEventingPort,
   IdentityProducerPipelinesAdapter,
   PostgresIdentityNewbornSweepAdapter,
+  PostgresIdentityUserMigrationsAdapter,
 } from "@langwatch/identity-server";
 import { PostgresSystemMigrationsAdapter, SystemMigrationsPassTask } from "@langwatch/ops-server";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { TASKS_PROCESS_NAME, type TasksEventingInfrastructure } from "./tasks-eventing.composition";
 import type { TasksHost } from "./tasks-host.composition";
 
 /**
  * Main's worker-boot migration loop, as one more `&&` step of the image CMD,
- * after `lwql-provision`. The registry is the organization-rooted
- * authorization-engine migration only; the identity ones are user-rooted.
+ * after `lwql-provision`. Two registries on main's two tenant axes: the
+ * authorization engine over organizations, the identity ones over users.
  */
 export function buildSystemMigrationsPassTask({
   host,
@@ -26,28 +28,43 @@ export function buildSystemMigrationsPassTask({
   host: TasksHost;
   eventing: TasksEventingInfrastructure | undefined;
 }): SystemMigrationsPassTask {
-  // Composed once, not per pass: registering the identity pipeline again on
-  // every pass would register the same producer repeatedly.
+  // Composed once, not per pass, and SHARED by the user-rooted registry and
+  // the sweep: registering the identity pipeline again would register the
+  // same producer repeatedly.
+  let identity: TasksIdentityEventing | undefined;
+  const identityEventing = () => (identity ??= TasksIdentityEventing.create({ eventing }));
   let sweep: ReturnType<PostgresIdentityNewbornSweepAdapter["build"]> | undefined;
   return SystemMigrationsPassTask.create({
     pass: () => {
       const database = host.requirePrisma();
       const migrations = registeredMigrations({ host, eventing });
+      const userMigrations = registeredUserMigrations({ database, eventing: identityEventing() });
       const runner = PostgresSystemMigrationsAdapter.create({
         database,
         redis: host.redis ?? null,
         isSaaS: () => host.config.isSaaS,
         migrations: () => migrations,
-        // The identity migrations are the user-rooted axis, and this process
-        // composes none of them yet: their services (backfill, secret carry,
-        // connection grandfather) have no composition here. The leg is driven
-        // the moment a registry hands them over.
-        userMigrations: () => [],
-        newbornSweep: () => (sweep ??= newbornSweep({ host, eventing })).runPass(),
+        userMigrations: () => userMigrations,
+        newbornSweep: () =>
+          (sweep ??= newbornSweep({ database, eventing: identityEventing() })).runPass(),
       });
       return ({ signal }) => runner.runPass({ signal });
     },
   });
+}
+
+/**
+ * The USER-rooted registry (ADR-101 §6), in main's order. Both stage through
+ * this process's producer-only identity pipeline.
+ */
+export function registeredUserMigrations({
+  database,
+  eventing,
+}: {
+  database: PrismaClient;
+  eventing: IdentityEventingPort;
+}): readonly SystemMigration[] {
+  return PostgresIdentityUserMigrationsAdapter.create({ database, eventing }).build();
 }
 
 /**
@@ -56,16 +73,13 @@ export function buildSystemMigrationsPassTask({
  * no queue the ledger refuses by name, which the pass logs rather than fails.
  */
 function newbornSweep({
-  host,
+  database,
   eventing,
 }: {
-  host: TasksHost;
-  eventing: TasksEventingInfrastructure | undefined;
+  database: PrismaClient;
+  eventing: IdentityEventingPort;
 }): ReturnType<PostgresIdentityNewbornSweepAdapter["build"]> {
-  return PostgresIdentityNewbornSweepAdapter.create({
-    database: host.requirePrisma(),
-    eventing: TasksIdentityEventing.create({ eventing }),
-  }).build();
+  return PostgresIdentityNewbornSweepAdapter.create({ database, eventing }).build();
 }
 
 /** The identity command senders this process produces, or none at all. */

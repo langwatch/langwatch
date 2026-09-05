@@ -67,7 +67,11 @@ vi.mock("../../../hooks/use-trace-resources", () => ({
   }),
 }));
 
-import { buildTraceEditPatch, useDrawerStore, useTraceEditStore } from "../../../../../../index";
+import { useDrawerStore } from "../../../../../../behavior/drawer.store";
+import {
+  buildTraceEditPatch,
+  useTraceEditStore,
+} from "../../../../../../behavior/trace-edit.store";
 import { TraceSummaryAccordions } from "../trace-summary-accordions";
 
 const TRACE_ID = "trace-1";

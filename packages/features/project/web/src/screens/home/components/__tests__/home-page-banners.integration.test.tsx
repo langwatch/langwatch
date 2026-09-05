@@ -22,7 +22,7 @@ vi.mock("@langwatch/langy-web/surfaces/langy-store", () => ({
 vi.mock("@langwatch/langy-web/surfaces/langy-mark", () => ({
   LangyMark: () => null,
 }));
-vi.mock("@langwatch/langy-web/asaplangy", () => ({
+vi.mock("@langwatch/langy-web/surfaces/asaplangy", () => ({
   SERIF: "serif",
 }));
 

@@ -42,7 +42,6 @@ export function usePeerCursors({
       sessionId: string;
     }
   >(
-    // @ts-expect-error - tRPC subscription type mismatch with hook signature
     api.presence.onPresenceCursor,
     {
       projectId: projectId ?? "",

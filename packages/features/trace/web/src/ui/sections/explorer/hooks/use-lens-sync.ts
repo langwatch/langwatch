@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api } from "../../../../behavior/trace-api";
-import { type LensConfig, setLensSyncBridge, useViewStore } from "../../../../index";
+import { type LensConfig, setLensSyncBridge, useViewStore } from "../../../../behavior/view.store";
 
 /** Discriminator stored on each SavedView row so the traces v2 lens
  * persistence doesn't collide with the v1 filter views — rows left behind by

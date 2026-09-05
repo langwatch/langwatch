@@ -148,6 +148,13 @@ Feature: Feature package boundary lint
     And the same importer is rejected for the bare package entry or any other subpath
 
   @unit @architecture
+  Scenario: A web package's test seam is reachable from a test source
+    Given a web package declares a testing entry of fixture builders
+    When a test source in another web package or in the browser application imports it
+    Then the dependency is allowed, the same way a server package's testing entry is
+    And a production source importing that same entry is still rejected
+
+  @unit @architecture
   Scenario: Wildcard exports are forbidden for feature packages
     Given a feature package export map contains a wildcard subpath
     When architecture lint checks its manifest

@@ -1,7 +1,7 @@
 import { Box, HStack, Icon, IconButton, Popover, Text, VStack } from "@chakra-ui/react";
 import { CircleAlert, Equal, Play, Trophy } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
-import { Markdown } from "@langwatch/workflow-web/components/Markdown";
+import { Markdown } from "@langwatch/workflow-web/surfaces/markdown";
 import { parseEvaluationResult } from "@langwatch/evaluator-web/surfaces/evaluation-results";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store";
 import { scrollToTargetColumn } from "../../../behavior/experiments-v3/use-open-target-editor";

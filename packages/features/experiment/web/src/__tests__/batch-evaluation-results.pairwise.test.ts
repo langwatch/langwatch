@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildPairwiseComparisons } from "@langwatch/experiment-web";
-import type { BatchComparisonColumn } from "@langwatch/experiment-web";
+import { buildPairwiseComparisons } from "../ui/sections/batch-evaluation-results.pairwise";
+import type { BatchComparisonColumn } from "../ui/sections/batch-evaluation-results.types";
 
 const columnWith = (
   verdictsByRow: BatchComparisonColumn["verdictsByRow"],

@@ -5,8 +5,9 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import { LangySidecar } from "./langy-panel";
 import { useLangyScopeReset } from "../../behavior/use-langy-scope-reset";
 import { useShowLangy } from "../../behavior/use-show-langy";
-import { LangyProvider, useLangy } from "./langy-context";
-import { LANGY_DOCKED_OFFSET, LANGY_TRANSITION, useLangyStore } from "../../../../index";
+import { LangyProvider, useLangy } from "../../../../ui/sections/langy-page-context";
+import { useLangyStore } from "../../../../behavior/langy.store";
+import { LANGY_DOCKED_OFFSET, LANGY_TRANSITION } from "../../../../model/langy-panel-layout";
 
 /**
  * Layout route that mounts Langy once per project, above the swapping page.

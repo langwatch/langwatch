@@ -7,8 +7,9 @@ import {
 } from "@tanstack/react-table";
 import type React from "react";
 import { useMemo, useState } from "react";
-import type { LensConfig } from "../../../../index";
-import { groupByForGrouping, useFilterStore } from "../../../../index";
+import type { LensConfig } from "../../../../behavior/view.store";
+import { useFilterStore } from "../../../../behavior/filter.store";
+import { groupByForGrouping } from "../../../../behavior/view.store";
 import type { TraceListItem } from "../types/trace";
 import { buildGroupColumns } from "./columns";
 import { buildGroups, groupRegistry, RegistryRow, type TraceGroup } from "./registry";

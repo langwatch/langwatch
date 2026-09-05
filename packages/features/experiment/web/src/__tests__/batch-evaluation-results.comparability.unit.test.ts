@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { computeBTLeaderboard } from "@langwatch/experiment-web";
-import { comparabilityOf, computeComparability } from "@langwatch/experiment-web";
+import { computeBTLeaderboard } from "../model/batch-evaluation-results.bt-leaderboard";
+import {
+  comparabilityOf,
+  computeComparability,
+} from "../model/batch-evaluation-results.comparability";
 
 /**
  * These pin the two shapes that defeated the old per-variant guard.

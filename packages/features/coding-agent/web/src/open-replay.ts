@@ -3,7 +3,7 @@
 // address lands is what makes the replay open on the same frame as the click.
 // Reaching a sibling web package is a recorded finding; a second store would be
 // a second answer to "which trace is open".
-import { useDrawerStore } from "@langwatch/trace-web";
+import { useDrawerStore } from "@langwatch/trace-web/surfaces/trace-drawer-store";
 
 import type { codingAgentApi } from "./coding-agent-api";
 import type { CodingAgentToaster } from "./coding-agent-feedback";

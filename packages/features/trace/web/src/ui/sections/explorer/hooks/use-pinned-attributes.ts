@@ -3,7 +3,7 @@ import {
   type PinnedAttribute,
   type PinnedAttributeSource,
   usePinnedAttributesStore,
-} from "../../../../index";
+} from "../../../../behavior/pinned-attributes.store";
 
 const EMPTY: PinnedAttribute[] = [];
 

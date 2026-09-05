@@ -35,7 +35,7 @@ import {
 import type { Experiment, Project } from "@langwatch/workflow-contract";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { FormatMoney } from "@langwatch/workflow-web/surfaces/format-money";
-import { VersionBox } from "@langwatch/workflow-web/optimization_studio/components/History";
+import { VersionBox } from "@langwatch/workflow-web/surfaces/version-history";
 import type { WorkflowApiRouter } from "@langwatch/workflow-web/surfaces/workflow-api";
 import type {
   AppliedOptimization,
@@ -51,7 +51,7 @@ import { formatMoney } from "@langwatch/design-system/format-money";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { titleCase } from "@langwatch/design-system/string-casing";
-import { getRunDisplayName } from "../../../index";
+import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name";
 
 /** The runs query, with the contract's row rather than the router's inference. */
 type DSPyRunsQuery = UseTRPCQueryResult<
@@ -68,7 +68,7 @@ import { ChartTooltip } from "../analytics/chart-tooltip";
 import { FeedbackLink } from "../feedback-link";
 import { LLMIcon } from "@langwatch/design-system/icons";
 import { MetadataTag } from "../metadata-tag";
-import { RenderInputOutput } from "@langwatch/trace-web/components/traces/RenderInputOutput";
+import { RenderInputOutput } from "@langwatch/trace-web/surfaces/render-input-output";
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { Switch } from "@langwatch/design-system/switch";
 

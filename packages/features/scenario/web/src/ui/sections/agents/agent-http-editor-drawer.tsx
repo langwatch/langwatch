@@ -3,7 +3,7 @@ import {
   AgentHttpEditorPresentationPort,
   type RenderAgentVariablesInput,
   type RenderScenarioMappingsInput,
-} from "@langwatch/agent-web/screens/agent-management";
+} from "@langwatch/agent-web/surfaces/agent-http-editor";
 import { AgentTestPanel } from "./agent-test-panel";
 import {
   agentInputBindingSchema,

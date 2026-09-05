@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
 import { fetchSSE } from "../../../model/sse/fetch-sse";
-import { isHandledByGlobalHandler } from "../../../behavior/trpc-error";
+import { isHandledByGlobalHandler } from "@langwatch/ui-host/errors";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
 import type { BaseComponent } from "@langwatch/workflow-contract";
@@ -13,7 +13,8 @@ import {
   explainExecutionStateError,
   reportableExecutionFailure,
 } from "./execution-state-error";
-import { useWorkflowStore, type WorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store";
+import { type WorkflowStore } from "../../../behavior/workflow-store";
 
 const logger = createLogger("langwatch:wizard:usePostEvent");
 let pythonDisconnectedTimeout: NodeJS.Timeout | null = null;

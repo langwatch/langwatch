@@ -44,7 +44,7 @@ import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import {
   DepartmentPicker,
   useDepartmentColumn,
-} from "@langwatch/organization-web/screens/organization";
+} from "@langwatch/organization-web/surfaces/department-picker";
 import { api } from "../../behavior/project-api";
 import {
   useProjectHost,

@@ -11,7 +11,7 @@ const { workflowRef } = vi.hoisted(() => ({
   workflowRef: { current: {} as Record<string, unknown> },
 }));
 
-vi.mock("@langwatch/workflow-web", () => ({
+vi.mock("../../../behavior/use-workflow-store", () => ({
   useWorkflowStore: () => ({
     reset: vi.fn(),
     setWorkflow: vi.fn(),

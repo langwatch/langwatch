@@ -34,6 +34,10 @@
       "types": "./src/toaster.ts",
       "default": "./src/toaster.ts"
     },
+    "./storage": {
+      "types": "./src/storage.ts",
+      "default": "./src/storage.ts"
+    },
     "./errors": {
       "types": "./src/errors.ts",
       "default": "./src/errors.ts"

@@ -6,14 +6,12 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useEvaluatorOptions } from "../hooks/use-evaluator-options";
-import type { LensColumnOption, TimeColumnFormat } from "../../../../index";
-import {
-  isEvalColumnId,
-  LENS_CAPABILITIES,
-  parseEvalColumnId,
-  useTimeFormatStore,
-  useViewStore,
-} from "../../../../index";
+import type { LensColumnOption } from "../../../../behavior/lens-capabilities";
+import type { TimeColumnFormat } from "../../../../behavior/time-format.store";
+import { LENS_CAPABILITIES } from "../../../../behavior/lens-capabilities";
+import { useTimeFormatStore } from "../../../../behavior/time-format.store";
+import { useViewStore } from "../../../../behavior/view.store";
+import { isEvalColumnId, parseEvalColumnId } from "../../../../model/lens-eval-column-id";
 import { evalColumnLabel } from "../trace-table/eval-columns";
 import { AddEvalColumnForm, COLUMN_APPENDED_HINT } from "./column-picker/add-eval-column-form";
 import { VisibleOrderStrip } from "./column-picker/visible-order-strip";

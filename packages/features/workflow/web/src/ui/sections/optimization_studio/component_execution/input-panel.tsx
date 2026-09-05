@@ -7,7 +7,7 @@ import {
   type InputField,
 } from "../../../elements/executable-panel/execution-input-panel";
 import { getInputsForExecution, useComponentExecution } from "../use-component-execution";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../../../../behavior/use-workflow-store";
 import type { Component } from "@langwatch/workflow-contract";
 
 /**

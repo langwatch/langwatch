@@ -1,9 +1,6 @@
 import { Button, Field, HStack } from "@chakra-ui/react";
-import {
-  ScenarioParameterDefinitionsInput,
-  type ScenarioFormController,
-  type ScenarioFormData,
-} from "../../..";
+import { type ScenarioFormController, type ScenarioFormData } from "../scenario-form";
+import { ScenarioParameterDefinitionsInput } from "../scenario-parameter-definitions-input";
 import { Controller, type FieldErrors, useFormState } from "react-hook-form";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Dialog } from "@langwatch/design-system/studio-dialog";

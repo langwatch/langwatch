@@ -26,7 +26,7 @@ vi.mock("../../ai/use-ai-trace-action", () => ({
 
 import { explainAnyError } from "../../../errors";
 import type { AiActionError } from "@langwatch/trace-contract";
-import { useFilterStore } from "../../../../../index";
+import { useFilterStore } from "../../../../../behavior/filter.store";
 import { FloatingAiBar } from "../floating-ai-bar";
 
 /** A handled failure in the shape tRPC delivers it. */

@@ -10,7 +10,7 @@ import {
   highlightedRow,
   navigateSuggestion,
   type SuggestionUIState,
-} from "@langwatch/trace-web/explorer/components/SearchBar/suggestionUI";
+} from "@langwatch/trace-web/surfaces/suggestion-ui";
 import { useReportOpenList } from "../../../elements/agent-testing/shared/open-list-context";
 import {
   acceptParameterField,

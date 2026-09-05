@@ -2,9 +2,10 @@
  * What the trace screens do with a failure.
  */
 
-import { showErrorToast as reportFailure } from "@langwatch/ui-host/errors";
-
-import { isHandledByGlobalHandler } from "../../trpc-error";
+import {
+  isHandledByGlobalHandler,
+  showErrorToast as reportFailure,
+} from "@langwatch/ui-host/errors";
 import type { TraceFailureAction } from "../../trace-host";
 
 export interface ShowErrorToastOptions {

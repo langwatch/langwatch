@@ -28,7 +28,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ query: harness.query }),
 }));
 
-import { useDrawerStore } from "../../../../../index";
+import { useDrawerStore } from "../../../../../behavior/drawer.store";
 import { useDrawerUrlSync } from "../use-drawer-url-sync";
 
 /** The params an open drawer already carries, so only `drawer.edit` is in play. */

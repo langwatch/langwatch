@@ -17,7 +17,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { LangyChoicesCard } from "./langy-choices-card";
 import { LangyDerivedCardView } from "./langy-derived-card-view";
-import { LangyFailedCard } from "../../../../../index";
+import { LangyFailedCard } from "../../../../../ui/elements/derived-cards/langy-failed-card";
 import type { ChoicesRefRow } from "../../../behavior/derived-cards/use-choices-ref-rows";
 
 // ─── fixtures ────────────────────────────────────────────────────────────────

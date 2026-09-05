@@ -1,13 +1,13 @@
+import { type StreamingMessage } from "../../../model/scenario-message-display";
 import {
   ScenarioMessageRenderer as FeatureScenarioMessageRenderer,
   type ScenarioMessageRendererProps as FeatureScenarioMessageRendererProps,
-  type StreamingMessage,
-} from "../../..";
+} from "../scenario-message-renderer";
 import type { SimulationMessage } from "@langwatch/scenario-contract";
 import type { NextSpeaker } from "../../elements/next-speaker";
-import { Bubble } from "@langwatch/trace-web/explorer/components/TraceTable/registry/addons/conversation/Bubble";
+import { Bubble } from "@langwatch/trace-web/surfaces/conversation-bubble";
 import { getDisplayRoleVisuals } from "@langwatch/trace-web/surfaces/scenario-role";
-import { RenderInputOutput } from "@langwatch/trace-web/components/traces/RenderInputOutput";
+import { RenderInputOutput } from "@langwatch/trace-web/surfaces/render-input-output";
 import { RunTurnSeparator } from "./run-turn-separator";
 import { MediaPart } from "../media-part";
 

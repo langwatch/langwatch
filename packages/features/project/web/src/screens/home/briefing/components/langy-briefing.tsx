@@ -1,7 +1,7 @@
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { GitPullRequest, Sparkles } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
-import { LangyPanelSurface } from "@langwatch/langy-web/asaplangy";
+import { LangyPanelSurface } from "@langwatch/langy-web/surfaces/asaplangy";
 import { Chip } from "@langwatch/trace-web/surfaces/trace-drawer-chip";
 import type { BriefingData, BriefingReceipt, BriefingSeverity, ScenarioBar } from "../types";
 import { QuietHeadline } from "./quiet-headline";

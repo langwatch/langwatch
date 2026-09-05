@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type EditorContext, handleKey, type KeyAction } from "../../../index";
+import { type EditorContext, handleKey, type KeyAction } from "../../../model/handle-key";
 
 function ctx(overrides: Partial<EditorContext> = {}): EditorContext {
   return {

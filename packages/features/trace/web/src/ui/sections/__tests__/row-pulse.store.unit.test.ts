@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useRowPulseStore } from "../../../index";
+import { useRowPulseStore } from "../../../behavior/row-pulse.store";
 
 beforeEach(() => {
   vi.useFakeTimers();

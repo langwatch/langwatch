@@ -2,8 +2,8 @@ import {
   deriveFollowUps as derivePackageFollowUps,
   followUpsForResult as followPackageUpsForResult,
   SUGGESTION_LABEL,
-} from "../../../../index";
-import type { FollowUpSuggestion, SettledToolResult } from "../../../../index";
+} from "../../../../model/langy-cli-follow-ups";
+import type { FollowUpSuggestion, SettledToolResult } from "../../../../model/langy-cli-follow-ups";
 import {
   featureForCliToolName,
   featuresConsuming,

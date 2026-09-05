@@ -1,11 +1,8 @@
 import { useCallback } from "react";
-import type { FocusSection } from "../../../../index";
-import {
-  isFocusSection,
-  useDrawerStore,
-  useFocusSectionStore,
-  useSpanPulseStore,
-} from "../../../../index";
+import type { FocusSection } from "../../../../behavior/focus-section.store";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
+import { isFocusSection, useFocusSectionStore } from "../../../../behavior/focus-section.store";
+import { useSpanPulseStore } from "../../../../behavior/span-pulse.store";
 
 /** A comment's anchor as it comes back from a read. */
 export interface AnnotationAnchorTarget {

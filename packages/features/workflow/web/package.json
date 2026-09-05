@@ -10,6 +10,10 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
+    "./surfaces/workflow-code-editor": {
+      "types": "./src/ui/elements/code/workflow-code-editor.tsx",
+      "default": "./src/ui/elements/code/workflow-code-editor.tsx"
+    },
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
@@ -18,19 +22,19 @@
       "types": "./src/ui/sections/copy-button.tsx",
       "default": "./src/ui/sections/copy-button.tsx"
     },
-    "./components/GenerateApiSnippetDialog": {
+    "./surfaces/generate-api-snippet-dialog": {
       "types": "./src/ui/sections/generate-api-snippet-dialog.tsx",
       "default": "./src/ui/sections/generate-api-snippet-dialog.tsx"
     },
-    "./components/HoverableBigText": {
+    "./surfaces/hoverable-big-text": {
       "types": "./src/ui/sections/hoverable-big-text.tsx",
       "default": "./src/ui/sections/hoverable-big-text.tsx"
     },
-    "./components/Markdown": {
+    "./surfaces/markdown": {
       "types": "./src/ui/sections/markdown.tsx",
       "default": "./src/ui/sections/markdown.tsx"
     },
-    "./components/blocks/CodeBlockEditor": {
+    "./surfaces/code-block-editor": {
       "types": "./src/ui/sections/blocks/code-block-editor.tsx",
       "default": "./src/ui/sections/blocks/code-block-editor.tsx"
     },
@@ -38,15 +42,15 @@
       "types": "./src/ui/sections/code/render-code.tsx",
       "default": "./src/ui/sections/code/render-code.tsx"
     },
-    "./components/run-via-api/DataSourcePicker": {
+    "./surfaces/run-via-api-data-source-picker": {
       "types": "./src/ui/elements/run-via-api/data-source-picker.tsx",
       "default": "./src/ui/elements/run-via-api/data-source-picker.tsx"
     },
-    "./components/run-via-api/runSnippets": {
+    "./surfaces/run-snippets": {
       "types": "./src/model/run-via-api/run-snippets.ts",
       "default": "./src/model/run-via-api/run-snippets.ts"
     },
-    "./components/run-via-api/useRunViaApiTabs": {
+    "./surfaces/run-via-api-tabs": {
       "types": "./src/ui/sections/run-via-api/use-run-via-api-tabs.ts",
       "default": "./src/ui/sections/run-via-api/use-run-via-api-tabs.ts"
     },
@@ -70,7 +74,7 @@
       "types": "./src/model/workflow-host.ts",
       "default": "./src/model/workflow-host.ts"
     },
-    "./optimization_studio/components/AddModelProviderKey": {
+    "./surfaces/add-model-provider-key": {
       "types": "./src/ui/elements/optimization_studio/add-model-provider-key.tsx",
       "default": "./src/ui/elements/optimization_studio/add-model-provider-key.tsx"
     },
@@ -78,15 +82,15 @@
       "types": "./src/ui/elements/optimization_studio/format-money.tsx",
       "default": "./src/ui/elements/optimization_studio/format-money.tsx"
     },
-    "./optimization_studio/components/History": {
+    "./surfaces/version-history": {
       "types": "./src/ui/sections/optimization_studio/history.tsx",
       "default": "./src/ui/sections/optimization_studio/history.tsx"
     },
-    "./optimization_studio/components/code/workflow-code-editor.transport": {
+    "./surfaces/code-editor-transport": {
       "types": "./src/ui/sections/optimization_studio/code/workflow-code-editor.transport.tsx",
       "default": "./src/ui/sections/optimization_studio/code/workflow-code-editor.transport.tsx"
     },
-    "./optimization_studio/components/properties/modals/EmojiPickerModal": {
+    "./surfaces/emoji-picker-modal": {
       "types": "./src/ui/sections/optimization_studio/properties/modals/emoji-picker-modal.tsx",
       "default": "./src/ui/sections/optimization_studio/properties/modals/emoji-picker-modal.tsx"
     },
@@ -134,33 +138,29 @@
       "types": "./src/model/sse/fetch-sse.ts",
       "default": "./src/model/sse/fetch-sse.ts"
     },
-    "./utils/trpcError": {
-      "types": "./src/behavior/trpc-error.ts",
-      "default": "./src/behavior/trpc-error.ts"
-    },
     "./surfaces/workflow-icons": {
-      "types": "./src/ui/sections/workflow-icons.surface.ts",
-      "default": "./src/ui/sections/workflow-icons.surface.ts"
+      "types": "./src/surfaces/workflow-icons/index.ts",
+      "default": "./src/surfaces/workflow-icons/index.ts"
     },
     "./surfaces/workflow-card": {
-      "types": "./src/ui/sections/workflow-card.surface.ts",
-      "default": "./src/ui/sections/workflow-card.surface.ts"
+      "types": "./src/surfaces/workflow-card/index.ts",
+      "default": "./src/surfaces/workflow-card/index.ts"
     },
     "./surfaces/code-agent": {
-      "types": "./src/ui/sections/code-agent.surface.ts",
-      "default": "./src/ui/sections/code-agent.surface.ts"
+      "types": "./src/surfaces/code-agent/index.ts",
+      "default": "./src/surfaces/code-agent/index.ts"
     },
     "./surfaces/workflow-templates": {
-      "types": "./src/ui/sections/workflow-templates.surface.ts",
-      "default": "./src/ui/sections/workflow-templates.surface.ts"
+      "types": "./src/surfaces/workflow-templates/index.ts",
+      "default": "./src/surfaces/workflow-templates/index.ts"
     },
     "./surfaces/studio-dataset-columns": {
-      "types": "./src/ui/sections/studio-dataset-columns.surface.ts",
-      "default": "./src/ui/sections/studio-dataset-columns.surface.ts"
+      "types": "./src/surfaces/studio-dataset-columns/index.ts",
+      "default": "./src/surfaces/studio-dataset-columns/index.ts"
     },
     "./surfaces/studio-drawer-footer": {
-      "types": "./src/ui/sections/studio-drawer-footer.surface.ts",
-      "default": "./src/ui/sections/studio-drawer-footer.surface.ts"
+      "types": "./src/surfaces/studio-drawer-footer/index.ts",
+      "default": "./src/surfaces/studio-drawer-footer/index.ts"
     }
   },
   "scripts": {

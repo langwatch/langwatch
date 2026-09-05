@@ -1,4 +1,8 @@
-import { MediaPart as SimulationMediaPart, type MediaPartProps, type MediaProbeResult } from "@langwatch/scenario-web";
+import {
+  MediaPart as SimulationMediaPart,
+  type MediaPartProps,
+  type MediaProbeResult,
+} from "@langwatch/scenario-web/surfaces/media-part";
 import { useEffect, useState } from "react";
 import { api } from "../../../behavior/trace-api";
 

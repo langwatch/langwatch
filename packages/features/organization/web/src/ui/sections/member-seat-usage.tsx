@@ -8,16 +8,7 @@ import {
 import { api } from "../../behavior/organization-api";
 
 /**
- * Where the organization stands on each kind of seat, on the page where seats
- * are decided.
- *
- * The two decisions the member list offers, moving somebody to a Lite Member
- * seat and disabling them, are each refused once the matching allowance runs
- * out. Without this an admin reconciling down to their plan learns the
- * allowances one refusal at a time, having already picked the person and clicked
- * save. Same counts and the same row component as the usage page, so the two
- * never disagree.
- *
+ * Where the organization stands on each kind of seat, on the page where seats are decided.
  * Spec: specs/licensing/seat-reconciliation.feature
  */
 export function MemberSeatUsage({

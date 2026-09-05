@@ -8,11 +8,11 @@
   ],
   "type": "module",
   "exports": {
-    "./components/EditModelProviderForm": {
+    "./surfaces/edit-model-provider-form": {
       "types": "./src/ui/sections/model-provider-form.tsx",
       "default": "./src/ui/sections/model-provider-form.tsx"
     },
-    "./components/ModelSelector": {
+    "./surfaces/model-selector": {
       "types": "./src/ui/elements/model-selector.tsx",
       "default": "./src/ui/elements/model-selector.tsx"
     },
@@ -20,7 +20,7 @@
       "types": "./src/ui/elements/no-models-configured-callout.tsx",
       "default": "./src/ui/elements/no-models-configured-callout.tsx"
     },
-    "./components/ProviderModelSelector": {
+    "./surfaces/provider-model-selector": {
       "types": "./src/ui/elements/provider-model-selector.tsx",
       "default": "./src/ui/elements/provider-model-selector.tsx"
     },
@@ -44,11 +44,11 @@
       "types": "./src/ui/sections/drawers.ts",
       "default": "./src/ui/sections/drawers.ts"
     },
-    "./hooks/useModelLimits": {
+    "./surfaces/model-limits": {
       "types": "./src/behavior/use-model-limits.ts",
       "default": "./src/behavior/use-model-limits.ts"
     },
-    "./hooks/useModelProvidersSettings": {
+    "./surfaces/model-provider-settings": {
       "types": "./src/behavior/use-model-providers-settings.ts",
       "default": "./src/behavior/use-model-providers-settings.ts"
     },

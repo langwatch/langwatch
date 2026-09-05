@@ -29,12 +29,9 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "../../../../behavior/use-reduced-motion";
 import type { LangySkill } from "../../../../model/shared/langy/langy-skills";
-import {
-  describeChipContext,
-  type LangyContextChip,
-  useLangyContextTargetStore,
-  useLangyStore,
-} from "../../../../index";
+import { describeChipContext } from "../../../../behavior/langy-chip-context";
+import { useLangyContextTargetStore } from "../../../../behavior/langy-context-target.store";
+import { type LangyContextChip, useLangyStore } from "../../../../behavior/langy.store";
 import { LangyComposerPalette, type PaletteMode } from "../elements/langy-composer-palette";
 import { LangyModelPill } from "../elements/langy-model-pill";
 

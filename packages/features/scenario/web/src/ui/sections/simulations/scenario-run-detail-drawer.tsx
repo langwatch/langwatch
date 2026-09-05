@@ -15,15 +15,13 @@ import { api } from "../../../behavior/scenario-api";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { ScenarioMessageRenderer } from "./scenario-message-renderer";
-import {
-  CopyIdChip,
-  RunCriteriaChip,
-  RunDetailSection,
-  ScenarioRunActions,
-  ScenarioRunStatusIcon,
-  SimulationConsole,
-  hasNoResults,
-} from "../../..";
+import { hasNoResults } from "../../../model/scenario-run-status.utils";
+import { CopyIdChip } from "../../elements/copy-id-chip";
+import { RunCriteriaChip } from "../../elements/run-criteria-chip";
+import { RunDetailSection } from "../../elements/run-detail-section";
+import { ScenarioRunActions } from "../../elements/scenario-run-actions";
+import { ScenarioRunStatusIcon } from "../../elements/scenario-run-status-icon";
+import { SimulationConsole } from "../../elements/simulation-console/simulation-console";
 import { useRunAgainActions } from "./use-run-again-actions";
 import { useRunDetailFacts } from "../../../behavior/simulations/use-run-detail-facts";
 import { useRunStateStream } from "../../../behavior/simulations/use-run-state-stream";

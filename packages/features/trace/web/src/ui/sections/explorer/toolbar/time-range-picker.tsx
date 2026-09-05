@@ -16,7 +16,8 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { TimeRange, TimeRangePreset } from "../../../../index";
+import type { TimeRange } from "../../../../behavior/filter.store";
+import type { TimeRangePreset } from "../../../../behavior/time-range-presets";
 import {
   getPresetById,
   matchPreset,

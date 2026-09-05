@@ -273,11 +273,19 @@ const boundaryRule = {
 
       if (target) {
         const subpath = packageSubpath(specifier, target.name);
+        // `./testing` is a package's declared test seam. A server package
+        // publishes one for the runtimes that compose it; a web package
+        // publishes one for the browser features that render it. Either way
+        // only a recognized test source may walk through it.
+        const testSeamRole =
+          (target.pkg.role === "server" &&
+            (classification.role === "other" || classification.role === "server")) ||
+          (target.pkg.role === "web" &&
+            (classification.role === "other" || classification.role === "web"));
         const testSupportImport =
-          target.pkg.role === "server" &&
+          testSeamRole &&
           subpath === "./testing" &&
           target.pkg.exports.has(subpath) &&
-          (classification.role === "other" || classification.role === "server") &&
           isRecognizedTestSource(classification.workspacePath);
         // A web feature's public surface is exactly `surfaces/<id>` for other web
         // features and `screens/<owner>` for the browser application. A screen is

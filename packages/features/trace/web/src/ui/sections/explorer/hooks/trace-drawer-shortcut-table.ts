@@ -1,6 +1,6 @@
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import type { useDrawerStore } from "../../../../index";
-import { isTerminalOrigin } from "../../../../index";
+import type { useDrawerStore } from "../../../../behavior/drawer.store";
+import { isTerminalOrigin } from "../../../../model/terminal-origin";
 import type { useTraceDrawerNavigation } from "./use-trace-drawer-navigation";
 
 type DrawerStoreState = ReturnType<typeof useDrawerStore.getState>;

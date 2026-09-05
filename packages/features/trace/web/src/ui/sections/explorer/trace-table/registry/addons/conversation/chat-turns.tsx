@@ -4,7 +4,7 @@ import type React from "react";
 import { useDrawer, useDrawerParams } from "../../../../../../../behavior/use-drawer";
 import { useOpenTraceDrawer } from "../../../../hooks/use-open-trace-drawer";
 import type { TraceListItem } from "../../../../types/trace";
-import { formatDuration } from "../../../../../../../index";
+import { formatDuration } from "../../../../../../../model/display-formatters";
 import { SystemPromptBanner } from "../../../../trace-drawer/conversation-view/system-prompt-banner";
 import { TraceIdPeek } from "../../../../trace-id-peek";
 import {

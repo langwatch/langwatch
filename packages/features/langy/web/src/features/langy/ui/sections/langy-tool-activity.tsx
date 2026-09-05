@@ -14,17 +14,16 @@ import { Braces, Check, ChevronRight, Layers3 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "../../../../behavior/use-reduced-motion";
+import { useLangyStore } from "../../../../behavior/langy.store";
+import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode";
 import {
   type CapabilityCommand,
   commandOfToolCall,
-  isPlanToolPart,
-  isQuestionToolPart,
-  LangyInterruptedNote,
-  langyThinkingShimmerStyles,
-  questionToolCardParts,
-  useLangyDevMode,
-  useLangyStore,
-} from "../../../../index";
+} from "../../../../model/langy-capability-digest";
+import { isPlanToolPart } from "../../../../model/langy-plan";
+import { isQuestionToolPart, questionToolCardParts } from "../../../../model/langy-question-tool";
+import { langyThinkingShimmerStyles } from "../../../../model/values/langy-shimmer";
+import { LangyInterruptedNote } from "../../../../ui/elements/langy-interrupted-note";
 import {
   type LangyToolErrorPresentation,
   presentLangyToolError,

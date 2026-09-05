@@ -1,5 +1,5 @@
 /**
- * Moved here from `@langwatch/workflow-web/utils/constants`: the prefix a KSUID-backed id is
+ * Moved here from `@langwatch/workflow-web/surfaces/platform-defaults`: the prefix a KSUID-backed id is
  * minted with, per resource.
  */
 export const KSUID_RESOURCES = {

@@ -5,7 +5,7 @@ import {
   extractDiffFromToolInput,
   isDiffTool,
   toolPrimaryArg,
-} from "@langwatch/coding-agent-web";
+} from "../trace/terminal-session";
 
 function modelCall(atMs: number, tokens: number, costUsd: number): TranscriptEntry {
   return {

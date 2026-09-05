@@ -2,7 +2,7 @@ import type { Node } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
 import { HttpConfigEditor, useHttpTest } from "../../../../behavior/agents/http/index";
 import { CodeBlockEditor } from "../../blocks/code-block-editor";
-import { OutputsSection } from "@langwatch/prompt-web/components/outputs/OutputsSection";
+import { OutputsSection } from "@langwatch/prompt-web/surfaces/outputs-section";
 import { VariablesSection } from "@langwatch/prompt-web/surfaces/variables";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import type {
@@ -15,24 +15,24 @@ import type {
   PromptingTechnique,
   Retriever,
 } from "@langwatch/workflow-contract";
+import { useWorkflowStore } from "../../../../behavior/use-workflow-store";
+import { LiquidConditionEditor } from "../../../elements/code/liquid-condition-editor";
+import { InsideDrawerProvider } from "../../../elements/studio-drawer-footer";
+import { CodePropertiesPanel as WorkflowCodePropertiesPanel } from "../../properties/workflow-code-properties-panel";
+import { EndPropertiesPanel as WorkflowEndPropertiesPanel } from "../../properties/workflow-end-properties-panel";
+import { EntryPointPropertiesPanel as WorkflowEntryPointPropertiesPanel } from "../../properties/workflow-entry-point-properties-panel";
+import { HttpPropertiesPanel as WorkflowHttpPropertiesPanel } from "../../properties/workflow-http-properties-panel";
+import { IfElsePropertiesPanel as WorkflowIfElsePropertiesPanel } from "../../properties/workflow-if-else-properties-panel";
+import { PromptingTechniquePropertiesPanel as WorkflowPromptingTechniquePropertiesPanel } from "../../properties/workflow-prompting-technique-properties-panel";
 import {
-  CodePropertiesPanel as WorkflowCodePropertiesPanel,
-  EndPropertiesPanel as WorkflowEndPropertiesPanel,
-  EntryPointPropertiesPanel as WorkflowEntryPointPropertiesPanel,
-  HttpPropertiesPanel as WorkflowHttpPropertiesPanel,
-  IfElsePropertiesPanel as WorkflowIfElsePropertiesPanel,
-  InsideDrawerProvider,
-  LiquidConditionEditor,
-  PromptingTechniquePropertiesPanel as WorkflowPromptingTechniquePropertiesPanel,
-  RetrievePropertiesPanel as WorkflowRetrievePropertiesPanel,
   type WorkflowBasePropertiesPanelProps,
   type WorkflowCodeEditorProps,
   type WorkflowHttpConfigProps,
   type WorkflowHttpTestConfig,
   type WorkflowOutputsProps,
   type WorkflowVariablesProps,
-  useWorkflowStore,
-} from "@langwatch/workflow-web";
+} from "../../properties/workflow-properties.ports";
+import { RetrievePropertiesPanel as WorkflowRetrievePropertiesPanel } from "../../properties/workflow-retrieve-properties-panel";
 import { DatasetModal } from "../dataset-modal";
 import { AgentPropertiesPanel } from "../properties/agent-properties-panel";
 import { BasePropertiesPanel, PropertySectionTitle } from "../properties/base-properties-panel";

@@ -1,6 +1,7 @@
 import type { Editor } from "@tiptap/react";
-import type { KeyAction, SuggestionState } from "../../../../index";
-import { getSuggestionState } from "../../../../index";
+import type { SuggestionState } from "../../../../model/get-suggestion-state";
+import type { KeyAction } from "../../../../model/handle-key";
+import { getSuggestionState } from "../../../../model/get-suggestion-state";
 
 // TipTap wraps text in a paragraph node, so cursor positions in
 // `editor.state.selection` are 1-based. Subtract 1 to map back to a string

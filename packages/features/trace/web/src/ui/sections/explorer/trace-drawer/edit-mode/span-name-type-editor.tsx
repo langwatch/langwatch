@@ -1,7 +1,10 @@
 import { HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useMemo } from "react";
 import { type SpanTypes, spanTypesSchema } from "@langwatch/trace-contract";
-import { selectSpanEditBaseline, useTraceEditStore } from "../../../../../index";
+import {
+  selectSpanEditBaseline,
+  useTraceEditStore,
+} from "../../../../../behavior/trace-edit.store";
 
 const SPAN_TYPES: SpanTypes[] = spanTypesSchema.options.map((option) => option.value);
 

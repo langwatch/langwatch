@@ -58,7 +58,7 @@ vi.mock("../../../../../../behavior/trace-api", () => ({
 }));
 
 import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids";
-import { useAnnotationDraftStore } from "../../../../../../index";
+import { useAnnotationDraftStore } from "../../../../../../behavior/annotation-draft.store";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace";
 import { ChatTurnRow } from "../chat-turn-row";
 import type { TurnLayout } from "../types";

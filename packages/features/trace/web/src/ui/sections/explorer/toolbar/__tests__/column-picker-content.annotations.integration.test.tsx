@@ -32,8 +32,7 @@ vi.mock("../../../../../behavior/view.store", () => ({
     }),
 }));
 
-vi.mock("../../../../../index", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../../../index")>()),
+vi.mock("../../../../../behavior/time-format.store", () => ({
   useTimeFormatStore: (selector: (s: unknown) => unknown) =>
     selector({ format: "relative", setFormat: vi.fn() }),
 }));

@@ -41,19 +41,18 @@ vi.mock("../../../../../behavior/view.store", () => ({
     }),
 }));
 
-vi.mock("../../../../../index", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../../../index")>();
-
-  return {
-    ...actual,
-    useDensityStore: (selector: (state: unknown) => unknown) => selector({ density: mockDensity }),
-    useRefreshUIStore: (selector: (state: unknown) => unknown) =>
-      selector({
-        pulse: vi.fn(),
-        setReplacingData: mockSetReplacingData,
-      }),
-  };
-});
+vi.mock("../../../../../behavior/density.store", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useDensityStore: (selector: (state: unknown) => unknown) => selector({ density: mockDensity }),
+}));
+vi.mock("../../../../../behavior/refresh-ui.store", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useRefreshUIStore: (selector: (state: unknown) => unknown) =>
+    selector({
+      pulse: vi.fn(),
+      setReplacingData: mockSetReplacingData,
+    }),
+}));
 
 // ─── Module under test ────────────────────────────────────────────────────────
 import { useViewSwitchingDim } from "../use-view-switching-dim";

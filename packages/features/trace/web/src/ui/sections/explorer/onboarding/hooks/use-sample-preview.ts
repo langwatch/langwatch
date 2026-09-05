@@ -1,4 +1,4 @@
-import { useFilterStore } from "../../../../../index";
+import { useFilterStore } from "../../../../../behavior/filter.store";
 import type { TraceListItem } from "../../types/trace";
 import { shouldShowArrivals } from "../../../../../model/explorer/onboarding/chapters/onboarding-journey-config";
 import { ARRIVAL_PREVIEW_TRACES, SAMPLE_PREVIEW_TRACES } from "../data/sample-preview-traces";

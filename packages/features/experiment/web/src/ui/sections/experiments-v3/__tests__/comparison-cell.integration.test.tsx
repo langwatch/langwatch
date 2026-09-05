@@ -27,7 +27,7 @@ const scrollSpy = vi.fn();
 vi.mock("../../../../behavior/experiments-v3/use-open-target-editor", () => ({
   scrollToTargetColumn: (id: string) => scrollSpy(id),
 }));
-vi.mock("@langwatch/workflow-web/components/Markdown", () => ({
+vi.mock("@langwatch/workflow-web/surfaces/markdown", () => ({
   Markdown: ({ children }: { children: string }) => <div>{children}</div>,
 }));
 

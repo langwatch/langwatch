@@ -29,9 +29,9 @@ import { api } from "../../../model/workflow-api-client";
 import { useEvaluationExecution } from "./use-evaluation-execution";
 import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data";
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store";
 import type { Entry } from "@langwatch/workflow-contract";
-import { trainTestSplit } from "@langwatch/workflow-web";
+import { trainTestSplit } from "../../../model/studio-dataset.utils";
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key";
 import { VersionToBeUsed } from "./version-to-be-used";
 

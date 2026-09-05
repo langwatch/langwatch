@@ -14,7 +14,8 @@ import {
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { AttributeFormat, ChatMessage } from "../../../../index";
+import type { AttributeFormat } from "../../../../model/attribute-format";
+import type { ChatMessage } from "../../../../model/transcript/types";
 import { contentToString } from "../../../../model/explorer/trace-table/chat-content";
 import {
   buildInlineDescriptor,

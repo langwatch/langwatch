@@ -1,7 +1,10 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { memo } from "react";
 import { LuChevronRight, LuClock, LuTriangleRight, LuZap } from "react-icons/lu";
-import { CostStatsTooltip, LatencyStatsTooltip } from "../../../../index";
+import {
+  CostStatsTooltip,
+  LatencyStatsTooltip,
+} from "../../../elements/batch-results/metric-stats-tooltip";
 import {
   getPassRateGradientColor,
   PassRateCircle,

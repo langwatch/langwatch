@@ -46,7 +46,7 @@ import {
   type ProposalHandlers,
   useRegisterLangyActions,
   useRegisterLangyHandlers,
-} from "@langwatch/langy-web";
+} from "@langwatch/langy-web/surfaces/langy-page-registration";
 
 /**
  * Experiments Workbench Page

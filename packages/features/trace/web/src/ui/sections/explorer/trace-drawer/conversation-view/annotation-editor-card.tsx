@@ -8,7 +8,10 @@ import {
   type AnnotationFormState,
 } from "@langwatch/annotation-web/surfaces/annotation-form";
 import { useEffect } from "react";
-import { type AnnotationDraft, useAnnotationDraftStore } from "../../../../../index";
+import {
+  type AnnotationDraft,
+  useAnnotationDraftStore,
+} from "../../../../../behavior/annotation-draft.store";
 import { useAnnotationMutations } from "./use-annotation-form";
 
 interface AnnotationEditorCardProps {

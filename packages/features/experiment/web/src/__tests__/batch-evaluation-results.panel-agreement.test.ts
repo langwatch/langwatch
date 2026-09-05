@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { computeLeaderboardVerdict } from "@langwatch/experiment-web";
-import { computeParetoDominance } from "@langwatch/experiment-web";
-import { computeSampleAdequacy } from "@langwatch/experiment-web";
-import { areDistinguishable } from "@langwatch/experiment-web";
-import type { BTLeaderboard, BTLeaderboardEntry, VariantMetrics } from "@langwatch/experiment-web";
+import { computeLeaderboardVerdict } from "../ui/sections/batch-evaluation-results.verdict";
+import { computeParetoDominance } from "../ui/sections/batch-evaluation-results.pareto";
+import { computeSampleAdequacy } from "../model/batch-evaluation-results.sample-adequacy";
+import { areDistinguishable } from "../model/batch-evaluation-results.score-separation";
+import type {
+  BTLeaderboard,
+  BTLeaderboardEntry,
+} from "../model/batch-evaluation-results.bt-leaderboard";
+import type { VariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics";
 
 const metricStats = (avg: number, count: number) => ({
   min: avg,

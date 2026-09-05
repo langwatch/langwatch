@@ -1,17 +1,19 @@
 import { useEffect, useMemo } from "react";
 import { useInRouterContext, useLocation } from "react-router";
-import { useLangy } from "./langy-context";
+import { useLangy } from "../../../../ui/sections/langy-page-context";
 import {
   datasetContextChip,
-  type LangyContextChip,
   mergeContextChips,
+  traceContextChip,
+} from "../../../../behavior/langy-context-chips";
+import { useLangyContextTargetStore } from "../../../../behavior/langy-context-target.store";
+import {
+  type LangyContextChip,
   selectAddableChips,
   selectVisibleChips,
-  traceContextChip,
-  useLangyContextTargetStore,
-  useLangyDrawerContext,
   useLangyStore,
-} from "../../../../index";
+} from "../../../../behavior/langy.store";
+import { useLangyDrawerContext } from "../../../../behavior/use-langy-drawer-context";
 import { useLangySelectionContext } from "../../behavior/use-langy-selection-context";
 import { useLangyTraceViewContext } from "../../behavior/use-langy-trace-view-context";
 

@@ -1,10 +1,10 @@
 import { TraceMediaPart } from "../../../traces/trace-media-part";
 import { TerminalOutput } from "@langwatch/coding-agent-web/surfaces/agent-traces";
+import { TranscriptRenderProvider } from "../../../../elements/transcript-render-ports";
 import {
   BlockStack as TraceWebBlockStack,
-  TranscriptRenderProvider,
   type BlockStackProps,
-} from "../../../../../index";
+} from "../../../transcript/block-stack";
 
 export { pairToolBlocks, reparseTextBlock } from "../../../../../index";
 

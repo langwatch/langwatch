@@ -47,11 +47,9 @@ vi.mock("../../../../errors", () => ({
   showErrorToast: (...args: unknown[]) => showErrorToast(...args),
 }));
 
-import {
-  useAnnotationSessionStore,
-  useDrawerStore,
-  useTraceEditStore,
-} from "../../../../../../index";
+import { useAnnotationSessionStore } from "../../../../../../behavior/annotation-session.store";
+import { useDrawerStore } from "../../../../../../behavior/drawer.store";
+import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store";
 import { EditModeBar } from "../edit-mode-bar";
 
 function renderBar() {

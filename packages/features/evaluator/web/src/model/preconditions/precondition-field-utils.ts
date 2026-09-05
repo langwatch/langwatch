@@ -3,7 +3,7 @@ import type { PreconditionField } from "@langwatch/analytics-contract";
 import {
   getAvailablePreconditionFields,
   PRECONDITION_ALLOWED_RULES,
-} from "@langwatch/analytics-web/server/filters/precondition-matchers";
+} from "@langwatch/analytics-web/surfaces/precondition-matchers";
 import { availableFilters } from "@langwatch/analytics-web/surfaces/filter-registry";
 import type { FilterField } from "@langwatch/analytics-web/surfaces/filter-types";
 

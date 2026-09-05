@@ -9,7 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { useSelectionStore } from "../../../../../index";
+import { useSelectionStore } from "../../../../../behavior/selection.store";
 import type { TraceListItem } from "../../types/trace";
 import { traceSelectColumnDef } from "../select-column";
 import { buildTracePlaceholderRows } from "../skeleton-placeholders";

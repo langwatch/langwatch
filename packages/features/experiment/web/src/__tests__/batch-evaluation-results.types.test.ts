@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { transformBatchEvaluationData } from "@langwatch/experiment-web";
+import { transformBatchEvaluationData } from "../ui/sections/batch-evaluation-results.types";
 
 // Helper to create base timestamps
 const createTimestamps = () => ({

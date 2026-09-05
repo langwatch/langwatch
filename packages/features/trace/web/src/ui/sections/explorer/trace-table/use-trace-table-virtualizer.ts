@@ -1,6 +1,6 @@
 import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
 import { useCallback } from "react";
-import { useDensityStore } from "../../../../index";
+import { useDensityStore } from "../../../../behavior/density.store";
 import { useTraceTableScrollElement } from "../../../../behavior/explorer/trace-table/scroll-context";
 
 /** Px estimate per row before measureElement runs. */

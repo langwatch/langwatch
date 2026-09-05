@@ -4,7 +4,8 @@ import {
   SELECT_ALL_MATCHING_CAP,
   useSelectionStore,
 } from "@langwatch/trace-web/surfaces/trace-selection";
-import { ALL_MATCHING_PREFIX, type LangyContextChip } from "../../../index";
+import { ALL_MATCHING_PREFIX } from "../../../behavior/langy-chip-context";
+import { type LangyContextChip } from "../../../behavior/langy.store";
 
 /**
  * Turns the Trace Explorer's bulk-selection (the row checkboxes) into a Langy context

@@ -4,7 +4,7 @@ import type React from "react";
 import { useState } from "react";
 import { explainAnyError } from "../../errors";
 import type { AiActionError } from "@langwatch/trace-contract";
-import { useFilterStore } from "../../../../index";
+import { useFilterStore } from "../../../../behavior/filter.store";
 import { AiErrorDetails, hasAiErrorDetails } from "./error-banner-detail";
 
 /**

@@ -1,6 +1,6 @@
 import type { CollapsedFieldProps } from "@microlink/react-json-view";
 import React from "react";
-import { TraceInputOutput, type TraceJsonViewOptions } from "../../../index";
+import { TraceInputOutput, type TraceJsonViewOptions } from "../../blocks/trace-input-output";
 import { collectMediaParts, type MediaPartData } from "../../../behavior/shared/traces/media-parts";
 import { isPythonRepr, parsePythonInsideJson } from "@langwatch/trace-contract";
 import dynamic from "../../../behavior/compat/next-dynamic";

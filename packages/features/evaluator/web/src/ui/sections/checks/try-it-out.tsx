@@ -20,7 +20,7 @@ import { useDebounceValue } from "usehooks-ts";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
 import { toaster } from "@langwatch/ui-host/toaster";
-import { useFilterParams } from "@langwatch/analytics-web/hooks/useFilterParams";
+import { useFilterParams } from "@langwatch/analytics-web/surfaces/filter-params";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import {
   type Evaluators,
@@ -37,9 +37,9 @@ import type { CheckPreconditions } from "../../../model/evaluations/types";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import type { Money } from "@langwatch/design-system/type-utils";
-import { FilterSidebar } from "@langwatch/analytics-web/components/filters/FilterSidebar";
-import { FilterToggle } from "@langwatch/analytics-web/components/filters/FilterToggle";
-import { HoverableBigText } from "@langwatch/workflow-web/components/HoverableBigText";
+import { FilterSidebar } from "@langwatch/analytics-web/surfaces/filter-sidebar";
+import { FilterToggle } from "@langwatch/analytics-web/surfaces/filter-toggle";
+import { HoverableBigText } from "@langwatch/workflow-web/surfaces/hoverable-big-text";
 import {
   PeriodSelector,
   usePeriodSelector,
@@ -48,7 +48,7 @@ import { InputGroup } from "@langwatch/design-system/input-group";
 import { RedactedField } from "@langwatch/workflow-web/surfaces/redacted-field";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { CheckConfigFormData } from "./check-config-form";
-import { evaluationStatusColor } from "@langwatch/evaluator-web";
+import { evaluationStatusColor } from "../../../model/evaluation-status";
 
 export function TryItOut({
   form,

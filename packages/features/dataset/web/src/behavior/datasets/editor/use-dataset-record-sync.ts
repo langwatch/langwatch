@@ -13,7 +13,8 @@
  * silent success on error.
  */
 import { useCallback, useEffect, useRef } from "react";
-import type { AutosaveState, PendingSavedChanges } from "@langwatch/dataset-web";
+import type { AutosaveState } from "../../../model/dataset-table-context";
+import type { PendingSavedChanges } from "../../../model/pending-saved-changes";
 
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 

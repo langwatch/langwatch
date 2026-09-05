@@ -1,4 +1,4 @@
-import type { NumericMode } from "../../../../index";
+import type { NumericMode } from "../../../../behavior/numeric-mode.store";
 import type { RangeSectionData } from "../../../../behavior/explorer/filter-sidebar/types";
 
 /**

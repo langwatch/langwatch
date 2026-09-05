@@ -40,15 +40,12 @@ vi.mock("@langwatch/ui-drawer", () => ({
   getFlowCallbacks: () => ({}),
 }));
 
-vi.mock(
-  "@langwatch/workflow-web/optimization_studio/components/code/workflow-code-editor.transport",
-  () => ({
-    CodeEditor: () => null,
-    CodeEditorModal: () => null,
-  }),
-);
+vi.mock("@langwatch/workflow-web/surfaces/code-editor-transport", () => ({
+  CodeEditor: () => null,
+  CodeEditorModal: () => null,
+}));
 
-vi.mock("@langwatch/workflow-web/components/blocks/CodeBlockEditor", () => ({
+vi.mock("@langwatch/workflow-web/surfaces/code-block-editor", () => ({
   CodeBlockEditor: ({ code, onChange }: { code: string; onChange: (code: string) => void }) => (
     <div data-testid="code-editor">
       <textarea

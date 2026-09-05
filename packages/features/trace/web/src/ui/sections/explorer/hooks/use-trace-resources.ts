@@ -3,7 +3,7 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import type { InstrumentationScope, SpanResourceInfoDto } from "@langwatch/trace-contract";
 import { api } from "../../../../behavior/trace-api";
 import { useSharedTrace } from "../context/shared-trace-context";
-import { useDrawerStore } from "../../../../index";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
 
 export interface TraceResourcesResult {
   rootSpanId: string | null;

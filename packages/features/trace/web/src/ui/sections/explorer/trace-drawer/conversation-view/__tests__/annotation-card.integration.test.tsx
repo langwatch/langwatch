@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids";
-import { useDrawerStore } from "../../../../../../index";
+import { useDrawerStore } from "../../../../../../behavior/drawer.store";
 import { AnnotationCard } from "../annotation-card";
 
 const SCORE_NAMES = new Map([

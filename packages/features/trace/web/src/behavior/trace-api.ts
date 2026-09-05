@@ -26,7 +26,7 @@ import type {
   PresenceUpdateInput,
 } from "@langwatch/presence-contract";
 import type { SimulationRunStatus } from "@langwatch/scenario-contract";
-import type { MediaProbeResult } from "@langwatch/scenario-web";
+import type { MediaProbeResult } from "@langwatch/scenario-web/surfaces/media-part";
 import type { ShareLink, ShareResourceType, ShareVisibility } from "@langwatch/share-contract";
 import type { CodingAgentTranscript } from "@langwatch/coding-agent-contract";
 import type { CodingAgentSessionDisplay } from "@langwatch/coding-agent-web/surfaces/agent-traces";

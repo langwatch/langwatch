@@ -2,7 +2,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useDrawerStore } from "../../../../../index";
+import { useDrawerStore } from "../../../../../behavior/drawer.store";
 import { useTraceHeader } from "../use-trace-header";
 
 const headerData: { traceId?: string; timestamp?: number } = {};

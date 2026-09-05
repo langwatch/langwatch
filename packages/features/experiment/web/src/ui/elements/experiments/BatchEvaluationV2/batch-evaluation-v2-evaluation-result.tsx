@@ -7,7 +7,7 @@ import { Box, Button, HStack } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import numeral from "numeral";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { TraceIdPeek } from "@langwatch/trace-web/explorer/components/TraceIdPeek";
+import { TraceIdPeek } from "@langwatch/trace-web/surfaces/trace-id-peek";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { formatMilliseconds } from "@langwatch/trace-web/surfaces/format-milliseconds";
@@ -16,7 +16,7 @@ import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-im
 import {
   ExpandedTextDialog,
   HoverableBigText,
-} from "@langwatch/workflow-web/components/HoverableBigText";
+} from "@langwatch/workflow-web/surfaces/hoverable-big-text";
 import { getEvaluationColumns } from "../../../../model/experiments/BatchEvaluationV2/utils";
 
 type EvaluationRowData = {

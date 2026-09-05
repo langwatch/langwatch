@@ -2,7 +2,8 @@ import { useCallback } from "react";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
 import { api } from "../../../../../behavior/trace-api";
 import { useProjectHasTraces } from "../../../../../behavior/explorer/use-project-has-traces";
-import { INITIAL_TIME_RANGE, useFilterStore, useViewStore } from "../../../../../index";
+import { INITIAL_TIME_RANGE, useFilterStore } from "../../../../../behavior/filter.store";
+import { useViewStore } from "../../../../../behavior/view.store";
 import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store";
 import { useOnboardingActive } from "../../../../../behavior/explorer/onboarding/use-onboarding-active";
 

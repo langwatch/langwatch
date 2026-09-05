@@ -1,8 +1,8 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertCircle, ChevronRight, RotateCcw } from "lucide-react";
 import { useState } from "react";
-import { LangyCard } from "../../../asaplangy";
-import { useLangyDevMode } from "../../../../index";
+import { LangyCard } from "../../../../ui/sections/langy-card";
+import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode";
 import type {
   LangyErrorPresentation,
   LangySerializedReason,

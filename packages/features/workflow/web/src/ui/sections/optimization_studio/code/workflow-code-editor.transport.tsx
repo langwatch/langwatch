@@ -1,10 +1,10 @@
+import { type PythonField } from "../../../../model/code/python-provider.shared";
 import {
-  type PythonField,
   WorkflowCodeEditor,
   WorkflowCodeEditorModal,
   type WorkflowCodeEditorContractProps,
   type WorkflowCodeEditorModalHost as WorkflowCodeEditorModalHostPort,
-} from "@langwatch/workflow-web";
+} from "../../../elements/code/workflow-code-editor";
 import type { Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { useMemo } from "react";

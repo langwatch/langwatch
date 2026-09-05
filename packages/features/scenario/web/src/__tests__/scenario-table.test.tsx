@@ -4,7 +4,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { ScenarioTable, type ScenarioListItem } from "..";
+import { type ScenarioListItem } from "../model/scenario-list.types";
+import { ScenarioTable } from "../ui/elements/scenario-table";
 
 class TestResizeObserver {
   observe(): void {}

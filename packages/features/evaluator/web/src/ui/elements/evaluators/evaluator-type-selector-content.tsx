@@ -1,10 +1,11 @@
-import { EvaluatorTypePicker, type EvaluatorCategoryId } from "@langwatch/evaluator-web";
+import { type EvaluatorCategoryId } from "../../blocks/evaluator-category-picker";
+import { EvaluatorTypePicker } from "../../blocks/evaluator-type-picker";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { useRouter } from "@langwatch/ui-host/use-router";
 
-export { evaluatorCategoryNames as categoryNames } from "@langwatch/evaluator-web";
+export { evaluatorCategoryNames as categoryNames } from "../../..";
 
 export type EvaluatorTypeSelectorContentProps = {
   category?: EvaluatorCategoryId;

@@ -9,7 +9,7 @@ import {
   EVAL_FIELD_LABELS,
   type EvalColumnField,
   formatEvalColumnId,
-} from "../../../../../index";
+} from "../../../../../model/lens-eval-column-id";
 import { evalColumnLabel } from "../../trace-table/eval-columns";
 
 /** Toast hint shown after a column is added, shared with the picker's own

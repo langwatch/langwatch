@@ -54,7 +54,7 @@ vi.mock("../../../behavior/project-api", () => {
 // THAT package's transport, which the composing application mounts app-wide
 // alongside this one's. Nothing here is about departments, so the control is
 // stubbed to the "no departments configured" answer it gives most readers.
-vi.mock("@langwatch/organization-web/screens/organization", () => ({
+vi.mock("@langwatch/organization-web/surfaces/department-picker", () => ({
   useDepartmentColumn: () => ({
     show: false,
     departments: [],

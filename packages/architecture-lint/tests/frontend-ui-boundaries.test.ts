@@ -520,6 +520,65 @@ describe("frontend UI architecture boundaries", () => {
     expect(policies([promptWeb]).filter((policy) => policy === "ui-surface-closure")).toEqual([]);
   });
 
+  /** @scenario "A surface may build on another feature's declared surface" */
+  it("lets a surface import another feature's declared door and nothing else of it", () => {
+    const promptWeb = webPackage("prompt", {
+      "./surfaces/prompt-reference": "./src/surfaces/prompt-reference/index.ts",
+    });
+    const modelProviderWeb = webPackage("model-provider", {
+      ".": "./src/index.ts",
+      "./surfaces/model-selector": "./src/surfaces/model-selector.tsx",
+      "./screens/model-providers": "./src/screens/model-providers/index.ts",
+    });
+    writeCatalogue([
+      { id: "trace-explorer", surfaces: ["@langwatch/prompt-web/surfaces/prompt-reference"] },
+    ]);
+    write(
+      "apps/ui/src/features/trace-explorer/route.ts",
+      'import "@langwatch/prompt-web/surfaces/prompt-reference";',
+    );
+    write(
+      "packages/features/prompt/web/src/surfaces/prompt-reference/index.ts",
+      'export { PromptReference } from "../../ui/sections/prompt-reference";',
+    );
+    write(
+      "packages/features/prompt/web/src/ui/sections/prompt-reference.tsx",
+      [
+        'import { ModelSelector } from "@langwatch/model-provider-web/surfaces/model-selector";',
+        "export const PromptReference = ModelSelector;",
+      ].join("\n"),
+    );
+    write("packages/features/model-provider/web/src/index.ts", "export {};");
+    write("packages/features/model-provider/web/src/surfaces/model-selector.tsx", "export {};");
+    write(
+      "packages/features/model-provider/web/src/screens/model-providers/index.ts",
+      "export {};",
+    );
+
+    expect(
+      lint([promptWeb, modelProviderWeb])
+        .filter((violation) => violation.policy === "ui-surface-closure")
+        .map((violation) => violation.message),
+    ).toEqual([]);
+
+    write(
+      "packages/features/prompt/web/src/ui/sections/prompt-reference.tsx",
+      [
+        'import { ModelSelector } from "@langwatch/model-provider-web";',
+        'import { ModelProviders } from "@langwatch/model-provider-web/screens/model-providers";',
+        "export const PromptReference = [ModelSelector, ModelProviders];",
+      ].join("\n"),
+    );
+
+    expect(
+      lint([promptWeb, modelProviderWeb]).filter(
+        (violation) =>
+          violation.policy === "ui-surface-closure" &&
+          violation.message.includes("a feature-web public entry"),
+      ),
+    ).toHaveLength(2);
+  });
+
   /** @scenario "An owner-only screen remains browser-safe" */
   it("keeps owner-only screens browser-safe while allowing private presentation code", () => {
     const promptWeb = webPackage("prompt", {
@@ -611,7 +670,7 @@ describe("frontend UI architecture boundaries", () => {
     write(
       "packages/features/prompt/web/src/surfaces/prompt-reference/index.ts",
       [
-        'import "@langwatch/trace-web/surfaces/trace-reference";',
+        'import "@langwatch/prompt-web/surfaces/prompt-version";',
         'import "@langwatch/prompt-server";',
         'import "@langwatch/platform-api";',
         'import "@langwatch/prisma-client";',
@@ -1002,6 +1061,44 @@ describe("frontend UI architecture boundaries", () => {
         "ui-web-surface-leakage",
         "ui-web-public-boundary-leakage",
       ]),
+    );
+  });
+
+  /** @scenario "A door under surfaces reaches its package's own shared layers" */
+  it("lets a door under surfaces re-export its package's own model, behavior and ui", () => {
+    const agentWeb = webPackage("agent", {
+      "./surfaces/browser-port": "./src/surfaces/browser-port/index.ts",
+    });
+    writeCatalogue([
+      { id: "agent-management", surfaces: ["@langwatch/agent-web/surfaces/browser-port"] },
+    ]);
+    write(
+      "apps/ui/src/features/agent-management/route.ts",
+      'import "@langwatch/agent-web/surfaces/browser-port";',
+    );
+    write(
+      "packages/features/agent/web/src/surfaces/browser-port/index.ts",
+      [
+        'export { BrowserPortView } from "../../ui/sections/browser-port-view";',
+        'export { useBrowserPort } from "../../behavior/use-browser-port";',
+        'export type { BrowserPortValue } from "../../model/browser-port";',
+      ].join("\n"),
+    );
+    write(
+      "packages/features/agent/web/src/ui/sections/browser-port-view.tsx",
+      'import { browserPortLabel } from "../../model/browser-port"; export const BrowserPortView = browserPortLabel;',
+    );
+    write(
+      "packages/features/agent/web/src/behavior/use-browser-port.ts",
+      "export const useBrowserPort = () => undefined;",
+    );
+    write(
+      "packages/features/agent/web/src/model/browser-port.ts",
+      'export type BrowserPortValue = string; export const browserPortLabel = "port";',
+    );
+
+    expect(policies([agentWeb]).filter((policy) => policy === "ui-web-surface-leakage")).toEqual(
+      [],
     );
   });
 

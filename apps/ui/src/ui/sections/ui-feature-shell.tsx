@@ -2,6 +2,7 @@
  * What `apps/ui` mounts around every routed page.
  */
 
+import { BrowserUiStorage, setUiStorage } from "@langwatch/ui-host/storage";
 import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
 import { UiScopeHostProvider } from "@langwatch/ui-host/use-organization-team-project";
 import { QueryClient, QueryClientContext, QueryClientProvider } from "@tanstack/react-query";
@@ -24,6 +25,9 @@ import { BrowserUiRpc, UiRpcContextProvider } from "../../behavior/ui-rpc";
 import { useRouterUiNavigation, useRouterUiRoute } from "../../behavior/ui-router-navigation";
 import type { UiSessionSource } from "../../behavior/ui-session";
 import type { UiProviderShell } from "./ui-outer-providers";
+
+/** The device store the shell publishes to every feature. */
+const SHELL_UI_STORAGE = new BrowserUiStorage();
 
 export type UiFeatureShellInstall = {
   /** One entry per feature package whose hooks this application serves. */
@@ -85,6 +89,7 @@ export function createUiFeatureShell({
     // store actions, where no hook can run, so the resolved feedback port is
     // published to them here rather than read through the context.
     setUiFeedbackHost(resolved.feedback);
+    setUiStorage(SHELL_UI_STORAGE);
 
     // The one scope host every feature's shared hook reads, on every route; a
     // session with nothing resolved publishes none and the hook reads unresolved.

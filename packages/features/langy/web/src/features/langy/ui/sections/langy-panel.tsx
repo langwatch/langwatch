@@ -1,57 +1,63 @@
 import { Box, chakra, HStack, IconButton, Separator, Text, VStack } from "@chakra-ui/react";
+import { mergeContextChips } from "../../../../behavior/langy-context-chips";
 import {
-  APP_HEADER_HEIGHT,
   attachedContextToChip,
-  currentTurnAssistant,
-  deriveWaveActivity,
-  EmptyState,
-  executeUiAction,
-  FLOATING_PANEL_CSS_WIDTH,
-  FLOATING_PANEL_INSET,
-  FLOATING_PEEK_NEAR_PX,
-  hasTokens,
-  LANGY_DODGE_STAGGER_MS,
-  LANGY_TRANSITION,
-  LangyCardBoundary,
-  langyChoicesTimeline,
-  LangyContextTargetLayer,
-  LangyMark,
-  LangyMarkGradientDefs,
   type LangyPanelEffect,
   type LangyPanelMode,
-  type LangyPeekPhase,
-  langyPlan,
-  langyRestingFloorPx,
-  LangyThinkingLine,
-  type LangyUiActionHandlers,
-  LangyWave,
-  mergeContextChips,
-  navigateDedupKey,
-  PANEL_LAYOUT_TRANSITION,
-  PANEL_ROOT_ATTR,
-  PANEL_SUGGESTION_COUNT,
-  reserveNavigate,
-  resolveFloatingPanelWidth,
-  resolveLangyActivityOwnership,
-  resolveLangyStopTarget,
-  resolvePeekTranslate,
-  runningTool,
-  selectLangySuggestions,
-  settledTool,
-  shouldRehydrateEngineFromDurable,
-  SIDEBAR_PANEL_WIDTH,
-  SIDEBAR_PEEK_NEAR_PX,
-  StreamingStatusLine,
-  useGlobalLangyShortcut,
-  useLangyContextDropZone,
-  useLangyDevMode,
-  useLangyOrbProximity,
-  useLangyPeekProximity,
   useLangyStore,
-  useLangyTurnSignals,
-  useLingeringDodge,
-  useScrolledFromTop,
-} from "../../../../index";
+} from "../../../../behavior/langy.store";
+import { useGlobalLangyShortcut } from "../../../../behavior/use-global-langy-shortcut";
+import { useLangyContextDropZone } from "../../../../behavior/use-langy-context-drop-zone";
+import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode";
+import { useLangyOrbProximity } from "../../../../behavior/use-langy-orb-proximity";
+import { useLangyPeekProximity } from "../../../../behavior/use-langy-peek-proximity";
+import { useLangyTurnSignals } from "../../../../behavior/use-langy-turn-signals";
+import { useLingeringDodge } from "../../../../behavior/use-lingering-dodge";
+import { useScrolledFromTop } from "../../../../behavior/use-scrolled-from-top";
+import { PANEL_ROOT_ATTR } from "../../../../model/composer-morph-geometry";
+import { shouldRehydrateEngineFromDurable } from "../../../../model/foreign-turn-rehydration";
+import { resolveLangyActivityOwnership } from "../../../../model/langy-activity-ownership";
+import { langyChoicesTimeline } from "../../../../model/langy-choices-timeline";
+import { navigateDedupKey, reserveNavigate } from "../../../../model/langy-navigate-dedup";
+import {
+  APP_HEADER_HEIGHT,
+  FLOATING_PANEL_CSS_WIDTH,
+  FLOATING_PANEL_INSET,
+  LANGY_DODGE_STAGGER_MS,
+  LANGY_TRANSITION,
+  langyRestingFloorPx,
+  PANEL_LAYOUT_TRANSITION,
+  resolveFloatingPanelWidth,
+  SIDEBAR_PANEL_WIDTH,
+} from "../../../../model/langy-panel-layout";
+import {
+  FLOATING_PEEK_NEAR_PX,
+  type LangyPeekPhase,
+  resolvePeekTranslate,
+  SIDEBAR_PEEK_NEAR_PX,
+} from "../../../../model/langy-peek-dock";
+import { langyPlan } from "../../../../model/langy-plan";
+import { resolveLangyStopTarget } from "../../../../model/langy-stop-target";
+import {
+  currentTurnAssistant,
+  hasTokens,
+  runningTool,
+  settledTool,
+} from "../../../../model/langy-thinking-line";
+import { deriveWaveActivity } from "../../../../model/langy-wave-motion";
+import { executeUiAction } from "../../../../model/ui-actions/execute-ui-action";
+import { type LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types";
+import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary";
+import { LangyWave } from "../../../../ui/elements/langy-wave";
+import { LangyContextTargetLayer } from "../../../../ui/sections/langy-context-target-layer";
+import { EmptyState } from "../../../../ui/sections/langy-empty-state";
+import {
+  PANEL_SUGGESTION_COUNT,
+  selectLangySuggestions,
+} from "../../../../ui/sections/langy-home-suggestions";
+import { LangyMark, LangyMarkGradientDefs } from "../../../../ui/sections/langy-mark";
+import { LangyThinkingLine } from "../../../../ui/sections/langy-thinking-line";
+import { StreamingStatusLine } from "../../../../ui/sections/streaming-status-line";
 import {
   LANGY_CHOICE_SELECTION_PART_TYPE,
   type LangyChoiceSelection,
@@ -81,7 +87,7 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useProjectReach } from "../../../../behavior/home/use-project-reach";
-import { allModelOptions } from "@langwatch/model-provider-web/components/ModelSelector";
+import { allModelOptions } from "@langwatch/model-provider-web/surfaces/model-selector";
 import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
 import { IsolatedErrorBoundary } from "@langwatch/workflow-web/surfaces/isolated-error-boundary";
 import { Menu } from "@langwatch/design-system/menu";

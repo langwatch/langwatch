@@ -40,7 +40,7 @@ import { toaster } from "@langwatch/ui-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { LEGACY_EXPERIMENT_TASK_TYPES } from "@langwatch/experiment-contract";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import { isHandledByGlobalHandler } from "@langwatch/trace-web/utils/trpcError";
+import { isHandledByGlobalHandler } from "@langwatch/ui-host/errors";
 
 /** One row of the experiments list, as this table renders it. */
 type ExperimentListRow = {

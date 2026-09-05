@@ -23,10 +23,12 @@
  * on, made visible).
  */
 import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
-import { LangyGitHubProgressCard, StreamingStatusLine, useLangyStore } from "../../../../index";
+import { useLangyStore } from "../../../../behavior/langy.store";
+import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card";
+import { StreamingStatusLine } from "../../../../ui/sections/streaming-status-line";
 import type { UIMessage } from "ai";
 import { X } from "lucide-react";
-import { LangyCard } from "../../../asaplangy";
+import { LangyCard } from "../../../../ui/sections/langy-card";
 import {
   explainLangyError,
   KNOWN_LANGY_ERROR_KINDS,

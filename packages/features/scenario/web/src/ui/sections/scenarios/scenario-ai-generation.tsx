@@ -12,15 +12,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { createLogger } from "@langwatch/observability";
-import {
-  consumeStoredPrompt,
-  type GeneratedScenario,
-  generateScenarioWithAI,
-  type ScenarioFormController,
-} from "../../..";
+import { type GeneratedScenario, generateScenarioWithAI } from "../../../model/scenario-generation";
+import { consumeStoredPrompt } from "../../../model/scenario-prompt-storage";
+import { type ScenarioFormController } from "../../elements/scenario-form";
 import { AlertTriangle, ArrowLeft, Check, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { useModelProvidersSettings } from "@langwatch/model-provider-web/hooks/useModelProvidersSettings";
+import { useModelProvidersSettings } from "@langwatch/model-provider-web/surfaces/model-provider-settings";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { api } from "../../../behavior/scenario-api";
 import { ResolvedModelCaption } from "../../elements/scenarios/resolved-model-caption";

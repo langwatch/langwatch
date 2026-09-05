@@ -42,15 +42,12 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-vi.mock(
-  "@langwatch/workflow-web/optimization_studio/components/code/workflow-code-editor.transport",
-  () => ({
-    CodeEditor: () => null,
-    CodeEditorModal: () => null,
-  }),
-);
+vi.mock("@langwatch/workflow-web/surfaces/code-editor-transport", () => ({
+  CodeEditor: () => null,
+  CodeEditorModal: () => null,
+}));
 
-vi.mock("@langwatch/workflow-web/components/blocks/CodeBlockEditor", () => ({
+vi.mock("@langwatch/workflow-web/surfaces/code-block-editor", () => ({
   CodeBlockEditor: () => <div data-testid="code-editor" />,
 }));
 

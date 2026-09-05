@@ -1,9 +1,9 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import type { ReactNode } from "react";
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion";
-import "../../../../ui/elements/langy-theme.css";
-import { CARD_TAXONOMY, type LangyCardIntent, SERIF, TYPE } from "../../model/tokens";
+import { useReducedMotion } from "../../behavior/use-reduced-motion";
+import "../elements/langy-theme.css";
+import { CARD_TAXONOMY, type LangyCardIntent, SERIF, TYPE } from "../../model/asaplangy-tokens";
 import { LangyPanelSurface } from "./langy-panel-surface";
 
 const dotPulse = keyframes`
@@ -187,4 +187,4 @@ function statusDotForInline(color: string, pulse: boolean, reduce: boolean): Rea
 }
 
 /** Re-export the intent list for gallery / migration tooling. */
-export { CARD_INTENTS } from "../../model/tokens";
+export { CARD_INTENTS } from "../../model/asaplangy-tokens";

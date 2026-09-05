@@ -57,7 +57,6 @@ export function usePresence({ projectId, location, enabled = true }: UsePresence
 
   // SSE subscription: feed every delta into the local store.
   useSSESubscription<PresenceEvent, { projectId: string }>(
-    // @ts-expect-error - tRPC subscription type mismatch with hook signature
     api.presence.onPresenceUpdate,
     { projectId: projectId ?? "" },
     {

@@ -9,7 +9,7 @@ import { Link } from "@langwatch/ui-host/link";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { useComponentVersion } from "../../../../behavior/optimization_studio/use-component-version";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../../../../behavior/use-workflow-store";
 import { getInputsOutputs, parseStudioWorkflow, type Custom } from "@langwatch/workflow-contract";
 import { VersionBox } from "../history";
 import { BasePropertiesPanel } from "./base-properties-panel";

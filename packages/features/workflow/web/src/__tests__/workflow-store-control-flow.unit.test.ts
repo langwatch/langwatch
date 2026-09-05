@@ -10,8 +10,8 @@ import type { Node } from "@xyflow/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";
 
-import { GATE_FIELD, GATE_HANDLE_ID } from "@langwatch/workflow-web";
-import { store as storeCreator, type WorkflowStore } from "@langwatch/workflow-web";
+import { GATE_FIELD, GATE_HANDLE_ID } from "../model/control-flow";
+import { store as storeCreator, type WorkflowStore } from "../behavior/workflow-store";
 
 const node = (
   id: string,

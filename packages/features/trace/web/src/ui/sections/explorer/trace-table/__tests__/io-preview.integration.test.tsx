@@ -11,15 +11,11 @@ import { IOPreview } from "../io-preview";
 
 // Compact vs comfortable is gated by the density store; force compact so
 // the row path under test is the one in the screenshot.
-vi.mock("../../../../../index", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../../../index")>();
-
-  return {
-    ...actual,
-    useDensityStore: (selector: (state: { density: string }) => unknown) =>
-      selector({ density: "compact" }),
-  };
-});
+vi.mock("../../../../../behavior/density.store", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useDensityStore: (selector: (state: { density: string }) => unknown) =>
+    selector({ density: "compact" }),
+}));
 
 vi.mock("../../hooks/use-density-tokens", () => ({
   useDensityTokens: () => ({ ioFontSize: "11px" }),

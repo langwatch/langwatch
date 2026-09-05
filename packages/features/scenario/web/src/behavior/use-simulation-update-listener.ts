@@ -11,7 +11,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { api } from "./scenario-api";
 import { usePageVisibility } from "@langwatch/trace-web/surfaces/page-visibility";
-import { useSSESubscription } from "@langwatch/trace-web/hooks/useSSESubscription";
+import { useSSESubscription } from "@langwatch/trace-web/surfaces/sse-subscription";
 
 const logger = createLogger("useSimulationUpdateListener");
 
@@ -190,73 +190,68 @@ export function useSimulationUpdateListener({
   const subscription = useSSESubscription<
     { event: string; timestamp: number },
     { projectId: string; tabKey?: string; tabId?: string }
-  >(
-    // @ts-expect-error - tRPC subscription type is not compatible with the useSSESubscription hook
-    api.scenarios.onSimulationUpdate,
-    subscriptionInput,
-    {
-      enabled: Boolean(enabled && projectId),
-      onData: (data) => {
-        if (!data.event) return;
+  >(api.scenarios.onSimulationUpdate, subscriptionInput, {
+    enabled: Boolean(enabled && projectId),
+    onData: (data) => {
+      if (!data.event) return;
 
-        try {
-          const parsed = typeof data.event === "string" ? JSON.parse(data.event) : data.event;
+      try {
+        const parsed = typeof data.event === "string" ? JSON.parse(data.event) : data.event;
 
-          // Tab handoffs address a machine, not a run, so they are matched on
-          // the tab key alone and never against the run/batch filter below.
-          if (isScenarioTabNavigatePayload(parsed)) {
-            if (onTabNavigate && tabKey && parsed.tabKey === tabKey) {
-              onTabNavigate(parsed);
-            }
-            return;
+        // Tab handoffs address a machine, not a run, so they are matched on
+        // the tab key alone and never against the run/batch filter below.
+        if (isScenarioTabNavigatePayload(parsed)) {
+          if (onTabNavigate && tabKey && parsed.tabKey === tabKey) {
+            onTabNavigate(parsed);
           }
-
-          // Compact streaming events: { e: "S"|"C"|"E", r, b, m, ... }
-          if (isCompactStreamingEvent(parsed)) {
-            if (filter?.batchRunId && parsed.b !== filter.batchRunId) return;
-            if (filter?.scenarioRunId && parsed.r !== filter.scenarioRunId) return;
-
-            if (onStreamingEvent) {
-              onStreamingEvent(parsed);
-              return;
-            }
-            // No streaming handler: skip CONTENT, refetch for START/END
-            if (parsed.e === "C") return;
-            scheduleUpdate();
-            return;
-          }
-
-          // Non-streaming events: { event: "simulation_updated", ... }
-          const payload = parsed as SimulationBroadcastPayload;
-          if (!matchesFilter(payload)) return;
-
-          if (payload.event === "simulation_updated") {
-            // Selective invalidation: only the affected card refetches,
-            // not all N cards like the old blanket invalidation did.
-            if (payload.scenarioRunId) {
-              void applyRunUpdate({
-                scenarioRunId: payload.scenarioRunId,
-                status: payload.status,
-              });
-            }
-
-            scheduleUpdate();
-
-            if (
-              payload.batchRunId &&
-              onNewBatchRun &&
-              recordNewBatchRunId(payload.batchRunId, knownBatchRunIdsRef.current)
-            ) {
-              onNewBatchRun(payload.batchRunId);
-            }
-          }
-        } catch (err) {
-          logger.warn({ err }, "Failed to parse SSE event");
-          scheduleUpdate();
+          return;
         }
-      },
+
+        // Compact streaming events: { e: "S"|"C"|"E", r, b, m, ... }
+        if (isCompactStreamingEvent(parsed)) {
+          if (filter?.batchRunId && parsed.b !== filter.batchRunId) return;
+          if (filter?.scenarioRunId && parsed.r !== filter.scenarioRunId) return;
+
+          if (onStreamingEvent) {
+            onStreamingEvent(parsed);
+            return;
+          }
+          // No streaming handler: skip CONTENT, refetch for START/END
+          if (parsed.e === "C") return;
+          scheduleUpdate();
+          return;
+        }
+
+        // Non-streaming events: { event: "simulation_updated", ... }
+        const payload = parsed as SimulationBroadcastPayload;
+        if (!matchesFilter(payload)) return;
+
+        if (payload.event === "simulation_updated") {
+          // Selective invalidation: only the affected card refetches,
+          // not all N cards like the old blanket invalidation did.
+          if (payload.scenarioRunId) {
+            void applyRunUpdate({
+              scenarioRunId: payload.scenarioRunId,
+              status: payload.status,
+            });
+          }
+
+          scheduleUpdate();
+
+          if (
+            payload.batchRunId &&
+            onNewBatchRun &&
+            recordNewBatchRunId(payload.batchRunId, knownBatchRunIdsRef.current)
+          ) {
+            onNewBatchRun(payload.batchRunId);
+          }
+        }
+      } catch (err) {
+        logger.warn({ err }, "Failed to parse SSE event");
+        scheduleUpdate();
+      }
     },
-  );
+  });
 
   // Callers use the connection state to disable fallback polling while the
   // event stream is healthy — SSE is the primary freshness signal, polling

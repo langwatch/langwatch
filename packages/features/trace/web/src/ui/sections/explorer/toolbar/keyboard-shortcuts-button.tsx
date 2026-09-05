@@ -1,7 +1,7 @@
 import { IconButton } from "@chakra-ui/react";
 import { Keyboard } from "lucide-react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useUIStore } from "../../../../index";
+import { useUIStore } from "../../../../behavior/ui.store";
 
 export const KeyboardShortcutsButton = () => {
   const toggle = useUIStore((s) => s.toggleShortcutsHelp);

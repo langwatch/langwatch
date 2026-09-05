@@ -1,4 +1,4 @@
-import { ScenarioTargetSelector } from "../../..";
+import { ScenarioTargetSelector } from "../scenario-target-selector";
 import type { TargetValue } from "../../../model/scenario-target";
 import { agentHasDevTunnel } from "@langwatch/agent-web/surfaces/browser-port";
 import { useMemo } from "react";

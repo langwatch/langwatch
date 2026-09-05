@@ -13,28 +13,30 @@ import type { UIMessage } from "ai";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
 import type React from "react";
 import { memo, useMemo } from "react";
+import { useLangyStore } from "../../../../behavior/langy.store";
 import {
-  foldReasoningTitles,
   hasLangyBlockParts,
-  isSubstantiveLangyAnswer,
-  LANGY_ACTION_SHADOW,
   type LangyAnswerSegment,
   langyAnswerSegments,
   langyAnswerSegmentsFromText,
-  LangyCardBoundary,
-  LangyFailedCard,
-  LangyGitHubProgressCard,
-  LangyMeshLayer,
-  langyPlan,
-  langyRunText,
-  langyTranscriptRuns,
+} from "../../../../model/langy-answer-segments";
+import {
+  isSubstantiveLangyAnswer,
   parseLangyFeedbackDirective,
-  questionToolCardParts,
+} from "../../../../model/langy-feedback-directive";
+import { langyPlan } from "../../../../model/langy-plan";
+import { questionToolCardParts } from "../../../../model/langy-question-tool";
+import {
+  foldReasoningTitles,
   stripReasoningTitles,
-  stripToolNarration,
-  useLangyStore,
-} from "../../../../index";
-import { isInternalHref, Markdown } from "@langwatch/workflow-web/components/Markdown";
+} from "../../../../model/langy-reasoning-titles";
+import { stripToolNarration } from "../../../../model/langy-tool-narration";
+import { langyRunText, langyTranscriptRuns } from "../../../../model/langy-transcript";
+import { LangyFailedCard } from "../../../../ui/elements/derived-cards/langy-failed-card";
+import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card";
+import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary";
+import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "../../../../ui/sections/langy-mark";
+import { isInternalHref, Markdown } from "@langwatch/workflow-web/surfaces/markdown";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { githubPrsFromToolParts } from "../../../../model/shared/langy/github-pr-card";
 import { useRouter } from "@langwatch/ui-host/use-router";

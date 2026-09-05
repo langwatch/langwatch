@@ -12,7 +12,7 @@ import {
 } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { describeCellFailure } from "../../../../model/experiments-v3/cell-failure";
-import { TraceIdPeek } from "@langwatch/trace-web/explorer/components/TraceIdPeek";
+import { TraceIdPeek } from "@langwatch/trace-web/surfaces/trace-id-peek";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useEscapeKey } from "@langwatch/design-system/use-escape-key";
 import { parseLLMError } from "../../../../model/format-llm-error";

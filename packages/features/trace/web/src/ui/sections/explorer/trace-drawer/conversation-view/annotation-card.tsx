@@ -2,7 +2,7 @@ import { AnnotationCard as PackageAnnotationCard } from "@langwatch/annotation-w
 import { UserAvatar } from "../../../../elements/user-avatar";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids";
 import { useJumpToAnnotationAnchor } from "../../hooks/use-jump-to-annotation-anchor";
-import { useDrawerStore } from "../../../../../index";
+import { useDrawerStore } from "../../../../../behavior/drawer.store";
 
 interface AnnotationCardProps {
   annotation: AnnotationByTrace;

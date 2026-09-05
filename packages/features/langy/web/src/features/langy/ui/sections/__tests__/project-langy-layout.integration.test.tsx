@@ -42,7 +42,7 @@ vi.mock("../langy-panel", () => ({
 }));
 
 import ProjectLangyLayout from "../project-langy-layout";
-import { useLangyStore } from "../../../../../index";
+import { useLangyStore } from "../../../../../behavior/langy.store";
 import {
   LangyHostPort,
   LangyHostProvider,

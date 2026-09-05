@@ -2,13 +2,12 @@ import { HelpCircle, type LucideIcon } from "lucide-react";
 import {
   FACET_ICONS,
   FACET_LABELS,
-  formatBytes,
   GROUP_ICONS,
   NORMAL_CASE_FIELDS,
-  ORIGIN_DISPLAY,
-  originLabel,
   SECTION_ORDER,
-} from "../../../../index";
+} from "../../../../behavior/facet-constants";
+import { formatBytes } from "../../../../model/display-formatters";
+import { ORIGIN_DISPLAY, originLabel } from "../../../../model/origin-display";
 import type { SectionGroup } from "../../../../behavior/explorer/filter-sidebar/types";
 
 const TOKEN_K = 1_000;

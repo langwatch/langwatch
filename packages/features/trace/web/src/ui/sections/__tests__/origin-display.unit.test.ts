@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ORIGIN_DISPLAY, originColorPalette, originLabel } from "../../../index";
+import { ORIGIN_DISPLAY, originColorPalette, originLabel } from "../../../model/origin-display";
 
 describe("origin display mapping", () => {
   it.each(Object.entries(ORIGIN_DISPLAY))(

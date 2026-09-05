@@ -6,7 +6,7 @@
 import { Badge, Box, chakra, HStack, Input, Text } from "@chakra-ui/react";
 import { useId, useRef } from "react";
 import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite";
-import { SuggestionPanel } from "@langwatch/trace-web/explorer/components/SearchBar/SuggestionDropdown";
+import { SuggestionPanel } from "@langwatch/trace-web/surfaces/suggestion-dropdown";
 import {
   DIALOG_FIELD_STYLE,
   FieldError,

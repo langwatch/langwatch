@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { useDrawerStore, useFilterStore } from "../../../../index";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
+import { useFilterStore } from "../../../../behavior/filter.store";
 
 const BASE_TITLE = "LangWatch";
 const TRACE_ID_LENGTH = 8;

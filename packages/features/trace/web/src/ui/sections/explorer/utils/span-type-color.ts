@@ -1,4 +1,4 @@
-import { SPAN_TYPE_COLORS } from "../../../../index";
+import { SPAN_TYPE_COLORS } from "../../../../model/display-formatters";
 
 /**
  * The palette read as the open map a span's `type` actually indexes.

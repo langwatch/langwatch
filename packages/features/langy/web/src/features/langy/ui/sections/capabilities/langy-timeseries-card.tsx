@@ -24,7 +24,7 @@ import { useOrganizationTeamProject } from "../../../../../behavior/use-organiza
 import { api } from "../../../../../behavior/langy-api";
 import { useRouter } from "@langwatch/ui-host/use-router";
 
-import { formatMoneyShort, Money } from "../../../../../index";
+import { formatMoneyShort, Money } from "../../../../../ui/elements/langy-money";
 import type { CapabilityCardInput } from "../../../model/capabilities/capability-registry";
 import { LangyCapabilityCard } from "./langy-capability-card";
 

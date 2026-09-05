@@ -21,7 +21,7 @@ import {
   Zap,
 } from "lucide-react";
 import { memo, useMemo, useState } from "react";
-import { useModelSelectionOptions } from "@langwatch/model-provider-web/components/ModelSelector";
+import { useModelSelectionOptions } from "@langwatch/model-provider-web/surfaces/model-selector";
 import {
   modelProviderIcons,
   ProviderIconGlyph,
@@ -30,12 +30,9 @@ import { Link } from "../../../../ui/elements/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
 import { getModelById } from "@langwatch/model-provider-contract";
-import {
-  LangyComboboxSearch,
-  type LangyModelGroup,
-  profileLangyModel,
-  splitLangyModels,
-} from "../../../../index";
+import { type LangyModelGroup, profileLangyModel } from "../../../../model/langy-model-profile";
+import { splitLangyModels } from "../../../../model/langy-model-suggestions";
+import { LangyComboboxSearch } from "../../../../ui/elements/langy-combobox-search";
 
 type ProviderKey = keyof typeof modelProviderIcons;
 

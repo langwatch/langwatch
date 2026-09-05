@@ -1,12 +1,5 @@
 /**
  * The AI-tool catalogue as the personal portal reads it.
- *
- * Written out here rather than imported from
- * `@langwatch/enterprise-governance-contract`: the portal is core and the
- * catalogue's authoring side is enterprise, so a core screen may read the
- * shape but may not depend on the package that owns it. The wire shape is
- * `aiToolEntrySchema` in that contract — a field added there reaches the
- * portal only once it is added here too.
  */
 
 /** The kind of tile a catalogue entry renders as. */

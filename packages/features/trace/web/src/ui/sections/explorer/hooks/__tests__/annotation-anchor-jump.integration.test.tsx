@@ -9,7 +9,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { useSectionFocusGlow } from "../../trace-drawer/trace-accordions/use-section-focus-glow";
-import { useDrawerStore, useFocusSectionStore, useSpanPulseStore } from "../../../../../index";
+import { useDrawerStore } from "../../../../../behavior/drawer.store";
+import { useFocusSectionStore } from "../../../../../behavior/focus-section.store";
+import { useSpanPulseStore } from "../../../../../behavior/span-pulse.store";
 import { useJumpToAnnotationAnchor } from "../use-jump-to-annotation-anchor";
 
 const TRACE_ID = "trace-1";

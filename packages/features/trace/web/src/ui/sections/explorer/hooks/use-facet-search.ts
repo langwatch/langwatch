@@ -1,7 +1,7 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api } from "../../../../behavior/trace-api";
-import { useFilterStore } from "../../../../index";
+import { useFilterStore } from "../../../../behavior/filter.store";
 
 const EMPTY: { value: string; label?: string; count: number }[] = [];
 

@@ -39,17 +39,14 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   },
 }));
 
-vi.mock("@langwatch/dataset-web", async (importActual) => {
-  const actual = await importActual<typeof import("@langwatch/dataset-web")>();
-  return {
-    ...actual,
-    retryDatasetNormalize: (...args: unknown[]) => retryDatasetNormalize(...args),
-    requestDirectUpload: (...args: unknown[]) => requestDirectUpload(...args),
-    putFileToPresignedUrl: (...args: unknown[]) => putFileToPresignedUrl(...args),
-    finalizeDirectUpload: (...args: unknown[]) => finalizeDirectUpload(...args),
-    abortPendingUpload: (...args: unknown[]) => abortPendingUpload(...args),
-  };
-});
+vi.mock("../../../../behavior/direct-upload", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  retryDatasetNormalize: (...args: unknown[]) => retryDatasetNormalize(...args),
+  requestDirectUpload: (...args: unknown[]) => requestDirectUpload(...args),
+  putFileToPresignedUrl: (...args: unknown[]) => putFileToPresignedUrl(...args),
+  finalizeDirectUpload: (...args: unknown[]) => finalizeDirectUpload(...args),
+  abortPendingUpload: (...args: unknown[]) => abortPendingUpload(...args),
+}));
 
 vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({

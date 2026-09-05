@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
-import { deriveTokenTimeline, findCacheRebuilds } from "@langwatch/coding-agent-web";
+import { deriveTokenTimeline, findCacheRebuilds } from "../trace/token-timeline";
 
 function modelCall({
   atMs,

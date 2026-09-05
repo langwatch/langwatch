@@ -11,13 +11,10 @@ import type React from "react";
 import { useCallback, useMemo } from "react";
 import { traceContextChip } from "@langwatch/langy-web/surfaces/langy-context";
 import { useEvaluatorOptions } from "../hooks/use-evaluator-options";
-import type { LensConfig } from "../../../../index";
-import {
-  getColumnSizingKey,
-  useColumnSizingStore,
-  useFilterStore,
-  useViewStore,
-} from "../../../../index";
+import type { LensConfig } from "../../../../behavior/view.store";
+import { getColumnSizingKey, useColumnSizingStore } from "../../../../behavior/column-sizing.store";
+import { useFilterStore } from "../../../../behavior/filter.store";
+import { useViewStore } from "../../../../behavior/view.store";
 import type { TraceListItem } from "../types/trace";
 import { ADD_COLUMN_ID } from "./add-column-header";
 import { RegistryRow } from "./registry";

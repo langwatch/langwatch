@@ -6,7 +6,7 @@ import { HandledErrorState } from "../../ui/elements/studio-host/errors";
 import { useOrganizationTeamProject } from "../../behavior/studio-host/use-organization-team-project";
 import OptimizationStudio from "../../ui/sections/optimization_studio/optimization-studio";
 import { useLoadWorkflow } from "../../behavior/optimization_studio/use-load-workflow";
-import { _useWorkflowStore, useWorkflowStore } from "@langwatch/workflow-web";
+import { _useWorkflowStore, useWorkflowStore } from "../../behavior/use-workflow-store";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { api } from "../../model/workflow-api-client";
 import { useStudioHostBinding } from "../../ui/sections/studio-host/binding";

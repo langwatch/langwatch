@@ -9,7 +9,7 @@ import {
   type MediaPartData,
   mediaRefToMediaData,
 } from "../../../../../behavior/shared/traces/media-parts";
-import { formatDuration, formatRelativeTime } from "../../../../../index";
+import { formatDuration, formatRelativeTime } from "../../../../../model/display-formatters";
 import { extractSystemText } from "../transcript/parsing";
 import type { ParsedTurn } from "./types";
 

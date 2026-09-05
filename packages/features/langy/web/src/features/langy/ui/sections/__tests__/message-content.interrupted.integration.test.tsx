@@ -48,7 +48,7 @@ vi.mock("recharts", async (importOriginal) => {
 });
 
 import { MessageContent } from "../message-content";
-import { useLangyStore } from "../../../../../index";
+import { useLangyStore } from "../../../../../behavior/langy.store";
 
 afterEach(cleanup);
 

@@ -14,9 +14,13 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./asaplangy": {
-      "types": "./src/features/asaplangy/index.ts",
-      "default": "./src/features/asaplangy/index.ts"
+    "./surfaces/asaplangy": {
+      "types": "./src/surfaces/asaplangy/index.ts",
+      "default": "./src/surfaces/asaplangy/index.ts"
+    },
+    "./surfaces/langy-page-registration": {
+      "types": "./src/surfaces/langy-page-registration/index.ts",
+      "default": "./src/surfaces/langy-page-registration/index.ts"
     },
     "./surfaces/langy-theme.css": "./src/ui/elements/langy-theme.css",
     "./screens/langy": {
@@ -24,24 +28,24 @@
       "default": "./src/screens/langy/index.ts"
     },
     "./surfaces/langy-store": {
-      "types": "./src/ui/sections/langy-store.surface.ts",
-      "default": "./src/ui/sections/langy-store.surface.ts"
+      "types": "./src/surfaces/langy-store/index.ts",
+      "default": "./src/surfaces/langy-store/index.ts"
     },
     "./surfaces/langy-context": {
-      "types": "./src/ui/sections/langy-context.surface.ts",
-      "default": "./src/ui/sections/langy-context.surface.ts"
+      "types": "./src/surfaces/langy-context/index.ts",
+      "default": "./src/surfaces/langy-context/index.ts"
     },
     "./surfaces/langy-mark": {
-      "types": "./src/ui/sections/langy-mark.surface.ts",
-      "default": "./src/ui/sections/langy-mark.surface.ts"
+      "types": "./src/surfaces/langy-mark/index.ts",
+      "default": "./src/surfaces/langy-mark/index.ts"
     },
     "./surfaces/langy-panel-layout": {
-      "types": "./src/ui/sections/langy-panel-layout.surface.ts",
-      "default": "./src/ui/sections/langy-panel-layout.surface.ts"
+      "types": "./src/surfaces/langy-panel-layout/index.ts",
+      "default": "./src/surfaces/langy-panel-layout/index.ts"
     },
     "./surfaces/langy-ui-actions": {
-      "types": "./src/ui/sections/langy-ui-actions.surface.ts",
-      "default": "./src/ui/sections/langy-ui-actions.surface.ts"
+      "types": "./src/surfaces/langy-ui-actions/index.ts",
+      "default": "./src/surfaces/langy-ui-actions/index.ts"
     }
   },
   "scripts": {

@@ -8,7 +8,7 @@ import { useAnchoredAnnotations } from "../../hooks/use-anchored-annotations";
 import { useSpanDetail } from "../../hooks/use-span-detail";
 import { useSpanLogs } from "../../hooks/use-span-logs";
 import { useTraceResources } from "../../hooks/use-trace-resources";
-import { useDrawerStore } from "../../../../../index";
+import { useDrawerStore } from "../../../../../behavior/drawer.store";
 import { type AttributeComments, AttributeTable } from "../attribute-table";
 import { commentCountsBySection } from "../anchored-comments/section-comments";
 import { CorrectedFieldFrame } from "../edit-mode/corrected-field";

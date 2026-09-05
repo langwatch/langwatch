@@ -12,7 +12,7 @@ import type {
   FieldMapping as UIFieldMapping,
 } from "@langwatch/prompt-web/surfaces/variables";
 
-import { ComparisonConfigForm } from "@langwatch/experiment-web/experiments-v3/components/EvaluatorPanel/ComparisonConfigForm";
+import { ComparisonConfigForm } from "@langwatch/experiment-web/surfaces/comparison-config-form";
 import type {
   ComparisonEvaluatorConfig,
   LocalEvaluatorConfig,
@@ -42,11 +42,11 @@ import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-web/surfaces/platform-defaults";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 
+import { type EvaluatorCategoryId } from "../../blocks/evaluator-category-picker";
 import {
-  type EvaluatorCategoryId,
   EvaluatorEditorActions,
   EvaluatorEditorHeading as EvaluatorEditorHeadingPresentation,
-} from "@langwatch/evaluator-web";
+} from "../../elements/evaluator-editor-chrome";
 import { EvaluatorMappingsSection } from "../../elements/evaluators/evaluator-mappings-section";
 
 // Stable module-level reference (not an inline JSX literal): ComparisonConfigForm

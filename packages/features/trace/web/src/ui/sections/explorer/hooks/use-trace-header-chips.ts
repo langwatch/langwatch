@@ -1,13 +1,11 @@
 import { useDrawer } from "../../../../behavior/use-drawer";
 import type { TraceHeader } from "@langwatch/trace-contract";
 import { type ScenarioChipData, useScenarioChipData } from "../trace-drawer/scenario-chip";
-import type { SdkInfo } from "../../../../index";
-import {
-  parseSdkInfo,
-  useDrawerStore,
-  useFilterStore,
-  useFocusSectionStore,
-} from "../../../../index";
+import type { SdkInfo } from "../../../../model/sdk-info";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
+import { useFilterStore } from "../../../../behavior/filter.store";
+import { useFocusSectionStore } from "../../../../behavior/focus-section.store";
+import { parseSdkInfo } from "../../../../model/sdk-info";
 import { usePromptByHandle } from "./use-prompt-by-handle";
 import { type RichEval, useTraceEvaluations } from "./use-trace-evaluations";
 

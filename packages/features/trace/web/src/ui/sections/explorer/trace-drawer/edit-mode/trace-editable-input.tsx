@@ -1,5 +1,8 @@
 import { useCallback, useMemo } from "react";
-import { selectTraceInputBaseline, useTraceEditStore } from "../../../../../index";
+import {
+  selectTraceInputBaseline,
+  useTraceEditStore,
+} from "../../../../../behavior/trace-edit.store";
 import { EditableIOField } from "./editable-io-field";
 
 /**

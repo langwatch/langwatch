@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { useTraceSpanTree } from "../../../../hooks/use-trace-span-tree";
 import type { TraceEvalResult, TraceListItem } from "../../../../types/trace";
-import { formatDuration } from "../../../../../../../index";
+import { formatDuration } from "../../../../../../../model/display-formatters";
 import { spanTypeColor } from "../../../../utils/span-type-color";
 import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives";
 import { evalChipColor, formatEvalScore } from "../../shared-chips";

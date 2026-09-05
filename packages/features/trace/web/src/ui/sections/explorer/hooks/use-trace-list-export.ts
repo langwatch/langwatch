@@ -1,5 +1,5 @@
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { useFilterStore } from "../../../../index";
+import { useFilterStore } from "../../../../behavior/filter.store";
 import { useExportTraces } from "./use-export-traces";
 
 /**

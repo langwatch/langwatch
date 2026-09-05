@@ -17,7 +17,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ErrorActions } from "../../../behavior/errors";
 import { LangyMark, LangyMarkGradientDefs } from "@langwatch/langy-web/surfaces/langy-mark";
 import "@langwatch/langy-web/surfaces/langy-theme.css";
-import { CARD } from "@langwatch/langy-web/asaplangy";
+import { CARD } from "@langwatch/langy-web/surfaces/asaplangy";
 import { classifyGenerationError } from "../../../behavior/scenarios/classify-generation-error";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 

@@ -20,7 +20,7 @@ vi.mock("../trace-drawer", () => ({
   TraceV2DrawerShell: () => <div data-testid="trace-v2-shell" />,
 }));
 
-import { useDrawerStore } from "../../../../index";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
 import { GlobalTraceV2DrawerMount } from "../global-trace-v2-drawer-mount";
 
 describe("GlobalTraceV2DrawerMount", () => {

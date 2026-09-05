@@ -5,8 +5,8 @@ import type React from "react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { filterContextChip } from "../../langy/hooks/use-langy-filter-context";
-import type { FloatRect } from "../../../../index";
-import { useFilterStore } from "../../../../index";
+import type { FloatRect } from "../../../../behavior/use-float-rect";
+import { useFilterStore } from "../../../../behavior/filter.store";
 import { AiPromptInput } from "../ai/ai-prompt-input";
 import { AiShaderBackdrop } from "./ai-shader-backdrop";
 

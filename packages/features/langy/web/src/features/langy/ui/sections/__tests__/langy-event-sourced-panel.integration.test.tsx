@@ -290,8 +290,8 @@ vi.mock("../../../../../behavior/langy-api", async () => {
 });
 
 import { LangySidecar } from "../langy-panel";
-import { LangyProvider } from "../langy-context";
-import { useLangyStore } from "../../../../../index";
+import { LangyProvider } from "../../../../../ui/sections/langy-page-context";
+import { useLangyStore } from "../../../../../behavior/langy.store";
 import {
   LangyHostPort,
   LangyHostProvider,

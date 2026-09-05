@@ -1,6 +1,6 @@
 import { type MutableRefObject, useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { useSSESubscription } from "@langwatch/trace-web/hooks/useSSESubscription";
+import { useSSESubscription } from "@langwatch/trace-web/surfaces/sse-subscription";
 import {
   type ExperimentUpdateSignal,
   experimentUpdateSignalSchema,
@@ -257,7 +257,6 @@ const useExperimentUpdateSignal = ({
   applyServerVersion: ApplyServerVersion;
 }) => {
   useSSESubscription<{ event?: unknown; timestamp?: number }, { projectId: string }>(
-    // @ts-expect-error - tRPC subscription type isn't inferred for the hook's generic
     api.experiments.onExperimentUpdate,
     { projectId },
     {

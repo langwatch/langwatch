@@ -20,7 +20,7 @@ const { mockResolvedDefault, mockGenerateMutate } = vi.hoisted(() => ({
   mockGenerateMutate: vi.fn(),
 }));
 
-vi.mock("@langwatch/workflow-web", () => ({
+vi.mock("../../../../behavior/use-workflow-store", () => ({
   useWorkflowStore: (selector: (s: unknown) => unknown) =>
     selector({
       checkCanCommitNewVersion: () => true,
@@ -82,7 +82,7 @@ vi.mock("../history", () => ({
   }),
 }));
 
-vi.mock("@langwatch/model-provider-web/components/ModelSelector", () => ({
+vi.mock("@langwatch/model-provider-web/surfaces/model-selector", () => ({
   allModelOptions: [],
   useModelSelectionOptions: () => ({ modelOption: undefined }),
 }));

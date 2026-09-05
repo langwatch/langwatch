@@ -1,5 +1,5 @@
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
-import { timeColumnSizing } from "../../../../index";
+import { timeColumnSizing } from "../../../../behavior/time-format.store";
 import type { TraceListItem } from "../types/trace";
 import type { ConversationGroup } from "./conversation-groups";
 import type { TraceGroup } from "./registry";

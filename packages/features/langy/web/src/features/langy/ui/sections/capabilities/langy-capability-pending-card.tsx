@@ -5,15 +5,16 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { useReducedMotion } from "../../../../../behavior/use-reduced-motion";
 import { useCapabilityData } from "../../../behavior/use-capability-data";
-import { formatLangyPreviewCount, formatLangyProgressCount } from "../../../../../index";
 import {
-  type CapabilityCommand,
-  type LangyProgressSample,
-  LangyInterruptedNote,
-  langyThinkingShimmerStyles,
-  useProjectedProgress,
-} from "../../../../../index";
-import type { CapabilitySurface } from "../../../../../index";
+  formatLangyPreviewCount,
+  formatLangyProgressCount,
+} from "../../../../../model/langy-activity-ownership";
+import { type CapabilityCommand } from "../../../../../model/langy-capability-digest";
+import { langyThinkingShimmerStyles } from "../../../../../model/values/langy-shimmer";
+import { type LangyProgressSample } from "../../../../../model/values/langy-turn";
+import { LangyInterruptedNote } from "../../../../../ui/elements/langy-interrupted-note";
+import { useProjectedProgress } from "../../../../../ui/sections/streaming-status-line";
+import type { CapabilitySurface } from "../../../../../model/langy-capability-catalog";
 import { CapabilityRow, LangyCapabilityCard } from "./langy-capability-card";
 
 const rowAppear = keyframes`

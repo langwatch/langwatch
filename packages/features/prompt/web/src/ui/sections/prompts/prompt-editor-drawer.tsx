@@ -3,7 +3,7 @@ import debounce from "lodash-es/debounce";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, useFieldArray, useWatch } from "react-hook-form";
 import { LuArrowLeft, LuPencil } from "react-icons/lu";
-import { getMaxTokenLimit } from "@langwatch/prompt-web/surfaces/llm-parameters";
+import { getMaxTokenLimit } from "../../../surfaces/llm-parameters";
 import { FormOutputsSection } from "../../elements/outputs/form-outputs-section";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/ui-host/toaster";
@@ -12,8 +12,8 @@ import {
   type AvailableSource,
   type FieldMapping,
   FormVariablesSection,
-} from "@langwatch/prompt-web/surfaces/variables";
-import { useEvaluationMappings } from "@langwatch/experiment-web/experiments-v3/hooks/useEvaluationMappings";
+} from "../../../surfaces/variables";
+import { useEvaluationMappings } from "@langwatch/experiment-web/surfaces/evaluation-mappings";
 import type { LocalPromptConfig } from "@langwatch/experiment-web/surfaces/workbench-types";
 import { getFieldsUsedByPromptTemplate } from "@langwatch/experiment-web/surfaces/mapping-validation";
 import { showErrorToast } from "@langwatch/ui-host/errors";
@@ -23,12 +23,12 @@ import {
   useDrawer,
   useDrawerParams,
 } from "@langwatch/ui-host/use-drawer";
-import { useModelProvidersSettings } from "@langwatch/model-provider-web/hooks/useModelProvidersSettings";
+import { useModelProvidersSettings } from "@langwatch/model-provider-web/surfaces/model-provider-settings";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { useRegisterDrawerFooter } from "@langwatch/workflow-web/surfaces/studio-drawer-footer";
 import { PromptEditorFooter } from "./prompt-editor-footer";
 import { PromptEditorHeader } from "./prompt-editor-header";
-import { VersionBadge } from "@langwatch/prompt-web/surfaces/prompt-version";
+import { VersionBadge } from "../../../surfaces/prompt-version";
 import { ChangeHandleDialog } from "./forms/change-handle-dialog";
 import { PromptMessagesField } from "../../elements/prompts/forms/fields/message-history-fields/prompt-messages-field";
 import {
@@ -45,7 +45,7 @@ import {
   hasNonEmptySystemMessage,
   type PromptConfigFormValues,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
-} from "@langwatch/prompt-web/surfaces/prompt-form";
+} from "../../../surfaces/prompt-form";
 import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";

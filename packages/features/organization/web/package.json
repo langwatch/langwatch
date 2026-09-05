@@ -8,6 +8,10 @@
   ],
   "type": "module",
   "exports": {
+    "./surfaces/department-picker": {
+      "types": "./src/surfaces/department-picker/index.ts",
+      "default": "./src/surfaces/department-picker/index.ts"
+    },
     "./drawers": {
       "types": "./src/screens/drawers.ts",
       "default": "./src/screens/drawers.ts"

@@ -27,8 +27,11 @@ import {
 } from "@langwatch/presence-web/surfaces/presence-state";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility";
-import type { VizTab } from "../../../../index";
-import { FlameView, SequenceSkeleton, TopologySkeleton, useDrawerStore } from "../../../../index";
+import type { VizTab } from "../../../../behavior/drawer.store";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
+import { SequenceSkeleton } from "../../../blocks/sequence/sequence-skeleton";
+import { TopologySkeleton } from "../../../blocks/sequence/topology-skeleton";
+import { FlameView } from "../../flame/flame-view";
 import { spanTypeColor } from "../utils/span-type-color";
 import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu";
 import { WaterfallView } from "./waterfall-view";

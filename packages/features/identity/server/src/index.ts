@@ -315,6 +315,10 @@ export {
   IdentitySecretHealMigrationAdapter,
 } from "./adapters/system-migration.identity-secret-heal.adapter";
 export {
+  PostgresIdentityUserMigrationsAdapter,
+  type PostgresIdentityUserMigrationsOptions,
+} from "./adapters/postgres.identity-user-migrations.adapter";
+export {
   ScimSyncLedgerWriterAdapter,
   type ScimSyncLedgerWriterDeps,
   type ScimSyncStagedSender,

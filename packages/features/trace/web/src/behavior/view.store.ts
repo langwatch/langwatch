@@ -1,3 +1,4 @@
+import { readUiStorage, writeUiStorage } from "@langwatch/ui-host/storage";
 import { useMemo } from "react";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
@@ -161,7 +162,7 @@ export const ACTIVE_LENS_KEY = "langwatch:traces-v2:active-lens:v1";
 export function getPersistedActiveLensId(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return localStorage.getItem(ACTIVE_LENS_KEY);
+    return readUiStorage(ACTIVE_LENS_KEY) ?? null;
   } catch {
     return null;
   }
@@ -174,7 +175,7 @@ export function getPersistedActiveLensId(): string | null {
 function persistActiveLensId(id: string): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(ACTIVE_LENS_KEY, id);
+    writeUiStorage(ACTIVE_LENS_KEY, id);
   } catch {
     // storage may be full / disabled
   }
@@ -211,7 +212,7 @@ function isSortConfig(value: unknown): value is SortConfig {
 function loadDrafts(): Map<string, DraftLensState> {
   if (typeof window === "undefined") return new Map();
   try {
-    const raw = localStorage.getItem(DRAFTS_KEY);
+    const raw = readUiStorage(DRAFTS_KEY);
     if (!raw) return new Map();
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return new Map();
@@ -240,7 +241,7 @@ function persistDrafts(drafts: Map<string, DraftLensState>): void {
   try {
     const obj: Record<string, DraftLensState> = {};
     for (const [k, v] of drafts) obj[k] = v;
-    localStorage.setItem(DRAFTS_KEY, JSON.stringify(obj));
+    writeUiStorage(DRAFTS_KEY, JSON.stringify(obj));
   } catch {
     // storage may be full / disabled
   }
@@ -249,7 +250,7 @@ function persistDrafts(drafts: Map<string, DraftLensState>): void {
 function loadDismissedBuiltInIds(): Set<string> {
   if (typeof window === "undefined") return new Set();
   try {
-    const raw = localStorage.getItem(DISMISSED_BUILTINS_KEY);
+    const raw = readUiStorage(DISMISSED_BUILTINS_KEY);
     if (!raw) return new Set();
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return new Set();
@@ -262,7 +263,7 @@ function loadDismissedBuiltInIds(): Set<string> {
 function persistDismissedBuiltInIds(ids: Set<string>): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(DISMISSED_BUILTINS_KEY, JSON.stringify([...ids]));
+    writeUiStorage(DISMISSED_BUILTINS_KEY, JSON.stringify([...ids]));
   } catch {
     // storage may be full / disabled
   }

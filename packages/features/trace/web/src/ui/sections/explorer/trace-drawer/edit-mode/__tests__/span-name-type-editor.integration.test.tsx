@@ -12,7 +12,7 @@ import {
   buildTraceEditPatch,
   selectIsTraceEditDirty,
   useTraceEditStore,
-} from "../../../../../../index";
+} from "../../../../../../behavior/trace-edit.store";
 import { SpanNameTypeEditor } from "../span-name-type-editor";
 
 const CAPTURED_NAME = "handler";

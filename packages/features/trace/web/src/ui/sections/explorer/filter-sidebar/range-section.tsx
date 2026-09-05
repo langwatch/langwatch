@@ -3,7 +3,7 @@ import type React from "react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useFacetLensStore } from "../../../../index";
+import { useFacetLensStore } from "../../../../behavior/facet-lens.store";
 import {
   commitRange as commitRangeShared,
   RangeEndpointInput,

@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 
-import { useLangyStore } from "../../../../../index";
+import { useLangyStore } from "../../../../../behavior/langy.store";
 
 // The auto-resizing textarea (Ark's field-textarea) reaches for
 // ResizeObserver on mount, which jsdom does not implement.

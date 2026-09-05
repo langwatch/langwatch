@@ -126,8 +126,7 @@ vi.mock("../../../../../behavior/sse-status.store", () => ({
 // Track pulse calls per traceId.
 const pulseMock = vi.fn();
 
-vi.mock("../../../../../index", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../../../index")>()),
+vi.mock("../../../../../behavior/row-pulse.store", () => ({
   useRowPulseStore: (selector: (s: { pulse: typeof pulseMock }) => unknown) =>
     selector({ pulse: pulseMock }),
 }));

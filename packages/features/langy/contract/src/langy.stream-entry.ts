@@ -1,20 +1,7 @@
 /**
- * One entry on `langy.onTurnStream`, as both sides of the wire read it.
- *
- * THE TYPE IS THE WIRE, and the wire has two ends: the worker's token buffer
- * writes these, and the browser's chat transport bridges them into the chunk
- * stream `useChat` reads. It was declared in `@langwatch/langy-server`'s token
- * buffer, which is where the ENCODING belongs and not where the SHAPE does — a
- * browser package may not import a server one even for a type, so the Langy
- * dock could not name the entries it decodes.
- *
- * THE ONLY DECLARATION. The server's token-buffer port imports it from here,
- * so the two ends of the wire cannot drift.
- *
- * `delta` carries buffered tokens; `status`/`progress` are ephemeral live-only
- * ticks; `milestone` mirrors a durable milestone to the live UI (the durable
- * event is dispatched separately); `end`/`error` are terminal markers the
- * reader stops on.
+ * One entry on `langy.onTurnStream`, as both sides of the wire read it. THE TYPE IS THE WIRE,
+ * and the wire has two ends: the worker's token buffer writes these, and the browser's chat
+ * transport bridges them into the chunk stream `useChat` reads.
  */
 
 import type { CliResultDigest } from "./cards/digest";

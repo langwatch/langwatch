@@ -8,7 +8,7 @@ import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { useAlertOnComponent } from "./use-alert-on-component";
 import { usePostEvent } from "./use-post-event";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store";
 
 const logger = createLogger("langwatch:studio:componentExecution");
 

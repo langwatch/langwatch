@@ -1,5 +1,5 @@
 import type { SearchFieldGroup } from "@langwatch/trace-contract";
-import type { SuggestionState } from "../../../../index";
+import type { SuggestionState } from "../../../../model/get-suggestion-state";
 import {
   getFieldSuggestions,
   getValueSuggestions,

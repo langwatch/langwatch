@@ -1,3 +1,4 @@
+import { readUiStorage, removeUiStorage, writeUiStorage } from "@langwatch/ui-host/storage";
 import { create } from "zustand";
 import { isPreviewTraceId } from "../model/preview-trace-id";
 import { selectIsTraceEditDirty, useTraceEditStore } from "./trace-edit.store";
@@ -238,7 +239,7 @@ const LAST_VIZ_TAB_STORAGE_KEY = "langwatch:traces-v2:drawer-last-viz:v1";
 function loadLastViewMode(): DrawerViewMode | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(LAST_VIEW_MODE_STORAGE_KEY);
+    const raw = readUiStorage(LAST_VIEW_MODE_STORAGE_KEY);
     return raw && isViewMode(raw) ? raw : null;
   } catch {
     return null;
@@ -248,7 +249,7 @@ function loadLastViewMode(): DrawerViewMode | null {
 function persistLastViewMode(mode: DrawerViewMode): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(LAST_VIEW_MODE_STORAGE_KEY, mode);
+    writeUiStorage(LAST_VIEW_MODE_STORAGE_KEY, mode);
   } catch {
     // storage may be full / disabled
   }
@@ -257,7 +258,7 @@ function persistLastViewMode(mode: DrawerViewMode): void {
 function loadLastVizTab(): VizTab | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(LAST_VIZ_TAB_STORAGE_KEY);
+    const raw = readUiStorage(LAST_VIZ_TAB_STORAGE_KEY);
     return raw && isVizTab(raw) ? raw : null;
   } catch {
     return null;
@@ -267,7 +268,7 @@ function loadLastVizTab(): VizTab | null {
 function persistLastVizTab(tab: VizTab): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(LAST_VIZ_TAB_STORAGE_KEY, tab);
+    writeUiStorage(LAST_VIZ_TAB_STORAGE_KEY, tab);
   } catch {
     // storage may be full / disabled
   }
@@ -443,8 +444,8 @@ const DEFAULT_PANE_STATE: Record<PaneId, PaneState> = {
 function readPinnedFromStorage(): boolean {
   if (typeof window === "undefined") return true;
   try {
-    const raw = window.localStorage.getItem(PINNED_STORAGE_KEY);
-    if (raw === null) return true;
+    const raw = readUiStorage(PINNED_STORAGE_KEY);
+    if (raw === void 0) return true;
     return raw === "true";
   } catch {
     return true;
@@ -454,7 +455,7 @@ function readPinnedFromStorage(): boolean {
 function persistPinned(value: boolean) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(PINNED_STORAGE_KEY, String(value));
+    writeUiStorage(PINNED_STORAGE_KEY, String(value));
   } catch {
     // Best-effort persistence — quota errors / disabled storage just lose
     // the preference for this session.
@@ -464,8 +465,8 @@ function persistPinned(value: boolean) {
 function readWidthFromStorage(): number | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(WIDTH_STORAGE_KEY);
-    if (raw === null) return null;
+    const raw = readUiStorage(WIDTH_STORAGE_KEY);
+    if (raw === void 0) return null;
     const n = Number(raw);
     if (!Number.isFinite(n) || n <= 0) return null;
     // Clamp the persisted value against the *current* viewport so that a width
@@ -482,9 +483,9 @@ function persistWidth(value: number | null) {
   if (typeof window === "undefined") return;
   try {
     if (value === null) {
-      window.localStorage.removeItem(WIDTH_STORAGE_KEY);
+      removeUiStorage(WIDTH_STORAGE_KEY);
     } else {
-      window.localStorage.setItem(WIDTH_STORAGE_KEY, String(Math.round(value)));
+      writeUiStorage(WIDTH_STORAGE_KEY, String(Math.round(value)));
     }
   } catch {
     // Best-effort persistence.
@@ -494,8 +495,8 @@ function persistWidth(value: number | null) {
 function readPaneStateFromStorage(): Record<PaneId, PaneState> {
   if (typeof window === "undefined") return DEFAULT_PANE_STATE;
   try {
-    const raw = window.localStorage.getItem(PANE_STATE_STORAGE_KEY);
-    if (raw === null) return DEFAULT_PANE_STATE;
+    const raw = readUiStorage(PANE_STATE_STORAGE_KEY);
+    if (raw === void 0) return DEFAULT_PANE_STATE;
     const parsed = JSON.parse(raw) as Partial<Record<PaneId, PaneState>>;
     return {
       conversationContext: parsed.conversationContext ?? DEFAULT_PANE_STATE.conversationContext,
@@ -510,7 +511,7 @@ function readPaneStateFromStorage(): Record<PaneId, PaneState> {
 function persistPaneState(value: Record<PaneId, PaneState>) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(PANE_STATE_STORAGE_KEY, JSON.stringify(value));
+    writeUiStorage(PANE_STATE_STORAGE_KEY, JSON.stringify(value));
   } catch {
     // Best-effort persistence.
   }

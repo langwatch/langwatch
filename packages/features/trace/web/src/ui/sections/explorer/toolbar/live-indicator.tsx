@@ -6,7 +6,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ConnectionState } from "../../../../behavior/use-sse-subscription";
 import { useTraceListRefresh } from "../hooks/use-trace-list-refresh";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active";
-import { type LiveUpdatesMode, useSseStatusStore } from "../../../../index";
+import { type LiveUpdatesMode, useSseStatusStore } from "../../../../behavior/sse-status.store";
 
 const SSE_STATE_STYLE: Record<ConnectionState, { dotColor: string; pulse: boolean }> = {
   connected: { dotColor: "green.solid", pulse: true },

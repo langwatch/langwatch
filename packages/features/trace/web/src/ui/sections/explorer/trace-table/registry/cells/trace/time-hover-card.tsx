@@ -7,7 +7,7 @@ import {
   formatISOTimestamp,
   formatLocalWithZone,
   resolveViewerTimeZone,
-} from "../../../../../../../index";
+} from "../../../../../../../model/display-formatters";
 import { useVerboseRelativeTime } from "../../../../utils/use-relative-time";
 
 /**

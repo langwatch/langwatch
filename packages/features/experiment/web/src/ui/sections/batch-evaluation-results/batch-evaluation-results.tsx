@@ -21,34 +21,36 @@ import { EvaluatorResultChip } from "@langwatch/evaluator-web/surfaces/evaluator
 import { ExternalImage } from "@langwatch/design-system/external-image";
 import { Link } from "@langwatch/ui-host/link";
 import { describeCellFailure } from "../../../model/experiments-v3/cell-failure";
-import { TraceIdPeek } from "@langwatch/trace-web/explorer/components/TraceIdPeek";
+import { TraceIdPeek } from "@langwatch/trace-web/surfaces/trace-id-peek";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { TableSkeleton } from "../../elements/batch-results/table-skeleton";
+import {
+  transformBatchEvaluationData,
+  type BatchEvaluationData,
+} from "../batch-evaluation-results.types";
 import {
   BatchEvaluationResultsTable,
-  type BatchRunSummary,
-  BatchRunsSidebar,
   ColumnVisibilityButton,
-  ComparisonCharts,
   DEFAULT_HIDDEN_COLUMNS,
   FieldsButton,
   GroupRowsButton,
   RowHeightButton,
-  TableSkeleton,
-  transformBatchEvaluationData,
-  type BatchEvaluationData,
-} from "@langwatch/experiment-web";
-import { downloadCsv, getRunDisplayName } from "@langwatch/experiment-web";
-import { isRunFinished } from "@langwatch/experiment-web";
-import { useComparisonMode } from "@langwatch/experiment-web";
+} from "../batch-results/batch-evaluation-results-table";
+import { type BatchRunSummary, BatchRunsSidebar } from "../batch-results/batch-runs-sidebar";
+import { ComparisonCharts } from "../batch-results/comparison-charts";
+import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name";
+import { downloadCsv } from "../batch-evaluation-results.csv";
+import { isRunFinished } from "../../../model/batch-evaluation-results.run-state";
+import { useComparisonMode } from "../../../behavior/use-comparison-mode";
 import {
   RUN_COLORS,
   useMultiRunData,
 } from "../../../behavior/batch-evaluation-results/use-multi-run-data";
-import { useResultDisplayPreferences } from "@langwatch/experiment-web";
-import { useResultsGrouping } from "@langwatch/experiment-web";
+import { useResultDisplayPreferences } from "../../../behavior/use-result-display-preferences";
+import { useResultsGrouping } from "../use-results-grouping";
 import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard";
 
 type BatchEvaluationResultsProps = {

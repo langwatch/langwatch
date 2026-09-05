@@ -19,13 +19,10 @@ import { useFirstTraceSpotlightTrigger } from "../onboarding/hooks/use-first-tra
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active";
 import { SpotlightOverlay } from "../onboarding/spotlights/spotlight-overlay";
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store";
-import {
-  SELECT_ALL_MATCHING_CAP,
-  useDrawerStore,
-  useFilterStore,
-  useSelectionStore,
-  useUIStore,
-} from "../../../../index";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
+import { useFilterStore } from "../../../../behavior/filter.store";
+import { SELECT_ALL_MATCHING_CAP, useSelectionStore } from "../../../../behavior/selection.store";
+import { useUIStore } from "../../../../behavior/ui.store";
 import { DensityProvider } from "../density-provider";
 import { ExportConfigDialog } from "../export-config-dialog";
 import { ExportProgress } from "../../../elements/explorer/export-progress";

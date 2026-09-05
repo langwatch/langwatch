@@ -1,5 +1,9 @@
 import { Text } from "@chakra-ui/react";
-import { formatCost, formatDuration, formatTokens } from "../../../../../../index";
+import {
+  formatCost,
+  formatDuration,
+  formatTokens,
+} from "../../../../../../model/display-formatters";
 import { MonoCell } from "../../../../../elements/explorer/trace-table/mono-cell";
 import type { CellDef } from "../types";
 

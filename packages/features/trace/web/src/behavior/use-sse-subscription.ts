@@ -1,10 +1,12 @@
 import { createLogger } from "@langwatch/observability";
-import type { TRPCClientError } from "@trpc/client";
 import { useEffect, useRef, useState } from "react";
+
 /**
- * The router type a tRPC client error is typed by.
+ * As much of a failed subscription as this hook reads. Structural on purpose:
+ * the subscription itself is handed in by the calling feature, so the hook
+ * never names the transport that produced the error.
  */
-type AppRouter = any;
+export type SubscriptionError = { message: string };
 
 const logger = createLogger("langwatch:use-sse-subscription");
 
@@ -27,14 +29,14 @@ export function useSSESubscription<TData = unknown, TInput = Record<string, unkn
       opts: {
         enabled?: boolean;
         onData?: (data: TData) => void;
-        onError?: (error: TRPCClientError<AppRouter>) => void;
+        onError?: (error: SubscriptionError) => void;
         onStarted?: () => void;
         onStopped?: () => void;
       },
     ) => void;
   },
   input: TInput,
-  options: SSESubscriptionOptions<TData, TRPCClientError<AppRouter>> = {},
+  options: SSESubscriptionOptions<TData, SubscriptionError> = {},
 ) {
   const {
     enabled = true,
@@ -51,7 +53,7 @@ export function useSSESubscription<TData = unknown, TInput = Record<string, unkn
   );
 
   const lastDataRef = useRef<TData | undefined>(void 0);
-  const lastErrorRef = useRef<TRPCClientError<AppRouter> | undefined>(void 0);
+  const lastErrorRef = useRef<SubscriptionError | undefined>(void 0);
   const hasConnectedRef = useRef(false);
 
   logger.debug({ enabled, input }, "SSE subscription hook initialized");
@@ -83,7 +85,7 @@ export function useSSESubscription<TData = unknown, TInput = Record<string, unkn
       onData?.(data);
     },
 
-    onError: (error: TRPCClientError<AppRouter>) => {
+    onError: (error: SubscriptionError) => {
       hasConnectedRef.current = false;
       lastErrorRef.current = error;
       setConnectionState("error");

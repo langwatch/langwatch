@@ -5,7 +5,7 @@ import {
 } from "@langwatch/presence-web/surfaces/presence-indicators";
 import { type ReactNode, useRef } from "react";
 import { LuChevronDown, LuMessageSquare } from "react-icons/lu";
-import { getDrawerDensityTokens, useDensityStore } from "../../../../../index";
+import { getDrawerDensityTokens, useDensityStore } from "../../../../../behavior/density.store";
 import { useSectionPresenceStore } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence";
 
 export function AccordionShell({

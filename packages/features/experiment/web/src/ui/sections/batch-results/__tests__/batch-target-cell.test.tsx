@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BatchTargetCell } from "../batch-target-cell";
-import type { BatchEvaluatorResult, BatchTargetOutput } from "@langwatch/experiment-web";
+import type { BatchEvaluatorResult, BatchTargetOutput } from "../../batch-evaluation-results.types";
 
 // Wrapper with Chakra provider
 const Wrapper = ({ children }: { children: ReactNode }) => (

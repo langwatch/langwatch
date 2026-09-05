@@ -43,7 +43,7 @@ vi.mock("@langwatch/langy-web/surfaces/langy-store", async (importOriginal) => {
   return { ...actual, useLangyStore };
 });
 
-import { useFilterStore } from "../../../../../index";
+import { useFilterStore } from "../../../../../behavior/filter.store";
 import { SearchBar } from "../search-bar";
 
 function renderSearchBar() {

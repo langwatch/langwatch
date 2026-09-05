@@ -8,7 +8,7 @@ import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { LangyToolActivity } from "../langy-tool-activity";
-import { useLangyStore } from "../../../../../index";
+import { useLangyStore } from "../../../../../behavior/langy.store";
 
 function turnFromParts(parts: unknown[]): UIMessage {
   return {

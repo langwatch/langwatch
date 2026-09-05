@@ -1,5 +1,8 @@
 import { useCallback, useMemo } from "react";
-import { selectSpanParamsBaseline, useTraceEditStore } from "../../../../../index";
+import {
+  selectSpanParamsBaseline,
+  useTraceEditStore,
+} from "../../../../../behavior/trace-edit.store";
 import type { AttributeEditing } from "../attribute-table";
 
 /**

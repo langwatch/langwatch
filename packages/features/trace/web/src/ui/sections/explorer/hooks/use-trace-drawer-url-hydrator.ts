@@ -1,11 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useDrawer, useDrawerParams } from "../../../../behavior/use-drawer";
-import {
-  parseEditParam,
-  selectIsTraceEditDirty,
-  useDrawerStore,
-  useTraceEditStore,
-} from "../../../../index";
+import { parseEditParam, useDrawerStore } from "../../../../behavior/drawer.store";
+import { selectIsTraceEditDirty, useTraceEditStore } from "../../../../behavior/trace-edit.store";
 import { enterTraceEditMode, exitTraceEditMode } from "../utils/trace-edit-mode";
 
 /**

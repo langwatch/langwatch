@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api } from "../../../../behavior/trace-api";
-import { isPreviewTraceId } from "../../../../index";
+import { isPreviewTraceId } from "../../../../model/preview-trace-id";
 import { spanTreeQueryFn, spanTreeQueryKey } from "./span-tree-paged-query";
 
 /**

@@ -2,7 +2,7 @@ import type { Edge, Node } from "@xyflow/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";
 import { fieldSchema } from "@langwatch/workflow-contract";
-import { store as storeCreator, type WorkflowStore } from "@langwatch/workflow-web";
+import { store as storeCreator, type WorkflowStore } from "../behavior/workflow-store";
 
 function makeCodeNode({
   id,

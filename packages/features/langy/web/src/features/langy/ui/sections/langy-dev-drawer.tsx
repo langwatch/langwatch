@@ -9,12 +9,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { IsolatedErrorBoundary } from "@langwatch/workflow-web/surfaces/isolated-error-boundary";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "../../../../behavior/use-reduced-motion";
+import { useLangyStore } from "../../../../behavior/langy.store";
 import {
   INSPECTOR_TUCK,
   INSPECTOR_WIDTH,
   resolveInspectorFrame,
-  useLangyStore,
-} from "../../../../index";
+} from "../../../../model/langy-panel-layout";
 import {
   DEV_LOG_CAPACITY,
   type DevToolCall,

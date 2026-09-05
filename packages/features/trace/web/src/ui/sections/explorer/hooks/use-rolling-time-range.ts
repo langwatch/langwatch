@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { usePageVisibility } from "../../../../behavior/use-page-visibility";
-import { getPresetById, useDrawerStore, useFilterStore } from "../../../../index";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
+import { useFilterStore } from "../../../../behavior/filter.store";
+import { getPresetById } from "../../../../behavior/time-range-presets";
 
 // Each tick rolls the live time range forward, which invalidates every
 // query that includes timeRange in its input (discover, list, newCount,

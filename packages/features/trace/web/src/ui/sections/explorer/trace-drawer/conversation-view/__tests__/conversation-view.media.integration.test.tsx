@@ -41,8 +41,7 @@ vi.mock("../../../hooks/use-text-translation", () => ({
   }),
 }));
 
-vi.mock("../../../../../../index", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../../../../index")>()),
+vi.mock("../../../../../blocks/markdown/rendered-markdown", () => ({
   RenderedMarkdown: () => null,
 }));
 

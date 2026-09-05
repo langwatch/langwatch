@@ -12,6 +12,14 @@
       "types": "./src/screens/agent-management/index.ts",
       "default": "./src/screens/agent-management/index.ts"
     },
+    "./surfaces/connected-agents": {
+      "types": "./src/surfaces/connected-agents/index.ts",
+      "default": "./src/surfaces/connected-agents/index.ts"
+    },
+    "./surfaces/agent-http-editor": {
+      "types": "./src/surfaces/agent-http-editor/index.ts",
+      "default": "./src/surfaces/agent-http-editor/index.ts"
+    },
     "./surfaces/browser-port": {
       "types": "./src/surfaces/browser-port/index.ts",
       "default": "./src/surfaces/browser-port/index.ts"

@@ -23,7 +23,7 @@ export {
   type TestMessage,
   TestMessagesBuilder,
   type TestMessagesBuilderProps,
-} from "@langwatch/agent-web/screens/agent-management";
+} from "@langwatch/agent-web/surfaces/agent-http-editor";
 
 export function useHttpTest({
   url,

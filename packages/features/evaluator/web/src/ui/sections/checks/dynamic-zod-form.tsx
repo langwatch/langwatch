@@ -14,7 +14,7 @@ import { Info, Plus, Trash2, X } from "react-feather";
 import { Controller, type FieldErrors, useFieldArray, useFormContext } from "react-hook-form";
 import { type ZodType, z } from "zod";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { AddModelProviderKey } from "@langwatch/workflow-web/optimization_studio/components/AddModelProviderKey";
+import { AddModelProviderKey } from "@langwatch/workflow-web/surfaces/add-model-provider-key";
 import type { EvaluatorDefinition, EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
@@ -24,7 +24,7 @@ import {
   allModelOptions,
   ModelSelector,
   useModelSelectionOptions,
-} from "@langwatch/model-provider-web/components/ModelSelector";
+} from "@langwatch/model-provider-web/surfaces/model-selector";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { PropertySectionTitle } from "@langwatch/design-system/property-section-title";
 import { Switch } from "@langwatch/design-system/switch";

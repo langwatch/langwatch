@@ -10,7 +10,9 @@ import { useTraceExplorerTourPreference } from "../onboarding/hooks/use-trace-ex
 import { writeSpotlightFragment } from "../onboarding/spotlights/spotlight-overlay";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../model/explorer/onboarding/spotlights/spotlights";
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store";
-import { useDrawerStore, useFilterStore, useViewStore } from "../../../../index";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
+import { useFilterStore } from "../../../../behavior/filter.store";
+import { useViewStore } from "../../../../behavior/view.store";
 import { AutomateButton } from "./automate-button";
 import { ColumnsDropdown } from "./columns-dropdown";
 import { DensityToggle } from "./density-toggle";

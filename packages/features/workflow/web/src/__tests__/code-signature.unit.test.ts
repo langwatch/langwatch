@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { rewriteCodeSignature } from "@langwatch/workflow-web";
+import { rewriteCodeSignature } from "../model/code-signature";
 
 describe("rewriteCodeSignature", () => {
   describe("given inputs to sync", () => {

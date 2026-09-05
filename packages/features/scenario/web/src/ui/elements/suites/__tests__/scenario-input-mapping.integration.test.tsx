@@ -17,12 +17,9 @@ import {
 
 // -- Mock transitive deps that pull in complex modules --
 
-vi.mock(
-  "@langwatch/workflow-web/optimization_studio/components/code/workflow-code-editor.transport",
-  () => ({
-    CodeEditor: () => null,
-  }),
-);
+vi.mock("@langwatch/workflow-web/surfaces/code-editor-transport", () => ({
+  CodeEditor: () => null,
+}));
 
 // -- Helpers --
 

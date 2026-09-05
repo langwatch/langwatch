@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import type { BatchComparisonColumn, BatchResultRow } from "@langwatch/experiment-web";
-import { leaderboardFor } from "@langwatch/experiment-web";
-import { variantMetricsFor } from "@langwatch/experiment-web";
+import type {
+  BatchComparisonColumn,
+  BatchResultRow,
+} from "../ui/sections/batch-evaluation-results.types";
+import { leaderboardFor } from "../ui/sections/use-bt-leaderboard";
+import { variantMetricsFor } from "../ui/sections/use-variant-metrics";
 
 /**
  * The caches exist so the fit runs once per answer rather than once per render.

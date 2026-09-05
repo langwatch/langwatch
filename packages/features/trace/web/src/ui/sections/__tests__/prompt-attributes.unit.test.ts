@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractPromptReference } from "../../../index";
+import { extractPromptReference } from "../../../model/prompt-attributes";
 
 // Wire-format contract pinned by specs/nlp-go/prompt-spans-*.feature.
 // Each test exercises a single attribute permutation that nlpgo (or

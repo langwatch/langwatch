@@ -35,10 +35,10 @@ import { workflowApi } from "../../../model/workflow-api";
 import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data";
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys";
 import { useOptimizationExecution } from "./use-optimization-execution";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store";
 import type { Entry } from "@langwatch/workflow-contract";
-import { OPTIMIZERS } from "@langwatch/workflow-web";
-import { trainTestSplit } from "@langwatch/workflow-web";
+import { OPTIMIZERS } from "../../../model/optimizers";
+import { trainTestSplit } from "../../../model/studio-dataset.utils";
 import { checkIsEvaluator } from "@langwatch/workflow-contract";
 
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key";

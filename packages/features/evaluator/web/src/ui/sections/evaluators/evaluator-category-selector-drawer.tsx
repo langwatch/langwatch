@@ -1,5 +1,8 @@
 import { Button, Heading, HStack } from "@chakra-ui/react";
-import { EvaluatorCategoryPicker, type EvaluatorCategoryId } from "@langwatch/evaluator-web";
+import {
+  EvaluatorCategoryPicker,
+  type EvaluatorCategoryId,
+} from "../../blocks/evaluator-category-picker";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
@@ -17,7 +20,7 @@ import {
   EvaluatorTypeSelectorContent,
 } from "../../elements/evaluators/evaluator-type-selector-content";
 
-export type { EvaluatorCategoryId } from "@langwatch/evaluator-web";
+export type { EvaluatorCategoryId } from "../../..";
 
 export type EvaluatorCategorySelectorDrawerProps = {
   open?: boolean;

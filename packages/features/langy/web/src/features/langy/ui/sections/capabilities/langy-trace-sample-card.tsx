@@ -6,17 +6,15 @@ import { Button, Text } from "@chakra-ui/react";
 import { asJsonDocument, type CliResultDigest } from "@langwatch/langy-contract";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
+import { traceContextChip } from "../../../../../behavior/langy-context-chips";
+import { collectionOf, textValue, totalOf } from "../../../../../model/langy-cli-result-document";
 import {
   buildTraceExplorerHref,
-  collectionOf,
-  LangyContextTarget,
-  LangyObservationState,
   readTraceSearchQuery,
-  textValue,
-  totalOf,
-  traceContextChip,
   type TraceSearchQuery,
-} from "../../../../../index";
+} from "../../../../../model/langy-trace-explorer-link";
+import { LangyContextTarget } from "../../../../../ui/sections/langy-context-target";
+import { LangyObservationState } from "../../../../../ui/sections/langy-observation-state";
 import { type CapabilityData, useCapabilityData } from "../../../behavior/use-capability-data";
 import { LangySpaAnchor } from "../langy-spa-anchor";
 import type { CapabilityCardInput } from "../../../model/capabilities/capability-registry";

@@ -3,7 +3,11 @@
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { MIN_QUERY_LENGTH, useTraceSearchIndex, type TraceSearchItem } from "../../../index";
+import {
+  MIN_QUERY_LENGTH,
+  useTraceSearchIndex,
+  type TraceSearchItem,
+} from "../../../behavior/find-search-index";
 
 const traces: TraceSearchItem[] = [
   {

@@ -6,7 +6,7 @@
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { LuListTree } from "react-icons/lu";
 import { TRACE_QUERY_CONFIG } from "../copilot-kit/trace-message";
-import { TracePreviewHoverCard } from "@langwatch/trace-web/explorer/components/TraceIdPeek";
+import { TracePreviewHoverCard } from "@langwatch/trace-web/surfaces/trace-id-peek";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { useTraceDetailsDrawer } from "../../../behavior/use-trace-details-drawer";
 import { api } from "../../../behavior/scenario-api";

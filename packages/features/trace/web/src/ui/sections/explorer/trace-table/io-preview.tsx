@@ -6,7 +6,8 @@ import type { TraceMediaRef } from "@langwatch/trace-contract";
 import type { MediaPartData } from "../../../../behavior/shared/traces/media-parts";
 import { collectMediaParts } from "../../../../behavior/shared/traces/media-parts";
 import { useDensityTokens } from "../hooks/use-density-tokens";
-import { formatPreview, useDensityStore } from "../../../../index";
+import { useDensityStore } from "../../../../behavior/density.store";
+import { formatPreview } from "../../../../behavior/preview-formatter";
 import { tryParseChat } from "../../../../model/explorer/trace-table/chat-content";
 
 const COMFORTABLE_LABEL_WIDTH = "60px";

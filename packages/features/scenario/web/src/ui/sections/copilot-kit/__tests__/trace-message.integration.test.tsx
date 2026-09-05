@@ -24,7 +24,7 @@ vi.mock("../../../../behavior/scenario-api", () => ({
 
 // Only rendered on the success path (not reached here); mocked so the
 // traces-v2 module graph does not have to load for this test.
-vi.mock("@langwatch/trace-web/explorer/components/TraceIdPeek", () => ({
+vi.mock("@langwatch/trace-web/surfaces/trace-id-peek", () => ({
   TracePreviewHoverCard: ({ children }: { children: ReactNode }) => children,
 }));
 

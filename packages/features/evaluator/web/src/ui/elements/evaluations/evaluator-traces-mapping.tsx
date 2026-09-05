@@ -1,6 +1,6 @@
-import { useFilterParams } from "@langwatch/analytics-web/hooks/useFilterParams";
+import { useFilterParams } from "@langwatch/analytics-web/surfaces/filter-params";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import { TracesMapping } from "@langwatch/trace-web/components/traces/TracesMapping";
+import { TracesMapping } from "@langwatch/trace-web/surfaces/traces-mapping";
 
 /**
  * The mapping an evaluator is set up with. Evaluations run against the trace as

@@ -12,15 +12,11 @@ import { ROW_STYLES } from "../../../../status-row";
 import { IOPreviewAddon } from "../io-preview-addon";
 
 // Force the compact path — that's the density the IO preview row renders in.
-vi.mock("../../../../../../../../index", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../../../../../../index")>();
-
-  return {
-    ...actual,
-    useDensityStore: (selector: (state: { density: string }) => unknown) =>
-      selector({ density: "compact" }),
-  };
-});
+vi.mock("../../../../../../../../behavior/density.store", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useDensityStore: (selector: (state: { density: string }) => unknown) =>
+    selector({ density: "compact" }),
+}));
 
 vi.mock("../../../../../hooks/use-density-tokens", () => ({
   useDensityTokens: () => ({ ioFontSize: "11px" }),

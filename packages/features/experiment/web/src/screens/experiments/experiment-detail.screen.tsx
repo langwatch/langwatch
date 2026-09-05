@@ -8,7 +8,7 @@ import BatchEvaluation from "../../ui/elements/experiments/batch-evaluation";
 import { DSPyExperiment } from "../../ui/elements/experiments/ds-py-experiment";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/surfaces/studio-scope";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import { isNotFound } from "@langwatch/trace-web/utils/trpcError";
+import { isNotFoundError as isNotFound } from "@langwatch/ui-host/errors";
 
 export default function ExperimentPage() {
   const router = useRouter();

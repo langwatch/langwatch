@@ -8,7 +8,7 @@ import {
   DRAWER_MAXIMIZE_EDGE_PX,
   DRAWER_MIN_WIDTH_PX,
   useDrawerStore,
-} from "../../../../../../index";
+} from "../../../../../../behavior/drawer.store";
 import { ResizeRail } from "../resize-rail";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (

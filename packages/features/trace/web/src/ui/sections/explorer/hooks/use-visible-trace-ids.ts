@@ -1,6 +1,7 @@
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api } from "../../../../behavior/trace-api";
-import { useFilterStore, useViewStore } from "../../../../index";
+import { useFilterStore } from "../../../../behavior/filter.store";
+import { useViewStore } from "../../../../behavior/view.store";
 
 export interface VisibleTraceIds {
   /** Set of traceIds currently rendered in the list. */

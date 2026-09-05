@@ -3,7 +3,8 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import type { Evaluation } from "@langwatch/trace-contract";
 import { api } from "../../../../behavior/trace-api";
 import { useSharedTrace } from "../context/shared-trace-context";
-import { isPreviewTraceId, useDrawerStore } from "../../../../index";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
+import { isPreviewTraceId } from "../../../../model/preview-trace-id";
 import type { EvalSummary } from "../types/trace";
 
 export type RichEval = EvalSummary & {

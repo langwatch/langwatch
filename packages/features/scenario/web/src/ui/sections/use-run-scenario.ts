@@ -6,7 +6,7 @@ import type { TargetValue } from "../../model/scenario-target";
 import { toaster } from "@langwatch/design-system/toaster";
 import { api } from "../../behavior/scenario-api";
 import { type PollResult, pollForScenarioRun } from "../../model/poll-for-scenario-run";
-import { useModelProvidersSettings } from "@langwatch/model-provider-web/hooks/useModelProvidersSettings";
+import { useModelProvidersSettings } from "@langwatch/model-provider-web/surfaces/model-provider-settings";
 
 interface RunCompleteResult {
   scenarioRunId: string;

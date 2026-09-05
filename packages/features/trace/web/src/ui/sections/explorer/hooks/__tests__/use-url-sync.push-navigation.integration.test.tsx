@@ -7,12 +7,8 @@ import { act, render } from "@testing-library/react";
 import { BrowserRouter, useNavigate } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import {
-  ACTIVE_LENS_KEY,
-  INITIAL_TIME_RANGE,
-  useFilterStore,
-  useViewStore,
-} from "../../../../../index";
+import { INITIAL_TIME_RANGE, useFilterStore } from "../../../../../behavior/filter.store";
+import { ACTIVE_LENS_KEY, useViewStore } from "../../../../../behavior/view.store";
 import { useURLSync } from "../use-url-sync";
 
 let pushHash: ((hash: string) => void) | null = null;

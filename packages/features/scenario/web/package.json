@@ -10,6 +10,10 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
+    "./surfaces/media-part": {
+      "types": "./src/ui/sections/media-part.tsx",
+      "default": "./src/ui/sections/media-part.tsx"
+    },
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"

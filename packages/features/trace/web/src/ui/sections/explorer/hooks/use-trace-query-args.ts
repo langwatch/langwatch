@@ -1,5 +1,7 @@
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { isPreviewTraceId, LIVE_WINDOW_MS, useDrawerStore } from "../../../../index";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
+import { isPreviewTraceId } from "../../../../model/preview-trace-id";
+import { LIVE_WINDOW_MS } from "../../../../model/trace-freshness";
 import { useTraceViewer } from "../../../elements/explorer/context/trace-viewer-context";
 import { useDrawerProjectId } from "./use-drawer-project-id";
 

@@ -3,7 +3,10 @@ import {
   traceAttributeKeyForMetadata,
   traceMetadataKeyForAttribute,
 } from "@langwatch/trace-contract";
-import { selectTraceMetadataBaseline, useTraceEditStore } from "../../../../../index";
+import {
+  selectTraceMetadataBaseline,
+  useTraceEditStore,
+} from "../../../../../behavior/trace-edit.store";
 import type { AttributeEditing } from "../attribute-table";
 
 /**

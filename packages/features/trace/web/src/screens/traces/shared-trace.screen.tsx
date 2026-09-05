@@ -9,7 +9,7 @@ import {
   useSharedTrace,
 } from "../../ui/sections/explorer/context/shared-trace-context";
 import { TraceViewerProvider } from "../../ui/elements/explorer/context/trace-viewer-context";
-import { useDrawerStore } from "../../index";
+import { useDrawerStore } from "../../behavior/drawer.store";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { api } from "../../behavior/trace-api";
 

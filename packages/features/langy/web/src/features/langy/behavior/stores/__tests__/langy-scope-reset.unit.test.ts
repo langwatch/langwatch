@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
-import { useLangyContextTargetStore, useLangyStore } from "../../../../../index";
+import { useLangyContextTargetStore } from "../../../../../behavior/langy-context-target.store";
+import { useLangyStore } from "../../../../../behavior/langy.store";
 import { useLangyDevLog } from "../langy-dev-log";
 
 /**

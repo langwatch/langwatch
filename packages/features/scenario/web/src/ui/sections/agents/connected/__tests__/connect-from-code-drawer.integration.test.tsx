@@ -22,7 +22,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
 
 // The agent-setup menu reaches the API and the Langy store; the drawer
 // only mounts it, so the boundary is mocked here.
-vi.mock("@langwatch/trace-web/components/SetupWithAgentButton", () => ({
+vi.mock("@langwatch/trace-web/surfaces/setup-with-agent-button", () => ({
   SetupWithAgentButton: ({ surface }: { surface: string }) => (
     <button data-testid="setup-with-agent" data-surface={surface}>
       Setup via Agent

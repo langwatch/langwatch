@@ -13,7 +13,7 @@ vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));
 
-vi.mock("@langwatch/trace-web/components/SetupWithAgentButton", () => ({
+vi.mock("@langwatch/trace-web/surfaces/setup-with-agent-button", () => ({
   SetupWithAgentButton: () => null,
 }));
 

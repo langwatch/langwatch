@@ -6,7 +6,7 @@ import { useDrawer } from "../../../../behavior/use-drawer";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { usePromptByHandle } from "../hooks/use-prompt-by-handle";
-import { extractPromptReference, hasPromptMetadata } from "../../../../index";
+import { extractPromptReference, hasPromptMetadata } from "../../../../model/prompt-attributes";
 
 export { hasPromptMetadata };
 

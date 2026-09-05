@@ -18,7 +18,8 @@ import { showErrorToast } from "../../../errors";
 import { useAnnotationInvalidation } from "../../../use-annotation-invalidation";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
 import { api } from "../../../../../behavior/trace-api";
-import { useAnnotationQueueSessionStore, useAnnotationSessionStore } from "../../../../../index";
+import { useAnnotationQueueSessionStore } from "../../../../../behavior/annotation-queue-session.store";
+import { useAnnotationSessionStore } from "../../../../../behavior/annotation-session.store";
 
 /** The toast-and-invalidate pair every annotation write ends on. */
 function saveCallbacks({

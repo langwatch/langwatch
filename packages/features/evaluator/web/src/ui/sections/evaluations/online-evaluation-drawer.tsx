@@ -28,7 +28,7 @@ import {
 } from "../../../model/preconditions/precondition-field-utils";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
-import { createEvaluatorEditorCallbacks } from "@langwatch/experiment-web/experiments-v3/utils/evaluatorEditorCallbacks";
+import { createEvaluatorEditorCallbacks } from "@langwatch/experiment-web/surfaces/evaluator-editor-callbacks";
 import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-web/surfaces/mapping-validation";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import {

@@ -14,7 +14,7 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./surfaces/test-doubles": {
+    "./testing": {
       "types": "./src/__tests__/test-helpers.ts",
       "default": "./src/__tests__/test-helpers.ts"
     },

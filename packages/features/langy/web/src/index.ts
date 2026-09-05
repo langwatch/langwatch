@@ -94,5 +94,5 @@ export { LangyClient, type LangyTransport } from "./model/langy-client";
 export {
   useRegisterLangyActions,
   useRegisterLangyHandlers,
-} from "./features/langy/ui/sections/langy-context";
-export type { ProposalHandlers } from "./features/langy/ui/sections/message-content";
+} from "./ui/sections/langy-page-context";
+export type { AppliedOutcome, ProposalHandlers } from "./model/langy-proposal-handlers";

@@ -15,8 +15,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { BatchEvaluationResultsTable } from "../batch-evaluation-results-table";
 import { ComparisonWinnerCell } from "../comparison-winner-cell";
-import type { BatchComparisonColumn, BatchComparisonVerdict } from "@langwatch/experiment-web";
-import { transformBatchEvaluationData } from "@langwatch/experiment-web";
+import type {
+  BatchComparisonColumn,
+  BatchComparisonVerdict,
+} from "../../batch-evaluation-results.types";
+import { transformBatchEvaluationData } from "../../batch-evaluation-results.types";
 import { WinRateChart } from "../win-rate-chart";
 
 // recharts renders its bars through internal layout, so under jsdom there is

@@ -1,7 +1,10 @@
 import { Circle, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
 import { getEvalChipDisplay } from "../../../../../../../model/evaluation-results";
-import { EVAL_FIELD_LABELS, type EvalColumnField } from "../../../../../../../index";
+import {
+  EVAL_FIELD_LABELS,
+  type EvalColumnField,
+} from "../../../../../../../model/lens-eval-column-id";
 import type { TraceListItem } from "../../../../types/trace";
 import { latestEvalForKey } from "../../../eval-columns";
 import type { CellDef } from "../../types";

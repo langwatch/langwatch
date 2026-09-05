@@ -37,26 +37,27 @@ import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
 import { assertCrispChatHidden } from "../../../behavior/crisp-bubble-policy";
 import { titleCase } from "@langwatch/design-system/string-casing";
+import { useAskBeforeLeaving } from "../../../behavior/use-ask-before-leaving";
+import { WorkflowAutosave } from "../workflow-autosave";
+import { WorkflowDragPreview } from "../workflow-drag-preview";
+import { WorkflowEdge } from "../workflow-edge";
+import { type WorkflowEmojiPickerRenderProps, WorkflowNamePopover } from "../workflow-name-popover";
 import {
-  useAskBeforeLeaving,
-  type WorkflowEmojiPickerRenderProps,
-  WorkflowAutosave,
-  WorkflowEdge,
-  WorkflowDragPreview,
-  WorkflowNamePopover,
   WorkflowNodeSelectionPanel,
   WorkflowNodeSelectionPanelButton,
-  WorkflowProgressToast,
+} from "../workflow-node-selection-panel";
+import { workflowNodeComponents } from "../workflow-nodes.registry";
+import { WorkflowProgressToast } from "../workflow-progress-toast";
+import {
   WorkflowRunUntilHereDialog,
-  WorkflowRunningStatus,
-  WorkflowUndoRedo,
   getWorkflowEntryNode,
-  workflowNodeComponents,
-} from "@langwatch/workflow-web";
+} from "../workflow-run-until-here-dialog";
+import { WorkflowRunningStatus } from "../workflow-running-status";
+import { WorkflowUndoRedo } from "../workflow-undo-redo";
 import { PostEventProvider, usePostEvent } from "./use-post-event";
-import { useWorkflowStore } from "@langwatch/workflow-web";
-import { isConnectionAllowed } from "@langwatch/workflow-web";
-import { WorkflowNodeHostProvider } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store";
+import { isConnectionAllowed } from "../../../model/control-flow";
+import { WorkflowNodeHostProvider } from "../../elements/workflow-node.host";
 import {
   fieldSchema,
   getInputsOutputs,
@@ -65,12 +66,12 @@ import {
   type Entry,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
-import { LLMModelDisplay } from "@langwatch/prompt-web/components/llmPromptConfigs/LLMModelDisplay";
+import { LLMModelDisplay } from "@langwatch/prompt-web/surfaces/llm-model-display";
 import { HoverableBigText } from "../hoverable-big-text";
 import { StudioNodeDrawer } from "./drawers/studio-node-drawer";
 import { Evaluate } from "./evaluate";
 import { History } from "./history";
-import { ComponentIcon } from "@langwatch/workflow-web";
+import { ComponentIcon } from "../../elements/workflow-icons";
 import { useComponentExecution } from "./use-component-execution";
 import { useComponentVersion } from "../../../behavior/optimization_studio/use-component-version";
 import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data";

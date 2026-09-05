@@ -10,7 +10,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Agent } from "@langwatch/agent-contract";
-import { AgentCard } from "@langwatch/agent-web/screens/agent-management";
+import { AgentCard } from "@langwatch/agent-web/surfaces/connected-agents";
 import { useAgentTestRun } from "../use-agent-test-run";
 
 const openDrawer = vi.fn();
@@ -136,7 +136,7 @@ describe("Test agent from the agents page", () => {
     it("requests a test run for that agent", async () => {
       const user = userEvent.setup();
       const { ConnectedAgentsSection } =
-        await import("@langwatch/agent-web/screens/agent-management");
+        await import("@langwatch/agent-web/surfaces/connected-agents");
       const onTest = vi.fn();
       render(
         <ConnectedAgentsSection

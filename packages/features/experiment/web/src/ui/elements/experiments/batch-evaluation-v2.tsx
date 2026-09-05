@@ -22,7 +22,7 @@ import { Link } from "@langwatch/ui-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useDejaViewLink } from "@langwatch/workflow-web/surfaces/deja-view-link";
 import { FormatMoney } from "@langwatch/workflow-web/surfaces/format-money";
-import { VersionBox } from "@langwatch/workflow-web/optimization_studio/components/History";
+import { VersionBox } from "@langwatch/workflow-web/surfaces/version-history";
 import type {
   WorkflowApiRouter,
   RouterOutputs,
@@ -30,7 +30,7 @@ import type {
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
-import { getRunDisplayName } from "@langwatch/experiment-web";
+import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import {
   BatchEvaluationV2EvaluationSummary,

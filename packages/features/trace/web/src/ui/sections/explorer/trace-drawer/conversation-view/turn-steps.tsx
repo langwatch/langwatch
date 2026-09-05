@@ -4,7 +4,7 @@ import { memo, useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { api } from "../../../../../behavior/trace-api";
-import { formatCost, formatDuration, formatTokens } from "../../../../../index";
+import { formatCost, formatDuration, formatTokens } from "../../../../../model/display-formatters";
 
 const LLM_REQUEST_SPAN = "claude_code.llm_request";
 const TOOL_SPAN = "claude_code.tool";

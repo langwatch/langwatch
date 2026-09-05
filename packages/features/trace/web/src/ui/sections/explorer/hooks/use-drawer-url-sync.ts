@@ -12,7 +12,7 @@ import {
   useDrawerStore,
   type VizTab,
   viewModeForEditState,
-} from "../../../../index";
+} from "../../../../behavior/drawer.store";
 
 const DEFAULTS = {
   // Mirror drawerStore's "summary" default so a popstate into an older

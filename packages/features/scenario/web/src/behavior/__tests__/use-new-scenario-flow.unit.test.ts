@@ -3,7 +3,7 @@
  * @vitest-environment jsdom
  */
 import { act, renderHook } from "@testing-library/react";
-import { useNewScenarioFlow } from "../..";
+import { useNewScenarioFlow } from "../use-new-scenario-flow";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const WELCOME_SEEN_KEY = "langwatch:scenarios:welcomeSeen";

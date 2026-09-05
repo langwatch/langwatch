@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { BTLeaderboardEntry } from "@langwatch/experiment-web";
+import type { BTLeaderboardEntry } from "../../../../model/batch-evaluation-results.bt-leaderboard";
 import { computeScoreBarScale } from "../leaderboard-verdict-panel";
 
 /**

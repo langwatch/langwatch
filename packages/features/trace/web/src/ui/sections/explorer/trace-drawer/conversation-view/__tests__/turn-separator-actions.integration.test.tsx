@@ -52,9 +52,9 @@ vi.mock("../../../../../../behavior/trace-api", () => ({
 import {
   isSessionMarked,
   useAnnotationQueueSessionStore,
-  useDrawerStore,
-  useTraceEditStore,
-} from "../../../../../../index";
+} from "../../../../../../behavior/annotation-queue-session.store";
+import { useDrawerStore } from "../../../../../../behavior/drawer.store";
+import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace";
 import { enterTraceEditMode } from "../../../utils/trace-edit-mode";
 import { ChatTurnRow } from "../chat-turn-row";

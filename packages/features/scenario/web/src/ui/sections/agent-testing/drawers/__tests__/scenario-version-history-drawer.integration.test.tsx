@@ -116,7 +116,7 @@ vi.mock("../../../scenarios/scenario-editor-sidebar", () => ({
 vi.mock("../../../scenarios/scenario-run-model-dialog", () => ({
   ScenarioRunModelDialog: () => null,
 }));
-vi.mock("@langwatch/prompt-web/components/prompts/PromptEditorDrawer", () => ({
+vi.mock("@langwatch/prompt-web/surfaces/prompt-editor-drawer", () => ({
   PromptEditorDrawer: () => null,
 }));
 

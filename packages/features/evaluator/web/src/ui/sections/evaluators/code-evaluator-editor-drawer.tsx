@@ -17,7 +17,7 @@ import {
   useDrawerParams,
 } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { CodeEditor } from "@langwatch/workflow-web/optimization_studio/components/code/workflow-code-editor.transport";
+import { CodeEditor } from "@langwatch/workflow-web/surfaces/code-editor-transport";
 import { rewriteCodeSignature } from "@langwatch/workflow-web/surfaces/code-agent";
 import {
   type CodeEvaluatorConfig,
@@ -26,12 +26,12 @@ import {
 } from "@langwatch/evaluator-contract";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 
+import { codeEvaluatorDisabledReason } from "../../../model/code-evaluator-disabled-reason";
 import {
   CodeEvaluatorEditor,
-  codeEvaluatorDisabledReason,
   type CodeEvaluatorField,
   validCodeEvaluatorFields,
-} from "@langwatch/evaluator-web";
+} from "../../blocks/code-evaluator-editor";
 import type { EvaluatorMappingsConfig } from "./evaluator-editor-shared";
 
 type EditableField = CodeEvaluatorField;

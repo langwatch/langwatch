@@ -1,6 +1,7 @@
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api } from "../../../../behavior/trace-api";
-import { useFilterStore, useSseStatusStore } from "../../../../index";
+import { useFilterStore } from "../../../../behavior/filter.store";
+import { useSseStatusStore } from "../../../../behavior/sse-status.store";
 
 const FALLBACK_INTERVAL_MS = 60_000;
 

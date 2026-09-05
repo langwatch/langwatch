@@ -10,7 +10,7 @@ import {
   type DatasetRecordEntry,
   newDatasetEntriesSchema,
 } from "@langwatch/dataset-contract";
-import { convertDatasetRecordsToColumnTypes } from "@langwatch/dataset-web";
+import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { CSVReaderComponent } from "./upload-csv-drawer";
 

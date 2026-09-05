@@ -11,7 +11,8 @@ import {
   toCliToolResult,
 } from "@langwatch/langy-contract";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
-import { digestOfToolCall, LangyCardBoundary } from "../../../../../index";
+import { digestOfToolCall } from "../../../../../model/langy-capability-digest";
+import { LangyCardBoundary } from "../../../../../ui/elements/langy-card-boundary";
 import {
   type CapabilityCardInput,
   type CapabilityDescriptor,

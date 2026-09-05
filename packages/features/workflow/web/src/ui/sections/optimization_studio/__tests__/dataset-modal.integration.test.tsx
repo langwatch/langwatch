@@ -98,7 +98,7 @@ vi.mock("../../../../model/workflow-api-client", () => ({
   },
 }));
 
-import { _useWorkflowStore } from "@langwatch/workflow-web";
+import { _useWorkflowStore } from "../../../../behavior/use-workflow-store";
 import type { Entry } from "@langwatch/workflow-contract";
 import { DatasetModal } from "../dataset-modal";
 

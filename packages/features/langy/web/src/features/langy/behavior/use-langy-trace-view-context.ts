@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { TimeRange } from "@langwatch/trace-web/surfaces/trace-filters";
-import { useFilterStore, useViewStore } from "@langwatch/trace-web";
-import type { LangyContextChip } from "../../../index";
+import { useFilterStore, useViewStore } from "@langwatch/trace-web/surfaces/trace-view-state";
+import type { LangyContextChip } from "../../../behavior/langy.store";
 
 export type ObservabilitySource = "traces" | "events" | "logs" | "metrics";
 

@@ -9,7 +9,7 @@ import {
 import { IsolatedErrorBoundary } from "../../../isolated-error-boundary";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useConversationContext } from "../../hooks/use-conversation-context";
-import { useDrawerStore } from "../../../../../index";
+import { useDrawerStore } from "../../../../../behavior/drawer.store";
 import { ConversationContext } from "../conversation-context";
 import { VizPlaceholder } from "../viz-placeholder";
 import { SpanDetailPane } from "./span-detail-pane";

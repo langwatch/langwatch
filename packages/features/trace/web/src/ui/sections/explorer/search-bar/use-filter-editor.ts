@@ -15,8 +15,10 @@ import {
   readEditorContext,
 } from "./editor-document";
 import { FilterHighlight } from "../../../../behavior/explorer/search-bar/filter-highlight";
-import type { SuggestionState } from "../../../../index";
-import { getSuggestionState, handleKey, useLatestRef } from "../../../../index";
+import type { SuggestionState } from "../../../../model/get-suggestion-state";
+import { useLatestRef } from "../../../../behavior/use-latest-ref";
+import { getSuggestionState } from "../../../../model/get-suggestion-state";
+import { handleKey } from "../../../../model/handle-key";
 import { searchBarPlaceholder } from "./placeholder-editor";
 import {
   buildSuggestionUI,

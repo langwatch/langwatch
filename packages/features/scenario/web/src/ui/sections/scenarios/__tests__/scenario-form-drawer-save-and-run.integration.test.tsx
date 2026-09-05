@@ -8,7 +8,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
 
-vi.mock("@langwatch/prompt-web/components/prompts/PromptEditorDrawer", () => ({
+vi.mock("@langwatch/prompt-web/surfaces/prompt-editor-drawer", () => ({
   PromptEditorDrawer: () => null,
 }));
 vi.mock("../scenario-editor-sidebar", () => ({

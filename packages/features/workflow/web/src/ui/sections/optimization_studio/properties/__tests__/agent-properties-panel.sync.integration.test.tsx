@@ -53,23 +53,22 @@ vi.mock("../../../../../model/workflow-api-client", () => ({
   },
 }));
 
-vi.mock("@langwatch/workflow-web", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@langwatch/workflow-web")>();
-
-  return {
-    ...actual,
-    useWorkflowStore: (selector: (state: unknown) => unknown) =>
-      selector({
-        setNode: mockSetNode,
-        setEdges: vi.fn(),
-        deselectAllNodes: vi.fn(),
-        getWorkflow: () => ({ nodes: [], edges: [] }),
-      }),
-    useRegisterDrawerFooter: (content: ReactNode) => {
-      footerHolder.content = content;
-    },
-  };
-});
+vi.mock("../../../../../behavior/use-workflow-store", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useWorkflowStore: (selector: (state: unknown) => unknown) =>
+    selector({
+      setNode: mockSetNode,
+      setEdges: vi.fn(),
+      deselectAllNodes: vi.fn(),
+      getWorkflow: () => ({ nodes: [], edges: [] }),
+    }),
+}));
+vi.mock("../../../../elements/studio-drawer-footer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useRegisterDrawerFooter: (content: ReactNode) => {
+    footerHolder.content = content;
+  },
+}));
 
 vi.mock("@xyflow/react", () => ({
   useUpdateNodeInternals: () => vi.fn(),
@@ -94,7 +93,7 @@ vi.mock("@langwatch/prompt-web/surfaces/variables", () => ({
   VariablesSection: () => null,
 }));
 
-vi.mock("@langwatch/prompt-web/components/outputs/OutputsSection", () => ({
+vi.mock("@langwatch/prompt-web/surfaces/outputs-section", () => ({
   CODE_OUTPUT_TYPES: ["str"],
   OutputsSection: () => null,
 }));

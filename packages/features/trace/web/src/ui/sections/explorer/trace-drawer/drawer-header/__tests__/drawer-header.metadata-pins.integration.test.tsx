@@ -106,8 +106,7 @@ vi.mock("../share-trace-dialog", () => ({ ShareTraceDialog: () => null }));
 // tRPC mutation and would need a transport Provider this test has no reason to
 // mount. Partially mock the barrel so everything else it exports — notably
 // `usePinnedAttributesStore`, which this test drives — stays real.
-vi.mock("../../../../../../index", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../../../../index")>()),
+vi.mock("../../../../editable-trace-name", () => ({
   EditableTraceName: ({ value }: { value: string }) => <span>{value}</span>,
 }));
 
@@ -120,7 +119,7 @@ vi.mock("../../edit-mode/edited-original-toggle", () => ({
 vi.mock("../../raw-json-dialog", () => ({ RawJsonDialog: () => null }));
 
 import type { TraceHeader } from "@langwatch/trace-contract";
-import { usePinnedAttributesStore } from "../../../../../../index";
+import { usePinnedAttributesStore } from "../../../../../../behavior/pinned-attributes.store";
 import { DrawerHeader } from "../drawer-header";
 
 function makeTrace(overrides: Partial<TraceHeader> = {}): TraceHeader {

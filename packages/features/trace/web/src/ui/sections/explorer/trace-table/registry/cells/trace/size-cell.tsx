@@ -1,6 +1,6 @@
 import { Text } from "@chakra-ui/react";
 import type { TraceListItem } from "../../../../types/trace";
-import { formatBytes } from "../../../../../../../index";
+import { formatBytes } from "../../../../../../../model/display-formatters";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell";
 import type { CellDef } from "../../types";
 

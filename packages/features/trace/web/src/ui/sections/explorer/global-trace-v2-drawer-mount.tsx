@@ -1,7 +1,7 @@
 import type React from "react";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { useTraceDrawerUrlHydrator } from "./hooks/use-trace-drawer-url-hydrator";
-import { useDrawerStore } from "../../../index";
+import { useDrawerStore } from "../../../behavior/drawer.store";
 import { isTraceExplorerPath } from "../../../model/trace-explorer-path";
 import { TraceV2DrawerShell } from "./trace-drawer";
 

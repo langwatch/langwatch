@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { BTLeaderboard, BTLeaderboardEntry } from "@langwatch/experiment-web";
-import { computeSampleAdequacy } from "@langwatch/experiment-web";
+import type {
+  BTLeaderboard,
+  BTLeaderboardEntry,
+} from "../model/batch-evaluation-results.bt-leaderboard";
+import { computeSampleAdequacy } from "../model/batch-evaluation-results.sample-adequacy";
 
 const entry = (
   variantId: string,

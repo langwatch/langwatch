@@ -11,13 +11,9 @@ import { act, renderHook } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import {
-  ACTIVE_LENS_KEY,
-  getPresetById,
-  INITIAL_TIME_RANGE,
-  useFilterStore,
-  useViewStore,
-} from "../../../../../index";
+import { INITIAL_TIME_RANGE, useFilterStore } from "../../../../../behavior/filter.store";
+import { getPresetById } from "../../../../../behavior/time-range-presets";
+import { ACTIVE_LENS_KEY, useViewStore } from "../../../../../behavior/view.store";
 import { useURLSync } from "../use-url-sync";
 
 const renderURLSync = () => renderHook(() => useURLSync(), { wrapper: BrowserRouter });

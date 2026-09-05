@@ -10,7 +10,7 @@ import {
 } from "@tanstack/react-table";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { AddOrEditDatasetDrawer } from "@langwatch/dataset-web/components/AddOrEditDatasetDrawer";
+import { AddOrEditDatasetDrawer } from "@langwatch/dataset-web/surfaces/dataset-drawer";
 import {
   type DatasetTableColumnType as ColumnType,
   datasetTableCss,

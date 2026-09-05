@@ -28,7 +28,7 @@ vi.mock("../../elements/langy-model-pill", () => ({
 }));
 
 import { Composer } from "../composer";
-import { useLangyStore } from "../../../../../index";
+import { useLangyStore } from "../../../../../behavior/langy.store";
 
 function renderComposer({
   variant,

@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useCanAskLangy } from "../../../../behavior/langy/use-can-ask-langy";
 import { useShowLangy } from "../../langy/hooks/use-show-langy";
 import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
-import { useFilterStore } from "../../../../index";
+import { useFilterStore } from "../../../../behavior/filter.store";
 import { handOffSearchToLangy } from "./search-langy-handoff";
 
 /**

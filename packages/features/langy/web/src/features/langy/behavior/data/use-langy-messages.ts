@@ -4,7 +4,7 @@ import { useEffect } from "react";
 
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api } from "../../../../behavior/langy-api";
-import { useLangyStore } from "../../../../index";
+import { useLangyStore } from "../../../../behavior/langy.store";
 import type { LangyMessageDto } from "@langwatch/langy-contract";
 
 export interface LangyMessagesResult {

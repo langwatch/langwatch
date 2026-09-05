@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let capturedOnData: ((data: { event: string }) => void) | undefined;
 
-vi.mock("@langwatch/trace-web/hooks/useSSESubscription", () => ({
+vi.mock("@langwatch/trace-web/surfaces/sse-subscription", () => ({
   useSSESubscription: (
     _subscription: unknown,
     _input: Record<string, unknown>,

@@ -1,6 +1,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo } from "react";
-import { parseEvalColumnId, timeColumnSizing, useTimeFormatStore } from "../../../../index";
+import { timeColumnSizing, useTimeFormatStore } from "../../../../behavior/time-format.store";
+import { parseEvalColumnId } from "../../../../model/lens-eval-column-id";
 import type { TraceListItem } from "../types/trace";
 import { addColumnColumnDef } from "./add-column-header";
 import { getTraceColumnDef } from "./columns";

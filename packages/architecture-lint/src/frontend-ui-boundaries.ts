@@ -571,12 +571,38 @@ function isPortableFirstPartyImport({
   return PORTABLE_BY_ROLE.test(specifier) || portable.isPortable(specifier);
 }
 
+/**
+ * Surfaces compose. A surface is a feature's declared door, so another
+ * feature's door is a legitimate collaborator inside a surface closure — the
+ * bare package entry, a screen and every private subpath stay refused, and so
+ * does a second door of the surface's own package, which would be the package
+ * talking to itself through the front step.
+ */
+function collaboratingSurfaceImport({
+  specifier,
+  webPackages,
+  ownPackageName,
+}: {
+  specifier: string;
+  webPackages: readonly WebPackage[];
+  ownPackageName: string;
+}): boolean {
+  const door = specifier.match(
+    /^(@langwatch\/[a-z0-9-]+-web)\/surfaces\/([a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/,
+  );
+  if (!door || door[1] === ownPackageName) return false;
+  const target = webPackages.find((candidate) => candidate.name === door[1]);
+  return target === void 0 || packageExports(target).has(`./surfaces/${door[2]!}`);
+}
+
 function forbiddenWebPresentationImport({
   specifier,
   portable,
+  collaboratingSurface,
 }: {
   specifier: string;
   portable: PortableModuleOracle;
+  collaboratingSurface?: (specifier: string) => boolean;
 }): string | undefined {
   if (isScreenPortableTransport(specifier)) return void 0;
   const forbiddenUiSpecifier = isForbiddenUiSpecifier(specifier);
@@ -587,6 +613,7 @@ function forbiddenWebPresentationImport({
     return "an application or package source alias";
   }
   if (/^@langwatch\/[^/]+-web(?:\/|$)/.test(specifier)) {
+    if (collaboratingSurface?.(specifier)) return void 0;
     return "a feature-web public entry";
   }
   if (specifier.startsWith("@langwatch/") && !isPortableFirstPartyImport({ specifier, portable })) {
@@ -1293,7 +1320,16 @@ function lintWebSurfaceClosures(
             continue;
           }
           const forbiddenImport =
-            forbiddenWebPresentationImport({ specifier: sourceImport.specifier, portable }) ??
+            forbiddenWebPresentationImport({
+              specifier: sourceImport.specifier,
+              portable,
+              collaboratingSurface: (edge) =>
+                collaboratingSurfaceImport({
+                  specifier: edge,
+                  webPackages,
+                  ownPackageName: pkg.name,
+                }),
+            }) ??
             (isLegacyApplicationRelativeImport(root, current, sourceImport.specifier)
               ? "legacy platform/app implementation"
               : void 0);
@@ -1563,18 +1599,17 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
           });
           continue;
         }
-        if (
-          module.kind === "surface" &&
-          target.kind !== "surface" &&
-          !(target.kind === "global" && target.layer === "model")
-        ) {
+        // A door is the package's own front step onto its shared implementation,
+        // so it reaches the global model, behavior and ui layers the same way the
+        // surface closure walk admits them. What stays out is a package-private
+        // feature and an owner-only screen.
+        if (module.kind === "surface" && target.kind !== "surface" && target.kind !== "global") {
           violations.push({
             policy: "ui-web-surface-leakage",
             file,
             line: sourceImport.line,
             specifier: sourceImport.specifier,
-            message:
-              "A public surface may not reach package-private features, global layers, or a screen.",
+            message: "A public surface may not reach package-private features or a screen.",
           });
           continue;
         }

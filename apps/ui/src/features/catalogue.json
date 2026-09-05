@@ -354,7 +354,11 @@
       "root": "workflows",
       "uses": {
         "screens": ["@langwatch/workflow-web/screens/workflows"],
-        "surfaces": []
+        "surfaces": [
+          "@langwatch/dataset-web/surfaces/dataset-drawer",
+          "@langwatch/dataset-web/surfaces/upload-csv-drawer",
+          "@langwatch/prompt-web/surfaces/prompt-editor-drawer"
+        ]
       }
     }
   ]

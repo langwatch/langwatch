@@ -16,7 +16,8 @@ vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-import { useDrawerStore, useFocusSectionStore } from "../../../../../../index";
+import { useDrawerStore } from "../../../../../../behavior/drawer.store";
+import { useFocusSectionStore } from "../../../../../../behavior/focus-section.store";
 import { TraceCommentList } from "../trace-comment-list";
 
 const TRACE_ID = "trace-1";

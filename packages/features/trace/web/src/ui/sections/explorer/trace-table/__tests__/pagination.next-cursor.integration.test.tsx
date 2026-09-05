@@ -9,7 +9,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { useFilterStore, useViewStore } from "../../../../../index";
+import { useFilterStore } from "../../../../../behavior/filter.store";
+import { useViewStore } from "../../../../../behavior/view.store";
 import { Pagination } from "../pagination";
 
 const CURSOR_TO_PAGE_2 = { sortValue: 1_700_000_002_000, traceId: "trace-b" };

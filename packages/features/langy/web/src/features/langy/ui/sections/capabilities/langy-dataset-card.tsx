@@ -10,7 +10,7 @@ import {
   extractPrimaryId,
   extractToolText,
 } from "../../../model/capabilities/capability-registry";
-import { collectionOf, totalOf } from "../../../../../index";
+import { collectionOf, totalOf } from "../../../../../model/langy-cli-result-document";
 import {
   CapabilityRow,
   CapabilityRowSkeletons,

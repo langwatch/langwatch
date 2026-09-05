@@ -11,11 +11,11 @@ import { LLMModelDisplay } from "../../../llmPromptConfigs/llm-model-display";
 import {
   allModelOptions,
   useModelSelectionOptions,
-} from "@langwatch/model-provider-web/components/ModelSelector";
+} from "@langwatch/model-provider-web/surfaces/model-selector";
 import { NoModelsConfiguredCallout } from "@langwatch/model-provider-web/surfaces/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
+import type { PromptConfigFormValues } from "../../../../../surfaces/prompt-form";
 import type { LlmConfigOutputType } from "@langwatch/workflow-web/surfaces/component-types";
 
 type ModelSelectFieldMiniProps = {

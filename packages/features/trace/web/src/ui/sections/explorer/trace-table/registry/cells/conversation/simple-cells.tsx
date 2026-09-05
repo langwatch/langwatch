@@ -2,7 +2,7 @@ import { chakra, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { TraceStatus } from "../../../../types/trace";
-import { formatTokens } from "../../../../../../../index";
+import { formatTokens } from "../../../../../../../model/display-formatters";
 import type { ConversationGroup } from "../../../conversation-groups";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell";
 import { StatusDot, StatusIndicator } from "../../../status-row";

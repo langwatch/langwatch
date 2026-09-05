@@ -60,7 +60,8 @@ vi.mock("../use-trace-query-args", () => ({
   }),
 }));
 
-import { useDrawerStore, useTraceEditStore } from "../../../../../index";
+import { useDrawerStore } from "../../../../../behavior/drawer.store";
+import { useTraceEditStore } from "../../../../../behavior/trace-edit.store";
 import { useSpanTree, useSpanTreeWithCaptured } from "../use-span-tree";
 
 function node(over: { spanId: string; parentSpanId?: string; name?: string }) {

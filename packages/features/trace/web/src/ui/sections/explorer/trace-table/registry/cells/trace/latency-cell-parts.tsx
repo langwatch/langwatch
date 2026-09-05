@@ -1,7 +1,7 @@
 import { Text, VStack } from "@chakra-ui/react";
 import { MeterBar } from "../../../../../../elements/meter-bar";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatDuration } from "../../../../../../../index";
+import { formatDuration } from "../../../../../../../model/display-formatters";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell";
 
 interface LatencyBarProps {

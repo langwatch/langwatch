@@ -11,7 +11,7 @@ import {
   CAPABILITY_HYDRATORS,
   type CapabilityHydratedRow,
 } from "./capabilities/capability-hydrators";
-import type { CapabilityCommand } from "../../../index";
+import type { CapabilityCommand } from "../../../model/langy-capability-digest";
 
 /** How many rows a card draws, and therefore how many this hook hydrates. */
 const DEFAULT_MAX_ROWS = 5;

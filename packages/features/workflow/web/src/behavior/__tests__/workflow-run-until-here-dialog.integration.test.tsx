@@ -13,8 +13,8 @@ import {
   type WorkflowDatasetPreviewProps,
   type WorkflowPartialExecutionInput,
   WorkflowRunUntilHereDialog,
-  useRunUntilHereDialogStore,
-} from "@langwatch/workflow-web";
+} from "../../ui/sections/workflow-run-until-here-dialog";
+import { useRunUntilHereDialogStore } from "../use-run-until-here-dialog-store";
 import { _useWorkflowStore } from "../use-workflow-store";
 
 const datasetRows: DatasetRecordEntry[] = [

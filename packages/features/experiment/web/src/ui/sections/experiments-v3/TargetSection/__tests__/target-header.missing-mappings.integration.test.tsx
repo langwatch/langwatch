@@ -20,7 +20,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   }),
 }));
 
-vi.mock("@langwatch/prompt-web/prompts/hooks/useLatestPromptVersion", () => ({
+vi.mock("@langwatch/prompt-web/surfaces/latest-prompt-version", () => ({
   useLatestPromptVersion: () => ({
     currentVersion: undefined,
     latestVersion: undefined,

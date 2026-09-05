@@ -8,7 +8,7 @@ import {
 } from "@langwatch/handled-error/presentation";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 
-import { ScenarioGenerationError } from "../..";
+import { ScenarioGenerationError } from "../../model/scenario-generation";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types

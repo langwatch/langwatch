@@ -3,8 +3,9 @@ import { useMemo } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api } from "../../../../behavior/trace-api";
 import { useSamplePreview } from "../onboarding";
-import type { TraceListCursor } from "../../../../index";
-import { DEFAULT_SORT, useFilterStore, useViewStore } from "../../../../index";
+import type { TraceListCursor } from "../../../../behavior/filter.store";
+import { useFilterStore } from "../../../../behavior/filter.store";
+import { DEFAULT_SORT, useViewStore } from "../../../../behavior/view.store";
 import type { TraceListItem } from "../types/trace";
 import { mapTraceListPayload } from "../utils/map-trace-list-payload";
 

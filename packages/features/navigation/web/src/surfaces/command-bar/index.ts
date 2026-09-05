@@ -19,9 +19,9 @@
  * keeps the shell's cost the shell's.
  */
 
-export { CommandBarProvider } from "./command-bar-provider";
-export { CommandBarTrigger } from "./command-bar-trigger";
-export { CommandPalette, type CommandPaletteSurface } from "./command-palette";
+export { CommandBarProvider } from "../../ui/sections/command-bar-provider";
+export { CommandBarTrigger } from "../../ui/sections/command-bar-trigger";
+export { CommandPalette, type CommandPaletteSurface } from "../../ui/sections/command-palette";
 export { useCommandBar } from "../../behavior/command-bar-context";
 export { openCommandBar, hasCommandBar } from "../../behavior/command-bar-control";
 export { getCommandBarShortcut, getIsMac } from "../../model/command-platform";

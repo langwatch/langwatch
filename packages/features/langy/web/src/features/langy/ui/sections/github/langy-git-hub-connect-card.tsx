@@ -4,7 +4,7 @@
  * Spec: specs/integrations/github-connection.feature.
  */
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
-import { useGitHubConnectPopup } from "@langwatch/github-web";
+import { useGitHubConnectPopup } from "@langwatch/github-web/surfaces/github-connect-popup";
 import { useState } from "react";
 import { GitHub } from "react-feather";
 import { useRouter } from "@langwatch/ui-host/use-router";

@@ -17,7 +17,8 @@ import { Drawer } from "../../drawer";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { FIELD_VALUES, SEARCH_FIELDS, type SearchFieldMeta } from "@langwatch/trace-contract";
-import { useFilterStore, useUIStore } from "../../../../index";
+import { useFilterStore } from "../../../../behavior/filter.store";
+import { useUIStore } from "../../../../behavior/ui.store";
 import { QueryPreview } from "./query-preview";
 
 interface Example {

@@ -23,16 +23,16 @@
       "default": "./src/screens/annotations/index.ts"
     },
     "./surfaces/annotation-form": {
-      "types": "./src/ui/sections/annotation-form.surface.ts",
-      "default": "./src/ui/sections/annotation-form.surface.ts"
+      "types": "./src/surfaces/annotation-form/index.ts",
+      "default": "./src/surfaces/annotation-form/index.ts"
     },
     "./surfaces/annotation-chips": {
-      "types": "./src/ui/sections/annotation-chips.surface.ts",
-      "default": "./src/ui/sections/annotation-chips.surface.ts"
+      "types": "./src/surfaces/annotation-chips/index.ts",
+      "default": "./src/surfaces/annotation-chips/index.ts"
     },
     "./surfaces/annotation-card": {
-      "types": "./src/ui/sections/annotation-card.surface.ts",
-      "default": "./src/ui/sections/annotation-card.surface.ts"
+      "types": "./src/surfaces/annotation-card/index.ts",
+      "default": "./src/surfaces/annotation-card/index.ts"
     }
   },
   "scripts": {

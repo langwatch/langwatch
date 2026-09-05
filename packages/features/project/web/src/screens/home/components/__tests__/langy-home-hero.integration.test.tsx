@@ -23,7 +23,7 @@ vi.mock("@langwatch/langy-web/surfaces/langy-store", () => ({
 // AgentActionsMenu (trace/web) reaches a tRPC-backed skill-prompt query this
 // test does not exercise — the menu never opens in these two scenarios, only
 // its trigger's own label and ordering are asserted.
-vi.mock("@langwatch/trace-web/components/SetupWithAgentButton", () => ({
+vi.mock("@langwatch/trace-web/surfaces/setup-with-agent-button", () => ({
   AgentActionsMenu: ({ trigger }: { trigger: React.ReactNode }) => trigger,
   setupAgentPrompt: () => "",
 }));

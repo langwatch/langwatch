@@ -2,7 +2,7 @@ import { Box, type BoxProps, HStack, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { isJson } from "../../model/is-json";
 import { Markdown } from "./markdown";
-import { RenderInputOutput } from "@langwatch/trace-web/components/traces/RenderInputOutput";
+import { RenderInputOutput } from "@langwatch/trace-web/surfaces/render-input-output";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";

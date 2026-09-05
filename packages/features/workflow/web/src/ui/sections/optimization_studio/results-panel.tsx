@@ -10,20 +10,20 @@ import {
 import { ExternalImage } from "@langwatch/design-system/external-image";
 import { EvaluatorResultChip } from "@langwatch/evaluator-web/surfaces/evaluator-result-chip";
 import { describeCellFailure } from "@langwatch/experiment-web/surfaces/cell-failure";
-import { TraceIdPeek } from "@langwatch/trace-web/explorer/components/TraceIdPeek";
+import { TraceIdPeek } from "@langwatch/trace-web/surfaces/trace-id-peek";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
-import { useBatchEvaluationState } from "@langwatch/experiment-web/components/experiments/BatchEvaluationV2";
+import { useBatchEvaluationState } from "@langwatch/experiment-web/surfaces/batch-evaluation-state";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
 import { api } from "../../../model/workflow-api-client";
 import { slugify } from "@langwatch/design-system/slugify";
 import { useRunEvalution } from "./use-run-evalution";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store";
+import { isExperimentQueryEnabled } from "../../../model/studio-evaluation-query";
 import {
-  isExperimentQueryEnabled,
   useWorkflowSelectedEvaluationRun,
-  useWorkflowStore,
   WorkflowEvaluationResultsLayout,
   WorkflowResultsPanel,
-} from "@langwatch/workflow-web";
+} from "../../elements/workflow-results-panel";
 import type { Entry, StudioWorkflow } from "@langwatch/workflow-contract";
 import { getWorkflowEntryOutputs } from "@langwatch/workflow-contract";
 import { OpenFullResultsButton } from "../../elements/optimization_studio/open-full-results-button";

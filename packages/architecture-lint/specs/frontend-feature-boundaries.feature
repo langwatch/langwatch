@@ -43,6 +43,20 @@ Feature: Frontend feature boundary lint
     And a shareable component needs no copy hoisted into another layer to be exposed
 
   @unit @architecture
+  Scenario: A door under surfaces reaches its package's own shared layers
+    Given a governed web package puts a door at src/surfaces/<id>/index.ts
+    When the door re-exports the package's own model, behavior and ui modules
+    Then architecture lint accepts it, the same shape every other package's door has
+    And a package-private feature module or an owner-only screen is still refused
+
+  @unit @architecture
+  Scenario: A surface may build on another feature's declared surface
+    Given the Prompt reference surface renders the Model Provider model selector
+    When architecture lint resolves the Prompt surface's production dependency closure
+    Then it accepts the other feature's declared surfaces/<id> door as a collaborator
+    And the same package's bare entry, its screens and its private subpaths stay refused
+
+  @unit @architecture
   Scenario: A surface cannot pull in its feature's complete implementation
     Given @langwatch/prompt-web/surfaces/prompt-reference imports a Prompt table through a module outside those layers
     When architecture lint resolves the surface's production dependency closure
@@ -83,7 +97,7 @@ Feature: Frontend feature boundary lint
   @unit @architecture
   Scenario: Public screen and surface boundaries do not leak inward
     Given a governed screen reaches its own private feature sections and surfaces
-    When private code imports a screen or surface, a screen imports another screen, or a surface reaches private code
+    When private code imports a screen or surface, a screen imports another screen, or a surface reaches a package-private feature or a screen
     Then architecture lint rejects the leaking edge
     And browser-safety remains checked through the full recursive closure
 

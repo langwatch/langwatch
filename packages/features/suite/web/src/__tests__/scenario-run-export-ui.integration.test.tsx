@@ -7,11 +7,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  RunHistoryFilters,
-  ScenarioRunExportDialog,
-  type RunHistoryFilterValues,
-} from "@langwatch/suite-web";
+import { RunHistoryFilters, type RunHistoryFilterValues } from "../run-history-filters";
+import { ScenarioRunExportDialog } from "../scenario-run-export-dialog";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

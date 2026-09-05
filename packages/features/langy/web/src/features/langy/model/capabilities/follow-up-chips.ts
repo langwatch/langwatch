@@ -2,8 +2,11 @@
  * Turning a settled tool call into the follow-up chips to draw beneath its card.
  * @see specs/langy/langy-followup-suggestions.feature
  */
-import { buildAutomationHref, readTraceSearchQuery } from "../../../../index";
-import type { TraceSearchQuery, UnstatedWindow } from "../../../../index";
+import {
+  buildAutomationHref,
+  readTraceSearchQuery,
+} from "../../../../model/langy-trace-explorer-link";
+import type { TraceSearchQuery, UnstatedWindow } from "../../../../model/langy-trace-explorer-link";
 import { buildSurfaceHref, SURFACE_BY_FEATURE, SURFACE_LABEL } from "./capability-registry";
 import { followUpsForResult } from "./cli-follow-ups";
 

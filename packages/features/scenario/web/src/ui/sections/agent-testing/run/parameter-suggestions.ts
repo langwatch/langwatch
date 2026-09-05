@@ -10,7 +10,7 @@ import {
   type SuggestionState,
 } from "@langwatch/trace-web/surfaces/suggestion-state";
 import { rankByMatch } from "@langwatch/trace-web/surfaces/suggestion-items";
-import type { SuggestionRow } from "@langwatch/trace-web/explorer/components/SearchBar/suggestionUI";
+import type { SuggestionRow } from "@langwatch/trace-web/surfaces/suggestion-ui";
 import { displayTypedValue } from "@langwatch/design-system/json-value-text";
 import { parseParameterLine } from "../../../../model/agent-testing/run/parameter-line";
 

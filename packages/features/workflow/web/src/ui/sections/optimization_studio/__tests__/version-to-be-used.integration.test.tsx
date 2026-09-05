@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/workflow-web", () => ({
+vi.mock("../../../../behavior/use-workflow-store", () => ({
   useWorkflowStore: (selector: (state: unknown) => unknown) =>
     selector({
       checkCanCommitNewVersion: () => true,
@@ -30,7 +30,7 @@ vi.mock("../history", () => ({
   }),
 }));
 
-vi.mock("@langwatch/model-provider-web/components/ModelSelector", () => ({
+vi.mock("@langwatch/model-provider-web/surfaces/model-selector", () => ({
   allModelOptions: [],
   useModelSelectionOptions: () => ({ modelOption: { isDisabled: false } }),
 }));

@@ -95,11 +95,8 @@ export class PageTooDeepError extends HandledError {
 }
 
 /**
- * This process refused the statement itself: concurrency slots all taken and
- * the wait queue full, so it never reached ClickHouse. Distinct from {@link
- * ClickHouseUnavailableError} though both are a 503 — "the database is down"
- * and "we declined to add to a load we are already struggling with" call for
- * different responses. Count lives in `clickhouse_statements_shed_total`.
+ * This process refused the statement itself: concurrency slots all taken and the wait queue
+ * full, so it never reached ClickHouse.
  */
 export class ClickHouseOverloadedError extends HandledError {
   declare readonly code: "clickhouse_overloaded";

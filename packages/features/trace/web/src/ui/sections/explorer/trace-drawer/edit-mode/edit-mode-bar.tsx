@@ -6,14 +6,14 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "../../../errors";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
 import { api } from "../../../../../behavior/trace-api";
+import { useAnnotationSessionStore } from "../../../../../behavior/annotation-session.store";
+import { useDrawerStore } from "../../../../../behavior/drawer.store";
+import { useFocusSectionStore } from "../../../../../behavior/focus-section.store";
 import {
   buildTraceEditPatch,
   summarizeTraceEdit,
-  useAnnotationSessionStore,
-  useDrawerStore,
-  useFocusSectionStore,
   useTraceEditStore,
-} from "../../../../../index";
+} from "../../../../../behavior/trace-edit.store";
 import { exitTraceEditMode } from "../../utils/trace-edit-mode";
 
 /** "3 fields changed, 1 span deleted", with only the non-zero parts. */

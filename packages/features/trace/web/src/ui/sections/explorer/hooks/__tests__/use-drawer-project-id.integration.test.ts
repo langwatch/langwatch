@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useDrawerStore } from "../../../../../index";
+import { useDrawerStore } from "../../../../../behavior/drawer.store";
 import { useDrawerProjectId } from "../use-drawer-project-id";
 
 vi.mock("../../../../../behavior/use-organization-team-project", () => ({

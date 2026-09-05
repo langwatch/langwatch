@@ -2,29 +2,32 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
 import { analyzeOrGroups, buildFacetStateLookup, getFacetValues } from "@langwatch/trace-contract";
 import { useTraceFacets } from "../../hooks/use-trace-facets";
-import type { NumericMode } from "../../../../../index";
+import type { NumericMode } from "../../../../../behavior/numeric-mode.store";
+import { useDensityStore } from "../../../../../behavior/density.store";
 import {
-  applyLensOrder,
   ATTRIBUTES_SECTION_KEY,
   COMFORTABLE_DEFAULT_SECTIONS,
   DISCRETE_MODE_MAX_VALUES,
   EVENT_ATTRIBUTES_SECTION_KEY,
   FACET_COLORS,
   FACET_DEFAULTS,
-  hashColor,
   METADATA_DOCS_URL,
   METADATA_SECTION_KEY,
   RANGE_DEFAULTS,
-  selectNumericModesFor,
-  selectVisibilityFor,
   SPAN_ATTRIBUTES_SECTION_KEY,
-  useDensityStore,
-  useFacetLensStore,
-  useFacetVisibilityStore,
-  useFilterStore,
-  useNumericModeStore,
   VIBRANT_FIELDS,
-} from "../../../../../index";
+} from "../../../../../behavior/facet-constants";
+import { applyLensOrder, useFacetLensStore } from "../../../../../behavior/facet-lens.store";
+import {
+  selectVisibilityFor,
+  useFacetVisibilityStore,
+} from "../../../../../behavior/facet-visibility.store";
+import { useFilterStore } from "../../../../../behavior/filter.store";
+import {
+  selectNumericModesFor,
+  useNumericModeStore,
+} from "../../../../../behavior/numeric-mode.store";
+import { hashColor } from "../../../../../model/display-formatters";
 import { computeDiscreteEligible, resolveNumericModeByKey } from "../discrete-mode";
 import { routeToggleViaOrGroups } from "../../../../../model/explorer/filter-sidebar/route-toggle-via-or-groups";
 import type {

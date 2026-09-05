@@ -1,4 +1,4 @@
-import type { CheckPreconditionRule } from "@langwatch/evaluator-web/server/evaluations/types";
+import type { CheckPreconditionRule } from "@langwatch/evaluator-web/surfaces/evaluation-types";
 import type { PreconditionField } from "@langwatch/analytics-contract";
 import { availableFilters } from "./registry";
 import type { FilterField } from "./types";

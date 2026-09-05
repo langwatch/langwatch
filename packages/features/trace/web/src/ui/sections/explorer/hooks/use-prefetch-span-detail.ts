@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api } from "../../../../behavior/trace-api";
-import { useDrawerStore } from "../../../../index";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
 
 /**
  * Returns a callback that prefetches span detail for a given span id under the

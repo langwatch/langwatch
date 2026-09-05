@@ -7,7 +7,7 @@
 import { generate } from "@langwatch/ksuid";
 import { getSuiteSetId } from "@langwatch/suite-contract";
 import { useCallback, useRef } from "react";
-import { useModelProvidersSettings } from "@langwatch/model-provider-web/hooks/useModelProvidersSettings";
+import { useModelProvidersSettings } from "@langwatch/model-provider-web/surfaces/model-provider-settings";
 import { writeScenarioTarget } from "../../use-scenario-target";
 import { api } from "../../../../behavior/scenario-api";
 import { KSUID_RESOURCES } from "@langwatch/workflow-contract";

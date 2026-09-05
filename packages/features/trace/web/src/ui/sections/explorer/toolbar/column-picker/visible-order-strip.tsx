@@ -11,7 +11,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowDown, ArrowUp, GripVertical, X } from "lucide-react";
 import type React from "react";
-import type { LensColumnOption } from "../../../../../index";
+import type { LensColumnOption } from "../../../../../behavior/lens-capabilities";
 
 /**
  * Compact drag-to-reorder strip of the visible columns. Each row is

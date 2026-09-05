@@ -1,15 +1,12 @@
-import {
-  generateScenarioWithAI,
-  type ScenarioFormData,
-  type ScenarioInitialData,
-  storePromptForScenario,
-} from "../../..";
+import { generateScenarioWithAI } from "../../../model/scenario-generation";
+import { storePromptForScenario } from "../../../model/scenario-prompt-storage";
+import { type ScenarioFormData, type ScenarioInitialData } from "../../elements/scenario-form";
 import { useCallback } from "react";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { useModelProvidersSettings } from "@langwatch/model-provider-web/hooks/useModelProvidersSettings";
+import { useModelProvidersSettings } from "@langwatch/model-provider-web/surfaces/model-provider-settings";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { api } from "../../../behavior/scenario-api";
-import { isHandledByGlobalHandler } from "@langwatch/workflow-web/utils/trpcError";
+import { isHandledByGlobalHandler } from "@langwatch/ui-host/errors";
 import { AICreateModal, type ExampleTemplate } from "../shared/ai-create-modal";
 import { ModelProviderRequiredModal } from "../../elements/scenarios/model-provider-required-modal";
 import type { ScenarioEditorVariant } from "./scenario-form-drawer";

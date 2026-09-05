@@ -18,9 +18,12 @@ const mockNodeDataToLocalPromptConfig = vi.fn();
 let capturedProps: Record<string, any> = {};
 let mockEdges: any[] = [];
 
-vi.mock("@langwatch/workflow-web", async (importOriginal) => ({
+vi.mock("../../../../../behavior/use-smart-set-node", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useSmartSetNode: () => mockSetNode,
+}));
+vi.mock("../../../../../behavior/use-workflow-store", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useWorkflowStore: (selector: any) =>
     selector({
       getWorkflow: () => ({ nodes: [], edges: mockEdges }),
@@ -28,7 +31,7 @@ vi.mock("@langwatch/workflow-web", async (importOriginal) => ({
       deselectAllNodes: mockDeselectAllNodes,
     }),
 }));
-vi.mock("@langwatch/prompt-web/components/prompts/PromptEditorDrawer", () => ({
+vi.mock("@langwatch/prompt-web/surfaces/prompt-editor-drawer", () => ({
   PromptEditorDrawer: (props: any) => {
     capturedProps = props;
     return <div data-testid="mock-prompt-editor" />;
@@ -43,7 +46,7 @@ vi.mock("zustand/react/shallow", () => ({
   useShallow: (fn: any) => fn,
 }));
 
-vi.mock("@langwatch/prompt-web/prompts/utils/llmPromptConfigUtils", () => ({
+vi.mock("@langwatch/prompt-web/surfaces/llm-prompt-config-utils", () => ({
   nodeDataToLocalPromptConfig: (...args: any[]) => mockNodeDataToLocalPromptConfig(...args),
 }));
 

@@ -4,12 +4,9 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
 import { useDebouncedValue } from "../../../../behavior/explorer/use-debounced-value";
 import { useFacetSearch } from "../hooks/use-facet-search";
-import {
-  dedupeByValue,
-  MAX_EXPANDED_FACETS,
-  MAX_VISIBLE_FACETS,
-  useFacetLensStore,
-} from "../../../../index";
+import { MAX_EXPANDED_FACETS, MAX_VISIBLE_FACETS } from "../../../../behavior/facet-constants";
+import { useFacetLensStore } from "../../../../behavior/facet-lens.store";
+import { dedupeByValue } from "../../../../model/dedupe-by-value";
 import { FacetRow } from "./facet-row";
 import { NoneFacetRow } from "../../../blocks/explorer/filter-sidebar/none-facet-row";
 import { SidebarSection } from "../../../elements/explorer/filter-sidebar/sidebar-section";

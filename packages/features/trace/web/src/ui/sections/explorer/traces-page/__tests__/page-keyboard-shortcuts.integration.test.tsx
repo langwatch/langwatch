@@ -8,18 +8,14 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../../../../index", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../../../index")>();
-
-  return {
-    ...actual,
-    useUIStore: (selector: (state: unknown) => unknown) =>
-      selector({
-        shortcutsHelpOpen: true,
-        setShortcutsHelpOpen: vi.fn(),
-      }),
-  };
-});
+vi.mock("../../../../../behavior/ui.store", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useUIStore: (selector: (state: unknown) => unknown) =>
+    selector({
+      shortcutsHelpOpen: true,
+      setShortcutsHelpOpen: vi.fn(),
+    }),
+}));
 
 // ⌘I fires the search bar's ask affordance, which belongs to Langy when
 // Langy is available — the dialog row must name whoever answers. The gate

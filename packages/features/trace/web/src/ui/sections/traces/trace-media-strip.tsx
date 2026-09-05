@@ -1,4 +1,4 @@
-import { TraceMediaStrip as TraceMediaStripView } from "../../../index";
+import { TraceMediaStrip as TraceMediaStripView } from "../../elements/trace-media-strip";
 import type { MediaPartData } from "../../../behavior/shared/traces/media-parts";
 import { TraceMediaPart } from "./trace-media-part";
 

@@ -12,7 +12,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ComparisonCharts } from "../comparison-charts";
-import type { BatchComparisonColumn, ComparisonRunData } from "@langwatch/experiment-web";
+import type {
+  BatchComparisonColumn,
+  ComparisonRunData,
+} from "../../batch-evaluation-results.types";
 
 const EVALUATOR_ID = "comparison-1";
 

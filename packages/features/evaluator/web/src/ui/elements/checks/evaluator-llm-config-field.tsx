@@ -2,13 +2,13 @@ import { Box, HStack, Skeleton } from "@chakra-ui/react";
 import { useCallback, useMemo } from "react";
 import { ChevronDown } from "react-feather";
 import { useFormContext, useWatch } from "react-hook-form";
-import { LLMConfigPopover } from "@langwatch/prompt-web/components/llmPromptConfigs/LLMConfigPopover";
-import { LLMModelDisplay } from "@langwatch/prompt-web/components/llmPromptConfigs/LLMModelDisplay";
+import { LLMConfigPopover } from "@langwatch/prompt-web/surfaces/llm-config-popover";
+import { LLMModelDisplay } from "@langwatch/prompt-web/surfaces/llm-model-display";
 import { toInternalKey } from "@langwatch/prompt-web/surfaces/llm-parameters";
 import {
   allModelOptions,
   useModelSelectionOptions,
-} from "@langwatch/model-provider-web/components/ModelSelector";
+} from "@langwatch/model-provider-web/surfaces/model-selector";
 import { NoModelsConfiguredCallout } from "@langwatch/model-provider-web/surfaces/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import type { LLMConfig } from "@langwatch/workflow-contract";

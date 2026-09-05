@@ -15,7 +15,7 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./components/experiments/BatchEvaluationV2": {
+    "./surfaces/batch-evaluation-state": {
       "types": "./src/ui/elements/experiments/batch-evaluation-v2.tsx",
       "default": "./src/ui/elements/experiments/batch-evaluation-v2.tsx"
     },
@@ -27,11 +27,11 @@
       "types": "./src/ui/sections/drawers.ts",
       "default": "./src/ui/sections/drawers.ts"
     },
-    "./experiments-v3/components/EvaluatorPanel/ComparisonConfigForm": {
+    "./surfaces/comparison-config-form": {
       "types": "./src/ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.tsx",
       "default": "./src/ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.tsx"
     },
-    "./experiments-v3/hooks/useEvaluationMappings": {
+    "./surfaces/evaluation-mappings": {
       "types": "./src/behavior/experiments-v3/use-evaluation-mappings.ts",
       "default": "./src/behavior/experiments-v3/use-evaluation-mappings.ts"
     },
@@ -43,7 +43,7 @@
       "types": "./src/model/experiments-v3/cell-failure.ts",
       "default": "./src/model/experiments-v3/cell-failure.ts"
     },
-    "./experiments-v3/utils/evaluatorEditorCallbacks": {
+    "./surfaces/evaluator-editor-callbacks": {
       "types": "./src/model/experiments-v3/evaluator-editor-callbacks.ts",
       "default": "./src/model/experiments-v3/evaluator-editor-callbacks.ts"
     },
@@ -56,8 +56,8 @@
       "default": "./src/screens/experiments/index.ts"
     },
     "./surfaces/batch-results": {
-      "types": "./src/ui/sections/batch-results.surface.ts",
-      "default": "./src/ui/sections/batch-results.surface.ts"
+      "types": "./src/surfaces/batch-results/index.ts",
+      "default": "./src/surfaces/batch-results/index.ts"
     }
   },
   "scripts": {

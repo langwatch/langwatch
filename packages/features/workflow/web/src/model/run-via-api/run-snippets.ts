@@ -17,7 +17,7 @@ import {
   buildEvaluateParameters,
   exampleParameterValue,
   PLACEHOLDER_PARAMETERS,
-} from "@langwatch/workflow-web";
+} from "../evaluate-api-snippet";
 import type { WorkflowField } from "@langwatch/workflow-contract";
 
 export type RunSnippetLang = "python" | "typescript" | "shell";

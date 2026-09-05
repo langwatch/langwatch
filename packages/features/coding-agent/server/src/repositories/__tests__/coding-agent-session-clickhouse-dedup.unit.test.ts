@@ -296,7 +296,7 @@ function listClient(rows: Array<Record<string, unknown>>): {
       const latest = new Map<string, number>();
       for (const row of rows) {
         if (!inScope(row, inner, params)) continue;
-        const key = `${String(row.TenantId)} ${String(row.SessionId)}`;
+        const key = `${String(row.TenantId)}\u0000${String(row.SessionId)}`;
         latest.set(key, Math.max(latest.get(key) ?? -Infinity, millis(row.UpdatedAt)));
       }
 
@@ -304,7 +304,7 @@ function listClient(rows: Array<Record<string, unknown>>): {
         .filter((row) => inScope(row, outer, params))
         .filter(
           (row) =>
-            latest.get(`${String(row.TenantId)} ${String(row.SessionId)}`) ===
+            latest.get(`${String(row.TenantId)}\u0000${String(row.SessionId)}`) ===
             millis(row.UpdatedAt),
         )
         .sort((left, right) => millis(right.StartedAt) - millis(left.StartedAt))

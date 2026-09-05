@@ -6,7 +6,10 @@ import { DIGEST_STRATEGIES } from "@langwatch/langy-contract";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
-import { CAPABILITY_CATALOG, CAPABILITY_SURFACES } from "../../../../../index";
+import {
+  CAPABILITY_CATALOG,
+  CAPABILITY_SURFACES,
+} from "../../../../../model/langy-capability-catalog";
 import { SURFACE_LABEL, SURFACE_PATH } from "../capability-registry";
 
 const CLI_PROGRAM_PATH = fileURLToPath(

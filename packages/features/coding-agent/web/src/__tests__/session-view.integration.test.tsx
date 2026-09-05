@@ -15,8 +15,8 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
-import type { CodingAgentSessionDisplay } from "@langwatch/coding-agent-web";
-import { SessionView } from "@langwatch/coding-agent-web";
+import type { CodingAgentSessionDisplay } from "../trace/session-display";
+import { SessionView } from "../trace/session-view";
 
 afterEach(cleanup);
 

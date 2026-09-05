@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSSESubscription } from "@langwatch/trace-web/hooks/useSSESubscription";
+import { useSSESubscription } from "@langwatch/trace-web/surfaces/sse-subscription";
 import {
   type LangyConversationUpdateSignal,
   langyConversationUpdateSignalSchema,
@@ -76,7 +76,6 @@ export function useLangyConversationUpdateListener({
   const [lastEventAt, setLastEventAt] = useState(0);
 
   const sse = useSSESubscription<{ event: string; timestamp: number }, { projectId: string }>(
-    // @ts-expect-error - tRPC subscription type isn't inferred for the hook's generic
     api.langy.onConversationUpdate,
     { projectId },
     {

@@ -5,17 +5,17 @@ import AnnotationsLayout from "../../ui/sections/annotation-queue-layout";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { IsolatedErrorBoundary } from "@langwatch/trace-web/components/ui/IsolatedErrorBoundary";
+import { IsolatedErrorBoundary } from "@langwatch/trace-web/surfaces/isolated-error-boundary";
 import { useShowErrorToast } from "../../behavior/use-error-toast";
-import { ConversationView } from "@langwatch/trace-web/explorer/components/TraceDrawer/conversationView";
+import { ConversationView } from "@langwatch/trace-web/surfaces/conversation-view";
+import { useShikiAdapter } from "@langwatch/design-system/shiki";
 import {
   sessionTraceIds,
   useAnnotationQueueSessionStore,
-  useShikiAdapter,
-} from "@langwatch/trace-web";
-import { useConversationTurns } from "@langwatch/trace-web/explorer/hooks/useConversationTurns";
-import { legacyTraceToTurn } from "@langwatch/trace-web/explorer/utils/legacyTraceToTurn";
-import { openTraceEditorFromConversation } from "@langwatch/trace-web/explorer/utils/traceEditMode";
+} from "@langwatch/trace-web/surfaces/annotation-queue-session";
+import { useConversationTurns } from "@langwatch/trace-web/surfaces/conversation-turns";
+import { legacyTraceToTurn } from "@langwatch/trace-web/surfaces/legacy-trace-to-turn";
+import { openTraceEditorFromConversation } from "@langwatch/trace-web/surfaces/trace-edit-mode";
 import { useAnnotationQueues } from "../../behavior/use-annotation-queues";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";

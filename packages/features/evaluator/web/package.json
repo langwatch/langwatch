@@ -14,15 +14,15 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./components/checks/DynamicZodForm": {
+    "./surfaces/dynamic-zod-form": {
       "types": "./src/ui/sections/checks/dynamic-zod-form.tsx",
       "default": "./src/ui/sections/checks/dynamic-zod-form.tsx"
     },
-    "./components/evaluators/EvaluatorEditorContent": {
+    "./surfaces/evaluator-editor-content": {
       "types": "./src/ui/sections/evaluators/evaluator-editor-content.tsx",
       "default": "./src/ui/sections/evaluators/evaluator-editor-content.tsx"
     },
-    "./components/evaluators/EvaluatorEditorShared": {
+    "./surfaces/evaluator-editor-shared": {
       "types": "./src/ui/sections/evaluators/evaluator-editor-shared.tsx",
       "default": "./src/ui/sections/evaluators/evaluator-editor-shared.tsx"
     },
@@ -38,7 +38,7 @@
       "types": "./src/ui/sections/editor-drawers.ts",
       "default": "./src/ui/sections/editor-drawers.ts"
     },
-    "./hooks/useAvailableEvaluators": {
+    "./surfaces/available-evaluators": {
       "types": "./src/behavior/use-available-evaluators.ts",
       "default": "./src/behavior/use-available-evaluators.ts"
     },
@@ -50,7 +50,7 @@
       "types": "./src/screens/evaluators/index.ts",
       "default": "./src/screens/evaluators/index.ts"
     },
-    "./server/evaluations/types": {
+    "./surfaces/evaluation-types": {
       "types": "./src/model/evaluations/types.ts",
       "default": "./src/model/evaluations/types.ts"
     },
@@ -59,8 +59,8 @@
       "default": "./src/model/evaluation-results.ts"
     },
     "./surfaces/evaluation-status": {
-      "types": "./src/ui/sections/evaluation-status.surface.ts",
-      "default": "./src/ui/sections/evaluation-status.surface.ts"
+      "types": "./src/surfaces/evaluation-status/index.ts",
+      "default": "./src/surfaces/evaluation-status/index.ts"
     }
   },
   "scripts": {

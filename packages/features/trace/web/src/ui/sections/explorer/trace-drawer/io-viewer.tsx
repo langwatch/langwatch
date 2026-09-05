@@ -23,7 +23,7 @@ import {
 import { MessageCommentScope } from "./transcript/message-comments";
 import { TraceMediaPart } from "../../traces/trace-media-part";
 import { TerminalOutput } from "@langwatch/coding-agent-web/surfaces/agent-traces";
-import { TranscriptRenderProvider } from "../../../../index";
+import { TranscriptRenderProvider } from "../../../elements/transcript-render-ports";
 import { type MarkdownSubmode, useIOViewerState, type ViewFormat } from "./use-io-viewer-state";
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { timeColumnSizing } from "../../../../../index";
+import { timeColumnSizing } from "../../../../../behavior/time-format.store";
 import { getTraceColumnDef } from "../columns";
 
 describe("getTraceColumnDef", () => {

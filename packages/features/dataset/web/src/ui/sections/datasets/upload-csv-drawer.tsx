@@ -39,13 +39,15 @@ import {
   putFileToPresignedUrl,
   requestDirectUpload,
   retryDatasetNormalize,
+} from "../../../behavior/direct-upload";
+import { parseHeaderColumns } from "../../../model/parse-header-columns";
+import { getSafeColumnName } from "../../../model/reserved-columns";
+import {
   DROPZONE_DOTTED_STYLE,
   DropzonePrompt,
   dropzoneSurfaceProps,
   RAINBOW_TEXT_CSS,
-  parseHeaderColumns,
-  getSafeColumnName,
-} from "@langwatch/dataset-web";
+} from "../../elements/dataset-dropzone-styles";
 
 const logger = createLogger("UploadCSVDrawer");
 

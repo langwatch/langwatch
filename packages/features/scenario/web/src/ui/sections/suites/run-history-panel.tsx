@@ -6,7 +6,7 @@ import { Box, Button, EmptyState, HStack, Skeleton, Text, VStack } from "@chakra
 import { FlaskConical, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
-import { SetupWithAgentButton } from "@langwatch/trace-web/components/SetupWithAgentButton";
+import { SetupWithAgentButton } from "@langwatch/trace-web/surfaces/setup-with-agent-button";
 import { ShadowDivider } from "../../elements/shadow-divider";
 import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "@langwatch/ui-host/errors";

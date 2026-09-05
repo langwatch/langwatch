@@ -3,7 +3,8 @@ import React, { useMemo } from "react";
 import { useLangyContextTarget } from "@langwatch/langy-web/surfaces/langy-context";
 import type { LangyContextTargetDescriptor } from "@langwatch/langy-web/surfaces/langy-context";
 import { useDensityTokens } from "../../hooks/use-density-tokens";
-import { useDensityStore, useRowPulseStore } from "../../../../../index";
+import { useDensityStore } from "../../../../../behavior/density.store";
+import { useRowPulseStore } from "../../../../../behavior/row-pulse.store";
 import type { TraceStatus } from "../../types/trace";
 import {
   SkeletonAddonRow,

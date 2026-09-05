@@ -1,6 +1,10 @@
 import { Drawer } from "../../drawer";
 import { DrawerSpotlights } from "../onboarding/spotlights/drawer-spotlights";
-import { DRAWER_DEFAULT_WIDTH_PX, DRAWER_MIN_WIDTH_PX, useDrawerStore } from "../../../../index";
+import {
+  DRAWER_DEFAULT_WIDTH_PX,
+  DRAWER_MIN_WIDTH_PX,
+  useDrawerStore,
+} from "../../../../behavior/drawer.store";
 import { KeyboardShortcutsHelp } from "./keyboard-shortcuts-help";
 import { ResizeRail } from "./panes/resize-rail";
 import { TraceDrawerContent } from "./trace-drawer-content";

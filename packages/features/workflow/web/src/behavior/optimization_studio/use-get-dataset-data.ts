@@ -7,7 +7,7 @@ import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-cont
 import { api } from "../../model/workflow-api-client";
 import type { Entry } from "@langwatch/workflow-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
-import { datasetDatabaseRecordsToInMemoryDataset } from "@langwatch/workflow-web";
+import { datasetDatabaseRecordsToInMemoryDataset } from "../../model/studio-dataset.utils";
 
 export const useGetDatasetData = ({
   dataset,

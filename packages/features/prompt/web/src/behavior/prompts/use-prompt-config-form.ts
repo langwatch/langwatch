@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import isEqual from "lodash-es/isEqual";
 import { useEffect, useMemo, useRef } from "react";
 import { type DeepPartial, useForm } from "react-hook-form";
-import { useModelLimits } from "@langwatch/model-provider-web/hooks/useModelLimits";
+import { useModelLimits } from "@langwatch/model-provider-web/surfaces/model-limits";
 import {
   buildDefaultFormValues,
   formSchema,
@@ -10,7 +10,7 @@ import {
   inputsAndOutputsToDemostrationColumns,
   type PromptConfigFormValues,
   refinedFormSchemaWithModelLimits,
-} from "@langwatch/prompt-web/surfaces/prompt-form";
+} from "../../surfaces/prompt-form";
 import { salvageValidData } from "@langwatch/design-system/zod-salvage";
 
 interface UsePromptConfigFormProps {

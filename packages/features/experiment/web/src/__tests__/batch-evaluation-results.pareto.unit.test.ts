@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { computeBTLeaderboard } from "@langwatch/experiment-web";
-import { computeParetoDominance } from "@langwatch/experiment-web";
-import type { BTLeaderboard, BTLeaderboardEntry, VariantMetrics } from "@langwatch/experiment-web";
+import { computeBTLeaderboard } from "../model/batch-evaluation-results.bt-leaderboard";
+import { computeParetoDominance } from "../ui/sections/batch-evaluation-results.pareto";
+import type {
+  BTLeaderboard,
+  BTLeaderboardEntry,
+} from "../model/batch-evaluation-results.bt-leaderboard";
+import type { VariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics";
 
 /**
  * Dominance is the one claim on the trade-off chart a reader acts on directly — "this

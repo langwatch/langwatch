@@ -24,7 +24,7 @@ import {
   type Output,
   OutputsSection,
   type OutputType,
-} from "@langwatch/prompt-web/components/outputs/OutputsSection";
+} from "@langwatch/prompt-web/surfaces/outputs-section";
 import {
   type FieldMapping,
   type Variable,
@@ -41,23 +41,23 @@ import {
   buildCodeConfig,
   DEFAULT_CODE,
   getCodeFromConfig,
-  useRegisterDrawerFooter,
-} from "@langwatch/workflow-web";
+} from "../../../../model/code-agent-config";
+import { useRegisterDrawerFooter } from "../../../elements/studio-drawer-footer";
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
 import { api } from "../../../../model/workflow-api-client";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../../../../behavior/use-workflow-store";
 import type { AgentComponent, Field as DslField } from "@langwatch/workflow-contract";
 import {
   buildAgentNodeData,
   nodeMatchesAgent,
   readCodeSnapshot,
   readHttpSnapshot,
-} from "@langwatch/workflow-web";
+} from "../../../../model/agent-node-data";
 import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
-} from "@langwatch/workflow-web";
+} from "../../../../model/edge-mapping";
 import { CodeEditorModal } from "../code/workflow-code-editor.transport";
 import { BasePropertiesPanel } from "./base-properties-panel";
 

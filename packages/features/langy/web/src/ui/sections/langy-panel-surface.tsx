@@ -1,8 +1,8 @@
 import { Box, type BoxProps } from "@chakra-ui/react";
 import { motion } from "motion/react";
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion";
-import "../../../../ui/elements/langy-theme.css";
-import { CARD } from "../../model/tokens";
+import { useReducedMotion } from "../../behavior/use-reduced-motion";
+import "../elements/langy-theme.css";
+import { CARD } from "../../model/asaplangy-tokens";
 
 const MotionBox = motion.create(Box);
 

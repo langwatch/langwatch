@@ -6,8 +6,8 @@ import {
   computeBTLeaderboard,
   type PairwiseComparison,
   type ScoreDifferenceCI,
-} from "@langwatch/experiment-web";
-import { areDistinguishable } from "@langwatch/experiment-web";
+} from "../model/batch-evaluation-results.bt-leaderboard";
+import { areDistinguishable } from "../model/batch-evaluation-results.score-separation";
 
 /**
  * The separation test is the root of every claim this feature makes, so it gets its own

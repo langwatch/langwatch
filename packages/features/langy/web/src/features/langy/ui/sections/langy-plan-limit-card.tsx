@@ -1,12 +1,12 @@
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { ArrowUpRight, Crown } from "lucide-react";
-import { LangyCard } from "../../../asaplangy";
+import { LangyCard } from "../../../../ui/sections/langy-card";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { usePlanManagementUrl } from "../../../../behavior/use-plan-management-url";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { trackEvent } from "../../../../model/tracking";
 import type { LangyToolErrorPresentation } from "../../model/logic/langy-tool-failure";
-import { useLangyStore } from "../../../../index";
+import { useLangyStore } from "../../../../behavior/langy.store";
 
 /**
  * A step that couldn't run because the plan ran out — and the way to change it.

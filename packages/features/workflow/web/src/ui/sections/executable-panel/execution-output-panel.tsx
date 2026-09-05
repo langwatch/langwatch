@@ -10,8 +10,8 @@ import {
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import { useDebounceValue } from "usehooks-ts";
-import { RenderInputOutput } from "@langwatch/trace-web/components/traces/RenderInputOutput";
-import { SpanDuration } from "@langwatch/trace-web/components/traces/SpanDetails";
+import { RenderInputOutput } from "@langwatch/trace-web/surfaces/render-input-output";
+import { SpanDuration } from "@langwatch/trace-web/surfaces/span-details";
 import { RedactedField } from "../redacted-field";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import type { ExecutionState } from "@langwatch/workflow-contract";

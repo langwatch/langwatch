@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeLineDiff, diffStat } from "@langwatch/coding-agent-web";
+import { computeLineDiff, diffStat } from "../trace/terminal-line-diff";
 
 describe("computeLineDiff", () => {
   it("marks identical lines as context", () => {

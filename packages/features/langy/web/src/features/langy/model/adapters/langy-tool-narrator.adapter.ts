@@ -1,4 +1,4 @@
-import type { LangyToolNarrator } from "../../../../index";
+import type { LangyToolNarrator } from "../../../../model/langy-thinking-line";
 import { describeToolCall, effectiveToolName } from "../logic/langy-tool-label";
 
 export const langyToolNarrator: LangyToolNarrator = {

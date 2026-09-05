@@ -18,7 +18,7 @@ import { applyHandledErrorToForm, showErrorToast } from "@langwatch/ui-host/erro
 import { FormServerError } from "@langwatch/workflow-web/surfaces/handled-error-views";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { EmojiPickerModal } from "@langwatch/workflow-web/optimization_studio/components/properties/modals/EmojiPickerModal";
+import { EmojiPickerModal } from "@langwatch/workflow-web/surfaces/emoji-picker-modal";
 import { getRandomWorkflowIcon } from "@langwatch/workflow-web/surfaces/workflow-icons";
 import { customEvaluatorTemplate } from "@langwatch/workflow-web/surfaces/workflow-templates";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";

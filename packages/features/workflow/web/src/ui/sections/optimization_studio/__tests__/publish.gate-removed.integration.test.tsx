@@ -12,7 +12,7 @@ const { mockCanPublish, mockRouterPush } = vi.hoisted(() => ({
   mockRouterPush: vi.fn(),
 }));
 
-vi.mock("@langwatch/workflow-web", () => ({
+vi.mock("../../../../behavior/use-workflow-store", () => ({
   useWorkflowStore: (selector: (s: any) => any) =>
     selector({
       workflow_id: "wf-1",

@@ -7,7 +7,10 @@ import { Button, Text, VStack } from "@chakra-ui/react";
 import { asJsonDocument } from "@langwatch/langy-contract";
 import { Search } from "lucide-react";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { buildTraceExplorerHref, readTraceSearchQuery } from "../../../../../index";
+import {
+  buildTraceExplorerHref,
+  readTraceSearchQuery,
+} from "../../../../../model/langy-trace-explorer-link";
 import {
   buildSurfaceHref,
   type CapabilityCardInput,
@@ -15,7 +18,7 @@ import {
   extractToolText,
   summaryLines,
 } from "../../../model/capabilities/capability-registry";
-import { collectionOf, textValue, totalOf } from "../../../../../index";
+import { collectionOf, textValue, totalOf } from "../../../../../model/langy-cli-result-document";
 import { CapabilityRow, LangyCapabilityCard } from "./langy-capability-card";
 
 interface ParsedTrace {

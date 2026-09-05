@@ -3,7 +3,7 @@ import { createContext, type ReactNode, useContext, useMemo } from "react";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids";
 import { type TraceAnchor, useAnchoredAnnotations } from "../../hooks/use-anchored-annotations";
 import { AnchorCommentButton } from "../anchored-comments/anchor-comment-button";
-import { TranscriptRenderProvider } from "../../../../../index";
+import { TranscriptRenderProvider } from "../../../../elements/transcript-render-ports";
 
 interface MessageCommentScopeValue {
   /** The trace a comment left on a message in this transcript is about. */

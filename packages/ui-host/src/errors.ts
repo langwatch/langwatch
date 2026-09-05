@@ -135,3 +135,35 @@ export function applyHandledErrorToForm({
   });
   return true;
 }
+
+/**
+ * Failures a global interceptor has already surfaced — as a modal, or as its own
+ * bespoke toast. The registry lives in the host rather than in each feature so
+ * that a mark made by one feature's interceptor is seen by every other feature's
+ * `onError`; a per-package copy silently reports the same refusal twice.
+ */
+const globallyHandled = new WeakSet<Error>();
+
+/** Records that a global interceptor has already reported this failure. */
+export function markHandledGlobally(error: Error): void {
+  globallyHandled.add(error);
+}
+
+/**
+ * Whether a global interceptor already reported this failure, which is a
+ * component-level `onError`'s signal to stay quiet rather than duplicate it.
+ */
+export function isHandledByGlobalHandler(error: unknown): boolean {
+  return error instanceof Error && globallyHandled.has(error);
+}
+
+/**
+ * Whether a failure carries the transport's 404. Read structurally off the
+ * serialised envelope rather than through the tRPC client class, so the host
+ * stays clear of the transport its features are not allowed to name.
+ */
+export function isNotFoundError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const data = (error as { data?: { httpStatus?: unknown } }).data;
+  return data?.httpStatus === 404;
+}

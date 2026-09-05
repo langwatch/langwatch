@@ -21,7 +21,8 @@ import {
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility";
 import { usePrefetchSpanDetail } from "../hooks/use-prefetch-span-detail";
-import { formatDuration, useDrawerStore } from "../../../../index";
+import { useDrawerStore } from "../../../../behavior/drawer.store";
+import { formatDuration } from "../../../../model/display-formatters";
 import { spanTypeColor } from "../utils/span-type-color";
 import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu";
 

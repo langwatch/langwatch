@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeVariantMetrics } from "@langwatch/experiment-web";
-import type { BatchResultRow, BatchTargetOutput } from "@langwatch/experiment-web";
+import { computeVariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics";
+import type {
+  BatchResultRow,
+  BatchTargetOutput,
+} from "../ui/sections/batch-evaluation-results.types";
 
 const target = (overrides: Partial<BatchTargetOutput> = {}): BatchTargetOutput => ({
   targetId: "variant-a",

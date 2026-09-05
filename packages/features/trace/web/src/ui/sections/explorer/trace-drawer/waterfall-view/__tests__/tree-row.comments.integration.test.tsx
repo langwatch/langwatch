@@ -62,7 +62,7 @@ vi.mock("../../../../../../behavior/trace-api", () => ({
   },
 }));
 
-import { useSpanHoverStore } from "../../../../../../index";
+import { useSpanHoverStore } from "../../../../../../behavior/span-hover.store";
 import { TreeRow } from "../tree-row";
 import type { WaterfallTreeNode } from "../types";
 

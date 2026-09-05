@@ -10,7 +10,7 @@ import { runParameterValuesSchema } from "@langwatch/scenario-contract";
 import { buildDisplayTitle } from "@langwatch/suite-web/surfaces/run-formatters";
 import { useTargetNameMap } from "../use-target-name-map";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
-import { shouldShowNoResponse } from "../..";
+import { shouldShowNoResponse } from "../../model/scenario-run-status.utils";
 import type { ScenarioRunState } from "./use-run-state-stream";
 
 /**

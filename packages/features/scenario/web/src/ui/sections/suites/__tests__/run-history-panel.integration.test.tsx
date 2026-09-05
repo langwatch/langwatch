@@ -14,7 +14,7 @@ vi.mock("posthog-js", () => ({
 
 // The empty states carry the Setup via Agent menu, whose langy hooks need
 // app context these tests do not build; the control has its own tests.
-vi.mock("@langwatch/trace-web/components/SetupWithAgentButton", () => ({
+vi.mock("@langwatch/trace-web/surfaces/setup-with-agent-button", () => ({
   SetupWithAgentButton: () => null,
 }));
 
@@ -22,7 +22,7 @@ vi.mock("@langwatch/trace-web/surfaces/page-visibility", () => ({
   usePageVisibility: () => true,
 }));
 
-vi.mock("@langwatch/trace-web/hooks/useSSESubscription", () => ({
+vi.mock("@langwatch/trace-web/surfaces/sse-subscription", () => ({
   useSSESubscription: vi.fn(() => ({
     connectionState: "disconnected",
     isConnected: false,

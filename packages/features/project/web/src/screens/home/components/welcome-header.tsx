@@ -1,6 +1,6 @@
 import { Heading } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
-import { SERIF } from "@langwatch/langy-web/asaplangy";
+import { SERIF } from "@langwatch/langy-web/surfaces/asaplangy";
 import { useProjectHomeHost } from "../../../model/project-home-host";
 
 /**

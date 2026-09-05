@@ -12,10 +12,10 @@ import { useEffect, useMemo } from "react";
 import { LANGY_SKILLS, type LangySkill } from "../../../../model/shared/langy/langy-skills";
 import {
   absorbContextTarget,
-  type LangyContextChip,
-  type LangyContextTargetDescriptor,
+  type LangyContextTarget as LangyContextTargetDescriptor,
   useLangyContextTargetStore,
-} from "../../../../index";
+} from "../../../../behavior/langy-context-target.store";
+import { type LangyContextChip } from "../../../../behavior/langy.store";
 
 /**
  * The composer's command palette — `/` for skills, `#` for context.

@@ -3,14 +3,13 @@
 // Internal pages don't need to be server rendering
 
 import { HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
+import { ScenarioArchiveDialog } from "../../ui/elements/scenario-archive-dialog";
 import {
-  ScenarioArchiveDialog,
   ScenarioBatchActionBar as BatchActionBar,
   ScenarioEmptyState,
   ScenarioLabelFilter as LabelFilterDropdown,
-  ScenarioWelcomeModal,
-  ScenarioWelcomeScreen,
-} from "../..";
+} from "../../ui/elements/scenario-library-controls";
+import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "../../ui/elements/scenario-welcome";
 import { ReturnToNewSimulationsBanner } from "../../ui/sections/suites/return-to-new-simulations-banner";
 import { useAgentTestingRedirect } from "../../behavior/suites/use-agent-testing-redirect";
 import { PageLayout } from "@langwatch/design-system/page-layout";

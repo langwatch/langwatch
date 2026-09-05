@@ -44,12 +44,9 @@ vi.mock("@langwatch/ui-host/errors", () => ({
 
 // Stub the monaco editor and the variables section so the test stays focused on
 // the drawer's create-vs-edit behavior without pulling in heavy editors.
-vi.mock(
-  "@langwatch/workflow-web/optimization_studio/components/code/workflow-code-editor.transport",
-  () => ({
-    CodeEditor: ({ code }: { code: string }) => <div data-testid="code-editor">{code}</div>,
-  }),
-);
+vi.mock("@langwatch/workflow-web/surfaces/code-editor-transport", () => ({
+  CodeEditor: ({ code }: { code: string }) => <div data-testid="code-editor">{code}</div>,
+}));
 vi.mock("@langwatch/prompt-web/surfaces/variables", () => ({
   VariablesSection: () => <div data-testid="variables-section" />,
 }));

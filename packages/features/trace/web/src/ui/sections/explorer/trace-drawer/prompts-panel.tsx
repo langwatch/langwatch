@@ -14,13 +14,13 @@ import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/promp
 import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { usePromptByHandle } from "../hooks/use-prompt-by-handle";
 import { useSpansFull } from "../hooks/use-spans-full";
-import type { PromptReference } from "../../../../index";
+import type { PromptReference } from "../../../../model/prompt-attributes";
+import { formatDuration } from "../../../../model/display-formatters";
 import {
   extractPromptReference,
-  formatDuration,
   parseTracePromptIds,
   promptReferenceKey,
-} from "../../../../index";
+} from "../../../../model/prompt-attributes";
 
 interface PromptsPanelProps {
   trace: TraceHeader;

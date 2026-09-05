@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getSuggestionState, PARAMETER_LINE_GRAMMAR, SEARCH_GRAMMAR } from "../../../index";
+import {
+  getSuggestionState,
+  PARAMETER_LINE_GRAMMAR,
+  SEARCH_GRAMMAR,
+} from "../../../model/get-suggestion-state";
 
 describe("getSuggestionState", () => {
   describe("given an empty editor", () => {

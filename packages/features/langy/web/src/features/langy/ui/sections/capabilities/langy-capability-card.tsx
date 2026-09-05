@@ -1,12 +1,14 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { toRelativeSameOriginHref } from "@langwatch/langy-contract";
 import {
-  CapabilityRowSkeletons,
-  LangyCapabilityCard as LangyCapabilityCardPresentation,
   type CapabilityIconName,
   type CapabilitySurface,
+} from "../../../../../model/langy-capability-catalog";
+import {
+  CapabilityRowSkeletons,
+  LangyCapabilityCard as LangyCapabilityCardPresentation,
   type LangyCapabilityTone,
-} from "../../../../../index";
+} from "../../../../../ui/sections/langy-capability-card";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { useSpaLinkClick } from "../../../behavior/logic/spa-link";

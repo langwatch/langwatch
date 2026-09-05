@@ -1,6 +1,6 @@
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { useFilterStore } from "../../../../index";
+import { useFilterStore } from "../../../../behavior/filter.store";
 import { AiPromptInput } from "../ai/ai-prompt-input";
 import { useAiTraceAction } from "../ai/use-ai-trace-action";
 

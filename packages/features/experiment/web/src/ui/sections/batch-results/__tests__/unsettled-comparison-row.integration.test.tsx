@@ -13,11 +13,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 
-import { buildPairwiseComparisons } from "@langwatch/experiment-web";
+import { buildPairwiseComparisons } from "../../batch-evaluation-results.pairwise";
 import { ComparisonWinnerCell, resolveWinner } from "../comparison-winner-cell";
-import { buildCsvData, buildCsvHeaders } from "@langwatch/experiment-web";
-import type { BatchComparisonColumn, BatchEvaluationData } from "@langwatch/experiment-web";
-import { transformBatchEvaluationData } from "@langwatch/experiment-web";
+import { buildCsvData, buildCsvHeaders } from "../../batch-evaluation-results.csv";
+import type {
+  BatchComparisonColumn,
+  BatchEvaluationData,
+} from "../../batch-evaluation-results.types";
+import { transformBatchEvaluationData } from "../../batch-evaluation-results.types";
 import { WinRateChart } from "../win-rate-chart";
 
 /** What select_best_compare stores when its two passes disagree. */

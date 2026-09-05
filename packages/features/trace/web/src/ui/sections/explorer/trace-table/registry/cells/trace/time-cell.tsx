@@ -1,7 +1,8 @@
 import { Box, HStack, Icon, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
-import { formatISOTimestamp, useTimeFormatStore } from "../../../../../../../index";
+import { useTimeFormatStore } from "../../../../../../../behavior/time-format.store";
+import { formatISOTimestamp } from "../../../../../../../model/display-formatters";
 import type { TraceListItem } from "../../../../types/trace";
 import { useRelativeTime } from "../../../../utils/use-relative-time";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell";

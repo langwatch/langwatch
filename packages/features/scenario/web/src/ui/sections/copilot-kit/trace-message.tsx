@@ -1,6 +1,6 @@
 import { Button, HStack, type StackProps } from "@chakra-ui/react";
 import { LuListTree } from "react-icons/lu";
-import { TracePreviewHoverCard } from "@langwatch/trace-web/explorer/components/TraceIdPeek";
+import { TracePreviewHoverCard } from "@langwatch/trace-web/surfaces/trace-id-peek";
 import { useTraceDetailsDrawer } from "../../../behavior/use-trace-details-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { api } from "../../../behavior/scenario-api";

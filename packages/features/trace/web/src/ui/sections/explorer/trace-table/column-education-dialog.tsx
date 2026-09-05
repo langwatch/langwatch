@@ -10,7 +10,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from "../../dialog";
-import { useColumnEducationStore } from "../../../../index";
+import { useColumnEducationStore } from "../../../../behavior/column-education.store";
 
 /**
  * One-off teaching dialog that fires the first time the operator tries to drag a column

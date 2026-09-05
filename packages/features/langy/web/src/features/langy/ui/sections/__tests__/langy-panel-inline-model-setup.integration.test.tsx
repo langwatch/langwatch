@@ -104,7 +104,9 @@ vi.mock("../../../../../behavior/langy-api", async () => {
     },
     virtualKeys: { list: { useQuery: () => ({ data: undefined, isLoading: false }) } },
     github: {
-      getConnectionStatus: { useQuery: () => ({ data: undefined, isLoading: false, isError: true }) },
+      getConnectionStatus: {
+        useQuery: () => ({ data: undefined, isLoading: false, isError: true }),
+      },
       disconnect: { useMutation: () => ({ mutate: () => undefined, isPending: false }) },
     },
   };
@@ -113,8 +115,8 @@ vi.mock("../../../../../behavior/langy-api", async () => {
 });
 
 import { LangySidecar } from "../langy-panel";
-import { LangyProvider } from "../langy-context";
-import { useLangyStore } from "../../../../../index";
+import { LangyProvider } from "../../../../../ui/sections/langy-page-context";
+import { useLangyStore } from "../../../../../behavior/langy.store";
 import {
   LangyHostPort,
   LangyHostProvider,
@@ -186,13 +188,15 @@ describe("given a project that already has a default model configured", () => {
   describe("when the user opens the Langy panel", () => {
     /** @scenario "Langy skips the setup prompt when a model already resolves" */
     it("renders the normal empty state and no model setup prompt", async () => {
-      resolvedDefaultRef.current = { data: { model: "gpt-5-mini" }, isLoading: false, isError: false };
+      resolvedDefaultRef.current = {
+        data: { model: "gpt-5-mini" },
+        isLoading: false,
+        isError: false,
+      };
 
       renderPanel();
 
-      expect(
-        await screen.findByText(/Just type away/),
-      ).toBeInTheDocument();
+      expect(await screen.findByText(/Just type away/)).toBeInTheDocument();
       expect(screen.queryByText("Langy needs a model to get started")).not.toBeInTheDocument();
     });
   });
@@ -209,9 +213,7 @@ describe("given the project's model resolver fails to answer", () => {
       // A positive anchor first: the ordinary empty state is what a failed
       // lookup must fall back to, not merely "the setup prompt is absent",
       // which would also hold for a panel that rendered nothing at all.
-      expect(
-        await screen.findByText(/Just type away/),
-      ).toBeInTheDocument();
+      expect(await screen.findByText(/Just type away/)).toBeInTheDocument();
 
       await waitFor(() => {
         expect(screen.queryByText("Langy needs a model to get started")).not.toBeInTheDocument();

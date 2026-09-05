@@ -2,7 +2,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { api } from "../../../../behavior/trace-api";
 import { useSharedTrace } from "../context/shared-trace-context";
-import { isPreviewTraceId } from "../../../../index";
+import { isPreviewTraceId } from "../../../../model/preview-trace-id";
 import type { ConversationTurn } from "../../../../model/explorer/conversation-turn";
 import { useDrawerProjectId } from "./use-drawer-project-id";
 

@@ -3,8 +3,10 @@ import { BookOpen } from "lucide-react";
 import type React from "react";
 import { memo, useMemo } from "react";
 import { SEARCH_FIELDS, type SearchFieldMeta } from "@langwatch/trace-contract";
-import type { FacetGroupDef, SuggestionState } from "../../../../index";
-import { FACET_GROUPS, getFacetGroupId, GROUP_ICONS, useUIStore } from "../../../../index";
+import type { FacetGroupDef } from "../../../../behavior/facet-constants";
+import type { SuggestionState } from "../../../../model/get-suggestion-state";
+import { FACET_GROUPS, getFacetGroupId, GROUP_ICONS } from "../../../../behavior/facet-constants";
+import { useUIStore } from "../../../../behavior/ui.store";
 import { getFacetIcon } from "../filter-sidebar/utils";
 import type { SuggestionRow, SuggestionUIState } from "./suggestion-ui";
 

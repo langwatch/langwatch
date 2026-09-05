@@ -1,4 +1,4 @@
-import type { TraceListCursor } from "../../../../index";
+import type { TraceListCursor } from "../../../../behavior/filter.store";
 import type { TraceListItem } from "../types/trace";
 import { useNewlyArrivedTraceIds } from "./use-newly-arrived-trace-ids";
 import { useTraceListAnnotations } from "./use-trace-list-annotations";

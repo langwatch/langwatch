@@ -12,7 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ComparisonCharts } from "../comparison-charts";
-import type { ComparisonRunData } from "@langwatch/experiment-web";
+import type { ComparisonRunData } from "../../batch-evaluation-results.types";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

@@ -2,7 +2,7 @@ import { CLI_SUBRESOURCE_VERBS } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 import { FEATURES } from "../../../../../model/shared/langy/feature-map";
 import { extractPlatformUrl } from "@langwatch/langy-contract";
-import { CAPABILITY_CATALOG } from "../../../../../index";
+import { CAPABILITY_CATALOG } from "../../../../../model/langy-capability-catalog";
 import {
   buildResourceHref,
   buildSurfaceHref,

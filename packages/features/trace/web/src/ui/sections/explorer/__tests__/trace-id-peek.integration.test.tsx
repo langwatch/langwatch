@@ -34,8 +34,7 @@ vi.mock("../../../../behavior/use-drawer", () => ({
 // partition-pruning hint, so capture what the hover hands the summary; that the
 // summary forwards it to the header query is asserted in the package, beside
 // the query.
-vi.mock("../../../../index", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../../index")>()),
+vi.mock("../../trace-peek-summary", () => ({
   TracePeekSummary: (input: HeaderInput) => {
     capturedHeaderInputs.push(input);
     return null;

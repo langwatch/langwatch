@@ -16,7 +16,7 @@ vi.mock("../../../../ui/sections/explorer/hooks/use-facet-search", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
-import { useFacetLensStore } from "../../../../index";
+import { useFacetLensStore } from "../../../facet-lens.store";
 import { FacetSection } from "../../../../ui/sections/explorer/filter-sidebar/facet-section";
 import type { FacetItem, FacetValueState } from "../types";
 

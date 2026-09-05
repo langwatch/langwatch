@@ -9,19 +9,22 @@ import { useUpdateNodeInternals } from "@xyflow/react";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Database, Plus, Upload } from "react-feather";
 
-import { DatasetPickerList } from "@langwatch/dataset-web/components/datasets/DatasetPickerList";
+import { DatasetPickerList } from "@langwatch/dataset-web/surfaces/dataset-picker-list";
 import {
   DatasetEditorTable,
   type InMemoryDataset,
-} from "@langwatch/dataset-web/components/datasets/editor/DatasetEditorTable";
-import { UploadCSVDrawer } from "@langwatch/dataset-web/components/datasets/UploadCSVDrawer";
+} from "@langwatch/dataset-web/surfaces/dataset-editor-table";
+import { UploadCSVDrawer } from "@langwatch/dataset-web/surfaces/upload-csv-drawer";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store";
 import type { Component, Entry } from "@langwatch/workflow-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
-import { datasetColumnsToFields, inMemoryDatasetToNodeDataset } from "@langwatch/workflow-web";
+import {
+  datasetColumnsToFields,
+  inMemoryDatasetToNodeDataset,
+} from "../../../model/studio-dataset.utils";
 
 const DRAFT_DATASET_COLUMNS: DatasetColumns = [
   { name: "input", type: "string" },

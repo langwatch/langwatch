@@ -8,12 +8,12 @@ import { AISparklesLoader } from "@langwatch/model-provider-web/surfaces/ai-spar
 import {
   allModelOptions,
   useModelSelectionOptions,
-} from "@langwatch/model-provider-web/components/ModelSelector";
+} from "@langwatch/model-provider-web/surfaces/model-selector";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
 import { api } from "../../../model/workflow-api-client";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { useVersionState } from "./history";
 

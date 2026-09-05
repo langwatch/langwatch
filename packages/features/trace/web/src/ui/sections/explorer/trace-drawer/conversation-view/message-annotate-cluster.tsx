@@ -4,7 +4,10 @@ import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dia
 import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate";
 import { showErrorToast } from "../../../errors";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
-import { isSameAnnotationTarget, useAnnotationDraftStore } from "../../../../../index";
+import {
+  isSameAnnotationTarget,
+  useAnnotationDraftStore,
+} from "../../../../../behavior/annotation-draft.store";
 import {
   HoverActionButton,
   HoverActionCluster,

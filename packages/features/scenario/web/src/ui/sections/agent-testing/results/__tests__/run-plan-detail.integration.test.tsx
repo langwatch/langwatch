@@ -169,11 +169,11 @@ vi.mock("../../../../../behavior/auth-session", () => ({
   }),
 }));
 
-vi.mock("@langwatch/model-provider-web/hooks/useModelProvidersSettings", () => ({
+vi.mock("@langwatch/model-provider-web/surfaces/model-provider-settings", () => ({
   useModelProvidersSettings: () => ({ hasEnabledProviders: true }),
 }));
 
-vi.mock("@langwatch/model-provider-web/components/ModelSelector", async (importOriginal) => {
+vi.mock("@langwatch/model-provider-web/surfaces/model-selector", async (importOriginal) => {
   const mod = await importOriginal<object>();
   return {
     ...mod,

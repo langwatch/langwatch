@@ -19,8 +19,10 @@ const { mockResolvedDefault, mockGenerateMutateAsync, mockCommitMutateAsync, moc
     mockPostEvent: vi.fn(),
   }));
 
-vi.mock("@langwatch/workflow-web", () => ({
+vi.mock("../../../../behavior/use-workflow-store", () => ({
   useWorkflowStore: (selector: (s: unknown) => unknown) => selector(storeState),
+}));
+vi.mock("../../../../behavior/workflow-store", () => ({
   serializeWorkflow: (workflow: unknown) => workflow,
 }));
 vi.mock("../../../../behavior/studio-host/use-organization-team-project", () => ({

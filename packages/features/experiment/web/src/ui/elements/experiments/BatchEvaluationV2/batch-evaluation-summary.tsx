@@ -12,7 +12,7 @@ import type {
 import type { ExperimentRun } from "@langwatch/experiment-contract";
 import { formatMilliseconds } from "@langwatch/trace-web/surfaces/format-milliseconds";
 import { formatMoney } from "@langwatch/design-system/format-money";
-import { HoverableBigText } from "@langwatch/workflow-web/components/HoverableBigText";
+import { HoverableBigText } from "@langwatch/workflow-web/surfaces/hoverable-big-text";
 import { EvaluationProgressBar } from "./evaluation-progress-bar";
 
 export function BatchEvaluationV2EvaluationSummary({

@@ -970,12 +970,34 @@ tester.run("package-boundaries: web feature surfaces", plugin.rules["package-bou
     },
     {
       filename: "packages/features/prompt/web/src/ui/elements/briefing.tsx",
-      code: 'import { asaplangy } from "@langwatch/langy-web/asaplangy"; export { asaplangy };',
+      code: 'import { TraceDrawers } from "@langwatch/trace-web/drawers"; export { TraceDrawers };',
       errors: [{ messageId: "crossFeature" }],
     },
     {
       filename: "packages/features/prompt/web/src/ui/elements/agents.tsx",
       code: 'import { AgentManagementScreen } from "@langwatch/agent-web/screens/agent-management"; export { AgentManagementScreen };',
+      errors: [{ messageId: "crossFeature" }],
+    },
+  ],
+});
+
+/** @scenario "A web package's test seam is reachable from a test source" */
+tester.run("package-boundaries: web test seam", plugin.rules["package-boundaries"], {
+  valid: [
+    {
+      filename:
+        "packages/features/scenario/web/src/behavior/suites/__tests__/cancel-button.integration.test.tsx",
+      code: 'import { makeScenarioRunData } from "@langwatch/suite-web/testing"; export { makeScenarioRunData };',
+    },
+    {
+      filename: "apps/ui/src/features/simulations/__tests__/runs.integration.test.tsx",
+      code: 'import { makeScenarioRunData } from "@langwatch/suite-web/testing"; export { makeScenarioRunData };',
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/scenario/web/src/behavior/suites/run-history.ts",
+      code: 'import { makeScenarioRunData } from "@langwatch/suite-web/testing"; export { makeScenarioRunData };',
       errors: [{ messageId: "crossFeature" }],
     },
   ],

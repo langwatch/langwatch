@@ -3,7 +3,8 @@ import { useMemo } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import type { TraceEventRollup } from "@langwatch/trace-contract";
 import { api } from "../../../../behavior/trace-api";
-import { useFilterStore, useViewStore } from "../../../../index";
+import { useFilterStore } from "../../../../behavior/filter.store";
+import { useViewStore } from "../../../../behavior/view.store";
 import type { TraceListItem } from "../types/trace";
 import { NO_TRACE_EVENTS } from "../types/trace";
 

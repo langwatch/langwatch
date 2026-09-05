@@ -6,7 +6,9 @@ import { createPortal } from "react-dom";
 import { useDebouncedValue } from "../../../../behavior/explorer/use-debounced-value";
 import { useFacetSearch } from "../hooks/use-facet-search";
 import { useTraceFacets } from "../hooks/use-trace-facets";
-import { dedupeByValue, useFilterStore, useUIStore } from "../../../../index";
+import { useFilterStore } from "../../../../behavior/filter.store";
+import { useUIStore } from "../../../../behavior/ui.store";
+import { dedupeByValue } from "../../../../model/dedupe-by-value";
 
 const MAX_VALUES_PER_PAGE = 60;
 const POPOVER_WIDTH = 320;

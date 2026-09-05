@@ -5,7 +5,9 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { TraceFindBar, useFindStore, type TraceSearchItem } from "../../../index";
+import { type TraceSearchItem } from "../../../behavior/find-search-index";
+import { useFindStore } from "../../../behavior/find-store";
+import { TraceFindBar } from "../trace-find-bar";
 
 Element.prototype.scrollIntoView = vi.fn();
 

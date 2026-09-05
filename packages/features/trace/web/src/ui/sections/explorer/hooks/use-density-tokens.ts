@@ -1,4 +1,4 @@
-import { useDensityStore } from "../../../../index";
+import { useDensityStore } from "../../../../behavior/density.store";
 
 /**
  * All density-dependent sizing in one place.

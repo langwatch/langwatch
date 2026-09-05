@@ -49,14 +49,10 @@ vi.mock("../../../../../behavior/filter.store", () => ({
     }),
 }));
 
-vi.mock("../../../../../index", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../../../index")>();
-
-  return {
-    ...actual,
-    useUIStore: (selector: (state: unknown) => unknown) => selector({ setSyntaxHelpOpen: vi.fn() }),
-  };
-});
+vi.mock("../../../../../behavior/ui.store", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useUIStore: (selector: (state: unknown) => unknown) => selector({ setSyntaxHelpOpen: vi.fn() }),
+}));
 
 import { TokenValuePicker } from "../token-value-picker";
 

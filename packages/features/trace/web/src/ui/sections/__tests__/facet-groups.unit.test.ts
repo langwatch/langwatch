@@ -13,7 +13,7 @@ import {
   SECTION_ORDER,
   SPAN_ATTRIBUTES_SECTION_KEY,
   sectionOrderForPerspective,
-} from "../../../index";
+} from "../../../behavior/facet-constants";
 
 /**
  * Round-5 refined the 9-group AI-observability taxonomy into 12 finer sub-groups (Cost

@@ -6,8 +6,8 @@ import {
   useSessionGroups,
 } from "../hooks/use-session-groups";
 import { useTraceList } from "../hooks/use-trace-list";
-import type { PageCursor } from "../../../../index";
-import { rowKindForGrouping, useEffectiveLens } from "../../../../index";
+import type { PageCursor } from "../../../../behavior/filter.store";
+import { rowKindForGrouping, useEffectiveLens } from "../../../../behavior/view.store";
 import { ConversationLensBody } from "./conversation-lens-body";
 import { EmptyFilterState } from "./empty-filter-state";
 import { GroupLensBody } from "./group-lens-body";

@@ -1,6 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import type React from "react";
-import { useDensityStore } from "../../../index";
+import { useDensityStore } from "../../../behavior/density.store";
 
 export const DensityProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const density = useDensityStore((s) => s.density);

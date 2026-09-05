@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { buildCsvData, buildCsvHeaders, generateCsvContent } from "@langwatch/experiment-web";
+import {
+  buildCsvData,
+  buildCsvHeaders,
+  generateCsvContent,
+} from "../ui/sections/batch-evaluation-results.csv";
 import type {
   BatchComparisonColumn,
   BatchEvaluationData,
   BatchTargetOutput,
-} from "@langwatch/experiment-web";
-import { transformBatchEvaluationData } from "@langwatch/experiment-web";
+} from "../ui/sections/batch-evaluation-results.types";
+import { transformBatchEvaluationData } from "../ui/sections/batch-evaluation-results.types";
 
 const createMinimalData = (overrides: Partial<BatchEvaluationData> = {}): BatchEvaluationData => ({
   runId: "run-1",

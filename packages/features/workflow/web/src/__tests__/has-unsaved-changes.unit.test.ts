@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { Component, Evaluator, Signature } from "@langwatch/workflow-contract";
-import { hasUnsavedChanges } from "@langwatch/workflow-web";
+import { hasUnsavedChanges } from "../model/unsaved-changes";
 
 describe("hasUnsavedChanges", () => {
   describe("when node data has no local changes", () => {

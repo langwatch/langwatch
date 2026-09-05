@@ -1,6 +1,6 @@
 export * from "../../behavior/langy-context-chips";
 export * from "../../behavior/use-langy-context-target";
-export * from "./langy-context-target";
+export * from "../../ui/sections/langy-context-target";
 export {
   absorbContextTarget,
   LANGY_CONTEXT_DRAG_MIME,

@@ -28,31 +28,33 @@ vi.mock("../../hooks/use-trace-facets", () => ({
   }),
 }));
 
-vi.mock("../../../../../index", async (importOriginal) => {
-  const traceWeb = await importOriginal<typeof import("../../../../../index")>();
-
-  return {
-    ...traceWeb,
-    useUIStore: (selector: (state: Record<string, unknown>) => unknown) =>
-      selector({
-        toggleSidebar: vi.fn(),
-        facetManagerOpen: false,
-        setFacetManagerOpen: mockSetFacetManagerOpen,
-        sidebarCollapsed: false,
-        sidebarWidth: null,
-      }),
-    useDensityStore: (selector: (state: Record<string, unknown>) => unknown) =>
-      selector({ density: "comfortable" }),
-    useFacetVisibilityStore: (selector: (state: Record<string, unknown>) => unknown) =>
-      selector({
-        showFacet: vi.fn(),
-        hideFacet: vi.fn(),
-        resetAll: vi.fn(),
-        hydrateFromStorage: vi.fn(),
-      }),
-    selectVisibilityFor: () => ({ hidden: [], shown: [] }),
-  };
-});
+vi.mock("../../../../../behavior/density.store", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useDensityStore: (selector: (state: Record<string, unknown>) => unknown) =>
+    selector({ density: "comfortable" }),
+}));
+vi.mock("../../../../../behavior/facet-visibility.store", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useFacetVisibilityStore: (selector: (state: Record<string, unknown>) => unknown) =>
+    selector({
+      showFacet: vi.fn(),
+      hideFacet: vi.fn(),
+      resetAll: vi.fn(),
+      hydrateFromStorage: vi.fn(),
+    }),
+  selectVisibilityFor: () => ({ hidden: [], shown: [] }),
+}));
+vi.mock("../../../../../behavior/ui.store", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useUIStore: (selector: (state: Record<string, unknown>) => unknown) =>
+    selector({
+      toggleSidebar: vi.fn(),
+      facetManagerOpen: false,
+      setFacetManagerOpen: mockSetFacetManagerOpen,
+      sidebarCollapsed: false,
+      sidebarWidth: null,
+    }),
+}));
 
 vi.mock("../../../../../behavior/filter.store", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>

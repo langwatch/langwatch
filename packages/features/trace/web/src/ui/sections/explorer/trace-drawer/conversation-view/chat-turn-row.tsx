@@ -12,13 +12,15 @@ import {
   useTextTranslation,
 } from "../../hooks/use-text-translation";
 import {
+  isSessionMarked,
+  useAnnotationQueueSessionStore,
+} from "../../../../../behavior/annotation-queue-session.store";
+import {
   formatCost,
   formatDuration,
   formatRelativeTimeAgo,
-  isSessionMarked,
-  isTerminalOrigin,
-  useAnnotationQueueSessionStore,
-} from "../../../../../index";
+} from "../../../../../model/display-formatters";
+import { isTerminalOrigin } from "../../../../../model/terminal-origin";
 import type { TraceListItem } from "../../types/trace";
 import {
   Bubble,

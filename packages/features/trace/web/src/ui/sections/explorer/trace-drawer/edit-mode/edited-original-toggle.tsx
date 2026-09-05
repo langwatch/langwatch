@@ -2,8 +2,10 @@ import { Button, HStack, Icon, Text } from "@chakra-ui/react";
 import { LuGitCompare } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useTraceEditOverlay } from "../../hooks/use-trace-edit-overlay";
-import type { TraceOverlayView } from "../../../../../index";
-import { formatAbsoluteTime, useDrawerStore, useTraceEditStore } from "../../../../../index";
+import type { TraceOverlayView } from "../../../../../behavior/trace-edit.store";
+import { useDrawerStore } from "../../../../../behavior/drawer.store";
+import { useTraceEditStore } from "../../../../../behavior/trace-edit.store";
+import { formatAbsoluteTime } from "../../../../../model/display-formatters";
 import { SegmentedToggle } from "../../../../elements/explorer/trace-drawer/segmented-toggle";
 import { TraceEditDiffDialog } from "../trace-edit-diff-dialog";
 

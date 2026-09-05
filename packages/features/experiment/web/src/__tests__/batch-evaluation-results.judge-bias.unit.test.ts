@@ -4,8 +4,8 @@ import {
   computeJudgeIndependence,
   computeVerbosityProfile,
   modelFamily,
-} from "@langwatch/experiment-web";
-import type { BatchResultRow } from "@langwatch/experiment-web";
+} from "../ui/sections/batch-evaluation-results.judge-bias";
+import type { BatchResultRow } from "../ui/sections/batch-evaluation-results.types";
 
 const row = (index: number, outputs: Record<string, string | null>): BatchResultRow => ({
   index,

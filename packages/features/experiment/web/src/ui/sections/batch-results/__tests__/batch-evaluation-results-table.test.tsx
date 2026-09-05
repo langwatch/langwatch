@@ -11,7 +11,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BatchEvaluationResultsTable } from "../batch-evaluation-results-table";
-import type { BatchEvaluationData, ComparisonRunData } from "@langwatch/experiment-web";
+import type { BatchEvaluationData, ComparisonRunData } from "../../batch-evaluation-results.types";
 
 // Wrapper with Chakra provider
 const Wrapper = ({ children }: { children: ReactNode }) => (

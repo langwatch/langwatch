@@ -16,8 +16,8 @@ import {
   MenuRoot,
   MenuSeparator,
 } from "@langwatch/design-system/menu";
-import type { LensConfig } from "../../../../index";
-import { useViewStore } from "../../../../index";
+import type { LensConfig } from "../../../../behavior/view.store";
+import { useViewStore } from "../../../../behavior/view.store";
 import { LensNameDialog } from "./lens-name-dialog";
 
 interface LensTabProps {

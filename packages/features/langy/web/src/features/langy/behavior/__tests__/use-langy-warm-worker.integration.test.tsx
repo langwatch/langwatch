@@ -6,7 +6,7 @@
 import { cleanup, renderHook } from "@testing-library/react";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useLangyStore } from "../../../../index";
+import { useLangyStore } from "../../../../behavior/langy.store";
 import { useLangyWarmWorker } from "../use-langy-warm-worker";
 
 type WarmInput = {

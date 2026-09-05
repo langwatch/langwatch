@@ -2,7 +2,7 @@ import { Text } from "@chakra-ui/react";
 import type { ReactElement } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { TraceListItem } from "../../../../types/trace";
-import { formatCost } from "../../../../../../../index";
+import { formatCost } from "../../../../../../../model/display-formatters";
 import { CostBreakdownTooltipContent } from "../../../../shared/cost-breakdown-tooltip";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell";
 import type { CellDef } from "../../types";

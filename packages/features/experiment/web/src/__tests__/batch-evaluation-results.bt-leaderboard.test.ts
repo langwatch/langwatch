@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { computeBTLeaderboard, type PairwiseComparison } from "@langwatch/experiment-web";
+import {
+  computeBTLeaderboard,
+  type PairwiseComparison,
+} from "../model/batch-evaluation-results.bt-leaderboard";
 
 /**
  * Build a comparisons list where `winner` beat each `loser` once. Helper

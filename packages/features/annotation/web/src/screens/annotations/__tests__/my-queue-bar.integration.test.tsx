@@ -74,7 +74,7 @@ vi.mock("../../../ui/elements/tasks-done-icon", () => ({
   TasksDone: () => <div data-testid="tasks-done" />,
 }));
 
-vi.mock("@langwatch/trace-web/explorer/components/TraceDrawer/conversationView", () => ({
+vi.mock("@langwatch/trace-web/surfaces/conversation-view", () => ({
   ConversationView: () => <div data-testid="conversation-view" />,
 }));
 
@@ -88,7 +88,7 @@ vi.mock("@langwatch/trace-web", async (importOriginal) => ({
   useShikiAdapter: () => ({ getHighlighter: () => () => null }),
 }));
 
-vi.mock("@langwatch/trace-web/explorer/hooks/useConversationTurns", () => ({
+vi.mock("@langwatch/trace-web/surfaces/conversation-turns", () => ({
   useConversationTurns: () => ({
     data: undefined,
     isLoading: false,
@@ -135,8 +135,9 @@ vi.mock("../../../behavior/annotation-api", () => ({
 // The drawer store is the real one: "Edit trace" leaves the tab it lands on to the shared
 // helper, and what that helper does to the reader's remembered tab is the point of the
 // fallback.
-const { useDrawerStore } = await import("@langwatch/trace-web/drawer.store");
-const { useAnnotationQueueSessionStore } = await import("@langwatch/trace-web");
+const { useDrawerStore } = await import("@langwatch/trace-web/surfaces/trace-drawer-store");
+const { useAnnotationQueueSessionStore } =
+  await import("@langwatch/trace-web/surfaces/annotation-queue-session");
 const {
   default: MyQueuePage,
   END_SESSION_QUESTION,

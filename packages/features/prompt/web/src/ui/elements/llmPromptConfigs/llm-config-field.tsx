@@ -3,7 +3,7 @@ import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 import { LLMConfigPopover, type Output } from "./llm-config-popover";
-import { AddModelProviderKey } from "@langwatch/workflow-web/optimization_studio/components/AddModelProviderKey";
+import { AddModelProviderKey } from "@langwatch/workflow-web/surfaces/add-model-provider-key";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import type { ModelOption } from "@langwatch/topic-contract";
 import { NoModelsConfiguredCallout } from "@langwatch/model-provider-web/surfaces/no-models-configured-callout";

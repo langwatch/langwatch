@@ -20,7 +20,8 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
 import { api } from "../../../model/workflow-api-client";
 import { workflowApi } from "../../../model/workflow-api";
-import { serializeWorkflow, useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store";
+import { serializeWorkflow } from "../../../behavior/workflow-store";
 import {
   hasDSLChanged,
   parseStudioWorkflow,

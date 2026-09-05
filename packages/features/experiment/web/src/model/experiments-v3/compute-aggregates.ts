@@ -1,4 +1,4 @@
-import { computeMetricStats, type MetricStats } from "../../index";
+import { computeMetricStats, type MetricStats } from "../batch-evaluation-results.metric-stats";
 import { parseEvaluationResult } from "@langwatch/evaluator-web/surfaces/evaluation-results";
 import type { EvaluationResults, EvaluatorConfig, TargetConfig } from "./types";
 import { resolveVerdictLabel, toComparisonConfig } from "@langwatch/experiment-contract";

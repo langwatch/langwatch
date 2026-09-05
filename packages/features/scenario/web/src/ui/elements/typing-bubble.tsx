@@ -6,7 +6,7 @@
 import { Box, Circle, Flex, HStack, Icon } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { getDisplayRoleVisuals } from "@langwatch/trace-web/surfaces/scenario-role";
-import { BUBBLE_TONES } from "@langwatch/trace-web/explorer/components/TraceTable/registry/addons/conversation/Bubble";
+import { BUBBLE_TONES } from "@langwatch/trace-web/surfaces/conversation-bubble";
 
 /** One dot rises and fades, the next follows it. */
 const typingDot = keyframes`

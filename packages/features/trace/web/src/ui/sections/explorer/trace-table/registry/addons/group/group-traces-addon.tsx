@@ -3,13 +3,13 @@ import type React from "react";
 import { useDrawer, useDrawerParams } from "../../../../../../../behavior/use-drawer";
 import type { DensityTokens } from "../../../../hooks/use-density-tokens";
 import type { TraceListItem } from "../../../../types/trace";
+import { formatPreview } from "../../../../../../../behavior/preview-formatter";
 import {
   formatCost,
   formatDuration,
-  formatPreview,
   formatRelativeTime,
   formatTokens,
-} from "../../../../../../../index";
+} from "../../../../../../../model/display-formatters";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell";
 import { ROW_STYLES, rowVariantFor, StatusDot } from "../../../status-row";
 import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives";

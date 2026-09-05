@@ -1,5 +1,5 @@
-import { TRPCClientError, type TRPCClientErrorLike } from "@trpc/client";
-import type { WorkflowApiRouter } from "../model/workflow-api";
+import { TRPCClientError } from "@trpc/client";
+import { markHandledGlobally } from "@langwatch/ui-host/errors";
 
 /**
  * The seat levers a licence caps, written out here rather than imported from
@@ -7,19 +7,6 @@ import type { WorkflowApiRouter } from "../model/workflow-api";
  * depend on enterprise. `limitTypes` in that contract is the source of truth.
  */
 type LimitType = "members" | "membersLite";
-
-export const isNotFound = (error: TRPCClientErrorLike<WorkflowApiRouter> | null) => {
-  if (error && error instanceof TRPCClientError && error.data?.httpStatus === 404) {
-    return true;
-  }
-  return false;
-};
-
-/**
- * Every error any global interceptor in `utils/api.tsx` has already surfaced — as a modal, or
- * as its own bespoke toast.
- */
-const handledGlobally = new WeakSet<Error>();
 
 // Track handled errors without mutating them
 const handledLicenseErrors = new WeakSet<Error>();
@@ -30,7 +17,7 @@ const handledLicenseErrors = new WeakSet<Error>();
  */
 export function markAsHandledByLicenseHandler(error: Error): void {
   handledLicenseErrors.add(error);
-  handledGlobally.add(error);
+  markHandledGlobally(error);
 }
 
 /**
@@ -52,20 +39,11 @@ const handledLiteMemberErrors = new WeakSet<Error>();
 
 export function markAsHandledByLiteMemberHandler(error: Error): void {
   handledLiteMemberErrors.add(error);
-  handledGlobally.add(error);
+  markHandledGlobally(error);
 }
 
 export function isHandledByLiteMemberHandler(error: unknown): boolean {
   return error instanceof Error && handledLiteMemberErrors.has(error);
-}
-
-/**
- * Check if an error was already handled by any global error handler, which surface it as a
- * modal or a bespoke toast — so reporting it again would duplicate it.
- * @example
- */
-export function isHandledByGlobalHandler(error: unknown): boolean {
-  return error instanceof Error && handledGlobally.has(error);
 }
 
 // --- Lite member restriction extractor ---
@@ -115,7 +93,7 @@ const handledMissingModelErrors = new WeakSet<Error>();
 
 export function markAsHandledByMissingModelHandler(error: Error): void {
   handledMissingModelErrors.add(error);
-  handledGlobally.add(error);
+  markHandledGlobally(error);
 }
 
 export function isHandledByMissingModelHandler(error: unknown): boolean {
@@ -171,7 +149,7 @@ const handledProviderDisabledErrors = new WeakSet<Error>();
 
 export function markAsHandledByProviderDisabledHandler(error: Error): void {
   handledProviderDisabledErrors.add(error);
-  handledGlobally.add(error);
+  markHandledGlobally(error);
 }
 
 export function isHandledByProviderDisabledHandler(error: unknown): boolean {

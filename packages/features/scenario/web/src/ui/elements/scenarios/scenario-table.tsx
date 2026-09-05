@@ -1,4 +1,5 @@
-import { ScenarioTable as ScenarioTableView, type ScenarioListItem } from "../../..";
+import { type ScenarioListItem } from "../../../model/scenario-list.types";
+import { ScenarioTable as ScenarioTableView } from "../scenario-table";
 import type { ColumnFiltersState, RowSelectionState } from "@tanstack/react-table";
 import {
   LangyContextTarget,

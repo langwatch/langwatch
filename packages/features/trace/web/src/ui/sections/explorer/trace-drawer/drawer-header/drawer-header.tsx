@@ -38,19 +38,19 @@ import { useSpanTree } from "../../hooks/use-span-tree";
 import { useTraceDrawerNavigation } from "../../hooks/use-trace-drawer-navigation";
 import { useTraceRefresh } from "../../hooks/use-trace-refresh";
 import { useTraceResources } from "../../hooks/use-trace-resources";
+import { useDrawerStore } from "../../../../../behavior/drawer.store";
+import { useFilterStore } from "../../../../../behavior/filter.store";
+import { useFocusSectionStore } from "../../../../../behavior/focus-section.store";
 import {
-  EditableTraceName,
   formatAbsoluteTime,
   formatCost,
   formatDuration,
   formatRelativeTimeAgo,
   formatTokens,
-  isTerminalOrigin,
   STATUS_COLORS,
-  useDrawerStore,
-  useFilterStore,
-  useFocusSectionStore,
-} from "../../../../../index";
+} from "../../../../../model/display-formatters";
+import { isTerminalOrigin } from "../../../../../model/terminal-origin";
+import { EditableTraceName } from "../../../editable-trace-name";
 import { rankedErrorSpans } from "../../../../../model/explorer/error-spans";
 import { guardTraceEditExit } from "../../utils/trace-edit-mode";
 import { AddToAnnotationQueueDialog } from "../../add-to-annotation-queue-dialog";

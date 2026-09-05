@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contextHealthBand, contextWindowCeiling } from "@langwatch/coding-agent-web";
+import { contextHealthBand, contextWindowCeiling } from "../trace/context-health";
 
 describe("contextWindowCeiling", () => {
   describe("given a session that only used standard-window models", () => {

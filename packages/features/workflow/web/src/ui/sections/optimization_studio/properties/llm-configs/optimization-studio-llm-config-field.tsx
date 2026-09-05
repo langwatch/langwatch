@@ -1,12 +1,12 @@
 import { useCallback } from "react";
-import type { Output } from "@langwatch/prompt-web/components/llmPromptConfigs/LLMConfigPopover";
-import { LLMConfigField } from "@langwatch/prompt-web/components/llmPromptConfigs/LlmConfigField";
+import type { Output } from "@langwatch/prompt-web/surfaces/llm-config-popover";
+import { LLMConfigField } from "@langwatch/prompt-web/surfaces/llm-config-field";
 import {
   allModelOptions,
   useModelSelectionOptions,
-} from "@langwatch/model-provider-web/components/ModelSelector";
+} from "@langwatch/model-provider-web/surfaces/model-selector";
 import { useOrganizationTeamProject } from "../../../../../behavior/studio-host/use-organization-team-project";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../../../../../behavior/use-workflow-store";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { normalizeWorkflowLlmConfig } from "@langwatch/workflow-contract";
 

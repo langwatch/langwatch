@@ -13,14 +13,14 @@ import {
 import { HelpCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
-import { CodeBlockEditor } from "@langwatch/workflow-web/components/blocks/CodeBlockEditor";
+import { CodeBlockEditor } from "@langwatch/workflow-web/surfaces/code-block-editor";
 import { AgentTestPanel } from "./agent-test-panel";
 import {
   CODE_OUTPUT_TYPES,
   type Output,
   OutputsSection,
   type OutputType,
-} from "@langwatch/prompt-web/components/outputs/OutputsSection";
+} from "@langwatch/prompt-web/surfaces/outputs-section";
 import {
   isScenarioMappingValid,
   ScenarioInputMappingSection,
@@ -41,7 +41,7 @@ import {
   useDrawerParams,
 } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { CodeEditorModal } from "@langwatch/workflow-web/optimization_studio/components/code/workflow-code-editor.transport";
+import { CodeEditorModal } from "@langwatch/workflow-web/surfaces/code-editor-transport";
 import type { CodeComponentConfig, Field as DSLField } from "@langwatch/workflow-contract";
 import {
   buildCodeConfig,

@@ -4,7 +4,7 @@ import type React from "react";
 import { type ReactNode, useState } from "react";
 import { useDrawer } from "../../../behavior/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { TracePeekSummary } from "../../../index";
+import { TracePeekSummary } from "../trace-peek-summary";
 
 interface TracePreviewHoverCardProps {
   traceId: string;

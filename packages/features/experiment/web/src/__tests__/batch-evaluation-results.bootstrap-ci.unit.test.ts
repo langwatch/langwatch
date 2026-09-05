@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { bootstrapMeanCI } from "@langwatch/experiment-web";
+import { bootstrapMeanCI } from "../model/batch-evaluation-results.bootstrap-ci";
 
 /**
  * The horizontal arm of the trade-off chart's error cross.

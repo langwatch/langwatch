@@ -21,24 +21,29 @@ const mockDeleteNode = vi.fn();
 const mockDeselectAllNodes = vi.fn();
 const mockSetPropertiesExpanded = vi.fn();
 
-vi.mock("@langwatch/workflow-web", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@langwatch/workflow-web")>();
-
-  return {
-    ...actual,
-    useWorkflowStore: (selector: (state: unknown) => unknown) =>
-      selector({
-        deselectAllNodes: mockDeselectAllNodes,
-        propertiesExpanded: false,
-        setPropertiesExpanded: mockSetPropertiesExpanded,
-        duplicateNode: mockDuplicateNode,
-        deleteNode: mockDeleteNode,
-      }),
-    ComponentExecutionButton: () => <div data-testid="exec-button" />,
-    ComponentIcon: () => <div data-testid="component-icon" />,
-    getNodeDisplayName: (node: Node<Component>) => node.data.name ?? node.id,
-  };
-});
+vi.mock("../../../../../behavior/use-workflow-store", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useWorkflowStore: (selector: (state: unknown) => unknown) =>
+    selector({
+      deselectAllNodes: mockDeselectAllNodes,
+      propertiesExpanded: false,
+      setPropertiesExpanded: mockSetPropertiesExpanded,
+      duplicateNode: mockDuplicateNode,
+      deleteNode: mockDeleteNode,
+    }),
+}));
+vi.mock("../../../../elements/workflow-icons", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ComponentIcon: () => <div data-testid="component-icon" />,
+}));
+vi.mock("../../../workflow-node-execution", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ComponentExecutionButton: () => <div data-testid="exec-button" />,
+}));
+vi.mock("../../../workflow-nodes", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  getNodeDisplayName: (node: Node<Component>) => node.data.name ?? node.id,
+}));
 
 vi.mock("zustand/react/shallow", () => ({
   useShallow: (fn: unknown) => fn,

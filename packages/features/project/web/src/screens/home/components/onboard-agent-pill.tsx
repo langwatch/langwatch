@@ -4,7 +4,7 @@ import { LuBot, LuChevronDown, LuSparkles, LuTerminal } from "react-icons/lu";
 import {
   AgentActionsMenu,
   setupAgentPrompt,
-} from "@langwatch/trace-web/components/SetupWithAgentButton";
+} from "@langwatch/trace-web/surfaces/setup-with-agent-button";
 import { selfHostedEndpoint } from "../../../model/self-hosted-endpoint";
 import { useProjectHomeHost } from "../../../model/project-home-host";
 

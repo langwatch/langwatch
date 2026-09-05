@@ -7,11 +7,11 @@ import { useEffect } from "react";
 import { useWatch } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/model-provider-web/hooks/useModelLimits", () => ({
+vi.mock("@langwatch/model-provider-web/surfaces/model-limits", () => ({
   useModelLimits: () => ({ limits: null }),
 }));
 
-import { hasNonEmptySystemMessage } from "@langwatch/prompt-web/surfaces/prompt-form";
+import { hasNonEmptySystemMessage } from "../../../surfaces/prompt-form";
 import { usePromptConfigForm } from "../use-prompt-config-form";
 
 interface MutationCall {

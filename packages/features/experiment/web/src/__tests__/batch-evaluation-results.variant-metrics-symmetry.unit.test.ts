@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { computeVariantMetrics } from "@langwatch/experiment-web";
-import type { BatchResultRow } from "@langwatch/experiment-web";
+import { computeVariantMetrics } from "../ui/sections/batch-evaluation-results.variant-metrics";
+import type { BatchResultRow } from "../ui/sections/batch-evaluation-results.types";
 
 /**
  * The paired cost/duration intervals decide dominance, and dominance is a statement

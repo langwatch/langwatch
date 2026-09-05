@@ -3,8 +3,11 @@ import { ArrowUpRight } from "lucide-react";
 import {
   LangyDerivedCardView as LangyDerivedCardViewPresentation,
   type LangyExploreLinkProps,
-} from "../../../../../index";
-import { buildTraceExplorerHref, readTraceSearchQuery } from "../../../../../index";
+} from "../../../../../ui/sections/derived-cards/langy-derived-card-view";
+import {
+  buildTraceExplorerHref,
+  readTraceSearchQuery,
+} from "../../../../../model/langy-trace-explorer-link";
 import { TimeseriesPlot } from "../capabilities/langy-timeseries-card";
 import { LangySpaAnchor } from "../langy-spa-anchor";
 import { useChoicesRefRows } from "../../../behavior/derived-cards/use-choices-ref-rows";

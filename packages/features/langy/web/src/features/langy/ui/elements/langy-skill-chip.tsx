@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { findSkill } from "../../../../model/shared/langy/langy-skills";
-import type { LangyContextChip, LangySkillChip } from "../../../../index";
+import type { LangyContextChip, LangySkillChip } from "../../../../behavior/langy.store";
 
 /**
  * A skill chip: "do THIS", optionally "…on THAT".

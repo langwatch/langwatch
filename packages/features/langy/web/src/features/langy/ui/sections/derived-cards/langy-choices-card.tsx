@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 import {
   LangyChoicesCard as LangyChoicesCardPresentation,
   type ChoicesRefRow,
-} from "../../../../../index";
+} from "../../../../../ui/sections/derived-cards/langy-choices-card";
 import { useChoicesRefRows } from "../../../behavior/derived-cards/use-choices-ref-rows";
 
 type PresentationProps = ComponentProps<typeof LangyChoicesCardPresentation>;

@@ -5,10 +5,10 @@ import { FormProvider, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { z } from "zod";
 import { useShallow } from "zustand/react/shallow";
-import DynamicZodForm from "@langwatch/evaluator-web/components/checks/DynamicZodForm";
-import { EvaluatorEditorContent } from "@langwatch/evaluator-web/components/evaluators/EvaluatorEditorContent";
-import type { EvaluatorMappingsConfig } from "@langwatch/evaluator-web/components/evaluators/EvaluatorEditorShared";
-import { useAvailableEvaluators } from "@langwatch/evaluator-web/hooks/useAvailableEvaluators";
+import DynamicZodForm from "@langwatch/evaluator-web/surfaces/dynamic-zod-form";
+import { EvaluatorEditorContent } from "@langwatch/evaluator-web/surfaces/evaluator-editor-content";
+import type { EvaluatorMappingsConfig } from "@langwatch/evaluator-web/surfaces/evaluator-editor-shared";
+import { useAvailableEvaluators } from "@langwatch/evaluator-web/surfaces/available-evaluators";
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project";
 import {
   AVAILABLE_EVALUATORS,
@@ -19,13 +19,14 @@ import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
 import { api } from "../../../../model/workflow-api-client";
 import { DEFAULT_EMBEDDINGS_MODEL } from "../../../../model/constants";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { useRegisterDrawerFooter, useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../../../../behavior/use-workflow-store";
+import { useRegisterDrawerFooter } from "../../../elements/studio-drawer-footer";
 import type { Evaluator, Field } from "@langwatch/workflow-contract";
 import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
-} from "@langwatch/workflow-web";
+} from "../../../../model/edge-mapping";
 import { BasePropertiesPanel } from "./base-properties-panel";
 
 /**

@@ -19,7 +19,10 @@ import {
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef } from "react";
-import { COLUMN_DRAG_THRESHOLD_PX, useColumnEducationStore } from "../../../../index";
+import {
+  COLUMN_DRAG_THRESHOLD_PX,
+  useColumnEducationStore,
+} from "../../../../behavior/column-education.store";
 import { ColumnResizeGrip } from "../../../elements/explorer/trace-table/column-resize-grip";
 import { SELECT_COLUMN_ID } from "./registry/cells/select-cells";
 import {

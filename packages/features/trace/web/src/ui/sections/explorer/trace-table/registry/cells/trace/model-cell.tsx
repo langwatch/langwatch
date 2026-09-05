@@ -5,7 +5,7 @@ import {
   modelProviderIcons,
   ProviderIconGlyph,
 } from "../../../../../../blocks/model-providers/icons-map";
-import { useFilterStore } from "../../../../../../../index";
+import { useFilterStore } from "../../../../../../../behavior/filter.store";
 import type { TraceListItem } from "../../../../types/trace";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell";
 import type { CellDef } from "../../types";

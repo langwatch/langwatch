@@ -3,8 +3,8 @@
  * needs a `WorkflowHostProvider` — published by its own feature, mounted here.
  */
 
-import { AddOrEditDatasetDrawer as AddOrEditDataset } from "@langwatch/dataset-web/components/AddOrEditDatasetDrawer";
-import { UploadCSVDrawer as UploadCSV } from "@langwatch/dataset-web/components/datasets/UploadCSVDrawer";
+import { AddOrEditDatasetDrawer as AddOrEditDataset } from "@langwatch/dataset-web/surfaces/dataset-drawer";
+import { UploadCSVDrawer as UploadCSV } from "@langwatch/dataset-web/surfaces/upload-csv-drawer";
 import {
   CodeEvaluatorEditorDrawer as CodeEvaluatorEditor,
   EvaluatorCategorySelectorDrawer as EvaluatorCategorySelector,
@@ -12,7 +12,7 @@ import {
   OnlineEvaluationDrawer as OnlineEvaluation,
   WorkflowSelectorForEvaluatorDrawer as WorkflowSelectorForEvaluator,
 } from "@langwatch/evaluator-web/editor-drawers";
-import { PromptEditorDrawer as PromptEditor } from "@langwatch/prompt-web/components/prompts/PromptEditorDrawer";
+import { PromptEditorDrawer as PromptEditor } from "@langwatch/prompt-web/surfaces/prompt-editor-drawer";
 
 import { withWorkflowHost } from "./workflows-host";
 

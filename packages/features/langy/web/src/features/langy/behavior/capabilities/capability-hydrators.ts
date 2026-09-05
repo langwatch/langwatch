@@ -3,8 +3,8 @@
  */
 
 import type { api } from "../../../../behavior/langy-api";
-import { asFreeTextTerm } from "../../../../index";
-import { traceMetaLine, truncateRowText } from "../../../../index";
+import { asFreeTextTerm } from "../../../../model/langy-trace-explorer-link";
+import { traceMetaLine, truncateRowText } from "../../../../model/langy-row-format";
 
 /**
  * The trace row a card hydrates fresh, as this file reads it.

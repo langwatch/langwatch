@@ -5,7 +5,7 @@ import {
   parseAnsi,
   stripAnsi,
   xterm256ToHex,
-} from "@langwatch/coding-agent-web";
+} from "../trace/terminal-ansi-parser";
 
 /** Flatten a parsed result to plain text, joining lines with \n. */
 function textOf(lines: AnsiLine[]): string {

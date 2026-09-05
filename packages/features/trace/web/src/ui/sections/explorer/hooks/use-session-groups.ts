@@ -8,7 +8,8 @@ import {
   sortConversationGroups,
 } from "../trace-table/conversation-groups";
 import { useSamplePreview } from "../onboarding";
-import { useFilterStore, useViewStore } from "../../../../index";
+import { useFilterStore } from "../../../../behavior/filter.store";
+import { useViewStore } from "../../../../behavior/view.store";
 import { mapSessionGroupsPayload } from "../utils/map-session-groups-payload";
 
 export interface SessionGroupsResult {

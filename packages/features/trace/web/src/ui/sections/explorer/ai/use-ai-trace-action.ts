@@ -3,7 +3,8 @@ import { readHandledError } from "../../errors";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import type { AiActionError, AiActionErrorDetails } from "@langwatch/trace-contract";
 import { api } from "../../../../behavior/trace-api";
-import { useFilterStore, useViewStore } from "../../../../index";
+import { useFilterStore } from "../../../../behavior/filter.store";
+import { useViewStore } from "../../../../behavior/view.store";
 
 /**
  * Lifts the composer's detail rows out of a handled error's `meta`.

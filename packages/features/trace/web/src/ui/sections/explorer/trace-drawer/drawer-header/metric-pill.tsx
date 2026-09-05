@@ -2,7 +2,7 @@ import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useCallback } from "react";
 import { LuArrowUpRight, LuFilter, LuPin, LuSparkles } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { PinnedAttribute } from "../../../../../index";
+import type { PinnedAttribute } from "../../../../../behavior/pinned-attributes.store";
 import { useCopyToClipboard } from "../../../../../index";
 import { TooltipRow } from "../../../../elements/explorer/shared/tooltip-row";
 import { Chip, type ChipTone } from "../../../../elements/explorer/trace-drawer/chip";

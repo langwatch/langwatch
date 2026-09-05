@@ -4,7 +4,9 @@
 
 import { Text, VStack } from "@chakra-ui/react";
 import { asJsonDocument } from "@langwatch/langy-contract";
-import { formatMoneyShort, type LangyTurnMetric, StreamingStatCard } from "../../../../../index";
+import { type LangyTurnMetric } from "../../../../../model/values/langy-turn";
+import { formatMoneyShort } from "../../../../../ui/elements/langy-money";
+import { StreamingStatCard } from "../../../../../ui/sections/streaming-stat-card";
 import {
   type CapabilityCardInput,
   extractToolText,

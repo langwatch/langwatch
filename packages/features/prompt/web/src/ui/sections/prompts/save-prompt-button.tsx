@@ -1,6 +1,6 @@
 import { Button } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
-import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
+import type { PromptConfigFormValues } from "../../../surfaces/prompt-form";
 import { useLatestPromptVersion } from "../../../behavior/prompts/use-latest-prompt-version";
 
 export type SavePromptButtonProps = {

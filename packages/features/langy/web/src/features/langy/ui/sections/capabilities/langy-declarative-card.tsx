@@ -5,7 +5,8 @@
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
 import { type CliResultDigest, parseCardResult } from "@langwatch/langy-contract";
 import { extractPlatformUrl } from "@langwatch/langy-contract";
-import { StreamingStatCard, type LangyTurnMetric } from "../../../../../index";
+import { type LangyTurnMetric } from "../../../../../model/values/langy-turn";
+import { StreamingStatCard } from "../../../../../ui/sections/streaming-stat-card";
 import { type CapabilityData, useCapabilityData } from "../../../behavior/use-capability-data";
 import {
   buildResourceHref,
@@ -18,7 +19,7 @@ import {
   SURFACE_LABEL,
   summaryLines,
 } from "../../../model/capabilities/capability-registry";
-import { collectionOf, totalOf } from "../../../../../index";
+import { collectionOf, totalOf } from "../../../../../model/langy-cli-result-document";
 import {
   CapabilityRow,
   CapabilityRowSkeletons,

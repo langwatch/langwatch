@@ -1,6 +1,6 @@
 import { Badge, Text } from "@chakra-ui/react";
 import type React from "react";
-import { useFilterStore } from "../../../../../../../index";
+import { useFilterStore } from "../../../../../../../behavior/filter.store";
 import { useOrganizationTeamProject } from "../../../../../../../behavior/use-organization-team-project";
 import { api } from "../../../../../../../behavior/trace-api";
 import type { TraceListItem } from "../../../../types/trace";

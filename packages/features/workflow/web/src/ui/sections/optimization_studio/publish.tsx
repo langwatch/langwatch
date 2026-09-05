@@ -26,7 +26,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
 import { api } from "../../../model/workflow-api-client";
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store";
 import {
   getEntryInputs,
   parseStudioWorkflow,
@@ -36,7 +36,7 @@ import {
 import {
   datasetDatabaseRecordsToInMemoryDataset,
   inMemoryDatasetToNodeDataset,
-} from "@langwatch/workflow-web";
+} from "../../../model/studio-dataset.utils";
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key";
 import { useVersionState } from "./history";
 import { VersionToBeUsed } from "./version-to-be-used";
