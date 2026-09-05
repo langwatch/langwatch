@@ -12,10 +12,16 @@ export const LANGY_BLOCKS_METRIC_NAME = "langwatch_langy_blocks_total";
  * process passed the real one in; this is that function, beside the service
  * that calls it. No caller passes it today.
  */
-export function createOtelLangyBlockCounter(): LangyBlockCounter {
-  const blocks = counter({
-    name: LANGY_BLOCKS_METRIC_NAME,
-    description: "Langy derived blocks by salvage outcome",
-  });
-  return (reason: string) => blocks.inc({ outcome: reason }, 1);
+export class OtelLangyBlockMetricsAdapter {
+  static create(): OtelLangyBlockMetricsAdapter {
+    return new OtelLangyBlockMetricsAdapter();
+  }
+
+  blockCounter(): LangyBlockCounter {
+    const blocks = counter({
+      name: LANGY_BLOCKS_METRIC_NAME,
+      description: "Langy derived blocks by salvage outcome",
+    });
+    return (reason: string) => blocks.inc({ outcome: reason }, 1);
+  }
 }

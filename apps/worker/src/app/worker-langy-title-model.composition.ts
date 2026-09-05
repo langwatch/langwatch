@@ -9,7 +9,7 @@
  * ## The two-step resolution lives here
  *
  * A project may point `langy.conversation_title` at a model of its own, and
- * most projects point it nowhere. `getVercelAIModel` answers the second case
+ * most projects point it nowhere. `ModelProviderExecutionHandleService.getVercelAIModel` answers the second case
  * with `ModelNotConfiguredError`, and only that error means "the cascade
  * resolved nothing" — a disabled provider, an unknown project or an
  * unreachable proxy are different failures that must NOT be answered by
@@ -29,7 +29,7 @@
  */
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
-import { getVercelAIModel } from "@langwatch/model-provider-server";
+import { ModelProviderExecutionHandleService } from "@langwatch/model-provider-server";
 import { LangyTitleModelPort } from "@langwatch/langy-server";
 import { nlpProxyBaseUrl } from "@langwatch/workflow-server";
 
@@ -43,8 +43,12 @@ import { nlpProxyBaseUrl } from "@langwatch/workflow-server";
  * call needs.
  */
 export type WorkerLangyTitleProjectDirectory = {
-  tryGetWithTeam: Parameters<typeof getVercelAIModel>[0]["projects"]["tryGetWithTeam"];
-  getWithTeam: Parameters<typeof getVercelAIModel>[0]["projects"]["getWithTeam"];
+  tryGetWithTeam: Parameters<
+    typeof ModelProviderExecutionHandleService.getVercelAIModel
+  >[0]["projects"]["tryGetWithTeam"];
+  getWithTeam: Parameters<
+    typeof ModelProviderExecutionHandleService.getVercelAIModel
+  >[0]["projects"]["getWithTeam"];
 };
 
 export type WorkerLangyTitleModelOptions = Readonly<{
@@ -103,9 +107,9 @@ class WorkerLangyTitleModelAdapter extends LangyTitleModelPort {
     projectId: string;
     featureKey: string;
     fallbackModel: string;
-  }): Promise<Awaited<ReturnType<typeof getVercelAIModel>>> {
+  }): Promise<Awaited<ReturnType<typeof ModelProviderExecutionHandleService.getVercelAIModel>>> {
     try {
-      return await getVercelAIModel({
+      return await ModelProviderExecutionHandleService.getVercelAIModel({
         ...this.options,
         projectId: input.projectId,
         featureKey: input.featureKey,
@@ -116,7 +120,7 @@ class WorkerLangyTitleModelAdapter extends LangyTitleModelPort {
       // back through one of those would run a customer's title call on a
       // provider they had switched off.
       if (!(error instanceof ModelNotConfiguredError)) throw error;
-      return await getVercelAIModel({
+      return await ModelProviderExecutionHandleService.getVercelAIModel({
         ...this.options,
         projectId: input.projectId,
         model: input.fallbackModel,

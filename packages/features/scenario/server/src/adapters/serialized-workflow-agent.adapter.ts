@@ -25,13 +25,8 @@ import { randomBytes } from "crypto";
 import { resolveFieldMappings } from "@langwatch/scenario-contract";
 import type { RunParameterValues, WorkflowAgentData } from "@langwatch/scenario-contract";
 import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
-import {
-  createNlpFetchDispatcher,
-  type FetchInitWithDispatcher,
-  resolveFloorFetchTimeoutMs,
-  resolveMaxFetchTimeoutMs,
-} from "./nlp-fetch.adapter";
-import { SerializedAgentAdapter } from "./serialized-agent.adapter";
+import { type FetchInitWithDispatcher, NlpFetchAdapter } from "./nlp-fetch.adapter";
+import { SerializedAgentAdapter } from "./serialized-agent.base";
 
 /**
  * How long to wait on the NLP service for one turn.
@@ -47,7 +42,9 @@ import { SerializedAgentAdapter } from "./serialized-agent.adapter";
  * raised and this one wasn't told.
  */
 function fetchTimeoutMs(): number {
-  return Math.min(resolveMaxFetchTimeoutMs(), resolveFloorFetchTimeoutMs());
+  const transport = NlpFetchAdapter.create();
+
+  return Math.min(transport.maxTimeoutMs(), transport.floorTimeoutMs());
 }
 
 /**
@@ -286,7 +283,7 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
         headers: { "Content-Type": "application/json" },
         body,
         signal,
-        dispatcher: createNlpFetchDispatcher({ timeoutMs }),
+        dispatcher: NlpFetchAdapter.create().dispatcher({ timeoutMs }),
       };
       // undici's own fetch, not the global one: Node's global fetch is bound
       // to the undici bundled with Node, which rejects a dispatcher built by

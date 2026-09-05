@@ -22,7 +22,7 @@ import type {
   LangyToolCallFailedEvent,
   LangyToolCallInitiatedEvent,
   LangyToolCallSucceededEvent,
-} from "../adapters/eventing.langy.adapter";
+} from "../services/langy-conversation.events";
 import {
   LangyAgentRespondedEventSchema,
   LangyAgentResponseFailedEventSchema,
@@ -39,7 +39,7 @@ import {
   LangyToolCallFailedEventSchema,
   LangyToolCallInitiatedEventSchema,
   LangyToolCallSucceededEventSchema,
-} from "../adapters/eventing.langy.adapter";
+} from "../services/langy-conversation.events";
 
 export interface LangyConversationState extends Projection<LangyConversationStateData> {
   data: LangyConversationStateData;
@@ -92,6 +92,12 @@ export class LangyConversationStateFoldProjection
   readonly store: StateProjectionStore<LangyConversationStateData>;
 
   protected readonly events = langyConversationEvents;
+
+  static create(deps: {
+    store: StateProjectionStore<LangyConversationStateData>;
+  }): LangyConversationStateFoldProjection {
+    return new LangyConversationStateFoldProjection(deps);
+  }
 
   constructor(deps: { store: StateProjectionStore<LangyConversationStateData> }) {
     super();

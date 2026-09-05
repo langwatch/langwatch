@@ -13,7 +13,7 @@ import { LANGY_CONVERSATION_PROCESS_NAME } from "@langwatch/langy-server/eventin
 import { createStubLangyEffectPorts } from "@langwatch/langy-server/testing";
 import { agentRespondedEvent, CONVERSATION_ID, PROJECT_ID } from "./helpers/langyEventFixtures";
 import {
-  createLangyConversationProcessingPipeline,
+  LangyConversationPipelineAdapter,
   type LangyAnalyticsEventProjectionRecord,
   type LangyConversationProcessingPipelineDeps,
 } from "@langwatch/langy-server/eventing/langy-conversation-processing";
@@ -65,7 +65,7 @@ function buildPipeline(overrides: Partial<LangyConversationProcessingPipelineDep
     ...overrides,
   };
   return {
-    pipeline: createLangyConversationProcessingPipeline(deps),
+    pipeline: LangyConversationPipelineAdapter.create(deps).build(),
     analyticsAppend,
     subscribers,
   };

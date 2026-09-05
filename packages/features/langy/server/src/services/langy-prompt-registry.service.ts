@@ -2,7 +2,7 @@
  * Langy prompt registry loader.
  *
  * WIRED for the per-turn override only. `langy-turn.service.ts` resolves the
- * system block through `resolveLangyPrompt` when LANGY_PROMPT_PROJECT_ID names
+ * system block through `LangyPromptRegistryService` when LANGY_PROMPT_PROJECT_ID names
  * the project holding these rows; unset skips the registry entirely and the
  * in-repo fallback is used verbatim. The `agentDefinition` handle still has no
  * runtime consumer — the manager writes its embedded AGENTS.md — so seeding
@@ -21,7 +21,7 @@
  * This module is the single seam that reads a Langy prompt from the registry
  * with a HARD FALLBACK to the in-repo copy. The invariant is: **Langy must never
  * fail to start a turn because a prompt row is missing, malformed, or the
- * registry read threw.** `resolveLangyPrompt` therefore never rejects — on any
+ * registry read threw.** `LangyPromptRegistryService.resolve` therefore never rejects — on any
  * miss/empty/error it returns the caller-supplied fallback and logs at warn.
  *
  * The registry read is a DIRECT service call (Prisma) — NOT an HTTP/tRPC call and
@@ -51,8 +51,6 @@ export abstract class LangyPromptPort {
 }
 
 export interface ResolveLangyPromptParams {
-  /** Only the read method is required — keeps this trivially fakeable in tests. */
-  promptService: LangyPromptPort;
   /** The project that HOLDS the Langy registry rows (the internal system project). */
   projectId: string;
   /** One of `LANGY_PROMPT_HANDLES`. */
@@ -82,44 +80,53 @@ export interface ResolvedLangyPrompt {
   source: "registry" | "fallback" | "error";
 }
 
-/**
- * Resolve a Langy prompt from the registry, falling back to the in-repo copy.
- *
- * NEVER throws. A registry hit with a non-empty `prompt` wins; anything else
- * (no row, empty prompt, read error) yields the fallback text, with `source`
- * telling a miss apart from a failure so callers can treat them differently
- * and surface which path was taken (metrics / a span attribute / a version
- * label on the worker's rendered AGENTS.md).
- */
-export async function resolveLangyPrompt(
-  params: ResolveLangyPromptParams,
-): Promise<ResolvedLangyPrompt> {
-  const { promptService, projectId, handle, fallback } = params;
-  const tag = params.tag ?? LANGY_PROMPT_DEFAULT_TAG;
-
-  try {
-    const versioned = await promptService.tryGetPromptByIdOrHandle({
-      idOrHandle: handle,
-      projectId,
-      tag,
-    });
-    const text = versioned?.prompt?.trim();
-    if (text) {
-      return { text: versioned!.prompt, source: "registry" };
-    }
-
-    logger.warn(
-      { handle, projectId, tag },
-      "langy prompt registry row missing or empty — using in-repo fallback",
-    );
-  } catch (error) {
-    logger.warn(
-      { error, handle, projectId, tag },
-      "langy prompt registry read failed — using in-repo fallback",
-    );
-
-    return { text: fallback, source: "error" };
+export class LangyPromptRegistryService {
+  static create(options: { prompts: LangyPromptPort }): LangyPromptRegistryService {
+    return new LangyPromptRegistryService(options);
   }
 
-  return { text: fallback, source: "fallback" };
+  private readonly prompts: LangyPromptPort;
+
+  private constructor(options: { prompts: LangyPromptPort }) {
+    this.prompts = options.prompts;
+  }
+
+  /**
+   * Resolve a Langy prompt from the registry, falling back to the in-repo copy.
+   *
+   * NEVER throws. A registry hit with a non-empty `prompt` wins; anything else
+   * (no row, empty prompt, read error) yields the fallback text, with `source`
+   * telling a miss apart from a failure so callers can treat them differently
+   * and surface which path was taken.
+   */
+  async resolve(params: ResolveLangyPromptParams): Promise<ResolvedLangyPrompt> {
+    const { projectId, handle, fallback } = params;
+    const tag = params.tag ?? LANGY_PROMPT_DEFAULT_TAG;
+
+    try {
+      const versioned = await this.prompts.tryGetPromptByIdOrHandle({
+        idOrHandle: handle,
+        projectId,
+        tag,
+      });
+      const text = versioned?.prompt?.trim();
+      if (text) {
+        return { text: versioned!.prompt, source: "registry" };
+      }
+
+      logger.warn(
+        { handle, projectId, tag },
+        "langy prompt registry row missing or empty — using in-repo fallback",
+      );
+    } catch (error) {
+      logger.warn(
+        { error, handle, projectId, tag },
+        "langy prompt registry read failed — using in-repo fallback",
+      );
+
+      return { text: fallback, source: "error" };
+    }
+
+    return { text: fallback, source: "fallback" };
+  }
 }

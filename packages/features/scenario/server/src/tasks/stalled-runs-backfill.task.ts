@@ -33,7 +33,7 @@ const logger = createLogger("langwatch:tasks:backfillStalledSimulationRuns");
  * (`apps/tasks/src/platform/stalled-runs-backfill.composition.ts`), whose
  * `execution` dispatches `finishRun` through a producer-only Eventing
  * registration of the SAME `simulation_processing` pipeline the worker
- * consumes (`createSimulationProcessingProducerPipeline`).
+ * consumes (`SimulationProcessingProducerAdapter`).
  */
 
 /**

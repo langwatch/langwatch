@@ -204,54 +204,6 @@ function groupRunsByBatch(runs: SimulationRunData[]): Map<string, SimulationRunD
   return byBatch;
 }
 
-/**
- * Cuts a full-message page at a batch boundary.
- *
- * The page limit selects batches, and one batch holds every run of a suite,
- * so a page of 20 batches can carry far more than 20 runs. With whole
- * conversations attached that is the payload the cap exists to prevent. The
- * page therefore stops before the batch that would pass the run ceiling.
- *
- * The cut is always at a batch boundary, because the cursor advances by
- * batch: a page ending inside a batch would skip the rest of it on the next
- * read. The first batch is always kept whole, so a single batch larger than
- * the ceiling still moves the cursor forward.
- */
-export function capRunsAtBatchBoundary({
-  runs,
-  batchRunIds,
-  ceiling,
-}: {
-  runs: SimulationRunData[];
-  batchRunIds: string[];
-  ceiling: number;
-}): { runs: SimulationRunData[]; batchesKept: number } {
-  const byBatch = groupRunsByBatch(runs);
-
-  const kept: SimulationRunData[] = [];
-  let batchesKept = 0;
-  for (const batchRunId of batchRunIds) {
-    const batch = byBatch.get(batchRunId) ?? [];
-    if (kept.length > 0 && kept.length + batch.length > ceiling) break;
-    kept.push(...batch);
-    batchesKept++;
-    if (kept.length >= ceiling) break;
-  }
-
-  return { runs: kept, batchesKept };
-}
-
-export function clampPageLimit({
-  limit,
-  shouldIncludeMessages,
-}: {
-  limit: number;
-  shouldIncludeMessages: boolean;
-}): number {
-  const ceiling = shouldIncludeMessages ? FULL_MESSAGES_PAGE_LIMIT : LIST_PAGE_LIMIT;
-  return Math.min(Math.max(1, limit), ceiling);
-}
-
 /** The actor a stored id and label name, or null when they name no person. */
 function readActor(params: {
   id: string | null | undefined;
@@ -312,6 +264,49 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     windowedRead: SimulationWindowedReadPort,
   ): SimulationClickHouseRepository {
     return new SimulationClickHouseRepository(resolveClient, windowedRead);
+  }
+
+  /**
+   * Cuts a full-message page at a batch boundary.
+   *
+   * The page limit selects batches, and one batch holds every run of a suite,
+   * so a page stops before the batch that would pass the run ceiling. The cut
+   * is always at a batch boundary, because the cursor advances by batch; the
+   * first batch is kept whole so an oversized one still moves the cursor.
+   */
+  static capRunsAtBatchBoundary({
+    runs,
+    batchRunIds,
+    ceiling,
+  }: {
+    runs: SimulationRunData[];
+    batchRunIds: string[];
+    ceiling: number;
+  }): { runs: SimulationRunData[]; batchesKept: number } {
+    const byBatch = groupRunsByBatch(runs);
+
+    const kept: SimulationRunData[] = [];
+    let batchesKept = 0;
+    for (const batchRunId of batchRunIds) {
+      const batch = byBatch.get(batchRunId) ?? [];
+      if (kept.length > 0 && kept.length + batch.length > ceiling) break;
+      kept.push(...batch);
+      batchesKept++;
+      if (kept.length >= ceiling) break;
+    }
+
+    return { runs: kept, batchesKept };
+  }
+
+  static clampPageLimit({
+    limit,
+    shouldIncludeMessages,
+  }: {
+    limit: number;
+    shouldIncludeMessages: boolean;
+  }): number {
+    const ceiling = shouldIncludeMessages ? FULL_MESSAGES_PAGE_LIMIT : LIST_PAGE_LIMIT;
+    return Math.min(Math.max(1, limit), ceiling);
   }
 
   static tryStartedAtBoundsForPage(
@@ -856,7 +851,10 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     nextCursor?: string;
     hasMore: boolean;
   }> {
-    const validatedLimit = clampPageLimit({ limit, shouldIncludeMessages });
+    const validatedLimit = SimulationClickHouseRepository.clampPageLimit({
+      limit,
+      shouldIncludeMessages,
+    });
     const decoded = cursor ? this.decodeCursor(cursor) : null;
 
     const cursorPredicate = decoded
@@ -918,7 +916,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
 
     if (!shouldIncludeMessages) return { runs, nextCursor, hasMore };
 
-    const capped = capRunsAtBatchBoundary({
+    const capped = SimulationClickHouseRepository.capRunsAtBatchBoundary({
       runs,
       batchRunIds,
       ceiling: FULL_MESSAGES_PAGE_LIMIT,
@@ -1029,7 +1027,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     nextCursor?: string;
     hasMore: boolean;
   }): { runs: SimulationRunData[]; nextCursor?: string; hasMore: boolean } {
-    const capped = capRunsAtBatchBoundary({
+    const capped = SimulationClickHouseRepository.capRunsAtBatchBoundary({
       runs,
       batchRunIds: pageRows.map((row) => row.BatchRunId),
       ceiling: FULL_MESSAGES_PAGE_LIMIT,
@@ -1081,7 +1079,10 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       }
     }
 
-    const validatedLimit = clampPageLimit({ limit, shouldIncludeMessages });
+    const validatedLimit = SimulationClickHouseRepository.clampPageLimit({
+      limit,
+      shouldIncludeMessages,
+    });
     const decoded = cursor ? this.decodeCursor(cursor) : null;
 
     const batchRows = await this.selectBatchPage({

@@ -4,7 +4,7 @@
  * The egress allow-list door, through the composition production uses.
  *
  * `LangyService` carries two heads: an older repository-backed set of methods
- * and a newer one over the composed feature services. `createComposed` — the
+ * and a newer one over the composed feature services. `create` — the
  * only construction outside tests — passes `null` for the repositories, so
  * every method still reading `this.persistence` throws "Langy persistence is
  * not configured".
@@ -40,13 +40,13 @@ function credentialService(stored: string[] | null) {
 }
 
 function composed(credentials: LangyCredentialService) {
-  return LangyService.createComposed(
-    {} as unknown as LangyConversationService,
-    {} as unknown as LangyTurnService,
-    {} as unknown as LangyMessageService,
+  return LangyService.create({
+    conversations: {} as unknown as LangyConversationService,
+    turns: {} as unknown as LangyTurnService,
+    messages: {} as unknown as LangyMessageService,
     credentials,
-    { shouldPrompt: () => false } as never,
-  );
+    feedbackPrompt: { shouldPrompt: () => false } as never,
+  });
 }
 
 describe("LangyService egress allow-list, composed the way production composes it", () => {

@@ -75,6 +75,7 @@ import {
   ScenarioSecretCipherPort,
   ScenarioTabRegistryService,
   ScenarioTabStorePort,
+  SerializedAgentRegistryAdapter,
   SimulationClickHouseAdapter,
   SimulationWindowedReadPort,
   RedisCancellationPublisherAdapter,
@@ -403,6 +404,7 @@ export function composeScenarioFeature(
     config: options.scenarioExecution.config,
     ownership: ApiAgentTestOwnershipAdapter.create(),
     connectedDispatch: ApiAgentTestConnectedDispatchAdapter.create(),
+    agentAdapters: SerializedAgentRegistryAdapter.create(),
     maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
   });
 

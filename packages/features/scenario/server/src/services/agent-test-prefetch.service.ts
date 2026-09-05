@@ -57,74 +57,81 @@ function targetLabel(target: TargetConfig): string {
   }
 }
 
-export async function prefetchAgentTestData({
-  context,
-  target,
-  reads,
-  config,
-  onChildEnvReady,
-}: {
-  context: ScenarioExecutionPrefetchInput["context"];
-  target: TargetConfig;
-  reads: AgentTestReads;
-  config: ScenarioExecutionPrefetchConfig;
-  onChildEnvReady?: (environment: ScenarioChildEnvironment) => void;
-}): Promise<ScenarioExecutionPrefetchResult> {
-  if (target.type === "prompt") {
+/** Reads what an agent test run needs before its child starts. */
+export class AgentTestPrefetchService {
+  static create(): AgentTestPrefetchService {
+    return new AgentTestPrefetchService();
+  }
+
+  async prefetch({
+    context,
+    target,
+    reads,
+    config,
+    onChildEnvReady,
+  }: {
+    context: ScenarioExecutionPrefetchInput["context"];
+    target: TargetConfig;
+    reads: AgentTestReads;
+    config: ScenarioExecutionPrefetchConfig;
+    onChildEnvReady?: (environment: ScenarioChildEnvironment) => void;
+  }): Promise<ScenarioExecutionPrefetchResult> {
+    if (target.type === "prompt") {
+      return {
+        success: false,
+        error: "A prompt cannot be tested this way; run a scenario against it",
+      };
+    }
+
+    const [project, adapterResult, agentName] = await Promise.all([
+      reads.project(),
+      reads.adapter(),
+      reads.agentName(),
+    ]);
+
+    if (!project.success) {
+      return { success: false, error: project.error };
+    }
+
+    if (adapterResult !== null && "success" in adapterResult) {
+      return {
+        success: false,
+        error: adapterResult.message,
+        reason: adapterResult.reason,
+      };
+    }
+
+    if (!adapterResult) {
+      return {
+        success: false,
+        error: `${targetLabel(target)} ${target.referenceId} not found`,
+      };
+    }
+
+    const scenario = agentTestScenarioConfig({
+      agentName: agentName ?? target.referenceId,
+    });
+    const telemetry = {
+      endpoint: config.langwatchEndpoint,
+      apiKey: project.data.apiKey,
+    };
+    onChildEnvReady?.({ labels: scenario.labels, telemetry });
+
     return {
-      success: false,
-      error: "A prompt cannot be tested this way; run a scenario against it",
+      success: true,
+      data: {
+        context,
+        scenario,
+        parameters: {},
+        adapterData: adapterResult,
+        nlpServiceUrl: config.nlpServiceUrl,
+        target,
+        script: { kind: "agent_test", userMessage: AGENT_TEST_USER_MESSAGE },
+      },
+      telemetry,
+      // An agent test run resolves no model: no simulator plays the person and
+      // no judge decides, so there is nothing here for the run to record.
+      resolvedModels: null,
     };
   }
-
-  const [project, adapterResult, agentName] = await Promise.all([
-    reads.project(),
-    reads.adapter(),
-    reads.agentName(),
-  ]);
-
-  if (!project.success) {
-    return { success: false, error: project.error };
-  }
-
-  if (adapterResult !== null && "success" in adapterResult) {
-    return {
-      success: false,
-      error: adapterResult.message,
-      reason: adapterResult.reason,
-    };
-  }
-
-  if (!adapterResult) {
-    return {
-      success: false,
-      error: `${targetLabel(target)} ${target.referenceId} not found`,
-    };
-  }
-
-  const scenario = agentTestScenarioConfig({
-    agentName: agentName ?? target.referenceId,
-  });
-  const telemetry = {
-    endpoint: config.langwatchEndpoint,
-    apiKey: project.data.apiKey,
-  };
-  onChildEnvReady?.({ labels: scenario.labels, telemetry });
-
-  return {
-    success: true,
-    data: {
-      context,
-      scenario,
-      parameters: {},
-      adapterData: adapterResult,
-      nlpServiceUrl: config.nlpServiceUrl,
-      target,
-      script: { kind: "agent_test", userMessage: AGENT_TEST_USER_MESSAGE },
-    },
-    telemetry,
-    // An agent test run resolves no model: no simulator plays the person and
-    // no judge decides, so there is nothing here for the run to record.
-    resolvedModels: null,
-  };
 }

@@ -10,7 +10,7 @@
 
 import * as ScenarioRunner from "@langwatch/scenario";
 import { describe, expect, it, vi } from "vitest";
-import { buildAgentTestRun, ScriptedUserAgent } from "../adapters/agent-test-script.adapter";
+import { AgentTestScriptAdapter, ScriptedUserAgent } from "../adapters/agent-test-script.adapter";
 import {
   ConnectedAgentCallError,
   SerializedConnectedAgentAdapter,
@@ -41,10 +41,10 @@ function fakeExecutor() {
   return { calls, executor };
 }
 
-describe("buildAgentTestRun", () => {
+describe("AgentTestScriptAdapter", () => {
   describe("when the child builds the cast of a scripted run", () => {
     const adapter = new AnsweringAgent();
-    const cast = buildAgentTestRun({
+    const cast = AgentTestScriptAdapter.create().build({
       adapter,
       script: { kind: "agent_test", userMessage: "ping" },
     });
@@ -100,7 +100,7 @@ describe("buildAgentTestRun", () => {
         },
         sleep: async () => {},
       });
-      const cast = buildAgentTestRun({
+      const cast = AgentTestScriptAdapter.create().build({
         adapter,
         script: { kind: "agent_test", userMessage: "ping" },
       });

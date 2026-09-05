@@ -10,7 +10,7 @@
 import type { HttpAgentData } from "@langwatch/scenario-contract";
 import { AGENT_TEST_SCENARIO_ID, AGENT_TEST_USER_MESSAGE } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
-import { prefetchAgentTestData } from "../agent-test-prefetch.service";
+import { AgentTestPrefetchService } from "../agent-test-prefetch.service";
 import type { ScenarioExecutionPrefetchConfig } from "../scenario-execution-prefetcher.service";
 
 const config: ScenarioExecutionPrefetchConfig = {
@@ -34,7 +34,7 @@ describe("given the agent test scenario id and an http agent", () => {
     const agentName = vi.fn().mockResolvedValue("ACME Support Agent");
     const adapter = vi.fn().mockResolvedValue(httpAdapterData);
 
-    const result = await prefetchAgentTestData({
+    const result = await AgentTestPrefetchService.create().prefetch({
       context: {
         projectId: "proj_1",
         scenarioId: AGENT_TEST_SCENARIO_ID,
@@ -44,7 +44,10 @@ describe("given the agent test scenario id and an http agent", () => {
       target: { type: "http", referenceId: "agent_http" },
       reads: {
         project: () =>
-          Promise.resolve({ success: true, data: { apiKey: "sk-lw-project", organizationId: "org_1" } }),
+          Promise.resolve({
+            success: true,
+            data: { apiKey: "sk-lw-project", organizationId: "org_1" },
+          }),
         adapter,
         agentName,
       },
@@ -53,7 +56,10 @@ describe("given the agent test scenario id and an http agent", () => {
 
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.data.script).toEqual({ kind: "agent_test", userMessage: AGENT_TEST_USER_MESSAGE });
+    expect(result.data.script).toEqual({
+      kind: "agent_test",
+      userMessage: AGENT_TEST_USER_MESSAGE,
+    });
     expect(result.data.scenario.id).toBe(AGENT_TEST_SCENARIO_ID);
     expect(result.data.scenario.name).toBe("Test ACME Support Agent");
     expect(result.data.adapterData).toEqual(httpAdapterData);

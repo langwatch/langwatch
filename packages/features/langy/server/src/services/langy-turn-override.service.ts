@@ -1,5 +1,5 @@
 import { LANGY_PROMPT_HANDLES } from "@langwatch/langy-contract";
-import { resolveLangyPrompt, type LangyPromptPort } from "./langy-prompt-registry.service";
+import { LangyPromptRegistryService, type LangyPromptPort } from "./langy-prompt-registry.service";
 import { LANGY_OVERRIDE } from "./langy-turn.shared";
 
 export type LangyTurnOverride = {
@@ -28,8 +28,7 @@ export class LangyTurnOverrideService {
       return { text: LANGY_OVERRIDE, source: "unconfigured" };
     }
 
-    const resolved = await resolveLangyPrompt({
-      promptService: this.prompts,
+    const resolved = await LangyPromptRegistryService.create({ prompts: this.prompts }).resolve({
       projectId: this.projectId,
       handle: LANGY_PROMPT_HANDLES.turnOverride,
       fallback: LANGY_OVERRIDE,

@@ -4,7 +4,7 @@ import {
   LANGY_PROMPT_HANDLES,
   LANGY_TURN_OVERRIDE_FALLBACK,
 } from "@langwatch/langy-contract";
-import { LangyPromptPort, resolveLangyPrompt } from "../langy-prompt-registry.service";
+import { LangyPromptPort, LangyPromptRegistryService } from "../langy-prompt-registry.service";
 
 const FALLBACK = "IN-REPO FALLBACK PROMPT";
 const PROJECT_ID = "project_system";
@@ -16,12 +16,13 @@ function fakePromptPort(
   return { tryGetPromptByIdOrHandle };
 }
 
-describe("resolveLangyPrompt", () => {
+describe("LangyPromptRegistryService", () => {
   describe("given a registry row with a non-empty prompt", () => {
     it("returns the registry text and marks the source registry", async () => {
       const read = vi.fn().mockResolvedValue({ prompt: "REGISTRY VERSION" });
-      const result = await resolveLangyPrompt({
-        promptService: fakePromptPort(read),
+      const result = await LangyPromptRegistryService.create({
+        prompts: fakePromptPort(read),
+      }).resolve({
         projectId: PROJECT_ID,
         handle: LANGY_PROMPT_HANDLES.turnOverride,
         fallback: FALLBACK,
@@ -33,8 +34,7 @@ describe("resolveLangyPrompt", () => {
     /** @scenario "A production-tagged registry version is used when present" */
     it("pins the production tag by default", async () => {
       const read = vi.fn().mockResolvedValue({ prompt: "REGISTRY VERSION" });
-      await resolveLangyPrompt({
-        promptService: fakePromptPort(read),
+      await LangyPromptRegistryService.create({ prompts: fakePromptPort(read) }).resolve({
         projectId: PROJECT_ID,
         handle: LANGY_PROMPT_HANDLES.agentDefinition,
         fallback: FALLBACK,
@@ -49,8 +49,7 @@ describe("resolveLangyPrompt", () => {
 
     it("forwards an explicit tag when asked to read latest", async () => {
       const read = vi.fn().mockResolvedValue({ prompt: "DRAFT" });
-      await resolveLangyPrompt({
-        promptService: fakePromptPort(read),
+      await LangyPromptRegistryService.create({ prompts: fakePromptPort(read) }).resolve({
         projectId: PROJECT_ID,
         handle: LANGY_PROMPT_HANDLES.turnOverride,
         fallback: FALLBACK,
@@ -65,8 +64,9 @@ describe("resolveLangyPrompt", () => {
     /** @scenario "A turn runs from the in-repo copy when no registry row exists" */
     it("falls back to the in-repo copy", async () => {
       const read = vi.fn().mockResolvedValue(null);
-      const result = await resolveLangyPrompt({
-        promptService: fakePromptPort(read),
+      const result = await LangyPromptRegistryService.create({
+        prompts: fakePromptPort(read),
+      }).resolve({
         projectId: PROJECT_ID,
         handle: LANGY_PROMPT_HANDLES.turnOverride,
         fallback: FALLBACK,
@@ -80,8 +80,9 @@ describe("resolveLangyPrompt", () => {
     /** @scenario "An empty or blank registry prompt is treated as a miss" */
     it("treats whitespace-only as a miss and falls back", async () => {
       const read = vi.fn().mockResolvedValue({ prompt: "   \n  " });
-      const result = await resolveLangyPrompt({
-        promptService: fakePromptPort(read),
+      const result = await LangyPromptRegistryService.create({
+        prompts: fakePromptPort(read),
+      }).resolve({
         projectId: PROJECT_ID,
         handle: LANGY_PROMPT_HANDLES.turnOverride,
         fallback: FALLBACK,
@@ -95,8 +96,9 @@ describe("resolveLangyPrompt", () => {
     /** @scenario A registry read failure falls back to the in-repo copy */
     it("never propagates the error and falls back, reporting source 'error'", async () => {
       const read = vi.fn().mockRejectedValue(new Error("db down"));
-      const result = await resolveLangyPrompt({
-        promptService: fakePromptPort(read),
+      const result = await LangyPromptRegistryService.create({
+        prompts: fakePromptPort(read),
+      }).resolve({
         projectId: PROJECT_ID,
         handle: LANGY_PROMPT_HANDLES.agentDefinition,
         fallback: FALLBACK,

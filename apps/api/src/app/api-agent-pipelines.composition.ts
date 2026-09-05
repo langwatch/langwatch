@@ -25,7 +25,7 @@
  * ## One definition, two registrations
  *
  * Each pipeline is built here from its feature's own producer variant
- * (`createSimulationProcessingProducerPipeline` and friends), which supplies
+ * (`SimulationProcessingProducerAdapter` and friends), which supplies
  * stand-ins for the consumer-side dependencies so the definition can be
  * CONSTRUCTED, and refuses by name if one is ever CALLED. That is the same
  * shape `createTraceProcessingProducerPipeline` and
@@ -50,11 +50,11 @@ import type { EventSourcing } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
 import { HandledError } from "@langwatch/handled-error";
 import {
-  createLangyConversationProducerPipeline,
+  LangyConversationProducerAdapter,
   type LangyConversationCommands,
 } from "@langwatch/langy-server";
 import {
-  createSimulationProcessingProducerPipeline,
+  SimulationProcessingProducerAdapter,
   SimulationExecutionPort,
 } from "@langwatch/scenario-server";
 import type {
@@ -159,7 +159,9 @@ export function composeApiAgentPipelines(options: ApiAgentPipelinesOptions): Api
 
   const simulation = commandLookup({
     pipeline: "simulation_processing",
-    registered: eventing.register(createSimulationProcessingProducerPipeline({ processName })),
+    registered: eventing.register(
+      SimulationProcessingProducerAdapter.create({ processName }).build(),
+    ),
   });
   const suite = commandLookup({
     pipeline: "suite_run_processing",
@@ -167,7 +169,7 @@ export function composeApiAgentPipelines(options: ApiAgentPipelinesOptions): Api
   });
   const langy = commandLookup({
     pipeline: "langy_conversation_processing",
-    registered: eventing.register(createLangyConversationProducerPipeline({ processName })),
+    registered: eventing.register(LangyConversationProducerAdapter.create({ processName }).build()),
   });
 
   return {

@@ -63,21 +63,21 @@ export class LangyService extends LangyServiceContract {
   }
 
   /** Builds the process-owned capability from the complete Langy services. */
-  static createComposed(
-    conversations: LangyConversationService,
-    turns: LangyTurnService,
-    messages: LangyMessageService,
-    credentials: LangyCredentialService,
-    feedbackPrompt: LangyFeedbackPromptPolicy,
-    relayOptions?: LangyRelayCompositionOptions,
-  ): LangyService {
+  static create(options: {
+    conversations: LangyConversationService;
+    turns: LangyTurnService;
+    messages: LangyMessageService;
+    credentials: LangyCredentialService;
+    feedbackPrompt: LangyFeedbackPromptPolicy;
+    relayOptions?: LangyRelayCompositionOptions;
+  }): LangyService {
     return new LangyService(
-      feedbackPrompt,
-      conversations,
-      turns,
-      messages,
-      credentials,
-      relayOptions ?? null,
+      options.feedbackPrompt,
+      options.conversations,
+      options.turns,
+      options.messages,
+      options.credentials,
+      options.relayOptions ?? null,
     );
   }
 

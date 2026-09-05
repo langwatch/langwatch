@@ -66,36 +66,6 @@ function storedMetadata(metadata: Record<string, unknown> | undefined): string |
   return JSON.stringify(rest);
 }
 
-/**
- * The stored metadata with the served instance written into its reserved
- * `langwatch` namespace.
- *
- * The column holds the metadata as one JSON string, so the instance is
- * merged into the object and written back. Metadata that does not parse as
- * an object is replaced by one that holds the instance alone: the run's
- * other metadata was already unreadable, and the instance is what this
- * event records.
- */
-export function withAgentInstance({
-  metadata,
-  agentInstance,
-}: {
-  metadata: string | null;
-  agentInstance: { hostname: string; label: string | null };
-}): string {
-  const current = parseMetadataObject(metadata);
-  const langwatch =
-    typeof current.langwatch === "object" &&
-    current.langwatch !== null &&
-    !Array.isArray(current.langwatch)
-      ? (current.langwatch as Record<string, unknown>)
-      : {};
-  return JSON.stringify({
-    ...current,
-    langwatch: { ...langwatch, agentInstance },
-  });
-}
-
 /** A parsed JSON value that is a plain object, not an array or a scalar. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -283,26 +253,6 @@ function isTerminalStatus(status: string): boolean {
   return TERMINAL_STATUSES.has(status);
 }
 
-/**
- * Whether the fold has seen an event that DEFINES the run, and so whether the
- * state is worth a `simulation_runs` row.
- *
- * Every lifecycle event names the run it belongs to, and every handler for one
- * writes that name onto `ScenarioRunId`. The metrics event is the exception:
- * it carries a run id, a trace id and a cost, and no identity at all, so its
- * handler leaves `ScenarioRunId` empty. A non-empty `ScenarioRunId` is
- * therefore the exact statement "some event has said what this run is".
- *
- * Cost alone must not mint a run: a redacted/misattributed run id would
- * otherwise address an aggregate no run ever created, producing a row with no
- * name, scenario, set or end whose cost grows with every trace. The fold
- * store consults this before it writes, so metrics accumulate in the fold
- * state and reach the table with the run's first lifecycle event.
- */
-export function hasRunDefiningEvent(state: SimulationRunStateData): boolean {
-  return state.ScenarioRunId.length > 0;
-}
-
 const simulationRunEvents = [
   SimulationRunQueuedEventSchema,
   SimulationRunStartedEventSchema,
@@ -331,6 +281,41 @@ export class SimulationRunStateFoldProjection
     store: FoldProjectionStore<SimulationRunStateData>;
   }): SimulationRunStateFoldProjection {
     return new SimulationRunStateFoldProjection(deps);
+  }
+
+  /**
+   * The stored metadata with the served instance written into its reserved
+   * `langwatch` namespace. Metadata that does not parse as an object is
+   * replaced by one that holds the instance alone.
+   */
+  static withAgentInstance({
+    metadata,
+    agentInstance,
+  }: {
+    metadata: string | null;
+    agentInstance: { hostname: string; label: string | null };
+  }): string {
+    const current = parseMetadataObject(metadata);
+    const langwatch =
+      typeof current.langwatch === "object" &&
+      current.langwatch !== null &&
+      !Array.isArray(current.langwatch)
+        ? (current.langwatch as Record<string, unknown>)
+        : {};
+    return JSON.stringify({
+      ...current,
+      langwatch: { ...langwatch, agentInstance },
+    });
+  }
+
+  /**
+   * Whether the fold has seen an event that DEFINES the run, and so whether
+   * the state is worth a `simulation_runs` row. Every lifecycle event names
+   * its run; the metrics event carries a cost and no identity, so cost alone
+   * must not mint a run.
+   */
+  static hasRunDefiningEvent(state: SimulationRunStateData): boolean {
+    return state.ScenarioRunId.length > 0;
   }
 
   readonly name = "simulationRunState";
@@ -659,7 +644,7 @@ export class SimulationRunStateFoldProjection
     // The event carries a `scenarioRunId` and this handler deliberately does
     // not write it onto the state. The id is a span attribute the customer's
     // agent sent, so it names a run only if a run said so, and
-    // `hasRunDefiningEvent` is what reads the difference. Copying it here would
+    // `SimulationRunStateFoldProjection.hasRunDefiningEvent` is what reads the difference. Copying it here would
     // let a cost figure alone create a run in the simulations list.
 
     // Store per-trace breakdown, then recompute aggregates
@@ -715,7 +700,7 @@ export class SimulationRunStateFoldProjection
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
-      Metadata: withAgentInstance({
+      Metadata: SimulationRunStateFoldProjection.withAgentInstance({
         metadata: state.Metadata,
         agentInstance: event.data.agentInstance,
       }),

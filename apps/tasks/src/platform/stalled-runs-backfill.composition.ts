@@ -1,6 +1,6 @@
 import { AgentService } from "@langwatch/agent-contract";
 import {
-  createSimulationProcessingProducerPipeline,
+  SimulationProcessingProducerAdapter,
   ScenarioFailureHandlerService,
   SimulationClickHouseAdapter,
   SimulationExecutionPort,
@@ -210,7 +210,7 @@ export function buildStalledRunsBackfillTask({
         );
       }
       const registered = eventing.eventSourcing.register(
-        createSimulationProcessingProducerPipeline({ processName: TASKS_PROCESS_NAME }),
+        SimulationProcessingProducerAdapter.create({ processName: TASKS_PROCESS_NAME }).build(),
       );
       const simulations = SimulationClickHouseAdapter.createNull({
         execution: new TasksSimulationExecution(registered.commands.finishRun),

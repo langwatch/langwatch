@@ -46,7 +46,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import { AGENT_CHAT_TIMEOUT_MS } from "../../adapters/langy.turn-errors.adapter";
+import { AGENT_CHAT_TIMEOUT_MS } from "../../services/langy-turn-errors.errors";
 import { ADOPTABLE_CONVERSATION_ID } from "../../services/langy-conversation.service";
 import type { LangyChatMessageInput } from "../../services/langy-turn.shared";
 import type { LangyStreamEntry } from "../../streaming/langy-token-buffer";

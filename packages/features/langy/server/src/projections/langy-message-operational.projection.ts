@@ -8,7 +8,7 @@ import {
   LangyMessageImportedEventSchema,
   type LangyMessageRecordedEvent,
   LangyMessageRecordedEventSchema,
-} from "../adapters/eventing.langy.adapter";
+} from "../services/langy-conversation.events";
 
 const messageEvents = [
   LangyMessageRecordedEventSchema,
@@ -34,6 +34,12 @@ export class LangyMessageOperationalMapProjection
     groupKeyFn: (event: { data: { conversationId: string; messageId: string } }) =>
       `langy:${event.data.conversationId}:message:${event.data.messageId}`,
   };
+
+  static create(deps: {
+    store: AppendStore<LangyMessageProjectionRecord>;
+  }): LangyMessageOperationalMapProjection {
+    return new LangyMessageOperationalMapProjection(deps);
+  }
 
   constructor(deps: { store: AppendStore<LangyMessageProjectionRecord> }) {
     super();

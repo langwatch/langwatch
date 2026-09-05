@@ -20,13 +20,11 @@ import type { CodeAgentData, RunParameterValues } from "@langwatch/scenario-cont
 import { resolveFieldMappings, sourceFieldOf } from "@langwatch/scenario-contract";
 import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
 import {
-  createNlpFetchDispatcher,
   type FetchInitWithDispatcher,
   NLP_FETCH_HEADROOM_MS,
-  resolveFloorFetchTimeoutMs,
-  resolveMaxFetchTimeoutMs,
+  NlpFetchAdapter,
 } from "./nlp-fetch.adapter";
-import { SerializedAgentAdapter } from "./serialized-agent.adapter";
+import { SerializedAgentAdapter } from "./serialized-agent.base";
 
 /** Categories for adapter failures, surfaced as the `error.kind` span attribute. */
 type AdapterErrorKind = "timeout" | "fetch" | "http" | "nlp_error";
@@ -285,11 +283,11 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
   /**
    * How long to wait on the NLP service for one turn.
    *
-   * Always at least {@link resolveFloorFetchTimeoutMs}'s result — the engine's
+   * Always at least {@link NlpFetchAdapter.floorTimeoutMs}'s result — the engine's
    * own code-block ceiling plus headroom — and above the agent's own code
    * budget when that budget is longer, so the engine gets to enforce (and
    * report) the timeout rather than the request being aborted from here —
-   * bounded by {@link resolveMaxFetchTimeoutMs}, this platform's operator-
+   * bounded by {@link NlpFetchAdapter.maxTimeoutMs}, this platform's operator-
    * configurable maximum for one turn.
    *
    * An over-large `timeoutMs` is clamped rather than rejected. The schemas
@@ -307,8 +305,9 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
    */
   private fetchTimeoutMs(): number {
     const { timeoutMs } = this.config;
-    const floorTimeoutMs = resolveFloorFetchTimeoutMs();
-    const maxTimeoutMs = resolveMaxFetchTimeoutMs();
+    const transport = NlpFetchAdapter.create();
+    const floorTimeoutMs = transport.floorTimeoutMs();
+    const maxTimeoutMs = transport.maxTimeoutMs();
     if (timeoutMs === undefined) {
       return Math.min(maxTimeoutMs, floorTimeoutMs);
     }
@@ -389,7 +388,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(event),
               signal: controller.signal,
-              dispatcher: createNlpFetchDispatcher({
+              dispatcher: NlpFetchAdapter.create().dispatcher({
                 timeoutMs: fetchTimeoutMs,
               }),
             };

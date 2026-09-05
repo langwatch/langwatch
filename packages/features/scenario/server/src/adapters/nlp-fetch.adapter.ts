@@ -151,7 +151,7 @@ function resolvePositiveMsEnv({ name, fallbackMs }: { name: string; fallbackMs: 
  *
  * @internal Exported for testing.
  */
-export function resolveFloorFetchTimeoutMs(): number {
+function resolveFloorFetchTimeoutMs(): number {
   const engineCeilingMs = resolvePositiveSecondsEnvAsMs({
     name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV,
     fallbackSeconds: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS,
@@ -181,7 +181,7 @@ export function resolveFloorFetchTimeoutMs(): number {
  *
  * @internal Exported for testing.
  */
-export function resolveMaxFetchTimeoutMs(): number {
+function resolveMaxFetchTimeoutMs(): number {
   return resolvePositiveMsEnv({
     name: NLP_FETCH_MAX_TIMEOUT_ENV,
     fallbackMs: NLP_FETCH_MAX_TIMEOUT_DEFAULT_MS,
@@ -189,7 +189,7 @@ export function resolveMaxFetchTimeoutMs(): number {
 }
 
 /**
- * Cache for {@link createNlpFetchDispatcher}, keyed by the effective
+ * Cache for the dispatcher, keyed by the effective
  * `timeoutMs`. An `Agent` owns its own connection pool, so building a fresh
  * one per call — the original behaviour here — opened a new pool on every
  * scenario fetch that was never reused and never destroyed: a socket/FD
@@ -219,10 +219,10 @@ const dispatchersByTimeoutMs = new Map<number, Dispatcher>();
  * {@link FetchInitWithDispatcher} is typed so that mistake cannot compile.
  *
  * Memoized by `timeoutMs` — see {@link dispatchersByTimeoutMs}. Call
- * {@link closeNlpFetchDispatchers} on shutdown to release the pooled
+ * {@link NlpFetchAdapter.close} on shutdown to release the pooled
  * connections this holds open.
  */
-export function createNlpFetchDispatcher({ timeoutMs }: { timeoutMs: number }): Dispatcher {
+function createNlpFetchDispatcher({ timeoutMs }: { timeoutMs: number }): Dispatcher {
   const cached = dispatchersByTimeoutMs.get(timeoutMs);
   if (cached) {
     return cached;
@@ -236,25 +236,55 @@ export function createNlpFetchDispatcher({ timeoutMs }: { timeoutMs: number }): 
 }
 
 /**
- * Closes every dispatcher {@link createNlpFetchDispatcher} has cached and
+ * Closes every dispatcher this module has cached and
  * clears the cache, so a later call builds a fresh `Agent` instead of
  * reusing a closed one. Wired into process shutdown from
  * the worker process's own shutdown.
  */
-export async function closeNlpFetchDispatchers(): Promise<void> {
+async function closeNlpFetchDispatchers(): Promise<void> {
   const dispatchers = [...dispatchersByTimeoutMs.values()];
   dispatchersByTimeoutMs.clear();
   await Promise.all(dispatchers.map((dispatcher) => dispatcher.close()));
 }
 
 /**
- * The request init for a call that carries {@link createNlpFetchDispatcher}'s
+ * The undici transport every scenario call to nlpgo goes through: the
+ * env-derived deadlines, and the memoized dispatcher that carries them.
+ */
+export class NlpFetchAdapter {
+  static create(): NlpFetchAdapter {
+    return new NlpFetchAdapter();
+  }
+
+  /** The deadline derived from the engine's own code-block ceiling. */
+  floorTimeoutMs(): number {
+    return resolveFloorFetchTimeoutMs();
+  }
+
+  /** This platform's own maximum for one scenario turn. */
+  maxTimeoutMs(): number {
+    return resolveMaxFetchTimeoutMs();
+  }
+
+  /** The pooled dispatcher for one deadline, built once per distinct value. */
+  dispatcher({ timeoutMs }: { timeoutMs: number }): Dispatcher {
+    return createNlpFetchDispatcher({ timeoutMs });
+  }
+
+  /** Releases every pooled connection this process holds open to nlpgo. */
+  async close(): Promise<void> {
+    await closeNlpFetchDispatchers();
+  }
+}
+
+/**
+ * The request init for a call that carries {@link NlpFetchAdapter.dispatcher}'s
  * dispatcher.
  *
  * Deliberately undici's own `RequestInit` (which already declares
  * `dispatcher`), not the DOM-lib one the global `fetch` takes. The two are not
  * assignable to each other, so this type is what makes handing the dispatcher
  * to the global `fetch` a compile error rather than a production outage — see
- * {@link createNlpFetchDispatcher} for what that outage looked like.
+ * {@link NlpFetchAdapter.dispatcher} for what that outage looked like.
  */
 export type FetchInitWithDispatcher = UndiciRequestInit;

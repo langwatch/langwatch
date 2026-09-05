@@ -16,7 +16,7 @@ import { NotFoundError } from "@langwatch/handled-error";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import { isSetupSkillId, setupSkillBody } from "../../services/setup-skills.service";
+import { SetupSkillsService } from "../../services/setup-skills.service";
 
 /**
  * The surface reads nothing off the request beyond the project the permission
@@ -60,10 +60,11 @@ export class SetupSkillsTrpcApi {
       getPrompt: policy("project:view")(
         procedure.input(z.object({ projectId: z.string(), skill: z.string() })),
       ).query(({ input }: { input: { projectId: string; skill: string } }) => {
-        if (!isSetupSkillId(input.skill)) {
+        const skills = SetupSkillsService.create();
+        if (!skills.isSetupSkillId(input.skill)) {
           throw new NotFoundError("not_found", "Setup guide", input.skill);
         }
-        return { body: setupSkillBody(input.skill) };
+        return { body: skills.body(input.skill) };
       }),
     });
   }

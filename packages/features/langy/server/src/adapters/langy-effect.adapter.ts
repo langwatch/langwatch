@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { LangyDispatchRejectedError } from "@langwatch/langy-contract";
-import { LangyTurnErrors } from "./langy.turn-errors.adapter";
+import { LangyTurnErrors } from "../services/langy-turn-errors.errors";
 import type { LangyEffectPorts, LangyTitleGenerator } from "../ports/langy-effect.port";
 import { LangyTurnDispatchRetry } from "../processes/langy-turn-dispatch-retry.error";
 import type { LangyWorkerPort } from "../ports/langy-turn-runtime.port";

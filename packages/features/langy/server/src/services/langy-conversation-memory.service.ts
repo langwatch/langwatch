@@ -49,6 +49,10 @@ import type { LangyMessageRow } from "@langwatch/langy-contract";
  * reaching a SYSTEM block is data and never an instruction.
  */
 export class LangyConversationMemoryService {
+  static create(): LangyConversationMemoryService {
+    return new LangyConversationMemoryService();
+  }
+
   /**
    * The resources this conversation touched, most recent first.
    *

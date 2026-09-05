@@ -27,10 +27,10 @@ import {
 } from "@langwatch/langy-contract";
 
 import {
-  resolveLangyActorSession,
+  LangyActorSessionService,
   type LangyActorUserReader,
 } from "#services/langy-actor-session.service";
-import { resolveLangyKeyIdentity } from "#services/langy-key-identity.service";
+import { LangyKeyIdentityService } from "#services/langy-key-identity.service";
 
 /**
  * How this process reads a project credential off a request.
@@ -114,10 +114,9 @@ export async function resolveLangyRestCaller(input: {
   });
   if (!surfaceOpen) return { dark: true };
 
-  const identity = await resolveLangyKeyIdentity({
-    resolved,
+  const identity = await LangyKeyIdentityService.create({
     featureFlags: input.ports.featureFlags(),
-  });
+  }).resolve({ resolved });
   if (!identity.ok) {
     throw new LangyApiIdentityDeniedError(
       identity.reason === "unowned" ? "langy_api_key_unowned" : "langy_api_key_no_langy_access",
@@ -143,10 +142,9 @@ export async function resolveLangyRestActor(input: {
   ports: LangyRestCredentialPorts;
   userId: string;
 }): Promise<LangyCredentialSession> {
-  const actor = await resolveLangyActorSession({
+  const actor = await LangyActorSessionService.create({
     users: input.ports.actors(),
-    userId: input.userId,
-  });
+  }).resolve({ userId: input.userId });
   if (!actor.ok) {
     throw new LangyApiIdentityDeniedError("langy_api_actor_missing", actor.message);
   }

@@ -188,16 +188,16 @@ export class PostgresLangyAdapter {
       messages: this.repositories.messages,
       admission: this.repositories.admission,
     });
-    this.service = LangyService.createComposed(
+    this.service = LangyService.create({
       conversations,
       turns,
       messages,
       credentials,
-      LangyFeedbackPromptPolicy.create({
+      feedbackPrompt: LangyFeedbackPromptPolicy.create({
         redis: options.feedbackPromptRedis ?? null,
       }),
-      options.relay,
-    );
+      relayOptions: options.relay,
+    });
     return this.service;
   }
 }

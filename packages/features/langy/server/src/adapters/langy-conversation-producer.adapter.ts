@@ -95,7 +95,7 @@ class ProducerOnlyAppendStore<TRow> implements AppendStore<TRow> {
  * `processName` names the refusal, so a stand-in reached by accident says which
  * process reached it rather than reporting an anonymous failure.
  */
-export function createLangyConversationProducerPipeline(input: { processName: string }) {
+function buildLangyConversationProducerPipeline(input: { processName: string }) {
   const { processName } = input;
   const refuse = (capability: string) => (): Promise<never> =>
     Promise.reject(producerOnly(processName, capability));
@@ -154,4 +154,17 @@ export function createLangyConversationProducerPipeline(input: { processName: st
     titleGenerator,
     sessionKeys,
   }).buildProcessing();
+}
+
+/** The Langy conversation definition as a command-only producer sees it. */
+export class LangyConversationProducerAdapter {
+  static create(options: { processName: string }): LangyConversationProducerAdapter {
+    return new LangyConversationProducerAdapter(options);
+  }
+
+  private constructor(private readonly options: { processName: string }) {}
+
+  build() {
+    return buildLangyConversationProducerPipeline(this.options);
+  }
 }

@@ -7,7 +7,7 @@
  * This suite used to carry four more cases over the repository-backed head —
  * conversation identity, relay delegation, "turns repository absence into the
  * contract error", and visibility-before-messages. That head had no production
- * construction (`createComposed` passed `null` for it) and no caller, so those
+ * construction (`create` passed `null` for it) and no caller, so those
  * cases proved only that the abstractions they defined were self-consistent.
  * They went with it.
  */
@@ -37,13 +37,13 @@ function feedbackPrompt() {
 
 /** Composed the way production composes it; feedback reaches no collaborator. */
 function service(prompt: LangyFeedbackPromptPolicy) {
-  return LangyService.createComposed(
-    {} as unknown as LangyConversationService,
-    {} as unknown as LangyTurnService,
-    {} as unknown as LangyMessageService,
-    {} as unknown as LangyCredentialService,
-    prompt,
-  );
+  return LangyService.create({
+    conversations: {} as unknown as LangyConversationService,
+    turns: {} as unknown as LangyTurnService,
+    messages: {} as unknown as LangyMessageService,
+    credentials: {} as unknown as LangyCredentialService,
+    feedbackPrompt: prompt,
+  });
 }
 
 describe("LangyService", () => {

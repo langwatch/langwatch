@@ -11,7 +11,7 @@ import type {
   LangyTurnAdmissionCapability,
 } from "@langwatch/langy-contract";
 import { LangyEffectPortsAdapter } from "./langy-effect.adapter";
-import { createLangyConversationProcessingPipeline } from "./eventing.langy-conversation.adapter";
+import { LangyConversationPipelineAdapter } from "./eventing.langy-conversation.adapter";
 import type { LangyAnalyticsEventProjectionRecord } from "../projections/langy-analytics-event.projection";
 import type { LangyTitleGenerator } from "../ports/langy-effect.port";
 import type { LangyWorkerPort } from "../ports/langy-turn-runtime.port";
@@ -160,14 +160,14 @@ export class EventingLangyConversationAdapter {
       admissions: options.admissions,
     });
 
-    return createLangyConversationProcessingPipeline({
+    return LangyConversationPipelineAdapter.create({
       langyConversationProjectionStore: conversationStore,
       langyConversationTurnProjectionStore: options.langyConversationTurnProjectionStore,
       langyMessageProjectionStore: options.langyMessageProjectionStore,
       langyAnalyticsEventProjectionStore: options.langyAnalyticsEventProjectionStore,
       langyProcessPorts: effectPorts,
       subscribers: [livenessSubscriber, broadcastSubscriber, admissionLifecycleSubscriber],
-    });
+    }).build();
   }
 
   connectCommands(commands: LangyConversationRuntimeCommands): void {

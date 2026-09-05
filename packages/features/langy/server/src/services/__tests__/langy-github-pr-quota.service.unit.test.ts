@@ -11,12 +11,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  getLangyGithubPrUsage,
   LANGY_GITHUB_PRS_PER_DAY,
   LangyGithubPrCounterPort,
-  recordLangyGithubPr,
-  releaseLangyGithubPrPermit,
-  reserveLangyGithubPrPermit,
+  LangyGithubPrQuotaService,
 } from "../langy-github-pr-quota.service";
 
 const get = vi.fn();
@@ -44,15 +41,17 @@ class FakeCounter extends LangyGithubPrCounterPort {
 }
 
 const counter = new FakeCounter();
+const quota = LangyGithubPrQuotaService.create({ counter });
+const quotaWithoutCounter = LangyGithubPrQuotaService.create({ counter: null });
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("getLangyGithubPrUsage", () => {
+describe("LangyGithubPrQuotaService.usage", () => {
   describe("when Redis is unavailable", () => {
     it("fails open — user is allowed and full quota remains", async () => {
-      const out = await getLangyGithubPrUsage({ counter: null, userId: "u1" });
+      const out = await quotaWithoutCounter.usage({ userId: "u1" });
       expect(out.allowed).toBe(true);
       expect(out.remaining).toBe(LANGY_GITHUB_PRS_PER_DAY);
     });
@@ -61,7 +60,7 @@ describe("getLangyGithubPrUsage", () => {
   describe("when the counter is below the cap", () => {
     it("reports remaining as cap minus count and allowed=true", async () => {
       get.mockResolvedValue("5");
-      const out = await getLangyGithubPrUsage({ counter, userId: "u1", limit: 20 });
+      const out = await quota.usage({ userId: "u1", limit: 20 });
       expect(out).toMatchObject({ allowed: true, remaining: 15 });
     });
   });
@@ -69,18 +68,18 @@ describe("getLangyGithubPrUsage", () => {
   describe("when the counter is at the cap", () => {
     it("reports allowed=false and remaining=0", async () => {
       get.mockResolvedValue("20");
-      const out = await getLangyGithubPrUsage({ counter, userId: "u1", limit: 20 });
+      const out = await quota.usage({ userId: "u1", limit: 20 });
       expect(out).toMatchObject({ allowed: false, remaining: 0 });
     });
   });
 });
 
-describe("recordLangyGithubPr", () => {
+describe("LangyGithubPrQuotaService.record", () => {
   describe("on first PR of the day", () => {
     it("increments and sets a 2-day TTL on the bucket key", async () => {
       incr.mockResolvedValue(1);
       expire.mockResolvedValue(1);
-      const out = await recordLangyGithubPr({ counter, userId: "u1", limit: 20 });
+      const out = await quota.record({ userId: "u1", limit: 20 });
       expect(incr).toHaveBeenCalledTimes(1);
       expect(expire).toHaveBeenCalledWith(
         expect.stringContaining("langy:gh:prs:u1:"),
@@ -93,7 +92,7 @@ describe("recordLangyGithubPr", () => {
   describe("when this increment crosses the cap", () => {
     it("returns allowed=false on the post-increment count", async () => {
       incr.mockResolvedValue(21);
-      const out = await recordLangyGithubPr({ counter, userId: "u1", limit: 20 });
+      const out = await quota.record({ userId: "u1", limit: 20 });
       expect(out.allowed).toBe(false);
       expect(out.remaining).toBe(0);
     });
@@ -102,18 +101,17 @@ describe("recordLangyGithubPr", () => {
   describe("when Redis throws mid-increment", () => {
     it("fails open — chat must not break because the counter is sick", async () => {
       incr.mockRejectedValue(new Error("boom"));
-      const out = await recordLangyGithubPr({ counter, userId: "u1", limit: 20 });
+      const out = await quota.record({ userId: "u1", limit: 20 });
       expect(out).toMatchObject({ allowed: true, remaining: 20 });
     });
   });
 });
 
-describe("reserveLangyGithubPrPermit", () => {
+describe("LangyGithubPrQuotaService.reservePermit", () => {
   describe("when the reservation lands within the cap", () => {
     it("INCRs once and returns allowed=true with no DECR", async () => {
       incr.mockResolvedValue(5);
-      const out = await reserveLangyGithubPrPermit({
-        counter,
+      const out = await quota.reservePermit({
         userId: "u1",
         limit: 20,
       });
@@ -127,8 +125,7 @@ describe("reserveLangyGithubPrPermit", () => {
     it("rolls back via DECR and returns allowed=false", async () => {
       incr.mockResolvedValue(21);
       decr.mockResolvedValue(20);
-      const out = await reserveLangyGithubPrPermit({
-        counter,
+      const out = await quota.reservePermit({
         userId: "u1",
         limit: 20,
       });
@@ -143,7 +140,7 @@ describe("reserveLangyGithubPrPermit", () => {
 
   describe("when Redis is unavailable", () => {
     it("fails open — does not strip GitHub from every connected user", async () => {
-      const out = await reserveLangyGithubPrPermit({ counter: null, userId: "u1" });
+      const out = await quotaWithoutCounter.reservePermit({ userId: "u1" });
       expect(out).toMatchObject({
         allowed: true,
         remaining: LANGY_GITHUB_PRS_PER_DAY,
@@ -160,8 +157,8 @@ describe("reserveLangyGithubPrPermit", () => {
       incr.mockResolvedValueOnce(20).mockResolvedValueOnce(21);
       decr.mockResolvedValue(20);
       const [winner, loser] = await Promise.all([
-        reserveLangyGithubPrPermit({ counter, userId: "u1", limit: 20 }),
-        reserveLangyGithubPrPermit({ counter, userId: "u1", limit: 20 }),
+        quota.reservePermit({ userId: "u1", limit: 20 }),
+        quota.reservePermit({ userId: "u1", limit: 20 }),
       ]);
       expect(winner.allowed).toBe(true);
       expect(loser.allowed).toBe(false);
@@ -170,20 +167,18 @@ describe("reserveLangyGithubPrPermit", () => {
   });
 });
 
-describe("releaseLangyGithubPrPermit", () => {
+describe("LangyGithubPrQuotaService.releasePermit", () => {
   describe("when called for a turn that opened no PR", () => {
     it("DECRs to return the slot to the daily pool", async () => {
       decr.mockResolvedValue(4);
-      await releaseLangyGithubPrPermit({ counter, userId: "u1" });
+      await quota.releasePermit({ userId: "u1" });
       expect(decr).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("when Redis is unavailable", () => {
     it("is a no-op (best-effort fairness, not a correctness boundary)", async () => {
-      await expect(
-        releaseLangyGithubPrPermit({ counter: null, userId: "u1" }),
-      ).resolves.toBeUndefined();
+      await expect(quotaWithoutCounter.releasePermit({ userId: "u1" })).resolves.toBeUndefined();
     });
   });
 });

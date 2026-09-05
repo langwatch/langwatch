@@ -73,7 +73,7 @@ describe("ScenarioService", () => {
   /** @scenario "A required scenario read is tenant scoped" */
   /** @scenario "Optional scenario discovery is explicit" */
   it("keeps reads project-scoped and only makes optional reads nullable", async () => {
-    const repository = new MemoryScenarioRepository();
+    const repository = MemoryScenarioRepository.create();
     const service = ScenarioService.create(serviceOptions(repository, "scenario_1"));
     await service.create({
       projectId: "project-a",
@@ -99,7 +99,7 @@ describe("ScenarioService", () => {
 
   /** @scenario "Scenario archive delivery is retry safe" */
   it("preserves the first archive timestamp across retry delivery", async () => {
-    const repository = new MemoryScenarioRepository();
+    const repository = MemoryScenarioRepository.create();
     const first = new Date("2026-01-01T00:00:00.000Z");
     const later = new Date("2026-01-02T00:00:00.000Z");
     const service = ScenarioService.create(
@@ -123,7 +123,7 @@ describe("ScenarioService", () => {
   });
 
   it("keeps run configuration parameter JSON project-scoped", async () => {
-    const repository = new MemoryScenarioRepository();
+    const repository = MemoryScenarioRepository.create();
     const service = ScenarioService.create(serviceOptions(repository, "scenario_1"));
     await service.create({
       projectId: "project-a",
@@ -186,7 +186,7 @@ describe("ScenarioService", () => {
   });
 
   it("persists model selections through the canonical update boundary", async () => {
-    const repository = new MemoryScenarioRepository();
+    const repository = MemoryScenarioRepository.create();
     const service = ScenarioService.create(serviceOptions(repository, "scenario_1"));
     await service.create({
       projectId: "project-a",
@@ -217,7 +217,7 @@ describe("ScenarioService", () => {
 
   it("resolves a suite's scenarios together and encrypts secret values", async () => {
     const service = ScenarioService.create(
-      serviceOptions(new MemoryScenarioRepository(), "scenario_1"),
+      serviceOptions(MemoryScenarioRepository.create(), "scenario_1"),
     );
 
     await expect(
@@ -268,7 +268,7 @@ describe("ScenarioService", () => {
     /** @scenario "Writing a scenario secret refuses by name" */
     it("refuses saving a stored secret, naming the missing encryption key", async () => {
       const service = ScenarioService.create({
-        ...serviceOptions(new MemoryScenarioRepository(), "scenario_1"),
+        ...serviceOptions(MemoryScenarioRepository.create(), "scenario_1"),
         secretCipher: new RefusingScenarioSecretCipher(),
       });
 
@@ -295,7 +295,7 @@ describe("ScenarioService", () => {
 
   it("rejects an unknown suite parameter before returning schedulable values", async () => {
     const service = ScenarioService.create(
-      serviceOptions(new MemoryScenarioRepository(), "scenario_1"),
+      serviceOptions(MemoryScenarioRepository.create(), "scenario_1"),
     );
 
     await expect(
@@ -316,7 +316,7 @@ describe("ScenarioService", () => {
   });
 
   it("preserves order, duplicates, retry success, and exact failures in a batch archive", async () => {
-    const repository = new MemoryScenarioRepository();
+    const repository = MemoryScenarioRepository.create();
     const firstService = ScenarioService.create(serviceOptions(repository, "scenario_1"));
     const secondService = ScenarioService.create(serviceOptions(repository, "scenario_2"));
     await firstService.create({
@@ -367,7 +367,7 @@ describe("ScenarioService", () => {
     describe("when the name is only spaces", () => {
       /** @scenario "A test suite created with a blank name is rejected with validation_error" */
       it("rejects the input before it reaches the repository", async () => {
-        const repository = new MemoryScenarioRepository();
+        const repository = MemoryScenarioRepository.create();
         const service = ScenarioService.create(serviceOptions(repository, "test_suite_1"));
 
         expect(() => service.createTestSuite({ projectId: "project-a", name: "   " })).toThrow();
@@ -380,7 +380,7 @@ describe("ScenarioService", () => {
     describe("given a scenario already filed in one test suite", () => {
       /** @scenario "A scenario belongs to exactly one test suite" */
       it("holds only the destination test suite id, replacing the one it left", async () => {
-        const repository = new MemoryScenarioRepository();
+        const repository = MemoryScenarioRepository.create();
         // Each test suite is created through its own service instance so its
         // fixed id generator (see `serviceOptions`) mints a distinct id; the
         // repository underneath is shared, so every instance reads and

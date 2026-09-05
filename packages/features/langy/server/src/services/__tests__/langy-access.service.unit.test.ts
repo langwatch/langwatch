@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
-import { hasLangyAccess } from "../langy-access.service";
+import { LangyAccessService } from "../langy-access.service";
 
 function featureFlags(enabled: boolean) {
   const service = MemoryFeatureFlagService.create();
@@ -10,16 +10,15 @@ function featureFlags(enabled: boolean) {
   return { service, isEnabled };
 }
 
-describe("hasLangyAccess", () => {
+describe("LangyAccessService", () => {
   describe("when the rollout flag is off", () => {
     it("denies access", async () => {
       const { service, isEnabled } = featureFlags(false);
 
       await expect(
-        hasLangyAccess({
+        LangyAccessService.create({ featureFlags: service }).hasAccess({
           user: { id: "customer-1" },
           projectId: "project-1",
-          featureFlags: service,
         }),
       ).resolves.toBe(false);
 
@@ -42,10 +41,9 @@ describe("hasLangyAccess", () => {
       const { service, isEnabled } = featureFlags(true);
 
       await expect(
-        hasLangyAccess({
+        LangyAccessService.create({ featureFlags: service }).hasAccess({
           user: { id: "customer-2" },
           organizationId: "org-1",
-          featureFlags: service,
         }),
       ).resolves.toBe(true);
 
@@ -66,9 +64,8 @@ describe("hasLangyAccess", () => {
       const { service, isEnabled } = featureFlags(false);
 
       await expect(
-        hasLangyAccess({
+        LangyAccessService.create({ featureFlags: service }).hasAccess({
           user: { id: "staff-1" },
-          featureFlags: service,
         }),
       ).resolves.toBe(false);
 
@@ -83,9 +80,8 @@ describe("hasLangyAccess", () => {
       // The GitHub install route has neither a projectId nor an organizationId
       // in hand, so the gate states both scopes as not targeted.
       await expect(
-        hasLangyAccess({
+        LangyAccessService.create({ featureFlags: service }).hasAccess({
           user: { id: "customer-3" },
-          featureFlags: service,
         }),
       ).resolves.toBe(false);
 

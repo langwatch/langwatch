@@ -11,7 +11,7 @@
  * only because `run_evaluations: false` skips the path that would surface
  * it.
  *
- * These tests exercise `createAdapter` (the actual composition point, not
+ * These tests exercise `SerializedAgentRegistryAdapter.build` (the actual composition point, not
  * an adapter constructed by hand) and assert on the EMITTED request body —
  * asserting a constructor argument would pass even if the registry still
  * wired the wrong value through, since nothing downstream would catch it.
@@ -29,7 +29,7 @@ import type {
   LiteLLMParams,
   WorkflowAgentData,
 } from "@langwatch/scenario-contract";
-import { createAdapter } from "../index";
+import { SerializedAgentRegistryAdapter } from "../index";
 
 // The workflow and code adapters call undici's own fetch, so that export is
 // the interception point. Hoisted, because the vi.mock factory below is
@@ -136,7 +136,7 @@ describe("createAdapter — project API key threading", () => {
 
     /** @scenario "The workflow adapter sends the project's platform API key, not an LLM key" */
     it("emits the project API key as workflow.api_key on the outbound request", async () => {
-      const adapter = createAdapter({
+      const adapter = SerializedAgentRegistryAdapter.create().build({
         adapterData: workflowData,
         modelParams,
         nlpServiceUrl,
@@ -163,7 +163,7 @@ describe("createAdapter — project API key threading", () => {
 
     /** @scenario "The code adapter sends the project's platform API key, not an LLM key" */
     it("emits the project API key as workflow.api_key on the outbound request", async () => {
-      const adapter = createAdapter({
+      const adapter = SerializedAgentRegistryAdapter.create().build({
         adapterData: codeData,
         modelParams,
         nlpServiceUrl,
@@ -196,7 +196,7 @@ describe("createAdapter — project API key threading", () => {
       // compile, which is the point: http must stay the one factory that
       // touches neither key.
       expect(() =>
-        createAdapter({
+        SerializedAgentRegistryAdapter.create().build({
           adapterData: httpData,
           nlpServiceUrl,
         }),

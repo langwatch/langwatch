@@ -40,7 +40,7 @@ import {
 import { LangyConversationStateFoldProjection } from "../projections/langy-conversation-state.projection";
 import { LangyConversationTurnFoldProjection } from "../projections/langy-conversation-turn.projection";
 import { LangyMessageOperationalMapProjection } from "../projections/langy-message-operational.projection";
-import type { LangyConversationProcessingEvent } from "./eventing.langy.adapter";
+import type { LangyConversationProcessingEvent } from "../services/langy-conversation.events";
 
 export interface LangyConversationProcessingPipelineDeps {
   langyConversationProjectionStore: StateProjectionStore<LangyConversationStateData>;
@@ -97,9 +97,7 @@ export interface LangyConversationProcessingPipelineDeps {
  * events — they are published to a Redis buffer via LangyEphemeralPublisher
  * (./ephemeral.ts), never through this pipeline. PR3 wires that transport.
  */
-export function createLangyConversationProcessingPipeline(
-  deps: LangyConversationProcessingPipelineDeps,
-) {
+function buildLangyConversationPipeline(deps: LangyConversationProcessingPipelineDeps) {
   let builder = definePipeline<LangyConversationProcessingEvent>({
     name: "langy_conversation_processing",
     aggregate: defineAggregate({
@@ -108,22 +106,22 @@ export function createLangyConversationProcessingPipeline(
     }),
   })
     .withPostgresProjection(
-      new LangyConversationStateFoldProjection({
+      LangyConversationStateFoldProjection.create({
         store: deps.langyConversationProjectionStore,
       }),
     )
     .withPostgresProjection(
-      new LangyConversationTurnFoldProjection({
+      LangyConversationTurnFoldProjection.create({
         store: deps.langyConversationTurnProjectionStore,
       }),
     )
     .withClickHouseMapProjection(
-      new LangyMessageOperationalMapProjection({
+      LangyMessageOperationalMapProjection.create({
         store: deps.langyMessageProjectionStore,
       }),
     )
     .withClickHouseMapProjection(
-      new LangyAnalyticsEventMapProjection({
+      LangyAnalyticsEventMapProjection.create({
         store: deps.langyAnalyticsEventProjectionStore,
       }),
     );
@@ -154,4 +152,17 @@ export function createLangyConversationProcessingPipeline(
     .withCommand("consumeTurnHandoff", ConsumeTurnHandoffCommand)
     .withCommand("generateConversationTitle", GenerateConversationTitleCommand)
     .build();
+}
+
+/** Deliberate process-facing adapter for the Langy conversation pipeline. */
+export class LangyConversationPipelineAdapter {
+  static create(deps: LangyConversationProcessingPipelineDeps): LangyConversationPipelineAdapter {
+    return new LangyConversationPipelineAdapter(deps);
+  }
+
+  private constructor(private readonly deps: LangyConversationProcessingPipelineDeps) {}
+
+  build() {
+    return buildLangyConversationPipeline(this.deps);
+  }
 }

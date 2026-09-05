@@ -18,13 +18,13 @@ import { AgentTestService } from "../services/agent-test.service";
 
 const prefetchAgentTestData = vi.fn();
 vi.mock("../services/agent-test-prefetch.service", () => ({
-  prefetchAgentTestData: (...args: unknown[]) => prefetchAgentTestData(...args),
+  AgentTestPrefetchService: {
+    create: () => ({ prefetch: (...args: unknown[]) => prefetchAgentTestData(...args) }),
+  },
 }));
 
-const createAdapter = vi.fn();
-vi.mock("../adapters/serialized-agent-registry.adapter", () => ({
-  createAdapter: (...args: unknown[]) => createAdapter(...args),
-}));
+/** The adapter registry, handed to the service the way the process hands it. */
+const buildAdapter = vi.fn();
 
 const now = new Date("2026-08-30T10:00:00Z");
 
@@ -102,6 +102,7 @@ function serviceFor(options: {
     secrets: {} as never,
     modelProviders: {} as never,
     ownership: fakeOwnership(options.namesById ?? {}),
+    agentAdapters: { build: (...args: never[]) => buildAdapter(...args) } as never,
     connectedDispatch: {
       dispatch: vi.fn().mockResolvedValue({
         output: {},
@@ -136,7 +137,7 @@ describe("AgentTestService.sendTurn", () => {
     /** @scenario "A turn that outlives the call deadline is failed" */
     it("fails with agent_call_timeout at the platform cap", async () => {
       vi.useFakeTimers();
-      createAdapter.mockReturnValue({ call: () => new Promise(() => undefined) });
+      buildAdapter.mockReturnValue({ call: () => new Promise(() => undefined) });
       const { service } = serviceFor({});
 
       const pending = service.sendTurn({
@@ -155,7 +156,7 @@ describe("AgentTestService.sendTurn", () => {
 
   describe("given an HTTP agent that answers inside the deadline", () => {
     it("answers what the adapter returned", async () => {
-      createAdapter.mockReturnValue({ call: () => Promise.resolve("pong") });
+      buildAdapter.mockReturnValue({ call: () => Promise.resolve("pong") });
       const { service } = serviceFor({});
 
       const result = await service.sendTurn({

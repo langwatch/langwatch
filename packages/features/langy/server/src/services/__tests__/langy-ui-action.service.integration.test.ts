@@ -45,7 +45,7 @@ function makeService({
   appended: Array<{ actionId: string }>;
   backendRunner?: (args: { kind: string }) => Promise<unknown>;
 }) {
-  return new LangyUiActionService({
+  return LangyUiActionService.create({
     redis: redis as unknown as UiActionRedis,
     conversations: {
       findByIdVisible: async () => ({ currentTurnId: IDS.turnId }),

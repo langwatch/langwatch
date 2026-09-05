@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { createAdapter } from "../index";
+import { SerializedAgentRegistryAdapter } from "../index";
 import {
   SerializedCodeAgentAdapter,
   SerializedHttpAgentAdapter,
@@ -11,7 +11,7 @@ import {
 } from "../index";
 import type { LiteLLMParams, TargetAdapterData } from "@langwatch/scenario-contract";
 
-describe("createAdapter", () => {
+describe("SerializedAgentRegistryAdapter", () => {
   const defaultModelParams: LiteLLMParams = {
     api_key: "test-key",
     model: "openai/gpt-4",
@@ -28,7 +28,7 @@ describe("createAdapter", () => {
         inputs: [],
       };
 
-      const adapter = createAdapter({
+      const adapter = SerializedAgentRegistryAdapter.create().build({
         adapterData,
         modelParams: defaultModelParams,
         projectApiKey: "lw-project-key",
@@ -50,7 +50,7 @@ describe("createAdapter", () => {
         secrets: {},
       };
 
-      const adapter = createAdapter({
+      const adapter = SerializedAgentRegistryAdapter.create().build({
         adapterData,
         modelParams: defaultModelParams,
         projectApiKey: "lw-project-key",
@@ -72,7 +72,7 @@ describe("createAdapter", () => {
         secrets: {},
       };
 
-      const adapter = createAdapter({
+      const adapter = SerializedAgentRegistryAdapter.create().build({
         adapterData,
         modelParams: defaultModelParams,
         projectApiKey: "lw-project-key",

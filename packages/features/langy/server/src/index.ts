@@ -60,7 +60,7 @@ export {
   SetupSkillsTrpcApi,
   type SetupSkillsTrpcContext,
 } from "./transport/api-trpc/setup-skills.api";
-export { isSetupSkillId, setupSkillBody, type SetupSkillId } from "./services/setup-skills.service";
+export { SetupSkillsService, type SetupSkillId } from "./services/setup-skills.service";
 // The agent-to-page UI-action channel. Moved here whole from the application
 // that used to hold it; the one thing it could not bring is the workbench's
 // action manifest, which arrives as {@link LangyUiActionCatalogPort}.
@@ -92,8 +92,8 @@ export {
   AGENT_CHAT_TIMEOUT_MS,
   LangyTurnErrors,
   LangyWorkerStoppedError,
-} from "./adapters/langy.turn-errors.adapter";
-export type { LangyConversationProcessingEvent } from "./adapters/eventing.langy.adapter";
+} from "./services/langy-turn-errors.errors";
+export type { LangyConversationProcessingEvent } from "./services/langy-conversation.events";
 export {
   computeFrameMac,
   mintRunToken,
@@ -104,7 +104,7 @@ export {
 export { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "./ports/langy-effect.port";
 export {
   AGENT_DISPATCH_TIMEOUT_MS,
-  createLangyWorkerPort,
+  LangyWorkerHttpAdapter,
 } from "./adapters/langy-worker-http.adapter";
 export type {
   LangyDispatchOutcome,
@@ -126,14 +126,14 @@ export type {
   LangyWorkerWarmInput,
 } from "./ports/langy-turn-runtime.port";
 export { FeatureFlagLangyUiActionSurfaceAdapter } from "./adapters/feature-flag.langy-ui-action-surface.adapter";
-export { createLangyConversationProcessingPipeline } from "./adapters/eventing.langy-conversation.adapter";
+export { LangyConversationPipelineAdapter } from "./adapters/eventing.langy-conversation.adapter";
 export type { LangyConversationProcessingPipelineDeps } from "./adapters/eventing.langy-conversation.adapter";
 export {
   EventingLangyConversationAdapter,
   type EventingLangyConversationAdapterOptions,
   type LangyConversationRuntimeCommands,
 } from "./adapters/eventing.langy-conversation-runtime.adapter";
-export { createLangyConversationProducerPipeline } from "./adapters/langy-conversation-producer.adapter";
+export { LangyConversationProducerAdapter } from "./adapters/langy-conversation-producer.adapter";
 export {
   EventingLangyMaintenanceAdapter,
   type LangyMaintenancePipelineDeps,
@@ -148,7 +148,7 @@ export {
   runLangySessionKeyReap,
   type LangySessionKeyReapDeps,
 } from "./intents/langy-session-key-reap.intent";
-export type { LangyAnalyticsEventProjectionRecord } from "./adapters/eventing.langy-projections-index.adapter";
+export type { LangyAnalyticsEventProjectionRecord } from "./projections/langy-analytics-event.projection";
 export {
   LangyAnalyticsEventStorageAdapter,
   NullLangyAnalyticsEventSinkAdapter,
@@ -250,14 +250,14 @@ export {
   type LangyRestCredentialReader,
 } from "./transport/api-rest/langy-rest.credentials";
 export { LANGY_API_KEY_TURNS_FLAG } from "./transport/api-rest/langy-rest.flags";
-export { hasLangyAccess, LANGY_RELEASE_FLAG } from "./services/langy-access.service";
+export { LangyAccessService, LANGY_RELEASE_FLAG } from "./services/langy-access.service";
 export {
-  resolveLangyActorSession,
+  LangyActorSessionService,
   type LangyActorResolution,
   type LangyActorUserReader,
 } from "./services/langy-actor-session.service";
 export {
-  resolveLangyKeyIdentity,
+  LangyKeyIdentityService,
   type LangyIdentityDenialReason,
   type LangyIdentityToken,
   type LangyKeyIdentity,
@@ -265,14 +265,10 @@ export {
 
 // The per-user daily cap on pull requests Langy may open on someone's behalf.
 export {
-  getLangyGithubPrUsage,
   type GithubPrLimitResult,
   LANGY_GITHUB_PRS_PER_DAY,
   LangyGithubPrCounterPort,
-  recordExtraLangyGithubPrs,
-  recordLangyGithubPr,
-  releaseLangyGithubPrPermit,
-  reserveLangyGithubPrPermit,
+  LangyGithubPrQuotaService,
 } from "./services/langy-github-pr-quota.service";
 export {
   LANGY_DISPATCH_METRIC_NAME,
@@ -280,5 +276,5 @@ export {
 } from "./adapters/otel.langy-worker-metrics.adapter";
 export {
   LANGY_BLOCKS_METRIC_NAME,
-  createOtelLangyBlockCounter,
+  OtelLangyBlockMetricsAdapter,
 } from "./adapters/otel.langy-block-metrics.adapter";

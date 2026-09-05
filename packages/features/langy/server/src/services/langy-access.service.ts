@@ -12,15 +12,6 @@ import type { FeatureFlagService, FeatureFlagTarget } from "@langwatch/feature-f
  */
 export const LANGY_RELEASE_FLAG = "release_langy_enabled" as const;
 
-export async function hasLangyAccess(input: {
-  user: { id: string };
-  projectId?: string;
-  organizationId?: string;
-  featureFlags: FeatureFlagService;
-}): Promise<boolean> {
-  return input.featureFlags.isEnabled(LANGY_RELEASE_FLAG, targetForLangyAccess(input));
-}
-
 function targetForLangyAccess(input: {
   user: { id: string };
   projectId?: string;
@@ -44,4 +35,25 @@ function targetForLangyAccess(input: {
   }
 
   return { kind: "user", userId: input.user.id };
+}
+
+/** Decides whether one user may reach Langy in a given scope. */
+export class LangyAccessService {
+  static create(options: { featureFlags: FeatureFlagService }): LangyAccessService {
+    return new LangyAccessService(options);
+  }
+
+  private readonly featureFlags: FeatureFlagService;
+
+  private constructor(options: { featureFlags: FeatureFlagService }) {
+    this.featureFlags = options.featureFlags;
+  }
+
+  async hasAccess(input: {
+    user: { id: string };
+    projectId?: string;
+    organizationId?: string;
+  }): Promise<boolean> {
+    return this.featureFlags.isEnabled(LANGY_RELEASE_FLAG, targetForLangyAccess(input));
+  }
 }

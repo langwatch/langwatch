@@ -26,6 +26,10 @@ import {
 import { ScenarioRepository, type ScenarioPlanRecord } from "../../scenario.repository";
 
 export class MemoryScenarioRepository extends ScenarioRepository {
+  static create(): MemoryScenarioRepository {
+    return new MemoryScenarioRepository();
+  }
+
   readonly rows = new Map<string, Scenario>();
   readonly testSuites = new Map<string, ScenarioTestSuite>();
 

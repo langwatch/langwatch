@@ -15,7 +15,7 @@ import type {
   LangyToolCallFailedEvent,
   LangyToolCallInitiatedEvent,
   LangyToolCallSucceededEvent,
-} from "./eventing.langy.adapter";
+} from "./langy-conversation.events";
 
 /**
  * Which event a `LangyConversationProcessingEvent` actually is.

@@ -3,29 +3,19 @@
  *
  * Uses the registry pattern for Open/Closed Principle (OCP) compliance:
  * - Open for extension: Add new adapters by registering a factory
- * - Closed for modification: No changes to createAdapter needed
+ * - Closed for modification: No changes to `build` needed
  */
 
-import type { Logger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
-import type { RunParameterValues } from "@langwatch/scenario-contract";
+import {
+  AgentAdapterFactoryPort,
+  type AgentAdapterBuildInput,
+} from "../ports/agent-adapter-factory.port";
 import { SerializedCodeAgentAdapter } from "./serialized-code-agent.adapter";
 import { SerializedHttpAgentAdapter } from "./serialized-http-agent.adapter";
 import { SerializedPromptConfigAdapter } from "./serialized-prompt-config.adapter";
 import { SerializedConnectedAgentAdapter } from "./serialized-connected-agent.adapter";
 import { SerializedWorkflowAgentAdapter } from "./serialized-workflow-agent.adapter";
-import type { LiteLLMParams, TargetAdapterData } from "@langwatch/scenario-contract";
-import type { ScenarioHttpPort } from "../ports/scenario-http.port";
-
-type CreateSerializedAdapterInput = {
-  adapterData: TargetAdapterData;
-  modelParams?: LiteLLMParams;
-  nlpServiceUrl: string;
-  projectApiKey?: string;
-  parameters?: RunParameterValues;
-  httpPort?: ScenarioHttpPort;
-  logger?: Logger;
-};
 
 /**
  * Creates an adapter from serialized data using the registry.
@@ -34,14 +24,12 @@ type CreateSerializedAdapterInput = {
  *   factory is missing the credential it needs (modelParams for prompt,
  *   projectApiKey for workflow/code).
  */
-export class SerializedAgentRegistryAdapter {
+export class SerializedAgentRegistryAdapter extends AgentAdapterFactoryPort {
   static create(): SerializedAgentRegistryAdapter {
     return new SerializedAgentRegistryAdapter();
   }
 
-  private constructor() {}
-
-  static build(input: CreateSerializedAdapterInput): AgentAdapter {
+  build(input: AgentAdapterBuildInput): AgentAdapter {
     const { adapterData } = input;
     switch (adapterData.type) {
       case "prompt": {
@@ -99,5 +87,3 @@ export class SerializedAgentRegistryAdapter {
     }
   }
 }
-
-export const createAdapter = SerializedAgentRegistryAdapter.build;

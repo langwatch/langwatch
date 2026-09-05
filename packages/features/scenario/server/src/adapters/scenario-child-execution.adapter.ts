@@ -27,9 +27,9 @@
 import * as ScenarioRunner from "@langwatch/scenario";
 import { type TracerProvider, trace } from "@opentelemetry/api";
 import type { Logger } from "@langwatch/observability";
-import { buildAgentTestRun } from "./agent-test-script.adapter";
+import { AgentTestScriptAdapter } from "./agent-test-script.adapter";
 import { buildRemoteTraceRunConfig } from "./remote-trace-run.adapter";
-import { createAdapter } from "./serialized-agent-registry.adapter";
+import { SerializedAgentRegistryAdapter } from "./serialized-agent-registry.adapter";
 import { createJudgeModelFromParams, createModelFromParams } from "./litellm-model.adapter";
 import { selectRoleModelParams } from "./scenario-role-model.adapter";
 import { SerializedConnectedAgentAdapter } from "./serialized-connected-agent.adapter";
@@ -93,7 +93,7 @@ function buildRunCast({
   script?: ScenarioRunner.ScriptStep[];
 } {
   if (jobData.script) {
-    return buildAgentTestRun({ adapter, script: jobData.script });
+    return AgentTestScriptAdapter.create().build({ adapter, script: jobData.script });
   }
   const { nlpServiceUrl, scenario } = jobData;
   const roleModelParams = selectRoleModelParams(jobData);
@@ -134,7 +134,7 @@ async function executeScenarioChildValue({
   // sets LANGWATCH_API_KEY from the prefetched project telemetry key —
   // no need to duplicate it onto the job payload. The workflow/code
   // factories consume it as workflow.api_key; prompt and http ignore it.
-  const adapter = createAdapter({
+  const adapter = SerializedAgentRegistryAdapter.create().build({
     adapterData,
     modelParams,
     nlpServiceUrl,

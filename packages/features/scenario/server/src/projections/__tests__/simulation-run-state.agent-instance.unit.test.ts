@@ -20,7 +20,6 @@ import type {
 import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,
-  withAgentInstance,
 } from "../simulation-run-state.projection";
 
 const noopStore: FoldProjectionStore<SimulationRunStateData> = {
@@ -99,7 +98,7 @@ function fold(events: SimulationProcessingEvent[]): SimulationRunStateData {
   return state;
 }
 
-describe("withAgentInstance", () => {
+describe("SimulationRunStateFoldProjection.withAgentInstance", () => {
   describe("when the metadata already holds the reserved namespace", () => {
     /** @scenario "The instance is written into the run metadata beside what the run already carries" */
     it("adds the instance and keeps everything else", () => {
@@ -111,7 +110,11 @@ describe("withAgentInstance", () => {
         },
       });
 
-      expect(JSON.parse(withAgentInstance({ metadata, agentInstance: INSTANCE }))).toEqual({
+      expect(
+        JSON.parse(
+          SimulationRunStateFoldProjection.withAgentInstance({ metadata, agentInstance: INSTANCE }),
+        ),
+      ).toEqual({
         parameters: { model: "gpt-5-mini" },
         langwatch: {
           targetKey: "agent_1#abcd1234",
@@ -124,7 +127,14 @@ describe("withAgentInstance", () => {
 
   describe("when the run carries no metadata", () => {
     it("writes the namespace with the instance alone", () => {
-      expect(JSON.parse(withAgentInstance({ metadata: null, agentInstance: INSTANCE }))).toEqual({
+      expect(
+        JSON.parse(
+          SimulationRunStateFoldProjection.withAgentInstance({
+            metadata: null,
+            agentInstance: INSTANCE,
+          }),
+        ),
+      ).toEqual({
         langwatch: { agentInstance: INSTANCE },
       });
     });
@@ -133,7 +143,12 @@ describe("withAgentInstance", () => {
   describe("when the metadata does not parse", () => {
     it("writes the namespace with the instance alone", () => {
       expect(
-        JSON.parse(withAgentInstance({ metadata: "{not json", agentInstance: INSTANCE })),
+        JSON.parse(
+          SimulationRunStateFoldProjection.withAgentInstance({
+            metadata: "{not json",
+            agentInstance: INSTANCE,
+          }),
+        ),
       ).toEqual({ langwatch: { agentInstance: INSTANCE } });
     });
   });

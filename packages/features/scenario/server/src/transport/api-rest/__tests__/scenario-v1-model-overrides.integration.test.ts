@@ -72,7 +72,7 @@ function testSecurity(): AppRestSecurity {
 let nextId = 0;
 
 function harness() {
-  const repository = new MemoryScenarioRepository();
+  const repository = MemoryScenarioRepository.create();
   const scenarios = ScenarioService.create({
     repository,
     simulations: Object.create(SimulationService.prototype) as SimulationService,

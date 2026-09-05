@@ -38,11 +38,11 @@ import {
 import type { SecretService } from "@langwatch/secret-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 
-import { createAdapter } from "../adapters/serialized-agent-registry.adapter";
+import type { AgentAdapterFactoryPort } from "../ports/agent-adapter-factory.port";
 import type { AgentTestConnectedDispatchPort } from "../ports/agent-test-connected-dispatch.port";
 import type { AgentTestOwnershipPort } from "../ports/agent-test-ownership.port";
 import {
-  prefetchAgentTestData,
+  AgentTestPrefetchService,
   type AdapterRead,
   type ProjectRead,
 } from "./agent-test-prefetch.service";
@@ -76,6 +76,8 @@ export type AgentTestServiceOptions = {
   config: ScenarioExecutionPrefetchConfig;
   ownership: AgentTestOwnershipPort;
   connectedDispatch: AgentTestConnectedDispatchPort;
+  /** Builds the adapter that speaks to the agent under test. */
+  agentAdapters: AgentAdapterFactoryPort;
   /** The platform's call-budget ceiling every kind of agent answers inside. */
   maxCallTimeoutMs: number;
 };
@@ -222,7 +224,7 @@ export class AgentTestService {
       return dispatched;
     }
 
-    const prefetch = await prefetchAgentTestData({
+    const prefetch = await AgentTestPrefetchService.create().prefetch({
       context: {
         projectId: input.projectId,
         scenarioId: AGENT_TEST_SCENARIO_ID,
@@ -241,7 +243,7 @@ export class AgentTestService {
       throw new AgentTestRefusedError({ reason: prefetch.error });
     }
 
-    const adapter = createAdapter({
+    const adapter = this.options.agentAdapters.build({
       adapterData: prefetch.data.adapterData,
       nlpServiceUrl: prefetch.data.nlpServiceUrl,
       projectApiKey: prefetch.telemetry.apiKey,
@@ -273,7 +275,7 @@ export class AgentTestService {
     const batchRunId = generateBatchRunId();
     const setId = getAgentTestSetId(input.projectId);
 
-    const prefetch = await prefetchAgentTestData({
+    const prefetch = await AgentTestPrefetchService.create().prefetch({
       context: {
         projectId: input.projectId,
         scenarioId: AGENT_TEST_SCENARIO_ID,

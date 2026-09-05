@@ -23,7 +23,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { closeNlpFetchDispatchers } from "../adapters/nlp-fetch.adapter";
+import { NlpFetchAdapter } from "../adapters/nlp-fetch.adapter";
 import type { CodeAgentData, WorkflowAgentData } from "@langwatch/scenario-contract";
 
 // Tracing is not the boundary under test, and the real tracer would need a
@@ -92,7 +92,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await closeNlpFetchDispatchers();
+  await NlpFetchAdapter.create().close();
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 

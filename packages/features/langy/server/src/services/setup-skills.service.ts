@@ -15,11 +15,18 @@ import { SETUP_SKILL_BODIES } from "./setup-skill-bodies.generated";
 
 export type SetupSkillId = keyof typeof SETUP_SKILL_BODIES;
 
-export function isSetupSkillId(id: string): id is SetupSkillId {
-  return Object.hasOwn(SETUP_SKILL_BODIES, id);
-}
+/** Serves the skill instructions the "copy a prompt" menu hands to an agent. */
+export class SetupSkillsService {
+  static create(): SetupSkillsService {
+    return new SetupSkillsService();
+  }
 
-/** The skill's own text, front matter already stripped by the generator. */
-export function setupSkillBody(skill: SetupSkillId): string {
-  return SETUP_SKILL_BODIES[skill];
+  isSetupSkillId(id: string): id is SetupSkillId {
+    return Object.hasOwn(SETUP_SKILL_BODIES, id);
+  }
+
+  /** The skill's own text, front matter already stripped by the generator. */
+  body(skill: SetupSkillId): string {
+    return SETUP_SKILL_BODIES[skill];
+  }
 }

@@ -60,8 +60,7 @@ function dispatchOutcome(response: Response): LangyDispatchOutcome {
   return "unavailable";
 }
 
-/** HTTP adapter for the process-owned Langy worker manager. */
-export function createLangyWorkerPort(config: LangyWorkerAdapterConfig): LangyWorkerPort {
+function buildLangyWorkerPort(config: LangyWorkerAdapterConfig): LangyWorkerPort {
   const { agentUrl, internalSecret, metrics } = config;
   const logger = createLogger("langwatch:langy:worker");
   const tracer = getLangWatchTracer("langwatch.langy.chat");
@@ -236,4 +235,11 @@ export function createLangyWorkerPort(config: LangyWorkerAdapterConfig): LangyWo
       );
     },
   };
+}
+
+/** HTTP adapter for the process-owned Langy worker manager. */
+export class LangyWorkerHttpAdapter {
+  static create(config: LangyWorkerAdapterConfig): LangyWorkerPort {
+    return buildLangyWorkerPort(config);
+  }
 }

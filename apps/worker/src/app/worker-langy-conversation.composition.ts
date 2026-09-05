@@ -1,6 +1,6 @@
 import {
   ClickHouseLangyAnalyticsEventAdapter,
-  createLangyWorkerPort,
+  LangyWorkerHttpAdapter,
   EventingLangyConversationAdapter,
   LangyAnalyticsEventStorageAdapter,
   NullLangyWorkerMetricsAdapter,
@@ -83,7 +83,7 @@ export type WorkerLangyConversationCompositionInput = Readonly<{
  *       |                                    projection and the turn admissions
  *       |- ClickHouseLangyAnalyticsEventAdapter   the content-free grain
  *       |- LangyTokenBuffer / LangyTurnHandoffStore   the queue's own Redis
- *       |- createLangyWorkerPort             the agent manager, or absent
+ *       |- LangyWorkerHttpAdapter           the agent manager, or absent
  *       |- tenant broadcast                  the shared publisher, renamed
  *       |- LangyTitleGeneratorService        the model gateway, or absent
  *       `- sessionKeys                       ABSENT (see below)
@@ -139,7 +139,7 @@ export function createWorkerLangyConversation(
     buffer: LangyTokenBuffer.create({ redis: options.redis }),
     handoffStore: LangyTurnHandoffStore.create({ redis: options.redis }),
     worker: options.config.langy
-      ? createLangyWorkerPort({
+      ? LangyWorkerHttpAdapter.create({
           agentUrl: options.config.langy.agentUrl,
           internalSecret: options.config.langy.internalSecret,
           metrics: workerMetrics,

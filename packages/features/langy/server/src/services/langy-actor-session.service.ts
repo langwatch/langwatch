@@ -31,31 +31,41 @@ export type LangyActorResolution =
   | { ok: true; session: LangyCredentialSession }
   | { ok: false; reason: "actor-missing"; message: string };
 
-export async function resolveLangyActorSession(input: {
-  users: LangyActorUserReader;
-  userId: string;
-}): Promise<LangyActorResolution> {
-  const user = await input.users.user.findUnique({
-    where: { id: input.userId },
-    select: { id: true, name: true, email: true },
-  });
-  if (!user) {
-    return {
-      ok: false,
-      reason: "actor-missing",
-      message:
-        "The user this API key belongs to no longer exists. Langy turns are attributed to a real person, so this key cannot start one.",
-    };
+/** Reads the person a key-authenticated turn is filed under. */
+export class LangyActorSessionService {
+  static create(options: { users: LangyActorUserReader }): LangyActorSessionService {
+    return new LangyActorSessionService(options);
   }
 
-  return {
-    ok: true,
-    session: {
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
+  private readonly users: LangyActorUserReader;
+
+  private constructor(options: { users: LangyActorUserReader }) {
+    this.users = options.users;
+  }
+
+  async resolve(input: { userId: string }): Promise<LangyActorResolution> {
+    const user = await this.users.user.findUnique({
+      where: { id: input.userId },
+      select: { id: true, name: true, email: true },
+    });
+    if (!user) {
+      return {
+        ok: false,
+        reason: "actor-missing",
+        message:
+          "The user this API key belongs to no longer exists. Langy turns are attributed to a real person, so this key cannot start one.",
+      };
+    }
+
+    return {
+      ok: true,
+      session: {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+        },
       },
-    },
-  };
+    };
+  }
 }

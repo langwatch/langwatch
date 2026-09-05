@@ -13,7 +13,7 @@ import {
   AgentSessionTooLargeError,
   SESSION_TOO_LARGE_PREFIX,
   SerializedAgentAdapter,
-} from "../serialized-agent.adapter";
+} from "../serialized-agent.base";
 
 /** The smallest adapter that exposes the store: no transport, no call. */
 class StoreOnlyAdapter extends SerializedAgentAdapter {

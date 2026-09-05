@@ -18,7 +18,7 @@ import { ClickHouseStalledSimulationRunRepository } from "../repositories/clickh
 import { MemorySimulationRunStateRepository } from "../repositories/memory/memory.simulation-run-state.repository";
 import type { SimulationRunMetricsProjectionRecord } from "../projections/simulation-run-metrics.projection";
 import {
-  hasRunDefiningEvent,
+  SimulationRunStateFoldProjection,
   type SimulationRunStateData,
 } from "../projections/simulation-run-state.projection";
 import {
@@ -38,14 +38,15 @@ const logger = createLogger("scenario:simulation-run-state-fold-store");
  * naive write takes `ScenarioRunId` straight from the aggregate key — putting
  * a row in `simulation_runs` for a run that never existed, with no name, no
  * verdict, no end, and cost that rises with every further trace.
- * {@link hasRunDefiningEvent} is the gate: metrics still accumulate in the
+ * {@link SimulationRunStateFoldProjection.hasRunDefiningEvent} is the gate:
+ * metrics still accumulate in the
  * fold state, and reach the table with the run's first lifecycle event.
  */
 class GatedSimulationRunStateFoldStore implements FoldProjectionStore<SimulationRunStateData> {
   constructor(private readonly inner: FoldProjectionStore<SimulationRunStateData>) {}
 
   async store(state: SimulationRunStateData, context: ProjectionStoreContext): Promise<void> {
-    if (!hasRunDefiningEvent(state)) {
+    if (!SimulationRunStateFoldProjection.hasRunDefiningEvent(state)) {
       this.reportDeclined(context);
       return;
     }
@@ -56,7 +57,7 @@ class GatedSimulationRunStateFoldStore implements FoldProjectionStore<Simulation
     entries: Array<{ state: SimulationRunStateData; context: ProjectionStoreContext }>,
   ): Promise<void> {
     const writable = entries.filter(({ state, context }) => {
-      if (hasRunDefiningEvent(state)) return true;
+      if (SimulationRunStateFoldProjection.hasRunDefiningEvent(state)) return true;
       this.reportDeclined(context);
       return false;
     });

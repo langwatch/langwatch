@@ -34,7 +34,7 @@ import {
   LangyCliEnvelopeService,
   type LangyToolFrame,
 } from "../services/langy-cli-envelope.service";
-import { LangyTurnErrors } from "../adapters/langy.turn-errors.adapter";
+import { LangyTurnErrors } from "../services/langy-turn-errors.errors";
 import { verifyFrame } from "../ports/langy-frame-auth.port";
 import {
   type LangyFrameEnvelope,

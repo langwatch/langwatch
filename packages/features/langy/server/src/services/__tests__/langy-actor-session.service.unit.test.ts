@@ -4,7 +4,7 @@
 import { FEATURE_FLAGS } from "@langwatch/feature-flag-contract";
 import { describe, expect, it } from "vitest";
 import type { LangyActorUserReader } from "../langy-actor-session.service";
-import { resolveLangyActorSession } from "../langy-actor-session.service";
+import { LangyActorSessionService } from "../langy-actor-session.service";
 
 /**
  * A user directory exposing only the `user.findUnique` the resolver uses.
@@ -21,17 +21,16 @@ const userReader = (
   user: { findUnique: async () => user },
 });
 
-describe("resolveLangyActorSession", () => {
+describe("LangyActorSessionService", () => {
   /** @scenario The acting identity is loaded from the owner's record, not invented */
   it("uses the API key owner's persisted identity", async () => {
-    const result = await resolveLangyActorSession({
+    const result = await LangyActorSessionService.create({
       users: userReader({
         id: "user_1",
         name: "Ada Lovelace",
         email: "ada@example.com",
       }),
-      userId: "user_1",
-    });
+    }).resolve({ userId: "user_1" });
 
     // The GitHub Co-authored-by trailer is derived from name and email, so a
     // stand-in here would sign a real commit with an identity nobody owns.
@@ -49,10 +48,9 @@ describe("resolveLangyActorSession", () => {
 
   /** @scenario A key whose owning user no longer exists is refused */
   it("refuses an API key whose owning user no longer exists", async () => {
-    const result = await resolveLangyActorSession({
+    const result = await LangyActorSessionService.create({
       users: userReader(null),
-      userId: "user_deleted",
-    });
+    }).resolve({ userId: "user_deleted" });
 
     expect(result).toMatchObject({ ok: false, reason: "actor-missing" });
   });

@@ -6,42 +6,51 @@
 import { describe, expect, it } from "vitest";
 import type { SimulationRunData } from "@langwatch/scenario-contract";
 import {
-  capRunsAtBatchBoundary,
-  clampPageLimit,
+  SimulationClickHouseRepository,
   FULL_MESSAGES_PAGE_LIMIT,
   LIST_PAGE_LIMIT,
 } from "../simulation-clickhouse.repository";
 
-describe("clampPageLimit()", () => {
+describe("SimulationClickHouseRepository.clampPageLimit()", () => {
   describe("when the caller reads the trimmed projection", () => {
     it("allows up to the list ceiling", () => {
-      expect(clampPageLimit({ limit: 100, shouldIncludeMessages: false })).toBe(LIST_PAGE_LIMIT);
-      expect(clampPageLimit({ limit: 20, shouldIncludeMessages: false })).toBe(20);
+      expect(
+        SimulationClickHouseRepository.clampPageLimit({ limit: 100, shouldIncludeMessages: false }),
+      ).toBe(LIST_PAGE_LIMIT);
+      expect(
+        SimulationClickHouseRepository.clampPageLimit({ limit: 20, shouldIncludeMessages: false }),
+      ).toBe(20);
     });
   });
 
   describe("when the caller asks for whole conversations", () => {
     /** @scenario "include=messages caps the page size" */
     it("reduces the page to the full-message cap", () => {
-      expect(clampPageLimit({ limit: 100, shouldIncludeMessages: true })).toBe(
-        FULL_MESSAGES_PAGE_LIMIT,
-      );
+      expect(
+        SimulationClickHouseRepository.clampPageLimit({ limit: 100, shouldIncludeMessages: true }),
+      ).toBe(FULL_MESSAGES_PAGE_LIMIT);
     });
 
     it("leaves a page already under the cap alone", () => {
-      expect(clampPageLimit({ limit: 5, shouldIncludeMessages: true })).toBe(5);
+      expect(
+        SimulationClickHouseRepository.clampPageLimit({ limit: 5, shouldIncludeMessages: true }),
+      ).toBe(5);
     });
   });
 
   describe("when the limit is below one", () => {
     it("floors at a single run", () => {
-      expect(clampPageLimit({ limit: 0, shouldIncludeMessages: false })).toBe(1);
-      expect(clampPageLimit({ limit: -3, shouldIncludeMessages: true })).toBe(1);
+      expect(
+        SimulationClickHouseRepository.clampPageLimit({ limit: 0, shouldIncludeMessages: false }),
+      ).toBe(1);
+      expect(
+        SimulationClickHouseRepository.clampPageLimit({ limit: -3, shouldIncludeMessages: true }),
+      ).toBe(1);
     });
   });
 });
 
-describe("capRunsAtBatchBoundary()", () => {
+describe("SimulationClickHouseRepository.capRunsAtBatchBoundary()", () => {
   const makeBatch = ({ batchRunId, count }: { batchRunId: string; count: number }) =>
     Array.from(
       { length: count },
@@ -62,7 +71,7 @@ describe("capRunsAtBatchBoundary()", () => {
         ...makeBatch({ batchRunId: "batch-c", count: 9 }),
       ];
 
-      const capped = capRunsAtBatchBoundary({
+      const capped = SimulationClickHouseRepository.capRunsAtBatchBoundary({
         runs,
         batchRunIds,
         ceiling: FULL_MESSAGES_PAGE_LIMIT,
@@ -82,7 +91,7 @@ describe("capRunsAtBatchBoundary()", () => {
         ...makeBatch({ batchRunId: "batch-b", count: 4 }),
       ];
 
-      const capped = capRunsAtBatchBoundary({
+      const capped = SimulationClickHouseRepository.capRunsAtBatchBoundary({
         runs,
         batchRunIds,
         ceiling: FULL_MESSAGES_PAGE_LIMIT,
@@ -102,7 +111,7 @@ describe("capRunsAtBatchBoundary()", () => {
         ...makeBatch({ batchRunId: "batch-b", count: 2 }),
       ];
 
-      const capped = capRunsAtBatchBoundary({
+      const capped = SimulationClickHouseRepository.capRunsAtBatchBoundary({
         runs,
         batchRunIds,
         ceiling: FULL_MESSAGES_PAGE_LIMIT,

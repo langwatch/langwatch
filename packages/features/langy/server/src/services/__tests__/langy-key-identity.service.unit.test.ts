@@ -4,7 +4,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import type { LangyIdentityToken } from "../langy-key-identity.service";
-import { resolveLangyKeyIdentity } from "../langy-key-identity.service";
+import { LangyKeyIdentityService } from "../langy-key-identity.service";
 
 /**
  * A resolved project API key, carrying exactly the fields the identity bridge
@@ -32,14 +32,13 @@ function featureFlags(enabled: boolean) {
   return { service, isEnabled };
 }
 
-describe("resolveLangyKeyIdentity", () => {
+describe("LangyKeyIdentityService", () => {
   /** @scenario A key owned by a user with Langy access resolves to that user */
   it("resolves the key's owner when they have Langy access", async () => {
     const { service, isEnabled } = featureFlags(true);
 
-    const result = await resolveLangyKeyIdentity({
+    const result = await LangyKeyIdentityService.create({ featureFlags: service }).resolve({
       resolved: apiKeyToken({ userId: "customer-1" }),
-      featureFlags: service,
     });
 
     expect(result).toEqual({ ok: true, userId: "customer-1" });
@@ -55,9 +54,8 @@ describe("resolveLangyKeyIdentity", () => {
   /** @scenario A key owned by a user without Langy access is refused */
   it("refuses a key whose owner does not have Langy access", async () => {
     const { service } = featureFlags(false);
-    const result = await resolveLangyKeyIdentity({
+    const result = await LangyKeyIdentityService.create({ featureFlags: service }).resolve({
       resolved: apiKeyToken({ userId: "customer-2" }),
-      featureFlags: service,
     });
 
     expect(result).toMatchObject({ ok: false, reason: "no-access" });
@@ -71,15 +69,11 @@ describe("resolveLangyKeyIdentity", () => {
     featureFlags.setFlag("release_langy_enabled", true);
     const resolved = apiKeyToken({ userId: "customer-3" });
 
-    const before = await resolveLangyKeyIdentity({
-      resolved,
-      featureFlags,
-    });
+    const identities = LangyKeyIdentityService.create({ featureFlags });
+
+    const before = await identities.resolve({ resolved });
     featureFlags.setFlag("release_langy_enabled", false);
-    const after = await resolveLangyKeyIdentity({
-      resolved,
-      featureFlags,
-    });
+    const after = await identities.resolve({ resolved });
 
     expect(before).toEqual({ ok: true, userId: "customer-3" });
     expect(after).toMatchObject({ ok: false, reason: "no-access" });
@@ -89,9 +83,8 @@ describe("resolveLangyKeyIdentity", () => {
   it("refuses an ownerless key without consulting the gate", async () => {
     const { service, isEnabled } = featureFlags(true);
 
-    const result = await resolveLangyKeyIdentity({
+    const result = await LangyKeyIdentityService.create({ featureFlags: service }).resolve({
       resolved: apiKeyToken({ userId: null }),
-      featureFlags: service,
     });
 
     expect(result).toMatchObject({ ok: false, reason: "unowned" });
@@ -109,9 +102,8 @@ describe("resolveLangyKeyIdentity", () => {
     const resolved = apiKeyToken({ userId: "owner-1" });
     (resolved as unknown as Record<string, unknown>).actorUserId = "victim-2";
 
-    const result = await resolveLangyKeyIdentity({
+    const result = await LangyKeyIdentityService.create({ featureFlags: service }).resolve({
       resolved,
-      featureFlags: service,
     });
 
     expect(result).toEqual({ ok: true, userId: "owner-1" });

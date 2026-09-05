@@ -1,7 +1,4 @@
-import {
-  closeNlpFetchDispatchers,
-  type ScenarioProcessorService,
-} from "@langwatch/scenario-server";
+import { NlpFetchAdapter, type ScenarioProcessorService } from "@langwatch/scenario-server";
 import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 
 /**
@@ -40,7 +37,7 @@ export class ScenarioExecutionWorkerFeatureInstaller implements WorkerFeatureIns
     const running = await this.processor.start();
     return async () => {
       await running.close();
-      await closeNlpFetchDispatchers();
+      await NlpFetchAdapter.create().close();
     };
   }
 }

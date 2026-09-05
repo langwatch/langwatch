@@ -35,7 +35,7 @@ import {
   LangyToolCallInitiatedEventSchema,
   type LangyToolCallSucceededEvent,
   LangyToolCallSucceededEventSchema,
-} from "../adapters/eventing.langy.adapter";
+} from "../services/langy-conversation.events";
 
 export interface LangyAnalyticsEventProjectionRecord {
   eventId: string;
@@ -83,6 +83,12 @@ export class LangyAnalyticsEventMapProjection
   readonly name = "langyAnalyticsEvent";
   readonly store: AppendStore<LangyAnalyticsEventProjectionRecord>;
   protected readonly events = analyticsEvents;
+
+  static create(deps: {
+    store: AppendStore<LangyAnalyticsEventProjectionRecord>;
+  }): LangyAnalyticsEventMapProjection {
+    return new LangyAnalyticsEventMapProjection(deps);
+  }
 
   constructor(deps: { store: AppendStore<LangyAnalyticsEventProjectionRecord> }) {
     super();

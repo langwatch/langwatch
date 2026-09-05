@@ -116,7 +116,7 @@ function makeService({
     experimentSlug?: string;
   }) => Promise<unknown>;
 }) {
-  return new LangyUiActionService({
+  return LangyUiActionService.create({
     redis,
     conversations: {
       findByIdVisible: async () => (conversationExists ? { currentTurnId } : null),

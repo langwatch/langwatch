@@ -119,7 +119,7 @@ export function createLangyUiActionsRestApp(options: {
   const service = () => {
     const langy = ports.langy();
     const redis = ports.redis();
-    return new LangyUiActionService({
+    return LangyUiActionService.create({
       redis,
       conversations: {
         findByIdVisible: (args) => langy.tryFindVisible(args),

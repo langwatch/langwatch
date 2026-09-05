@@ -1,5 +1,9 @@
 import { ApiKeyService } from "@langwatch/api-key-contract";
-import { AuthzService } from "@langwatch/authz-contract";
+import {
+  type AuthzEffectivePermissionsInput,
+  type AuthzEffectivePermissionsOutput,
+  AuthzService,
+} from "@langwatch/authz-contract";
 import {
   LANGY_CANDIDATE_PERMISSIONS,
   LangySessionKeyMetricsPort,
@@ -164,7 +168,9 @@ describe("LangySessionKeyService", () => {
     const apiKeys: ApiKeyService = Object.create(ApiKeyService.prototype);
     apiKeys.create = apiKeyCreate;
     const authz: AuthzService = Object.create(AuthzService.prototype);
-    authz.effectivePermissions = vi.fn(async () => ["project:view", "experiments:delete"]);
+    authz.effectivePermissions = vi
+      .fn<(args: AuthzEffectivePermissionsInput) => Promise<AuthzEffectivePermissionsOutput>>()
+      .mockImplementation(async () => ["project:view", "experiments:delete"]);
 
     await createService({
       repository,
@@ -193,7 +199,9 @@ describe("LangySessionKeyService", () => {
     apiKeys.create = apiKeyCreate;
     const authz: AuthzService = Object.create(AuthzService.prototype);
     // Holds enough to mint a key at all (view), but not the destructive grain.
-    authz.effectivePermissions = vi.fn(async () => ["project:view", "experiments:view"]);
+    authz.effectivePermissions = vi
+      .fn<(args: AuthzEffectivePermissionsInput) => Promise<AuthzEffectivePermissionsOutput>>()
+      .mockImplementation(async () => ["project:view", "experiments:view"]);
 
     await createService({
       repository,

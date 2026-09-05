@@ -168,7 +168,7 @@ class ProducerOnlySimulationExecution extends SimulationExecutionPort {
  * `processName` names the refusal, so a stand-in reached by accident says which
  * process reached it rather than reporting an anonymous failure.
  */
-export function createSimulationProcessingProducerPipeline(input: { processName: string }) {
+function buildSimulationProcessingProducerPipeline(input: { processName: string }) {
   const { processName } = input;
   const execution = new ProducerOnlySimulationExecution(processName);
   const simulations: SimulationService = SimulationClickHouseAdapter.createNull({ execution });
@@ -214,4 +214,17 @@ export function createSimulationProcessingProducerPipeline(input: { processName:
         Promise.reject(producerOnly(processName, "compute a run's trace metrics")),
     },
   });
+}
+
+/** The simulation-processing definition as a command-only producer sees it. */
+export class SimulationProcessingProducerAdapter {
+  static create(options: { processName: string }): SimulationProcessingProducerAdapter {
+    return new SimulationProcessingProducerAdapter(options);
+  }
+
+  private constructor(private readonly options: { processName: string }) {}
+
+  build() {
+    return buildSimulationProcessingProducerPipeline(this.options);
+  }
 }

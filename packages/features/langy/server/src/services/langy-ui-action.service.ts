@@ -140,29 +140,36 @@ export interface UiActionConversations {
   }): Promise<{ currentTurnId: string | null } | null>;
 }
 
+/** Everything the UI-action channel needs from the process that holds it. */
+export type LangyUiActionServiceDependencies = {
+  redis: UiActionRedis;
+  conversations: UiActionConversations;
+  buffer: Pick<LangyTokenBuffer, "appendUiAction">;
+  /**
+   * Which kinds exist and what each one's payload must look like.
+   *
+   * A port rather than an import: the only catalogue that exists is the
+   * experiments workbench's, and a Langy server package may not reach into
+   * another feature's. The process that holds both supplies it; a process
+   * that holds neither composes none, and `dispatch` refuses every kind by
+   * name — which is the right answer there, because no page on it can run one.
+   */
+  actions: LangyUiActionCatalogPort;
+  backendRunner?: UiActionBackendRunner;
+};
+
 export class LangyUiActionService {
+  static create(deps: LangyUiActionServiceDependencies): LangyUiActionService {
+    return new LangyUiActionService(deps);
+  }
+
   private readonly redis: UiActionRedis;
   private readonly conversations: UiActionConversations;
   private readonly buffer: Pick<LangyTokenBuffer, "appendUiAction">;
   private readonly actions: LangyUiActionCatalogPort;
   private readonly backendRunner?: UiActionBackendRunner;
 
-  constructor(deps: {
-    redis: UiActionRedis;
-    conversations: UiActionConversations;
-    buffer: Pick<LangyTokenBuffer, "appendUiAction">;
-    /**
-     * Which kinds exist and what each one's payload must look like.
-     *
-     * A port rather than an import: the only catalogue that exists is the
-     * experiments workbench's, and a Langy server package may not reach into
-     * another feature's. The process that holds both supplies it; a process
-     * that holds neither composes none, and `dispatch` refuses every kind by
-     * name — which is the right answer there, because no page on it can run one.
-     */
-    actions: LangyUiActionCatalogPort;
-    backendRunner?: UiActionBackendRunner;
-  }) {
+  constructor(deps: LangyUiActionServiceDependencies) {
     this.redis = deps.redis;
     this.conversations = deps.conversations;
     this.buffer = deps.buffer;

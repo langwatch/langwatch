@@ -15,7 +15,7 @@ import type {
   LangyToolCallFailedEvent,
   LangyToolCallInitiatedEvent,
   LangyToolCallSucceededEvent,
-} from "../adapters/eventing.langy.adapter";
+} from "../services/langy-conversation.events";
 import {
   LangyAgentRespondedEventSchema,
   LangyAgentResponseFailedEventSchema,
@@ -24,7 +24,7 @@ import {
   LangyToolCallFailedEventSchema,
   LangyToolCallInitiatedEventSchema,
   LangyToolCallSucceededEventSchema,
-} from "../adapters/eventing.langy.adapter";
+} from "../services/langy-conversation.events";
 
 export interface LangyConversationTurn extends Projection<LangyConversationTurnData> {
   data: LangyConversationTurnData;
@@ -73,6 +73,12 @@ export class LangyConversationTurnFoldProjection
     const data = (event as { data?: { conversationId?: string; turnId?: string } }).data;
     return makeConversationTurnKey(data?.conversationId ?? "", data?.turnId ?? "");
   };
+
+  static create(deps: {
+    store: StateProjectionStore<LangyConversationTurnData>;
+  }): LangyConversationTurnFoldProjection {
+    return new LangyConversationTurnFoldProjection(deps);
+  }
 
   constructor(deps: { store: StateProjectionStore<LangyConversationTurnData> }) {
     super();

@@ -32,9 +32,9 @@ import {
   langyJsonValueSchema,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import { LangyTurnErrors } from "../adapters/langy.turn-errors.adapter";
+import { LangyTurnErrors } from "./langy-turn-errors.errors";
 import { mintRunToken } from "../ports/langy-frame-auth.port";
-import type { LangyConversationProcessingEvent } from "../adapters/eventing.langy.adapter";
+import type { LangyConversationProcessingEvent } from "./langy-conversation.events";
 import { LANGY_ID_RESOURCES } from "../ports/langy-ids.port";
 import {
   LangyConversationIdUnadoptableError,

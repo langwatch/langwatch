@@ -32,26 +32,26 @@ export class ScriptedUserAgent extends ScenarioRunner.UserSimulatorAgentAdapter 
   }
 }
 
-/**
- * The agents and the steps of an agent test run: the user says the message,
- * the agent under test answers, the run succeeds.
- */
-export function buildAgentTestRun({
-  adapter,
-  script,
-}: {
-  adapter: ScenarioRunner.AgentAdapter;
-  script: ScriptedRun;
-}): {
-  agents: ScenarioRunner.AgentAdapter[];
-  script: ScenarioRunner.ScriptStep[];
-} {
-  return {
-    agents: [adapter, new ScriptedUserAgent()],
-    script: [
-      ScenarioRunner.user(script.userMessage),
-      ScenarioRunner.agent(),
-      ScenarioRunner.succeed("The agent answered"),
-    ],
-  };
+export class AgentTestScriptAdapter {
+  static create(): AgentTestScriptAdapter {
+    return new AgentTestScriptAdapter();
+  }
+
+  /**
+   * The agents and the steps of an agent test run: the user says the message,
+   * the agent under test answers, the run succeeds.
+   */
+  build({ adapter, script }: { adapter: ScenarioRunner.AgentAdapter; script: ScriptedRun }): {
+    agents: ScenarioRunner.AgentAdapter[];
+    script: ScenarioRunner.ScriptStep[];
+  } {
+    return {
+      agents: [adapter, new ScriptedUserAgent()],
+      script: [
+        ScenarioRunner.user(script.userMessage),
+        ScenarioRunner.agent(),
+        ScenarioRunner.succeed("The agent answered"),
+      ],
+    };
+  }
 }

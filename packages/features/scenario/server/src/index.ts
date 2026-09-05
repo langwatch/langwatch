@@ -56,7 +56,7 @@ export * from "./adapters/child-process-spawn.adapter";
 export * from "./adapters/child-tls-env.adapter";
 export * from "./adapters/http-auth.adapter";
 export * from "./adapters/litellm-model.adapter";
-export { closeNlpFetchDispatchers } from "./adapters/nlp-fetch.adapter";
+export { NlpFetchAdapter } from "./adapters/nlp-fetch.adapter";
 export * from "./adapters/node-scenario-child-process.adapter";
 export { OtelScenarioProcessorMetricsAdapter } from "./adapters/otel.scenario-processor-metrics.adapter";
 export * from "./adapters/prompt-template.adapter";
@@ -111,7 +111,7 @@ export {
   SimulationProcessingPipelineAdapter,
   type SimulationProcessingPipelineDeps,
 } from "./adapters/simulation-processing-pipeline.adapter";
-export { createSimulationProcessingProducerPipeline } from "./adapters/simulation-processing-producer.adapter";
+export { SimulationProcessingProducerAdapter } from "./adapters/simulation-processing-producer.adapter";
 export {
   StalledRunsBackfillTask,
   backfillStalledRuns,
@@ -180,7 +180,7 @@ export {
 export {
   ScenarioRunExportForbiddenError,
   ScenarioRunExportUnauthenticatedError,
-} from "./services/scenario-run-export-error.service";
+} from "./services/scenario-run-export.errors";
 export {
   SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS,
   SCENARIO_GENERATE_FEATURE_KEY,
