@@ -15,12 +15,19 @@ import {
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Switch } from "@langwatch/design-system/switch";
 import type {
-  FeatureFlagRule,
   FeatureFlagRules,
   OperatorFeatureFlag,
   OperatorFeatureFlagCatalogue,
 } from "@langwatch/feature-flag-contract";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  editorToRules,
+  newEditorRule,
+  rulesToEditor,
+  validCreatedAfter,
+  validPercentage,
+  type FeatureFlagRuleEditorRule,
+} from "./model/rule-editing";
 
 export interface OperatorFeatureFlagCatalogueProps {
   /** True on a shared (multi-tenant) install, where a PRODUCT flag reaches every customer. */
@@ -31,57 +38,6 @@ export interface OperatorFeatureFlagCatalogueProps {
   onSetEnabled: (input: { key: string; enabled: boolean }) => Promise<void>;
   onClear: (input: { key: string }) => Promise<void>;
   onSetRules: (input: { key: string; rules: FeatureFlagRules }) => Promise<void>;
-}
-
-export interface FeatureFlagRuleEditorRule {
-  organizationId: string;
-  projectId: string;
-  percentage: string;
-  /**
-   * "New organizations": an ISO date, and every organization created on or
-   * after it matches. An operator rolling out to new signups cannot write the
-   * ids of organizations that do not exist yet, so the rule names one date
-   * instead and every later signup matches it without another edit.
-   */
-  organizationCreatedAfter: string;
-  enabled: boolean;
-  preservedMatch: FeatureFlagRule["match"];
-}
-
-export function rulesToEditor(rules: FeatureFlagRules): FeatureFlagRuleEditorRule[] {
-  if (rules.length === 0) {
-    return [newEditorRule()];
-  }
-
-  return rules.map((rule) => ({
-    organizationId: rule.match.organizationId ?? "",
-    projectId: rule.match.projectId ?? "",
-    percentage: rule.match.percentage?.toString() ?? "",
-    organizationCreatedAfter: rule.match.organizationCreatedAfter ?? "",
-    enabled: rule.enabled,
-    preservedMatch: { ...rule.match },
-  }));
-}
-
-export function editorToRules(rules: FeatureFlagRuleEditorRule[]): FeatureFlagRules {
-  return rules.map((rule) => {
-    const match = { ...rule.preservedMatch };
-    delete match.organizationId;
-    delete match.projectId;
-    delete match.percentage;
-    delete match.organizationCreatedAfter;
-
-    const organizationId = rule.organizationId.trim();
-    const projectId = rule.projectId.trim();
-    const percentage = rule.percentage.trim();
-    const organizationCreatedAfter = rule.organizationCreatedAfter.trim();
-    if (organizationId) match.organizationId = organizationId;
-    if (projectId) match.projectId = projectId;
-    if (percentage) match.percentage = Number(percentage);
-    if (organizationCreatedAfter) match.organizationCreatedAfter = organizationCreatedAfter;
-
-    return { match, enabled: rule.enabled };
-  });
 }
 
 export function OperatorFeatureFlagCatalogueView({
@@ -104,9 +60,9 @@ export function OperatorFeatureFlagCatalogueView({
       </Text>
 
       <ScopeSection
-        heading="System"
-        description="Backend kill switches and pipeline toggles. Resolved from the env override first, then this postgres store, then the registry default."
-        rows={grouped.system}
+        heading="Product"
+        description="Browser-visible product rollouts and experiments. Customers get the value set here when no targeting rule matches it first and no env override is set."
+        rows={grouped.product}
         sharedInstall={sharedInstall}
         canManage={canManage}
         pendingKey={pendingKey}
@@ -115,9 +71,9 @@ export function OperatorFeatureFlagCatalogueView({
         onSetRules={onSetRules}
       />
       <ScopeSection
-        heading="Product"
-        description="Browser-visible product rollouts and experiments. Customers get the value set here when no targeting rule matches it first and no env override is set."
-        rows={grouped.product}
+        heading="System"
+        description="Backend kill switches and pipeline toggles. Resolved from the env override first, then this postgres store, then the registry default."
+        rows={grouped.system}
         sharedInstall={sharedInstall}
         canManage={canManage}
         pendingKey={pendingKey}
@@ -546,29 +502,6 @@ function RuleInput({
       />
     </Field.Root>
   );
-}
-
-function newEditorRule(): FeatureFlagRuleEditorRule {
-  return {
-    organizationId: "",
-    projectId: "",
-    percentage: "",
-    organizationCreatedAfter: "",
-    enabled: true,
-    preservedMatch: {},
-  };
-}
-
-function validCreatedAfter(value: string): boolean {
-  if (!value.trim()) return true;
-  return !Number.isNaN(Date.parse(value));
-}
-
-function validPercentage(value: string): boolean {
-  if (!value.trim()) return true;
-  const percentage = Number(value);
-
-  return Number.isInteger(percentage) && percentage >= 0 && percentage <= 100;
 }
 
 function sourceFor(row: OperatorFeatureFlag): string {
