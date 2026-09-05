@@ -78,7 +78,7 @@ Run the suite on every pull request that touches the agent, so a later change ca
 langwatch test-suite run "Returns" --target connected:returns-agent --wait
 ```
 
-The command exits 1 when a scenario fails. `--wait` gives up after ten minutes, and a suite with repeats can take longer than that, so poll the batch for those: see [Run from CI](/agent-testing/run-from-ci).
+The command exits 1 when a scenario fails, which is what fails the job: see [Run from CI](/agent-testing/run-from-ci).
 
 ## Common failures
 

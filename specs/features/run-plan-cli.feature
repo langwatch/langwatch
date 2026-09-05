@@ -205,6 +205,26 @@ Feature: Run Plan CLI Commands
     Then the command exits with code 1
 
   @unit
+  Scenario: The wait gives up after 45 minutes by default
+    Given a run whose jobs never complete
+    When I run "langwatch run-plan run --all --target http:agent_abc --wait"
+    Then the CLI stops waiting after 45 minutes
+    And the exit code is nonzero
+
+  @unit
+  Scenario: Wait for a number of minutes
+    Given a run whose jobs never complete
+    When I run "langwatch run-plan run --all --target http:agent_abc --wait 1"
+    Then the CLI stops waiting after 1 minute
+    And the exit code is nonzero
+
+  @unit
+  Scenario: Wait with a value that is not a number of minutes
+    When I run "langwatch run-plan run --all --target http:agent_abc --wait soon"
+    Then the command is refused before anything is scheduled
+    And the message says --wait takes a number of minutes
+
+  @unit
   Scenario: Wait for a run that scheduled no job
     Given every scenario the scope covers is archived
     When I run "langwatch run-plan run --all --target http:agent_abc --wait"

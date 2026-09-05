@@ -38116,7 +38116,7 @@ langwatch test-suite run "Checkout regression" --target http:agent_abc123 --wait
 
 A connected agent is `connected:<name>`, which runs it in `development` or in the one other environment it is online in. `connected:<name>@<environment>` names the environment.
 
-`--wait` polls until the batch is complete, for up to ten minutes, and exits non-zero when a run failed, which is what fails the job. A batch that needs longer, such as a suite with repeats, is polled with the batch endpoint below. The test suite is named by its id or by its name.
+`--wait` polls until the batch is complete, for up to 45 minutes, and exits non-zero when a run failed, which is what fails the job. `--wait 90` raises the limit to ninety minutes. The test suite is named by its id or by its name.
 
 Add `--format json` (or `-o json`) to get one final document on stdout instead of the progress lines. It contains `outcome`, `tallies` and the per-run `results`, so a job step can read the verdict without parsing prose.
 

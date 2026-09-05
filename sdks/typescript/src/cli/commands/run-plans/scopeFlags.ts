@@ -275,6 +275,42 @@ export function parseTargets(
   });
 }
 
+/** How long `--wait` polls when no number of minutes is given. */
+export const DEFAULT_WAIT_MINUTES = 45;
+
+/** What `--wait` asked for. */
+export interface WaitOptions {
+  /** How long the poll runs before it gives up. */
+  timeoutMs: number;
+}
+
+/**
+ * Reads the `--wait [minutes]` flag.
+ *
+ * A bare `--wait` polls for 45 minutes, which covers a suite of slow agents
+ * with repeats; a number of minutes replaces that limit. Anything else is
+ * refused before the run is scheduled, so a typo does not start a batch the
+ * command then never waits for.
+ *
+ * @see specs/features/run-plan-cli.feature
+ */
+export function parseWait(
+  value: boolean | string | undefined,
+): WaitOptions | undefined {
+  if (value === undefined || value === false) return undefined;
+  if (value === true) return { timeoutMs: DEFAULT_WAIT_MINUTES * 60 * 1000 };
+  const minutes = Number(value);
+  if (value.trim() === "" || !Number.isFinite(minutes) || minutes <= 0) {
+    console.error(
+      chalk.red(
+        `Error: --wait takes a number of minutes, such as --wait 90, not "${value}".`,
+      ),
+    );
+    process.exit(1);
+  }
+  return { timeoutMs: minutes * 60 * 1000 };
+}
+
 /**
  * Reads the `--repeat <n>` flag.
  *

@@ -2896,7 +2896,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
       .option("--note <text>", NOTE_FLAG_HELP)
       .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
-      .option("--wait", "Wait for the run to complete")
+      .option(
+        "--wait [minutes]",
+        "Wait for the run to complete, up to 45 minutes or the number of minutes given, and exit non-zero when a run failed",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
   ).action(async (id: string, _options: unknown, command: Command) => {
     const { runScenarioCommand: impl } = await import("./commands/scenarios/run.js");
@@ -2976,7 +2979,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
       .option("--note <text>", NOTE_FLAG_HELP)
       .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
-      .option("--wait", "Wait for the run to complete")
+      .option(
+        "--wait [minutes]",
+        "Wait for the run to complete, up to 45 minutes or the number of minutes given, and exit non-zero when a run failed",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
   ).action(async (_options: unknown, command: Command) => {
     // Merged globals: a root-position `--output` only lands on the ROOT
@@ -3099,7 +3105,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
       .option("--note <text>", NOTE_FLAG_HELP)
       .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
-      .option("--wait", "Wait for the run to complete")
+      .option(
+        "--wait [minutes]",
+        "Wait for the run to complete, up to 45 minutes or the number of minutes given, and exit non-zero when a run failed",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
   ).action(async (suite: string, _options: unknown, command: Command) => {
     const { runTestSuiteCommand: impl } = await import("./commands/test-suites/run.js");
