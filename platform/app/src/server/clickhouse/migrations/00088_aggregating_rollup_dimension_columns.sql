@@ -29,9 +29,9 @@
 -- and 00081) and cannot be edited, so a new install replays them exactly as
 -- they are. runMigrations in goose.ts therefore runs everything up to 00086
 -- with allow_dimensions_outside_sorting_key relaxed, but only on a server
--- that has that setting, and this migration converts the tables immediately
--- after. Both paths end here, so an install created on ClickHouse 25 and one
--- created on ClickHouse 26 carry the same schema.
+-- that has that setting, and this migration then converts the tables. Both
+-- paths end here, so an install created on ClickHouse 25 and one created on
+-- ClickHouse 26 carry the same schema.
 --
 -- Migrations after this one run with the check in force.
 --

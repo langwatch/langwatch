@@ -32,4 +32,10 @@ const (
 	// providers bill by.
 	AttrGenAIUsageInputChars   = "gen_ai.usage.input_chars"
 	AttrGenAIUsageAudioSeconds = "gen_ai.usage.audio_seconds"
+	// Image usage measures: the token counts an image model bills, kept
+	// disjoint from the text totals, and how many images came back, which is
+	// what a per-image price is applied to.
+	AttrGenAIUsageInputImageTokens  = "gen_ai.usage.input_image_tokens"
+	AttrGenAIUsageOutputImageTokens = "gen_ai.usage.output_image_tokens"
+	AttrGenAIUsageImageCount        = "gen_ai.usage.image_count"
 )
