@@ -64596,7 +64596,11 @@ A [connected agent](/agent-testing/connect-your-agent) is the customer's own pro
 - **Outbound WSS from the customer's side.** The process that runs the agent opens `wss://` to your App's public hostname. The customer's side opens no listening port and needs no inbound rule.
 - **HTTP long polling for a network that blocks WebSockets.** The same frames also travel over `POST /api/v1/agents/connect/register`, `GET /api/v1/agents/connect/poll` and `POST /api/v1/agents/connect/frames`. A poll is held open for up to 25 seconds, so the ingress read timeout must be above that; the `proxy-read-timeout: 120` above covers it. The SDK switches to this path on its own when a proxy answers the upgrade with an HTTP status, or from the start with `LANGWATCH_AGENT_TRANSPORT=http`.
 
-Redis is required for more than one App replica. Instance presence and call dispatch live in Redis; without it the registry is in memory, correct for one replica only, and the App refuses a connection when `LANGWATCH_APP_REPLICAS` is above 1. That variable defaults to `1`, and Helm scales the App with `app.replicaCount` on its own, so a Helm deployment must set `LANGWATCH_APP_REPLICAS` to the same value as `app.replicaCount`. Without Redis, a mismatch fails in one of two ways. If `app.replicaCount` is above `LANGWATCH_APP_REPLICAS`, each pod runs its own in-memory registry, and an agent connected to one pod reads as Offline on the others. If `LANGWATCH_APP_REPLICAS` is above `app.replicaCount`, the App refuses every agent connection, also when only one pod runs.
+Redis is required for more than one App replica. Instance presence and call dispatch live in Redis; without it the registry is in memory, correct for one replica only, and the App refuses a connection when `LANGWATCH_APP_REPLICAS` is above 1.
+
+That variable defaults to `1`, and Helm scales the App with `app.replicaCount` on its own, so a Helm deployment must set `LANGWATCH_APP_REPLICAS` to the same value as `app.replicaCount`.
+
+Without Redis, a mismatch fails in one of two ways. If `app.replicaCount` is above `LANGWATCH_APP_REPLICAS`, each pod runs its own in-memory registry, and an agent connected to one pod reads as Offline on the others. If `LANGWATCH_APP_REPLICAS` is above `app.replicaCount`, the App refuses every agent connection, also when only one pod runs.
 
 ## Docker Images
 
@@ -65511,7 +65515,9 @@ This is deliberate rather than a failure state, so an unlicensed deployment alwa
 Once a license is present **and the configured identity provider actually starts**, the deployment flips to SSO and the email routes close, so no password account can be minted on a licensed install. If `NEXTAUTH_PROVIDER` names a provider LangWatch does not recognise or one whose credentials are missing, the deployment stays in email mode with the email routes open even though it is licensed, so a typo in a provider name cannot lock everyone out.
 
 <Warning>
-**Upgrading a deployment that predates this gate, where everyone signs in through SSO.** Before the license gate existed, the SSO environment variables alone were enough, so an unlicensed deployment can have a whole team of identity-provider accounts on it. Those accounts have no password, so the door back in is **Forgot password**, and that needs a working outbound email provider. Before upgrading, either configure an email gateway (see [Email](/self-hosting/configuration/email)) or set `LANGWATCH_LICENSE_KEY`, which keeps SSO on with no password and no email involved at all.
+**Upgrading a deployment that predates this gate, where everyone signs in through SSO.** Before the license gate existed, the SSO environment variables alone were enough, so an unlicensed deployment can have a whole team of identity-provider accounts on it.
+
+Those accounts have no password, so the door back in is **Forgot password**, and that needs a working outbound email provider. Before upgrading, either configure an email gateway (see [Email](/self-hosting/configuration/email)) or set `LANGWATCH_LICENSE_KEY`, which keeps SSO on with no password and no email involved at all.
 
 If you are already in this position, setting `LANGWATCH_LICENSE_KEY` and restarting is the recovery. It needs only the key, as long as the identity provider variables that were already working are still in place: the key licenses SSO, it does not configure it.
 </Warning>
