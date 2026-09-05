@@ -34,7 +34,7 @@ export const getDashboardWidgetCommand = async (
         console.log();
         console.log(`  ${chalk.gray("Code:")}`);
         for (const line of widget.definition.code.split("\n")) {
-          console.log(`    ${line}`);
+          console.log(`    ${sanitizeTerminalText(line)}`);
         }
         if (widget.definition.queries.length > 0) {
           console.log();
@@ -42,11 +42,13 @@ export const getDashboardWidgetCommand = async (
           for (const query of widget.definition.queries) {
             console.log(`    ${chalk.cyan(sanitizeTerminalText(query.name))}:`);
             for (const line of query.sql.split("\n")) {
-              console.log(`      ${line}`);
+              console.log(`      ${sanitizeTerminalText(line)}`);
             }
             if (query.parameters?.length) {
               console.log(
-                `      ${chalk.gray("Parameters:")} ${query.parameters.map((p) => p.name).join(", ")}`,
+                `      ${chalk.gray("Parameters:")} ${query.parameters
+                  .map((p) => sanitizeTerminalText(p.name))
+                  .join(", ")}`,
               );
             }
           }

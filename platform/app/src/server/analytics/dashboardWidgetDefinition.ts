@@ -39,6 +39,8 @@ const MAX_PARAMETERS_PER_QUERY = 32;
 const MAX_PARAMETER_VALUE_LENGTH = 4_000;
 /** Generous ceiling for a widget's source file — this is authored code, not data. */
 const MAX_CODE_LENGTH = 200_000;
+/** A widget name is a label, not a document — the persisted column is short. */
+const MAX_WIDGET_NAME_LENGTH = 200;
 
 /**
  * Every author-declared parameter name starting with this prefix is
@@ -162,10 +164,27 @@ export const dashboardWidgetQuerySchema = z.object({
     .optional(),
 });
 
+/**
+ * The bounded request-shape pieces every write surface shares — the tRPC
+ * router the UI uses and the REST routes the CLI/Langy use. Both validate a
+ * widget's name, code and query list against the SAME bounds, so a payload one
+ * API accepts the other cannot reject, and neither persists an unbounded blob
+ * that only `present()` would catch after the write (DoS via oversized
+ * `code`/`queries` — CWE-770).
+ */
+export const dashboardWidgetNameSchema = z
+  .string()
+  .min(1)
+  .max(MAX_WIDGET_NAME_LENGTH);
+export const dashboardWidgetCodeSchema = z.string().min(1).max(MAX_CODE_LENGTH);
+export const dashboardWidgetQueriesSchema = z
+  .array(dashboardWidgetQuerySchema)
+  .max(MAX_QUERIES_PER_WIDGET);
+
 export const dashboardWidgetDefinitionSchema = z.object({
   version: z.literal(DASHBOARD_WIDGET_DEFINITION_VERSION),
-  code: z.string().min(1).max(MAX_CODE_LENGTH),
-  queries: z.array(dashboardWidgetQuerySchema).max(MAX_QUERIES_PER_WIDGET),
+  code: dashboardWidgetCodeSchema,
+  queries: dashboardWidgetQueriesSchema,
 });
 
 export type DashboardWidgetQueryParameterDeclaration = z.infer<
@@ -211,10 +230,13 @@ export type DashboardWidgetQueryParamValidation =
  * the live `LW.query` dispatch and the Queries tab's standalone "Run" button,
  * so a query can never validate differently in one path than the other.
  */
-export function validateDashboardWidgetQueryParams(
-  query: Pick<DashboardWidgetQuery, "parameters">,
-  params: Readonly<Record<string, unknown>>,
-): DashboardWidgetQueryParamValidation {
+export function validateDashboardWidgetQueryParams({
+  query,
+  params,
+}: {
+  query: Pick<DashboardWidgetQuery, "parameters">;
+  params: Readonly<Record<string, unknown>>;
+}): DashboardWidgetQueryParamValidation {
   const declared = query.parameters ?? [];
   const declaredNames = new Set(declared.map((p) => p.name));
 

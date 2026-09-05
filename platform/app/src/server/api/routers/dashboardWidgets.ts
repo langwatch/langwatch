@@ -27,7 +27,9 @@ import { DashboardWidgetService } from "~/server/analytics/dashboard-widgets/das
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   type DashboardWidgetDefinition,
-  dashboardWidgetQuerySchema,
+  dashboardWidgetCodeSchema,
+  dashboardWidgetNameSchema,
+  dashboardWidgetQueriesSchema,
 } from "~/server/analytics/dashboardWidgetDefinition";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -69,9 +71,9 @@ export const dashboardWidgetsRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         dashboardId: z.string().optional(),
-        name: z.string(),
-        code: z.string(),
-        queries: z.array(dashboardWidgetQuerySchema),
+        name: dashboardWidgetNameSchema,
+        code: dashboardWidgetCodeSchema,
+        queries: dashboardWidgetQueriesSchema,
       }),
     )
     .permission("analytics:create")
@@ -92,9 +94,9 @@ export const dashboardWidgetsRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         id: z.string(),
-        name: z.string().optional(),
-        code: z.string(),
-        queries: z.array(dashboardWidgetQuerySchema),
+        name: dashboardWidgetNameSchema.optional(),
+        code: dashboardWidgetCodeSchema,
+        queries: dashboardWidgetQueriesSchema,
       }),
     )
     .permission("analytics:update")

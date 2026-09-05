@@ -16,7 +16,10 @@
 # Spec: specs/setup/langy-local-dogfood.feature
 set -uo pipefail
 
-ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+# Physical path (`-P`): LW_REAL below is resolved with `pwd -P`, so a logical
+# ROOT would fail the in-worktree `case` test whenever a symlinked ancestor
+# sits above the checkout, reporting an in-worktree CLI as outside it.
+ROOT="$(cd -P "$(dirname "$0")/../../.." && pwd -P)"
 ENV_FILE="$ROOT/platform/app/.env"
 APP_PORT="${PORT:-5560}"
 GATEWAY_PORT=$((APP_PORT + 3))

@@ -178,15 +178,17 @@ function buildTracesFragment(
   if (from !== undefined && to !== undefined) {
     fragmentParams.set("from", String(from));
     fragmentParams.set("to", String(to));
-  } else if (
-    (params.startDate !== undefined) !==
-    (params.endDate !== undefined)
-  ) {
-    // Only one bound named — carrying it alone would misrepresent the
-    // window (see `traceExplorerLink.ts`'s identical reasoning), so drop it
-    // and let the Explorer's own default window stand.
+  } else if (params.startDate !== undefined || params.endDate !== undefined) {
+    // A bound was named but the pair did not resolve — either only one was
+    // given, or one is unreadable (a malformed date fails `readEpochMs` and
+    // returns undefined). Branch on the parsed values, not on key presence:
+    // a present-but-malformed bound would slip past a key-presence XOR and be
+    // discarded silently. Carrying a lone bound would misrepresent the window
+    // (see `traceExplorerLink.ts`'s identical reasoning), so drop it,
+    // warn-and-drop rather than silently produce a wrong query, and let the
+    // Explorer's own default window stand.
     console.warn(
-      "[playground] dropped partial time range: startDate/endDate must both be set",
+      "[playground] dropped time range: startDate and endDate must both be set to a readable epoch-ms or date string",
     );
   }
 

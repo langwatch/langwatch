@@ -57,7 +57,33 @@ function requireEnv(name) {
   return value;
 }
 
+/**
+ * Refuses a credential-bearing endpoint that would send LW_API_KEY in
+ * cleartext (CWE-319): https is required, and http is allowed only for a
+ * loopback host where nothing leaves the machine.
+ */
+function assertSecureEndpoint(raw) {
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    console.error(`Invalid LW_ENDPOINT URL: ${raw}`);
+    process.exit(1);
+  }
+  const loopback = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+  const httpsOrLoopbackHttp =
+    url.protocol === "https:" ||
+    (url.protocol === "http:" && loopback.has(url.hostname));
+  if (!httpsOrLoopbackHttp) {
+    console.error(
+      `Refusing to send LW_API_KEY over ${url.protocol} to ${url.host}. Use https:// (http:// is allowed only for localhost).`,
+    );
+    process.exit(1);
+  }
+}
+
 const endpoint = requireEnv("LW_ENDPOINT").replace(/\/+$/, "");
+assertSecureEndpoint(endpoint);
 const apiKey = requireEnv("LW_API_KEY");
 const projectId = requireEnv("PROJECT_ID");
 
@@ -68,6 +94,9 @@ async function getJson(url) {
   const res = await fetch(url, {
     method: "GET",
     headers: { "X-Auth-Token": apiKey },
+    // A cross-origin redirect would forward X-Auth-Token to the new host
+    // (undici does not strip custom auth headers), so fail loudly instead.
+    redirect: "error",
   });
   if (!res.ok) {
     throw new Error(`GET ${url} failed: ${res.status} ${await res.text()}`);
@@ -82,6 +111,7 @@ async function postJson(url, body) {
       "X-Auth-Token": apiKey,
       "Content-Type": "application/json",
     },
+    redirect: "error",
     body: JSON.stringify(body),
   });
   if (!res.ok) {

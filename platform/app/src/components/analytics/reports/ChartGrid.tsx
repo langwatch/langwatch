@@ -73,7 +73,13 @@ export const fromLayoutItem = (item: LayoutItem): ChartGridPlacement => ({
   rowSpan: item.h,
 });
 
-const samePlacement = (a: ChartGridPlacement, b: ChartGridPlacement): boolean =>
+const samePlacement = ({
+  a,
+  b,
+}: {
+  a: ChartGridPlacement;
+  b: ChartGridPlacement;
+}): boolean =>
   a.graphId === b.graphId &&
   a.gridColumn === b.gridColumn &&
   a.gridRow === b.gridRow &&
@@ -84,15 +90,18 @@ const samePlacement = (a: ChartGridPlacement, b: ChartGridPlacement): boolean =>
  * True when two placement lists describe the same grid — used to skip a
  * commit for a drag that ended where it started.
  */
-export const samePlacements = (
-  a: readonly ChartGridPlacement[],
-  b: readonly ChartGridPlacement[],
-): boolean => {
+export const samePlacements = ({
+  a,
+  b,
+}: {
+  a: readonly ChartGridPlacement[];
+  b: readonly ChartGridPlacement[];
+}): boolean => {
   if (a.length !== b.length) return false;
   const byId = new Map(b.map((placement) => [placement.graphId, placement]));
   return a.every((placement) => {
     const other = byId.get(placement.graphId);
-    return other !== undefined && samePlacement(placement, other);
+    return other !== undefined && samePlacement({ a: placement, b: other });
   });
 };
 
@@ -125,7 +134,7 @@ export function ChartGrid({
   const commit = useCallback(
     (layout: Layout) => {
       const next = layout.map(fromLayoutItem);
-      if (samePlacements(next, placements)) return;
+      if (samePlacements({ a: next, b: placements })) return;
       onPlacementsCommit(next);
     },
     [onPlacementsCommit, placements],

@@ -38,7 +38,11 @@ import {
   DashboardWidgetService,
 } from "~/server/analytics/dashboard-widgets/dashboardWidget.service";
 import { CustomChartPlaygroundNotEnabledError } from "~/server/analytics/dashboard-widgets/errors";
-import { dashboardWidgetQuerySchema } from "~/server/analytics/dashboardWidgetDefinition";
+import {
+  dashboardWidgetCodeSchema,
+  dashboardWidgetNameSchema,
+  dashboardWidgetQueriesSchema,
+} from "~/server/analytics/dashboardWidgetDefinition";
 import { type createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
@@ -50,12 +54,17 @@ import type { RouteResponse } from "../../shared/types";
 import { lwqlProject } from "./routeGuards";
 
 /** Request shape only — a length, not a meaning. Matches the tRPC surface. */
-const nameSchema = z.string().min(1).max(200);
+const nameSchema = dashboardWidgetNameSchema;
 
-/** The `{ code, queries }` a create supplies. `queries` gets the versioned schema. */
+/**
+ * The `{ code, queries }` a create supplies, bounded by the same shared
+ * schemas the tRPC surface and the versioned definition use — so an oversized
+ * `code` or an over-long `queries` list is refused before persistence rather
+ * than after `present()` reads it back (CWE-770).
+ */
 const definitionShape = {
-  code: z.string().min(1),
-  queries: z.array(dashboardWidgetQuerySchema),
+  code: dashboardWidgetCodeSchema,
+  queries: dashboardWidgetQueriesSchema,
 };
 
 const createWidgetSchema = z.object({
@@ -66,8 +75,8 @@ const createWidgetSchema = z.object({
 const updateWidgetSchema = z
   .object({
     name: nameSchema.optional(),
-    code: z.string().min(1).optional(),
-    queries: z.array(dashboardWidgetQuerySchema).optional(),
+    code: dashboardWidgetCodeSchema.optional(),
+    queries: dashboardWidgetQueriesSchema.optional(),
   })
   // A PATCH naming nothing is a mistake worth reporting, and `code` without
   // `queries` (or the reverse) would write half a definition — the two rewrite

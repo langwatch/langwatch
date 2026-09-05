@@ -83,30 +83,34 @@ export const graphsRouter = createTRPCRouter({
         });
       }
 
-      // If no gridRow provided, find the next available row. Shared with
+      // Row computation and write share one interactive transaction so two
+      // concurrent creates cannot read the same free row and then both write
+      // it — the placement is atomic, not last-writer-wins. Shared with
       // `placeChart` so the two writers that can put a chart on this grid
       // never disagree about which row is free.
-      let gridRow = input.gridRow;
-      if (gridRow === undefined && input.dashboardId) {
-        gridRow = await allocateNextGridRow(ctx.prisma, {
-          dashboardId: input.dashboardId,
-          projectId: input.projectId,
-        });
-      }
+      const customGraph = await ctx.prisma.$transaction(async (tx) => {
+        const gridRow =
+          input.gridRow === undefined && input.dashboardId
+            ? await allocateNextGridRow(tx, {
+                dashboardId: input.dashboardId,
+                projectId: input.projectId,
+              })
+            : input.gridRow;
 
-      const customGraph = await ctx.prisma.customGraph.create({
-        data: {
-          id: nanoid(),
-          name: input.name,
-          graph: graph,
-          projectId: input.projectId,
-          filters: input.filterParams?.filters ?? {},
-          dashboardId: input.dashboardId,
-          gridColumn: input.gridColumn ?? 0,
-          gridRow: gridRow ?? 0,
-          colSpan: input.colSpan ?? CHART_GRID_DEFAULT_COL_SPAN,
-          rowSpan: input.rowSpan ?? CHART_GRID_DEFAULT_ROW_SPAN,
-        },
+        return await tx.customGraph.create({
+          data: {
+            id: nanoid(),
+            name: input.name,
+            graph: graph,
+            projectId: input.projectId,
+            filters: input.filterParams?.filters ?? {},
+            dashboardId: input.dashboardId,
+            gridColumn: input.gridColumn ?? 0,
+            gridRow: gridRow ?? 0,
+            colSpan: input.colSpan ?? CHART_GRID_DEFAULT_COL_SPAN,
+            rowSpan: input.rowSpan ?? CHART_GRID_DEFAULT_ROW_SPAN,
+          },
+        });
       });
 
       // Alert-writing lives on `automation.upsert` with `customGraphId`

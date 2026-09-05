@@ -10509,7 +10509,8 @@
                   },
                   "code": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 200000
                   },
                   "queries": {
                     "type": "array",
@@ -10573,7 +10574,8 @@
                         "name",
                         "sql"
                       ]
-                    }
+                    },
+                    "maxItems": 8
                   }
                 },
                 "required": [
@@ -11355,7 +11357,8 @@
                   },
                   "code": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 200000
                   },
                   "queries": {
                     "type": "array",
@@ -11419,7 +11422,8 @@
                         "name",
                         "sql"
                       ]
-                    }
+                    },
+                    "maxItems": 8
                   }
                 },
                 "minProperties": 1

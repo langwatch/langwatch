@@ -128,7 +128,7 @@ export function useDashboardWidgetExecutor(
         recordRun(queryName, { ranAt: Date.now(), error });
         throw error;
       }
-      const validation = validateDashboardWidgetQueryParams(query, params);
+      const validation = validateDashboardWidgetQueryParams({ query, params });
       if (!validation.ok) {
         recordRun(queryName, { ranAt: Date.now(), error: validation.error });
         throw validation.error;
@@ -155,7 +155,10 @@ export function useDashboardWidgetExecutor(
    */
   const runStandalone = useCallback(
     async (query: DashboardWidgetQuery) => {
-      const validation = validateDashboardWidgetQueryParams(query, {});
+      const validation = validateDashboardWidgetQueryParams({
+        query,
+        params: {},
+      });
       if (!validation.ok) {
         recordRun(query.name, { ranAt: Date.now(), error: validation.error });
         return;

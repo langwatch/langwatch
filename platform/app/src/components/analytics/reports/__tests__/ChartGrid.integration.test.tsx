@@ -44,13 +44,19 @@ const cardWidthPx = (colSpan: number) =>
 const cardHeightPx = (rowSpan: number) =>
   rowSpan * ROW_PX + (rowSpan - 1) * GAP_PX;
 
-const place = (
-  graphId: string,
-  gridColumn: number,
-  gridRow: number,
-  colSpan: number,
-  rowSpan: number,
-): ChartGridPlacement => ({ graphId, gridColumn, gridRow, colSpan, rowSpan });
+const place = ({
+  graphId,
+  gridColumn,
+  gridRow,
+  colSpan,
+  rowSpan,
+}: ChartGridPlacement): ChartGridPlacement => ({
+  graphId,
+  gridColumn,
+  gridRow,
+  colSpan,
+  rowSpan,
+});
 
 function Card({
   id,
@@ -74,7 +80,13 @@ function Card({
   );
 }
 
-function mount(placements: ChartGridPlacement[], withIframe = false) {
+function mount({
+  placements,
+  withIframe = false,
+}: {
+  placements: ChartGridPlacement[];
+  withIframe?: boolean;
+}) {
   const onPlacementsCommit =
     vi.fn<(placements: ChartGridPlacement[]) => void>();
   const view = render(
@@ -111,10 +123,17 @@ const resizeHandleOf = (item: HTMLElement): HTMLElement => {
  * intermediate positions, the way a real pointer arrives, so the grid sees
  * the card cross the neighbour rather than teleport past it.
  */
-function drag(
-  target: HTMLElement,
-  { dx, dy, steps = 1 }: { dx: number; dy: number; steps?: number },
-) {
+function drag({
+  target,
+  dx,
+  dy,
+  steps = 1,
+}: {
+  target: HTMLElement;
+  dx: number;
+  dy: number;
+  steps?: number;
+}) {
   const start = { clientX: 400, clientY: 300 };
   fireEvent.mouseDown(target, { ...start, button: 0 });
   for (let step = 1; step <= steps; step += 1) {
@@ -172,38 +191,80 @@ describe("ChartGrid", () => {
     describe("when its corner is released between two grid lines", () => {
       /** @scenario "A drag lands on the nearest grid cell, not an arbitrary pixel" */
       it("snaps to the nearer line in each dimension", () => {
-        const { getByTestId, onPlacementsCommit } = mount([
-          place("a", 0, 0, 4, 3),
-        ]);
+        const { getByTestId, onPlacementsCommit } = mount({
+          placements: [
+            place({
+              graphId: "a",
+              gridColumn: 0,
+              gridRow: 0,
+              colSpan: 4,
+              rowSpan: 3,
+            }),
+          ],
+        });
         const item = gridItemOf(getByTestId("card-a"));
 
         // 1.4 columns wider and 0.4 rows taller: nearer five columns, three rows.
-        drag(resizeHandleOf(item), {
+        drag({
+          target: resizeHandleOf(item),
           dx: 1.4 * (COLUMN_PX + GAP_PX),
           dy: 0.4 * (ROW_PX + GAP_PX),
         });
-        expect(committed(onPlacementsCommit).a).toEqual(place("a", 0, 0, 5, 3));
+        expect(committed(onPlacementsCommit).a).toEqual(
+          place({
+            graphId: "a",
+            gridColumn: 0,
+            gridRow: 0,
+            colSpan: 5,
+            rowSpan: 3,
+          }),
+        );
 
         // 0.6 columns wider again and 0.6 rows taller: nearer six columns, four rows.
-        drag(resizeHandleOf(item), {
+        drag({
+          target: resizeHandleOf(item),
           dx: 0.6 * (COLUMN_PX + GAP_PX),
           dy: 0.6 * (ROW_PX + GAP_PX),
         });
-        expect(committed(onPlacementsCommit).a).toEqual(place("a", 0, 0, 6, 4));
+        expect(committed(onPlacementsCommit).a).toEqual(
+          place({
+            graphId: "a",
+            gridColumn: 0,
+            gridRow: 0,
+            colSpan: 6,
+            rowSpan: 4,
+          }),
+        );
       });
     });
 
     describe("when its corner is dragged far past the point where it would vanish", () => {
       /** @scenario "A card cannot be dragged smaller than one cell" */
       it("stops at one column by one row and stays on the grid", () => {
-        const { getByTestId, onPlacementsCommit } = mount([
-          place("a", 0, 0, 4, 3),
-        ]);
+        const { getByTestId, onPlacementsCommit } = mount({
+          placements: [
+            place({
+              graphId: "a",
+              gridColumn: 0,
+              gridRow: 0,
+              colSpan: 4,
+              rowSpan: 3,
+            }),
+          ],
+        });
         const item = gridItemOf(getByTestId("card-a"));
 
-        drag(resizeHandleOf(item), { dx: -2000, dy: -2000 });
+        drag({ target: resizeHandleOf(item), dx: -2000, dy: -2000 });
 
-        expect(committed(onPlacementsCommit).a).toEqual(place("a", 0, 0, 1, 1));
+        expect(committed(onPlacementsCommit).a).toEqual(
+          place({
+            graphId: "a",
+            gridColumn: 0,
+            gridRow: 0,
+            colSpan: 1,
+            rowSpan: 1,
+          }),
+        );
         expect(getByTestId("card-a")).toBeInTheDocument();
       });
     });
@@ -213,17 +274,51 @@ describe("ChartGrid", () => {
     describe("when the left card is dragged wider into the right card's space", () => {
       /** @scenario "A resize that would overlap a neighbor pushes it aside instead" */
       it("pushes the right card below rather than underneath, and both stay rendered", () => {
-        const { getByTestId, onPlacementsCommit } = mount([
-          place("left", 0, 0, 4, 3),
-          place("right", 4, 0, 4, 3),
-        ]);
+        const { getByTestId, onPlacementsCommit } = mount({
+          placements: [
+            place({
+              graphId: "left",
+              gridColumn: 0,
+              gridRow: 0,
+              colSpan: 4,
+              rowSpan: 3,
+            }),
+            place({
+              graphId: "right",
+              gridColumn: 4,
+              gridRow: 0,
+              colSpan: 4,
+              rowSpan: 3,
+            }),
+          ],
+        });
         const item = gridItemOf(getByTestId("card-left"));
 
-        drag(resizeHandleOf(item), { dx: 4 * (COLUMN_PX + GAP_PX), dy: 0 });
+        drag({
+          target: resizeHandleOf(item),
+          dx: 4 * (COLUMN_PX + GAP_PX),
+          dy: 0,
+        });
 
         const next = committed(onPlacementsCommit);
-        expect(next.left).toEqual(place("left", 0, 0, 8, 3));
-        expect(next.right).toEqual(place("right", 4, 3, 4, 3));
+        expect(next.left).toEqual(
+          place({
+            graphId: "left",
+            gridColumn: 0,
+            gridRow: 0,
+            colSpan: 8,
+            rowSpan: 3,
+          }),
+        );
+        expect(next.right).toEqual(
+          place({
+            graphId: "right",
+            gridColumn: 4,
+            gridRow: 3,
+            colSpan: 4,
+            rowSpan: 3,
+          }),
+        );
         expect(getByTestId("card-left")).toBeInTheDocument();
         expect(getByTestId("card-right")).toBeInTheDocument();
       });
@@ -234,14 +329,29 @@ describe("ChartGrid", () => {
     describe("when its header is dragged down past its neighbour", () => {
       /** @scenario "Resizing and reordering stay separate gestures" */
       it("moves the card without changing its size, from a handle outside the iframe", () => {
-        const { getByTestId, onPlacementsCommit } = mount(
-          [place("a", 0, 0, 4, 3), place("b", 0, 3, 4, 3)],
-          true,
-        );
+        const { getByTestId, onPlacementsCommit } = mount({
+          placements: [
+            place({
+              graphId: "a",
+              gridColumn: 0,
+              gridRow: 0,
+              colSpan: 4,
+              rowSpan: 3,
+            }),
+            place({
+              graphId: "b",
+              gridColumn: 0,
+              gridRow: 3,
+              colSpan: 4,
+              rowSpan: 3,
+            }),
+          ],
+          withIframe: true,
+        });
         const header = getByTestId("handle-a");
         expect(getByTestId("iframe-a").contains(header)).toBe(false);
 
-        drag(header, { dx: 0, dy: 4 * (ROW_PX + GAP_PX), steps: 8 });
+        drag({ target: header, dx: 0, dy: 4 * (ROW_PX + GAP_PX), steps: 8 });
 
         const next = committed(onPlacementsCommit);
         const a = next.a;
@@ -256,19 +366,35 @@ describe("ChartGrid", () => {
     describe("when its corner is dragged instead", () => {
       /** @scenario "Resizing and reordering stay separate gestures" */
       it("changes only the size, from a handle outside the iframe, and the body itself starts neither gesture", () => {
-        const { getByTestId, onPlacementsCommit } = mount(
-          [place("a", 0, 0, 4, 3)],
-          true,
-        );
+        const { getByTestId, onPlacementsCommit } = mount({
+          placements: [
+            place({
+              graphId: "a",
+              gridColumn: 0,
+              gridRow: 0,
+              colSpan: 4,
+              rowSpan: 3,
+            }),
+          ],
+          withIframe: true,
+        });
         const item = gridItemOf(getByTestId("card-a"));
         const corner = resizeHandleOf(item);
         expect(getByTestId("iframe-a").contains(corner)).toBe(false);
 
-        drag(corner, { dx: 0, dy: 2 * (ROW_PX + GAP_PX) });
-        expect(committed(onPlacementsCommit).a).toEqual(place("a", 0, 0, 4, 5));
+        drag({ target: corner, dx: 0, dy: 2 * (ROW_PX + GAP_PX) });
+        expect(committed(onPlacementsCommit).a).toEqual(
+          place({
+            graphId: "a",
+            gridColumn: 0,
+            gridRow: 0,
+            colSpan: 4,
+            rowSpan: 5,
+          }),
+        );
 
         onPlacementsCommit.mockClear();
-        drag(getByTestId("iframe-a"), { dx: 300, dy: 300 });
+        drag({ target: getByTestId("iframe-a"), dx: 300, dy: 300 });
         expect(onPlacementsCommit).not.toHaveBeenCalled();
       });
     });
@@ -279,10 +405,24 @@ describe("ChartGrid", () => {
       /** @scenario "A resized card keeps its new size after the page reloads" */
       it("renders the card at exactly that many columns and rows", () => {
         // A full-width card above it, so the grid has no gap to close.
-        const { getByTestId } = mount([
-          place("top", 0, 0, 8, 2),
-          place("a", 1, 2, 5, 4),
-        ]);
+        const { getByTestId } = mount({
+          placements: [
+            place({
+              graphId: "top",
+              gridColumn: 0,
+              gridRow: 0,
+              colSpan: 8,
+              rowSpan: 2,
+            }),
+            place({
+              graphId: "a",
+              gridColumn: 1,
+              gridRow: 2,
+              colSpan: 5,
+              rowSpan: 4,
+            }),
+          ],
+        });
         const item = gridItemOf(getByTestId("card-a"));
 
         expect(item.style.width).toBe(`${cardWidthPx(5)}px`);
@@ -297,11 +437,19 @@ describe("ChartGrid", () => {
   describe("given a drag that ends where it started", () => {
     describe("when the pointer is released", () => {
       it("commits nothing", () => {
-        const { getByTestId, onPlacementsCommit } = mount([
-          place("a", 0, 0, 4, 3),
-        ]);
+        const { getByTestId, onPlacementsCommit } = mount({
+          placements: [
+            place({
+              graphId: "a",
+              gridColumn: 0,
+              gridRow: 0,
+              colSpan: 4,
+              rowSpan: 3,
+            }),
+          ],
+        });
 
-        drag(getByTestId("handle-a"), { dx: 4, dy: 0 });
+        drag({ target: getByTestId("handle-a"), dx: 4, dy: 0 });
 
         expect(onPlacementsCommit).not.toHaveBeenCalled();
       });

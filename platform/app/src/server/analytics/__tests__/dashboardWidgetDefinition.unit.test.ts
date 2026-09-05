@@ -38,10 +38,10 @@ describe("queryParameterDeclarationSchema (via dashboardWidgetQuerySchema)", () 
 describe("validateDashboardWidgetQueryParams", () => {
   describe("when a value has the declared type but exceeds its bound", () => {
     it("refuses an over-long string rather than binding it verbatim", () => {
-      const result = validateDashboardWidgetQueryParams(
-        { parameters: [{ name: "term", type: "string" }] },
-        { term: "x".repeat(4_001) },
-      );
+      const result = validateDashboardWidgetQueryParams({
+        query: { parameters: [{ name: "term", type: "string" }] },
+        params: { term: "x".repeat(4_001) },
+      });
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -50,10 +50,10 @@ describe("validateDashboardWidgetQueryParams", () => {
     });
 
     it("refuses a non-finite number", () => {
-      const result = validateDashboardWidgetQueryParams(
-        { parameters: [{ name: "count", type: "number" }] },
-        { count: Number.POSITIVE_INFINITY },
-      );
+      const result = validateDashboardWidgetQueryParams({
+        query: { parameters: [{ name: "count", type: "number" }] },
+        params: { count: Number.POSITIVE_INFINITY },
+      });
 
       expect(result.ok).toBe(false);
     });
@@ -61,10 +61,10 @@ describe("validateDashboardWidgetQueryParams", () => {
 
   describe("when a value is within its declared type and bound", () => {
     it("returns it as an own property (never on the prototype)", () => {
-      const result = validateDashboardWidgetQueryParams(
-        { parameters: [{ name: "term", type: "string" }] },
-        { term: "hello" },
-      );
+      const result = validateDashboardWidgetQueryParams({
+        query: { parameters: [{ name: "term", type: "string" }] },
+        params: { term: "hello" },
+      });
 
       expect(result.ok).toBe(true);
       if (result.ok) {
