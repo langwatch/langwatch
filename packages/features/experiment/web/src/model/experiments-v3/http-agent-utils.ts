@@ -29,9 +29,7 @@ export const extractVariablesFromBodyTemplate = (bodyTemplate: string | undefine
 
   const pattern = /\{\{(\w+)\}\}/g;
   const variables = new Set<string>();
-  let match;
-
-  while ((match = pattern.exec(bodyTemplate)) !== null) {
+  for (let match = pattern.exec(bodyTemplate); match !== null; match = pattern.exec(bodyTemplate)) {
     variables.add(match[1]!);
   }
 

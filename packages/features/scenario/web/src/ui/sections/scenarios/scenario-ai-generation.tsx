@@ -28,7 +28,7 @@ import {
   classifyGenerationError,
   reportableGenerationFailure,
 } from "../../../behavior/scenarios/classify-generation-error";
-import { showErrorToast } from "../../../behavior/errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
 import { getDefaultModelState } from "../../../model/scenarios/default-model-state";
 
 const logger = createLogger("langwatch:scenarios:ai-generation");

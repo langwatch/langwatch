@@ -82,7 +82,7 @@ const DEFERRED_NOTE: Record<string, string> = {
 
 export function OttlEditor({
   organizationId,
-  sourceType,
+  sourceType: _sourceType,
   statements,
   onChange,
   enabled,

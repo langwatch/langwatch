@@ -43,7 +43,8 @@ vi.mock("../../../../behavior/ui-organization-facts", () => ({
 }));
 
 vi.mock("@langwatch/ui-drawer", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/ui-drawer")>("@langwatch/ui-drawer");
+  const actual =
+    await vi.importActual<typeof import("@langwatch/ui-drawer")>("@langwatch/ui-drawer");
   return {
     ...actual,
     useDrawer: () => ({ openDrawer: () => {}, closeDrawer: () => {} }),
@@ -64,7 +65,7 @@ import {
   UiSessionPort,
   type UiActiveScope,
   type UiCapabilities,
-} from "../../../../behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { ProjectHost } from "../sections/project-host";
 
 class SilentNavigation extends UiNavigationPort {

@@ -57,12 +57,12 @@ const semantics = grammar.createSemantics().addOperation("toJSON", {
   KeyValue: (id, _, val) => [id.sourceString, val.toJSON()],
   DictPair: (key, _, val) => [key.toJSON(), val.toJSON()],
   Array: (_, elements, __) => elements.toJSON(),
-  String: (q1, chars, q2) => chars.sourceString,
+  String: (q1, chars, _q2) => chars.sourceString,
   Number: (n) => n.toJSON(),
-  float: function (neg, whole, dot, fract, e, eneg, exp) {
+  float: function (_neg, _whole, _dot, _fract, _e, _eneg, _exp) {
     return parseFloat(this.sourceString);
   },
-  integer: function (neg, digits) {
+  integer: function (_neg, _digits) {
     return parseInt(this.sourceString, 10);
   },
   Boolean: (b) => b.sourceString === "True",
@@ -84,7 +84,7 @@ export const isPythonRepr = (input: string) => /^[A-Z][A-Za-z0-9_]*\(/.test(inpu
 
 export const parsePythonInsideJson = <T extends object>(item: T): T => {
   if (typeof item === "object" && Array.isArray(item)) {
-    return item.map((item) => parsePythonInsideJson(item)) as T;
+    return item.map((element) => parsePythonInsideJson(element)) as T;
   } else if (typeof item === "object" && item !== null) {
     return Object.fromEntries(
       Object.entries(item).map(([key, value]) => [key, parsePythonInsideJson(value)]),

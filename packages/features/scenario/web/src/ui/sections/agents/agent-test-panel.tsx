@@ -12,7 +12,8 @@ import { Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Play } from "lucide-react";
 import { useState } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { HandledErrorAlert, readHandledError } from "../../../behavior/errors";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { HandledErrorAlert } from "../../../behavior/errors";
 import { api } from "../../../behavior/scenario-api";
 
 /** The message the panel sends when nothing else is typed. */

@@ -1,14 +1,14 @@
 import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
 import type { LocalPromptConfig } from "@langwatch/experiment-web/experiments-v3/types";
-import { PromptScope } from "@langwatch/workflow-web/model/prisma-types";
-import type {
-  Component,
-  LLMConfig,
-  LlmConfigParameter,
-  LlmPromptConfigComponent,
-  NodeDataset,
-  Signature,
+import {
+  type Component,
+  type LLMConfig,
+  type LlmConfigParameter,
+  type LlmPromptConfigComponent,
+  type NodeDataset,
+  PromptScope,
+  type Signature,
 } from "@langwatch/workflow-contract";
 import {
   inputsAndOutputsToDemostrationColumns,
@@ -24,7 +24,7 @@ import {
   type LlmConfigOutputType,
   LlmConfigOutputTypes,
 } from "@langwatch/workflow-web/types";
-import { DEFAULT_MODEL } from "@langwatch/workflow-web/utils/constants";
+import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { kebabCase } from "@langwatch/design-system/string-casing";
 
 import { generateUniqueIdentifier } from "@langwatch/prompt-contract";

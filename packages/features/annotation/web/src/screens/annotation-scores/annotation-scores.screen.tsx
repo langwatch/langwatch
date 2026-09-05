@@ -112,7 +112,7 @@ export default function AnnotationScoresScreen() {
             </PageLayout.HeaderButton>
           )}
         </HStack>
-        {getAllAnnotationScores.data && getAllAnnotationScores.data.length == 0 ? (
+        {getAllAnnotationScores.data && getAllAnnotationScores.data.length === 0 ? (
           <NoDataInfoBlock
             title="No scoring setup yet"
             description="Add new scoring metrics for your annotations."

@@ -22,9 +22,9 @@ import {
   DialogHeader,
   DialogRoot,
   DialogTitle,
-} from "@langwatch/workflow-web/components/ui/dialog";
+} from "@langwatch/design-system/studio-dialog";
 import { Select } from "@langwatch/design-system/select";
-import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
+import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import { GeneratePromptApiSnippetDialog } from "../../elements/prompts/generate-prompt-api-snippet-dialog";

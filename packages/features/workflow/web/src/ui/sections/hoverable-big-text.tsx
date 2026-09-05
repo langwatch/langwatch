@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { isJson } from "../../model/is-json";
 import { Markdown } from "./markdown";
 import { RenderInputOutput } from "@langwatch/trace-web/components/traces/RenderInputOutput";
-import { Dialog } from "../elements/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 

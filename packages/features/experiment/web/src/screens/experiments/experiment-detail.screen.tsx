@@ -1,7 +1,7 @@
 import { Alert, Box } from "@chakra-ui/react";
 import { HandledErrorAlert } from "@langwatch/workflow-web/studio-host/errors";
 import { ExperimentType } from "../../model/prisma-types";
-import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { BatchEvaluationResults } from "../../ui/sections/batch-evaluation-results";
 import BatchEvaluation from "../../ui/elements/experiments/batch-evaluation";
 // Note: BatchEvaluationV2 is kept for reference but no longer used - can be deleted after verification

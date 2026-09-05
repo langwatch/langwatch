@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useRef } from "react";
-import { toaster } from "../../../behavior/studio-host/toaster";
+import { toaster } from "@langwatch/ui-host/toaster";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { usePostEvent } from "./use-post-event";

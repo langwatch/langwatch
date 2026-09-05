@@ -34,7 +34,7 @@ import {
   useUiCapabilities,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import type { UiFeatureApiTransport } from "../src/behavior/ui-feature-transport";
 import { resolveUiFailureCopy } from "../src/behavior/ui-feedback";
 import { useBrowserUiSession } from "../src/behavior/ui-session";

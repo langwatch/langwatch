@@ -26,7 +26,7 @@
 import { useMemo } from "react";
 
 import { useWorkflowHost, type WorkflowCopyTarget } from "../../model/workflow-host";
-import type { Project } from "../../model/prisma-types";
+import type { Project } from "@langwatch/workflow-contract";
 import { api } from "./api";
 
 /**

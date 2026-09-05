@@ -24,7 +24,7 @@ import { useCallback, useRef } from "react";
 import { useModelProvidersSettings } from "@langwatch/model-provider-web/hooks/useModelProvidersSettings";
 import { writeScenarioTarget } from "../../use-scenario-target";
 import { api } from "../../../../behavior/scenario-api";
-import { KSUID_RESOURCES } from "@langwatch/workflow-web/utils/constants";
+import { KSUID_RESOURCES } from "@langwatch/workflow-contract";
 import { useAgentTestingStore } from "../use-agent-testing-store";
 import type { RunDialogSubmitInput, SuiteTargets } from "./use-run-dialog-submit";
 import { flushSync } from "react-dom";

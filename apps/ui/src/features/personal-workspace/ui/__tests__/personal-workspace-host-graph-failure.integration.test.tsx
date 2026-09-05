@@ -25,7 +25,12 @@ vi.mock("@langwatch/user-web/screens/personal-workspace", async () => {
     personalWorkspaceApi: {
       organization: {
         getAll: {
-          useQuery: () => ({ data: void 0, error: graph.error, isLoading: false, isSuccess: false }),
+          useQuery: () => ({
+            data: void 0,
+            error: graph.error,
+            isLoading: false,
+            isSuccess: false,
+          }),
         },
       },
     },
@@ -50,7 +55,7 @@ import {
   UiSessionPort,
   type UiActiveScope,
   type UiCapabilities,
-} from "../../../../behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { PersonalWorkspaceHost } from "../sections/personal-workspace-host";
 
 class SilentNavigation extends UiNavigationPort {

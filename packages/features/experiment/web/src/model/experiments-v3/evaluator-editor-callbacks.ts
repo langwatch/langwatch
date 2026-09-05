@@ -54,7 +54,7 @@ export type CreateEvaluatorEditorCallbacksParams = {
     id: string;
     name: string;
     evaluatorType?: string;
-  }) => boolean | void | Promise<void> | Promise<boolean>;
+  }) => boolean | undefined | Promise<void> | Promise<boolean>;
 };
 
 /**
@@ -69,7 +69,7 @@ export type EvaluatorEditorCallbacksForTarget = {
     id: string;
     name: string;
     evaluatorType?: string;
-  }) => boolean | void | Promise<void> | Promise<boolean>;
+  }) => boolean | undefined | Promise<void> | Promise<boolean>;
 };
 
 /**

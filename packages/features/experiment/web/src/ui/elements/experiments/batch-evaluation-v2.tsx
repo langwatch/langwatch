@@ -17,9 +17,9 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, ExternalLink } from "react-feather";
-import type { Experiment, Project } from "@langwatch/workflow-web/model/prisma-types";
-import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
-import { Link } from "@langwatch/workflow-web/studio-host/link";
+import type { Experiment, Project } from "@langwatch/workflow-contract";
+import { useRouter } from "@langwatch/ui-host/use-router";
+import { Link } from "@langwatch/ui-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useDejaViewLink } from "@langwatch/workflow-web/hooks/useDejaViewLink";
 import { FormatMoney } from "@langwatch/workflow-web/optimization_studio/components/FormatMoney";
@@ -117,7 +117,7 @@ export function BatchEvaluationV2({
             )}
           </HStack>
           {batchEvaluationRuns.isLoading ||
-          (batchEvaluationRuns.error && batchEvaluationRuns.error.data?.httpStatus == 404) ? (
+          (batchEvaluationRuns.error && batchEvaluationRuns.error.data?.httpStatus === 404) ? (
             <Skeleton width="100%" height="30px" />
           ) : batchEvaluationRuns.error ? (
             <Alert.Root status="error">

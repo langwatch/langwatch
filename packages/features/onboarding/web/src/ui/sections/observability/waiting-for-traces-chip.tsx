@@ -3,7 +3,7 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle } from "react-feather";
 import { api } from "../../../behavior/onboarding-api";
-import { useRouter } from "../../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
 import { useActiveProject } from "../active-project-context";
 

@@ -13,7 +13,7 @@ import {
 import { useMemo, type ReactNode } from "react";
 
 import { readPublicAppConfig } from "../../../../behavior/public-config";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { uiLeaveTo } from "../../../../behavior/ui-departure";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
 import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";

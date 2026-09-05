@@ -13,7 +13,7 @@ import { apiKeyApi } from "@langwatch/api-key-web/screens/api-key";
 import { useMemo, type ReactNode } from "react";
 import { useUiAddress } from "../../../../behavior/ui-address";
 import { writeUiClipboard } from "../../../../behavior/ui-clipboard";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { uiLeaveTo } from "../../../../behavior/ui-departure";
 import { authorizeUiMcpClient } from "../../../../behavior/ui-mcp-authorize";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";

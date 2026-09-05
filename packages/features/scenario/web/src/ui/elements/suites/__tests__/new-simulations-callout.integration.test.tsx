@@ -23,7 +23,7 @@ vi.mock("../../../../behavior/use-organization-team-project", () => ({
 
 // The bare rig has no router; the query object stands in for the address.
 const routerQuery: Record<string, unknown> = {};
-vi.mock("../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: vi.fn(() => ({ query: routerQuery })),
 }));
 

@@ -16,24 +16,27 @@ import { ArrowUp, ArrowUpCircle, ChevronDown, Code, Share2, XCircle } from "reac
 import { FormProvider, useForm } from "react-hook-form";
 import { RenderCode } from "../code/render-code";
 import type { Dataset, DatasetRecord } from "@langwatch/dataset-contract";
-import type { Project } from "../../../model/prisma-types";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import { SmallLabel } from "@langwatch/design-system/small-label";
-import { Dialog } from "../../elements/dialog";
-import { Link } from "../../elements/studio-host/link";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { Link } from "@langwatch/ui-host/link";
 import { Menu } from "@langwatch/design-system/menu";
-import { toaster } from "../../../behavior/studio-host/toaster";
+import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
 import { api } from "../../../behavior/studio-host/api";
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys";
 import { useWorkflowStore } from "@langwatch/workflow-web";
-import { parseStudioWorkflow, type StudioWorkflow } from "@langwatch/workflow-contract";
+import {
+  getEntryInputs,
+  parseStudioWorkflow,
+  type Project,
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
 import {
   datasetDatabaseRecordsToInMemoryDataset,
   inMemoryDatasetToNodeDataset,
 } from "@langwatch/workflow-web";
-import { getEntryInputs } from "@langwatch/workflow-contract";
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key";
 import { useVersionState } from "./history";
 import { VersionToBeUsed } from "./version-to-be-used";

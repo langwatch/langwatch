@@ -6,7 +6,7 @@ import { ExternalLink } from "react-feather";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 
 import { CopyIcon } from "@langwatch/model-provider-web/components/icons/Copy";
-import { Link as UiLink } from "@langwatch/workflow-web/studio-host/link";
+import { Link as UiLink } from "@langwatch/ui-host/link";
 import { Popover } from "@langwatch/design-system/popover";
 
 const MAX_VALUE_LENGTH = 48;

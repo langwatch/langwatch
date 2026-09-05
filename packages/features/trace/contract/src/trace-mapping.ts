@@ -460,10 +460,12 @@ export const TRACE_MAPPINGS = {
         .flatMap((trace) => trace.spans ?? [])
         .filter((span) => getSpanNameOrModel(span) === key);
       return Object.keys(spans[0] || {})
-        .filter((key) => ["input", "output", "generated", "params", "contexts"].includes(key))
-        .map((key) => ({
-          key,
-          label: key,
+        .filter((propKey) =>
+          ["input", "output", "generated", "params", "contexts"].includes(propKey),
+        )
+        .map((propKey) => ({
+          key: propKey,
+          label: propKey,
         }));
     },
     mapping: (trace: TraceWithAnnotations, key: string, subkey: string) => {
@@ -540,19 +542,21 @@ export const TRACE_MAPPINGS = {
     ) => {
       const evaluation = traces
         .flatMap((trace) => trace.evaluations ?? [])
-        .find((evaluation) => evaluation.evaluator_id === key);
+        .find((ev) => ev.evaluator_id === key);
       return Object.keys(evaluation || {})
-        .filter((key) => ["passed", "score", "label", "details", "status", "error"].includes(key))
-        .map((key) => ({
-          key,
-          label: key,
+        .filter((propKey) =>
+          ["passed", "score", "label", "details", "status", "error"].includes(propKey),
+        )
+        .map((propKey) => ({
+          key: propKey,
+          label: propKey,
         }));
     },
     mapping: (trace: TraceWithAnnotations, key: string, subkey: string) => {
       if (!key) {
         return trace.evaluations ?? [];
       }
-      const evaluation = trace.evaluations?.find((evaluation) => evaluation.evaluator_id === key);
+      const evaluation = trace.evaluations?.find((ev) => ev.evaluator_id === key);
       if (!subkey) {
         return evaluation;
       }
@@ -680,11 +684,11 @@ export const TRACE_MAPPINGS = {
         .filter((event) => event.event_type === key);
 
       const eventMetrics = events.flatMap((event) =>
-        Object.keys(event.metrics).map((key) => `metrics.${key}`),
+        Object.keys(event.metrics).map((metricKey) => `metrics.${metricKey}`),
       );
 
       const eventDetails = events.flatMap((event) =>
-        Object.keys(event.event_details).map((key) => `event_details.${key}`),
+        Object.keys(event.event_details).map((detailKey) => `event_details.${detailKey}`),
       );
 
       return Array.from(new Set([...eventMetrics, ...eventDetails])).map((event) => ({
@@ -1069,14 +1073,14 @@ export const mapTraceToDatasetEntry = (
   let expandedTraces: TraceWithAnnotations[] = [trace];
 
   for (const expansion of expansions) {
-    const expanded = expandedTraces.flatMap((trace) =>
-      TRACE_EXPANSIONS[expansion].expansion(trace),
+    const expanded = expandedTraces.flatMap((expandedTrace) =>
+      TRACE_EXPANSIONS[expansion].expansion(expandedTrace),
     );
     // Only use expanded traces if we found some, otherwise keep original
     expandedTraces = expanded.length > 0 ? expanded : expandedTraces;
   }
 
-  return expandedTraces.map((trace) =>
+  return expandedTraces.map((expandedTrace) =>
     Object.fromEntries(
       Object.entries(mapping).map(([column, { source, key, subkey, selectedFields }]) => {
         const source_ =
@@ -1084,7 +1088,7 @@ export const mapTraceToDatasetEntry = (
             ? TRACE_MAPPINGS[source as keyof typeof TRACE_MAPPINGS]
             : undefined;
 
-        let value = source_?.mapping(trace, key!, subkey!, {
+        let value = source_?.mapping(expandedTrace, key!, subkey!, {
           annotationScoreOptions,
           allTraces,
           selectedFields,

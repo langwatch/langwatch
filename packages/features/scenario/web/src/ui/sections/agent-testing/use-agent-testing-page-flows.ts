@@ -8,7 +8,7 @@
 import { useEffect } from "react";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { api } from "../../../behavior/scenario-api";
-import { useRouter } from "../../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { useOpenNewRunPlan } from "./run/run-plan-dialog-host";
 import type { AgentTestingSelection } from "../../../behavior/agent-testing/use-agent-testing-routing";
 import { useAgentTestingStore } from "./use-agent-testing-store";

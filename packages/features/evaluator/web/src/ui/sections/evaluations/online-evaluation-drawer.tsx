@@ -26,11 +26,11 @@ import {
   isRuleAllowedForField,
   RULE_LABELS,
 } from "../../../model/preconditions/precondition-field-utils";
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import { createEvaluatorEditorCallbacks } from "@langwatch/experiment-web/experiments-v3/utils/evaluatorEditorCallbacks";
 import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-web/experiments-v3/utils/mappingValidation";
-import { EvaluationExecutionMode } from "@langwatch/workflow-web/model/prisma-types";
+import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import {
   getComplexProps,
   getDrawerStack,

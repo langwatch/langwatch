@@ -25,7 +25,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -90,7 +90,7 @@ import {
   type UiActiveScope,
   type UiActor,
   type UiCapabilities,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { createUiFeatureApiClient } from "../src/behavior/ui-feature-transport";
 import { NavigationHostSection } from "../src/features/navigation";
 

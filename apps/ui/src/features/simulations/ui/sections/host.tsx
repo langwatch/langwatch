@@ -7,26 +7,14 @@
 import {
   scenarioApi,
   ScenarioHostProvider,
-  setScenarioErrorHost,
   type ScenarioHostPort,
 } from "@langwatch/scenario-web/screens/simulations";
-import { useEffect, useMemo, type ComponentType, type ReactNode } from "react";
+import { useMemo, type ComponentType, type ReactNode } from "react";
 import { useLocation, useParams } from "react-router";
 
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 
-export function ScenarioHost({
-  children,
-  publishFailures = true,
-}: {
-  children: ReactNode;
-  /**
-   * True for a page, false for a drawer: page and drawer hosts are siblings,
-   * not nested, so a drawer publishing too would clear the singleton the
-   * page's `showErrorToast` still needs on its unmount.
-   */
-  publishFailures?: boolean;
-}) {
+export function ScenarioHost({ children }: { children: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
   const scope = session.activeScope();
   const actor = session.currentUser();
@@ -127,26 +115,19 @@ export function ScenarioHost({
     ],
   );
 
-  /** The failure singleton: `showErrorToast` fires from `onError`, where no hook can run, so the package keeps a module-scope host. */
-  useEffect(() => {
-    if (!publishFailures) return;
-    setScenarioErrorHost(host);
-    return () => setScenarioErrorHost(void 0);
-  }, [host, publishFailures]);
-
   return <ScenarioHostProvider value={host}>{children}</ScenarioHostProvider>;
 }
 
 /**
  * Wraps one of this family's drawers in the same host: `CurrentDrawer`
  * mounts above the outlet, so a drawer opened elsewhere renders outside
- * whatever provider the page below brought. Skips the failure singleton — see `publishFailures`.
+ * whatever provider the page below brought.
  */
 export function withScenarioDrawerHost<P extends object>(
   Drawer: ComponentType<P>,
 ): ComponentType<P> {
   const Mounted = (props: P) => (
-    <ScenarioHost publishFailures={false}>
+    <ScenarioHost>
       <Drawer {...props} />
     </ScenarioHost>
   );

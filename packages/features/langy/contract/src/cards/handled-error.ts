@@ -360,15 +360,15 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
   const {
     error,
     message,
-    kind,
-    code,
-    type,
+    kind: _kind,
+    code: _code,
+    type: _type,
     meta: explicitMeta,
     telemetry,
     trace,
     reasons,
     traceId,
-    spanId,
+    spanId: _spanId,
     traceUrl,
     logsUrl,
     suggestions,
@@ -380,7 +380,7 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
     docsUrl,
     // `fault` is the envelope's own ("customer" vs "platform"), not something
     // the platform attached to this failure.
-    fault,
+    fault: _fault,
     retryable,
     ...rest
   } = record;

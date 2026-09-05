@@ -11,7 +11,7 @@
  */
 
 import { Box, Grid, Skeleton, VStack } from "@chakra-ui/react";
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 
 /** How wide the results column reads beside the conversation. */
 const RESULTS_COLUMN_WIDTH = "310px";

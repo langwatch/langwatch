@@ -97,6 +97,13 @@ function SpanFocusPresenceDot({ traceId, spanId }: { traceId: string; spanId: st
   return <PresenceMarker peers={peers} size={16} tooltipSuffix="this span" />;
 }
 
+/** Resolves each pinned span id to its tree node, dropping any that no longer exist. */
+function resolvePinnedSpans(pinnedSpanIds: string[], spanTree: SpanTreeNode[]): SpanTreeNode[] {
+  return pinnedSpanIds
+    .map((id) => spanTree.find((s) => s.spanId === id))
+    .filter((s): s is SpanTreeNode => s != null);
+}
+
 export const SpanTabBar = memo(function SpanTabBar({
   spanTree,
   rightSlot,
@@ -165,10 +172,7 @@ export const SpanTabBar = memo(function SpanTabBar({
   );
 
   const pinnedSpans = useMemo(
-    () =>
-      pinnedSpanIds
-        .map((id) => spanTree.find((s) => s.spanId === id))
-        .filter((s): s is SpanTreeNode => s != null),
+    () => resolvePinnedSpans(pinnedSpanIds, spanTree),
     [pinnedSpanIds, spanTree],
   );
 

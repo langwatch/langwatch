@@ -154,7 +154,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   getFlowCallbacks: vi.fn(() => undefined),
 }));
 
-vi.mock("@langwatch/workflow-web/components/ui/drawer", () => ({
+vi.mock("@langwatch/design-system/studio-drawer", () => ({
   Drawer: {
     Root: ({ children, open }: { children: React.ReactNode; open?: boolean }) =>
       open ? <div data-testid="drawer">{children}</div> : null,

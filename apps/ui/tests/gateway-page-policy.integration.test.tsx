@@ -59,7 +59,7 @@ import {
   type UiCapabilities,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { gatewayFeature } from "../src/features/gateway";
 import { MemoryRouter } from "react-router";
 

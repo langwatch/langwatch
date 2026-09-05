@@ -20,6 +20,30 @@ export function itemBlockKey(item: StackItem): string {
   return item.block.blockKey;
 }
 
+/**
+ * Finds the index of the `tool_result` that pairs with the `tool_use` at
+ * `useIdx`: an id match when both sides carry one, otherwise the next
+ * unconsumed result. Returns -1 when nothing pairs.
+ */
+function findMatchingResultIndex(
+  blocks: KeyedContentBlock[],
+  useIdx: number,
+  use: KeyedBlock<"tool_use">,
+  consumed: Set<number>,
+): number {
+  for (let j = useIdx + 1; j < blocks.length; j++) {
+    if (consumed.has(j)) continue;
+    const cand = blocks[j]!;
+    if (cand.kind !== "tool_result") continue;
+    if (use.id && cand.toolUseId) {
+      if (cand.toolUseId === use.id) return j;
+      continue;
+    }
+    return j;
+  }
+  return -1;
+}
+
 export function pairToolBlocks(blocks: KeyedContentBlock[]): StackItem[] {
   const out: StackItem[] = [];
   const consumed = new Set<number>();
@@ -27,21 +51,7 @@ export function pairToolBlocks(blocks: KeyedContentBlock[]): StackItem[] {
     if (consumed.has(i)) continue;
     const b = blocks[i]!;
     if (b.kind === "tool_use") {
-      let resultIdx = -1;
-      for (let j = i + 1; j < blocks.length; j++) {
-        if (consumed.has(j)) continue;
-        const cand = blocks[j]!;
-        if (cand.kind !== "tool_result") continue;
-        if (b.id && cand.toolUseId) {
-          if (cand.toolUseId === b.id) {
-            resultIdx = j;
-            break;
-          }
-          continue;
-        }
-        resultIdx = j;
-        break;
-      }
+      const resultIdx = findMatchingResultIndex(blocks, i, b, consumed);
       const result = resultIdx >= 0 ? blocks[resultIdx] : undefined;
       if (result?.kind === "tool_result") {
         consumed.add(resultIdx);

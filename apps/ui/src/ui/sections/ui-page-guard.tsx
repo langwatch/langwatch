@@ -23,7 +23,7 @@
  */
 
 import type { ComponentType } from "react";
-import { useUiCapabilities } from "../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 
 export type UiPageGuardFallbacks = {
   /** While the flags this page is behind have not answered. */

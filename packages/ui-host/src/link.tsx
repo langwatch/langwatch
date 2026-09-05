@@ -1,19 +1,20 @@
 /**
- * The link the moved studio modules already render.
+ * An in-application address, as an anchor, without reaching the router.
  *
- * `platform/app`'s `components/ui/link` wraps Chakra's `Link` around the
- * router's own anchor so an in-app address is a client navigation. A
- * feature-web package may not import the router, so an internal address is an
- * anchor whose click is handed to `WorkflowHostPort.navigate` — the same
- * navigation, asked through the one port the family declares. Modifier-clicks
+ * ADR-004 seals the router off from a feature package, so an internal address
+ * is an anchor whose click is handed to `UiNavigationPort` — the same
+ * navigation, asked of the one port the application publishes. Modifier-clicks
  * and middle-clicks fall through to the browser, so "open in a new tab" still
- * works on every link in the studio.
+ * works on every link.
+ *
+ * ABSENT IS A FULL PAGE LOAD, NOT A DEAD LINK. With no capabilities above it
+ * the anchor is left to the browser, which reaches the same address the slow way.
  */
 
 import { Link as ChakraLink } from "@chakra-ui/react";
 import type { ComponentProps, MouseEvent } from "react";
 
-import { useOptionalWorkflowHost } from "../../../model/workflow-host";
+import { useOptionalUiCapabilities } from "./capabilities";
 
 type LinkProps = {
   href: string | undefined;
@@ -33,7 +34,7 @@ function isBrowserClick(event: MouseEvent<HTMLAnchorElement>): boolean {
 }
 
 export const Link = ({ href, isExternal, children, onClick, ...props }: LinkProps) => {
-  const host = useOptionalWorkflowHost();
+  const capabilities = useOptionalUiCapabilities();
 
   if (isExternal) {
     return (
@@ -48,11 +49,9 @@ export const Link = ({ href, isExternal, children, onClick, ...props }: LinkProp
       href={href ?? ""}
       onClick={(event: MouseEvent<HTMLAnchorElement>) => {
         onClick?.(event);
-        // No host mounted: the anchor is left to the browser, which is a full
-        // page load to the same address rather than a dead link.
-        if (isBrowserClick(event) || !href || !host) return;
+        if (isBrowserClick(event) || !href || !capabilities) return;
         event.preventDefault();
-        host.navigate(href);
+        capabilities.navigation.navigate(href);
       }}
       {...props}
     >

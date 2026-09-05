@@ -12,7 +12,7 @@
  * @see specs/scenarios/scenario-version-on-runs.feature
  */
 
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { RunDrawerContent } from "./run-drawer-content";
 import { RunDrawerHeaderBand } from "./run-drawer-header-band";

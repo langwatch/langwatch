@@ -78,4 +78,3 @@ export {
  * mutation's `onError`, where no hook can run. The application's host provider
  * sets it on mount and clears it on unmount.
  */
-export { setTraceErrorHost } from "../../behavior/errors/logic/show-error-toast";

@@ -3,9 +3,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Building, Check, ChevronDown, Users } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Dialog } from "@langwatch/workflow-web/components/ui/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Menu } from "@langwatch/design-system/menu";
-import { PromptScope } from "@langwatch/workflow-web/model/prisma-types";
+import { PromptScope } from "@langwatch/workflow-contract";
 import { usePromptHandleCheck } from "../../../../behavior/prompts/use-prompt-handle-check";
 import {
   type ChangeHandleFormValues,

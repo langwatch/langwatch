@@ -10,7 +10,7 @@ import {
 } from "../../ui/sections/explorer/context/shared-trace-context";
 import { TraceViewerProvider } from "../../ui/elements/explorer/context/trace-viewer-context";
 import { useDrawerStore } from "../../index";
-import { useRouter } from "../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { api } from "../../ui/sections/trace-api";
 
 /** There is no drawer to close on a share page. */

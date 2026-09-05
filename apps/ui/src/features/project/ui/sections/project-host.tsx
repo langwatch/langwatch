@@ -14,7 +14,7 @@ import {
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useMemo, type ReactNode } from "react";
 
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiOrganizationFacts } from "../../../../behavior/ui-organization-facts";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
 import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";

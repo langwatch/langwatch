@@ -10,7 +10,7 @@ import {
 } from "@langwatch/notification-web/screens/email-suppressions";
 import { useMemo, type ReactNode } from "react";
 
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 
 export function NotificationHost({ children }: { children: ReactNode }) {
   const { session, feedback } = useUiCapabilities();

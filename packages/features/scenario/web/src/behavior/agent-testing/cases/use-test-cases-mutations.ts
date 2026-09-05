@@ -8,7 +8,7 @@
 
 import { useCallback, useState } from "react";
 import { toaster } from "@langwatch/design-system/toaster";
-import { showErrorToast } from "../../errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
 import { api } from "../../scenario-api";
 import type { AgentTestingSelection } from "../use-agent-testing-routing";
 import type { TestCase } from "../../../model/agent-testing/cases/test-cases";

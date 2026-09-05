@@ -21,7 +21,7 @@ describe("webhook event registry", () => {
   /** @scenario A family wildcard subscribes to every type in the family */
   it("family wildcard matches the whole family and nothing else", () => {
     const enabled = ["gateway.*"];
-    for (const t of WEBHOOK_EVENT_TYPES.filter((t) => t.family === "gateway")) {
+    for (const t of WEBHOOK_EVENT_TYPES.filter((eventType) => eventType.family === "gateway")) {
       expect(eventMatches(enabled, t.type)).toBe(true);
     }
     expect(eventMatches(enabled, "trace.settled")).toBe(false);

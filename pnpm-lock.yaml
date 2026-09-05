@@ -1549,6 +1549,9 @@ importers:
       numeral:
         specifier: ^2.0.6
         version: 2.0.6
+      react-error-boundary:
+        specifier: ^6.1.2
+        version: 6.1.2(react@19.2.8)
       react-feather:
         specifier: ^2.0.10
         version: 2.0.10(react@19.2.8)
@@ -3324,6 +3327,9 @@ importers:
       '@langwatch/ui-drawer':
         specifier: workspace:*
         version: link:../../../ui-drawer
+      '@langwatch/ui-host':
+        specifier: workspace:*
+        version: link:../../../ui-host
       date-fns:
         specifier: ^4.1.0
         version: 4.4.0
@@ -4631,6 +4637,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../handled-error
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../observability
@@ -4968,6 +4977,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../../model-provider/contract
       '@langwatch/model-provider-web':
         specifier: workspace:*
         version: link:../../model-provider/web
@@ -6087,6 +6099,9 @@ importers:
       '@langwatch/ui-drawer':
         specifier: workspace:*
         version: link:../../../ui-drawer
+      '@langwatch/ui-host':
+        specifier: workspace:*
+        version: link:../../../ui-host
       '@langwatch/workflow-web':
         specifier: workspace:*
         version: link:../../workflow/web
@@ -6813,6 +6828,9 @@ importers:
       '@langwatch/project-web':
         specifier: workspace:*
         version: link:../../project/web
+      '@langwatch/ui-host':
+        specifier: workspace:*
+        version: link:../../../ui-host
       libphonenumber-js:
         specifier: ^1.12.25
         version: 1.13.7
@@ -9520,6 +9538,9 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../handled-error
       '@langwatch/langy-web':
         specifier: workspace:*
         version: link:../../langy/web
@@ -10210,9 +10231,15 @@ importers:
 
   packages/ui-host:
     dependencies:
+      '@chakra-ui/react':
+        specifier: ^3.36.0
+        version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../enterprise/features/licensing/contract
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../handled-error
       '@langwatch/ui-drawer':
         specifier: workspace:*
         version: link:../ui-drawer
@@ -10223,6 +10250,9 @@ importers:
         specifier: ^4.5.7
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
     devDependencies:
+      '@emotion/react':
+        specifier: ^11.14.0
+        version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
       '@testing-library/jest-dom':
         specifier: ^7.0.1
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@4.1.10)

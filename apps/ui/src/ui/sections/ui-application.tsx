@@ -15,7 +15,7 @@
 
 import type { ComponentType } from "react";
 import type { FallbackProps } from "react-error-boundary";
-import type { UiCapabilityInstall } from "../../behavior/ui-capabilities";
+import type { UiCapabilityInstall } from "@langwatch/ui-host/capabilities";
 import { mergeUiPageLoaders, uiFeatureLoaders } from "../../behavior/ui-feature-loaders";
 import type {
   UiFeatureApiBinding,

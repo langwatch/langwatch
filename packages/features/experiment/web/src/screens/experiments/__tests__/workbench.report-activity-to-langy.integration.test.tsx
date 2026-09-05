@@ -24,7 +24,7 @@ const execution = vi.hoisted(() => ({
   progress: { completed: 0, total: 0 },
 }));
 
-vi.mock("@langwatch/workflow-web/studio-host/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
     query: { slug: "exp-1" },
     pathname: "",

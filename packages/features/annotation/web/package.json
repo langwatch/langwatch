@@ -40,6 +40,7 @@
     "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
     "date-fns": "^4.1.0",
     "diff": "^9.0.0",
     "lucide-react": "^1.22.0",

@@ -1,10 +1,9 @@
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { useCallback, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
-import { describeError, showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
+import { toaster } from "@langwatch/ui-host/toaster";
+import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import {
   type EvaluationV3Event,
   type ExecutionScope,

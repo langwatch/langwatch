@@ -17,7 +17,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { setScenarioErrorHost } from "../../../../behavior/errors";
+import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
 
 // Mock heavy sub-components that pull in generated types
 vi.mock("@langwatch/prompt-web/components/prompts/PromptEditorDrawer", () => ({
@@ -197,7 +197,7 @@ vi.mock("../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
     query: { project: "my-project" },
     pathname: "/[project]/simulations/scenarios",
@@ -248,14 +248,14 @@ describe("<ScenarioFormDrawer/>", () => {
     // A bare-Error refusal reports through the family's error host rather
     // than calling the toaster directly; bind a minimal one so that path is
     // observable the same way the direct toaster.create call sites are.
-    setScenarioErrorHost({
+    setUiFeedbackHost({
       failed: (failure) =>
         mockToasterCreate({
           title: failure.fallbackTitle,
           description: failure.description,
           type: "error",
         }),
-    } as Parameters<typeof setScenarioErrorHost>[0]);
+    } as Parameters<typeof setUiFeedbackHost>[0]);
     mocks.mockCreateMutateAsync.mockResolvedValue({
       id: "new-scenario-id",
       name: "Refund Request Test",
@@ -267,7 +267,7 @@ describe("<ScenarioFormDrawer/>", () => {
 
   afterEach(() => {
     cleanup();
-    setScenarioErrorHost(undefined);
+    setUiFeedbackHost(undefined);
   });
 
   describe("when opened without a scenarioId (create mode)", () => {

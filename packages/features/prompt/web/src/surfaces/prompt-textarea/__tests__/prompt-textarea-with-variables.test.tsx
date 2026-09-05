@@ -28,10 +28,21 @@ vi.mock("rich-textarea", () => ({
       onBlur?: (e: React.FocusEvent<HTMLTextAreaElement>) => void;
       "data-role"?: string;
     }
-  >(({ children, autoHeight, onSelectionChange, "data-role": dataRole, ...props }, ref) => {
-    // Simple textarea that mimics RichTextarea behavior
-    return <textarea ref={ref} data-role={dataRole} {...props} />;
-  }),
+  >(
+    (
+      {
+        children: _children,
+        autoHeight: _autoHeight,
+        onSelectionChange: _onSelectionChange,
+        "data-role": dataRole,
+        ...props
+      },
+      ref,
+    ) => {
+      // Simple textarea that mimics RichTextarea behavior
+      return <textarea ref={ref} data-role={dataRole} {...props} />;
+    },
+  ),
 }));
 
 const mockSources: AvailableSource[] = [

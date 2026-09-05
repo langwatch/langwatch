@@ -7,7 +7,6 @@
 import {
   langyApi,
   LangyHostProvider,
-  setLangyErrorHost,
   setLangyTrpcClient,
   type LangyHostPort,
 } from "@langwatch/langy-web/screens/langy-layout";
@@ -16,7 +15,7 @@ import { useLocation, useParams } from "react-router";
 
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { isLangyDemoProject } from "../../../../behavior/langy-demo-project";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiRpc } from "../../../../behavior/ui-rpc";
 
 export function LangyHost({ children }: { children: ReactNode }) {
@@ -125,11 +124,6 @@ export function LangyHost({ children }: { children: ReactNode }) {
       feedback,
     ],
   );
-
-  useEffect(() => {
-    setLangyErrorHost(host);
-    return () => setLangyErrorHost(void 0);
-  }, [host]);
 
   /**
    * The by-path dispatcher, handed over as the vanilla client Langy expects:

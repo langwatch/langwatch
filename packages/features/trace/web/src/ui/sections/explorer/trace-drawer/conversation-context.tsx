@@ -102,6 +102,21 @@ const SLIDE_TRANSITION = { duration: 0.16, ease: "easeOut" as const };
  * does all the work, so the strip's behaviour stays consistent across the
  * column / table / drawer surfaces.
  */
+/** The last message in `parsed` whose role is `prefer`, formatted as a preview. */
+function lastPreferredMessagePreview(parsed: unknown[], prefer: "user" | "assistant"): string {
+  for (let i = parsed.length - 1; i >= 0; i--) {
+    const msg = parsed[i] as Record<string, unknown> | null;
+    if (msg && msg.role === prefer) {
+      const single = formatPreview(JSON.stringify([msg]), {
+        maxChars: MAX_PREVIEW,
+        newlines: "preserve",
+      });
+      if (single.text.trim()) return single.text;
+    }
+  }
+  return "";
+}
+
 function extractReadableSnippet(
   raw: string | null | undefined,
   prefer: "user" | "assistant",
@@ -112,16 +127,8 @@ function extractReadableSnippet(
     try {
       const parsed = JSON.parse(trimmed) as unknown;
       if (Array.isArray(parsed)) {
-        for (let i = parsed.length - 1; i >= 0; i--) {
-          const msg = parsed[i] as Record<string, unknown> | null;
-          if (msg && msg.role === prefer) {
-            const single = formatPreview(JSON.stringify([msg]), {
-              maxChars: MAX_PREVIEW,
-              newlines: "preserve",
-            });
-            if (single.text.trim()) return single.text;
-          }
-        }
+        const preview = lastPreferredMessagePreview(parsed, prefer);
+        if (preview) return preview;
       }
     } catch {
       /* fall through to formatPreview on raw input */

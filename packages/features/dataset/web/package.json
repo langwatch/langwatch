@@ -66,6 +66,7 @@
     "@langwatch/csv": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",

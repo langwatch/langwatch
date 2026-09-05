@@ -164,8 +164,11 @@ function tagClassName({ fieldName, negated }: { fieldName: string; negated: bool
  */
 function flagOperatorShapedTypos(text: string, baseOffset: number, plan: DecorationPlan): void {
   OPERATOR_SHAPED_WORD_REGEX.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = OPERATOR_SHAPED_WORD_REGEX.exec(text)) !== null) {
+  for (
+    let match = OPERATOR_SHAPED_WORD_REGEX.exec(text);
+    match !== null;
+    match = OPERATOR_SHAPED_WORD_REGEX.exec(text)
+  ) {
     const word = match[1] ?? "";
     const from = baseOffset + match.index;
     const to = from + word.length;
@@ -299,8 +302,11 @@ function regexFallback(
   const slots: DecorationSlot[] = [];
   const tokens: TokenRef[] = [];
   FILTER_TOKEN_REGEX.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = FILTER_TOKEN_REGEX.exec(text)) !== null) {
+  for (
+    let match = FILTER_TOKEN_REGEX.exec(text);
+    match !== null;
+    match = FILTER_TOKEN_REGEX.exec(text)
+  ) {
     const groups = match.groups ?? {};
     const fieldName = groups.field ?? "";
     const negated = !!groups.prefix;

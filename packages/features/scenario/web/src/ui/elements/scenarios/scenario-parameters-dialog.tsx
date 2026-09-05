@@ -6,7 +6,7 @@ import {
 } from "../../../index";
 import { Controller, type FieldErrors, useFormState } from "react-hook-form";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { Dialog } from "@langwatch/workflow-web/components/ui/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 
 /**
  * Editor for the parameters a scenario declares, opened from the Parameters

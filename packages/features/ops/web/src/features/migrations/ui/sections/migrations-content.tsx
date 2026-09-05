@@ -529,36 +529,6 @@ function cohortDialogDescription({
 }
 
 /**
- * What a finished cohort draw says. A short pool is not an error — the
- * action asked for a sample and got everything that was left — so it reads
- * as success with the shortfall explained, and an empty pool as information.
- */
-function cohortResultToast({
-  enrolledCount,
-  sampleSize,
-}: {
-  enrolledCount: number;
-  sampleSize: number;
-}) {
-  if (enrolledCount === 0) {
-    return {
-      title: "No organizations enrolled",
-      description: "No eligible organizations remained to enroll for this step.",
-      type: "info" as const,
-    };
-  }
-  return {
-    title:
-      enrolledCount === 1 ? "1 organization enrolled" : `${enrolledCount} organizations enrolled`,
-    description:
-      enrolledCount < sampleSize
-        ? "Fewer eligible organizations remained than the requested cohort size, so every remaining one was enrolled. The next migration pass picks them up automatically."
-        : "The next migration pass picks the cohort up automatically.",
-    type: "success" as const,
-  };
-}
-
-/**
  * The two classes a cohort leaves out by default, each on its own switch.
  * Separate because the risks are different in kind — an enterprise
  * organization is a commercial relationship, a dedicated-data-plane one

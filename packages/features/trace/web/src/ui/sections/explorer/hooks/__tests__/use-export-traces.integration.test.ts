@@ -11,7 +11,8 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { setTraceErrorHost, showErrorToast } from "../../../errors";
+import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
+import { showErrorToast } from "../../../errors";
 import type { TraceFailureNotice, TraceHostPort } from "../../../../../behavior/trace-host";
 import { useExportTraces } from "../use-export-traces";
 
@@ -279,7 +280,7 @@ describe("useExportTraces()", () => {
       // words from its own code-keyed registry, so what is asserted here is
       // that it was HANDED OVER, not what it was made to say.
       const failures: TraceFailureNotice[] = [];
-      setTraceErrorHost({
+      setUiFeedbackHost({
         failed: (failure: TraceFailureNotice) => failures.push(failure),
       } as unknown as TraceHostPort);
 
@@ -289,7 +290,7 @@ describe("useExportTraces()", () => {
         result.current.startExport({ mode: "summary", format: "csv" });
       });
 
-      setTraceErrorHost(void 0);
+      setUiFeedbackHost(void 0);
 
       expect(result.current.isExporting).toBe(false);
       expect(failures).toHaveLength(1);

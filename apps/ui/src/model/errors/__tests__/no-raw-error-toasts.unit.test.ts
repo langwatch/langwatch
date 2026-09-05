@@ -944,11 +944,11 @@ const ROUTES_THROUGH_HOST = /\.\s*failed\s*\(/;
  * The module is one of two things, and both are named by their export or their
  * renderer rather than by what they import — an offender imports nothing.
  *
- * A local toaster is allowed exactly one shape: it may ROUTE. Workflow's
- * `behavior/studio-host/toaster.ts` is that shape — it renders nothing, owns no
- * store, and turns every `type: "error"` call into `WorkflowHostPort.failed`,
- * which is how twenty-five studio files reach the application's registry
- * without importing a renderer. So a module that hands its failures to a port
+ * A local toaster is allowed exactly one shape: it may ROUTE. `@langwatch/ui-host`'s
+ * `toaster.ts` is that shape — it renders nothing, owns no store, and turns
+ * every `type: "error"` call into `UiFeedbackPort.failed`, which is how the
+ * feature packages reach the application's registry without importing a
+ * renderer. So a module that hands its failures to a port
  * and builds no renderer is clean; anything else that can emit a failure is a
  * finding, and a success-or-info-only toaster is never one.
  */

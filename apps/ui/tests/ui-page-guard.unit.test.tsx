@@ -23,7 +23,7 @@ import {
   type UiFailureNotice,
   UiFeedbackPort,
   type UiSuccessNotice,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { resolveUiPageAccess, withUiPageGuard } from "../src/ui/sections/ui-page-guard";
 
 class SilentNavigation extends UiNavigationPort {

@@ -4,7 +4,7 @@ import type { UseFormReturn } from "react-hook-form";
 import { FormProvider, useWatch } from "react-hook-form";
 import type { ZodType } from "zod";
 import DynamicZodForm from "../checks/dynamic-zod-form";
-import { Link } from "@langwatch/workflow-web/studio-host/link";
+import { Link } from "@langwatch/ui-host/link";
 import { WorkflowCardDisplay } from "@langwatch/workflow-web";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";

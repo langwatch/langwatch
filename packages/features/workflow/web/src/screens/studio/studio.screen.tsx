@@ -1,7 +1,7 @@
 import { Button } from "@chakra-ui/react";
 import { SearchX } from "lucide-react";
 import { useEffect } from "react";
-import { Link } from "../../ui/elements/studio-host/link";
+import { Link } from "@langwatch/ui-host/link";
 import { HandledErrorState } from "../../ui/elements/studio-host/errors";
 import { useOrganizationTeamProject } from "../../behavior/studio-host/use-organization-team-project";
 import OptimizationStudio from "../../ui/sections/optimization_studio/optimization-studio";

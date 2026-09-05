@@ -9,7 +9,7 @@
  */
 
 import { useCallback } from "react";
-import { showErrorToast } from "../../../behavior/errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { api } from "../../../behavior/scenario-api";
 

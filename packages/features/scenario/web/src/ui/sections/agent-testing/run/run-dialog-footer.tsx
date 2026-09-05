@@ -12,7 +12,7 @@
 import { Box, chakra, Text } from "@chakra-ui/react";
 import { Play } from "lucide-react";
 import { useId } from "react";
-import { Dialog } from "@langwatch/workflow-web/components/ui/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button";
 import type { RunDialogController } from "./use-run-dialog-submit";
@@ -56,7 +56,12 @@ export function RunDialogFooter({
   return (
     <Dialog.Footer borderTopWidth="1px" borderColor="border" paddingX={5} paddingY={3} gap={2}>
       {reason ? (
-        <Text id={reasonId} fontSize="12px" color={FG_MUTED} data-testid="run-dialog-blocked-reason">
+        <Text
+          id={reasonId}
+          fontSize="12px"
+          color={FG_MUTED}
+          data-testid="run-dialog-blocked-reason"
+        >
           {reason}
         </Text>
       ) : null}

@@ -15,7 +15,7 @@ import { LuArrowLeft } from "react-icons/lu";
 
 import { CopyButton } from "@langwatch/workflow-web/components/CopyButton";
 import { SetupWithAgentButton } from "@langwatch/trace-web/components/SetupWithAgentButton";
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { useDrawer } from "@langwatch/ui-drawer";
 import {
   connectSnippets,

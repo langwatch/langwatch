@@ -38,11 +38,11 @@ vi.mock("@langwatch/ui-drawer", () => ({
   getFlowCallbacks: () => undefined,
 }));
 
-vi.mock("@langwatch/workflow-web/studio-host/toaster", () => ({
+vi.mock("@langwatch/ui-host/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-vi.mock("@langwatch/workflow-web/studio-host/errors", () => ({
+vi.mock("@langwatch/ui-host/errors", () => ({
   showErrorToast: vi.fn(),
 }));
 

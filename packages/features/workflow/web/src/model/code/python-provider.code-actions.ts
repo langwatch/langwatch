@@ -117,8 +117,11 @@ export function registerCodeActions(monaco: Monaco, contractRef: ContractRef): I
           const defaultLit = defaultValueLiteralFor(outputType);
           const returnRe = /(return\s*\{)([^}]*)\}/g;
           let lastMatch: RegExpExecArray | null = null;
-          let m: RegExpExecArray | null;
-          while ((m = returnRe.exec(source))) lastMatch = m;
+          let m: RegExpExecArray | null = returnRe.exec(source);
+          while (m) {
+            lastMatch = m;
+            m = returnRe.exec(source);
+          }
           if (lastMatch) {
             const matchStart = lastMatch.index;
             const dictBodyStart = matchStart + (lastMatch[1]?.length ?? 0);

@@ -48,7 +48,7 @@ vi.mock("../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ query: {}, push: vi.fn(), isReady: true }),
 }));
 

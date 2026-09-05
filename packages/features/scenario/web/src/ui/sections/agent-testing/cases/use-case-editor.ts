@@ -14,7 +14,8 @@ import {
   parseScenarioParameterDefinitions,
   type ScenarioParameterDefinition,
 } from "@langwatch/scenario-contract";
-import { readHandledError, showErrorToast } from "../../../../behavior/errors";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { showErrorToast } from "@langwatch/ui-host/errors";
 import type { Scenario } from "../../../../model/prisma-types";
 import { api } from "../../../../behavior/scenario-api";
 import {

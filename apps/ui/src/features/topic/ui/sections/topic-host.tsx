@@ -10,7 +10,7 @@ import {
 } from "@langwatch/topic-web/screens/topic-clustering";
 import { useMemo, type ReactNode } from "react";
 
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 
 export function TopicHost({ children }: { children: ReactNode }) {
   const { session, feedback } = useUiCapabilities();

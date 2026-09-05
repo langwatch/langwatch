@@ -1,7 +1,6 @@
-import type { JsonArray } from "@langwatch/workflow-web/model/prisma-types";
 import type { Edge, Node } from "@xyflow/react";
 import { useMemo } from "react";
-import { getInputsOutputs } from "@langwatch/workflow-contract";
+import { getInputsOutputs, type JsonArray } from "@langwatch/workflow-contract";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,

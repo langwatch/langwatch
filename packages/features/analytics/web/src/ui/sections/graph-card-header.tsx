@@ -1,4 +1,4 @@
-import { Box, Button, Heading, HStack, Spacer } from "@chakra-ui/react";
+import { Heading, HStack, Spacer } from "@chakra-ui/react";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { BarChart2 } from "lucide-react";

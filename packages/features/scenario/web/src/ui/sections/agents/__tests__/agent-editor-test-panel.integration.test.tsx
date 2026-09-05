@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const testMutate = vi.fn();
 let drawerParams: Record<string, string> = {};
 
-vi.mock("../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn(), query: {}, asPath: "/test" }),
 }));
 

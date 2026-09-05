@@ -17,10 +17,10 @@ import { VersionHistoryListPopover } from "../version-history-list-popover";
 vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_1" } }),
 }));
-vi.mock("@langwatch/workflow-web/studio-host/toaster", () => ({
+vi.mock("@langwatch/ui-host/toaster", () => ({
   toaster: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
 }));
-vi.mock("@langwatch/workflow-web/studio-host/errors", () => ({ showErrorToast: vi.fn() }));
+vi.mock("@langwatch/ui-host/errors", () => ({ showErrorToast: vi.fn() }));
 
 const mockUseQuery = vi.fn();
 vi.mock("@langwatch/workflow-web/studio-host/api", () => ({

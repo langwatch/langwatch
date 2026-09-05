@@ -265,7 +265,7 @@ export type NavigationApiMap = {
      * what the two agree on.
      */
     getBadgeCounts: {
-      query: { input: void; output: OpsApiGetBadgeCountsOutput };
+      query: { input: undefined; output: OpsApiGetBadgeCountsOutput };
     };
   };
 };

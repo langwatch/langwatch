@@ -17,7 +17,7 @@ const routerState = vi.hoisted(() => ({
   query: {} as Record<string, string>,
 }));
 
-vi.mock("../next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
     query: routerState.query,
     pathname: "/onboarding/product",

@@ -4,6 +4,25 @@ import { formatCost, formatDuration, type MarkdownConfig } from "../../../../../
 
 const AI_SPAN_TYPES = new Set(["llm", "agent", "rag", "tool", "evaluation"]);
 
+/** Marks span `s` and every ancestor of it as kept, in `keep`, by span id. */
+function keepAiSpanAndAncestors(
+  s: SpanTreeNode,
+  byId: Map<string, SpanTreeNode>,
+  keep: Set<string>,
+): void {
+  if (!AI_SPAN_TYPES.has((s.type ?? "span").toLowerCase())) {
+    return;
+  }
+  keep.add(s.spanId);
+  let parentId = s.parentSpanId;
+  while (parentId && !keep.has(parentId)) {
+    const parent = byId.get(parentId);
+    if (!parent) break;
+    keep.add(parent.spanId);
+    parentId = parent.parentSpanId;
+  }
+}
+
 // Attribute keys we always drop from the LLM-optimised output. These add
 // tokens without telling the LLM anything useful for reasoning about the
 // trace.
@@ -265,9 +284,8 @@ function splitThinkingFromText(text: string): TextSegment[] {
   if (!text) return [];
   const segments: TextSegment[] = [];
   let lastIndex = 0;
-  let match: RegExpExecArray | null;
   THINKING_TAG_RE.lastIndex = 0;
-  while ((match = THINKING_TAG_RE.exec(text)) !== null) {
+  for (let match = THINKING_TAG_RE.exec(text); match !== null; match = THINKING_TAG_RE.exec(text)) {
     if (match.index > lastIndex) {
       const before = text.slice(lastIndex, match.index).trim();
       if (before) segments.push({ kind: "text", content: before });
@@ -351,6 +369,24 @@ function renderToolCallBlock(block: Block, lines: string[]): void {
   }
 }
 
+function renderToolResultArrayItem(r: unknown, lines: string[]): void {
+  if (typeof r === "string") {
+    lines.push(`  - ${truncate(r, 400)}`);
+    return;
+  }
+  if (!r || typeof r !== "object") {
+    return;
+  }
+  const rblock = r as Block;
+  if (rblock.type === "text" && typeof rblock.text === "string") {
+    for (const ln of rblock.text.split("\n")) {
+      lines.push(`  ${truncate(ln, 400)}`);
+    }
+    return;
+  }
+  lines.push(`  - ${truncate(JSON.stringify(rblock), 400)}`);
+}
+
 function renderToolResultBlock(block: Block, lines: string[]): void {
   const id = typeof block.tool_use_id === "string" ? ` (${block.tool_use_id.slice(0, 8)})` : "";
   lines.push(`tool_result${id}:`);
@@ -361,18 +397,7 @@ function renderToolResultBlock(block: Block, lines: string[]): void {
     }
   } else if (Array.isArray(result)) {
     for (const r of result) {
-      if (typeof r === "string") {
-        lines.push(`  - ${truncate(r, 400)}`);
-      } else if (r && typeof r === "object") {
-        const rblock = r as Block;
-        if (rblock.type === "text" && typeof rblock.text === "string") {
-          for (const ln of rblock.text.split("\n")) {
-            lines.push(`  ${truncate(ln, 400)}`);
-          }
-        } else {
-          lines.push(`  - ${truncate(JSON.stringify(rblock), 400)}`);
-        }
-      }
+      renderToolResultArrayItem(r, lines);
     }
   } else if (result && typeof result === "object") {
     const flat = flattenAttributes(result as Record<string, unknown>);
@@ -705,15 +730,7 @@ export function buildTraceMarkdown(
       const byId = new Map(spans.map((s) => [s.spanId, s]));
       const keep = new Set<string>();
       for (const s of spans) {
-        if (!AI_SPAN_TYPES.has((s.type ?? "span").toLowerCase())) continue;
-        keep.add(s.spanId);
-        let parentId = s.parentSpanId;
-        while (parentId && !keep.has(parentId)) {
-          const parent = byId.get(parentId);
-          if (!parent) break;
-          keep.add(parent.spanId);
-          parentId = parent.parentSpanId;
-        }
+        keepAiSpanAndAncestors(s, byId, keep);
       }
       filtered = spans.filter((s) => keep.has(s.spanId));
     }

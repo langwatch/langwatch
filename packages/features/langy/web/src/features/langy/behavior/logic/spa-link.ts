@@ -6,7 +6,7 @@
  */
 import type { MouseEvent } from "react";
 
-import { useRouter } from "../../../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 
 /**
  * Whether an href stays inside this app. Relative paths (`/project/traces`)

@@ -1,4 +1,6 @@
 export * from "./workflow";
+export * from "./prisma-types";
+export * from "./ksuid-resources";
 export * from "./studio-workflow";
 export * from "./workflow-dsl-migration";
 export * from "./studio-workflow-node-utils";

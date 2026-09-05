@@ -142,7 +142,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
 /** The address the page writes, which is where the period is held. */
 const mockRouterPush = vi.hoisted(() => vi.fn());
 
-vi.mock("../../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
     query: routerState.query,
     asPath: routerState.asPath,

@@ -5,15 +5,14 @@
  */
 
 import {
-  setTraceErrorHost,
   traceApi,
   TraceHostProvider,
   type TraceHostPort,
 } from "@langwatch/trace-web/screens/traces";
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useLocation } from "react-router";
 
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
 import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { mergeTraceQuery } from "../../behavior/trace-merge-query";
@@ -126,16 +125,6 @@ export function TraceHost({ children }: { children: ReactNode }) {
       feedback,
     ],
   );
-
-  /**
-   * Published for `onError`, where no hook can run — the package keeps a
-   * module-scope host instead. Set every render, since `host` is a new
-   * value object whenever the scope moves.
-   */
-  useEffect(() => {
-    setTraceErrorHost(host);
-    return () => setTraceErrorHost(void 0);
-  }, [host]);
 
   if (failure.departing) return <UiPageLoading />;
   if (failure.copy) return <UiPageFailure copy={failure.copy} />;

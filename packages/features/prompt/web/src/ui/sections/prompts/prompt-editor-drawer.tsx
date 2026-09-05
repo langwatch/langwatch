@@ -5,8 +5,8 @@ import { FormProvider, useFieldArray, useWatch } from "react-hook-form";
 import { LuArrowLeft, LuPencil } from "react-icons/lu";
 import { getMaxTokenLimit } from "@langwatch/prompt-web/surfaces/llm-parameters";
 import { FormOutputsSection } from "../../elements/outputs/form-outputs-section";
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
-import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type AvailableSource,
@@ -16,7 +16,7 @@ import {
 import { useEvaluationMappings } from "@langwatch/experiment-web/experiments-v3/hooks/useEvaluationMappings";
 import type { LocalPromptConfig } from "@langwatch/experiment-web/experiments-v3/types";
 import { getFieldsUsedByPromptTemplate } from "@langwatch/experiment-web/experiments-v3/utils/mappingValidation";
-import { showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
 import {
   getComplexProps,
   getFlowCallbacks,

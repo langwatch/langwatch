@@ -1,7 +1,7 @@
 import { Button, Checkbox, HStack, Text, VStack } from "@chakra-ui/react";
 import { Play } from "lucide-react";
 import { useState } from "react";
-import { Dialog } from "@langwatch/workflow-web/components/ui/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { TargetSelector, type TargetValue } from "./target-selector";
 
 interface RunScenarioModalProps {

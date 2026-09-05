@@ -16,9 +16,9 @@ const graph = vi.hoisted(() => ({ error: null as unknown }));
 const departures = vi.hoisted(() => [] as string[]);
 
 vi.mock("@langwatch/prompt-web/screens/prompt-studio", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/prompt-web/screens/prompt-studio")>(
-    "@langwatch/prompt-web/screens/prompt-studio",
-  );
+  const actual = await vi.importActual<
+    typeof import("@langwatch/prompt-web/screens/prompt-studio")
+  >("@langwatch/prompt-web/screens/prompt-studio");
   return {
     ...actual,
     promptApi: {
@@ -45,7 +45,7 @@ import {
   UiSessionPort,
   type UiActiveScope,
   type UiCapabilities,
-} from "../../../../behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { PromptHost } from "../sections/prompt-host";
 
 class SilentNavigation extends UiNavigationPort {

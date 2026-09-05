@@ -133,7 +133,7 @@ import {
   UiSessionPort,
   type UiActiveScope,
   type UiActor,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { useRouterUiNavigation, useRouterUiRoute } from "../src/behavior/ui-router-navigation";
 import { createUiRouteObjects } from "../src/ui/sections/ui-route-objects";
 import { useDrawerStore } from "@langwatch/trace-web/drawer.store";

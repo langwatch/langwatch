@@ -3,7 +3,7 @@ import {
   type ErrorExplanation,
   explainSerializedError,
   UNKNOWN_ERROR_PRESENTATION,
-} from "@langwatch/workflow-web/studio-host/errors";
+} from "@langwatch/handled-error/presentation";
 import { UNNAMED_FAILURE } from "@langwatch/experiment-contract";
 
 /**

@@ -16,7 +16,7 @@ import { Button, Text, VStack } from "@chakra-ui/react";
 // panel agree on what a result document IS in exactly one place.
 import { asJsonDocument } from "@langwatch/langy-contract";
 import { Search } from "lucide-react";
-import { useRouter } from "../../../../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { buildTraceExplorerHref, readTraceSearchQuery } from "../../../../../index";
 import {
   buildSurfaceHref,

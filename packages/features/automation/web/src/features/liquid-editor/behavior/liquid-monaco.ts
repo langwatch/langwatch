@@ -276,9 +276,10 @@ function collectLocals(text: string, known: Set<string>): void {
     /\{%-?\s*capture\s+(\w+)\s*-?%\}/g,
   ];
   for (const pattern of patterns) {
-    let match: RegExpExecArray | null;
-    while ((match = pattern.exec(text)) !== null) {
+    let match: RegExpExecArray | null = pattern.exec(text);
+    while (match !== null) {
       if (match[1]) known.add(match[1]);
+      match = pattern.exec(text);
     }
   }
 }
@@ -313,9 +314,8 @@ export function detectUnknownVariables(text: string, variables: VariableInfo[]):
 
   const found: UnknownVariable[] = [];
   const outputRe = /\{\{-?([\s\S]*?)-?\}\}/g;
-  let match: RegExpExecArray | null;
 
-  while ((match = outputRe.exec(text)) !== null) {
+  for (let match = outputRe.exec(text); match !== null; match = outputRe.exec(text)) {
     const expr = match[1] ?? "";
     const firstPart = expr.split("|")[0]?.trim() ?? "";
     const idMatch = /^[a-zA-Z_][\w]*(?:\.[\w]+|\[\d+\])*/.exec(firstPart);

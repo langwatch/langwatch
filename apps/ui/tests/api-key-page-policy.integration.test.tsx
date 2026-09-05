@@ -113,7 +113,7 @@ import {
   type UiCapabilities,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { apiKeyFeature } from "../src/features/api-key";
 import { CLI_AUTH_DOCUMENT_TITLE } from "../src/features/api-key/ui/sections/api-key-routes";
 import { secretFeature } from "../src/features/secret";

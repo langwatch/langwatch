@@ -33,7 +33,7 @@
 
 import { useCallback, useMemo } from "react";
 
-import { useRouter } from "./next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 
 /** Any overlay the application registers. Untyped here on purpose: the registry is not this package's. */
 export type DrawerType = string;

@@ -12,7 +12,7 @@ import {
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useMemo, type ReactNode } from "react";
 
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiOrganizationFacts } from "../../../../behavior/ui-organization-facts";
 
 /** The name the editor answers to in the drawer registry, and in the address. */

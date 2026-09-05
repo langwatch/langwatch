@@ -49,20 +49,6 @@ const num = (error: AuthHandledError, key: string, fallback: number): number => 
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 };
 
-/**
- * Reads a list of short identifiers out of `meta` without trusting it.
- * Bounded on both axes because the sentence these end up in is read by a
- * person: a long list stops being copy and becomes a dump.
- */
-const strList = (error: AuthHandledError, key: string): string[] => {
-  const value = error.meta[key];
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter((entry): entry is string => typeof entry === "string")
-    .filter((entry) => entry.length > 0 && entry.length <= 64)
-    .slice(0, 10);
-};
-
 export const FRONT_DOOR_ERROR_COPY: Readonly<Record<string, FrontDoorErrorEntry>> = {
   email_already_registered: {
     // Reached from the sign-up screen, and the reader there is usually looking

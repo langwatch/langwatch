@@ -21,7 +21,7 @@ import { AgentTestingCaseEditor } from "../../../../sections/agent-testing/cases
 import { CASE_EDITOR_DRAWER } from "../../../../sections/agent-testing/cases/drawer-keys";
 import type { RunDialogProps } from "../../../../sections/agent-testing/run/run-dialog-types";
 
-vi.mock("../../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
     pathname: "/test",

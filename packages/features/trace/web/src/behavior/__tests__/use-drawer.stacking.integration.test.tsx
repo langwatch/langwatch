@@ -36,7 +36,7 @@ const harness = vi.hoisted(() => {
   };
 });
 
-vi.mock("../next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   default: harness.router,
   useRouter: () => harness.router,
 }));

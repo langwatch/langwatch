@@ -63,9 +63,8 @@ export function tokenizeLiquidTemplate(text: string): LiquidToken[] {
   const tokens: LiquidToken[] = [];
   const liquidPattern = /(\{%.*?%\}|\{\{.*?\}\})/g;
   let lastIndex = 0;
-  let match: RegExpExecArray | null;
 
-  while ((match = liquidPattern.exec(text)) !== null) {
+  for (let match = liquidPattern.exec(text); match !== null; match = liquidPattern.exec(text)) {
     if (match.index > lastIndex) {
       tokens.push({
         type: "plain-text",

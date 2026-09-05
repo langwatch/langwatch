@@ -58,14 +58,6 @@
       "types": "./src/ui/sections/redacted-field.tsx",
       "default": "./src/ui/sections/redacted-field.tsx"
     },
-    "./components/ui/dialog": {
-      "types": "./src/ui/elements/dialog.tsx",
-      "default": "./src/ui/elements/dialog.tsx"
-    },
-    "./components/ui/drawer": {
-      "types": "./src/ui/elements/drawer.tsx",
-      "default": "./src/ui/elements/drawer.tsx"
-    },
     "./hooks/useDejaViewLink": {
       "types": "./src/behavior/use-deja-view-link.ts",
       "default": "./src/behavior/use-deja-view-link.ts"
@@ -77,10 +69,6 @@
     "./model/prism-language": {
       "types": "./src/model/prism-language.ts",
       "default": "./src/model/prism-language.ts"
-    },
-    "./model/prisma-types": {
-      "types": "./src/model/prisma-types.ts",
-      "default": "./src/model/prisma-types.ts"
     },
     "./model/workflow-host": {
       "types": "./src/model/workflow-host.ts",
@@ -129,18 +117,6 @@
     "./studio-host/errors": {
       "types": "./src/ui/elements/studio-host/errors.tsx",
       "default": "./src/ui/elements/studio-host/errors.tsx"
-    },
-    "./studio-host/link": {
-      "types": "./src/ui/elements/studio-host/link.tsx",
-      "default": "./src/ui/elements/studio-host/link.tsx"
-    },
-    "./studio-host/next-router": {
-      "types": "./src/behavior/studio-host/next-router.ts",
-      "default": "./src/behavior/studio-host/next-router.ts"
-    },
-    "./studio-host/toaster": {
-      "types": "./src/behavior/studio-host/toaster.ts",
-      "default": "./src/behavior/studio-host/toaster.ts"
     },
     "./studio-host/use-organization-team-project": {
       "types": "./src/behavior/studio-host/use-organization-team-project.ts",
@@ -200,6 +176,7 @@
     "@langwatch/evaluator-web": "workspace:*",
     "@langwatch/experiment-web": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/langy-web": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/model-provider-web": "workspace:*",

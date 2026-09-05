@@ -6,7 +6,7 @@
 
 import { apiKeyScreens } from "@langwatch/api-key-web/screens/api-key";
 import { useEffect, type ComponentType } from "react";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";
 import { ApiKeyHost } from "./api-key-host";

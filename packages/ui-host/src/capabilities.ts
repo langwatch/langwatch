@@ -4,7 +4,7 @@
  * screen asks ports instead. Missing ports refuse loudly, never silently.
  */
 
-import type { UiScopeHostPort } from "@langwatch/ui-host/use-organization-team-project";
+import type { UiScopeHostPort } from "./use-organization-team-project";
 import { createContext, useContext } from "react";
 
 /** The composition never filled this port, and something asked it to work. */
@@ -89,6 +89,12 @@ export type UiRouteReadingValues = {
   params: Readonly<Record<string, string | undefined>>;
   /** The query string, single-valued — the last write of a repeated key wins. */
   query: Readonly<Record<string, string | undefined>>;
+  /**
+   * The path the reader is on, without query or fragment. Optional because a
+   * test that hands over a reading rarely has one; `useRouter` reads it as the
+   * empty string when it is absent.
+   */
+  pathname?: string;
 };
 
 /**
@@ -267,6 +273,18 @@ const UiCapabilityContext = createContext<UiCapabilities | undefined>(void 0);
 
 /** Publishes the resolved capabilities to everything a screen renders. */
 export const UiCapabilityContextProvider = UiCapabilityContext.Provider;
+
+/**
+ * The capabilities above this screen, or undefined where none are mounted.
+ *
+ * The hooks this package publishes over the ports — `useRouter`, `Link` — read
+ * this one rather than {@link useUiCapabilities}: a cross-feature component
+ * rendered with no shell above it degrades to an empty reading and an inert
+ * navigation instead of taking the page down.
+ */
+export function useOptionalUiCapabilities(): UiCapabilities | undefined {
+  return useContext(UiCapabilityContext);
+}
 
 /**
  * Missing means the screen was mounted outside the application shell — a

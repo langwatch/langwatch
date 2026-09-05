@@ -22,7 +22,7 @@ import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FakeEvaluatorHost, renderWithEvaluatorHost } from "../../../testing";
+import { renderWithEvaluatorHost } from "../../../testing";
 import EvaluatorsScreen from "../evaluators.screen";
 
 const { state } = vi.hoisted(() => ({

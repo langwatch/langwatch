@@ -29,8 +29,8 @@ export interface FilteredCommands {
 export function useFilteredCommands(
   query: string,
   isSaas: boolean | undefined,
-  projectId: string | undefined,
-  isDevMode: boolean,
+  _projectId: string | undefined,
+  _isDevMode: boolean,
 ): FilteredCommands {
   const host = useNavigationHost();
   const hasOpsAccess = host.opsAccess().hasAccess;

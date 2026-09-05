@@ -679,7 +679,7 @@ function InlineDepartment({
   entityId: string;
   value: string | null;
   departments: DepartmentOption[];
-  onAssigned: () => Promise<unknown> | void;
+  onAssigned: () => Promise<unknown> | undefined;
 }) {
   return (
     <HStack gap={2} pl={2} color="gray.500" fontSize="sm" onClick={(e) => e.stopPropagation()}>

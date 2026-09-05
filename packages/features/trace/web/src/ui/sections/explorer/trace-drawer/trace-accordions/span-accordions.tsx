@@ -62,7 +62,6 @@ function MaybeCorrected({
 export function SpanAccordions({
   traceId,
   span,
-  onSelectSpan,
 }: {
   traceId: string;
   span: SpanTreeNode;

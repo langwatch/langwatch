@@ -20,7 +20,7 @@ export function useInviteActions({
   onClose,
   refetchInvites,
   pricingModel,
-  activePlanFree,
+  activePlanFree: _activePlanFree,
   activePlanType,
   activePlanSource,
 }: {

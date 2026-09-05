@@ -6,7 +6,7 @@
 
 import { unsubscribeScreens } from "@langwatch/automation-web/screens/unsubscribe";
 import type { ComponentType } from "react";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";
 

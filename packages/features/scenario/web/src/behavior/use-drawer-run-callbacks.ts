@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useRouter } from "./next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { useOrganizationTeamProject } from "./use-organization-team-project";
 
 /**

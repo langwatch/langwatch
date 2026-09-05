@@ -8,7 +8,7 @@
  */
 
 import { Box, VStack } from "@chakra-ui/react";
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { HandledErrorAlert } from "../../../../behavior/errors";
 
 export function RunDrawerErrorBody({ error }: { error: unknown }) {

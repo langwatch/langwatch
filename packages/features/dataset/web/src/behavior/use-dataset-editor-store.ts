@@ -59,7 +59,10 @@ export function rekeyEditorRecords(
 }
 
 let newRecordSeq = 0;
-const generateRecordId = () => `new_${Date.now()}_${(newRecordSeq += 1)}`;
+const generateRecordId = () => {
+  newRecordSeq += 1;
+  return `new_${Date.now()}_${newRecordSeq}`;
+};
 
 export type DatasetEditorState = {
   /** Database dataset id: set in saved mode, undefined for in-memory. */

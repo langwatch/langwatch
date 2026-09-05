@@ -76,7 +76,6 @@ import type {
   TraceEditOverlayDto,
   TraceEditOverlayPatch,
   TraceEventRollup,
-  Evaluation,
   TraceHeader,
   TraceHeaderReadInput,
   TraceListPage,
@@ -870,7 +869,7 @@ export type TraceApiMap = {
     /** Whether the reader may see the Ops workspace, and at what tier. */
     getScope: {
       query: {
-        input: void;
+        input: undefined;
         output: { hasAccess: boolean; scope: { kind: string } | null };
       };
     };

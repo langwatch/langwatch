@@ -111,7 +111,7 @@ import {
   type UiCapabilities,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import type { UiPageLoaderRegistry } from "../src/behavior/ui-page-loaders";
 import { organizationFeature } from "../src/features/organization";
 import { personalWorkspaceFeature } from "../src/features/personal-workspace";

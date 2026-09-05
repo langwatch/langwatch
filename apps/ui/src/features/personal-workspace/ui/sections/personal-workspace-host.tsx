@@ -12,7 +12,7 @@ import {
 } from "@langwatch/user-web/screens/personal-workspace";
 import { useMemo, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import {
   linkUiSignInMethod,
   listUiPasskeys,

@@ -47,6 +47,7 @@
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
     "@langwatch/workflow-web": "workspace:*",
     "@tanstack/react-virtual": "^3.14.5",
     "ai": "^6.0.217",

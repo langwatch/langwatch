@@ -34,7 +34,8 @@ vi.mock("@langwatch/navigation-web/screens/landing", async () => {
 });
 
 vi.mock("@langwatch/ui-drawer", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/ui-drawer")>("@langwatch/ui-drawer");
+  const actual =
+    await vi.importActual<typeof import("@langwatch/ui-drawer")>("@langwatch/ui-drawer");
   return {
     ...actual,
     useDrawer: () => ({ openDrawer: () => {}, closeDrawer: () => {} }),
@@ -42,7 +43,8 @@ vi.mock("@langwatch/ui-drawer", async () => {
 });
 
 vi.mock("@langwatch/langy-web", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/langy-web")>("@langwatch/langy-web");
+  const actual =
+    await vi.importActual<typeof import("@langwatch/langy-web")>("@langwatch/langy-web");
   return {
     ...actual,
     useLangyStore: () => () => {},
@@ -77,7 +79,7 @@ import {
   UiSessionPort,
   type UiActiveScope,
   type UiCapabilities,
-} from "../../../../behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { NavigationHostSection } from "../sections/navigation-host";
 
 class SilentNavigation extends UiNavigationPort {

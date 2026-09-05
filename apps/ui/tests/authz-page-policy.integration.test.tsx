@@ -99,7 +99,7 @@ import {
   type UiCapabilities,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { authzFeature } from "../src/features/authz";
 
 class SilentNavigation extends UiNavigationPort {

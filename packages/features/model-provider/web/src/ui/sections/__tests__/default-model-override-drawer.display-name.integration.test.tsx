@@ -53,7 +53,7 @@
  * @see specs/model-providers/custom-model-display-name.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DefaultModelOverrideDrawer } from "../default-model-override-drawer";

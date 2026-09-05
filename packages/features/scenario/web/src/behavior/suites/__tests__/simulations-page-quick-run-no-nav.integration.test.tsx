@@ -83,7 +83,7 @@ const routerQueryPath = vi.hoisted(() => ({
  */
 const mockGetSummariesInvalidate = vi.hoisted(() => vi.fn());
 
-vi.mock("../../next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
     push: mockRouterPush,
     replace: mockRouterReplace,

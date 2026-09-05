@@ -1,8 +1,9 @@
 // eslint-disable-next-line no-restricted-imports
 import { Dialog as ChakraDialog, Portal } from "@chakra-ui/react";
 import * as React from "react";
-import { CloseButton } from "@langwatch/design-system/close-button";
-import { IsolatedErrorBoundary } from "./isolated-error-boundary";
+
+import { CloseButton } from "./close-button";
+import { StudioIsolatedErrorBoundary } from "./studio-error-boundary";
 
 interface DialogContentProps extends ChakraDialog.ContentProps {
   portalled?: boolean;
@@ -50,7 +51,7 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
     // children so a render error renders an inline error panel within the
     // dialog frame instead.
     const safeChildren = withErrorBoundary ? (
-      <IsolatedErrorBoundary scope={errorScope}>{children}</IsolatedErrorBoundary>
+      <StudioIsolatedErrorBoundary scope={errorScope}>{children}</StudioIsolatedErrorBoundary>
     ) : (
       children
     );

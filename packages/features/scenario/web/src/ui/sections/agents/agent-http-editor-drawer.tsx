@@ -23,7 +23,7 @@ import {
   type FieldMapping,
   VariablesSection,
 } from "@langwatch/prompt-web/surfaces/variables";
-import { showErrorToast } from "../../../behavior/errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
 import {
   getComplexProps,
   getFlowCallbacks,

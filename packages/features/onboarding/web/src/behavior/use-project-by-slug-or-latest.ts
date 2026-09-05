@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useRouter } from "../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 
 export interface MinimalProject {
   id: string;

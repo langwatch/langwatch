@@ -12,8 +12,8 @@ import { useDejaViewLink } from "@langwatch/workflow-web/hooks/useDejaViewLink";
 import { useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { api } from "../../../behavior/scenario-api";
-import { useRouter } from "../../../behavior/next-router";
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { useRouter } from "@langwatch/ui-host/use-router";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { ScenarioMessageRenderer } from "./scenario-message-renderer";
 import {
   CopyIdChip,

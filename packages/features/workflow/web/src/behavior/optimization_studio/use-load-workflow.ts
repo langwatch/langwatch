@@ -1,4 +1,4 @@
-import { useRouter } from "../studio-host/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { useOrganizationTeamProject } from "../studio-host/use-organization-team-project";
 import { workflowApi } from "../workflow-api";
 

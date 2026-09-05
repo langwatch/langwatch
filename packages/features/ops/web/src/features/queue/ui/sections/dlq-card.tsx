@@ -257,7 +257,7 @@ export function DlqRow({
   );
 }
 
-export function DlqCard({ queueNames }: { queueNames: string[] }) {
+export function DlqCard({ queueNames: _queueNames }: { queueNames: string[] }) {
   const { hasAccess } = useOpsPermission();
   const dlqQuery = api.ops.listAllDlqGroups.useQuery(undefined, {
     refetchInterval: 10000,

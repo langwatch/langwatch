@@ -190,8 +190,6 @@ export const SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER = [
   "anthropic_admin",
 ] as const;
 
-type PullConfigBuilderSourceType = (typeof SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER)[number];
-
 function resolvePullConfig(
   composer: ComposerState,
   {

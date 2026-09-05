@@ -92,7 +92,7 @@ interface FieldTally {
 }
 
 export function scanLangWatchQLChartValues({
-  encodedFieldsByDataset,
+  encodedFieldsByDataset: fieldsByDataset,
   datasets,
   columnsByDataset,
 }: ScanLangWatchQLChartValuesInput): LangWatchQLChartValueScan {
@@ -100,7 +100,7 @@ export function scanLangWatchQLChartValues({
   let scannedFields = 0;
   let fieldsWithValues = 0;
 
-  for (const [dataset, fields] of Object.entries(encodedFieldsByDataset)) {
+  for (const [dataset, fields] of Object.entries(fieldsByDataset)) {
     const rows = datasets[dataset] ?? [];
     const types = columnTypes(columnsByDataset[dataset] ?? []);
 

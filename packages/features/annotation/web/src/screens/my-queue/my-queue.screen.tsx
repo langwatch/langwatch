@@ -20,7 +20,7 @@ import { useAnnotationQueues } from "../../behavior/use-annotation-queues";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 import { api, type RouterOutputs } from "../../behavior/annotation-api";
-import { useRouter } from "../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { TasksDone } from "../../ui/elements/tasks-done-icon";
 import { QueueTraceHost } from "../../ui/sections/queue-trace-host";
 

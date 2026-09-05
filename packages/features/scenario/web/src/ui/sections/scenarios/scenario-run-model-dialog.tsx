@@ -1,5 +1,5 @@
 import { Button, Text, VStack } from "@chakra-ui/react";
-import { Dialog } from "@langwatch/workflow-web/components/ui/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { SimulationModelSelect } from "./simulation-model-select";
 
 /**

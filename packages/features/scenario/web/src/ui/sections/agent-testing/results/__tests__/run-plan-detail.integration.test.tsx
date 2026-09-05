@@ -154,7 +154,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({ openDrawer: mockOpenDrawer, setFlowCallbacks: vi.fn() }),
 }));
 
-vi.mock("../../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ query: {}, push: mockRouterPush, isReady: true }),
 }));
 

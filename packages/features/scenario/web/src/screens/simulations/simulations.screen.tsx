@@ -23,13 +23,15 @@
 import { useEffect } from "react";
 import SimulationsPage from "../../ui/sections/suites/simulations-page";
 import { resolveSimulationsRedirect } from "../../behavior/suites/use-suite-routing";
-import { useRouter } from "../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { useAgentTestingRedirect } from "../../behavior/suites/use-agent-testing-redirect";
 
 function SimulationsRoutePage() {
   const router = useRouter();
-  const pathSegments = Array.isArray(router.query.path) ? router.query.path : [];
-  const projectSlug = router.query.project as string | undefined;
+  // The catch-all segment, read off the route parameters. `/:project/simulations/*`
+  // is one page serving five addresses, and the splat is how it knows which.
+  const pathSegments = (router.params["*"] ?? "").split("/").filter(Boolean);
+  const projectSlug = router.query.project;
 
   const { deciding } = useAgentTestingRedirect({ segments: pathSegments });
 
@@ -38,7 +40,7 @@ function SimulationsRoutePage() {
       ? resolveSimulationsRedirect({
           projectSlug,
           segments: pathSegments,
-          query: router.query as Record<string, unknown>,
+          query: router.search,
         })
       : null;
 

@@ -18,7 +18,7 @@ import {
   DialogHeader,
   DialogRoot,
   DialogTitle,
-} from "@langwatch/workflow-web/components/ui/dialog";
+} from "@langwatch/design-system/studio-dialog";
 
 export type EvaluatorApiUsageDialogProps = {
   evaluator: Evaluator | null;

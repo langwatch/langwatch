@@ -18,7 +18,6 @@
 import {
   Badge,
   Box,
-  Button,
   CloseButton,
   createListCollection,
   HStack,

@@ -12,13 +12,13 @@ import {
 } from "@chakra-ui/react";
 import { useState } from "react";
 import { MoreVertical } from "react-feather";
-import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import CheckConfigForm, {
   type CheckConfigFormData,
 } from "../../ui/sections/checks/check-config-form";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
-import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
+import { toaster } from "@langwatch/ui-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 

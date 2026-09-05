@@ -11,7 +11,7 @@ import {
   type RetentionAvailableScopes,
 } from "@langwatch/data-retention-web/screens/data-retention";
 import { useMemo, type ReactNode } from "react";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import {
   useUiOrganizationFacts,
   useUiPlatformAdmin,

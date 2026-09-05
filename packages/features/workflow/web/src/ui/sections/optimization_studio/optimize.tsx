@@ -24,13 +24,13 @@ import {
 } from "react-hook-form";
 
 import { SmallLabel } from "@langwatch/design-system/small-label";
-import { Dialog } from "../../elements/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Select } from "@langwatch/design-system/select";
-import { toaster } from "../../../behavior/studio-host/toaster";
+import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
 import { api } from "../../../behavior/studio-host/api";
-import { DEFAULT_MODEL } from "../../../model/constants";
+import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { workflowApi } from "../../../behavior/workflow-api";
 import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data";
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys";

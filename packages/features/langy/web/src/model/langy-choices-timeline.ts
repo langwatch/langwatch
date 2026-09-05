@@ -37,6 +37,19 @@ interface MessageLike {
  * closed and the reader watches Langy ask a question it will not accept an
  * answer to.
  */
+/**
+ * Pushes one timeline entry per question-tool card in `part` (see
+ * `langyQuestionTool.ts`) and reports whether it pushed at least one.
+ */
+function pushQuestionToolCards(part: unknown, timeline: LangyChoicesTimelineEntry[]): boolean {
+  let pushedAny = false;
+  for (const questionCard of questionToolCardParts(part)) {
+    timeline.push({ kind: "question", blockId: questionCard.blockId });
+    pushedAny = true;
+  }
+  return pushedAny;
+}
+
 function streamedChoicesBlockIds(message: MessageLike): string[] {
   const recorded = (message.metadata as { recorded?: boolean } | undefined)?.recorded === true;
   if (recorded) return [];
@@ -72,11 +85,8 @@ export function langyChoicesTimeline(
         // (see langyQuestionTool.ts) — its cards must appear on the timeline
         // or the lock derivation would call them "never recorded" and render
         // every one permanently closed.
-        if (isQuestionToolPart(part)) {
-          for (const questionCard of questionToolCardParts(part)) {
-            timeline.push({ kind: "question", blockId: questionCard.blockId });
-            sawQuestion = true;
-          }
+        if (isQuestionToolPart(part) && pushQuestionToolCards(part, timeline)) {
+          sawQuestion = true;
         }
       }
       if (!sawQuestion) {

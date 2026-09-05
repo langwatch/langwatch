@@ -59,7 +59,7 @@ vi.mock("../../../../../behavior/use-organization-team-project", () => ({
 
 const routerPush = vi.hoisted(() => vi.fn());
 
-vi.mock("../../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
     push: routerPush,

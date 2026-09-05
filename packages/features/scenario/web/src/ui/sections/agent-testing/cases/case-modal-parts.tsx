@@ -34,7 +34,7 @@ import { SmallButton } from "../../../elements/agent-testing/shared/small-button
 import { CaseVersionHistoryPopover } from "./case-version-history-popover";
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases";
 import type { CaseDraft, CaseEditorState } from "./use-case-editor";
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { ParameterLineField } from "../run/parameter-line-field";
 import { parameterPlaceholder } from "../run/parameter-suggestions";
 import { useAgentDeclaredParameters } from "../run/use-agent-declared-parameters";

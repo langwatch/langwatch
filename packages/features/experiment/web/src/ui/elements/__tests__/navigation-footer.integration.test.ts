@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockPush = vi.fn();
 
-vi.mock("@langwatch/workflow-web/studio-host/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
     query: { project: "my-project", pageOffset: "0", pageSize: "25" },
     pathname: "/[project]/messages",

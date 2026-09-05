@@ -14,8 +14,10 @@ export type { ModelMetadataForFrontend };
  * the provider list.
  */
 let registryMetadata: Record<string, ModelMetadataForFrontend> | undefined;
-const catalogMetadata = (): Record<string, ModelMetadataForFrontend> =>
-  (registryMetadata ??= getModelMetadataForFrontend());
+const catalogMetadata = (): Record<string, ModelMetadataForFrontend> => {
+  registryMetadata ??= getModelMetadataForFrontend();
+  return registryMetadata;
+};
 
 export function useModelProvidersSettings(params: { projectId: string | undefined }) {
   const projectId = params.projectId ?? "";

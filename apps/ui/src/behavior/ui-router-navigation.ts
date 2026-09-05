@@ -5,8 +5,18 @@
  */
 
 import { useMemo } from "react";
-import { useNavigate, useParams, useSearchParams, type NavigateFunction } from "react-router";
-import { UiNavigationPort, UiRoutePort, type UiRouteReadingValues } from "./ui-capabilities";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+  type NavigateFunction,
+} from "react-router";
+import {
+  UiNavigationPort,
+  UiRoutePort,
+  type UiRouteReadingValues,
+} from "@langwatch/ui-host/capabilities";
 
 class RouterUiNavigation extends UiNavigationPort {
   constructor(private readonly navigateTo: NavigateFunction) {
@@ -89,6 +99,7 @@ export function createUiRoute({
 /** The route capability of the router this render is inside. */
 export function useRouterUiRoute(): UiRoutePort {
   const params = useParams();
+  const { pathname } = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
 
   return useMemo(() => {
@@ -98,7 +109,7 @@ export function useRouterUiRoute(): UiRoutePort {
     });
 
     return createUiRoute({
-      values: { params, query },
+      values: { params, query, pathname },
       setQuery: (next, options) => {
         const written = new URLSearchParams();
         for (const [key, value] of Object.entries(next)) {
@@ -107,5 +118,5 @@ export function useRouterUiRoute(): UiRoutePort {
         setSearchParams(written, { replace: options?.replace ?? false });
       },
     });
-  }, [params, searchParams, setSearchParams]);
+  }, [params, pathname, searchParams, setSearchParams]);
 }

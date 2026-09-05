@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { toaster } from "../../../behavior/studio-host/toaster";
+import { toaster } from "@langwatch/ui-host/toaster";
 import type { BaseComponent } from "@langwatch/workflow-contract";
 import { reportableExecutionFailure } from "./execution-state-error";
 import { useWorkflowStore } from "@langwatch/workflow-web";

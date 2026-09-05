@@ -5,10 +5,10 @@
  * package may not import. Every one of them is a reading of the address, and
  * the address is exactly what `WorkflowHostPort.route()` hands over.
  */
-import { useRouter } from "../studio-host/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { useWorkflowHost } from "../../model/workflow-host";
 
-export { useRouter } from "../studio-host/next-router";
+export { useRouter } from "@langwatch/ui-host/use-router";
 
 export function usePathname(): string {
   return useRouter().pathname;

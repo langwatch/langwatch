@@ -10,7 +10,7 @@ import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedb
 const BLOCKED_VIEWPORT_HEIGHT = 360;
 const BLOCKED_ROW_HEIGHT = 36;
 
-export function BlockedCard({ queueNames }: { queueNames: string[] }) {
+export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] }) {
   const showErrorToast = useShowErrorToast();
   const toaster = useOpsToaster();
   const { hasAccess } = useOpsPermission();

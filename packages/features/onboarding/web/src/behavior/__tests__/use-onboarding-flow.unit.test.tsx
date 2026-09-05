@@ -25,7 +25,7 @@ vi.mock("../attribution", () => ({
   readAttribution: () => ({}),
 }));
 
-vi.mock("../next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ query: {}, push: vi.fn(), replace: vi.fn() }),
 }));
 

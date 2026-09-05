@@ -8,7 +8,7 @@ import {
   useLegacySimulationsPreference,
 } from "../../../behavior/suites/use-legacy-simulations-preference";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { useRouter } from "../../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 
 /**
  * Small announcement card pinned to the bottom of the Agent Testing

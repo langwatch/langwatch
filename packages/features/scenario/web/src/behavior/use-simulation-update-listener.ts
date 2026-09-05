@@ -50,6 +50,23 @@ export interface SimulationBroadcastPayload {
   status?: string;
 }
 
+/**
+ * Records `batchRunId` as seen, and reports whether it was new — bounding the
+ * tracked set so a long-lived listener doesn't grow it unbounded, at the cost
+ * of occasionally re-announcing a batch after the set resets.
+ */
+function recordNewBatchRunId(batchRunId: string, knownIds: Set<string>, maxTracked = 500): boolean {
+  if (knownIds.has(batchRunId)) {
+    return false;
+  }
+  knownIds.add(batchRunId);
+  if (knownIds.size > maxTracked) {
+    knownIds.clear();
+    knownIds.add(batchRunId);
+  }
+  return true;
+}
+
 export function useSimulationUpdateListener({
   projectId,
   refetch,
@@ -240,15 +257,12 @@ export function useSimulationUpdateListener({
 
             scheduleUpdate();
 
-            if (payload.batchRunId && onNewBatchRun) {
-              if (!knownBatchRunIdsRef.current.has(payload.batchRunId)) {
-                knownBatchRunIdsRef.current.add(payload.batchRunId);
-                if (knownBatchRunIdsRef.current.size > 500) {
-                  knownBatchRunIdsRef.current.clear();
-                  knownBatchRunIdsRef.current.add(payload.batchRunId);
-                }
-                onNewBatchRun(payload.batchRunId);
-              }
+            if (
+              payload.batchRunId &&
+              onNewBatchRun &&
+              recordNewBatchRunId(payload.batchRunId, knownBatchRunIdsRef.current)
+            ) {
+              onNewBatchRun(payload.batchRunId);
             }
           }
         } catch (err) {

@@ -21,13 +21,12 @@ vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
 }));
 
 const toasts: Array<{ title?: string }> = [];
-vi.mock("@langwatch/workflow-web/studio-host/toaster", () => ({
+vi.mock("@langwatch/ui-host/toaster", () => ({
   toaster: { create: (toast: { title?: string }) => toasts.push(toast) },
 }));
 
-vi.mock("@langwatch/workflow-web/studio-host/errors", () => ({
+vi.mock("@langwatch/ui-host/errors", () => ({
   describeError: () => "",
-  readHandledError: () => void 0,
   showErrorToast: () => void 0,
 }));
 

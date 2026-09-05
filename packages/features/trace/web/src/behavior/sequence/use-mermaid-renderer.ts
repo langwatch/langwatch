@@ -42,6 +42,42 @@ interface UseMermaidRendererReturn {
 }
 
 /**
+ * Tags one actor/node with `data-kind` (so the CSS layer can theme it via
+ * Chakra semantic tokens) and, when its label resolves to a span, wires a
+ * click handler that selects that span.
+ */
+function tagNodeWithKindAndClick({
+  node,
+  result,
+  isPanningRef,
+  onSelectSpan,
+}: {
+  node: SVGGElement;
+  result: MermaidRenderResult;
+  isPanningRef: RefObject<boolean>;
+  onSelectSpan: (spanId: string) => void;
+}): void {
+  const label = node.querySelector("text")?.textContent?.trim() ?? "";
+  const match = label
+    ? Array.from(result.idToSpanId.entries()).find(
+        ([id]) => (result.idDisplay.get(id) ?? "").trim() === label.trim(),
+      )
+    : undefined;
+  const kindFromClass = ["agent", "llm", "tool", "other"].find((k) => node.classList.contains(k));
+  const kind = (match ? result.idKind.get(match[0]) : undefined) ?? kindFromClass ?? "other";
+  node.setAttribute("data-kind", kind);
+  if (match) {
+    const [, spanId] = match;
+    node.style.cursor = "pointer";
+    node.addEventListener("click", (e) => {
+      if (isPanningRef.current) return;
+      e.stopPropagation();
+      onSelectSpan(spanId);
+    });
+  }
+}
+
+/**
  * Renders the Mermaid SVG into `stageRef`, mirrors a scaled-down copy into
  * `minimapStageRef`, wires actor/node click handlers to `onSelectSpan`, and
  * applies the easter-egg avatar swap when active. Owns the per-render token
@@ -151,27 +187,7 @@ export function useMermaidRenderer({
         // from CSS using Chakra's semantic-token-backed CSS vars (which are
         // light/dark aware by definition).
         stage.querySelectorAll<SVGGElement>("g.actor, g.node").forEach((node) => {
-          const label = node.querySelector("text")?.textContent?.trim() ?? "";
-          const match = label
-            ? Array.from(result.idToSpanId.entries()).find(
-                ([id]) => (result.idDisplay.get(id) ?? "").trim() === label.trim(),
-              )
-            : undefined;
-          const kindFromClass = ["agent", "llm", "tool", "other"].find((k) =>
-            node.classList.contains(k),
-          );
-          const kind =
-            (match ? result.idKind.get(match[0]) : undefined) ?? kindFromClass ?? "other";
-          node.setAttribute("data-kind", kind);
-          if (match) {
-            const [, spanId] = match;
-            node.style.cursor = "pointer";
-            node.addEventListener("click", (e) => {
-              if (isPanningRef.current) return;
-              e.stopPropagation();
-              onSelectSpan(spanId);
-            });
-          }
+          tagNodeWithKindAndClick({ node, result, isPanningRef, onSelectSpan });
         });
 
         // Easter-egg avatar swap. Each Mermaid `actor` (stick figure)

@@ -82,6 +82,16 @@ const MODEL_GROUPS: Array<{
   },
 ];
 
+/** `MODEL_GROUPS`, each carrying the "more" items in its group, groups with none dropped. */
+function groupModelsByGroup<T extends { profile: { group: LangyModelGroup } }>(
+  items: T[],
+): Array<(typeof MODEL_GROUPS)[number] & { items: T[] }> {
+  return MODEL_GROUPS.map((group) => ({
+    ...group,
+    items: items.filter((item) => item.profile.group === group.id),
+  })).filter((group) => group.items.length > 0);
+}
+
 /**
  * The composer's per-send model picker, as a compact rail pill (reference
  * `.mpick`): a provider glyph + the model name + a chevron, sized to its label
@@ -189,14 +199,7 @@ export const LangyModelPill = memo(function LangyModelPill({
     [collection.items, langyDefaultModel, model, searching],
   );
 
-  const groupedItems = useMemo(
-    () =>
-      MODEL_GROUPS.map((group) => ({
-        ...group,
-        items: more.filter((item) => item.profile.group === group.id),
-      })).filter((group) => group.items.length > 0),
-    [more],
-  );
+  const groupedItems = useMemo(() => groupModelsByGroup(more), [more]);
 
   // Collapsed by default — the point of the shortlist is that the catalogue is
   // out of the way. A search forces it open, because a search that hides its own

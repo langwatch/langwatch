@@ -28,7 +28,6 @@ import { LangyCard } from "../../../asaplangy";
 import { useReducedMotion } from "../../../../behavior/use-reduced-motion";
 import type { LangyPlan, LangyPlanItem, LangyPlanItemStatus } from "../../../../index";
 import { langyThinkingShimmerStyles } from "../../../../index";
-import { LangyActivityParts } from "./langy-tool-activity";
 
 const dotPulse = keyframes`
   0%, 100% { opacity: 1; transform: scale(1); }

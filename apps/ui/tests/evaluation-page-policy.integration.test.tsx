@@ -82,7 +82,7 @@ import {
   type UiCapabilities,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { uiRouteTable, type UiRouteDescriptor } from "../src/model/ui-route-table";
 import { evaluatorFeature } from "../src/features/evaluator";
 import { overlayQuery as evaluatorOverlayQuery } from "../src/features/evaluator/behavior/evaluator-overlay-address";

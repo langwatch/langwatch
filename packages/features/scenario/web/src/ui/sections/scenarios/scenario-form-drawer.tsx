@@ -14,15 +14,11 @@ import { generate } from "@langwatch/ksuid";
 import { History, Lock, Play } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type FieldErrors, useFormState, useWatch } from "react-hook-form";
-import {
-  applyHandledErrorToForm,
-  FormServerError,
-  HandledErrorState,
-  readHandledError,
-  showErrorToast,
-} from "../../../behavior/errors";
+import { applyHandledErrorToForm, showErrorToast } from "@langwatch/ui-host/errors";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { FormServerError, HandledErrorState } from "../../../behavior/errors";
 import type { Scenario } from "@langwatch/scenario-contract";
-import { useRouter } from "../../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import {
   getComplexProps,
   setFlowCallbacks,
@@ -47,10 +43,10 @@ import { ScenarioRunModelDialog } from "./scenario-run-model-dialog";
 import type { TargetValue } from "./target-selector";
 import { CaseVersionChip } from "../../elements/agent-testing/shared/case-version-chip";
 import { api } from "../../../behavior/scenario-api";
-import { KSUID_RESOURCES } from "@langwatch/workflow-web/utils/constants";
+import { KSUID_RESOURCES } from "@langwatch/workflow-contract";
 import { PromptEditorDrawer } from "@langwatch/prompt-web/components/prompts/PromptEditorDrawer";
 import { hasScenarioInputMapping } from "../../elements/suites/scenario-input-mapping-section";
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { TagList } from "../../elements/tag-list";
 import { toaster } from "@langwatch/design-system/toaster";
 import { SaveAndRunMenu } from "./save-and-run-menu";

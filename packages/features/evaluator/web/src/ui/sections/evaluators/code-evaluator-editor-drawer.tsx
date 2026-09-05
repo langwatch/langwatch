@@ -2,14 +2,14 @@ import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
-import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { toaster } from "@langwatch/ui-host/toaster";
 import {
   type FieldMapping as UIFieldMapping,
   type Variable,
   VariablesSection,
 } from "@langwatch/prompt-web/surfaces/variables";
-import { showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
 import {
   getComplexProps,
   getFlowCallbacks,

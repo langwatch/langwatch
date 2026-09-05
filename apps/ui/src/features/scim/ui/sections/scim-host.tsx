@@ -8,7 +8,7 @@ import { ScimHostProvider, type ScimHostPort } from "@langwatch/enterprise-scim-
 import { useMemo, type ReactNode } from "react";
 
 import { readPublicAppConfig } from "../../../../behavior/public-config";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 
 /** Where a customer's identity provider posts. */
 const SCIM_PATH = "/api/scim/v2";

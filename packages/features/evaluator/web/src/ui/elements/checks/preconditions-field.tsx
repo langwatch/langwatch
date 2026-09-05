@@ -140,7 +140,7 @@ export const PreconditionsField = ({
                 >
                   <X />
                 </Button>
-                <SmallLabel>{index == 0 ? "When" : "and"}</SmallLabel>
+                <SmallLabel>{index === 0 ? "When" : "and"}</SmallLabel>
                 <HStack gap={2} flexWrap="wrap">
                   <NativeSelect.Root minWidth="fit-content">
                     <NativeSelect.Field

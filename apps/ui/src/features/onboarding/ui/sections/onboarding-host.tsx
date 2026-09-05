@@ -14,7 +14,7 @@ import {
 import { useMemo, type ReactNode } from "react";
 import { useUiAddress } from "../../../../behavior/ui-address";
 import { writeUiClipboard } from "../../../../behavior/ui-clipboard";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { uiLeaveTo } from "../../../../behavior/ui-departure";
 import { copyToClipboard } from "../../behavior/onboarding-copy-to-clipboard";
 import { useUiPrefersReducedMotion } from "../../../../behavior/ui-reduced-motion";

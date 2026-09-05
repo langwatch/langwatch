@@ -98,8 +98,7 @@ export function LiquidConditionEditor({
     }
     for (const name of validation.missingVariables) {
       const re = new RegExp(`\\b${escapeRegExp(name)}\\b`, "g");
-      let match: RegExpExecArray | null;
-      while ((match = re.exec(value)) !== null) {
+      for (let match = re.exec(value); match !== null; match = re.exec(value)) {
         markers.push({
           severity: monaco.MarkerSeverity.Warning,
           message: `Unknown input "${name}" — add it below or fix the name.`,

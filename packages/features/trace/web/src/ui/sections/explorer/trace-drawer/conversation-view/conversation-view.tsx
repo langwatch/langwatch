@@ -507,7 +507,7 @@ const ConversationHeader: React.FC<{
 }> = ({
   conversationId,
   currentTraceId,
-  turnCount,
+  turnCount: _turnCount,
   mode,
   onModeChange,
   isExpandAllEnabled,

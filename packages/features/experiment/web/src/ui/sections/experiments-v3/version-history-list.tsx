@@ -7,8 +7,8 @@
  */
 import { Badge, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
-import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
-import { showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
+import { toaster } from "@langwatch/ui-host/toaster";
+import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";

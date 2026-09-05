@@ -90,7 +90,7 @@ import {
   type UiCapabilities,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { githubFeature } from "../src/features/github";
 
 class SilentNavigation extends UiNavigationPort {

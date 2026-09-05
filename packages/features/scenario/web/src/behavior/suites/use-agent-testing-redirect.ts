@@ -14,7 +14,7 @@ import { useFeatureFlag } from "../use-feature-flag";
 import { useLegacySimulationsPreference } from "./use-legacy-simulations-preference";
 import { useOrganizationTeamProject } from "../use-organization-team-project";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-import { useRouter } from "../next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { toAgentTestingAddress } from "./use-suite-routing";
 
 export function useAgentTestingRedirect({
@@ -51,7 +51,7 @@ export function useAgentTestingRedirect({
       ? toAgentTestingAddress({
           projectSlug,
           segments,
-          query: router.query as Record<string, unknown>,
+          query: router.search,
         })
       : null;
 

@@ -50,7 +50,7 @@ vi.mock("@langwatch/workflow-web/studio-host/api", () => ({
   },
 }));
 
-vi.mock("@langwatch/workflow-web/studio-host/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
     query: { slug: "test-slug" },
     push: vi.fn(),
@@ -64,7 +64,7 @@ vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("@langwatch/workflow-web/studio-host/toaster", () => ({
+vi.mock("@langwatch/ui-host/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 

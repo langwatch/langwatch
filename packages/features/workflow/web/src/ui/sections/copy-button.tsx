@@ -1,6 +1,6 @@
 import { Button, type ButtonProps } from "@chakra-ui/react";
 import { CopyIcon } from "lucide-react";
-import { toaster } from "../../behavior/studio-host/toaster";
+import { toaster } from "@langwatch/ui-host/toaster";
 
 interface CopyButtonProps extends Omit<ButtonProps, "value" | "label" | "onClick"> {
   value: string;

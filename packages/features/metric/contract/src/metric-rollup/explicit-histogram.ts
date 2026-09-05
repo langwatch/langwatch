@@ -147,7 +147,9 @@ function buildHistogramRow({
     }
 
     const coarsened = coarsenedCounts ?? coarsenExplicit({ point, targetBounds: bounds });
-    coarsened.forEach((value, i) => (merged[i]! += value));
+    coarsened.forEach((value, i) => {
+      merged[i]! += value;
+    });
     totalCount += count;
     if (sum !== null) {
       totalSum += sum;

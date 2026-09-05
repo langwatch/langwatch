@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { SCENARIO_TAB_QUERY_PARAM } from "@langwatch/scenario-contract";
-import { useRouter } from "./next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 
 /**
  * Session key holding the scenario tab key for this tab only. Session storage

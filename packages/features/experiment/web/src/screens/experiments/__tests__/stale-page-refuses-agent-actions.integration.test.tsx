@@ -44,7 +44,7 @@ const saveNow = vi.hoisted(() => vi.fn(async () => store.saveOutcome));
 // leave the handler waiting out its whole id budget.
 const executeEvaluation = vi.hoisted(() => vi.fn(async () => undefined));
 
-vi.mock("@langwatch/workflow-web/studio-host/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
     query: { slug: "exp-1" },
     pathname: "",

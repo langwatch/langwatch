@@ -5,11 +5,7 @@ import {
   CODEX_RECOVERED_CONTENT_SPAN_NAME,
   collectRecoveredCodexTurn,
 } from "./coding-agent-transcript-codex";
-import {
-  extractedOutputText,
-  extractedSystemText,
-  outputMessagesText,
-} from "./coding-agent-transcript-content";
+import { extractedOutputText, outputMessagesText } from "./coding-agent-transcript-content";
 import {
   type CodexToolLogContent,
   createSpanEntryAccumulator,

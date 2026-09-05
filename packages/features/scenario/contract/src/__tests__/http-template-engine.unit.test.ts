@@ -431,7 +431,7 @@ describe("header template rendering", () => {
   describe("given interpolated content that renders a line break", () => {
     /** @scenario "A rendered header value cannot carry a line break" */
     it("rejects the value naming the header, instead of passing it to the HTTP client", () => {
-      const render = () =>
+      const attempt = () =>
         renderHeaderTemplate({
           template: "{{ params.note }}",
           context: buildTemplateContext({
@@ -441,9 +441,9 @@ describe("header template rendering", () => {
           headerKey: "X-Note",
         });
 
-      expect(render).toThrow(TemplateRenderError);
-      expect(render).toThrow(/header "X-Note"/);
-      expect(render).toThrow(/line break/);
+      expect(attempt).toThrow(TemplateRenderError);
+      expect(attempt).toThrow(/header "X-Note"/);
+      expect(attempt).toThrow(/line break/);
     });
   });
 

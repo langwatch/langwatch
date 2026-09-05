@@ -51,7 +51,7 @@ import {
   UiSessionPort,
   type UiActiveScope,
   type UiCapabilities,
-} from "../../../../behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { GovernanceHost } from "../sections/governance-host";
 
 class SilentNavigation extends UiNavigationPort {

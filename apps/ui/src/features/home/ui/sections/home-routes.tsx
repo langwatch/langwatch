@@ -8,7 +8,7 @@ import { projectHomeScreens } from "@langwatch/project-web/screens/home";
 import { useEffect, type ComponentType } from "react";
 
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { uiPage } from "../../../../ui/sections/ui-page";
 import { ProjectHomeHostSection } from "./home-host";
 

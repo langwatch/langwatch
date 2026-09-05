@@ -12,7 +12,7 @@ import {
 } from "@langwatch/agent-web/screens/agent-management";
 import { ConnectedAgentsSection } from "@langwatch/scenario-web/screens/simulations";
 import { useMemo, type ReactNode } from "react";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { resolveUiFailureCopy } from "../../../../behavior/ui-feedback";
 import { useUiRpc } from "../../../../behavior/ui-rpc";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";

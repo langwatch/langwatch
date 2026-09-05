@@ -24,7 +24,7 @@ import {
 } from "@langwatch/project-web/ui/blocks/tech-stack";
 import { useEffect } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
-import { useRouter } from "../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { api } from "../../behavior/onboarding-api";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 import { useRequiredSession } from "../../behavior/use-required-session";
@@ -78,7 +78,7 @@ export default function ProjectOnboarding() {
       {
         organizationId: organization?.id ?? "",
         name: data.name,
-        teamId: data.teamId == "NEW" ? undefined : data.teamId,
+        teamId: data.teamId === "NEW" ? undefined : data.teamId,
         newTeamName: data.newTeamName,
         language: data.language,
         framework: data.framework,
@@ -133,7 +133,7 @@ export default function ProjectOnboarding() {
                   <NativeSelect.Indicator />
                 </NativeSelect.Root>
               </Field.Root>
-              {teamId == "NEW" && (
+              {teamId === "NEW" && (
                 <Field.Root>
                   <Field.Label>New Team Name</Field.Label>
                   <Input {...form.register("newTeamName", { required: true })} />

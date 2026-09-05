@@ -1,7 +1,7 @@
 import { chakra } from "@chakra-ui/react";
 import type { ComponentPropsWithoutRef, MouseEvent } from "react";
 import { isInternalHref } from "@langwatch/workflow-web/components/Markdown";
-import { useRouter } from "../../../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 
 /**
  * The one anchor every Langy card links through.

@@ -14,7 +14,8 @@ import {
 import { ReturnToNewSimulationsBanner } from "../../ui/elements/suites/return-to-new-simulations-banner";
 import { useAgentTestingRedirect } from "../../behavior/suites/use-agent-testing-redirect";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { HandledErrorAlert, showErrorToast } from "../../behavior/errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
+import { HandledErrorAlert } from "../../behavior/errors";
 import type { Scenario } from "../../model/prisma-types";
 import { useScenarioLabelFilter as useLabelFilter } from "../../behavior/use-scenario-label-filter";
 import { useNewScenarioFlow } from "../../behavior/use-new-scenario-flow";

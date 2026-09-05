@@ -27,7 +27,7 @@ import {
 import { PASS_RATE_BAR_OPACITY } from "../../../../../ui/elements/agent-testing/shared/pass-rate-color";
 import type { TargetKind } from "../../../../../ui/elements/agent-testing/shared/target-mark";
 
-vi.mock("../../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ query: {}, push: vi.fn(), isReady: true }),
 }));
 

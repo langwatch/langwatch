@@ -83,6 +83,14 @@ type TargetHeaderProps = {
   isRunning?: boolean;
 };
 
+/** Resolves each variant id to its live target row, in the variant's declared order. */
+function resolveVariantTargets<T extends { id: string }>(
+  variantIds: string[],
+  allTargets: T[],
+): (T | undefined)[] {
+  return variantIds.map((id) => allTargets.find((t) => t.id === id));
+}
+
 /**
  * Header component for target columns in the evaluations table.
  * Shows target name with icon, a play button, and a dropdown menu on click.
@@ -159,7 +167,7 @@ export const TargetHeader = memo(function TargetHeader({
   const variantIds = targetComparison?.variants;
   const allTargets = useEvaluationsV3Store((state) => state.targets);
   const variantTargets = useMemo(
-    () => (variantIds ?? []).map((id) => allTargets.find((t) => t.id === id)),
+    () => resolveVariantTargets(variantIds ?? [], allTargets),
     [allTargets, variantIds],
   );
 

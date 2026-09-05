@@ -107,7 +107,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
 /** The address the page writes, which is where the period is held. */
 const mockPush = vi.hoisted(() => vi.fn());
 
-vi.mock("../../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
     query: routerState.query,
     asPath: routerState.asPath,
@@ -313,15 +313,14 @@ describe("the Results tab loading gate", () => {
 
         await userEvent.click(widen);
 
-        // The third argument is the compat router's, not Next's: this family
-        // writes the period through `WorkflowHostPort.setQuery`, which pushes
-        // `{ replace }` rather than `{ shallow }`.
+        // The period control writes the whole query through the shared
+        // router, which is the one every family now reads.
         expect(mockPush).toHaveBeenCalledWith(
           expect.objectContaining({
             query: expect.objectContaining({ period: "90d" }),
           }),
           undefined,
-          { replace: false },
+          { shallow: true },
         );
       });
     });

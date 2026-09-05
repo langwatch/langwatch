@@ -11,7 +11,7 @@
 
 import { Button, Input, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
-import { Dialog } from "@langwatch/workflow-web/components/ui/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 
 /** What the dialog says when the name is empty. */
 export const SUITE_NAME_REQUIRED = "A test suite needs a name.";

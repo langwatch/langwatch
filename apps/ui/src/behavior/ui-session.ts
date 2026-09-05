@@ -11,8 +11,8 @@ import {
 } from "@langwatch/ui-host/use-organization-team-project";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { UiActiveScope, UiActor, UiFeedbackPort } from "./ui-capabilities";
-import { UiSessionPort } from "./ui-capabilities";
+import type { UiActiveScope, UiActor, UiFeedbackPort } from "@langwatch/ui-host/capabilities";
+import { UiSessionPort } from "@langwatch/ui-host/capabilities";
 import { useUiAddress } from "./ui-address";
 import { uiLeaveTo } from "./ui-departure";
 import type { UiFeatureApiTransport } from "./ui-feature-transport";

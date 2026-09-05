@@ -325,11 +325,11 @@ describe("executionScope utilities", () => {
         { rowIndex: 1, targetId: "target-1" },
         { rowIndex: 0, targetId: "target-2" },
       ];
-      const targetIds = getExecutionTargetIds(cells);
+      const ids = getExecutionTargetIds(cells);
 
-      expect(targetIds.size).toBe(2);
-      expect(targetIds.has("target-1")).toBe(true);
-      expect(targetIds.has("target-2")).toBe(true);
+      expect(ids.size).toBe(2);
+      expect(ids.has("target-1")).toBe(true);
+      expect(ids.has("target-2")).toBe(true);
     });
   });
 

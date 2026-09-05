@@ -107,7 +107,7 @@ import {
   type UiCapabilities,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import type { UiPageLoaderRegistry } from "../src/behavior/ui-page-loaders";
 import { dataPrivacyFeature } from "../src/features/data-privacy";
 import { dataRetentionFeature } from "../src/features/data-retention";

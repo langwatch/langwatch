@@ -34,19 +34,14 @@ interface EventDrilldownProps {
  * its own. Labels are humanised, values are not: a row reads "thumbs down"
  * and emits the stored string verbatim so the filter round-trips.
  */
-export const EventDrilldown: React.FC<EventDrilldownProps> = ({
-  item,
-  ast,
-  toggleFacet,
-}) => {
+export const EventDrilldown: React.FC<EventDrilldownProps> = ({ item, ast, toggleFacet }) => {
   const metrics = item.eventMetrics ?? [];
   if (metrics.length === 0) return null;
 
   // Whether `event:<item.value>` is already an active top-level clause. On
   // an inactive row a metric click adds the anchor first — the attribute
   // clause alone would match the same metric under another event type.
-  const eventActive =
-    getFacetValueState(ast, "event", item.value) === "include";
+  const eventActive = getFacetValueState(ast, "event", item.value) === "include";
 
   return (
     // Same visual attachment as EvaluatorDrilldown: indented under the row
@@ -148,20 +143,15 @@ const MetricValueRow: React.FC<{
   maxCount: number;
   state: "neutral" | "include" | "exclude";
   onClick: () => void;
-}> = ({ value, displayValue, displayKey, count, maxCount, state, onClick }) => {
+}> = ({ value: _value, displayValue, displayKey, count, maxCount, state, onClick }) => {
   const active = state !== "neutral";
   const palette = state === "exclude" ? "red" : "blue";
-  const fillPct =
-    maxCount > 0 ? Math.max((count / maxCount) * 100, MIN_VISIBLE_FILL_PCT) : 0;
+  const fillPct = maxCount > 0 ? Math.max((count / maxCount) * 100, MIN_VISIBLE_FILL_PCT) : 0;
   // The key qualifies the value: two metrics on one event may share a value
   // ("1" under both `vote` and `rating`). The state word says which way the
   // filter points — "active" alone cannot tell include from exclude.
   const stateLabel =
-    state === "include"
-      ? "included"
-      : state === "exclude"
-        ? "excluded"
-        : "click to filter";
+    state === "include" ? "included" : state === "exclude" ? "excluded" : "click to filter";
   return (
     <RowButton
       type="button"

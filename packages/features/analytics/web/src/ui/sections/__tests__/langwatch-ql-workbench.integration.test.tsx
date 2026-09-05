@@ -192,11 +192,6 @@ const PAGE_WINDOW = {
  * looking at is the window the request carries.
  */
 async function renderWorkbench(period: { startDate: string; endDate: string } = PAGE_PERIOD) {
-  const url =
-    "/my-project/analytics/query" +
-    `?startDate=${encodeURIComponent(period.startDate)}` +
-    `&endDate=${encodeURIComponent(period.endDate)}`;
-
   // The period used to be read out of a real router; the workbench now reads
   // it off the analytics host, so the address is a fixture on the stub rather
   // than a MemoryRouter the package may not import.

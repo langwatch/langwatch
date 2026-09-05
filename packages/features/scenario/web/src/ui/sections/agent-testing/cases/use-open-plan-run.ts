@@ -11,7 +11,7 @@
  */
 
 import { useCallback } from "react";
-import { useRouter } from "../../../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { buildAgentTestingPush } from "../../../../behavior/agent-testing/use-agent-testing-routing";
 
 export type OpenPlanRunParams = {

@@ -76,7 +76,7 @@ import {
   type UiCapabilities,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { datasetFeature } from "../src/features/dataset";
 import { MemoryRouter } from "react-router";
 

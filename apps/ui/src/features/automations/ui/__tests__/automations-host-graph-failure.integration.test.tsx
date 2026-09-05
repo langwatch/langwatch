@@ -17,9 +17,9 @@ const graph = vi.hoisted(() => ({ error: null as unknown }));
 const departures = vi.hoisted(() => [] as string[]);
 
 vi.mock("@langwatch/automation-web/screens/automations", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/automation-web/screens/automations")>(
-    "@langwatch/automation-web/screens/automations",
-  );
+  const actual = await vi.importActual<
+    typeof import("@langwatch/automation-web/screens/automations")
+  >("@langwatch/automation-web/screens/automations");
   return {
     ...actual,
     automationApi: {
@@ -46,7 +46,7 @@ import {
   UiSessionPort,
   type UiActiveScope,
   type UiCapabilities,
-} from "../../../../behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { AutomationsHost } from "../sections/automations-host";
 
 class SilentNavigation extends UiNavigationPort {

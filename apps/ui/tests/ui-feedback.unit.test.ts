@@ -251,7 +251,12 @@ describe("given a failure a screen hands over", () => {
       BrowserUiFeedback.create(toaster).failed({
         error: trpcFailure("suite_all_scenarios_archived"),
         fallbackTitle: "Couldn't start the run",
-        action: { label: "Edit Run Plan", run: () => (taken += 1) },
+        action: {
+          label: "Edit Run Plan",
+          run: () => {
+            taken += 1;
+          },
+        },
       });
 
       // The whole reason the slot exists: before it, a failure with a fix had

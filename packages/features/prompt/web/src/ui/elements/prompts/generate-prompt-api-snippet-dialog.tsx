@@ -2,7 +2,7 @@ import { VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo } from "react";
 import { GenerateApiSnippetDialog } from "@langwatch/workflow-web/components/GenerateApiSnippetDialog";
-import { Link } from "@langwatch/workflow-web/studio-host/link";
+import { Link } from "@langwatch/ui-host/link";
 import { getGetPromptSnippets } from "@langwatch/prompt-web/surfaces/api-snippet";
 
 interface GeneratePromptApiSnippetButtonProps {

@@ -12,7 +12,7 @@
 import { render } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
-import type { UiRoutePort } from "../src/behavior/ui-capabilities";
+import type { UiRoutePort } from "@langwatch/ui-host/capabilities";
 import { useRouterUiRoute } from "../src/behavior/ui-router-navigation";
 
 function readRouteAt(url: string): { port: UiRoutePort; search: () => string } {
@@ -36,12 +36,13 @@ function readRouteAt(url: string): { port: UiRoutePort; search: () => string } {
 
 describe("given a screen asking where it is", () => {
   describe("when the address carries a path parameter and a query", () => {
-    it("hands back both, separately", () => {
+    it("hands back both, separately, alongside the path itself", () => {
       const { port } = readRouteAt("/governance/inventory/src_9?tab=sources");
 
       expect(port.reading()).toEqual({
         params: { id: "src_9" },
         query: { tab: "sources" },
+        pathname: "/governance/inventory/src_9",
       });
     });
   });

@@ -90,6 +90,7 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/project-web": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
     "libphonenumber-js": "^1.12.25",
     "lucide-react": "^1.22.0",
     "motion": "^12.42.2",

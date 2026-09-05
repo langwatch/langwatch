@@ -24,6 +24,9 @@ import {
 import { resolveCapability } from "../../../../model/capabilities/capability-registry";
 import { LangyEvalRunCard } from "../langy-eval-run-card";
 
+import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
+
 const navigateMock = vi.fn();
 
 class FakeLangyHost extends LangyHostPort {
@@ -89,9 +92,11 @@ const descriptor = resolveCapability("langwatch.simulation-run.get")!;
 function renderCard(output: unknown) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <LangyHostProvider value={host}>
-        <LangyEvalRunCard descriptor={descriptor} input={{}} output={output} projectSlug="acme" />
-      </LangyHostProvider>
+      <UiCapabilityContextProvider value={createUiCapabilitiesFromHost(host)}>
+        <LangyHostProvider value={host}>
+          <LangyEvalRunCard descriptor={descriptor} input={{}} output={output} projectSlug="acme" />
+        </LangyHostProvider>
+      </UiCapabilityContextProvider>
     </ChakraProvider>,
   );
 }

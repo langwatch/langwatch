@@ -82,7 +82,6 @@ export const VariableInsertMenu = ({
   onSelect,
   onCreateVariable,
   onClose,
-  expectedType,
   triggerRef,
 }: VariableInsertMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);

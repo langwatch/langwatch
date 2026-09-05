@@ -30,8 +30,8 @@ import {
   useColorModeValue,
   useColorRawValue,
 } from "@langwatch/design-system/color-mode";
-import { Link } from "../../elements/studio-host/link";
-import { toaster } from "../../../behavior/studio-host/toaster";
+import { Link } from "@langwatch/ui-host/link";
+import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
@@ -85,7 +85,7 @@ import { Optimize } from "./optimize";
 import { EmojiPickerModal } from "./properties/modals/emoji-picker-modal";
 import { Publish } from "./publish";
 import { ResultsPanel } from "./results-panel";
-import { DEFAULT_MODEL } from "../../../model/constants";
+import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { api } from "../../../behavior/studio-host/api";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {
@@ -475,7 +475,7 @@ function StatusCircle({ status, tooltip }: { status: string; tooltip?: string | 
           }
           borderRadius="full"
         />
-        {status !== "connected" && status != "disconnected" && (
+        {status !== "connected" && status !== "disconnected" && (
           <HStack>
             <Text>Connecting...</Text>
             <Spinner size="sm" />

@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { toaster } from "@langwatch/design-system/toaster";
-import { showErrorToast } from "../../errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useOrganizationTeamProject } from "../../use-organization-team-project";
 import { api } from "../../scenario-api";
 

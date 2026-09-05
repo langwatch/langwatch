@@ -35,7 +35,7 @@ export {
   type UiCapabilityInstall,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "./behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 export {
   mergeUiPageLoaders,
   uiFeatureLoaders,

@@ -31,7 +31,7 @@ vi.mock("../../../../behavior/prompts/use-load-span-into-prompt-playground", () 
   }),
 }));
 
-vi.mock("../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
     push: vi.fn(),

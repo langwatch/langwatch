@@ -12,7 +12,6 @@ import {
   type ListParams,
   type ListResult,
   type ResourceName,
-  type SortOrder,
 } from "./admin-client";
 
 /**

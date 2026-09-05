@@ -4,7 +4,7 @@ import { AnimatePresence, motion, type Variants } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { getComplexProps, useDrawer } from "@langwatch/ui-drawer";
 import {
   EvaluatorEditorBody,

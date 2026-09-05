@@ -36,10 +36,10 @@ import {
 import type { ValueType } from "recharts/types/component/DefaultTooltipContent";
 
 import { toaster } from "@langwatch/design-system/toaster";
-import { showErrorToast } from "../../../../../behavior/errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
 import { api } from "../../../../../behavior/langy-api";
-import { useRouter } from "../../../../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 
 import { formatMoneyShort, Money } from "../../../../../index";
 import type { CapabilityCardInput } from "../../../model/capabilities/capability-registry";

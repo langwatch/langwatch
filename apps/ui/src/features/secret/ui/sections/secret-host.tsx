@@ -10,7 +10,7 @@ import {
   type SecretHostPort,
 } from "@langwatch/secret-web/screens/secret";
 import { useMemo, type ReactNode } from "react";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { UiProjectSwitcher } from "../../../chrome";
 
 export function SecretHost({ children }: { children: ReactNode }) {

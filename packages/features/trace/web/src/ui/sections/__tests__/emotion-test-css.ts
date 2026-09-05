@@ -26,8 +26,11 @@ export function cssRulesForElement(element: Element): string {
   for (const cls of classes) {
     const escaped = cls.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const re = new RegExp(`\\.${escaped}\\{([^}]*)\\}`, "g");
-    let match: RegExpExecArray | null;
-    while ((match = re.exec(allCss)) !== null) bodies.push(match[1] ?? "");
+    let match = re.exec(allCss);
+    while (match !== null) {
+      bodies.push(match[1] ?? "");
+      match = re.exec(allCss);
+    }
   }
   return bodies.join("\n");
 }

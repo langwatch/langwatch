@@ -926,7 +926,7 @@ export type GatewayApiMap = {
     archive: {
       mutation: {
         input: { organizationId: string; endpointId: string };
-        output: void;
+        output: undefined;
       };
     };
     enable: {

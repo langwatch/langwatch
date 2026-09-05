@@ -40,7 +40,7 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Download, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { downloadCsv } from "@langwatch/csv/download";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
@@ -462,9 +462,7 @@ export function DatasetEditorTable({
 
     downloadCsv({
       fields: exportColumns.map((column) => column.name),
-      rows: exportRecords.map((record) =>
-        exportColumns.map((column) => record[column.name] ?? ""),
-      ),
+      rows: exportRecords.map((record) => exportColumns.map((column) => record[column.name] ?? "")),
       fileName: `${datasetName?.toLowerCase().replace(/ /g, "_") ?? "dataset"}.csv`,
     });
   }, [datasetId, datasetName, downloadDataset, host, project?.id]);

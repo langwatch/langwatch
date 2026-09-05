@@ -11,7 +11,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { UiCapabilityContextProvider, UiSessionPort } from "../ui-capabilities";
+import { UiCapabilityContextProvider, UiSessionPort } from "@langwatch/ui-host/capabilities";
 import { UiRpcContextProvider, type UiRpcPort } from "../ui-rpc";
 import { useUiOrganizationFacts } from "../ui-organization-facts";
 
@@ -39,8 +39,7 @@ function stubSession(): UiSessionPort {
 
 function stubRpc(planQuery: () => Promise<unknown>): UiRpcPort {
   return {
-    query: (path: string) =>
-      path === "limits.getUsage" ? planQuery() : Promise.resolve([]),
+    query: (path: string) => (path === "limits.getUsage" ? planQuery() : Promise.resolve([])),
     mutate: vi.fn(),
     subscribe: vi.fn(),
   } as unknown as UiRpcPort;

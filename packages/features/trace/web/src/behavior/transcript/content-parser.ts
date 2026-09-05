@@ -90,6 +90,53 @@ export function extractInlineBlocks(content: string): ContentBlock[] {
   return out;
 }
 
+/**
+ * Parses `trimmed` (already known to look like a JSON object or array) into
+ * content blocks, but only when doing so actually produces structure worth
+ * having — a real block type, or a single non-raw record. Returns `null` on
+ * a parse failure or a parse that resolves to nothing more useful than raw
+ * text, so the caller falls through to its other parsing strategies.
+ */
+/**
+ * A "text" block whose text is itself a nested JSON object naming a
+ * different, non-"text" block type is parsed as that nested block instead —
+ * some producers wrap a tool/thinking block in a text envelope. Returns
+ * `null` (keep the outer text as plain text) on a parse failure, an object
+ * that isn't itself typed, or one whose nested parse still reads as raw.
+ */
+function tryParseNestedJsonTextBlock(trimmed: string): ContentBlock[] | null {
+  try {
+    const inner: unknown = JSON.parse(trimmed);
+    if (!isRecord(inner) || typeof inner.type !== "string" || inner.type === "text") {
+      return null;
+    }
+    const innerBlocks = parseContentBlocks([inner]);
+    const first = innerBlocks[0];
+    return first && first.kind !== "raw" ? innerBlocks : null;
+  } catch {
+    // Keep malformed nested JSON as plain text.
+    return null;
+  }
+}
+
+function tryParseJsonContentBlocks(trimmed: string): ContentBlock[] | null {
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      const blocks = parseContentBlocks(parsed);
+      return blocks.some((b) => b.kind !== "text" && b.kind !== "raw") ? blocks : null;
+    }
+    if (isRecord(parsed)) {
+      const single = parseContentBlocks([parsed]);
+      return single.length > 0 && single[0]!.kind !== "raw" ? single : null;
+    }
+    return null;
+  } catch {
+    // Fall through to the inline-blocks scanner.
+    return null;
+  }
+}
+
 export function parseContentBlocks(content: ChatMessage["content"]): ContentBlock[] {
   if (content == null) return [];
   if (typeof content === "string") {
@@ -100,21 +147,9 @@ export function parseContentBlocks(content: ChatMessage["content"]): ContentBloc
       (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
       (trimmed.startsWith("[") && trimmed.endsWith("]"))
     ) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          const blocks = parseContentBlocks(parsed);
-          if (blocks.some((b) => b.kind !== "text" && b.kind !== "raw")) {
-            return blocks;
-          }
-        } else if (isRecord(parsed)) {
-          const single = parseContentBlocks([parsed]);
-          if (single.length > 0 && single[0]!.kind !== "raw") {
-            return single;
-          }
-        }
-      } catch {
-        // Fall through to the inline-blocks scanner.
+      const jsonBlocks = tryParseJsonContentBlocks(trimmed);
+      if (jsonBlocks) {
+        return jsonBlocks;
       }
     }
 
@@ -155,18 +190,10 @@ export function parseContentBlocks(content: ChatMessage["content"]): ContentBloc
           trimmed[trimmed.length - 1] === "}" &&
           trimmed.includes('"type":"')
         ) {
-          try {
-            const inner: unknown = JSON.parse(trimmed);
-            if (isRecord(inner) && typeof inner.type === "string" && inner.type !== "text") {
-              const innerBlocks = parseContentBlocks([inner]);
-              const first = innerBlocks[0];
-              if (first && first.kind !== "raw") {
-                out.push(...innerBlocks);
-                break;
-              }
-            }
-          } catch {
-            // Keep malformed nested JSON as plain text.
+          const nestedBlocks = tryParseNestedJsonTextBlock(trimmed);
+          if (nestedBlocks) {
+            out.push(...nestedBlocks);
+            break;
           }
         }
         out.push({ kind: "text", text });

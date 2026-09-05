@@ -13,12 +13,9 @@ import {
 import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
-import {
-  applyHandledErrorToForm,
-  FormServerError,
-  showErrorToast,
-} from "@langwatch/workflow-web/studio-host/errors";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { applyHandledErrorToForm, showErrorToast } from "@langwatch/ui-host/errors";
+import { FormServerError } from "@langwatch/workflow-web/studio-host/errors";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { EmojiPickerModal } from "@langwatch/workflow-web/optimization_studio/components/properties/modals/EmojiPickerModal";
@@ -26,7 +23,7 @@ import { getRandomWorkflowIcon } from "@langwatch/workflow-web";
 import { customEvaluatorTemplate } from "@langwatch/workflow-web";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 
 export type WorkflowSelectorForEvaluatorDrawerProps = {
   open?: boolean;

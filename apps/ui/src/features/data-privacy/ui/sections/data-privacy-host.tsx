@@ -10,7 +10,7 @@ import {
   type DataPrivacyHostPort,
 } from "@langwatch/data-privacy-web/screens/data-privacy";
 import { useMemo, type ReactNode } from "react";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 
 export function DataPrivacyHost({ children }: { children: ReactNode }) {
   const { session, route, feedback } = useUiCapabilities();

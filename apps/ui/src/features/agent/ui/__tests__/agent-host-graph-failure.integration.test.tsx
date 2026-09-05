@@ -16,9 +16,9 @@ const graph = vi.hoisted(() => ({ error: null as unknown }));
 const departures = vi.hoisted(() => [] as string[]);
 
 vi.mock("@langwatch/agent-web/screens/agent-management", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/agent-web/screens/agent-management")>(
-    "@langwatch/agent-web/screens/agent-management",
-  );
+  const actual = await vi.importActual<
+    typeof import("@langwatch/agent-web/screens/agent-management")
+  >("@langwatch/agent-web/screens/agent-management");
   return {
     ...actual,
     agentApi: {
@@ -45,7 +45,7 @@ import {
   UiSessionPort,
   type UiActiveScope,
   type UiCapabilities,
-} from "../../../../behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { AgentHost } from "../sections/agent-host";
 
 class SilentNavigation extends UiNavigationPort {

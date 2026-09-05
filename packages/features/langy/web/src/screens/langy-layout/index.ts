@@ -31,7 +31,6 @@ export {
   trpcClient as langyTrpcClient,
 } from "../../behavior/langy-api";
 export type { LangyApiMap, RouterOutputs as LangyRouterOutputs } from "../../behavior/langy-api";
-export { setLangyErrorHost } from "../../behavior/errors";
 export {
   LangyHostPort,
   LangyHostProvider,

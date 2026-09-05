@@ -1,0 +1,49 @@
+/**
+ * Moved here from `@langwatch/workflow-web/utils/constants`: the prefix a
+ * KSUID-backed id is minted with, per resource. It names resources across
+ * many features (scenario, trace, prompt, organization, ...), never only
+ * workflow's, so it lives on the contract rather than any one feature-web
+ * package.
+ */
+export const KSUID_RESOURCES = {
+  BATCH_RESULT: "batchresult",
+  COST: "cost",
+  EVALUATION: "eval",
+  EVENT: "event",
+  EXPERIMENT: "experiment",
+  EXPERIMENT_RUN_RESULT: "exprunresult",
+  MODEL_DEFAULT_CONFIG: "mdcfg",
+  MODEL_DEFAULT_CONFIG_SCOPE: "mdcs",
+  MODEL_PROVIDER: "provider",
+  MODEL_PROVIDER_SCOPE: "mpscope",
+  MONITOR: "monitor",
+  ORGANIZATION: "organization",
+  PROJECT: "project",
+  SCENARIO: "scenario",
+  SCENARIO_BATCH: "scenariobatch",
+  SCENARIO_RUN: "scenariorun",
+  SPAN: "span",
+  TEAM: "team",
+  TRIGGER: "trigger",
+  LOG_RECORD: "logrecord",
+  TRACE_SUMMARY: "tracesummary",
+  TRACKED_EVENT: "trackedevent",
+  USER: "user",
+  PROMPT_PLAYGROUND_THREAD: "promptthread",
+  DATASET_RECORD: "dsrecord",
+  GROUP: "group",
+  ROLE_BINDING: "rolebinding",
+  API_KEY_ROLE: "apikeyrole",
+  BUG_REPORT: "bugreport",
+  LANGY_CONVERSATION: "langyconv",
+  LANGY_MESSAGE: "langymsg",
+  TOPIC_CLUSTERING_RUN: "topicrun",
+  TOPIC_CLUSTERING_RUN_HISTORY: "topicrunhist",
+  TOPIC_MODEL_PROJECTION: "topicmodel",
+  PROCESS_MANAGER_INSTANCE: "pminstance",
+  PROCESS_MANAGER_INBOX: "pminbox",
+  PROCESS_MANAGER_OUTBOX: "pmoutbox",
+  WEBHOOK_ENDPOINT: "webhookendpoint",
+  EXPORT: "export",
+  TRACE_EDIT_OVERLAY: "traceedit",
+} as const;

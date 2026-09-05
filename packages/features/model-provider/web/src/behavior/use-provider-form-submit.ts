@@ -5,7 +5,7 @@ import {
   modelProviders,
   type ModelProviderEditorValue as MaybeStoredModelProvider,
 } from "@langwatch/model-provider-contract";
-import { describeError } from "@langwatch/workflow-web/studio-host/errors";
+import { describeError } from "@langwatch/ui-host/errors";
 
 import { useModelProviderToaster, useShowErrorToast } from "./model-provider-feedback";
 import type { CustomModelEntry } from "@langwatch/model-provider-contract";

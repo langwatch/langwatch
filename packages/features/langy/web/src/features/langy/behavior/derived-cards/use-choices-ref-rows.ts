@@ -20,12 +20,55 @@ import { useEffect, useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api } from "../../../../behavior/langy-api";
 import { CAPABILITY_HYDRATORS } from "../capabilities/capability-hydrators";
+import type { CapabilityHydrator, CapabilityTrpcUtils } from "../capabilities/capability-hydrators";
 
 export type ChoicesRefRow =
   | { state: "pending" }
   | { state: "plain" }
   | { state: "dead" }
   | { state: "live"; primary?: string; secondary?: string };
+
+/**
+ * Hydrates one ref type's entries, writing each option's verdict into `next`
+ * — `live`/`dead` from the hydrator's answer, or `plain` for every entry of
+ * this type on a hydrator failure (kept selectable rather than disabled on a
+ * transient error).
+ */
+async function hydrateRefType(
+  entries: { optionId: string; refId: string }[],
+  hydrator: NonNullable<CapabilityHydrator["byIds"]>,
+  utils: CapabilityTrpcUtils,
+  projectId: string,
+  next: Map<string, ChoicesRefRow>,
+): Promise<void> {
+  try {
+    const hydration = await hydrator({
+      utils,
+      projectId,
+      ids: entries.map((entry) => entry.refId),
+    });
+    const rowById = new Map(hydration.rows.map((row) => [row.id, row]));
+    for (const entry of entries) {
+      const row = rowById.get(entry.refId);
+      next.set(
+        entry.optionId,
+        row
+          ? {
+              state: "live",
+              ...(row.primary !== undefined ? { primary: row.primary } : {}),
+              ...(row.secondary !== undefined ? { secondary: row.secondary } : {}),
+            }
+          : { state: "dead" },
+      );
+    }
+  } catch {
+    // Couldn't resolve right now: keep the options selectable as
+    // given rather than disabling on a transient failure.
+    for (const entry of entries) {
+      next.set(entry.optionId, { state: "plain" });
+    }
+  }
+}
 
 export function useChoicesRefRows(
   options: LangyDerivedChoicesCard["options"],
@@ -59,33 +102,7 @@ export function useChoicesRefRows(
         [...hydratable.entries()].map(async ([type, entries]) => {
           const hydrator = CAPABILITY_HYDRATORS[type]?.byIds;
           if (!hydrator) return;
-          try {
-            const hydration = await hydrator({
-              utils,
-              projectId,
-              ids: entries.map((entry) => entry.refId),
-            });
-            const rowById = new Map(hydration.rows.map((row) => [row.id, row]));
-            for (const entry of entries) {
-              const row = rowById.get(entry.refId);
-              next.set(
-                entry.optionId,
-                row
-                  ? {
-                      state: "live",
-                      ...(row.primary !== undefined ? { primary: row.primary } : {}),
-                      ...(row.secondary !== undefined ? { secondary: row.secondary } : {}),
-                    }
-                  : { state: "dead" },
-              );
-            }
-          } catch {
-            // Couldn't resolve right now: keep the options selectable as
-            // given rather than disabling on a transient failure.
-            for (const entry of entries) {
-              next.set(entry.optionId, { state: "plain" });
-            }
-          }
+          await hydrateRefType(entries, hydrator, utils, projectId, next);
         }),
       );
       if (!cancelled) setResolved(next);

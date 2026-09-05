@@ -35,4 +35,4 @@ export { readHandledError } from "@langwatch/handled-error/read-handled-error";
 export type { ResolvedErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy";
 export { resolveErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy";
 export type { ShowErrorToastOptions } from "../../../behavior/errors/logic/show-error-toast";
-export { setTraceErrorHost, showErrorToast } from "../../../behavior/errors/logic/show-error-toast";
+export { showErrorToast } from "../../../behavior/errors/logic/show-error-toast";

@@ -6,7 +6,7 @@
 
 import { AuthzHostProvider, type AuthzHostPort } from "@langwatch/authz-web/screens/authz";
 import { useMemo, type ReactNode } from "react";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiOrganizationFacts } from "../../../../behavior/ui-organization-facts";
 
 export function AuthzHost({ children }: { children: ReactNode }) {

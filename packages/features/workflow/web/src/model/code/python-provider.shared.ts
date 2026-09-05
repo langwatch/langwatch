@@ -110,10 +110,11 @@ export function findLastReturnDict(source: string): ParsedReturnDict | null {
   const returnRe = /return\s*\{/g;
   let lastStart = -1;
   let lastBodyStart = -1;
-  let m: RegExpExecArray | null;
-  while ((m = returnRe.exec(source))) {
+  let m: RegExpExecArray | null = returnRe.exec(source);
+  while (m) {
     lastStart = m.index;
     lastBodyStart = m.index + m[0].length;
+    m = returnRe.exec(source);
   }
   if (lastStart === -1) return null;
   let depth = 1;

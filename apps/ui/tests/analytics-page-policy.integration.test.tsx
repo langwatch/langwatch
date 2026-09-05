@@ -78,7 +78,7 @@ import {
   type UiCapabilities,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { analyticsFeature } from "../src/features/analytics";
 import { MemoryRouter } from "react-router";
 

@@ -170,7 +170,7 @@ export const AddParticipants = ({
                 </Select.Item>
               ))}
             </Box>
-            {participantsLeft.length == 0 && (
+            {participantsLeft.length === 0 && (
               <Text padding={3} textAlign="center">
                 No options
               </Text>
@@ -200,7 +200,7 @@ export const AddParticipants = ({
           <Spacer />
           <Button
             colorPalette="orange"
-            disabled={annotators.length == 0}
+            disabled={annotators.length === 0}
             size="sm"
             onClick={sendToQueue}
             loading={isLoading}

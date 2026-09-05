@@ -268,14 +268,14 @@ describe("the grants ledger's wire boundary", () => {
 });
 
 describe("the revocation wire boundary", () => {
-  function revoke(entry: Record<string, unknown>) {
+  function revoke(revokeEntry: Record<string, unknown>) {
     return revokeGrantCommandDataSchema.safeParse({
       tenantId: ORG,
       organizationId: ORG,
       commandId: "cmd_1",
       actor: { type: "user", id: "user_admin" },
       occurredAtMs: 1_755_000_000_000,
-      ...entry,
+      ...revokeEntry,
     });
   }
 

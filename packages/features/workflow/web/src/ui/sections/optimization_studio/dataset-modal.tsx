@@ -30,7 +30,7 @@ import {
 import { UploadCSVDrawer } from "@langwatch/dataset-web/components/datasets/UploadCSVDrawer";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
-import { Dialog } from "../../elements/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import type { Component, Entry } from "@langwatch/workflow-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";

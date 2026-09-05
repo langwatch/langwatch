@@ -18,7 +18,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { targetLabelOf, parseSuiteTargets } from "@langwatch/suite-contract";
 import { api } from "../scenario-api";
-import { KSUID_RESOURCES } from "@langwatch/workflow-web/utils/constants";
+import { KSUID_RESOURCES } from "@langwatch/workflow-contract";
 import {
   displayTypedValue,
   serializeOptionalTypedScalarValue,

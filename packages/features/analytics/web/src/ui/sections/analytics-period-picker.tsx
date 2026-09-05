@@ -43,8 +43,8 @@ export function AnalyticsPeriodPicker({
   setPeriod,
   setRelativePeriod,
   clearPeriod,
-  size = "sm",
-  triggerVariant = "outline",
+  size: _size = "sm",
+  triggerVariant: _triggerVariant = "outline",
   placement = "bottom-end",
 }: {
   period: AnalyticsPeriod;

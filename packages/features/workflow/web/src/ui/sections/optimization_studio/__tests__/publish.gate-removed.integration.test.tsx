@@ -39,7 +39,7 @@ vi.mock("@langwatch/workflow-web", () => ({
       checkCanCommitNewVersion: () => false,
     }),
 }));
-vi.mock("../../../../behavior/studio-host/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
     query: {},
     push: mockRouterPush,
@@ -166,7 +166,7 @@ vi.mock("@langwatch/design-system/menu", () => ({
   },
 }));
 
-vi.mock("../../../elements/dialog", () => ({
+vi.mock("@langwatch/design-system/studio-dialog", () => ({
   Dialog: {
     Root: ({ children, open }: { children?: ReactNode; open?: boolean }) =>
       open ? <div>{children}</div> : null,
@@ -185,7 +185,7 @@ vi.mock("@langwatch/design-system/tooltip", () => ({
   ),
 }));
 
-vi.mock("../../../elements/studio-host/link", () => ({
+vi.mock("@langwatch/ui-host/link", () => ({
   Link: ({
     children,
     href,

@@ -28,7 +28,7 @@ import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { isLangyDemoProject } from "../../../../behavior/langy-demo-project";
 import { routePatternOf } from "../../../../behavior/navigation-tracing";
 import { useUiAddress } from "../../../../behavior/ui-address";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiOrganizationFacts } from "../../../../behavior/ui-organization-facts";
 import { selectAmbientTeam, userCanOpenTeam } from "../../../../behavior/ui-scope-resolution";
 import { useUiScopeMemory } from "../../../../behavior/ui-scope-storage";

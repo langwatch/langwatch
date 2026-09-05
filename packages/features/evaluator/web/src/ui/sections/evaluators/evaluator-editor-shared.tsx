@@ -6,7 +6,7 @@ import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import DynamicZodForm from "../checks/dynamic-zod-form";
-import { Link } from "@langwatch/workflow-web/studio-host/link";
+import { Link } from "@langwatch/ui-host/link";
 import type {
   AvailableSource,
   FieldMapping as UIFieldMapping,
@@ -19,11 +19,8 @@ import type {
   TargetConfig,
 } from "@langwatch/experiment-web/experiments-v3/types";
 import { isComparisonEvaluatorType } from "@langwatch/experiment-web/experiments-v3/types";
-import {
-  applyHandledErrorToForm,
-  FormServerError,
-  showErrorToast,
-} from "@langwatch/workflow-web/studio-host/errors";
+import { applyHandledErrorToForm, showErrorToast } from "@langwatch/ui-host/errors";
+import { FormServerError } from "@langwatch/workflow-web/studio-host/errors";
 import {
   getComplexProps,
   getDrawerStack,
@@ -42,7 +39,8 @@ import {
 import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
 import { isPersistedEvaluatorType } from "../../../model/persisted-evaluator-type";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL } from "@langwatch/workflow-web/utils/constants";
+import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-web/utils/constants";
+import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 
 import {
   type EvaluatorCategoryId,
@@ -76,7 +74,7 @@ export type EvaluatorEditorDrawerProps = {
     id: string;
     name: string;
     evaluatorType?: string;
-  }) => boolean | void | Promise<void> | Promise<boolean>;
+  }) => boolean | undefined | Promise<void> | Promise<boolean>;
   evaluatorType?: string;
   evaluatorId?: string;
   category?: EvaluatorCategoryId;

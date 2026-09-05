@@ -25,7 +25,7 @@ import {
   isScenarioMappingValid,
   ScenarioInputMappingSection,
 } from "../../elements/suites/scenario-input-mapping-section";
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type AvailableSource,
@@ -33,7 +33,7 @@ import {
   type Variable,
   VariablesSection,
 } from "@langwatch/prompt-web/surfaces/variables";
-import { showErrorToast } from "../../../behavior/errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
 import {
   getComplexProps,
   getFlowCallbacks,

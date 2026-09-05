@@ -15,7 +15,7 @@
  * @see specs/suites/test-suite-run-plan-reuse.feature
  */
 
-import { Dialog } from "@langwatch/workflow-web/components/ui/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { RunDialogFields } from "./run-dialog-fields";
 import { RunDialogFooter } from "./run-dialog-footer";
 import { isNoteTooLong } from "../../../elements/agent-testing/run/run-note-field";

@@ -78,7 +78,7 @@ function ConversationEmptyState({
  * speaker is known draws the bubble that message will land in.
  */
 function EmptyConversation({
-  detail,
+  detail: _detail,
   scenarioState,
   typingRole,
 }: {

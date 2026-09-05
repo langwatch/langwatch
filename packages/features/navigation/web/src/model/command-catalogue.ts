@@ -34,7 +34,6 @@ import {
   Table,
   Tags,
   Terminal,
-  ToggleLeft,
   TrendingUp,
   UserCog,
   UserPlus,

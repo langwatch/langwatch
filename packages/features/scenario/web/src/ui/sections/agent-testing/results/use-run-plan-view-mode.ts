@@ -6,7 +6,7 @@
  */
 
 import { useCallback } from "react";
-import { useRouter } from "../../../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { useAgentTestingStore } from "../use-agent-testing-store";
 
 export function useRunPlanViewMode() {

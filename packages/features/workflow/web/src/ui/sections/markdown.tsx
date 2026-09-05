@@ -3,12 +3,12 @@ import { createLogger } from "@langwatch/observability";
 import { Children, isValidElement, memo, type ReactNode, useState } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { useRouter } from "../../behavior/studio-host/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { stringifyIfObject } from "../../model/stringify-if-object";
 import { RenderCode } from "./code/render-code";
 import { getProxiedImageUrl } from "@langwatch/design-system/external-image";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { Link as UiLink } from "../elements/studio-host/link";
+import { Link as UiLink } from "@langwatch/ui-host/link";
 import { Prose } from "../elements/prose";
 
 const logger = createLogger("langwatch:components:Markdown");

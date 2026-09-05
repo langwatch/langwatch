@@ -26,7 +26,7 @@ export function DepartmentPicker({
   entityId: string;
   value: string | null;
   departments: DepartmentOption[];
-  onAssigned: () => Promise<unknown> | void;
+  onAssigned: () => Promise<unknown> | undefined;
   /**
    * Fixed width override. Members-table usage leaves this unset and relies on
    * the min/max range; the compact labeled variant on the teams page passes a

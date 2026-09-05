@@ -1,7 +1,7 @@
 import { EmptyState, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { keepPreviousData } from "@tanstack/react-query";
 import React, { useEffect, useRef, useState } from "react";
-import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { useFilterParams } from "../use-filter-params";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { Delayed } from "@langwatch/design-system/delayed";

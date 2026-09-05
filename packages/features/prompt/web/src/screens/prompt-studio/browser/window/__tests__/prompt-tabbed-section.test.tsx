@@ -619,7 +619,12 @@ describe("PromptTabbedSection Layout Modes", () => {
         <ChakraProvider value={defaultSystem}>
           <PromptHostProvider value={testHost}>
             <FormWrapper>
-              <Profiler id="PromptTabbedSection" onRender={() => (renderCount += 1)}>
+              <Profiler
+                id="PromptTabbedSection"
+                onRender={() => {
+                  renderCount += 1;
+                }}
+              >
                 <PromptTabbedSection
                   layoutMode="vertical"
                   isPromptExpanded={true}

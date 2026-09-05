@@ -80,9 +80,7 @@ function PromptBrowserWindowInner(props: {
   layoutMode: LayoutMode;
 }) {
   const form = usePromptConfigForm(props);
-  const updateTabData = useDraggableTabsBrowserStore(
-    (state) => state.updateTabData,
-  );
+  const updateTabData = useDraggableTabsBrowserStore((state) => state.updateTabData);
 
   const updateTabDataDebounced = useMemo(() => debounce(updateTabData, 500), [updateTabData]);
 
@@ -146,7 +144,7 @@ function PromptBrowserWindowInner(props: {
       0,
       containerHeight - headerHeight - TABS_AND_DIVIDER_HEIGHT - MIN_CHAT_AREA,
     );
-    if (maxAllowed == 0) return;
+    if (maxAllowed === 0) return;
     return maxAllowed;
   }, []);
 

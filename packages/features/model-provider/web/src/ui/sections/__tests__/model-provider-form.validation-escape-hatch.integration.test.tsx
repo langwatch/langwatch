@@ -13,7 +13,7 @@
  * Only the boundaries are stubbed: the drawer's own state flow is what
  * decides whether the probe gates the save.
  */
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

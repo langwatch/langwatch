@@ -227,14 +227,14 @@ export type OpsPromptSummary = {
  * surface this package calls. */
 export type OpsApiMap = {
   ops: {
-    getDashboardSnapshot: { query: { input: void; output: DashboardData | null } };
+    getDashboardSnapshot: { query: { input: undefined; output: DashboardData | null } };
     listParkedGroups: {
       query: {
         input: { queueName: string; tenantId: string; page: number; pageSize: number };
         output: OpsParkedGroupsPage;
       };
     };
-    listQueues: { query: { input: void; output: QueueSummaryInfo[] } };
+    listQueues: { query: { input: undefined; output: QueueSummaryInfo[] } };
 
     // -- Scheduler -----------------------------------------------------------
     listScheduledJobs: { query: { input: { limit: number }; output: OpsScheduledJob[] } };
@@ -263,8 +263,8 @@ export type OpsApiMap = {
     getGroupDetail: {
       query: { input: { queueName: string; groupId: string }; output: GroupInfo };
     };
-    getGrafanaLinkConfig: { query: { input: void; output: OpsGrafanaLinkConfig } };
-    getBlockedSummary: { query: { input: void; output: OpsBlockedSummary } };
+    getGrafanaLinkConfig: { query: { input: undefined; output: OpsGrafanaLinkConfig } };
+    getBlockedSummary: { query: { input: undefined; output: OpsBlockedSummary } };
     getGroupJobs: {
       query: {
         input: { queueName: string; groupId: string; page: number; pageSize: number };
@@ -280,10 +280,14 @@ export type OpsApiMap = {
     drainGroup: {
       mutation: { input: { queueName: string; groupId: string }; output: { jobsRemoved: number } };
     };
-    pausePipeline: { mutation: { input: { queueName: string; key: string }; output: void } };
-    unpausePipeline: { mutation: { input: { queueName: string; key: string }; output: void } };
-    pauseTenant: { mutation: { input: { queueName: string; tenantId: string }; output: void } };
-    unpauseTenant: { mutation: { input: { queueName: string; tenantId: string }; output: void } };
+    pausePipeline: { mutation: { input: { queueName: string; key: string }; output: undefined } };
+    unpausePipeline: { mutation: { input: { queueName: string; key: string }; output: undefined } };
+    pauseTenant: {
+      mutation: { input: { queueName: string; tenantId: string }; output: undefined };
+    };
+    unpauseTenant: {
+      mutation: { input: { queueName: string; tenantId: string }; output: undefined };
+    };
     listPausedTenants: { query: { input: { queueName: string }; output: string[] } };
     drainTenant: {
       mutation: {
@@ -291,7 +295,7 @@ export type OpsApiMap = {
         output: { groupsDrained: number; jobsDrained: number };
       };
     };
-    listAllDlqGroups: { query: { input: void; output: OpsQueueDlqGroupWithQueue[] } };
+    listAllDlqGroups: { query: { input: undefined; output: OpsQueueDlqGroupWithQueue[] } };
     listDlqGroups: { query: { input: { queueName: string }; output: OpsQueueDlqGroup[] } };
     drainAllBlockedPreview: {
       query: {
@@ -336,7 +340,7 @@ export type OpsApiMap = {
     // -- Projections and event subscribers -----------------------------------
     listProjections: {
       query: {
-        input: void;
+        input: undefined;
         output: {
           projections: OpsProjectionRegistration[];
           eventSubscribers: OpsEventSubscriberRegistration[];
@@ -351,7 +355,7 @@ export type OpsApiMap = {
         output: AggregateProcessManager[];
       };
     };
-    listProcessFleet: { query: { input: void; output: ProcessFleetSummary[] } };
+    listProcessFleet: { query: { input: undefined; output: ProcessFleetSummary[] } };
     listDeadLetters: {
       query: {
         input: { processName?: string; page: number; pageSize: number };
@@ -362,7 +366,7 @@ export type OpsApiMap = {
         };
       };
     };
-    listDeadLetterCounts: { query: { input: void; output: DeadLetterCount[] } };
+    listDeadLetterCounts: { query: { input: undefined; output: DeadLetterCount[] } };
     listProcessInstances: {
       query: {
         input: { processName?: string; page: number; pageSize: number; search?: string };
@@ -447,7 +451,7 @@ export type OpsApiMap = {
         output: AggregateSearchResult[];
       };
     };
-    getEventLogSearchWindow: { query: { input: void; output: OpsEventLogSearchWindow } };
+    getEventLogSearchWindow: { query: { input: undefined; output: OpsEventLogSearchWindow } };
     loadAggregateEvents: {
       query: {
         input: { aggregateId: string; tenantId: string; limit?: number };
@@ -481,7 +485,7 @@ export type OpsApiMap = {
         };
       };
     };
-    getReplayHistory: { query: { input: void; output: ReplayHistoryEntry[] } };
+    getReplayHistory: { query: { input: undefined; output: ReplayHistoryEntry[] } };
     getReplayRun: { query: { input: { runId: string }; output: ReplayHistoryEntry | null } };
     startReplay: {
       mutation: {
@@ -496,11 +500,11 @@ export type OpsApiMap = {
         output: { runId: string };
       };
     };
-    getReplayStatus: { query: { input: void; output: ReplayStatus } };
-    cancelReplay: { mutation: { input: void; output: { cancelled: boolean } } };
+    getReplayStatus: { query: { input: undefined; output: ReplayStatus } };
+    cancelReplay: { mutation: { input: undefined; output: { cancelled: boolean } } };
 
     // -- Tenant anomalies ----------------------------------------------------
-    listAnomalies: { query: { input: void; output: { anomalies: Anomaly[] } } };
+    listAnomalies: { query: { input: undefined; output: { anomalies: Anomaly[] } } };
     dismissAnomaly: {
       mutation: {
         input: { tenantId: string; kind: Anomaly["kind"] };
@@ -509,7 +513,7 @@ export type OpsApiMap = {
     };
 
     // -- Feature flags -------------------------------------------------------
-    listFeatureFlags: { query: { input: void; output: OperatorFeatureFlagCatalogue } };
+    listFeatureFlags: { query: { input: undefined; output: OperatorFeatureFlagCatalogue } };
     setFeatureFlag: {
       mutation: { input: { key: string; enabled: boolean }; output: OpsAcknowledgement };
     };
@@ -519,8 +523,8 @@ export type OpsApiMap = {
     clearFeatureFlag: { mutation: { input: { key: string }; output: OpsAcknowledgement } };
 
     // -- Payload store -------------------------------------------------------
-    listBlobQueues: { query: { input: void; output: string[] } };
-    getBlobStoreStats: { query: { input: void; output: OpsBlobStoreStats } };
+    listBlobQueues: { query: { input: undefined; output: string[] } };
+    getBlobStoreStats: { query: { input: undefined; output: OpsBlobStoreStats } };
     listBlobs: {
       query: {
         input: {
@@ -553,9 +557,9 @@ export type OpsApiMap = {
     };
 
     // -- In-place system migrations ------------------------------------------
-    listSystemMigrations: { query: { input: void; output: OpsMigrationOverview[] } };
+    listSystemMigrations: { query: { input: undefined; output: OpsMigrationOverview[] } };
     listMigrationEnrollments: {
-      query: { input: void; output: OpsMigrationEnrollmentListing };
+      query: { input: undefined; output: OpsMigrationEnrollmentListing };
     };
     searchMigrationOrganizations: {
       query: { input: { query: string }; output: OpsMigrationOrganizationMatch[] };
@@ -590,7 +594,7 @@ export type OpsApiMap = {
         output: OpsMigrationTargetedRunResult;
       };
     };
-    runSystemMigrationPass: { mutation: { input: void; output: { started: boolean } } };
+    runSystemMigrationPass: { mutation: { input: undefined; output: { started: boolean } } };
     rollBackSystemMigrationTenant: {
       mutation: {
         input: { migrationName: string; tenantId: string; confirm?: string };
@@ -634,40 +638,40 @@ export type OpsApiMap = {
     approveDomainClaim: {
       mutation: {
         input: { organizationId: string; connectionId: string; domain: string };
-        output: void;
+        output: undefined;
       };
     };
     rejectDomainClaim: {
       mutation: {
         input: { organizationId: string; connectionId: string; domain: string; note: string };
-        output: void;
+        output: undefined;
       };
     };
     attestDomain: {
       mutation: {
         input: { organizationId: string; connectionId: string; domain: string };
-        output: void;
+        output: undefined;
       };
     };
     activate: {
       mutation: {
         input: { organizationId: string; connectionId: string; testLoginAccountId: string };
-        output: void;
+        output: undefined;
       };
     };
     suspend: {
       mutation: {
         input: { organizationId: string; connectionId: string; reason: string | null };
-        output: void;
+        output: undefined;
       };
     };
     resume: {
-      mutation: { input: { organizationId: string; connectionId: string }; output: void };
+      mutation: { input: { organizationId: string; connectionId: string }; output: undefined };
     };
     requestTeardown: {
       mutation: {
         input: { organizationId: string; connectionId: string; reason: string | null };
-        output: void;
+        output: undefined;
       };
     };
   };

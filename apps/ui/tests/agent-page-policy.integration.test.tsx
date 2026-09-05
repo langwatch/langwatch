@@ -61,7 +61,7 @@ import {
   type UiCapabilities,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { agentFeature } from "../src/features/agent";
 import { MemoryRouter } from "react-router";
 

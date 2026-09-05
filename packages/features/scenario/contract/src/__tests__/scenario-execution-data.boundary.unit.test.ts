@@ -9,7 +9,7 @@
  * serialize it, and the worker entrypoint that runs the child — may name one
  * of its schemas as a value. Suite authoring and the browser never should.
  */
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -29,10 +29,7 @@ const ALLOWED_ROOTS = [
   join(REPO_ROOT, "apps/worker/src/scenario-child.entrypoint.ts"),
 ];
 
-const SCAN_ROOTS = [
-  join(REPO_ROOT, "apps"),
-  join(REPO_ROOT, "packages"),
-];
+const SCAN_ROOTS = [join(REPO_ROOT, "apps"), join(REPO_ROOT, "packages")];
 
 const SKIP_DIR_NAMES = new Set([
   "node_modules",
@@ -68,7 +65,10 @@ describe("the child execution contract's schemas", () => {
     describe("when a file outside the child's own tree names one of the schemas", () => {
       /** @scenario "Nothing outside the child's own tree imports the execution contract" */
       it("finds no such usage", () => {
-        expect(SCHEMA_NAMES.length, "the schema-name scan itself must find schemas").toBeGreaterThan(0);
+        expect(
+          SCHEMA_NAMES.length,
+          "the schema-name scan itself must find schemas",
+        ).toBeGreaterThan(0);
 
         const pattern = new RegExp(`\\b(${SCHEMA_NAMES.join("|")})\\b`);
         const leaks = SCAN_ROOTS.flatMap(sourceFiles)
@@ -87,12 +87,14 @@ describe("the child execution contract's schemas", () => {
       /** @scenario "The shared field mapping schema carries no framework dependency" */
       it("imports zod and nothing else", () => {
         const source = readFileSync(join(CONTRACT_SRC, "field-mapping.ts"), "utf8");
-        const specifiers = [...source.matchAll(/^import\s+(?:type\s+)?[\s\S]*?\sfrom\s+["']([^"']+)["']/gm)]
-          .map((match) => match[1]);
+        const specifiers = [
+          ...source.matchAll(/^import\s+(?:type\s+)?[\s\S]*?\sfrom\s+["']([^"']+)["']/gm),
+        ].map((match) => match[1]);
 
-        expect(specifiers.every((specifier) => specifier === "zod"), specifiers.join(", ")).toBe(
-          true,
-        );
+        expect(
+          specifiers.every((specifier) => specifier === "zod"),
+          specifiers.join(", "),
+        ).toBe(true);
       });
     });
   });

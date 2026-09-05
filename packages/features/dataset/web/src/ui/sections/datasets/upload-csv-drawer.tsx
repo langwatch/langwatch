@@ -21,16 +21,16 @@ import {
   usePapaParse,
 } from "react-papaparse";
 import type { InMemoryDataset } from "./editor/dataset-editor-table";
-import { describeError, showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
+import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
 import { type AddDatasetDrawerProps, AddOrEditDatasetDrawer } from "./add-or-edit-dataset-drawer";
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
-import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { toaster } from "@langwatch/ui-host/toaster";
 import {
   abortPendingUpload,
   DirectUploadUnavailableError,

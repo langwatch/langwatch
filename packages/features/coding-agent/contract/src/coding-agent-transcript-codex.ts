@@ -3,7 +3,6 @@ import { emitSystemPrompt } from "./coding-agent-transcript-state";
 import { isInjectedContextOnly } from "./coding-agent-transcript-context";
 import {
   extractedOutputText,
-  extractedSystemText,
   isSameRecoveredReply,
   parsedChatMessages,
 } from "./coding-agent-transcript-content";

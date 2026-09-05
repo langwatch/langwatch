@@ -159,7 +159,13 @@ vi.mock("../../../../../behavior/langy-api", async () => {
 import { LangySidecar } from "../langy-panel";
 import { LangyProvider } from "../langy-context";
 import { useLangyStore } from "../../../../../index";
-import { LangyHostPort, LangyHostProvider, type LangyRouteReading } from "../../../../../model/langy-host";
+import {
+  LangyHostPort,
+  LangyHostProvider,
+  type LangyRouteReading,
+} from "../../../../../model/langy-host";
+import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
 
 const PROJECT_ID = "project-demo";
 const navigateMock = vi.fn();
@@ -209,9 +215,11 @@ const host = new FakeLangyHost();
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>
-    <LangyHostProvider value={host}>
-      <LangyProvider>{children}</LangyProvider>
-    </LangyHostProvider>
+    <UiCapabilityContextProvider value={createUiCapabilitiesFromHost(host)}>
+      <LangyHostProvider value={host}>
+        <LangyProvider>{children}</LangyProvider>
+      </LangyHostProvider>
+    </UiCapabilityContextProvider>
   </ChakraProvider>
 );
 
@@ -282,9 +290,7 @@ describe("Feature: Langy opens the resource it surfaced in the browser", () => {
           });
         });
 
-        expect(navigateMock).toHaveBeenCalledWith(
-          "/demo/simulations/set_1/batch_1?openRun=run_1",
-        );
+        expect(navigateMock).toHaveBeenCalledWith("/demo/simulations/set_1/batch_1?openRun=run_1");
         // …and the move tore nothing down: the panel is still open with the
         // SAME live subscription — no remount, no re-subscribe.
         expect(useLangyStore.getState().isOpen).toBe(true);

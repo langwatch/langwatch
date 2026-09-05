@@ -16,7 +16,7 @@ import { useMemo, type ReactNode } from "react";
 import { useUiAddress } from "../../../../behavior/ui-address";
 import { writeUiClipboard } from "../../../../behavior/ui-clipboard";
 import { browserUiSessionStorage } from "../../../../behavior/ui-browser-storage";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import {
   approveCliDeviceCode,
   denyCliDeviceCode,

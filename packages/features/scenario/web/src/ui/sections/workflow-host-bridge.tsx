@@ -3,15 +3,15 @@
  *
  * `@langwatch/analytics-web/components/PeriodSelector` is the time-range
  * control the run board and Agent Testing both draw, and it reads and writes
- * the address through `@langwatch/workflow-web/studio-host/next-router` —
- * which asks for a `WorkflowHostPort`. Nothing on this page is the studio, and
+ * the address through the shared `useRouter` — but it asks for a
+ * `WorkflowHostPort` for its own scope reading. Nothing on this page is the studio, and
  * nothing about the control is: it needs an ADDRESS, and the workflow host is
  * simply the port the analytics package happened to be published against.
  *
  * So this bridges rather than duplicates. Everything below reads this family's
  * own host through the same compat router the rest of the package uses, which
- * is what keeps a test that mocks `behavior/next-router` mocking one router
- * rather than two.
+ * is what keeps a test that mocks `@langwatch/ui-host/use-router` mocking one
+ * router rather than two.
  *
  * WHAT IS DELIBERATELY INERT: `copyTargets` (the studio's replicate dialog),
  * `back` (the studio's drawer stack) and the two notices, which this family
@@ -30,8 +30,8 @@ import {
 } from "@langwatch/workflow-web/model/workflow-host";
 import { useMemo, type ReactNode } from "react";
 
-import { showErrorToast } from "../../behavior/errors";
-import { useRouter } from "../../behavior/next-router";
+import { showErrorToast } from "@langwatch/ui-host/errors";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 
 type Reading = {

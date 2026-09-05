@@ -69,7 +69,7 @@ import {
   type UiCapabilities,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { withHost } from "../src/ui/sections/ui-page";
 import { AnnotationHost } from "../src/features/annotation/ui/sections/annotation-host";
 

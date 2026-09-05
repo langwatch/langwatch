@@ -12,11 +12,10 @@ import {
 import { useCallback, useEffect, useMemo } from "react";
 import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
 import { UserAvatar } from "../../elements/user-avatar";
-import type { Project } from "../../../model/prisma-types";
 
 import { HistoryIcon } from "@langwatch/model-provider-web/components/icons/History";
 import { Popover } from "@langwatch/design-system/popover";
-import { toaster } from "../../../behavior/studio-host/toaster";
+import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
 import { api } from "../../../behavior/studio-host/api";
@@ -25,6 +24,7 @@ import { serializeWorkflow, useWorkflowStore } from "@langwatch/workflow-web";
 import {
   hasDSLChanged,
   parseStudioWorkflow,
+  type Project,
   studioWorkflowSchema,
 } from "@langwatch/workflow-contract";
 import { NewVersionFields } from "./version-to-be-used";

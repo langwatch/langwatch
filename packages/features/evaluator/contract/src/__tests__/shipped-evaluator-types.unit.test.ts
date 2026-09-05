@@ -92,8 +92,7 @@ function evaluatorTypesTaughtIn(file: string): TaughtType[] {
   for (const pattern of EVALUATOR_TYPE_POSITIONS) {
     // Fresh lastIndex per file — these are module-level /g regexes.
     pattern.lastIndex = 0;
-    let match: RegExpExecArray | null;
-    while ((match = pattern.exec(contents)) !== null) {
+    for (let match = pattern.exec(contents); match !== null; match = pattern.exec(contents)) {
       const slug = match[1];
       if (slug) found.push({ slug, file: path.relative(repoRoot, file) });
     }

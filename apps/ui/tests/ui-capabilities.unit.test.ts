@@ -9,7 +9,7 @@ import {
   UiSessionPort,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 
 class RecordingNavigation extends UiNavigationPort {
   readonly moves: string[] = [];

@@ -37,7 +37,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   getFlowCallbacks: () => ({}),
 }));
 
-vi.mock("../../../../behavior/errors", () => ({
+vi.mock("@langwatch/ui-host/errors", () => ({
   showErrorToast: (args: unknown) => showErrorToast(args),
 }));
 

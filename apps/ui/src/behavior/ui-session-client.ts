@@ -6,7 +6,7 @@
 
 import { createAuthClient } from "better-auth/react";
 import { HandledError } from "@langwatch/handled-error";
-import type { UiActor } from "./ui-capabilities";
+import type { UiActor } from "@langwatch/ui-host/capabilities";
 
 /** The session endpoint, relative to the auth client's own base URL. */
 export const UI_SESSION_PATH = "/session";

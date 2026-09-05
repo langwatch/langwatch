@@ -11,8 +11,8 @@ import {
 export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
   const inputOutputMap: Record<string, { input: RAGSpan["input"]; output: RAGSpan["output"] }> = {};
 
-  const fillInputOutputMap = (spans: Span[]): Span[] => {
-    return spans.map((span) => {
+  const fillInputOutputMap = (flatSpans: Span[]): Span[] => {
+    return flatSpans.map((span) => {
       const inputOutput = inputOutputMap[span.span_id];
       if (!inputOutput) {
         return span;
@@ -23,8 +23,8 @@ export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
     });
   };
 
-  const recursiveExtractInputAndOutput = (spans: SpanWithChildren[]): void => {
-    spans.forEach((span) => {
+  const recursiveExtractInputAndOutput = (treeSpans: SpanWithChildren[]): void => {
+    treeSpans.forEach((span) => {
       recursiveExtractInputAndOutput(span.children);
 
       if (span.type !== "rag" || (span.input && span.output)) {

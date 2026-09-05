@@ -419,7 +419,7 @@ function NestedListSelection({
       keys={keysBefore}
       onChange={(values) => {
         const topLevelFilterId = keysAhead[keysAhead.length - 1]!;
-        if (keysAhead.length === 1 && keysBefore.length == 0) {
+        if (keysAhead.length === 1 && keysBefore.length === 0) {
           setFilter(topLevelFilterId, values);
           return;
         }
@@ -495,11 +495,9 @@ function ListSelection({
   currentValues,
   onChange,
   nested,
-  paddingX = 0,
   allowCustomValue = false,
   highlightedIndex = -1,
   onHighlightChange,
-  isKeyboardNav = false,
   onKeyboardNavChange,
   onOptionCountChange,
   selectHighlightedRef,
@@ -640,7 +638,7 @@ function ListSelection({
     [highlightedIndex, onKeyboardNavChange, onHighlightChange],
   );
 
-  if (filter.type === "numeric" && keys?.[0] == "thumbs_up_down" && keys?.[1] == "vote") {
+  if (filter.type === "numeric" && keys?.[0] === "thumbs_up_down" && keys?.[1] === "vote") {
     return <ThumbsUpDownVoteFilter currentValues={currentValues} onChange={onChange} />;
   }
 
@@ -853,7 +851,7 @@ function RangeFilter({
         max={max}
         step={0.1}
         value={
-          currentValues && currentValues.length == 2
+          currentValues && currentValues.length === 2
             ? currentValues.map((v, i) => {
                 const n = +v;
                 return isNaN(n) ? (i === 0 ? min : max) : n;

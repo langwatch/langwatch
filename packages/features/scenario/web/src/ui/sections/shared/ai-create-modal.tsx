@@ -19,7 +19,7 @@ import { LangyMark, LangyMarkGradientDefs } from "@langwatch/langy-web";
 import "@langwatch/langy-web/langy-theme.css";
 import { CARD } from "@langwatch/langy-web/asaplangy";
 import { classifyGenerationError } from "../../../behavior/scenarios/classify-generation-error";
-import { Dialog } from "@langwatch/workflow-web/components/ui/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types

@@ -1,7 +1,7 @@
 /** What this package installs for itself, and how a host's install merges over it. */
 
 import { describe, expect, it } from "vitest";
-import { UiFeedbackPort } from "../src/behavior/ui-capabilities";
+import { UiFeedbackPort } from "@langwatch/ui-host/capabilities";
 import { installedUiFeatures } from "../src/features/installed-ui-features";
 
 const AGENT_PAGE_KEYS = [

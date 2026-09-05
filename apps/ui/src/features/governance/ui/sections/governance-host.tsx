@@ -11,7 +11,7 @@ import {
 } from "@langwatch/enterprise-governance-web/screens/governance";
 import { useMemo, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
 import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { resolveGovernanceOrganization } from "../../behavior/governance-organization-lookup";

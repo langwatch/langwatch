@@ -22,7 +22,6 @@ import React, { type Dispatch, type SetStateAction, useEffect, useRef, useState 
 import {
   AlignLeft,
   BarChart2,
-  Bell,
   Check,
   ChevronDown,
   GitBranch,
@@ -46,7 +45,6 @@ import {
 } from "react-hook-form";
 import { LuChartArea, LuPlus } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
-import { deriveSeriesIdentifier } from "@langwatch/automation-contract";
 import { CodeSnippet } from "../../ui/elements/code-snippet";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";

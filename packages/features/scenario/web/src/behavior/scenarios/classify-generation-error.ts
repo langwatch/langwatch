@@ -18,7 +18,7 @@ import {
   explainAnyError,
   explainSerializedError,
 } from "@langwatch/handled-error/presentation";
-import { readHandledError } from "../errors";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 
 import { ScenarioGenerationError } from "../../index";
 

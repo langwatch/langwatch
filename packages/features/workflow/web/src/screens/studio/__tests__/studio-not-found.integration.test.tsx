@@ -46,7 +46,7 @@ vi.mock("../../../behavior/studio-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { slug: "ux-review" } }),
 }));
 
-vi.mock("../../../ui/elements/studio-host/link", () => ({
+vi.mock("@langwatch/ui-host/link", () => ({
   Link: ({ href, children }: { href: string; children: React.ReactNode }) => (
     <a href={href}>{children}</a>
   ),

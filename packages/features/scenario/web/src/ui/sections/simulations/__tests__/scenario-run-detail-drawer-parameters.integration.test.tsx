@@ -87,7 +87,7 @@ vi.mock("../../../../behavior/use-simulation-streaming-state", () => ({
 vi.mock("../../../../behavior/use-simulation-update-listener", () => ({
   useSimulationUpdateListener: () => ({ isConnected: true }),
 }));
-vi.mock("../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn(), query: {}, pathname: "/" }),
 }));
 

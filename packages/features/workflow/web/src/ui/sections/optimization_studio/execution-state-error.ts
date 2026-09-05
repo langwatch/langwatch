@@ -2,7 +2,7 @@ import {
   type ErrorExplanation,
   explainSerializedError,
   UNKNOWN_ERROR_PRESENTATION,
-} from "../../elements/studio-host/errors";
+} from "@langwatch/handled-error/presentation";
 import { nodeErrorToDomainError } from "@langwatch/workflow-contract";
 
 /**

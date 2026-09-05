@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
 
-vi.mock("../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ query: { project: "test-proj" } }),
 }));
 

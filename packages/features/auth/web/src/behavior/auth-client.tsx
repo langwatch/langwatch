@@ -357,8 +357,6 @@ export const signOut = async (opts?: {
   navigate("/api/auth/logout");
 };
 
-const SOCIAL_PROVIDERS = new Set(["google", "github", "gitlab", "microsoft", "azure-ad"]);
-
 /**
  * Link an OAuth account to the currently signed-in user. This is distinct
  * from `signIn(provider)` — which creates/switches sessions. Linking routes

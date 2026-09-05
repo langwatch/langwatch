@@ -559,8 +559,12 @@ export function HomePageBanners({
       <Box
         position="relative"
         width="full"
-        onMouseEnter={() => (hoveredRef.current = true)}
-        onMouseLeave={() => (hoveredRef.current = false)}
+        onMouseEnter={() => {
+          hoveredRef.current = true;
+        }}
+        onMouseLeave={() => {
+          hoveredRef.current = false;
+        }}
       >
         {/* The ground: light, not a panel.
 
@@ -838,8 +842,12 @@ export function HomePageBanners({
         color="white"
         boxShadow="0 1px 2px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.18)"
         minHeight={{ base: "160px", md: "172px" }}
-        onMouseEnter={() => (hoveredRef.current = true)}
-        onMouseLeave={() => (hoveredRef.current = false)}
+        onMouseEnter={() => {
+          hoveredRef.current = true;
+        }}
+        onMouseLeave={() => {
+          hoveredRef.current = false;
+        }}
         data-banner-variant="legacy"
       >
         <Box
@@ -1061,8 +1069,12 @@ export function HomePageBanners({
         borderColor="border.muted"
         background="bg.surface"
         overflow="hidden"
-        onMouseEnter={() => (hoveredRef.current = true)}
-        onMouseLeave={() => (hoveredRef.current = false)}
+        onMouseEnter={() => {
+          hoveredRef.current = true;
+        }}
+        onMouseLeave={() => {
+          hoveredRef.current = false;
+        }}
       >
         {/* Liquid-glass edges: the slide's colour "refracting" off all four
             borders — four inset glows, one per edge, that follow every

@@ -12,7 +12,7 @@ import {
 import { useMemo, type ReactNode } from "react";
 
 import { readPublicAppConfig } from "../../../../behavior/public-config";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 
 /** The deployment and its purchase link: no config reads as unknown here, not a crash — right for a settings page, wrong for a boot boundary. */
 function readDeployment(): { isSaaS: boolean; isSettled: boolean; purchaseUrl?: string } {

@@ -3,7 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import { Children, isValidElement, memo, type ReactNode, useState } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { useRouter } from "../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { stringifyIfObject } from "../../model/stringify-if-object";
 import { RenderCode } from "../blocks/code/render-code";
 import { getProxiedImageUrl } from "./external-image";

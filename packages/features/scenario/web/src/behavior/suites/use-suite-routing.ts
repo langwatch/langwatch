@@ -13,7 +13,7 @@
  *   [setSlug, batchId]            → External set + highlight batch
  */
 import { useCallback } from "react";
-import { useRouter } from "../next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { isOnPlatformSet } from "@langwatch/scenario-contract";
 
 export const ALL_RUNS_ID = "all-runs" as const;

@@ -365,7 +365,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
               >
                 Add{" "}
                 {selectedDataset && tracesWithSpans.data
-                  ? `${rowsToAdd.length} ${rowsToAdd.length == 1 ? "row" : "rows"}`
+                  ? `${rowsToAdd.length} ${rowsToAdd.length === 1 ? "row" : "rows"}`
                   : ""}{" "}
                 to dataset
               </Button>

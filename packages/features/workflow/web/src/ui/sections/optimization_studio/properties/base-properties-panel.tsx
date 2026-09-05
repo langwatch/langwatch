@@ -10,8 +10,8 @@ import {
 } from "@langwatch/workflow-web";
 
 import { HoverableBigText } from "../../hoverable-big-text";
-import { toaster } from "../../../../behavior/studio-host/toaster";
-import { DEFAULT_MODEL } from "../../../../model/constants";
+import { toaster } from "@langwatch/ui-host/toaster";
+import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { ComponentIcon } from "@langwatch/workflow-web";
 import { OptimizationStudioLLMConfigField } from "./llm-configs/optimization-studio-llm-config-field";
 

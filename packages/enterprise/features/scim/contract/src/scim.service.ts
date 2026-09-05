@@ -2,7 +2,6 @@
 import type {
   ScimCreateGroupRequest,
   ScimCreateUserRequest,
-  ScimError,
   ScimGroup,
   ScimListResponse,
   ScimPatchRequest,

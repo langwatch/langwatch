@@ -10,7 +10,7 @@ import {
 } from "@langwatch/analytics-web/screens/analytics";
 import { useMemo, type ReactNode } from "react";
 
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
 import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { resolveAnalyticsProject } from "../../behavior/analytics-project";

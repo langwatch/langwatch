@@ -1,7 +1,7 @@
 import { Alert, Button, HStack, Input, List, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle } from "react-feather";
-import { Dialog } from "@langwatch/workflow-web/components/ui/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 
 export type RelatedEntity = {
   id: string;

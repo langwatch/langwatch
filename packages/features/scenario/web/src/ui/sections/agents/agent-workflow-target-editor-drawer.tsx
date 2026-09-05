@@ -2,7 +2,7 @@ import { Button, Field, Heading, HStack, Spinner, Text, VStack } from "@chakra-u
 import { ExternalLink } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Link } from "../../elements/link";
 import {
   type AvailableSource,

@@ -43,6 +43,48 @@ import { useWaterfallEditing } from "./use-waterfall-editing";
 const EMPTY_SIGNALS: readonly LangwatchSignalBucket[] = [];
 const EMPTY_COMMENTS: AnnotationByTrace[] = [];
 
+/**
+ * Collapses the deepest currently-expanded parent layer: walks depths from
+ * the bottom up and, on the first layer with a still-expanded parent, adds
+ * every one of that layer's parents to the collapsed set.
+ */
+function collapseDeepestExpandedLayer(
+  parentsByDepth: Map<number, string[]>,
+  collapsed: Set<string>,
+): Set<string> {
+  const depths = [...parentsByDepth.keys()].sort((a, b) => b - a);
+  for (const d of depths) {
+    const parentsAtDepth = parentsByDepth.get(d) ?? [];
+    const stillExpanded = parentsAtDepth.filter((id) => !collapsed.has(id));
+    if (stillExpanded.length === 0) continue;
+    const next = new Set(collapsed);
+    for (const id of stillExpanded) next.add(id);
+    return next;
+  }
+  return collapsed;
+}
+
+/**
+ * Inverse of `collapseDeepestExpandedLayer` — reveals the shallowest
+ * collapsed layer, working back down toward the leaves.
+ */
+function expandShallowestCollapsedLayer(
+  parentsByDepth: Map<number, string[]>,
+  collapsed: Set<string>,
+): Set<string> {
+  if (collapsed.size === 0) return collapsed;
+  const depths = [...parentsByDepth.keys()].sort((a, b) => a - b);
+  for (const d of depths) {
+    const parentsAtDepth = parentsByDepth.get(d) ?? [];
+    const collapsedAtDepth = parentsAtDepth.filter((id) => collapsed.has(id));
+    if (collapsedAtDepth.length === 0) continue;
+    const next = new Set(collapsed);
+    for (const id of collapsedAtDepth) next.delete(id);
+    return next;
+  }
+  return collapsed;
+}
+
 export const WaterfallView = memo(function WaterfallView({
   spans,
   selectedSpanId,
@@ -270,36 +312,13 @@ export const WaterfallView = memo(function WaterfallView({
     // Collapse the deepest currently-expanded layer first, then the
     // next layer up on subsequent clicks. Each click peels one level
     // off the tree until only the root remains visible.
-    setCollapsedIds((prev) => {
-      const depths = [...parentsByDepth.keys()].sort((a, b) => b - a);
-      for (const d of depths) {
-        const parentsAtDepth = parentsByDepth.get(d) ?? [];
-        const stillExpanded = parentsAtDepth.filter((id) => !prev.has(id));
-        if (stillExpanded.length === 0) continue;
-        const next = new Set(prev);
-        for (const id of stillExpanded) next.add(id);
-        return next;
-      }
-      return prev;
-    });
+    setCollapsedIds((prev) => collapseDeepestExpandedLayer(parentsByDepth, prev));
   }, [parentsByDepth]);
 
   const handleExpandMore = useCallback(() => {
     // Inverse of `handleCollapseMore` — reveal the shallowest collapsed
     // layer per click, working back down toward the leaves.
-    setCollapsedIds((prev) => {
-      if (prev.size === 0) return prev;
-      const depths = [...parentsByDepth.keys()].sort((a, b) => a - b);
-      for (const d of depths) {
-        const parentsAtDepth = parentsByDepth.get(d) ?? [];
-        const collapsedAtDepth = parentsAtDepth.filter((id) => prev.has(id));
-        if (collapsedAtDepth.length === 0) continue;
-        const next = new Set(prev);
-        for (const id of collapsedAtDepth) next.delete(id);
-        return next;
-      }
-      return prev;
-    });
+    setCollapsedIds((prev) => expandShallowestCollapsedLayer(parentsByDepth, prev));
   }, [parentsByDepth]);
 
   // Identity-stable: reads the current selection through a ref so the

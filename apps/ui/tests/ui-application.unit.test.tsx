@@ -2,7 +2,7 @@ import { render } from "@testing-library/react";
 import type { ComponentType, ReactNode } from "react";
 import { RouterProvider } from "react-router/dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { UiSessionPort, useUiCapabilities } from "../src/behavior/ui-capabilities";
+import { UiSessionPort, useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { uiRoutePageKeys, type UiPageLoaderRegistry } from "../src/behavior/ui-page-loaders";
 import type { UiFeatureApiTransport } from "../src/behavior/ui-feature-transport";
 import type { PublicEnvironment } from "../src/model/public-environment";

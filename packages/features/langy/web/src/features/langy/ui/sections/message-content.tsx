@@ -37,7 +37,7 @@ import {
 import { isInternalHref, Markdown } from "@langwatch/workflow-web/components/Markdown";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { githubPrsFromToolParts } from "../../../../model/shared/langy/github-pr-card";
-import { useRouter } from "../../../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { useSpaLinkClick } from "../../behavior/logic/spa-link";
 import { LangyDerivedCardView } from "./derived-cards/langy-derived-card-view";
 import { StreamingAnswerWithCards } from "./derived-cards/streaming-answer-with-cards";
@@ -55,11 +55,13 @@ export interface LangyProposal {
   payload: Record<string, unknown>;
 }
 
-export type AppliedOutcome = {
-  label?: string;
-  onOpen?: () => void;
-  href?: string;
-} | void;
+export type AppliedOutcome =
+  | {
+      label?: string;
+      onOpen?: () => void;
+      href?: string;
+    }
+  | undefined;
 
 export type ProposalHandlers = Record<
   string,
@@ -68,7 +70,7 @@ export type ProposalHandlers = Record<
 
 function MessageContentImpl({
   message,
-  organizationId,
+  organizationId: _organizationId,
   appliedOutcomes,
   discardedProposals,
   applyingProposals,

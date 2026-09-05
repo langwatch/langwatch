@@ -41,7 +41,8 @@ import {
 } from "../../../behavior/suites/use-suite-routing";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { toaster } from "@langwatch/design-system/toaster";
-import { HandledErrorAlert, showErrorToast } from "../../../behavior/errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
+import { HandledErrorAlert } from "../../../behavior/errors";
 import type { SimulationSuite } from "../../../model/prisma-types";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
@@ -50,7 +51,7 @@ import { useScenarioTabFollow } from "../../../behavior/use-scenario-tab-follow"
 import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener";
 import type { ScenarioTabNavigatePayload, SuiteRunSummary } from "@langwatch/scenario-contract";
 import { api } from "../../../behavior/scenario-api";
-import { useRouter } from "../../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { ScenarioWorkflowHostBridge } from "../workflow-host-bridge";
 
 export default function SimulationsPage() {

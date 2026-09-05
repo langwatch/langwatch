@@ -1,8 +1,9 @@
 // eslint-disable-next-line no-restricted-imports
 import { Drawer as ChakraDrawer, Portal } from "@chakra-ui/react";
 import * as React from "react";
-import { CloseButton } from "@langwatch/design-system/close-button";
-import { IsolatedErrorBoundary } from "./isolated-error-boundary";
+
+import { CloseButton } from "./close-button";
+import { StudioIsolatedErrorBoundary } from "./studio-error-boundary";
 
 /**
  * Context to provide a margin-top offset to all Drawer.Content descendants.
@@ -62,7 +63,7 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
     // children so a render error renders an inline error panel within the
     // drawer frame instead.
     const safeChildren = withErrorBoundary ? (
-      <IsolatedErrorBoundary scope={errorScope}>{children}</IsolatedErrorBoundary>
+      <StudioIsolatedErrorBoundary scope={errorScope}>{children}</StudioIsolatedErrorBoundary>
     ) : (
       children
     );
@@ -112,9 +113,9 @@ export const DrawerCloseTrigger = React.forwardRef<
  *
  * All defaults can be overridden by passing props explicitly.
  *
- * `size` is widened the way `@langwatch/design-system`'s drawer widens it:
- * Chakra types `size` from its OWN recipe, so a width step the product adds
- * in `system/drawer.recipe.ts` is unknown to it. The wrapper carries the
+ * `size` is widened the way `@langwatch/design-system`'s plain drawer widens
+ * it: Chakra types `size` from its OWN recipe, so a width step the product
+ * adds in `system/drawer.recipe.ts` is unknown to it. The wrapper carries the
  * product's list and hands the name down, which is why a drawer sets a width
  * by name and never with a maxWidth of its own.
  */

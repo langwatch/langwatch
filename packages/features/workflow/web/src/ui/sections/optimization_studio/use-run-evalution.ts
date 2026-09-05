@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
-import { toaster } from "../../../behavior/studio-host/toaster";
+import { toaster } from "@langwatch/ui-host/toaster";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
 import { api } from "../../../behavior/studio-host/api";
 import { useVersionState } from "./history";

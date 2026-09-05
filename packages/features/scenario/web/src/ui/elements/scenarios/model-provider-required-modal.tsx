@@ -1,6 +1,6 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
-import { Dialog } from "@langwatch/workflow-web/components/ui/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 
 export interface ModelProviderRequiredModalProps {
   open: boolean;

@@ -77,6 +77,7 @@
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/experiment-web": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/model-provider-web": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",

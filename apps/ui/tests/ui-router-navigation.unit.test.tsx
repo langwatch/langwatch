@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { UiNavigationPort } from "../src/behavior/ui-capabilities";
+import type { UiNavigationPort } from "@langwatch/ui-host/capabilities";
 import {
   createRouterUiNavigation,
   useRouterUiNavigation,

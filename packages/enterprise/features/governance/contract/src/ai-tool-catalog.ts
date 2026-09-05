@@ -1,9 +1,5 @@
 import { z } from "zod";
-import type {
-  PlatformToolPolicy,
-  PlatformToolPolicyMap,
-  PlatformToolSlug,
-} from "./platform-tool-policy";
+import type { PlatformToolSlug } from "./platform-tool-policy";
 
 export const AI_TOOL_TYPES = ["coding_assistant", "model_provider", "external_tool"] as const;
 export const aiToolTypeSchema = z.enum(AI_TOOL_TYPES);

@@ -44,7 +44,6 @@ export type {
   RouterOutputs as ScenarioRouterOutputs,
   ScenarioApiMap,
 } from "../../behavior/scenario-api";
-export { setScenarioErrorHost } from "../../behavior/errors";
 export {
   ScenarioHostPort,
   ScenarioHostProvider,

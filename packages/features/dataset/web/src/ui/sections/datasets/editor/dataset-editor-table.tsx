@@ -33,7 +33,7 @@ import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-im
 import { Pagination } from "@langwatch/design-system/pagination";
 import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";

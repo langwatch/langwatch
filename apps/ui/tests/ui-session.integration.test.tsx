@@ -20,7 +20,7 @@ import {
   UiCapabilityUnavailableError,
   UiSessionPort,
   useUiCapabilities,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import type { UiFeatureApiTransport } from "../src/behavior/ui-feature-transport";
 import { useBrowserUiSession } from "../src/behavior/ui-session";
 import type { UiAuthClient } from "../src/behavior/ui-session-client";

@@ -15,12 +15,13 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Edit2, HelpCircle } from "react-feather";
 import { Controller, FormProvider, type Resolver, useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
-import { EvaluationExecutionMode } from "@langwatch/workflow-web/model/prisma-types";
-import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
+import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { slugify } from "@langwatch/design-system/slugify";
 import { useAvailableEvaluators } from "../../../behavior/use-available-evaluators";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL } from "@langwatch/workflow-web/utils/constants";
+import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-web/utils/constants";
+import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { DEFAULT_MAPPINGS, migrateLegacyMappings } from "@langwatch/evaluator-contract";
 import { evaluatorDisplayName } from "@langwatch/evaluator-contract";
 import {
@@ -432,7 +433,7 @@ export default function CheckConfigForm({
                           runOn={
                             preconditions?.length === 0 &&
                             !evaluatorDefinition?.requiredFields.includes("contexts") ? (
-                              sample == 1 ? (
+                              sample === 1 ? (
                                 runOn
                               ) : (
                                 <Text color="fg.muted" fontStyle="italic">

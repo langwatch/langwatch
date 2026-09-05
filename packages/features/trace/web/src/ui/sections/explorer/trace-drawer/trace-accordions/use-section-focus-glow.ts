@@ -16,6 +16,35 @@ import { useFocusSectionStore } from "../../../../../index";
  * span-detail accordions render theirs. The hook is the brain; the
  * overlay is the visual.
  */
+/**
+ * Watches `root` for the glow target section to appear in the DOM (it may
+ * not be mounted yet — e.g. the span tab just switched and the detail
+ * skeleton is still showing), retrying `tryScrollAndGlow` on every mutation
+ * until it succeeds or a 5s bail timer runs out.
+ */
+function watchForSectionAndGlow(
+  root: HTMLElement,
+  tryScrollAndGlow: () => boolean,
+  clearFocus: () => void,
+): { observer: MutationObserver; bailTimer: number } {
+  const observer = new MutationObserver(() => {
+    if (tryScrollAndGlow()) {
+      observer.disconnect();
+      window.clearTimeout(bailTimer);
+    }
+  });
+  observer.observe(root, { childList: true, subtree: true });
+  // Safety net so we don't keep observing forever if the section
+  // never shows up (wrong trace, focus request to a section this
+  // stack doesn't render, etc.). 5s is generous for slow detail
+  // queries on dev infra.
+  const bailTimer = window.setTimeout(() => {
+    observer.disconnect();
+    clearFocus();
+  }, 5000);
+  return { observer, bailTimer };
+}
+
 export function useSectionFocusGlow({
   traceId,
   sections,
@@ -81,21 +110,9 @@ export function useSectionFocusGlow({
         // span tab just mounted and `useSpanDetail` is still loading
         // (the skeleton renders instead of the accordion stack). Watch
         // for the section to appear, then run the same scroll+glow.
-        observer = new MutationObserver(() => {
-          if (tryScrollAndGlow()) {
-            observer?.disconnect();
-            window.clearTimeout(bailTimer);
-          }
-        });
-        observer.observe(root, { childList: true, subtree: true });
-        // Safety net so we don't keep observing forever if the section
-        // never shows up (wrong trace, focus request to a section this
-        // stack doesn't render, etc.). 5s is generous for slow detail
-        // queries on dev infra.
-        bailTimer = window.setTimeout(() => {
-          observer?.disconnect();
-          clearFocus();
-        }, 5000);
+        const watch = watchForSectionAndGlow(root, tryScrollAndGlow, clearFocus);
+        observer = watch.observer;
+        bailTimer = watch.bailTimer;
       });
     });
     return () => {

@@ -82,7 +82,7 @@ import {
   type UiCapabilities,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { personalWorkspaceFeature } from "../src/features/personal-workspace";
 
 const FLAG = "release_ui_ai_governance_enabled";

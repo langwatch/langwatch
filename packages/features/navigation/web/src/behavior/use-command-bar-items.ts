@@ -1,6 +1,5 @@
 import { BookOpen, Search, Sparkles } from "lucide-react";
 import { useMemo } from "react";
-import { topLevelNavigationCommands } from "../model/command-catalogue";
 import {
   MIN_SEARCH_QUERY_LENGTH,
   RECENT_ITEMS_DISPLAY_LIMIT,

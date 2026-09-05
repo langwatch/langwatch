@@ -5,6 +5,65 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
 /**
+ * Builds a defaults object from a nested object schema's own shape, one field
+ * at a time, for the case where the schema itself has no usable empty parse
+ * (required fields with no top-level default).
+ */
+function constructDefaultsFromShape(
+  objectSchema: z.ZodObject<any>,
+): Record<string, unknown> | undefined {
+  const constructedDefaults: Record<string, unknown> = {};
+  for (const nestedKey of Object.keys(objectSchema.shape)) {
+    if (!Object.prototype.hasOwnProperty.call(objectSchema.shape, nestedKey)) {
+      continue;
+    }
+    const nestedFieldSchema = objectSchema.shape[nestedKey];
+    const fieldDefaultResult = nestedFieldSchema.safeParse(undefined);
+    if (fieldDefaultResult.success) {
+      constructedDefaults[nestedKey] = fieldDefaultResult.data;
+    }
+  }
+  return Object.keys(constructedDefaults).length > 0 ? constructedDefaults : undefined;
+}
+
+/**
+ * Resolves the default value to salvage a nested object against: the caller's
+ * own nested defaults if given, else the schema's empty parse, else defaults
+ * constructed field-by-field from the schema's shape.
+ */
+function resolveNestedDefaultValue(
+  objectSchema: z.ZodObject<any>,
+  nestedDefaults: unknown,
+): unknown {
+  if (nestedDefaults !== undefined) {
+    return nestedDefaults;
+  }
+  const emptyParseResult = objectSchema.safeParse({});
+  if (emptyParseResult.success) {
+    return emptyParseResult.data;
+  }
+  return constructDefaultsFromShape(objectSchema);
+}
+
+/**
+ * Salvages one nested object field: recurses through `salvageValidData` when
+ * there is a record of defaults to fall back to, otherwise tries a direct
+ * parse and leaves the field undefined (so the caller's merge falls back to
+ * `schemaDefaults`) when that also fails.
+ */
+function salvageNestedField(
+  objectSchema: z.ZodObject<any>,
+  value: unknown,
+  nestedDefaultValue: unknown,
+): unknown {
+  if (isRecord(nestedDefaultValue)) {
+    return salvageValidData(objectSchema, value, nestedDefaultValue);
+  }
+  const directParseResult = objectSchema.safeParse(value);
+  return directParseResult.success ? directParseResult.data : undefined;
+}
+
+/**
  * Recursively keeps whatever fields of `data` pass `schema`, field by field,
  * falling back to `defaults` (or the schema's own empty parse) for the rest —
  * rather than discarding the whole object on one bad field.
@@ -67,57 +126,14 @@ export function salvageValidData<T extends z.ZodObject<any>>(
       }
 
       if (objectSchema instanceof z.ZodObject) {
-        // Recursively salvage nested objects
-        // Extract nested defaults if available
+        // Recursively salvage nested objects, falling back to whatever
+        // defaults are available (the caller's, the schema's own empty
+        // parse, or ones constructed field-by-field from its shape).
         const nestedDefaults = schemaDefaults[key as keyof typeof schemaDefaults];
 
         try {
-          // Attempt to salvage the nested object
-          // For optional nested objects, nestedDefaults may be undefined
-
-          // First, try to extract defaults for the nested object
-          let nestedDefaultValue: unknown = undefined;
-
-          if (nestedDefaults !== undefined) {
-            // Use provided nested defaults
-            nestedDefaultValue = nestedDefaults;
-          } else {
-            // Try to get defaults by parsing empty object
-            const emptyParseResult = objectSchema.safeParse({});
-            if (emptyParseResult.success) {
-              nestedDefaultValue = emptyParseResult.data;
-            } else {
-              // If that fails, try to construct defaults from schema shape
-              // This helps with optional nested objects that have required fields
-              const constructedDefaults: Record<string, unknown> = {};
-              for (const nestedKey of Object.keys(objectSchema.shape)) {
-                if (Object.prototype.hasOwnProperty.call(objectSchema.shape, nestedKey)) {
-                  const nestedFieldSchema = objectSchema.shape[nestedKey];
-                  const fieldDefaultResult = nestedFieldSchema.safeParse(undefined);
-                  if (fieldDefaultResult.success) {
-                    constructedDefaults[nestedKey] = fieldDefaultResult.data;
-                  }
-                }
-              }
-              // Only use constructed defaults if we got something
-              if (Object.keys(constructedDefaults).length > 0) {
-                nestedDefaultValue = constructedDefaults;
-              }
-            }
-          }
-
-          // Now try to salvage with whatever defaults we have
-          if (isRecord(nestedDefaultValue)) {
-            salvaged[key] = salvageValidData(objectSchema, value, nestedDefaultValue);
-          } else {
-            // No defaults at all - try direct parse
-            const directParseResult = objectSchema.safeParse(value);
-            if (directParseResult.success) {
-              salvaged[key] = directParseResult.data;
-            }
-            // If parse fails and no defaults, leave salvaged[key] undefined
-            // merge() will use the default from schemaDefaults
-          }
+          const nestedDefaultValue = resolveNestedDefaultValue(objectSchema, nestedDefaults);
+          salvaged[key] = salvageNestedField(objectSchema, value, nestedDefaultValue);
         } catch {
           // If salvage fails (e.g., required fields missing in optional nested object),
           // silently fall back to the default from schemaDefaults (may be undefined)

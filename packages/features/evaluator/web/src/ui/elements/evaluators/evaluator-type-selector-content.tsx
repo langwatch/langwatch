@@ -2,7 +2,7 @@ import { EvaluatorTypePicker, type EvaluatorCategoryId } from "@langwatch/evalua
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 
 export { evaluatorCategoryNames as categoryNames } from "@langwatch/evaluator-web";
 

@@ -1,9 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { readHandledError } from "@langwatch/workflow-web/studio-host/errors";
-import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
-import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { useRouter } from "@langwatch/ui-host/use-router";
+import { toaster } from "@langwatch/ui-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { captureException, toError } from "../../model/posthog-error-capture";

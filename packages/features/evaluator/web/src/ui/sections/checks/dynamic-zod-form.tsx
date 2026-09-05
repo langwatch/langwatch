@@ -342,7 +342,7 @@ const DynamicZodForm = ({
           type="number"
           size={variant === "studio" ? "sm" : "md"}
           step={
-            typeof defaultValue === "number" && Math.round(defaultValue) != defaultValue
+            typeof defaultValue === "number" && Math.round(defaultValue) !== defaultValue
               ? "0.01"
               : "1"
           }

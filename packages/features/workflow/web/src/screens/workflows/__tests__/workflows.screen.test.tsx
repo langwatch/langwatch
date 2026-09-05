@@ -21,7 +21,7 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FakeWorkflowHost, renderWithWorkflowHost } from "../../../testing";
+import { renderWithWorkflowHost } from "../../../testing";
 import WorkflowsScreen from "../workflows.screen";
 
 const { state } = vi.hoisted(() => ({

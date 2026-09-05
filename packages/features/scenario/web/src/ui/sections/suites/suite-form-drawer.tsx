@@ -25,13 +25,9 @@ import {
 } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
-import {
-  applyHandledErrorToForm,
-  describeError,
-  FormServerError,
-  readHandledError,
-  showErrorToast,
-} from "../../../behavior/errors";
+import { applyHandledErrorToForm, describeError, showErrorToast } from "@langwatch/ui-host/errors";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { FormServerError } from "../../../behavior/errors";
 import type { SimulationSuite } from "../../../model/prisma-types";
 import { getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
@@ -40,7 +36,7 @@ import { api } from "../../../behavior/scenario-api";
 import { AgentHttpEditorDrawer } from "../agents/agent-http-editor-drawer";
 import { ScenarioFormDrawer } from "../scenarios/scenario-form-drawer";
 import { SimulationModelSelect } from "../scenarios/simulation-model-select";
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/design-system/toaster";
 import { PromptTargetMappingSection } from "../../elements/suites/prompt-target-mapping-section";
 import {

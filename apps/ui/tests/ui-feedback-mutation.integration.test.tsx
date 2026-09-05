@@ -24,7 +24,7 @@ import {
   UiCapabilityContextProvider,
   useUiCapabilities,
   type UiCapabilities,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { UiErrorToaster } from "../src/ui/elements/ui-error-toaster";
 
 // The Design System's toaster is a module singleton, so a toast raised by one

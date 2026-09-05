@@ -1,17 +1,5 @@
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  Container,
-  Heading,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Button, Card, Container, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { useEffect } from "react";
-import { AuthCard } from "../../ui/elements/auth-card";
 import { isSameOrigin, useSession } from "../../behavior/auth-client";
 import { hardNavigate } from "../../behavior/browser-navigation";
 import Link from "../../ui/elements/router-link";

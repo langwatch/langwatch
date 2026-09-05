@@ -12,7 +12,7 @@
  */
 
 import { useCallback } from "react";
-import { showErrorToast } from "../../../../behavior/errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api } from "../../../../behavior/scenario-api";
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans";

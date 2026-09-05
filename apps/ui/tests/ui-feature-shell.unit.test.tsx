@@ -7,7 +7,7 @@ import {
   createUiScopeHost,
   useOrganizationTeamProject,
 } from "@langwatch/ui-host/use-organization-team-project";
-import { UiSessionPort, useUiCapabilities } from "../src/behavior/ui-capabilities";
+import { UiSessionPort, useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import type {
   UiFeatureApiBinding,
   UiFeatureApiTransport,

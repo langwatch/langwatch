@@ -52,7 +52,7 @@ export type DataPrivacyApiMap = {
     removeForScope: {
       mutation: {
         input: ProjectScope & { scope: PrivacyScopeInput; personalOnly: boolean };
-        output: void;
+        output: undefined;
       };
     };
   };

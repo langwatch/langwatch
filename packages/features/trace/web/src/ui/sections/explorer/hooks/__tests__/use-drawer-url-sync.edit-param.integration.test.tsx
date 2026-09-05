@@ -27,7 +27,7 @@ vi.mock("../../../../../behavior/use-drawer", () => ({
   useUpdateDrawerParams: () => harness.updateDrawerParams,
 }));
 
-vi.mock("../../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ query: harness.query }),
 }));
 

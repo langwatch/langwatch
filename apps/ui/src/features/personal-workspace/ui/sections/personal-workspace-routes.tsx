@@ -10,7 +10,7 @@ import {
 } from "@langwatch/user-web/screens/personal-workspace";
 import { useEffect, type ComponentType } from "react";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { uiPage } from "../../../../ui/sections/ui-page";
 import { PersonalWorkspaceHost } from "./personal-workspace-host";
 

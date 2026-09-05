@@ -18,7 +18,6 @@ import {
 } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
-import type { inferRouterOutputs } from "@trpc/server";
 import numeral from "numeral";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp } from "react-feather";
@@ -33,8 +32,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { Experiment, Project } from "@langwatch/workflow-web/model/prisma-types";
-import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
+import type { Experiment, Project } from "@langwatch/workflow-contract";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { FormatMoney } from "@langwatch/workflow-web/optimization_studio/components/FormatMoney";
 import { VersionBox } from "@langwatch/workflow-web/optimization_studio/components/History";
 import type { AppRouter } from "@langwatch/workflow-web/studio-host/api";
@@ -125,7 +124,7 @@ export function DSPyExperiment({
                 <Card.Root width="100%">
                   <Card.Header>
                     <Heading as="h2" size="md">
-                      {optimizerNames.length == 1
+                      {optimizerNames.length === 1
                         ? optimizerNames[0]!
                         : optimizerNames.length > 1
                           ? "Multiple Optimizers"
@@ -1188,9 +1187,9 @@ export function DSPyRunsScoresChart({
           />
           <YAxis
             type="number"
-            name={labelNames.length == 1 ? labelNames[0] : "Score"}
+            name={labelNames.length === 1 ? labelNames[0] : "Score"}
             label={{
-              value: labelNames.length == 1 ? labelNames[0] : "Score",
+              value: labelNames.length === 1 ? labelNames[0] : "Score",
               angle: -90,
               position: "insideLeft",
               offset: -5,

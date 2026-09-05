@@ -10,7 +10,7 @@ import {
 } from "@langwatch/github-web/screens/integrations";
 import { useMemo, type ReactNode } from "react";
 
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { uiLeaveTo, uiOpenExternal } from "../../../../behavior/ui-departure";
 
 export function GithubHost({ children }: { children: ReactNode }) {

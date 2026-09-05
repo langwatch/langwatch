@@ -16,7 +16,7 @@ import {
   SetupWithAgentButton,
   setupAgentPrompt,
 } from "../setup-with-agent-button";
-import { setTraceErrorHost } from "../errors";
+import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
 import type { TraceFailureNotice, TraceHostPort } from "../../../behavior/trace-host";
 
 const canAskMock = vi.fn(() => true);
@@ -256,7 +256,7 @@ describe("SetupWithAgentButton", () => {
       // asserted here is that the refusal was HANDED OVER, not what it was
       // made to say, mirroring use-export-traces.integration.test.ts.
       const failures: TraceFailureNotice[] = [];
-      setTraceErrorHost({
+      setUiFeedbackHost({
         failed: (failure: TraceFailureNotice) => failures.push(failure),
       } as unknown as TraceHostPort);
 
@@ -273,7 +273,7 @@ describe("SetupWithAgentButton", () => {
       await waitFor(() => expect(failures).toHaveLength(1));
       expect(failures[0]?.fallbackTitle).toBe("Couldn't copy the prompt");
 
-      setTraceErrorHost(void 0);
+      setUiFeedbackHost(void 0);
     });
   });
 

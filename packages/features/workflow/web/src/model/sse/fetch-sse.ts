@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { toError } from "../studio-host/to-error";
+import { toError } from "@langwatch/ui-host/errors";
 import { FetchSSETimeoutError } from "./errors";
 
 const logger = createLogger("sseClient");

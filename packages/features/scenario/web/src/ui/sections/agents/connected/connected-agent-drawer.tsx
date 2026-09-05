@@ -21,7 +21,7 @@ import {
 } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
 import { AgentTestPanel } from "../agent-test-panel";
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 import {
   type AvailableSource,
   type FieldMapping,

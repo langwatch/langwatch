@@ -15,7 +15,7 @@
  * @see dev/docs/best_practices/drawers.md
  */
 
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { CaseModalFields, CaseModalFooter, CaseModalHeader } from "./case-modal-parts";
 import { CASE_EDITOR_DRAWER_SIZE } from "./drawer-keys";
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases";

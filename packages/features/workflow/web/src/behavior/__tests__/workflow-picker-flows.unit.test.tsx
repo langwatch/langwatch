@@ -208,7 +208,7 @@ describe("Workflow evaluator picker flow", () => {
   it("opens evaluator creation and applies the default output shape", () => {
     let callbacks: EvaluatorPickerCallbacks | undefined;
     let onSave:
-      | ((saved: { id: string; name: string; evaluatorType?: string }) => boolean | void)
+      | ((saved: { id: string; name: string; evaluatorType?: string }) => boolean | undefined)
       | undefined;
     const port: EvaluatorPickerPort = {
       register: (registered) => {
@@ -246,7 +246,7 @@ describe("Workflow evaluator picker flow", () => {
   it("derives the declared fields for a newly created evaluator", () => {
     let callbacks: EvaluatorPickerCallbacks | undefined;
     let onSave:
-      | ((saved: { id: string; name: string; evaluatorType?: string }) => boolean | void)
+      | ((saved: { id: string; name: string; evaluatorType?: string }) => boolean | undefined)
       | undefined;
     const port: EvaluatorPickerPort = {
       register: (registered) => {

@@ -32,6 +32,14 @@ type GroupedModelOptions = {
  *  to the saved JSON, so the cascade walks up). */
 export const INHERIT_SENTINEL = "__inherit__";
 
+/** Keeps a group's models whose label or value matches `search` (case-insensitive). */
+function filterGroupModels(group: GroupedModelOptions[number], search: string): ModelOption[] {
+  const needle = search.toLowerCase();
+  return group.models.filter(
+    (item) => item.label.toLowerCase().includes(needle) || item.value.toLowerCase().includes(needle),
+  );
+}
+
 /**
  * Model selector across providers, grouped by provider icon (from each
  * model's prefix). `inheritOption`, when set, prepends an "Inherit" entry
@@ -128,11 +136,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
       groupedByProvider
         .map((group) => ({
           ...group,
-          models: group.models.filter(
-            (item) =>
-              item.label.toLowerCase().includes(modelSearch.toLowerCase()) ||
-              item.value.toLowerCase().includes(modelSearch.toLowerCase()),
-          ),
+          models: filterGroupModels(group, modelSearch),
         }))
         .filter((group) => group.models.length > 0),
     [groupedByProvider, modelSearch],

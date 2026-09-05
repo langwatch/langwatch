@@ -36,7 +36,7 @@ vi.mock("../../../../../behavior/use-plan-management-url", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ push }),
 }));
 

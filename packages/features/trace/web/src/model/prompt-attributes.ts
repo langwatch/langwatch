@@ -244,6 +244,31 @@ export function extractPromptReference(
   return null;
 }
 
+/**
+ * Parses the wrapped-JSON-string form of `langwatch.prompt.variables`
+ * (`'{"type":"json","value":{...}}'`) into a flat string map. Returns `null`
+ * on a parse failure or a `value` that isn't a plain object.
+ */
+function parseWrappedPromptVariables(wrapped: string): Record<string, string> | null {
+  try {
+    const parsed: unknown = JSON.parse(wrapped);
+    if (typeof parsed === "object" && parsed !== null && "value" in parsed) {
+      const value = (parsed as { value: unknown }).value;
+      if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+        const result: Record<string, string> = {};
+        for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+          result[key] = String(val);
+        }
+        return result;
+      }
+    }
+    return null;
+  } catch {
+    // fall through to nested-object form
+    return null;
+  }
+}
+
 function parsePromptVariables(params: Record<string, unknown>): Record<string, string> | null {
   // Two emit shapes seen in the wild:
   //   1. Wrapped JSON string: `langwatch.prompt.variables = '{"type":"json","value":{...}}'`
@@ -253,20 +278,9 @@ function parsePromptVariables(params: Record<string, unknown>): Record<string, s
   // dotted keys. Try both — the first match wins.
   const wrapped = readAttribute(params, "langwatch.prompt.variables");
   if (typeof wrapped === "string") {
-    try {
-      const parsed: unknown = JSON.parse(wrapped);
-      if (typeof parsed === "object" && parsed !== null && "value" in parsed) {
-        const value = (parsed as { value: unknown }).value;
-        if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-          const result: Record<string, string> = {};
-          for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-            result[key] = String(val);
-          }
-          return result;
-        }
-      }
-    } catch {
-      // fall through to nested-object form
+    const parsed = parseWrappedPromptVariables(wrapped);
+    if (parsed) {
+      return parsed;
     }
   }
 

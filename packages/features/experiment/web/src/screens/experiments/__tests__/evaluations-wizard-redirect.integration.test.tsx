@@ -19,7 +19,7 @@ const { replaceMock, routerState, experimentState } = vi.hoisted(() => ({
 
 // A new object each call, mirroring the real compat shim, so the redirect
 // effect sees an unstable `router` dependency every render.
-vi.mock("@langwatch/workflow-web/studio-host/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ query: routerState.query, replace: replaceMock }),
 }));
 

@@ -16,15 +16,15 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
 import type { Experiment } from "@langwatch/experiment-contract";
-import type { Project } from "@langwatch/workflow-web/model/prisma-types";
+import type { Project } from "@langwatch/workflow-contract";
 import { EvaluatorResultChip } from "@langwatch/evaluator-web/components/shared/EvaluatorResultChip";
 import { ExternalImage } from "@langwatch/design-system/external-image";
-import { Link } from "@langwatch/workflow-web/studio-host/link";
+import { Link } from "@langwatch/ui-host/link";
 import { describeCellFailure } from "../../../model/experiments-v3/cell-failure";
 import { TraceIdPeek } from "@langwatch/trace-web/explorer/components/TraceIdPeek";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   BatchEvaluationResultsTable,

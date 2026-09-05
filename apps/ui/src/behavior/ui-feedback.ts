@@ -11,7 +11,11 @@ import {
   UNKNOWN_ERROR_PRESENTATION,
 } from "@langwatch/handled-error/presentation";
 import { readEnvelopeTraceId, readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { UiFeedbackPort, type UiFailureNotice, type UiSuccessNotice } from "./ui-capabilities";
+import {
+  UiFeedbackPort,
+  type UiFailureNotice,
+  type UiSuccessNotice,
+} from "@langwatch/ui-host/capabilities";
 
 /** How long a failure stays up: long enough to read it and copy the error id. */
 const FAILURE_DURATION_MS = 12_000;

@@ -4,10 +4,10 @@ import { useState } from "react";
 
 import { createInitialState } from "../../../model/experiments-v3/types";
 import { extractPersistedState } from "../../../model/experiments-v3/types/persistence";
-import { showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { generateHumanReadableId } from "@langwatch/experiment-contract";
 
 import { PageLayout } from "@langwatch/design-system/page-layout";

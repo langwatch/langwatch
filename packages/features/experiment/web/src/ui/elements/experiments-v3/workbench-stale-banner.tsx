@@ -1,7 +1,7 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
 import { useState } from "react";
 
-import { showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
 
 /**
  * Shown when the server holds a newer version of this workbench and the user

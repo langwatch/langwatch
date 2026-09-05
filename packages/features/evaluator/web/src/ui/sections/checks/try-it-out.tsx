@@ -19,7 +19,7 @@ import type { UseFormReturn } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
-import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
+import { toaster } from "@langwatch/ui-host/toaster";
 import { useFilterParams } from "@langwatch/analytics-web/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import {
@@ -534,7 +534,7 @@ export function TryItOut({
                                 </Table.Cell>
                               ) : null}
                             </>
-                          ) : i == firstPassingPrecondition ? (
+                          ) : i === firstPassingPrecondition ? (
                             <Table.Cell maxWidth="120">Waiting to run</Table.Cell>
                           ) : (
                             <Table.Cell maxWidth="120"></Table.Cell>

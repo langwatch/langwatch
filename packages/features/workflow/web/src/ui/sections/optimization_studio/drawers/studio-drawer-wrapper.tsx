@@ -8,7 +8,7 @@ import { Columns, Copy, MoreHorizontal, Trash2, X } from "react-feather";
 import { useWindowSize } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
 import { HoverableBigText } from "../../hoverable-big-text";
-import { Drawer } from "../../../elements/drawer";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { DrawerFooterContext, useWorkflowStore } from "@langwatch/workflow-web";

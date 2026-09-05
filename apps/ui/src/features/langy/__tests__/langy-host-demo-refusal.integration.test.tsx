@@ -66,7 +66,7 @@ import {
   type UiActiveScope,
   type UiActor,
   type UiCapabilities,
-} from "../../../behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { withHost } from "../../../ui/sections/ui-page";
 import { LangyHost } from "../ui/sections/host";
 

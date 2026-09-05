@@ -1,10 +1,7 @@
 import { Button, Field, HStack, NativeSelect, Text } from "@chakra-ui/react";
-import type { TRPCClientErrorLike } from "@trpc/client";
-import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import { ChevronLeft, ChevronRight } from "lucide-react"; // Changed from react-feather
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
-import type { AppRouter } from "@langwatch/workflow-web/studio-host/api";
+import { useRouter } from "@langwatch/ui-host/use-router";
 
 // Constants
 const DEFAULT_PAGE_SIZE = 25;
@@ -333,7 +330,6 @@ export function MessagesNavigationFooter({
   pageOffset = 0,
   pageSize,
   isPastFirstPage = false,
-  cursorInfo = null,
   cursorPageNumber = 1,
   estimatedTotalPages = 1,
   nextPage,

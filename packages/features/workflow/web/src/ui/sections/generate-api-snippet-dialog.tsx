@@ -6,7 +6,7 @@ import React, { createContext, useContext, useMemo, useState } from "react";
 import type { Snippet, Target } from "@langwatch/prompt-web/surfaces/api-snippet";
 import { uppercaseFirstLetter } from "@langwatch/design-system/string-casing";
 import { RenderCode } from "./code/render-code";
-import { Dialog } from "../elements/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 

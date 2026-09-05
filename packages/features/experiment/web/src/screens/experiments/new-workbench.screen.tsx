@@ -11,7 +11,7 @@ import { HandledErrorAlert } from "@langwatch/workflow-web/studio-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 
 /**
  * Builds a saved dataset reference from a loaded dataset, mirroring the

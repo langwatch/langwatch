@@ -17,7 +17,8 @@ import {
 } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
 import { api } from "../../../../behavior/studio-host/api";
-import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL } from "../../../../model/constants";
+import { DEFAULT_EMBEDDINGS_MODEL } from "../../../../model/constants";
+import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { useRegisterDrawerFooter, useWorkflowStore } from "@langwatch/workflow-web";
 import type { Evaluator, Field } from "@langwatch/workflow-contract";
 import {

@@ -11,7 +11,7 @@ import {
 } from "@langwatch/prompt-web/screens/prompt-studio";
 import { useMemo, type ReactNode } from "react";
 import { browserUiLogger, browserUiStorage } from "../../../../behavior/ui-browser-storage";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
 import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { resolvePromptDrawerAddress } from "../../behavior/prompt-drawer-address";

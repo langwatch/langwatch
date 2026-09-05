@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "./next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { OnboardingFlowDirection } from "./types";
 
 export function useGenericOnboardingFlow<

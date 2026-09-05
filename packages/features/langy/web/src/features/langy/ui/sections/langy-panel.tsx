@@ -88,7 +88,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { showErrorToast } from "../../../../behavior/errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
 import { ModelProviderScreen } from "../../../../ui/sections/model-provider-setup-gap";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useFeatureFlag } from "../../../../behavior/use-feature-flag";
@@ -103,7 +103,7 @@ import { useReducedMotion } from "../../../../behavior/use-reduced-motion";
 import type { LangyResourceContext } from "@langwatch/langy-contract";
 import { api, trpcClient } from "../../../../behavior/langy-api";
 import { LangyPlanCard } from "./langy-plan-card";
-import { useRouter } from "../../../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { useLangyConversationCommands } from "../../behavior/data/use-langy-conversation-commands";
 import { useLangyConversationList } from "../../behavior/data/use-langy-conversation-list";
 import { useLangyMessages } from "../../behavior/data/use-langy-messages";
@@ -3188,7 +3188,7 @@ function PanelHeader({
   hideClose,
   historyOpen,
   onToggleHistory,
-  devMode,
+  devMode: _devMode,
   devDrawerOpen,
   onToggleDevDrawer,
 }: {

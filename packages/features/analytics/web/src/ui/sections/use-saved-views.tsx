@@ -25,7 +25,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { availableFilters } from "../../model/filters/registry";
 import type { FilterField } from "../../model/filters/types";
 import { api } from "@langwatch/workflow-web/studio-host/api";

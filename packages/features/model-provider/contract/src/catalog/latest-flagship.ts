@@ -40,3 +40,6 @@ export const getLatestFlagshipForProvider = (
 
 export const getLatestOpenAIChatFlagship = (): string | undefined =>
   getLatestFlagshipForProvider("openai", "chat");
+
+/** The newest plain OpenAI chat flagship, falling back only when unreachable. */
+export const DEFAULT_MODEL = getLatestOpenAIChatFlagship() ?? "openai/gpt-5";

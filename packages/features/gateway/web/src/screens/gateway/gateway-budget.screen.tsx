@@ -462,7 +462,13 @@ type ScopeTarget = {
   memberCount?: number;
 };
 
-function ScopeBadge({ target, projectSlug }: { target: ScopeTarget; projectSlug: string | null }) {
+function ScopeBadge({
+  target,
+  projectSlug: _projectSlug,
+}: {
+  target: ScopeTarget;
+  projectSlug: string | null;
+}) {
   const kindLabel = target.kind.toLowerCase().replaceAll("_", " ");
   const vkHref = target.kind === "VIRTUAL_KEY" ? `/gateway/virtual-keys/${target.id}` : null;
   return (

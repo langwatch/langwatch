@@ -15,7 +15,11 @@ type UseVariableMenuProps = {
   onCreateVariable?: (variable: Variable) => void;
   onSetVariableMapping?: (identifier: string, sourceId: string, field: string) => void;
   otherNodesFields: Record<string, string[]>;
-  onAddEdge?: (nodeId: string, field: string, content: PromptTextAreaOnAddMention) => string | void;
+  onAddEdge?: (
+    nodeId: string,
+    field: string,
+    content: PromptTextAreaOnAddMention,
+  ) => string | undefined;
   /** Shared caret position ref (owned by parent, shared across menus) */
   caretPositionRef: React.RefObject<CaretPosition | null>;
   /** Shared last user cursor position ref (owned by parent, shared across menus) */

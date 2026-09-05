@@ -1,232 +1,32 @@
 /**
- * What the moved Langy modules do with a failure.
+ * The failure surfaces this package renders INTO a page.
  *
- * `platform/app/src/features/errors` is the APPLICATION's — a code-keyed
- * presentation registry, the toaster that renders it and the form binder that
- * places a rejection on the field it belongs to. None of it may be imported
- * from a feature-web package, and none of it is copied here: the words a
- * customer reads are the application's to decide, which is exactly what
- * `LangyHostPort.failed` hands back to it. The workflow family wrote the
- * same seam for the same reason, and this is that shape against this host.
- *
- * The names below are the ones the moved files import, kept letter for letter so
- * none of those files needed an edit beyond the module path.
- *
- * WHAT IS NARROWER THAN THE APPLICATION'S, named rather than hidden:
- * `applyHandledErrorToForm` places a validation refusal on the fields the
- * server named in `meta.fieldErrors`, but the SENTENCE it places is the generic
- * one — the registry that knows better lives in the application. A refusal
- * still lands where the reader is looking, which is the property the helper
- * exists for.
+ * Reporting a failure OVER the page is `showErrorToast` in
+ * `@langwatch/ui-host/errors`, and the words for a code come from the one
+ * code-keyed registry, `@langwatch/handled-error/presentation`. What is left
+ * here is the rendering: an inline alert and a whole-page dead end, which have
+ * no counterpart on the feedback port because they are layout, not a report.
  */
 
 import { Alert, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
-import { useLangyHost, type LangyHostPort } from "../model/langy-host";
+import { explainAnyError } from "@langwatch/handled-error/presentation";
 
 /**
- * The generic line, shared by every slot below so the two never disagree.
- *
- * Word for word the application registry's `UNKNOWN_ERROR_PRESENTATION`
- * description, because a failure that reads one way inside a run board and
- * another way on the page next to it is two products.
- */
-export const UNKNOWN_ERROR_DESCRIPTION = "We've been notified. Try again in a moment.";
-
-export type ErrorExplanation = {
-  title: string;
-  description: string;
-  code?: string;
-  /**
-   * Whether the failure carries a CODE — not whether this package has the words
-   * for it. The code-keyed registry is the application's and did not travel.
-   */
-  isRegistered?: boolean;
-};
-
-export const UNKNOWN_ERROR_PRESENTATION: ErrorExplanation = {
-  title: "Something went wrong",
-  description: UNKNOWN_ERROR_DESCRIPTION,
-  isRegistered: false,
-};
-
-export type HandledErrorShape = {
-  code: string;
-  httpStatus: number;
-  /** Whatever the code documented. Read by key, never spread into the UI. */
-  meta: Record<string, unknown>;
-  /** The one identifier a customer can hand to support. Absent on a browser-side refusal. */
-  traceId?: string;
-  /**
-   * Whose fault the failure was — `customer`, `platform` or `provider`.
-   *
-   * Langy's error explainer reads it to decide whether to offer a retry or a
-   * correction, which is the one place in the product where it reaches a reader.
-   */
-  fault?: string;
-  /** Remediation lines the code documented, in the order they should be read. */
-  tips?: string[];
-  /** Where the code is written up, when it is. */
-  docsUrl?: string;
-  /** Why a refusal was made, for a code that refuses on several grounds at once. */
-  reasons: unknown[];
-  /** Whether trying the same thing again could work. Langy offers a retry on it. */
-  retryable?: boolean;
-};
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/** The tRPC envelope's payload, or `null` when the failure was not a handled one. */
-export function readHandledError(error: unknown): HandledErrorShape | null {
-  const candidate = (error as { data?: { error?: unknown } } | null)?.data?.error;
-  if (!isRecord(candidate)) return null;
-  const code = typeof candidate.code === "string" ? candidate.code : null;
-  if (code === null) return null;
-  if (typeof candidate.httpStatus !== "number") return null;
-  return {
-    code,
-    httpStatus: candidate.httpStatus,
-    meta: isRecord(candidate.meta) ? candidate.meta : {},
-    ...(typeof candidate.traceId === "string" ? { traceId: candidate.traceId } : {}),
-    ...(typeof candidate.fault === "string" ? { fault: candidate.fault } : {}),
-    ...(Array.isArray(candidate.tips) ? { tips: candidate.tips as string[] } : {}),
-    ...(typeof candidate.docsUrl === "string" ? { docsUrl: candidate.docsUrl } : {}),
-    reasons: Array.isArray(candidate.reasons) ? candidate.reasons : [],
-    ...(typeof candidate.retryable === "boolean" ? { retryable: candidate.retryable } : {}),
-  };
-}
-
-/** The whole explanation as one string, for slots that can only take text. */
-export function describeError({
-  error: _error,
-  fallbackTitle,
-}: {
-  error: unknown;
-  fallbackTitle?: string;
-}): string {
-  return `${fallbackTitle ?? UNKNOWN_ERROR_PRESENTATION.title}. ${UNKNOWN_ERROR_DESCRIPTION}`;
-}
-
-/**
- * The code a failure carries, from either shape it arrives in.
- *
- * A tRPC failure wraps the payload in `data.error`; a handled error serialized
- * in the browser IS the payload. Both are read, because the caller does not
- * always know which it has.
- */
-function codeOf(error: unknown): string | null {
-  const handled = readHandledError(error);
-  if (handled) return handled.code;
-  if (isRecord(error) && typeof error.code === "string") return error.code;
-  return null;
-}
-
-/**
- * What a customer reads for a failure, as much of it as this package can say.
- *
- * WHAT IS LOST, named rather than hidden: the registry's specific title and
- * description for a code it lists. A caller's `fallbackTitle` carries the
- * weight instead, which is why every call site passes one.
- */
-export function explainAnyError(error: unknown): ErrorExplanation {
-  const code = codeOf(error);
-  if (code === null) return UNKNOWN_ERROR_PRESENTATION;
-  return { ...UNKNOWN_ERROR_PRESENTATION, code, isRegistered: true };
-}
-
-export const explainSerializedError = explainAnyError;
-export const explainHandledError = explainAnyError;
-
-export type ShowErrorToastOptions = {
-  error?: unknown;
-  fallbackTitle?: string;
-  description?: string;
-  id?: string;
-};
-
-let mounted: LangyHostPort | undefined;
-
-/** Called by this family's host provider on mount, and cleared on unmount. */
-export function setLangyErrorHost(host: LangyHostPort | undefined): void {
-  mounted = host;
-}
-
-/**
- * Reports a failure through the application's own feedback capability.
- *
- * A singleton for the same reason the toaster is one: most of these fire from a
- * mutation callback, where no hook can run.
- */
-export function showErrorToast(options: ShowErrorToastOptions): void {
-  if (!mounted) {
-    // oxlint-disable-next-line no-console
-    console.warn("A langy failure was reported with no host mounted:", options.fallbackTitle);
-    return;
-  }
-  mounted.failed({
-    error: options.error,
-    fallbackTitle: options.fallbackTitle ?? UNKNOWN_ERROR_PRESENTATION.title,
-    description: options.description,
-    id: options.id,
-  });
-}
-
-/** The key `applyHandledErrorToForm` writes a whole-form refusal under. */
-export const FORM_SERVER_ERROR = "root.serverError";
-
-/**
- * As much of a react-hook-form as these two helpers touch.
- *
- * Structural and deliberately loose: the forms that pass one in are typed by
- * their own value shapes, and narrowing `setError` to `string` would make every
- * caller cast.
+ * As much of a react-hook-form as {@link FormServerError} reads — the whole-form
+ * slot `applyHandledErrorToForm` writes into.
  */
 type MinimalForm = {
+  /** Not read here — it is what identifies the value as a form at all. */
   // oxlint-disable-next-line no-explicit-any
   setError: (name: any, error: { type: string; message: string }) => void;
-  formState: { errors: Record<string, unknown> };
+  formState?: { errors: Record<string, unknown> };
 };
-
-/**
- * Places a server's field-level rejection on the fields it named.
- *
- * Answers `true` when it placed something, which is the caller's signal to NOT
- * also raise a toast — a refusal reported twice reads as two failures.
- */
-export function applyHandledErrorToForm({
-  error,
-  form,
-  hasFormErrorSlot,
-}: {
-  error: unknown;
-  form: MinimalForm;
-  hasFormErrorSlot?: boolean;
-}): boolean {
-  const handled = readHandledError(error);
-  if (!handled) return false;
-
-  const fieldErrors = handled.meta.fieldErrors;
-  let placed = false;
-  if (isRecord(fieldErrors)) {
-    for (const [field, message] of Object.entries(fieldErrors)) {
-      const text = Array.isArray(message) ? String(message[0] ?? "") : String(message ?? "");
-      if (!text) continue;
-      form.setError(field, { type: "server", message: text });
-      placed = true;
-    }
-  }
-  if (placed) return true;
-  if (!hasFormErrorSlot) return false;
-  form.setError(FORM_SERVER_ERROR, { type: "server", message: UNKNOWN_ERROR_DESCRIPTION });
-  return true;
-}
 
 /** Renders whatever `applyHandledErrorToForm` put in the whole-form slot. */
 export function FormServerError({ form }: { form: MinimalForm }) {
-  const root = form.formState.errors.root as { serverError?: { message?: string } } | undefined;
+  const root = form.formState?.errors.root as { serverError?: { message?: string } } | undefined;
   const message = root?.serverError?.message;
   if (!message) return null;
   return (
@@ -331,10 +131,4 @@ export function HandledErrorAlert({
       )}
     </Alert.Root>
   );
-}
-
-/** Publishes the host to the singleton above. Rendered by the host provider. */
-export function useLangyErrorHostBinding(): void {
-  const host = useLangyHost();
-  setLangyErrorHost(host);
 }

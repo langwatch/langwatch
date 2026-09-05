@@ -6,7 +6,7 @@ import { AnalyticsBoundary } from "react-contextual-analytics";
 import { LoadingScreen } from "../blocks/loading-screen";
 import { useRequiredSession } from "../../behavior/use-required-session";
 import { api } from "../../behavior/onboarding-api";
-import { useRouter } from "../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 import { useOnboardingHost } from "../../model/onboarding-host";
 import { OnboardingContainer } from "../blocks/onboarding-container";

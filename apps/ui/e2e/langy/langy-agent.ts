@@ -303,9 +303,6 @@ export interface SettledToolCall {
   isError: boolean;
 }
 
-/** How long the harness listens to one turn's stream. */
-const TURN_STREAM_TIMEOUT_MS = 420_000;
-
 /** A turn's reply, and how the turn arrived at it. */
 interface TurnText {
   /** The reply, chosen the way the product chooses it (see the fold below). */
@@ -470,8 +467,7 @@ async function streamTurnText({
     const { value, done } = await reader.read();
     if (done) break;
     buf += decoder.decode(value, { stream: true });
-    let idx: number;
-    while ((idx = buf.indexOf("\n\n")) >= 0) {
+    for (let idx = buf.indexOf("\n\n"); idx >= 0; idx = buf.indexOf("\n\n")) {
       const frame = buf.slice(0, idx);
       buf = buf.slice(idx + 2);
       handleFrame(frame);

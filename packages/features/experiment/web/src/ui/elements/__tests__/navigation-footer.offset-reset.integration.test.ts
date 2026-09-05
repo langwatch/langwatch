@@ -18,7 +18,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 let mockQuery: Record<string, string> = {};
 const mockPush = vi.fn();
 
-vi.mock("@langwatch/workflow-web/studio-host/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
     query: mockQuery,
     pathname: "/[project]/experiments",

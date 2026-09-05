@@ -148,7 +148,7 @@ function SelectField({ config, value, onChange, disabled }: SelectFieldProps) {
 // ============================================================================
 
 export function ParameterField({
-  name,
+  name: _name,
   config,
   value,
   onChange,

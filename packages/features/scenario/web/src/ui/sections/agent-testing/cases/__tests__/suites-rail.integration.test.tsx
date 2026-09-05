@@ -25,7 +25,7 @@ import type { SuiteLastRun } from "../use-test-cases-data";
 
 const routerPush = vi.fn();
 
-vi.mock("../../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
     push: routerPush,

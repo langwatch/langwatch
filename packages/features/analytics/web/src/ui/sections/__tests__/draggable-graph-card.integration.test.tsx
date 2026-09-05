@@ -23,8 +23,6 @@
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-
 import { StubAnalyticsHost, AnalyticsTestHarness } from "../../../testing";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";

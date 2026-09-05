@@ -267,7 +267,7 @@ export const formatEvaluationSummary = (
   return evaluation.averagePassed !== undefined
     ? numeral(evaluation.averagePassed).format("0.[0]%") +
         (short ? " " : " pass") +
-        (short || evaluation.averagePassed == evaluation.averageScore
+        (short || evaluation.averagePassed === evaluation.averageScore
           ? ""
           : ` (${numeral(evaluation.averageScore).format("0.0[0]")} avg. score)`)
     : numeral(evaluation.averageScore).format("0.[00]");

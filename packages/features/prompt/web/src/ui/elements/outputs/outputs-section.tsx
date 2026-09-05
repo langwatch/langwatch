@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { LuBraces } from "react-icons/lu";
 import { fromZodError } from "zod-validation-error";
 
-import { Dialog } from "@langwatch/workflow-web/components/ui/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { CodeEditor } from "@langwatch/workflow-web/optimization_studio/components/code/workflow-code-editor.transport";

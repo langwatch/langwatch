@@ -1,7 +1,8 @@
 import { useCallback } from "react";
 import type { SuiteTarget } from "@langwatch/suite-contract";
 import type { TargetValue } from "../../scenarios/target-selector";
-import { readHandledError, showErrorToast, describeError } from "../../../../behavior/errors";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { showErrorToast, describeError } from "@langwatch/ui-host/errors";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { useAllPromptsForProject } from "../../../../behavior/prompts/use-all-prompts-for-project";
 import { api } from "../../../../behavior/scenario-api";

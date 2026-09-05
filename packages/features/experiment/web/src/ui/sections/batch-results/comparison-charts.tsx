@@ -391,6 +391,42 @@ const comparisonMetrics = ({
     })),
 ];
 
+interface GroupMetricsAccumulator {
+  displayName: string;
+  costs: number[];
+  latencies: number[];
+  scores: Record<string, number[]>;
+  passRates: Record<string, number[]>;
+}
+
+/** Folds one target's computed metrics into its group's running totals. */
+function accumulateGroupMetrics(
+  existing: GroupMetricsAccumulator,
+  targetMetrics: TargetMetricsResult,
+): void {
+  existing.costs.push(targetMetrics.totalCost);
+  if (targetMetrics.avgLatency > 0) {
+    existing.latencies.push(targetMetrics.avgLatency);
+  }
+  for (const [evalId, score] of Object.entries(targetMetrics.avgScores)) {
+    if (!existing.scores[evalId]) existing.scores[evalId] = [];
+    existing.scores[evalId]!.push(score);
+  }
+  for (const [evalId, rate] of Object.entries(targetMetrics.passRates)) {
+    if (!existing.passRates[evalId]) existing.passRates[evalId] = [];
+    existing.passRates[evalId]!.push(rate);
+  }
+}
+
+/** Averages each key's samples, naming the result `${prefix}_${key}`. */
+function prefixedAverages(record: Record<string, number[]>, prefix: string): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const [k, v] of Object.entries(record)) {
+    result[`${prefix}_${k}`] = v.reduce((a, b) => a + b, 0) / v.length;
+  }
+  return result;
+}
+
 export const ComparisonCharts = ({
   comparisonData,
   isVisible: controlledVisible,
@@ -638,21 +674,8 @@ export const ComparisonCharts = ({
             passRates: {},
           };
 
-          // Add this target's metrics
-          existing.costs.push(targetMetrics.totalCost);
-          if (targetMetrics.avgLatency > 0) {
-            existing.latencies.push(targetMetrics.avgLatency);
-          }
-
-          // Aggregate per-target evaluator metrics (NOT global run.metrics!)
-          for (const [evalId, score] of Object.entries(targetMetrics.avgScores)) {
-            if (!existing.scores[evalId]) existing.scores[evalId] = [];
-            existing.scores[evalId]!.push(score);
-          }
-          for (const [evalId, rate] of Object.entries(targetMetrics.passRates)) {
-            if (!existing.passRates[evalId]) existing.passRates[evalId] = [];
-            existing.passRates[evalId]!.push(rate);
-          }
+          // Add this target's metrics (per-target, NOT global run.metrics!)
+          accumulateGroupMetrics(existing, targetMetrics);
 
           targetGroups.set(targetCol.id, existing);
         }
@@ -664,18 +687,8 @@ export const ComparisonCharts = ({
         color: targetColors[id] ?? RUN_COLORS[index % RUN_COLORS.length]!,
         cost: data.costs.reduce((a, b) => a + b, 0) / (data.costs.length || 1),
         latency: data.latencies.reduce((a, b) => a + b, 0) / (data.latencies.length || 1),
-        ...Object.fromEntries(
-          Object.entries(data.scores).map(([k, v]) => [
-            `score_${k}`,
-            v.reduce((a, b) => a + b, 0) / v.length,
-          ]),
-        ),
-        ...Object.fromEntries(
-          Object.entries(data.passRates).map(([k, v]) => [
-            `pass_${k}`,
-            v.reduce((a, b) => a + b, 0) / v.length,
-          ]),
-        ),
+        ...prefixedAverages(data.scores, "score"),
+        ...prefixedAverages(data.passRates, "pass"),
       }));
     }
 
@@ -761,20 +774,7 @@ export const ComparisonCharts = ({
         };
 
         // Add this target's metrics
-        existing.costs.push(targetMetrics.totalCost);
-        if (targetMetrics.avgLatency > 0) {
-          existing.latencies.push(targetMetrics.avgLatency);
-        }
-
-        // Aggregate evaluator metrics
-        for (const [evalId, score] of Object.entries(targetMetrics.avgScores)) {
-          if (!existing.scores[evalId]) existing.scores[evalId] = [];
-          existing.scores[evalId]!.push(score);
-        }
-        for (const [evalId, rate] of Object.entries(targetMetrics.passRates)) {
-          if (!existing.passRates[evalId]) existing.passRates[evalId] = [];
-          existing.passRates[evalId]!.push(rate);
-        }
+        accumulateGroupMetrics(existing, targetMetrics);
 
         propertyGroups.set(key, existing);
       }
@@ -785,18 +785,8 @@ export const ComparisonCharts = ({
       color: RUN_COLORS[index % RUN_COLORS.length]!,
       cost: data.costs.reduce((a, b) => a + b, 0) / (data.costs.length || 1),
       latency: data.latencies.reduce((a, b) => a + b, 0) / (data.latencies.length || 1),
-      ...Object.fromEntries(
-        Object.entries(data.scores).map(([k, v]) => [
-          `score_${k}`,
-          v.reduce((a, b) => a + b, 0) / v.length,
-        ]),
-      ),
-      ...Object.fromEntries(
-        Object.entries(data.passRates).map(([k, v]) => [
-          `pass_${k}`,
-          v.reduce((a, b) => a + b, 0) / v.length,
-        ]),
-      ),
+      ...prefixedAverages(data.scores, "score"),
+      ...prefixedAverages(data.passRates, "pass"),
     }));
   }, [runMetrics, xAxisOption, promptNames, comparisonEvaluatorIds]);
 

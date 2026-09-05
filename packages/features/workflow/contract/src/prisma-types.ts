@@ -8,11 +8,10 @@
  * must stay identical to `schema.prisma` or a picker stops offering a value the
  * server accepts.
  *
- * A SECOND COPY OF `Project`, and the reason is worth naming: the trace family
- * restated it in `@langwatch/trace-web/model/prisma-types` for the same reason
- * on the same day, and neither package may depend on the other's model layer
- * for a Prisma shape. Both stop being restatements when a contract package
- * publishes the row.
+ * Moved here from `@langwatch/workflow-web/model/prisma-types` so features
+ * outside workflow can import it as a contract rather than a feature-web
+ * internal. `@langwatch/trace-web/model/prisma-types` still restates
+ * `Project` separately; the two stop being copies when trace's moves too.
  */
 
 /** How an evaluator runs: on every trace, on a sample, or only when called. */

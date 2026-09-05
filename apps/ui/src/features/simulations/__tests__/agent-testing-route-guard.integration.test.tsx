@@ -43,7 +43,7 @@ import {
   UiSessionPort,
   type UiActiveScope,
   type UiCapabilities,
-} from "../../../behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { simulationsPageLoaders } from "../ui/sections/routes";
 
 const AGENT_TESTING_PAGE = "pages/[project]/agent-testing/[[...path]]";

@@ -3,7 +3,7 @@ import { LoadingScreen } from "@langwatch/design-system/loading-screen";
 import { ExperimentType } from "../../model/prisma-types";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 
 /**
  * Redirects to the workbench when workbench-native (EVALUATIONS_V3 or a

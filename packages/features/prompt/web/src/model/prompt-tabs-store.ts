@@ -374,6 +374,11 @@ function createTabAwarePersistStorage(
   };
 }
 
+/** Index of the window whose tabs include `tabId`, or -1 if none does. */
+function findWindowIndexContainingTab(windows: Window[], tabId: string): number {
+  return windows.findIndex((w) => w.tabs.some((t) => t.id === tabId));
+}
+
 function createDraggableTabsBrowserStore(projectId: string, capabilities: PromptTabsCapabilities) {
   const { logger } = capabilities;
   const storageKey = getStorageKey(projectId);
@@ -429,7 +434,7 @@ function createDraggableTabsBrowserStore(projectId: string, capabilities: Prompt
         removeTab: ({ tabId }) => {
           set((state) => {
             // Find the window containing the tab
-            const windowIndex = state.windows.findIndex((w) => w.tabs.some((t) => t.id === tabId));
+            const windowIndex = findWindowIndexContainingTab(state.windows, tabId);
 
             if (windowIndex === -1) {
               logger.warn({ tabId }, "Tab not found, cannot remove");
@@ -479,9 +484,7 @@ function createDraggableTabsBrowserStore(projectId: string, capabilities: Prompt
         splitTab: ({ tabId }) => {
           set((state) => {
             // Find the tabbedWindow that contains the source tab
-            const tabWindowIndex = state.windows.findIndex((w) =>
-              w.tabs.some((t) => t.id === tabId),
-            );
+            const tabWindowIndex = findWindowIndexContainingTab(state.windows, tabId);
             const tabWindow = state.windows[tabWindowIndex];
 
             if (!tabWindow) {
@@ -531,9 +534,7 @@ function createDraggableTabsBrowserStore(projectId: string, capabilities: Prompt
         moveTab: ({ tabId, windowId, index }) => {
           set((state) => {
             // Find the source window containing the tab
-            const sourceWindowIndex = state.windows.findIndex((w) =>
-              w.tabs.some((t) => t.id === tabId),
-            );
+            const sourceWindowIndex = findWindowIndexContainingTab(state.windows, tabId);
 
             if (sourceWindowIndex === -1) {
               logger.warn({ tabId }, "Tab not found, cannot move");

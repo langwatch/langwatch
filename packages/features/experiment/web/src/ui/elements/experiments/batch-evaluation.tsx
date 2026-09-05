@@ -12,11 +12,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { JsonObject } from "@langwatch/workflow-web/model/prisma-types";
 import numeral from "numeral";
 import { downloadCsv } from "@langwatch/csv/download";
 import { Download } from "react-feather";
-import type { Experiment, Project } from "@langwatch/workflow-web/model/prisma-types";
+import type { Experiment, JsonObject, Project } from "@langwatch/workflow-contract";
 import type { BatchEvaluation } from "../../../model/prisma-types";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -305,7 +304,7 @@ export default function BatchEvaluation({
                 </Table.Body>
               </Table.Root>
             </Box>
-          ) : evaluations.data && evaluations.data.length == 0 ? (
+          ) : evaluations.data && evaluations.data.length === 0 ? (
             <Text>No data found</Text>
           ) : (
             Object.entries(groupedByEvaluation ?? {}).map(([evaluationKey, evaluations]) => {

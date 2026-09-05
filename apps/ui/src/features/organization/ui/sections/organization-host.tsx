@@ -13,7 +13,7 @@ import {
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useMemo, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { downloadUiFile } from "../../../../behavior/ui-file-download";
 import { useUiOrganizationFacts } from "../../../../behavior/ui-organization-facts";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";

@@ -17,9 +17,9 @@ const graph = vi.hoisted(() => ({ error: null as unknown }));
 const departures = vi.hoisted(() => [] as string[]);
 
 vi.mock("@langwatch/onboarding-web/screens/onboarding", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/onboarding-web/screens/onboarding")>(
-    "@langwatch/onboarding-web/screens/onboarding",
-  );
+  const actual = await vi.importActual<
+    typeof import("@langwatch/onboarding-web/screens/onboarding")
+  >("@langwatch/onboarding-web/screens/onboarding");
   return {
     ...actual,
     onboardingApi: {
@@ -54,7 +54,7 @@ import {
   UiSessionPort,
   type UiActiveScope,
   type UiCapabilities,
-} from "../../../../behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { OnboardingHost } from "../sections/onboarding-host";
 
 class SilentNavigation extends UiNavigationPort {

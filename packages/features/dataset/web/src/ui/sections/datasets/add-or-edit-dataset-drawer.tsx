@@ -14,14 +14,11 @@ import { Eye, EyeOff, Trash2 } from "react-feather";
 import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
 import type { InMemoryDataset } from "./editor/dataset-editor-table";
 import { convertDatasetRecordsToColumnTypes } from "@langwatch/dataset-web";
-import {
-  describeError,
-  readHandledError,
-  showErrorToast,
-} from "@langwatch/workflow-web/studio-host/errors";
+import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
-import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { toaster } from "@langwatch/ui-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { tryToMapPreviousColumnsToNewColumns } from "@langwatch/workflow-web";
 import {

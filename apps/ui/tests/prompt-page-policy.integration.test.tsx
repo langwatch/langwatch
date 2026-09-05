@@ -63,7 +63,7 @@ import {
   type UiCapabilities,
   type UiFailureNotice,
   type UiSuccessNotice,
-} from "../src/behavior/ui-capabilities";
+} from "@langwatch/ui-host/capabilities";
 import { promptFeature } from "../src/features/prompt";
 import { MemoryRouter } from "react-router";
 

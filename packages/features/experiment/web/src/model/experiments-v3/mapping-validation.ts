@@ -87,9 +87,7 @@ export type WorkbenchValidationResult = {
 export const extractFieldsFromContent = (content: string): Set<string> => {
   const pattern = /\{\{(\w+)\}\}/g;
   const fields = new Set<string>();
-  let match;
-
-  while ((match = pattern.exec(content)) !== null) {
+  for (let match = pattern.exec(content); match !== null; match = pattern.exec(content)) {
     fields.add(match[1]!);
   }
 

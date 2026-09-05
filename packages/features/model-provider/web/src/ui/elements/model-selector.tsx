@@ -30,7 +30,7 @@ import {
 } from "@langwatch/prompt-web/components/llmPromptConfigs/constants";
 import { NoModelsConfiguredCallout } from "./no-models-configured-callout";
 import { InputGroup } from "@langwatch/design-system/input-group";
-import { Link } from "@langwatch/workflow-web/studio-host/link";
+import { Link } from "@langwatch/ui-host/link";
 import { Select } from "@langwatch/design-system/select";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 

@@ -7,7 +7,7 @@
  *
  * Spec: specs/model-providers/model-cost-matching-spans-preview.feature
  */
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockPreviewState, mockPreviewQueryInputs } = vi.hoisted(() => ({

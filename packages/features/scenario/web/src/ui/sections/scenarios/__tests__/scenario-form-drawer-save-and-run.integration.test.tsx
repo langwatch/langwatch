@@ -16,7 +16,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { setScenarioErrorHost } from "../../../../behavior/errors";
+import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
 
 vi.mock("@langwatch/prompt-web/components/prompts/PromptEditorDrawer", () => ({
   PromptEditorDrawer: () => null,
@@ -183,7 +183,7 @@ vi.mock("../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
     query: { project: "my-project" },
     pathname: "/[project]/simulations/scenarios",
@@ -243,19 +243,19 @@ describe("<ScenarioFormDrawer /> save-and-run data-loss regression", () => {
     // A bare-Error refusal reports through the family's error host rather
     // than calling the toaster directly; bind a minimal one so that path is
     // observable the same way the direct toaster.create call sites are.
-    setScenarioErrorHost({
+    setUiFeedbackHost({
       failed: (failure) =>
         mockToasterCreate({
           title: failure.fallbackTitle,
           description: failure.description,
           type: "error",
         }),
-    } as Parameters<typeof setScenarioErrorHost>[0]);
+    } as Parameters<typeof setUiFeedbackHost>[0]);
   });
 
   afterEach(() => {
     cleanup();
-    setScenarioErrorHost(undefined);
+    setUiFeedbackHost(undefined);
   });
 
   describe("given the drawer is in edit mode with an existing scenario", () => {

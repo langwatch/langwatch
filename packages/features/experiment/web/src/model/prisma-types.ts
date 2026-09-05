@@ -3,9 +3,9 @@
  * generated client.
  *
  * `~/generated/prisma/client` is the application's own generated client and a
- * browser package may not reach it. `@langwatch/workflow-web/model/prisma-types`
- * already answers for `Project` and `Experiment`, which is why only two names
- * are here.
+ * browser package may not reach it. `@langwatch/workflow-contract` already
+ * answers for `Project` and `Experiment`, which is why only two names are
+ * here.
  *
  * `ExperimentType` IS DERIVED RATHER THAN RESTATED, and that is the difference
  * worth keeping: `@langwatch/experiment-contract` already publishes the enum's

@@ -130,7 +130,7 @@ function sharedSaveFields({
  * failures are toasts, because the row they were fired from is still there
  * and has nowhere of its own to say so.
  */
-function useListMutations(refetch: () => Promise<unknown> | void) {
+function useListMutations(refetch: () => Promise<unknown> | undefined) {
   const toaster = useGatewayToaster();
   const showErrorToast = useShowErrorToast();
   const setDefault = api.routingPolicy.setDefault.useMutation({

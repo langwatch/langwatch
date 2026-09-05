@@ -13,8 +13,9 @@ import {
 import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
-import { applyHandledErrorToForm, FormServerError, showErrorToast } from "../../../behavior/errors";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { applyHandledErrorToForm, showErrorToast } from "@langwatch/ui-host/errors";
+import { FormServerError } from "../../../behavior/errors";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { EmojiPickerModal } from "@langwatch/workflow-web/optimization_studio/components/properties/modals/EmojiPickerModal";
@@ -22,7 +23,7 @@ import { getRandomWorkflowIcon, blankTemplate } from "@langwatch/workflow-web";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import type { AgentWithFields } from "@langwatch/agent-contract";
 import { api } from "../../../behavior/scenario-api";
-import { useRouter } from "../../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { trackEvent } from "../../../model/tracking";
 
 export type WorkflowSelectorDrawerProps = {

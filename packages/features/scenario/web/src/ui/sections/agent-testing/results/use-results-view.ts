@@ -16,7 +16,7 @@
  */
 
 import { useCallback, useMemo, useState } from "react";
-import { useRouter } from "../../../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import {
   type AgentTestingRoutingState,
   buildAgentTestingPush,

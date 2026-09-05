@@ -13,7 +13,7 @@ import type { ScenarioTabNavigatePayload } from "@langwatch/scenario-contract";
 import { useScenarioTabFollow } from "../use-scenario-tab-follow";
 import { useSimulationUpdateListener } from "../use-simulation-update-listener";
 import { api } from "../scenario-api";
-import { useRouter } from "../next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { toAgentTestingRunPath } from "./results/run-plans";
 
 /**

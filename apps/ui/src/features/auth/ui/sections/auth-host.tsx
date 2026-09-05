@@ -9,7 +9,7 @@ import { readPublicAppConfig, toPublicEnvironment } from "@langwatch/ui/public-c
 import { useMemo, type ReactNode } from "react";
 
 import { useUiAddress } from "../../../../behavior/ui-address";
-import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 
 export function AuthHost({ children }: { children: ReactNode }) {
   const { route, feedback } = useUiCapabilities();

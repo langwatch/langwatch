@@ -12,7 +12,7 @@
  * render for real.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { type Tab, TabIdProvider, useIsOverflowing, useTabId } from "../../studio-internals";
+import { type Tab, useIsOverflowing, useTabId } from "../../studio-internals";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PromptTabStrip } from "../prompt-tab-strip";

@@ -55,7 +55,7 @@ type MessageRowProps = {
     handle: string,
     content: PromptTextAreaOnAddMention,
     idx: number,
-  ) => string | void;
+  ) => string | undefined;
   /** Whether to show role label and remove button */
   showControls?: boolean;
   /** Whether to render textarea in borderless mode (for horizontal layout) */
@@ -220,7 +220,7 @@ export function PromptMessagesField({
     handle: string,
     content: PromptTextAreaOnAddMention,
     idx: number,
-  ) => string | void;
+  ) => string | undefined;
 }) {
   const form = useFormContext<PromptConfigFormValues>();
   const { formState, control } = form;

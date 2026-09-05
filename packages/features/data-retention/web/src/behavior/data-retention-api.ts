@@ -88,7 +88,7 @@ export type DataRetentionApiMap = {
           scope: RetentionScopeInput;
           category: RetentionCategory;
         };
-        output: void;
+        output: undefined;
       };
     };
 
@@ -108,7 +108,7 @@ export type DataRetentionApiMap = {
     };
 
     killMutation: {
-      mutation: { input: ProjectScope & { mutationId: string }; output: void };
+      mutation: { input: ProjectScope & { mutationId: string }; output: undefined };
     };
   };
 

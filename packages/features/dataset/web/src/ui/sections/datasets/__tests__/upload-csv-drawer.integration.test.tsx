@@ -61,11 +61,11 @@ vi.mock("@langwatch/ui-host/use-drawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn() }),
 }));
 
-vi.mock("@langwatch/workflow-web/studio-host/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
-vi.mock("@langwatch/workflow-web/studio-host/toaster", () => ({
+vi.mock("@langwatch/ui-host/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 

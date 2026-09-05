@@ -17,7 +17,7 @@
  */
 import { useCallback, useMemo } from "react";
 import { survivesSelectionChange } from "../suites/use-suite-routing";
-import { useRouter } from "../next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 
 /** The catch-all page every Agent Testing address is pushed into. */
 export const AGENT_TESTING_PATHNAME = "/[project]/agent-testing/[[...path]]";

@@ -8,7 +8,7 @@ import { fieldSchema } from "@langwatch/workflow-contract";
 import { useWorkflowStore } from "./use-workflow-store";
 
 type SavedEvaluator = { id: string; name: string; evaluatorType?: string };
-type EvaluatorSaveResult = boolean | void;
+type EvaluatorSaveResult = boolean | undefined;
 
 export type EvaluatorPickerCallbacks = {
   onSelect: (evaluator: EvaluatorWithFields) => void;

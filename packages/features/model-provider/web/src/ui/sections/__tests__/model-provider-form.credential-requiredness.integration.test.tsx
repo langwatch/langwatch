@@ -15,7 +15,7 @@
  * Just the boundaries are stubbed: the tRPC client, the router-backed
  * drawer, feature flags, and the API-key probe.
  */
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

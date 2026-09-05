@@ -25,14 +25,10 @@ vi.mock("@langwatch/trace-web/components/SetupWithAgentButton", () => ({
 
 import { MemoryRouter, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
 import { ScenarioHostPort, ScenarioHostProvider } from "../../../model/scenario-host";
+import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
 
-// The global test-setup.ts stubs ~/utils/compat/next-router with an empty
-// router. For these tests we need the real compat layer because the bug
-// under test lives in its buildUrl / routeParamKeys logic.
-vi.unmock("../../next-router");
-vi.mock("../../next-router", async () => await vi.importActual<object>("../../next-router"));
-
-import { useRouter } from "../../next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { createRunHistoryStore } from "@langwatch/suite-web";
 import { ALL_RUNS_ID, EXTERNAL_SET_PREFIX, useSuiteRouting } from "../use-suite-routing";
 
@@ -87,8 +83,16 @@ function TestScenarioHost({ children }: { children: ReactNode }) {
       route() {
         return reading;
       }
-      setQuery() {
-        // The page under test writes whole addresses, never one key.
+      setQuery(next: Readonly<Record<string, string | undefined>>) {
+        // Mirrors the application's own route port: a whole-query write that
+        // stays on the page, which is what `useRouter` turns a query-only
+        // push into.
+        const written = new URLSearchParams();
+        for (const [key, value] of Object.entries(next)) {
+          if (value !== void 0) written.set(key, value);
+        }
+        const encoded = written.toString();
+        void navigate(`${location.pathname}${encoded ? `?${encoded}` : ""}`);
       }
       navigate(to: string, options?: { replace?: boolean }) {
         void navigate(to, { replace: options?.replace ?? false });
@@ -102,7 +106,11 @@ function TestScenarioHost({ children }: { children: ReactNode }) {
     })();
   }, [location.pathname, location.search, params, navigate]);
 
-  return <ScenarioHostProvider value={host}>{children}</ScenarioHostProvider>;
+  return (
+    <UiCapabilityContextProvider value={createUiCapabilitiesFromHost(host)}>
+      <ScenarioHostProvider value={host}>{children}</ScenarioHostProvider>
+    </UiCapabilityContextProvider>
+  );
 }
 
 /**

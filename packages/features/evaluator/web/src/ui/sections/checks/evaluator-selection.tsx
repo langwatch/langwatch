@@ -14,7 +14,7 @@ import {
 import { AlertTriangle, Plus, Shield } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 import NextLink from "@langwatch/workflow-web/utils/compat/next-link";
-import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { useFeatureFlag } from "@langwatch/workflow-web/hooks/useFeatureFlag";
 import { evaluatorDisplayName } from "@langwatch/evaluator-contract";
@@ -25,7 +25,7 @@ import {
 } from "@langwatch/evaluator-contract";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { titleCase } from "@langwatch/design-system/string-casing";
-import { Link } from "@langwatch/workflow-web/studio-host/link";
+import { Link } from "@langwatch/ui-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { CheckConfigFormData } from "./check-config-form";
 

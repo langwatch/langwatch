@@ -18,6 +18,30 @@
       "types": "./src/compat/next-dynamic.ts",
       "default": "./src/compat/next-dynamic.ts"
     },
+    "./capabilities": {
+      "types": "./src/capabilities.ts",
+      "default": "./src/capabilities.ts"
+    },
+    "./use-router": {
+      "types": "./src/use-router.ts",
+      "default": "./src/use-router.ts"
+    },
+    "./toaster": {
+      "types": "./src/toaster.ts",
+      "default": "./src/toaster.ts"
+    },
+    "./errors": {
+      "types": "./src/errors.ts",
+      "default": "./src/errors.ts"
+    },
+    "./testing": {
+      "types": "./src/testing.ts",
+      "default": "./src/testing.ts"
+    },
+    "./link": {
+      "types": "./src/link.tsx",
+      "default": "./src/link.tsx"
+    },
     "./use-drawer": {
       "types": "./src/use-drawer.ts",
       "default": "./src/use-drawer.ts"
@@ -41,12 +65,15 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@chakra-ui/react": "^3.36.0",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
     "date-fns": "^4.4.0",
     "zustand": "^4.5.7"
   },
   "devDependencies": {
+    "@emotion/react": "^11.14.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.14",

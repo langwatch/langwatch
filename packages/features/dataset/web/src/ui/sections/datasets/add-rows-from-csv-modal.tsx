@@ -2,8 +2,8 @@ import { Box, Button, HStack, NativeSelect, Spacer, Text } from "@chakra-ui/reac
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
-import { Dialog } from "@langwatch/workflow-web/components/ui/dialog";
-import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { toaster } from "@langwatch/ui-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import {
   type DatasetColumns,

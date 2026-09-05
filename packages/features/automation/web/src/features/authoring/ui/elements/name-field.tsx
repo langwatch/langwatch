@@ -11,7 +11,7 @@ const NAME_PLACEHOLDER = {
 export function AutomationNameField({
   source,
   value,
-  isEdit,
+  isEdit: _isEdit,
   configComplete,
   noun,
   onChange,

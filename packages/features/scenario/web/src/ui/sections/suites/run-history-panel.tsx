@@ -13,7 +13,8 @@ import type { Period } from "@langwatch/analytics-web/components/PeriodSelector"
 import { SetupWithAgentButton } from "@langwatch/trace-web/components/SetupWithAgentButton";
 import { ShadowDivider } from "../../elements/shadow-divider";
 import { toaster } from "@langwatch/design-system/toaster";
-import { HandledErrorAlert, showErrorToast } from "../../../behavior/errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
+import { HandledErrorAlert } from "../../../behavior/errors";
 import { LangyContextTarget, scenarioContextChip } from "@langwatch/langy-web";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
@@ -23,7 +24,7 @@ import { isOnPlatformSet, ScenarioRunStatus } from "@langwatch/scenario-contract
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { isSuiteSetId } from "@langwatch/suite-contract";
 import { api } from "../../../behavior/scenario-api";
-import { useRouter } from "../../../behavior/next-router";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import {
   GroupRow,
   RunHistoryFilters,

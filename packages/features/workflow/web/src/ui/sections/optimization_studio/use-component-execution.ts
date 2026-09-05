@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
-import { toaster } from "../../../behavior/studio-host/toaster";
+import { toaster } from "@langwatch/ui-host/toaster";
 import { generateOtelTraceId } from "@langwatch/trace-contract";
 import type { BaseComponent, Component, Field } from "@langwatch/workflow-contract";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";

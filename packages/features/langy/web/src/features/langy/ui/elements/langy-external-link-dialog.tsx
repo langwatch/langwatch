@@ -2,7 +2,7 @@ import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
 import { useRef } from "react";
 
-import { Dialog } from "@langwatch/workflow-web/components/ui/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 
 export interface LangyExternalLinkTarget {
   /** The full address, as the URL parser resolved it. */

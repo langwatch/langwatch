@@ -15,6 +15,8 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
 import { ScenarioHostPort, ScenarioHostProvider } from "../../../model/scenario-host";
 
 const state = vi.hoisted(() => ({
@@ -81,7 +83,11 @@ function TestScenarioHost({ children }: { children: React.ReactNode }) {
     }
   })();
 
-  return <ScenarioHostProvider value={host}>{children}</ScenarioHostProvider>;
+  return (
+    <UiCapabilityContextProvider value={createUiCapabilitiesFromHost(host)}>
+      <ScenarioHostProvider value={host}>{children}</ScenarioHostProvider>
+    </UiCapabilityContextProvider>
+  );
 }
 
 async function renderRoute() {
@@ -134,7 +140,7 @@ describe("the simulations address", () => {
     it("sends a saved run plan address to the plan in Agent Testing, without showing the v1 page", async () => {
       state.params = {
         project: "demo",
-        path: ["run-plans", "checkout", "batch_1"],
+        "*": "run-plans/checkout/batch_1",
       };
       state.query = { period: "7d" };
 
@@ -147,7 +153,7 @@ describe("the simulations address", () => {
     });
 
     it("sends the address the scenario library printed to the run in Agent Testing", async () => {
-      state.params = { project: "demo", path: ["python-examples", "batch_1"] };
+      state.params = { project: "demo", "*": "python-examples/batch_1" };
       state.query = {};
 
       await renderRoute();
@@ -183,7 +189,7 @@ describe("the simulations address", () => {
   describe("given the Agent Testing release flag is off", () => {
     /** @scenario "A saved simulations address opens as it did when the flag is off" */
     it("renders the v1 page and sends the reader nowhere", async () => {
-      state.params = { project: "demo", path: ["run-plans", "checkout"] };
+      state.params = { project: "demo", "*": "run-plans/checkout" };
       state.query = {};
 
       await renderRoute();
@@ -193,7 +199,7 @@ describe("the simulations address", () => {
     });
 
     it("still follows the v1 redirect for a near-miss address", async () => {
-      state.params = { project: "demo", path: ["scenarios", "scenario_1"] };
+      state.params = { project: "demo", "*": "scenarios/scenario_1" };
       state.query = {};
 
       await renderRoute();

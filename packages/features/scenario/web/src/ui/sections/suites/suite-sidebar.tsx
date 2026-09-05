@@ -383,7 +383,7 @@ function SidebarButton({
  */
 function RunSummaryLine({
   passedCount,
-  failedCount,
+  failedCount: _failedCount,
   totalCount,
 }: {
   passedCount: number;

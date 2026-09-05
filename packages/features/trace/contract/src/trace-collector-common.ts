@@ -17,7 +17,7 @@ export const getFirstInputAsText = (spans: Span[]): string => {
       span.type !== "guardrail" &&
       (span.input.type !== "json" || !isEmptyJson(span.input.value)) &&
       // Agent inputs captured by openinference from agno are not really human redable, skip it
-      !(span.params?.scope?.name == "openinference.instrumentation.agno" && span.type == "agent"),
+      !(span.params?.scope?.name === "openinference.instrumentation.agno" && span.type === "agent"),
   );
 
   let input = topmostInputs[0]?.input;
@@ -136,6 +136,25 @@ const getMessageContent = (message: any): unknown => {
   return message.content ?? message.parts;
 };
 
+/**
+ * The text of the LAST message in a chat-messages-shaped array, preferring
+ * the last one from `preferRole` if given.
+ */
+const extractLastMessageText = (json: any[], preferRole?: string): string => {
+  const preferredMessage = preferRole
+    ? [...json].reverse().find((m: any) => m?.role === preferRole)
+    : undefined;
+  const lastMessage = preferredMessage ?? json[json.length - 1];
+  const content = getMessageContent(lastMessage);
+  if (typeof content === "string") {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    return content.map(textFromContentBlock).join("");
+  }
+  return lastMessage ? JSON.stringify(lastMessage) : "";
+};
+
 export const typedValueToText = (
   typed: SpanInputOutput,
   last = false,
@@ -152,9 +171,9 @@ export const typedValueToText = (
     }
   };
 
-  if (typed.type == "text") {
+  if (typed.type === "text") {
     return typed.value;
-  } else if (typed.type == "chat_messages") {
+  } else if (typed.type === "chat_messages") {
     if (last) {
       const lastMessage = typed.value[typed.value.length - 1];
       if (!lastMessage) return "";
@@ -171,7 +190,7 @@ export const typedValueToText = (
         return content ?? JSON.stringify(message);
       })
       .join("");
-  } else if (typed.type == "json") {
+  } else if (typed.type === "json") {
     // A candidate value is "meaningful" when it's defined and not an empty
     // string/array/object — applied RECURSIVELY so a shell like
     // `{ output: { content: "" } }` is treated as empty at the top-level
@@ -321,18 +340,7 @@ export const typedValueToText = (
         "role" in json[0]
       ) {
         if (last) {
-          const preferredMessage = preferRole
-            ? [...json].reverse().find((m: any) => m?.role === preferRole)
-            : undefined;
-          const lastMessage = preferredMessage ?? json[json.length - 1];
-          const content = getMessageContent(lastMessage);
-          if (typeof content === "string") {
-            return content;
-          }
-          if (Array.isArray(content)) {
-            return content.map(textFromContentBlock).join("");
-          }
-          return lastMessage ? JSON.stringify(lastMessage) : "";
+          return extractLastMessageText(json, preferRole);
         }
         return json
           .map((message: any) => {
@@ -347,7 +355,7 @@ export const typedValueToText = (
       }
 
       const value =
-        Array.isArray(json) && json.length == 1
+        Array.isArray(json) && json.length === 1
           ? typeof json[0] === "string"
             ? json[0]
             : specialKeysMapping(json[0])
@@ -360,7 +368,7 @@ export const typedValueToText = (
     } catch {
       return typed.value?.toString() ?? "";
     }
-  } else if (typed.type == "list") {
+  } else if (typed.type === "list") {
     if (Array.isArray(typed.value) && typed.value.length > 0) {
       const item = last ? typed.value[typed.value.length - 1] : typed.value[0];
       // Only recurse into structured SpanInputOutput items (have "type" and "value").
@@ -371,7 +379,7 @@ export const typedValueToText = (
       }
     }
     return "";
-  } else if (typed.type == "raw") {
+  } else if (typed.type === "raw") {
     return stringified(typed.value);
   }
 
@@ -419,8 +427,8 @@ export const flattenSpanTree = (
 ): Span[] => {
   const result: Span[] = [];
 
-  const appendSpans = (spans: SpanWithChildren[]) => {
-    spans.forEach((span) => {
+  const appendSpans = (nodeSpans: SpanWithChildren[]) => {
+    nodeSpans.forEach((span) => {
       const spanWithoutChildren: Span = { ...span };
       //@ts-expect-error
       delete spanWithoutChildren.children;
@@ -428,19 +436,19 @@ export const flattenSpanTree = (
     });
   };
 
-  const traverseAndCollect = (spans: SpanWithChildren[]) => {
-    if (mode == "outside-in") {
-      appendSpans(spans);
+  const traverseAndCollect = (nodeSpans: SpanWithChildren[]) => {
+    if (mode === "outside-in") {
+      appendSpans(nodeSpans);
     }
 
-    spans.forEach((span) => {
+    nodeSpans.forEach((span) => {
       if (span.children && span.children.length > 0) {
         traverseAndCollect(span.children);
       }
     });
 
-    if (mode == "inside-out") {
-      appendSpans(spans);
+    if (mode === "inside-out") {
+      appendSpans(nodeSpans);
     }
   };
 

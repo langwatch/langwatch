@@ -44,7 +44,7 @@ const mockReplace = vi.fn();
 let mockQuery: Record<string, string | string[] | undefined> = {
   project: "my-project",
 };
-vi.mock("../../../../behavior/next-router", () => ({
+vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({
     query: mockQuery,
     pathname: "/[project]/simulations/[[...path]]",

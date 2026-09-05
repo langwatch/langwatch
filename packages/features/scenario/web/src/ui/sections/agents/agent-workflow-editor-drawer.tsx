@@ -16,10 +16,10 @@ import {
   isScenarioMappingValid,
   ScenarioInputMappingSection,
 } from "../../elements/suites/scenario-input-mapping-section";
-import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Link } from "../../elements/link";
 import type { FieldMapping, Variable } from "@langwatch/prompt-web/surfaces/variables";
-import { showErrorToast } from "../../../behavior/errors";
+import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { WorkflowCardDisplay } from "@langwatch/workflow-web";

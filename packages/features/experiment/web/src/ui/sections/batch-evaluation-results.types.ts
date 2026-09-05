@@ -263,6 +263,53 @@ export type BatchEvaluationData = {
  * Transforms raw ExperimentRunWithItems data into the row-based format
  * needed for TanStack Table display.
  */
+/**
+ * Resolves a V2-style predicted output for the "output"/"end"/flat target
+ * id, which may be flat (the output itself) or nested by node.
+ */
+const resolveV2OutputTargetPredicted = (
+  predicted: Record<string, unknown>,
+  targetId: string,
+): unknown => {
+  const isNested = Object.values(predicted).some(
+    (v) => typeof v === "object" && v !== null && !Array.isArray(v),
+  );
+  if (isNested && targetId in predicted) {
+    return predicted[targetId];
+  }
+  if (!isNested) {
+    return predicted;
+  }
+  return predicted.end ?? predicted;
+};
+
+/**
+ * Resolves a row's predicted output for a non-virtual target: V3 predicted
+ * is already the target's output; V2 predicted may be nested by node or flat
+ * under the "output"/"end"/"" target id.
+ */
+const resolvePredictedOutputForTarget = ({
+  predicted,
+  targetId,
+  isV3,
+}: {
+  predicted: Record<string, unknown>;
+  targetId: string;
+  isV3: boolean;
+}): unknown => {
+  if (isV3) {
+    return predicted;
+  }
+  if (targetId === "output" || targetId === "end" || targetId === "") {
+    // Check if it's flat (V2 old style) or nested
+    return resolveV2OutputTargetPredicted(predicted, targetId);
+  }
+  if (targetId in predicted) {
+    return predicted[targetId];
+  }
+  return null;
+};
+
 export const transformBatchEvaluationData = (data: ExperimentRunWithItems): BatchEvaluationData => {
   const { experimentId, runId, dataset, evaluations, targets, timestamps, progress, total } = data;
 
@@ -447,28 +494,11 @@ export const transformBatchEvaluationData = (data: ExperimentRunWithItems): Batc
         const rowEvaluations = evaluationsByIndexAndTarget.get(`${i}:`) ?? [];
         output = extractOutputFromEvaluatorInputsForEvaluator(rowEvaluations, evaluatorId);
       } else if (targetEntry?.predicted) {
-        if (targets && targets.length > 0) {
-          // V3: predicted is the output for this target
-          output = targetEntry.predicted;
-        } else {
-          // V2: predicted might be nested by node or flat
-          const predicted = targetEntry.predicted;
-          if (targetId === "output" || targetId === "end" || targetId === "") {
-            // Check if it's flat (V2 old style) or nested
-            const isNested = Object.values(predicted).some(
-              (v) => typeof v === "object" && v !== null && !Array.isArray(v),
-            );
-            if (isNested && targetId in predicted) {
-              output = predicted[targetId];
-            } else if (!isNested) {
-              output = predicted;
-            } else {
-              output = predicted.end ?? predicted;
-            }
-          } else if (targetId in predicted) {
-            output = predicted[targetId];
-          }
-        }
+        output = resolvePredictedOutputForTarget({
+          predicted: targetEntry.predicted,
+          targetId,
+          isV3: !!(targets && targets.length > 0),
+        });
       }
 
       // Get evaluator results for this target

@@ -592,7 +592,7 @@ export const TracesMapping = ({
       gap={2}
     >
       {titles?.map((title, idx) => (
-        <GridItem key={title} colSpan={idx == titles.length - 1 ? 1 : 2} paddingBottom={2}>
+        <GridItem key={title} colSpan={idx === titles.length - 1 ? 1 : 2} paddingBottom={2}>
           <Text fontWeight="semibold">{title}</Text>
         </GridItem>
       ))}
