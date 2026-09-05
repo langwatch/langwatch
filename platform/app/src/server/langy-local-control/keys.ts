@@ -51,6 +51,20 @@ export function sessionKeyBindingKey(apiKeyId: string): string {
   return `${PREFIX}:key_binding:${apiKeyId}`;
 }
 
+/**
+ * ZSET of the minted keys that control one conversation, scored by when each
+ * binding lapses.
+ *
+ * The binding above is keyed by the key's own id, which the panel does not
+ * have: disconnecting from the header chip knows a conversation and nothing
+ * else. Without this index the disconnect could clear presence and leave the
+ * credential alive for another six hours, so a command line that missed the
+ * disconnect frame simply reconnected and restored the folder.
+ */
+export function conversationKeyBindingsKey(conversationId: string): string {
+  return `${PREFIX}:conversation_keys:${conversationId}`;
+}
+
 /** The envelope of one local tool call, with the state it is in. */
 export function callKey(callId: string): string {
   return `${PREFIX}:call:${callId}`;

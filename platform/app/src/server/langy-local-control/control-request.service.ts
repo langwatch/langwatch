@@ -34,6 +34,7 @@ import type { ControlRequest } from "./http";
 import {
   controlRequestClaimKey,
   controlRequestKey,
+  conversationKeyBindingsKey,
   sessionKeyBindingKey,
   userRequestsKey,
 } from "./keys";
@@ -234,7 +235,34 @@ export class ControlRequestService {
 
   /** Drops the binding, so the key stops answering for the conversation. */
   async revokeKeyBinding(apiKeyId: string): Promise<void> {
+    const binding = await this.readKeyBinding(apiKeyId);
     await this.store.del(sessionKeyBindingKey(apiKeyId));
+    if (binding) {
+      await this.store.zrem(
+        conversationKeyBindingsKey(binding.conversationId),
+        apiKeyId,
+      );
+    }
+  }
+
+  /**
+   * Drops every binding for one conversation, so nothing controls it any more.
+   *
+   * What the panel's Disconnect needs: it knows the conversation, not the key.
+   * Presence is a separate thing and may already be gone, so this never reads
+   * it: revoking is the decision, and it holds whether or not a socket is
+   * still there to be told about it.
+   *
+   * @returns the keys that were revoked
+   */
+  async revokeConversationBindings(conversationId: string): Promise<string[]> {
+    const key = conversationKeyBindingsKey(conversationId);
+    const apiKeyIds = await this.store.zrangebyscore(key, 0);
+    for (const apiKeyId of apiKeyIds) {
+      await this.store.del(sessionKeyBindingKey(apiKeyId));
+      await this.store.zrem(key, apiKeyId);
+    }
+    return apiKeyIds;
   }
 
   async read(requestId: string): Promise<StoredControlRequest | null> {
@@ -288,6 +316,14 @@ export class ControlRequestService {
       } satisfies SessionKeyBinding),
       KEY_BINDING_TTL_SECONDS,
     );
+    // The reverse index: the panel disconnects a CONVERSATION, and this is how
+    // it finds the keys that control it.
+    await this.store.zadd({
+      key: conversationKeyBindingsKey(request.conversationId),
+      score: this.now() + KEY_BINDING_TTL_SECONDS * 1000,
+      member: minted.apiKeyId,
+      ttlSeconds: KEY_BINDING_TTL_SECONDS,
+    });
     await this.forget(request);
     logger.info(
       { requestId, conversationId: request.conversationId },

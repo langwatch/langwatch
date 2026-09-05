@@ -1000,9 +1000,19 @@ export const langyRouter = createTRPCRouter({
       });
       const runtime = getLocalControlRuntime();
       const workspace = await runtime.presence.read(input.conversationId);
-      if (!workspace) return { disconnected: false };
 
-      // Tell the command line first, so it prints why it is exiting rather
+      // The credential goes first, and it goes whether or not a folder is
+      // there to be told.
+      //
+      // The frame below is best effort: a command line that lost the network a
+      // second before this never receives it, and its own reconnect used to
+      // pass authentication on a binding that lives six hours, restoring the
+      // folder the reader had just disconnected. Revoking first closes that
+      // door, and revoking independently of presence closes it again for a
+      // record that had already lapsed.
+      await runtime.requests.revokeConversationBindings(input.conversationId);
+
+      // Then tell the command line, so it prints why it is exiting rather
       // than reading a closed socket as a network fault.
       await runtime.store.publish(
         workspaceChannel(input.conversationId),
@@ -1022,6 +1032,9 @@ export const langyRouter = createTRPCRouter({
             "The shared folder was disconnected, so the command did not finish.",
         });
       }
+      // The durable line belongs to a folder that was there. With no record
+      // to name, the revoke above is the whole of what this did.
+      if (!workspace) return { disconnected: false };
       await getApp().commands.langy.disconnectLocalWorkspace({
         tenantId: input.projectId,
         occurredAt: Date.now(),

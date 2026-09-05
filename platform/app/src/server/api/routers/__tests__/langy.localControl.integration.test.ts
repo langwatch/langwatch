@@ -58,6 +58,10 @@ vi.mock("~/server/app-layer/langy/langySkipPermissions", () => ({
 
 import { prisma } from "~/server/db";
 import {
+  conversationKeyBindingsKey,
+  sessionKeyBindingKey,
+} from "~/server/langy-local-control/keys";
+import {
   closeLocalControlRuntime,
   getLocalControlRuntime,
 } from "~/server/langy-local-control/runtime";
@@ -444,6 +448,46 @@ describe("given a folder shared with the conversation", () => {
           (command) => command.name === "local_workspace_disconnected",
         )?.data,
       ).toMatchObject({ reason: "panel" });
+    });
+  });
+
+  describe("when the command line never receives the disconnect", () => {
+    /** @scenario "Disconnecting revokes the key even when the command line cannot be reached" */
+    it("revokes the key that controlled the conversation, whatever presence says", async () => {
+      // The frame the mutation publishes is best effort. A command line that
+      // lost the network a second earlier misses it, and its own reconnect
+      // used to pass on a binding that lives six hours.
+      const runtime = getLocalControlRuntime();
+      // The binding an approval leaves behind. Written here rather than minted,
+      // because minting needs a real project row; that approving writes both
+      // keys is the control request service's own unit test.
+      const apiKeyId = `key-${ns}`;
+      await runtime.store.set(
+        sessionKeyBindingKey(apiKeyId),
+        JSON.stringify({
+          conversationId,
+          projectId,
+          userId,
+          requestId: `lcr_${ns}`,
+        }),
+        3600,
+      );
+      await runtime.store.zadd({
+        key: conversationKeyBindingsKey(conversationId),
+        score: Date.now() + 3_600_000,
+        member: apiKeyId,
+        ttlSeconds: 3600,
+      });
+      // The folder record has already lapsed: the machine went to sleep.
+      await runtime.presence.deregister({ conversationId });
+
+      const answer = await caller().disconnectLocalWorkspace({
+        projectId,
+        conversationId,
+      });
+
+      expect(answer).toEqual({ disconnected: false });
+      expect(await runtime.requests.readKeyBinding(apiKeyId)).toBeNull();
     });
   });
 

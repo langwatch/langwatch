@@ -181,6 +181,26 @@ describe("given a code access card that asked for a folder", () => {
 
       expect(await service.readKeyBinding(approved.apiKeyId)).toBeNull();
     });
+
+    /** @scenario "Disconnecting revokes the key even when the command line cannot be reached" */
+    it("revokes every key of the conversation, knowing only the conversation", async () => {
+      // What the panel has is a conversation, never a key id: it disconnects
+      // from the header chip. Without this reading the credential outlived the
+      // disconnect and the command line simply reconnected on it.
+      const approved = await service.approve({
+        requestId: (await create()).id,
+        userId,
+        projectId,
+      });
+
+      const revoked = await service.revokeConversationBindings(conversationId);
+
+      expect(revoked).toEqual([approved.apiKeyId]);
+      expect(await service.readKeyBinding(approved.apiKeyId)).toBeNull();
+      expect(await service.revokeConversationBindings(conversationId)).toEqual(
+        [],
+      );
+    });
   });
 
   describe("when the card for one conversation is waiting", () => {
