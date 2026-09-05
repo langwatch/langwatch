@@ -119,6 +119,11 @@ export const FRONTEND_FEATURE_FLAGS = [
   // remembered locally, and falls back to the deployment's `IDENTITY_ROUTER_V2`
   // when no override is set. See useIdentityFrontDoor.
   "release_ui_identity_front_door_enabled",
+  // The guided onboarding variant (spec:
+  // specs/features/onboarding/guided-onboarding-variant.feature). Read on the
+  // welcome flow with the user's id, which is what the percentage rollout
+  // rule buckets on, so the same user lands in the same variant every time.
+  "experiment_onboarding_langy_guided",
 ] as const;
 
 /**

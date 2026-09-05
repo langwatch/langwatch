@@ -380,6 +380,14 @@ export const FEATURE_FLAGS = [
     description:
       "Offers the Webhook (generic HTTP request) delivery channel for automations (ADR-040). Gates the delivery-picker card, the save route accepting SEND_WEBHOOK, and the test-fire path. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_webhook_automations.",
   },
+  {
+    key: "experiment_onboarding_langy_guided",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Langy",
+    description:
+      "The guided onboarding: after sign-up Langy takes over the screen, asks what to set up, connects a provider, tours the product and drives the real setup from its panel (spec: specs/features/onboarding/guided-onboarding-variant.feature). Off = the classic wizard, unchanged. For the A/B test add a rule { percentageRollout: 50 } at /ops/feature-flags: the split is a stable hash of the user id, so one user sees the same variant on every read. The resolved variant is recorded on the organization at creation. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=experiment_onboarding_langy_guided or ?ff_experiment_onboarding_langy_guided=on in the browser.",
+  },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [

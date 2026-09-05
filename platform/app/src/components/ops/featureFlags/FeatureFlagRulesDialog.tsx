@@ -69,6 +69,7 @@ const SCOPE_COLLECTION = createListCollection<{
     { value: "ORGANIZATION", label: "Organization" },
     { value: "PROJECT", label: "Project" },
     { value: "NEW_USERS", label: "New users" },
+    { value: "PERCENTAGE", label: "Percentage of users" },
   ],
 });
 
@@ -77,6 +78,7 @@ const SCOPE_FIELD_LABEL: Record<ScopeKind, string> = {
   ORGANIZATION: "Organization id",
   PROJECT: "Project id",
   NEW_USERS: "Organization created on or after",
+  PERCENTAGE: "Percentage of users",
 };
 
 const SCOPE_FIELD_PLACEHOLDER: Record<ScopeKind, string> = {
@@ -84,6 +86,7 @@ const SCOPE_FIELD_PLACEHOLDER: Record<ScopeKind, string> = {
   ORGANIZATION: "organization_xxxx",
   PROJECT: "project_xxxx",
   NEW_USERS: "",
+  PERCENTAGE: "50",
 };
 
 const MISSING_TARGET_MESSAGE: Record<ScopeKind, string> = {
@@ -91,6 +94,7 @@ const MISSING_TARGET_MESSAGE: Record<ScopeKind, string> = {
   ORGANIZATION: "Every organization rule needs an organization id.",
   PROJECT: "Every project rule needs a project id.",
   NEW_USERS: "Every new users rule needs a date.",
+  PERCENTAGE: "Every percentage rule needs a number between 0 and 100.",
 };
 
 export function FeatureFlagRulesDialog({
@@ -394,6 +398,8 @@ function TargetField({
   onChange: (patch: Partial<UIRule>) => void;
 }) {
   const isNewUsers = rule.scopeKind === "NEW_USERS";
+  const isPercentage = rule.scopeKind === "PERCENTAGE";
+  const inputType = isNewUsers ? "date" : isPercentage ? "number" : "text";
 
   return (
     <Field.Root flex={1}>
@@ -402,8 +408,10 @@ function TargetField({
       </Field.Label>
       <Input
         size="sm"
-        type={isNewUsers ? "date" : "text"}
-        fontFamily={isNewUsers ? undefined : "mono"}
+        type={inputType}
+        min={isPercentage ? 0 : undefined}
+        max={isPercentage ? 100 : undefined}
+        fontFamily={inputType === "text" ? "mono" : undefined}
         fontSize="xs"
         placeholder={SCOPE_FIELD_PLACEHOLDER[rule.scopeKind]}
         value={rule.target}
@@ -414,6 +422,13 @@ function TargetField({
         <Field.HelperText fontSize="xs">
           Matches organizations created on this date or later, so customers who
           signed up before it keep the value they already had.
+        </Field.HelperText>
+      )}
+      {isPercentage && (
+        <Field.HelperText fontSize="xs">
+          Matches this share of users. Each user lands in a stable bucket for
+          this flag, so they see the same value on every visit. Reads without a
+          signed-in user never match.
         </Field.HelperText>
       )}
     </Field.Root>

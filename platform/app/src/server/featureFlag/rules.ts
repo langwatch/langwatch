@@ -11,14 +11,15 @@ import { z } from "zod";
  * through to the registry default.
  *
  * The shape is intentionally open-ended — today it carries `projectId`,
- * `organizationId` and `organizationCreatedAfter`, tomorrow it can grow
- * `userEmail`, `percentageRollout`, etc., without a schema migration.
+ * `organizationId`, `organizationCreatedAfter` and `percentageRollout`,
+ * tomorrow it can grow `userEmail`, etc., without a schema migration.
  */
 
 const KNOWN_MATCH_KEYS = [
   "projectId",
   "organizationId",
   "organizationCreatedAfter",
+  "percentageRollout",
 ] as const;
 type KnownMatchKey = (typeof KNOWN_MATCH_KEYS)[number];
 
@@ -36,6 +37,14 @@ const featureFlagRuleMatchSchema = z
      * Date would round-trip as a string anyway.
      */
     organizationCreatedAfter: z.string().optional(),
+    /**
+     * A/B split: matches the share of callers, in percent, whose rollout
+     * bucket falls below this number. The bucket is a stable hash of the
+     * flag key and the read's `distinctId`, so one user keeps the same
+     * answer on every read of one flag while landing in different buckets
+     * for different flags. A read without a `distinctId` never matches.
+     */
+    percentageRollout: z.number().optional(),
   })
   // Future-proof: keep unknown fields on the parsed object rather than
   // rejecting them, so a newer writer can ship a rule shape the running
@@ -89,6 +98,20 @@ export const featureFlagRulesWriteSchema = featureFlagRulesSchema
       message:
         "A new-users targeting rule needs a date the organization was created on or after",
     },
+  )
+  .refine(
+    (rules) =>
+      rules.every(
+        (rule) =>
+          rule.match.percentageRollout === undefined ||
+          (Number.isFinite(rule.match.percentageRollout) &&
+            rule.match.percentageRollout >= 0 &&
+            rule.match.percentageRollout <= 100),
+      ),
+    {
+      message:
+        "A percentage rollout rule needs a percentage between 0 and 100",
+    },
   );
 
 export type FeatureFlagRuleMatch = z.infer<typeof featureFlagRuleMatchSchema>;
@@ -106,6 +129,48 @@ export interface RuleEvaluationContext {
    * rule matches.
    */
   organizationCreatedAt?: Date | string | null;
+  /**
+   * Who is asking, for a percentage rollout: the user id on a frontend read.
+   * Absent means no percentage rule can match, so an organization-scoped or
+   * project-scoped read with no caller identity is never split.
+   */
+  distinctId?: string;
+  /**
+   * The flag being read, salted into the rollout bucket so one user is not
+   * in the same half of every experiment. Absent means no percentage rule
+   * can match.
+   */
+  flagKey?: string;
+}
+
+/** Buckets in a percentage rollout: a bucket is an integer in [0, 100). */
+const ROLLOUT_BUCKETS = 100;
+
+/**
+ * The stable bucket of one caller for one flag: fnv1a over
+ * `${flagKey}:${distinctId}`, reduced to [0, 100). Deterministic across
+ * processes and deploys, with no dependency on a crypto module, so the
+ * matcher stays synchronous and the same user reads the same answer from
+ * every pod.
+ */
+export function rolloutBucket({
+  flagKey,
+  distinctId,
+}: {
+  flagKey: string;
+  distinctId: string;
+}): number {
+  return fnv1a32(`${flagKey}:${distinctId}`) % ROLLOUT_BUCKETS;
+}
+
+/** 32-bit FNV-1a over the UTF-16 code units of `input`. */
+function fnv1a32(input: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash >>> 0;
 }
 
 /**
@@ -225,7 +290,31 @@ function matchesContext(
   ) {
     return false;
   }
+  if (
+    match.percentageRollout !== undefined &&
+    !isInRollout(match.percentageRollout, ctx)
+  ) {
+    return false;
+  }
   return true;
+}
+
+/**
+ * Whether this read falls inside the rolled-out share. Fails closed on a
+ * read that carries no caller identity or no flag key, and on a percentage
+ * that cannot be read as a number, for the same reason the age rule does: a
+ * condition the matcher cannot evaluate must not become no condition.
+ */
+function isInRollout(
+  percentageRollout: number,
+  ctx: RuleEvaluationContext,
+): boolean {
+  if (!ctx.distinctId || !ctx.flagKey) return false;
+  if (!Number.isFinite(percentageRollout)) return false;
+  return (
+    rolloutBucket({ flagKey: ctx.flagKey, distinctId: ctx.distinctId }) <
+    percentageRollout
+  );
 }
 
 /**

@@ -154,11 +154,18 @@ Feature: Guided onboarding variant
     Then the guided state counts two replays
 
   @integration
-  Scenario: beginning a path makes it the current one and remembers it
+  Scenario: beginning a path the user never picked appends it to the picked paths
     Given an organization whose guided state lists llmops
     When the user begins the governance path
     Then the current path is governance
-    And governance is among the recorded paths
+    And the recorded paths are llmops then governance
+
+  @integration
+  Scenario: beginning a path the user already picked keeps the picked paths as they are
+    Given an organization whose guided state lists gateway then llmops
+    When the user begins the llmops path
+    Then the current path is llmops
+    And the recorded paths are still gateway then llmops
 
   @integration
   Scenario: completing a path is idempotent

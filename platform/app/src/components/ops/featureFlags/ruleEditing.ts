@@ -19,7 +19,9 @@ export type ScopeKind =
   | "ORGANIZATION"
   | "PROJECT"
   /** Organizations created on or after a date — shown as "New users". */
-  | "NEW_USERS";
+  | "NEW_USERS"
+  /** A stable share of users, in percent — shown as "Percentage of users". */
+  | "PERCENTAGE";
 
 export interface UIRule {
   /**
@@ -30,7 +32,10 @@ export interface UIRule {
    */
   id: string;
   scopeKind: ScopeKind;
-  /** An organization or project id, or a date for `NEW_USERS`. */
+  /**
+   * An organization or project id, a date for `NEW_USERS`, or a number of
+   * percent for `PERCENTAGE`.
+   */
   target: string;
   enabled: boolean;
   /**
@@ -94,6 +99,17 @@ export function rulesToUI(rules: FeatureFlagRules): UIRule[] {
         }),
       };
     }
+    if (rule.match.percentageRollout !== undefined) {
+      return {
+        ...base,
+        scopeKind: "PERCENTAGE" as const,
+        target: String(rule.match.percentageRollout),
+        otherConditions: without({
+          match: rule.match,
+          key: "percentageRollout",
+        }),
+      };
+    }
     return {
       ...base,
       scopeKind: "EVERYONE" as const,
@@ -122,6 +138,12 @@ export function uiToRules(rules: UIRule[]): FeatureFlagRules {
     if (rule.scopeKind === "NEW_USERS") {
       return {
         match: { ...rest, organizationCreatedAfter: target },
+        enabled: rule.enabled,
+      };
+    }
+    if (rule.scopeKind === "PERCENTAGE") {
+      return {
+        match: { ...rest, percentageRollout: Number(target) },
         enabled: rule.enabled,
       };
     }
@@ -182,9 +204,14 @@ export function withRuleMoved(
  * rule with no date are both rules the operator believes are live.
  */
 export function findUnfillableRule(rules: UIRule[]): UIRule | undefined {
-  return rules.find(
-    (rule) => rule.scopeKind !== "EVERYONE" && rule.target.trim() === "",
-  );
+  return rules.find((rule) => {
+    if (rule.scopeKind === "EVERYONE") return false;
+    const target = rule.target.trim();
+    if (target === "") return true;
+    if (rule.scopeKind !== "PERCENTAGE") return false;
+    const percentage = Number(target);
+    return !Number.isFinite(percentage) || percentage < 0 || percentage > 100;
+  });
 }
 
 /**
