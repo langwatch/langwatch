@@ -159,6 +159,22 @@ Feature: Langy asks how to reach the customer's code, once
       And it bans adjectives such as comprehensive
 
     @unit
+    Scenario: A checklist runs before the pull request is opened
+      Given the code changes skill
+      When its pull request step is read
+      Then it says the body may only state what a command in this conversation printed
+      And it says a connect change carries the restart and the agent read in the body
+      And it says to write that the restart is left to the user when it could not run
+      And it says the final message carries the pull request address the command printed
+
+    @unit
+    Scenario: The connected agent skill repeats the same checklist
+      Given the connect agent skill
+      When its reporting step is read
+      Then it says to restart the service and read the parameters back before opening the pull request
+      And it says a registration claim needs the agent read behind it
+
+    @unit
     Scenario: Every documentation page a skill names exists
       Given the set of skills Langy ships with
       When each documentation path they tell the agent to fetch is resolved

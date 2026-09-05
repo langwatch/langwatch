@@ -17,6 +17,14 @@ function codeChangesSkill(): string {
   return renderSkill(skill!);
 }
 
+function connectAgentSkill(): string {
+  const skill = listNativeSkills(skillsRoot).find(
+    (s) => s.slug === "connect-agent",
+  );
+  expect(skill, "connect-agent is a shipped native skill").toBeTruthy();
+  return renderSkill(skill!);
+}
+
 /** The decision table rows, as "| request | yes-or-no | reason |". */
 function decisionRows(rendered: string): { request: string; needsCode: string }[] {
   return rendered
@@ -110,6 +118,36 @@ describe("the code-changes skill", () => {
         "The title is the commit subject with the type prefix removed",
       );
       expect(rendered).toContain("comprehensive");
+    });
+
+    /** @scenario "A checklist runs before the pull request is opened" */
+    it("checks the body against the outputs and carries the address into the reply", () => {
+      const rendered = codeChangesSkill();
+      expect(rendered).toContain("The checklist before `gh pr create`");
+      expect(rendered).toContain(
+        "may only state what a command output **in this conversation** showed",
+      );
+      expect(rendered).toContain("langwatch agent get <name>");
+      expect(rendered).toContain("the restart is left to the user");
+      expect(rendered).toContain(
+        "Copy that address into your reply, character for character",
+      );
+    });
+  });
+});
+
+describe("the connect-agent skill", () => {
+  describe("given the change goes into a pull request", () => {
+    /** @scenario "The connected agent skill repeats the same checklist" */
+    it("restarts and reads the parameters back before the pull request is opened", () => {
+      const rendered = connectAgentSkill();
+      expect(rendered).toContain("When the change goes into a pull request");
+      expect(rendered).toContain("Restart the service that holds the connect call");
+      expect(rendered).toContain("`langwatch agent get <name>`");
+      expect(rendered).toContain("the restart is left to the user");
+      expect(rendered).toContain(
+        "is false unless the `agent get` output in this conversation lists both options",
+      );
     });
   });
 });

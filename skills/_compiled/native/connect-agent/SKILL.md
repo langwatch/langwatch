@@ -224,6 +224,16 @@ Report to the user:
 
 Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can contain secrets and tell the user nothing they can act on. Do NOT claim a scenario or a test suite ran when it did not.
 
+### When the change goes into a pull request
+
+A change to the connect call is not live until the process that holds it starts again, so the registration you report has to come from a process you restarted in this conversation. Before you run `gh pr create`:
+
+1. Restart the service that holds the connect call, on the same port.
+2. Run `langwatch agent get <name>` and read the parameter list back.
+3. Put that list in the pull request body, as the command printed it.
+
+When you could not restart the process, write in the body, in one line, that the restart is left to the user and that the parameters are not registered yet. A sentence such as "confirmed the connected agent registered both options" is false unless the `agent get` output in this conversation lists both options. Copy the pull request address that `gh pr create` prints into your reply as well, character for character.
+
 A connected setup shows, on the run page: the conversation transcript, a trace link on each turn opening the agent's own spans, and judge reasoning that cites spans.
 
 ## Plan Limits
@@ -359,3 +369,4 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 - Do NOT stop the agent process while a run is executing. Every turn of the run calls it.
 - Do NOT reach for the HTTP fallback because the decorator looks like more work. It is fewer steps: no public URL, no body template, no credential in the agent configuration, no middleware.
 - Do NOT report success when a command failed. An unreachable platform or a failed run is part of the report, named per step.
+- Do NOT write a registration into a pull request body without the `langwatch agent get` output that shows it. A body that states what no command in the conversation printed is a false report.

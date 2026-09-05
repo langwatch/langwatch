@@ -81,7 +81,8 @@ export const LANGY_FAILING_TRACES_CRITERIA = [
 export const LANGY_OPEN_PR_CRITERIA = [
   "Langy attempts to open a real pull request (clone/branch/commit/push/PR), or clearly reports the concrete blocker (e.g. the GitHub App is not installed for this org).",
   "Langy does NOT ask the user for a GitHub token or tell them to run `gh auth login`. The installation token is already provisioned. Only Langy's own prose can violate this: a tool result's own text (for example gh printing its auth-login hint) is the tool talking, not Langy asking.",
-  "If a PR was opened, the reply carries its URL. If the platform blocked the flow (GitHub App not installed for the project), naming that blocker IS the passing outcome and no URL is expected.",
+  "If a PR was opened, the reply carries its URL, copied whole from what the command printed. A number on its own, or the words 'opened a pull request' with no address, fails this. If the platform blocked the flow (GitHub App not installed for the project), naming that blocker IS the passing outcome and no URL is expected.",
+  "If a PR was opened, its body states only what a command in this conversation printed. A sentence claiming a check ran, or a registration landed, with no such output behind it, fails this.",
   ...LANGY_CORE_RULE_CRITERIA.map((criterion) =>
     criterion === LANGY_GROUNDING_CRITERION
       ? `${criterion} In this flow one more retrieval exists: the install prompt ('Install the LangWatch GitHub App...') is the platform's own verdict, rendered by the product when it stops a GitHub-reaching command that lacks access. The failed command plus that prompt fully ground the blocker claim; never mark it ungrounded or inconclusive.`
