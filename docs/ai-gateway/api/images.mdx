@@ -56,11 +56,9 @@ Authorization: Bearer vk-lw-<ULID>
 Content-Type: multipart/form-data
 ```
 
-Form matches OpenAI's [image edit schema](https://developers.openai.com/api/reference/resources/images/methods/edit/): one or more `image[]` parts, a `prompt` part, and `model`. A single file may also be sent under `image`. Use one field name or the other: a form carrying files under both gets a `400`, because the parts state an order inside each field and none across them.
+Form matches OpenAI's [image edit schema](https://developers.openai.com/api/reference/resources/images/methods/edit/): one or more `image[]` parts, a `prompt` part, and `model`. A single file may also be sent under `image`. Use one field name or the other. A form that sends files under both answers `400`, because each field orders its own parts and there is no order between the two fields.
 
-The optional parts are `mask`, `n`, `size`, `quality`, `background`, `input_fidelity`, `output_format`, `output_compression`, `response_format` and `user`. A part this list does not name is dropped rather than sent to the provider; `stream` and `partial_images` are the exception, and get the same `400` the generation route gives them.
-
-`response_format` reaches the provider as sent, and the gpt-image models reject it on this route as well.
+The optional parts are `mask`, `n`, `size`, `quality`, `background`, `input_fidelity`, `output_format`, `output_compression`, `response_format` and `user`. A part this list does not name is dropped rather than sent to the provider; `stream` and `partial_images` are the exception, and get the same `400` the generation route gives them. `response_format` reaches the provider as sent, and the gpt-image models reject it on this route as well.
 
 ```bash
 curl https://gateway.langwatch.ai/v1/images/edits \
