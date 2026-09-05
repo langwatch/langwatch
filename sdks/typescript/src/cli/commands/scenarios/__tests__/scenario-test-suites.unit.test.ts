@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ScenarioResponse } from "@/client-sdk/services/scenarios";
 
 const mockSuitesList = vi.hoisted(() => vi.fn());
+const mockSuiteGet = vi.hoisted(() => vi.fn());
 
 vi.mock("@/client-sdk/services/scenarios", async (importOriginal) => {
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports
@@ -22,7 +23,10 @@ vi.mock("@/client-sdk/services/scenarios", async (importOriginal) => {
 });
 
 vi.mock("../../test-suites/cli-test-suites-service", () => ({
-  createCliTestSuitesService: vi.fn(() => ({ list: mockSuitesList })),
+  createCliTestSuitesService: vi.fn(() => ({
+    list: mockSuitesList,
+    get: mockSuiteGet,
+  })),
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
@@ -112,6 +116,78 @@ describe("filing a scenario into a test suite from the command line", () => {
     vi.spyOn(console, "error").mockImplementation(noop);
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError(code as number);
+    });
+  });
+
+  describe("when creating a scenario with --field", () => {
+    /** @scenario "Create a scenario with field values coerced by the suite" */
+    it("coerces each value by the type the suite declares", async () => {
+      mockSuitesList.mockResolvedValue([
+        makeTestSuite({
+          fields: [
+            { identifier: "golden_sql", type: "text" },
+            { identifier: "row_limit", type: "number" },
+          ],
+        }),
+      ]);
+
+      await createScenarioCommand("Chargebacks", {
+        situation: "A fraud analyst asks for chargebacks per quarter",
+        testSuite: "Refunds",
+        field: ["golden_sql=SELECT 1", "row_limit=10"],
+      });
+
+      expect(mockScenarioCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          testSuiteId: "suite_abc",
+          fields: { golden_sql: "SELECT 1", row_limit: 10 },
+        }),
+      );
+    });
+
+    /** @scenario "A field value the suite does not declare is refused" */
+    it("refuses a field the suite does not declare before creating anything", async () => {
+      mockSuitesList.mockResolvedValue([
+        makeTestSuite({ fields: [{ identifier: "golden_sql", type: "text" }] }),
+      ]);
+
+      await expect(
+        createScenarioCommand("Chargebacks", {
+          situation: "...",
+          testSuite: "Refunds",
+          field: ["golden=SELECT 1"],
+        }),
+      ).rejects.toThrow(ProcessExitError);
+      expect(mockScenarioCreate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when updating a scenario with --field", () => {
+    /** @scenario "Update the field values of a scenario in place" */
+    it("reads the suite the scenario is in for its field types", async () => {
+      const mockScenarioGet = vi
+        .fn()
+        .mockResolvedValue(makeScenario({ testSuiteId: "suite_abc" }));
+      vi.mocked(ScenariosApiService).mockImplementation(function () {
+        return {
+          get: mockScenarioGet,
+          update: mockScenarioUpdate,
+        } as unknown as ScenariosApiService;
+      });
+      mockSuiteGet.mockResolvedValue({
+        ...makeTestSuite(),
+        scenarios: [],
+        fields: [{ identifier: "row_limit", type: "number" }],
+      });
+
+      await updateScenarioCommand("scenario_abc123", {
+        field: ["row_limit=25"],
+      });
+
+      expect(mockSuiteGet).toHaveBeenCalledWith("suite_abc");
+      expect(mockScenarioUpdate).toHaveBeenCalledWith("scenario_abc123", {
+        fields: { row_limit: 25 },
+      });
     });
   });
 

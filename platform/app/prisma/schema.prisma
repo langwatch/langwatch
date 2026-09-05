@@ -2867,6 +2867,11 @@ model Scenario {
   judgeModel      String?
   maxTurns        Int?
   minTurns        Int?
+  // The value this scenario carries for each field its test suite declares,
+  // keyed by field identifier: { golden_sql: "SELECT ...", max_rows: 12 }.
+  // Values are text, numbers or booleans. A field with no value has no key.
+  // Null reads as no values. See specs/scenarios/scenario-fields.feature.
+  fields          Json?
   // The test suite (a SimulationSuite with kind "test_suite") this scenario is
   // filed in, or null for an unfiled scenario. This column is the source of
   // truth for test suite membership; the test suite's scenarioIds is a
@@ -2959,6 +2964,19 @@ model SimulationSuite {
   // none: its members come from Scenario.testSuiteId. See
   // server/suites/scope.ts and specs/suites/run-plan-dynamic-scopes.feature.
   scope           Json?
+  // The fields a test suite declares beyond situation and criteria, as an
+  // array of { identifier, type } with type text, number or boolean. Every
+  // scenario filed in the suite carries a value per field in Scenario.fields.
+  // A run plan carries none. Null reads as no fields. See
+  // server/scenarios/suite-fields.ts and specs/scenarios/scenario-fields.feature.
+  fields          Json?
+  // The evaluators that run after every scenario run of this suite or plan,
+  // as an array of { id, evaluatorId, required, mappings }. A mapping names
+  // where an evaluator input reads its value: the conversation, the scenario
+  // (situation, criteria or a field) or the trace. A run plan's attachments
+  // run beside the ones of the test suites its scenarios belong to. Null
+  // reads as none. See server/scenarios/evaluator-attachments.ts.
+  evaluators      Json?
   testSuiteScenarios Scenario[] @relation("TestSuiteScenarios")
   archivedAt     DateTime?
   createdAt      DateTime  @default(now())

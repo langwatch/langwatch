@@ -158,6 +158,58 @@ Feature: Connected agents
     Then the reference is left as written
 
   # ---------------------------------------------------------------------------
+  # Offline refusal at scheduling
+  # ---------------------------------------------------------------------------
+
+  # A run against a connected agent no process is holding would only fail on
+  # its first turn, so it is refused before a job exists. Only connected
+  # agents have a presence: an HTTP, code or workflow agent is never offline.
+
+  @integration
+  Scenario: A run plan cannot target an offline connected agent
+    Given a shared connected agent with no process connected
+    When a run targets it
+    Then the run is refused with "agent_offline"
+    And nothing is scheduled
+
+  @integration
+  Scenario: A run plan against an online connected agent is scheduled
+    Given a shared connected agent with a process connected
+    When a run targets it
+    Then the run is scheduled
+
+  @integration
+  Scenario: A scenario run cannot target an offline connected agent
+    Given a shared connected agent with no process connected
+    When a single scenario run targets it
+    Then the run is refused with "agent_offline"
+
+  @integration
+  Scenario: A scenario run against an online connected agent resolves its target
+    Given a shared connected agent with a process connected
+    When a single scenario run targets it
+    Then the target resolves to that agent's id
+
+  @integration
+  Scenario: A scenario run against an HTTP agent reads no presence
+    Given an HTTP agent
+    When a single scenario run targets it
+    Then the target is answered as written
+
+  @unit
+  Scenario: An HTTP agent target is never offline
+    Given a run that targets an HTTP agent
+    When the targets are checked before scheduling
+    Then no presence is read
+    And the run is scheduled
+
+  @unit
+  Scenario: The owner-only refusal comes before the offline one
+    Given a personal development agent of user "u_1" with no process connected
+    When user "u_2" starts a run that targets it
+    Then the run is refused with "agent_owner_only"
+
+  # ---------------------------------------------------------------------------
   # Presence
   # ---------------------------------------------------------------------------
 

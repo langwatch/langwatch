@@ -2400,6 +2400,7 @@ export function createTestApp(overrides?: TestAppOverrides): App {
         textMessageStart: noop,
         textMessageEnd: noop,
         finishRun: noop,
+        recordEvaluations: noop,
         recordAgentInstance: noop,
         cancelRun: noop,
         deleteRun: noop,
@@ -2409,6 +2410,7 @@ export function createTestApp(overrides?: TestAppOverrides): App {
         startSuiteRun: noop,
         recordSuiteRunItemStarted: noop,
         completeSuiteRunItem: noop,
+        regradeSuiteRunItem: noop,
       } as AppCommands["suiteRuns"],
       langy: {
         createConversation: noop,

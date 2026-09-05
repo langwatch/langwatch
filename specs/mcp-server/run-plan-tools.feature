@@ -17,6 +17,16 @@ Feature: MCP Run Plan Tools
   Background:
     Given the MCP server is configured with a valid API key
 
+  Scenario: Agent runs a plan with its own evaluators
+    When the agent calls platform_run_plan with evaluators
+    Then the attachments travel inside the configuration
+    And every attachment is sent with an id and a gate, generated when the agent left them out
+
+  Scenario: Agent reads a run plan that carries evaluators
+    Given a run plan with one evaluator attached
+    When the agent calls platform_get_run_plan
+    Then the response lists the evaluator with its gate and its mappings
+
   Scenario: Agent runs a name that no plan carries yet
     When the agent calls platform_run_plan with a name no plan carries
     Then the response says the run plan was created and started

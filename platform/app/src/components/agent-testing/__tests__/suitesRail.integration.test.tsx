@@ -90,6 +90,8 @@ function makeSuite(overrides: Partial<TestSuiteEntry> = {}): TestSuiteEntry {
     name: "Refunds",
     slug: "refunds",
     caseCount: 3,
+    fields: [],
+    evaluators: [],
     ...overrides,
   };
 }
@@ -116,7 +118,7 @@ function renderRail(
     onNewSuite: vi.fn(),
     onNewTestCase: vi.fn(),
     onRunSuite: vi.fn(),
-    onRenameSuite: vi.fn(),
+    onEditSuite: vi.fn(),
     onArchiveSuite: vi.fn(),
     period: THIRTY_DAYS,
     periodMode: "relative",
@@ -300,7 +302,7 @@ describe("the test suites rail", () => {
     expect(items).toEqual([
       "New scenario",
       "Run suite",
-      "Rename",
+      "Edit",
       "Open recent runs",
       "Archive suite",
     ]);
@@ -353,9 +355,10 @@ describe("the test suites rail", () => {
   // --- The row menu ---
 
   /** @scenario "The row menu of a test suite offers its five actions in order" */
-  it("offers its five actions in order", async () => {
-    renderRail();
-    await openSuiteMenu("Refunds");
+  /** @scenario "The rail row menu offers Edit in place of Rename" */
+  it("offers its five actions in order, and Edit opens the suite editor", async () => {
+    const { props } = renderRail();
+    const user = await openSuiteMenu("Refunds");
 
     const items = (await screen.findAllByRole("menuitem")).map(
       (item) => item.textContent,
@@ -363,10 +366,13 @@ describe("the test suites rail", () => {
     expect(items).toEqual([
       "New scenario",
       "Run suite",
-      "Rename",
+      "Edit",
       "Open recent runs",
       "Archive suite",
     ]);
+
+    await user.click(screen.getByRole("menuitem", { name: "Edit" }));
+    expect(props.onEditSuite).toHaveBeenCalledWith("suite_1");
   });
 
   describe("given the project ran batches of this suite and of another", () => {
@@ -559,19 +565,16 @@ describe("the test suites rail", () => {
       setId: "nightly-ci",
     });
     expect(
-      screen.queryByRole("menuitem", { name: "Rename" }),
+      screen.queryByRole("menuitem", { name: "Edit" }),
     ).not.toBeInTheDocument();
   });
 
-  // --- The suite editor ---
-
-  describe("when the suite editor is opened", () => {
+  describe("when the new suite dialog is opened", () => {
     function renderEditor(
       overrides: Partial<React.ComponentProps<typeof SuiteNameDialog>> = {},
     ) {
       const props: React.ComponentProps<typeof SuiteNameDialog> = {
         open: true,
-        initialName: "Refunds",
         onClose: vi.fn(),
         onConfirm: vi.fn(),
         ...overrides,
@@ -580,14 +583,14 @@ describe("the test suites rail", () => {
       return { props };
     }
 
-    /** @scenario "Rename opens a small centered dialog holding only a Name field" */
+    /** @scenario "The rail offers to create a test suite" */
     it("opens a small centered dialog holding only a Name field", () => {
       renderEditor();
 
       const dialog = screen.getByTestId("agent-testing-suite-name-dialog");
-      expect(within(dialog).getByText("Rename test suite")).toBeInTheDocument();
+      expect(within(dialog).getByText("New test suite")).toBeInTheDocument();
       const name = within(dialog).getByLabelText("Test suite name");
-      expect(name).toHaveValue("Refunds");
+      expect(name).toHaveValue("");
       expect(within(dialog).getAllByRole("textbox")).toHaveLength(1);
     });
 
@@ -623,25 +626,11 @@ describe("the test suites rail", () => {
       expect(within(dialog).queryByRole("checkbox")).not.toBeInTheDocument();
     });
 
-    /** @scenario "Saving the name dialog renames the suite" */
-    it("renames the suite on save", async () => {
-      const user = userEvent.setup();
-      const { props } = renderEditor();
-
-      const name = screen.getByLabelText("Test suite name");
-      await user.clear(name);
-      await user.type(name, "Refunds and returns");
-      await user.click(screen.getByTestId("suite-name-confirm"));
-
-      expect(props.onConfirm).toHaveBeenCalledWith("Refunds and returns");
-    });
-
     /** @scenario "The name dialog refuses an empty name" */
     it("refuses an empty name and saves nothing", async () => {
       const user = userEvent.setup();
       const { props } = renderEditor();
 
-      await user.clear(screen.getByLabelText("Test suite name"));
       await user.click(screen.getByTestId("suite-name-confirm"));
 
       expect(screen.getByTestId("suite-name-problem")).toHaveTextContent(
@@ -651,7 +640,7 @@ describe("the test suites rail", () => {
     });
 
     /** @scenario "The name dialog offers no destructive action" */
-    it("offers only Cancel and Save", () => {
+    it("offers only Cancel and Create", () => {
       renderEditor();
 
       const dialog = screen.getByTestId("agent-testing-suite-name-dialog");
@@ -659,16 +648,14 @@ describe("the test suites rail", () => {
         .getAllByRole("button")
         .map((button) => button.textContent)
         .filter((label) => !!label);
-      expect(actions).toEqual(["Cancel", "Save"]);
+      expect(actions).toEqual(["Cancel", "Create"]);
     });
 
     /** @scenario "Naming the first test suite opens it" */
-    it("reads as a create when it is opened on no suite", async () => {
+    it("creates the suite under the name typed", async () => {
       const user = userEvent.setup();
-      const { props } = renderEditor({ initialName: "" });
+      const { props } = renderEditor();
 
-      const dialog = screen.getByTestId("agent-testing-suite-name-dialog");
-      expect(within(dialog).getByText("New test suite")).toBeInTheDocument();
       await user.type(screen.getByLabelText("Test suite name"), "Refunds");
       await user.click(screen.getByRole("button", { name: "Create" }));
 

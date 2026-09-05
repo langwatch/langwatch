@@ -6,6 +6,7 @@ import type {
   runPlanTargetSchema,
   RunPlanTargetWire,
 } from "./schemas/run-plan.js";
+import type { EvaluatorAttachmentWire } from "./schemas/suite-fields.js";
 
 /**
  * Client for `/api/v1/run-plans`.
@@ -47,6 +48,8 @@ export interface RunPlan {
   createdAt: string;
   updatedAt: string;
   platformUrl: string;
+  /** The plan's own evaluators. Absent on servers that predate them. */
+  evaluators?: EvaluatorAttachmentWire[];
 }
 
 /** The configuration a run either writes onto a plan or creates it with. */
@@ -57,6 +60,12 @@ export interface RunPlanConfig {
   simulatorModel?: string | null;
   judgeModel?: string | null;
   scenarioIds?: string[];
+  /**
+   * The plan's own evaluators, run beside the ones its test suites attach. A
+   * plan evaluator reads the conversation and the trace, never a scenario
+   * field. Left out, the plan keeps what it already holds.
+   */
+  evaluators?: EvaluatorAttachmentWire[];
 }
 
 export interface RunPlanRunResult {

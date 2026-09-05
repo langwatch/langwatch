@@ -120,3 +120,13 @@ Feature: Scenario versions
     Given a scenario that belongs to another project
     When its history is requested
     Then the request is refused with "not_found"
+
+  # --- Field values ---
+
+  @integration
+  Scenario: A save that changes a field value records a version naming fields
+    Given a scenario in a suite declaring the field golden_sql, at version 1
+    When its golden_sql is edited and saved
+    Then the scenario reads as version 2
+    And the history entry lists fields as the changed field
+    And the version snapshot carries the saved golden_sql

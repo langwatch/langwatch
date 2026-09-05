@@ -126,6 +126,15 @@ Feature: Connected agents in the product
     Then it offers a Python snippet and a TypeScript snippet
     And it shows that it is listening for the agent
 
+  @integration
+  Scenario: The connect snippets are syntax highlighted
+    Given the connect drawer is open
+    When it is drawn
+    Then the install line is highlighted as a shell command
+    And each snippet is highlighted as its own language
+    And the highlight follows the app color mode
+    And a long line scrolls sideways instead of being cut
+
   # An agent name is any text of up to 64 characters. Written into the snippet
   # as it stands, a quote or a line break would end the literal early, and the
   # code the reader copies would not be the code the page shows.
@@ -177,7 +186,7 @@ Feature: Connected agents in the product
   Scenario: An offline agent says on hover why it cannot be tested
     Given an offline connected agent
     When the pointer rests on the Test button
-    Then a tooltip says the agent is offline and to start the process that runs it
+    Then a tooltip says the agent is offline and to start the process that runs it to be able to test it
 
   @integration
   Scenario: The drawer sends one test turn to the agent
@@ -213,6 +222,26 @@ Feature: Connected agents in the product
     Given a development agent that belongs to another person
     When the pointer rests on its card
     Then it says only its owner can run it, naming the owner
+
+  @integration
+  Scenario: An offline connected agent cannot be chosen as a run target
+    Given a connected agent no process is holding
+    When the run dialog is open
+    Then that agent is drawn beside the others
+    And it cannot be chosen
+
+  @integration
+  Scenario: An offline connected agent says why on hover
+    Given a connected agent no process is holding
+    When the pointer rests on its card
+    Then it says the agent is offline and to start the process that runs it to be able to select it
+
+  @integration
+  Scenario: The scenario target selector draws an offline agent disabled
+    Given a connected agent no process is holding and an HTTP agent
+    When the target selector of a scenario run is open
+    Then the connected agent cannot be picked
+    And the HTTP agent can
 
   @integration
   Scenario: The dialog warns when the chosen agent is offline

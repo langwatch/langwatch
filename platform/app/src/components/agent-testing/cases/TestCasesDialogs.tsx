@@ -19,7 +19,6 @@ export function TestCasesDialogs({ model }: { model: TestCasesTabModel }) {
     <>
       <SuiteNameDialog
         open={suiteDialog.isOpen}
-        initialName={suiteDialog.suite?.name ?? ""}
         onClose={suiteDialog.close}
         onConfirm={suiteDialog.confirm}
       />

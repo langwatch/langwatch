@@ -422,3 +422,25 @@ Feature: The results atom
     An atom is one scenario, one target, one run. A row that names no
     scenario answers none of those, so it groups under an empty key and
     reads as a row with no name.
+
+  # --- Evaluators ---
+
+  @integration
+  Scenario: An atom carries the evaluator results of its run
+    Given a scenario run on which two evaluators reported
+    When its atom is read
+    Then it carries one entry per evaluator with its name, its status, whether it was required, its pass and its score
+    And the details and the inputs of the evaluators are not on the atom
+
+  @integration
+  Scenario: An atom whose required evaluator failed reads as failed
+    Given a scenario run that met every criterion and failed a required evaluator
+    When its atom is read
+    Then its outcome reads "failed"
+    And the pass rate of its group counts it as failed
+
+  @integration
+  Scenario: An evaluator that is not required leaves the outcome of an atom alone
+    Given a scenario run that met every criterion and failed an evaluator that is not required
+    When its atom is read
+    Then its outcome reads "passed"

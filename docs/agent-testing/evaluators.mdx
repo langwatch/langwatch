@@ -1,0 +1,97 @@
+---
+title: Evaluators
+sidebarTitle: Evaluators
+keywords: langwatch, agent testing, evaluators, test suite, fields, mappings, required, gate, tool call, contexts, golden answer, sql
+description: An evaluator attached to a test suite runs after every scenario run, reads the conversation, the scenario's fields or the trace, and reports beside the judge's verdict. A required one that fails fails the scenario.
+---
+
+## When to attach an evaluator
+
+The judge grades behavior from the criteria. An evaluator compares against a known answer or runs a check an existing evaluator already does well: a SQL query against the golden one, a reply against a reference answer, a transcript through a PII scanner, retrieved contexts through a faithfulness check. Any evaluator of the project's [library](/evaluations/evaluators/overview) can be attached, LLM judges included.
+
+A test suite declares [fields](/agent-testing/test-suites#fields) for the values an evaluator compares against. A scenario may carry a value for each field; a blank value skips the evaluators that read it.
+
+## Attach an evaluator
+
+**Edit suite** on a test suite opens the suite editor. Under **Customize test suite**, **Add evaluators** shows the attached evaluators as chips and **Add evaluator** opens the evaluator list of the project. Picking one attaches it with its mappings inferred; when a required input is still unmapped, or when the evaluator reads an expected value, the evaluator drawer opens on the attachment so you confirm where each input reads from.
+
+<Frame>
+<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" alt="The suite editor with two fields, golden_sql and table_schema, and two evaluator chips, SQL Query Equivalence marked as required and a score judge" />
+</Frame>
+
+A chip with an amber alert has a required input with no mapping. Press it to open the drawer. **Run suite** does not start while an attachment is in that state: it opens the drawer on the offending evaluator instead.
+
+## Mappings
+
+Every evaluator input reads from one source:
+
+| Source | Paths | What it reads |
+|---|---|---|
+| **Conversation** | `first_user_message`, `last_agent_message`, `transcript`, `messages` | The first message of the simulated user, the last reply of the agent, the whole conversation as `role: content` lines, or the messages as JSON. |
+| **Scenario** | `situation`, `criteria`, `fields.<identifier>` | The scenario's own text, or its value for a field the suite declares. |
+| **Trace** | `contexts`, `spans`, `tool_calls.<tool>.input`, `tool_calls.<tool>.output` | The retrieved contexts of the run's traces, every span of those traces as JSON in start order, or the input or output of the last call of a tool. Needs [linked traces](/agent-testing/linking-your-traces). |
+| A value | | A literal, the same for every scenario. |
+
+Mappings are inferred when an evaluator is attached. An input named `input`, `question` or `user_input` reads the first user message; `output`, `response` or `answer` reads the last agent message; `transcript`, `conversation` or `messages` reads the transcript; `contexts` or `retrieved_contexts` reads the trace's contexts.
+
+An input named `expected_output`, `expected_contexts` or another `expected_*` reads the field whose name matches, so `expected_output` matches `golden_sql` and `expected_contexts` matches `table_schema`. A suite with one field maps an expected input to it. A tool call or the spans are never inferred: set them by hand. `spans` hands a code or LLM evaluator the whole run, every span of every trace as JSON, when one tool call at a time is not enough.
+
+The example of a text-to-SQL agent: the suite declares `golden_sql` and `table_schema`, and **SQL Query Equivalence** reads `output` from `tool_calls.run_sql.input`, `expected_output` from `fields.golden_sql` and `expected_contexts` from `fields.table_schema`.
+
+## Required evaluators and scores
+
+**Required to pass** on the attachment makes a failing result fail the scenario. It is on by default for an evaluator that produces a pass or fail verdict. A score-only evaluator reports its score beside the verdict and never gates, whatever the switch says.
+
+## What each run reports
+
+After the conversation and the judge, the platform runs every attached evaluator and stores one result per evaluator on the run:
+
+| Status | Meaning |
+|---|---|
+| `passed`, `failed` | The evaluator's verdict. A failed required evaluator fails the scenario, and the verdict line names it. |
+| `scored` | A score, for an evaluator with no pass or fail verdict. |
+| `skipped` | A field the mapping reads is blank on this scenario. The reason names the field. |
+| `error` | The trace has no such tool call or no retrieved contexts, or the evaluator itself failed. The reason says which. |
+
+The run drawer lists the evaluators under the criteria, and the run header shows a pill per evaluator with its pass rate or its mean score. See [Results](/agent-testing/results#evaluator-results).
+
+## Evaluators on a run plan
+
+The [run dialog](/agent-testing/run-plans#the-run-dialog) shows the evaluators inherited from the test suites in scope, and **Add evaluator** adds one to the plan itself. A plan evaluator reads the conversation and the trace only, because a plan may cover scenarios from suites with different fields. Use it for a check that applies to every scenario, such as a PII scanner.
+
+## From the CLI and the API
+
+```bash
+langwatch test-suite create "Case lookups" \
+  --field golden_sql:text --field table_schema:text \
+  --evaluator sql-query-equivalence --required
+
+langwatch test-suite update "Case lookups" --evaluators-json evaluators.json
+
+langwatch run-plan run --test-suite "Case lookups" --target http:agent_abc123 --evaluator pii-leak-scanner
+
+langwatch simulation-run get <scenarioRunId> --format json   # results.evaluations
+```
+
+`--evaluator` infers the mappings the way the suite editor does. `--evaluators-json` takes the full attachment list, for a tool call mapping:
+
+```json
+[{
+  "id": "attachment_abc123",
+  "evaluatorId": "evaluator_abc123",
+  "required": true,
+  "mappings": {
+    "output": { "type": "source", "sourceId": "trace", "path": ["tool_calls", "run_sql", "input"] },
+    "expected_output": { "type": "source", "sourceId": "scenario", "path": ["fields", "golden_sql"] },
+    "expected_contexts": { "type": "source", "sourceId": "scenario", "path": ["fields", "table_schema"] }
+  }
+}]
+```
+
+The same list travels as `evaluators` on `POST /api/v1/test-suites`, `PATCH /api/v1/test-suites/{id}` and `config.evaluators` on `POST /api/v1/run-plans/run`. `GET /api/simulation-runs/{scenarioRunId}` answers with `results.evaluations`. See the [Test Suites API reference](/api-reference/test-suites/overview) and the [Run Plans API reference](/api-reference/run-plans/overview). The Python and TypeScript SDKs take `fields` and `evaluators` on `test_suites.create` / `testSuites.create`, `test_suites.update` / `testSuites.update` and on `run_plans.run` / `runPlans.run`; the MCP tools `platform_create_test_suite`, `platform_update_test_suite` and `platform_run_plan` take the same.
+
+## From code
+
+A scenario written with the Scenario SDK attaches evaluators in the test itself, with the same mappings and the same gate, and its results appear on the platform beside the judge's verdict like a platform-run scenario's. See [Evaluators on Scenarios](https://langwatch.ai/scenario/advanced/evaluators) in the Scenario documentation.
+
+Also check: [Test suites](/agent-testing/test-suites), [Scenarios](/agent-testing/scenarios), [Results](/agent-testing/results), [Linking your traces](/agent-testing/linking-your-traces).

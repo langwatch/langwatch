@@ -7,11 +7,13 @@ import type { FoldProjectionStore } from "../../../projections/foldProjection.ty
 import { SUITE_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
   SuiteRunItemCompletedEvent,
+  SuiteRunItemRegradedEvent,
   SuiteRunItemStartedEvent,
   SuiteRunStartedEvent,
 } from "../schemas/events";
 import {
   SuiteRunItemCompletedEventSchema,
+  SuiteRunItemRegradedEventSchema,
   SuiteRunItemStartedEventSchema,
   SuiteRunStartedEventSchema,
 } from "../schemas/events";
@@ -55,7 +57,43 @@ const suiteRunEvents = [
   SuiteRunStartedEventSchema,
   SuiteRunItemStartedEventSchema,
   SuiteRunItemCompletedEventSchema,
+  SuiteRunItemRegradedEventSchema,
 ] as const;
+
+/** Whether an item with this status counts as a failed item. */
+function isFailedItemStatus(status: string): boolean {
+  return status === "FAILURE" || status === "ERROR";
+}
+
+/**
+ * The counters one item adds to the suite run: which completion bucket it
+ * sits in, whether the judge graded it, and whether it passed.
+ */
+function itemCounts({
+  status,
+  verdict,
+}: {
+  status: string;
+  verdict: string | undefined;
+}): { completed: number; failed: number; graded: number; passed: number } {
+  const failed = isFailedItemStatus(status) ? 1 : 0;
+  return {
+    completed: 1 - failed,
+    failed,
+    graded: verdict ? 1 : 0,
+    passed: verdict === "success" ? 1 : 0,
+  };
+}
+
+function passRateBpsOf({
+  passed,
+  graded,
+}: {
+  passed: number;
+  graded: number;
+}): number | null {
+  return graded > 0 ? Math.round((passed / graded) * 10000) : null;
+}
 
 /**
  * Type-safe fold projection for suite run state.
@@ -130,8 +168,7 @@ export class SuiteRunStateFoldProjection
     event: SuiteRunItemCompletedEvent,
     state: SuiteRunStateData,
   ): SuiteRunStateData {
-    const isFailure =
-      event.data.status === "FAILURE" || event.data.status === "ERROR";
+    const isFailure = isFailedItemStatus(event.data.status);
 
     let completedCount = state.CompletedCount;
     let failedCount = state.FailedCount;
@@ -150,8 +187,10 @@ export class SuiteRunStateFoldProjection
       }
     }
 
-    const passRateBps =
-      gradedCount > 0 ? Math.round((passedCount / gradedCount) * 10000) : null;
+    const passRateBps = passRateBpsOf({
+      passed: passedCount,
+      graded: gradedCount,
+    });
 
     const progress = completedCount + failedCount;
     const allDone = state.Total > 0 && progress >= state.Total;
@@ -173,6 +212,56 @@ export class SuiteRunStateFoldProjection
       PassRateBps: passRateBps,
       Status: status,
       FinishedAt: finishedAt,
+    };
+  }
+
+  handleSuiteRunItemRegraded(
+    event: SuiteRunItemRegradedEvent,
+    state: SuiteRunStateData,
+  ): SuiteRunStateData {
+    // The item already counted once, when it completed. Move it from the
+    // bucket it counted in to the one it counts in now; progress and the
+    // finish time do not move, only which side of the line the item is on.
+    const before = itemCounts({
+      status: event.data.previousStatus,
+      verdict: event.data.previousVerdict,
+    });
+    const after = itemCounts({
+      status: event.data.status,
+      verdict: event.data.verdict,
+    });
+
+    const completedCount = Math.max(
+      0,
+      state.CompletedCount - before.completed + after.completed,
+    );
+    const failedCount = Math.max(
+      0,
+      state.FailedCount - before.failed + after.failed,
+    );
+    const gradedCount = Math.max(
+      0,
+      state.GradedCount - before.graded + after.graded,
+    );
+    const passedCount = Math.max(
+      0,
+      state.PassedCount - before.passed + after.passed,
+    );
+
+    const finished = state.FinishedAt != null;
+    return {
+      ...state,
+      CompletedCount: completedCount,
+      FailedCount: failedCount,
+      Progress: completedCount + failedCount,
+      GradedCount: gradedCount,
+      PassedCount: passedCount,
+      PassRateBps: passRateBpsOf({ passed: passedCount, graded: gradedCount }),
+      Status: finished
+        ? failedCount > 0
+          ? "FAILURE"
+          : "SUCCESS"
+        : state.Status,
     };
   }
 }

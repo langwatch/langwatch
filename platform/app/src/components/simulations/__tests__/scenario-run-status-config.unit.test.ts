@@ -72,6 +72,20 @@ describe("scenario-run-status-config", () => {
     });
   });
 
+  describe("when a run is waiting on its evaluators", () => {
+    /** @scenario "The results page draws a pending run as still going" */
+    it("reads as evaluating and not as a completed run", () => {
+      const config =
+        SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.PENDING_EVALUATION];
+
+      expect(config.label).toBe("evaluating");
+      expect(config.isComplete).toBe(false);
+      expect(
+        SCENARIO_RUN_STATUS_ICONS[ScenarioRunStatus.PENDING_EVALUATION],
+      ).toBeDefined();
+    });
+  });
+
   describe("getIconAndColor", () => {
     describe("when called with undefined status", () => {
       it("returns the PENDING icon and PENDING fgColor", () => {

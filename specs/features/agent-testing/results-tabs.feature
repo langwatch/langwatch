@@ -415,9 +415,12 @@ Feature: The Results tab
     And the pass block reads after it
     And the note reads last
 
-  # Evaluators on the run plan are not built yet. The two scenarios below state
-  # how they must read once they are, and bind nothing until then.
-  @unimplemented
+  # --- Evaluators on a run ---
+  # A test suite or a run plan attaches evaluators to its scenarios. Every
+  # scenario run then carries one result per evaluator, and the header, the
+  # rows and the run drawer read them.
+
+  @integration
   Scenario: The evaluator pills read after the pass block
     Given a run of a plan that carries evaluators
     When the run header is read
@@ -425,14 +428,62 @@ Feature: The Results tab
     And they are drawn at the size of the pass block
     And the note still reads last
 
-  @unimplemented
+  @integration
   Scenario: A score evaluator carries no threshold and no colour
     Given a run whose evaluators are one pass or fail check and one score
     When the evaluator pills are read
-    Then the pass or fail pill is coloured by its verdict
+    Then the pass or fail pill is coloured by its pass rate
     And the score pill reads its number with no colour
     And no threshold is shown for the score
 
+  @integration
+  Scenario: A pass or fail evaluator reads its pass rate over the run
+    Given a run of three scenarios on which one evaluator passed twice and failed once
+    When the evaluator pills of the run header are read
+    Then the pill of that evaluator reads "67%"
+    And a scenario on which the evaluator was skipped is left out of the rate
+
+  @integration
+  Scenario: A run without evaluators shows no evaluator pills
+    Given a run of a plan that carries no evaluators
+    When the run header is read
+    Then no evaluator pill is drawn after the pass block
+
+  @integration
+  Scenario: A result row carries one pill per evaluator
+    Given a finished run whose scenarios ran two evaluators
+    When the results table is read
+    Then the Evaluators cell of a row holds one pill per evaluator
+    And a pass or fail pill reads "Pass" or "Fail" with a dot in the colour of its verdict
+    And a score pill reads its number with no dot
+
+  @integration
+  Scenario: A skipped evaluator reads muted on its row
+    Given a run in which one scenario left an evaluator nothing to read
+    When the Evaluators cell of that row is read
+    Then the pill of that evaluator reads "Skipped"
+    And it reads muted
+
+  @integration
+  Scenario: A failed required evaluator names itself beside the verdict of a row
+    Given a run in which one scenario met every criterion and failed a required evaluator
+    When the result cell of that row is read
+    Then it reads "Failed" with the criteria count
+    And hovering it names the evaluator that failed the scenario
+
+  @integration
+  Scenario: The evaluator results land after the run finished without a reload
+    Given a finished run whose evaluators have not reported yet
+    When the evaluator results arrive
+    Then the Evaluators cell of each row fills in
+    And the header pills appear
+    And no manual reload is needed
+
+  @integration
+  Scenario: A simulation update makes the results read again
+    Given the results page with its live stream connected, so it does not poll
+    When a simulation update arrives, the one the evaluators send after the last run finished included
+    Then the results overview and the result atoms are read again
 
   @integration
   Scenario: A sidebar entry shows the number, the note, the age and the pass rate
@@ -705,10 +756,10 @@ Feature: The Results tab
     And no manual reload is needed
 
   @integration
-  Scenario: A run started from the rail appears in the sidebar without a page change
+  Scenario: A run started from the rail opens on the run it started
     Given a run plan is open
     When "Run suite" is chosen on another plan in the rail
-    Then the address does not change
+    Then the address moves to that other plan, on the new run
     And a placeholder entry for the new run appears in that other plan
 
   @integration

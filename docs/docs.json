@@ -124,6 +124,7 @@
                 "pages": [
                   "agent-testing/scenarios",
                   "agent-testing/test-suites",
+                  "agent-testing/evaluators",
                   "agent-testing/run-parameters"
                 ]
               },

@@ -6,9 +6,11 @@
  * or the one other environment it is online in), by `<name>@<environment>`
  * the way the SDK registered it, or by id. A personal development agent belongs to
  * the person whose key registered it, so a run started by anyone else, or by
- * no person at all, is refused before a job exists. The agent's own
- * parameters join the scenarios' declarations for the run, and its
- * environment and owner name are what its label reads.
+ * no person at all, is refused before a job exists. A connected agent no
+ * process is holding is refused the same way: the run would only fail on
+ * its first turn. The agent's own parameters join the scenarios'
+ * declarations for the run, and its environment and owner name are what
+ * its label reads.
  *
  * @see specs/agents/connected-agents.feature
  * @see dev/docs/adr/128-connected-agents.md
@@ -22,13 +24,17 @@ import type {
 import { isConnectedAgentStale } from "../agents/connected-agent-visibility";
 import {
   AgentEnvironmentUnresolvedError,
+  AgentOfflineError,
   AgentOwnerOnlyError,
 } from "../connected-agents/errors";
 import {
   DEVELOPMENT_ENVIRONMENT,
   parseConnectedReference,
 } from "../connected-agents/identity";
-import { readAgentPresence } from "../connected-agents/presence.read";
+import {
+  type PresenceReads,
+  readAgentPresence,
+} from "../connected-agents/presence.read";
 import {
   parseScenarioParameterDefinitions,
   type ScenarioParameterDefinition,
@@ -259,6 +265,38 @@ export async function assertConnectedAgentsRunnable({
     ownerUserId: foreign.ownerUserId,
     ownerName: names.get(foreign.ownerUserId) ?? null,
   });
+}
+
+/**
+ * Refuses the run when one of its connected agents has no process holding
+ * it right now.
+ *
+ * A run against such an agent would only fail on its first turn, so it is
+ * refused before a job exists. Only connected agents have a presence: an
+ * HTTP, code or workflow agent is never offline. The owner check runs first,
+ * so a personal agent of someone else reads as theirs rather than as offline.
+ */
+export async function assertConnectedAgentsOnline({
+  agents,
+  projectId,
+  presence,
+}: {
+  agents: readonly Pick<
+    AgentIdentityRow,
+    "id" | "name" | "type" | "environment"
+  >[];
+  projectId: string;
+  presence: PresenceReads;
+}): Promise<void> {
+  for (const agent of agents) {
+    if (agent.type !== "connected") continue;
+    const live = await presence.listLive({ projectId, agentId: agent.id });
+    if (live.length > 0) continue;
+    throw new AgentOfflineError({
+      agentName: agent.name,
+      environment: agent.environment,
+    });
+  }
 }
 
 /**

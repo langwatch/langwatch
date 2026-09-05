@@ -1,5 +1,9 @@
 import { ScenarioRunStatus, Verdict } from "../scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "../scenarios/scenario-event.types";
+import {
+  type ClickHouseEvaluationColumns,
+  columnsToEvaluations,
+} from "./simulation-evaluations.columns";
 
 type ScenarioMessages = ScenarioRunData["messages"];
 
@@ -9,7 +13,8 @@ type ScenarioMessages = ScenarioRunData["messages"];
  * Timestamp columns are returned as Unix milliseconds via toUnixTimestamp64Milli().
  * Messages are stored as parallel Nested arrays (Messages.id, Messages.role, etc.).
  */
-export interface ClickHouseSimulationRunRow {
+export interface ClickHouseSimulationRunRow
+  extends Partial<ClickHouseEvaluationColumns> {
   ScenarioRunId: string;
   ScenarioId: string;
   BatchRunId: string;
@@ -64,6 +69,8 @@ export function mapStatus(status: string): ScenarioRunStatus {
       return ScenarioRunStatus.PENDING;
     case "QUEUED":
       return ScenarioRunStatus.QUEUED;
+    case "PENDING_EVALUATION":
+      return ScenarioRunStatus.PENDING_EVALUATION;
     case "STALLED":
       return ScenarioRunStatus.STALLED;
     default:
@@ -89,7 +96,9 @@ function mapVerdict(verdict: string | null): Verdict | undefined {
  * Maps a ClickHouse simulation_runs row to ScenarioRunData.
  * Stored status is the only truth: runs without a finish timestamp read as
  * IN_PROGRESS regardless of age — a stalled run reaches terminal ERROR via
- * the process-manager stall watchdog, not a read-time derivation.
+ * the process-manager stall watchdog, not a read-time derivation, and a run
+ * that finished owing its evaluator results is stored PENDING_EVALUATION by
+ * the fold, not derived here.
  */
 export function mapClickHouseRowToScenarioRunData(
   row: ClickHouseSimulationRunRow,
@@ -152,6 +161,7 @@ export function mapClickHouseRowToScenarioRunData(
 
   const metCriteria = row.MetCriteria ?? [];
   const unmetCriteria = row.UnmetCriteria ?? [];
+  const evaluations = columnsToEvaluations(row);
 
   const results =
     verdictEnum != null
@@ -161,6 +171,7 @@ export function mapClickHouseRowToScenarioRunData(
           metCriteria,
           unmetCriteria,
           error: row.Error ?? undefined,
+          ...(evaluations.length > 0 && { evaluations }),
         }
       : null;
 

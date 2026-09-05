@@ -68,8 +68,8 @@ export type CasesPanelProps = {
   onMoveToSuite: (testCase: TestCase, suiteId: string) => void;
   onArchive: (testCase: TestCase) => void;
   onOpenExternalCase: (scenarioId: string) => void;
-  /** Opens the name dialog on the open test suite. */
-  onRenameSuite: () => void;
+  /** Opens the suite editor on the open test suite, at one attachment when asked. */
+  onEditSuite: (attachmentId?: string) => void;
 };
 
 export function CasesPanel(props: CasesPanelProps) {

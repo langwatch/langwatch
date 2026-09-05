@@ -35,6 +35,12 @@ export interface BatchRunProgress {
  * `STALLED` counts as finished on purpose: a stalled run is not coming back,
  * and treating it as in-flight is what would make `--wait` hang until its
  * timeout rather than report what happened.
+ *
+ * `PENDING_EVALUATION` is deliberately absent. The conversation is over and
+ * the judge has decided, but the evaluators the run's suite and plan attach
+ * have not been recorded yet, so a required one can still turn the run red.
+ * Counting it as finished is what let `--wait` report a green batch a moment
+ * before an evaluator failed it.
  */
 const FINISHED = new Set([
 	"SUCCESS",

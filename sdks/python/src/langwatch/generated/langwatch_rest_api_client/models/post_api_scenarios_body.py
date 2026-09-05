@@ -9,6 +9,7 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.post_api_scenarios_body_fields import PostApiScenariosBodyFields
     from ..models.post_api_scenarios_body_parameters_item import PostApiScenariosBodyParametersItem
 
 
@@ -35,6 +36,10 @@ class PostApiScenariosBody:
             default.
         test_suite_id (None | str | Unset): The test suite to file this scenario in. It must name a non-archived test
             suite of the same project. null files the scenario into the project's Default test suite.
+        fields (PostApiScenariosBodyFields | Unset): The value for each field the test suite declares, keyed by field
+            identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422
+            scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears
+            the field.
     """
 
     name: str
@@ -47,6 +52,7 @@ class PostApiScenariosBody:
     max_turns: int | None | Unset = UNSET
     min_turns: int | None | Unset = UNSET
     test_suite_id: None | str | Unset = UNSET
+    fields: PostApiScenariosBodyFields | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -99,6 +105,10 @@ class PostApiScenariosBody:
         else:
             test_suite_id = self.test_suite_id
 
+        fields: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.fields, Unset):
+            fields = self.fields.to_dict()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -123,11 +133,14 @@ class PostApiScenariosBody:
             field_dict["minTurns"] = min_turns
         if test_suite_id is not UNSET:
             field_dict["testSuiteId"] = test_suite_id
+        if fields is not UNSET:
+            field_dict["fields"] = fields
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.post_api_scenarios_body_fields import PostApiScenariosBodyFields
         from ..models.post_api_scenarios_body_parameters_item import PostApiScenariosBodyParametersItem
 
         d = dict(src_dict)
@@ -193,6 +206,13 @@ class PostApiScenariosBody:
 
         test_suite_id = _parse_test_suite_id(d.pop("testSuiteId", UNSET))
 
+        _fields = d.pop("fields", UNSET)
+        fields: PostApiScenariosBodyFields | Unset
+        if isinstance(_fields, Unset):
+            fields = UNSET
+        else:
+            fields = PostApiScenariosBodyFields.from_dict(_fields)
+
         post_api_scenarios_body = cls(
             name=name,
             situation=situation,
@@ -204,6 +224,7 @@ class PostApiScenariosBody:
             max_turns=max_turns,
             min_turns=min_turns,
             test_suite_id=test_suite_id,
+            fields=fields,
         )
 
         post_api_scenarios_body.additional_properties = d

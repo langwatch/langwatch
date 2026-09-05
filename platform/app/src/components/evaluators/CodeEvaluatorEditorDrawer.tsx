@@ -6,11 +6,12 @@ import {
   IconButton,
   Input,
   NativeSelect,
+  Spacer,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { LuArrowLeft, LuPlus, LuX } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
@@ -38,7 +39,12 @@ import {
 import { api } from "~/utils/api";
 
 import { codeEvaluatorDisabledReason } from "./codeEvaluatorValidation";
-import type { EvaluatorMappingsConfig } from "./EvaluatorEditorShared";
+import {
+  type EvaluatorGateConfig,
+  EvaluatorGateSection,
+  type EvaluatorMappingsConfig,
+  FooterRemoveArea,
+} from "./EvaluatorEditorShared";
 
 const FIELD_TYPES = ["str", "float", "bool", "list[str]", "dict"] as const;
 
@@ -61,10 +67,45 @@ export type CodeEvaluatorEditorDrawerProps = {
   ) => void;
   /** Called with the saved evaluator; flow callbacks take precedence. */
   onSave?: (evaluator: { id: string; name: string }) => void;
+  /** The gate of the attachment this evaluator is opened for. Present only
+   * when the drawer edits an attachment rather than the evaluator itself. */
+  gate?: EvaluatorGateConfig;
+  onRequiredChange?: (required: boolean) => void;
+  /** Takes the attachment off. Present only when editing an attachment. */
+  onRemove?: () => void;
 };
 
 const validFields = (fields: EditableField[]) =>
   fields.filter((f) => f.identifier.trim() !== "");
+
+/**
+ * The gate switch of the attachment this drawer edits: local state so the
+ * switch responds at once, kept in step with the gate a new attachment
+ * arrives with.
+ */
+function useAttachmentGate({
+  gate,
+  onRequiredChange,
+}: {
+  gate: EvaluatorGateConfig | undefined;
+  onRequiredChange: ((required: boolean) => void) | undefined;
+}) {
+  const [required, setRequired] = useState(gate?.required ?? false);
+  useEffect(() => {
+    setRequired(gate?.required ?? false);
+  }, [gate?.required]);
+  const handleRequiredChange = useCallback(
+    (next: boolean) => {
+      setRequired(next);
+      onRequiredChange?.(next);
+    },
+    [onRequiredChange],
+  );
+  return {
+    required,
+    onRequiredChange: gate ? handleRequiredChange : undefined,
+  };
+}
 
 /** Form state and the create/update mutation behind the drawer; no JSX in here. */
 function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
@@ -86,6 +127,14 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
   const onMappingChange =
     props.onMappingChange ??
     getFlowCallbacks("codeEvaluatorEditor")?.onMappingChange;
+  const gate =
+    props.gate ?? (complexProps.gate as EvaluatorGateConfig | undefined);
+  const onRequiredChange =
+    props.onRequiredChange ??
+    getFlowCallbacks("codeEvaluatorEditor")?.onRequiredChange;
+  const onRemove =
+    props.onRemove ?? getFlowCallbacks("codeEvaluatorEditor")?.onRemove;
+  const attachmentGate = useAttachmentGate({ gate, onRequiredChange });
 
   const isOpen = props.open !== false && props.open !== undefined;
 
@@ -253,6 +302,10 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     canSave,
     disabledReason,
     isPending,
+    gate,
+    required: attachmentGate.required,
+    onRequiredChange: attachmentGate.onRequiredChange,
+    onRemove,
   };
 }
 
@@ -297,11 +350,21 @@ export function CodeEvaluatorEditorDrawer(
               <Spinner size="md" />
             </HStack>
           ) : (
-            <CodeEvaluatorFormFields form={form} />
+            <>
+              <CodeEvaluatorFormFields form={form} />
+              {form.gate && (
+                <EvaluatorGateSection
+                  gate={form.gate}
+                  required={form.required}
+                  onRequiredChange={form.onRequiredChange}
+                />
+              )}
+            </>
           )}
         </Drawer.Body>
         <Drawer.Footer borderTopWidth="1px" borderColor="border">
-          <HStack width="full" justify="space-between" gap={3}>
+          <HStack width="full" gap={3}>
+            <FooterRemoveArea onRemove={form.onRemove} hasSpacer={false} />
             {form.disabledReason ? (
               <Text
                 fontSize="sm"
@@ -313,6 +376,7 @@ export function CodeEvaluatorEditorDrawer(
             ) : (
               <Box />
             )}
+            <Spacer />
             <Button
               colorPalette="blue"
               onClick={form.handleSave}

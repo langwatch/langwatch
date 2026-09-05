@@ -16,6 +16,10 @@ import {
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import type { ScenarioActor } from "~/server/scenarios/scenario-versioning";
 import {
+  parseScenarioFieldValues,
+  scenarioFieldValuesSchema,
+} from "~/server/scenarios/suite-fields";
+import {
   readTestingInterface,
   scenarioEditorPath,
   type TestingInterface,
@@ -80,6 +84,11 @@ const scenarioResponseSchema = z.object({
     .describe(
       "The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.",
     ),
+  fields: scenarioFieldValuesSchema
+    .optional()
+    .describe(
+      "The value this scenario carries for each field its test suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate suite fields.",
+    ),
 });
 
 const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
@@ -140,6 +149,11 @@ const scenarioVersionDetailResponseSchema = scenarioVersionSummarySchema.extend(
         judgeModel: z.string().nullable(),
         maxTurns: z.number().nullable(),
         minTurns: z.number().nullable(),
+        fields: scenarioFieldValuesSchema
+          .optional()
+          .describe(
+            "The field values as this version saved them. Absent on servers that predate suite fields.",
+          ),
       })
       .describe(
         "The editable content of the scenario as this version saved it.",
@@ -166,6 +180,9 @@ const parametersDescription =
 
 const testSuiteIdDescription =
   "The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite.";
+
+const fieldsDescription =
+  "The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field.";
 
 const simulatorModelDescription =
   "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.";
@@ -203,6 +220,7 @@ const createScenarioSchema = z.object({
     .nullish()
     .describe(minTurnsDescription),
   testSuiteId: z.string().nullish().describe(testSuiteIdDescription),
+  fields: scenarioFieldValuesSchema.optional().describe(fieldsDescription),
 });
 
 const updateScenarioSchema = z.object({
@@ -232,6 +250,11 @@ const updateScenarioSchema = z.object({
     .nullish()
     .describe(minTurnsDescription),
   testSuiteId: z.string().nullish().describe(testSuiteIdDescription),
+  fields: scenarioFieldValuesSchema
+    .optional()
+    .describe(
+      `${fieldsDescription} Send the full record; an empty record clears every value.`,
+    ),
 });
 
 /**
@@ -275,6 +298,7 @@ function toScenarioResponse(scenario: Scenario) {
     maxTurns: scenario.maxTurns,
     minTurns: scenario.minTurns,
     testSuiteId: scenario.testSuiteId,
+    fields: parseScenarioFieldValues(scenario.fields),
   };
 }
 
@@ -462,6 +486,7 @@ function registerCreateScenarioRoute(
           ...(body.judgeModel !== undefined && { judgeModel: body.judgeModel }),
           ...(body.maxTurns !== undefined && { maxTurns: body.maxTurns }),
           ...(body.minTurns !== undefined && { minTurns: body.minTurns }),
+          ...(body.fields !== undefined && { fields: body.fields }),
         },
         { actor: actorFromRequest(c) },
       );
@@ -764,6 +789,7 @@ function registerGetScenarioVersionRoute(
             judgeModel: detail.fields.judgeModel,
             maxTurns: detail.fields.maxTurns,
             minTurns: detail.fields.minTurns,
+            fields: parseScenarioFieldValues(detail.fields.fields),
           },
         });
       } catch (error) {

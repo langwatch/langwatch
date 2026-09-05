@@ -444,3 +444,71 @@ describe("the note and the scenario version", () => {
     });
   });
 });
+
+describe("getSimulationRunCommand()", () => {
+  describe("when a run has evaluator results", () => {
+    beforeEach(() => {
+      vi.spyOn(console, "log").mockImplementation(noop);
+      vi.spyOn(console, "error").mockImplementation(noop);
+      mockProcessExit();
+    });
+
+    /** @scenario "Get simulation run shows its evaluator results" */
+    it("shows one line per evaluator with its status, score, gate and reason", async () => {
+      const run = makeRun({
+        results: {
+          verdict: "failed",
+          reasoning: "SQL Query Equivalence failed",
+          metCriteria: [],
+          unmetCriteria: [],
+          error: null,
+          evaluations: [
+            {
+              evaluatorId: "evaluator_sql",
+              name: "SQL Query Equivalence",
+              status: "failed",
+              required: true,
+              passed: false,
+              details: "The query groups by month, not by quarter",
+            },
+            {
+              evaluatorId: "evaluator_judge",
+              name: "Answer quality",
+              status: "scored",
+              required: false,
+              score: 0.8,
+            },
+            {
+              evaluatorId: "evaluator_ctx",
+              name: "Context recall",
+              status: "skipped",
+              required: false,
+              details: "no table_schema on this scenario",
+            },
+          ],
+        },
+      });
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response(JSON.stringify(run), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      const result = await getSimulationRunCommand("run_abc123");
+      result?.table();
+
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((call) => String(call[0]))
+        .join("\n");
+      expect(printed).toContain("SQL Query Equivalence");
+      expect(printed).toContain("failed");
+      expect(printed).toContain("required");
+      expect(printed).toContain("The query groups by month, not by quarter");
+      expect(printed).toContain("score 0.8");
+      expect(printed).toContain("no table_schema on this scenario");
+      expect((result?.data as { results: { evaluations: unknown[] } }).results.evaluations).toHaveLength(3);
+    });
+  });
+});

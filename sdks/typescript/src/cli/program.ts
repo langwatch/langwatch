@@ -106,6 +106,34 @@ const JUDGE_MODEL_FLAG_HELP =
 const IDEMPOTENCY_KEY_FLAG_HELP =
   "Key that makes this run safe to retry. Two requests carrying the same key schedule one run.";
 
+/** Help for the `--field` flag on the test suite write commands. */
+const SUITE_FIELD_FLAG_HELP =
+  "A field the test suite declares, written identifier:type, for example golden_sql:text. The types are text, number and boolean; an identifier is lowercase letters, digits and underscores, starting with a letter. Repeat the flag for more than one. On update, the flags together replace the list the suite holds.";
+
+/** Help for the `--field` flag on the scenario write commands. */
+const SCENARIO_FIELD_FLAG_HELP =
+  "The scenario's value for a field its test suite declares, written identifier=value, for example golden_sql='SELECT 1'. A number field reads a number and a boolean field reads true or false; a field the suite does not declare is refused. Repeat the flag for more than one. On update, the flags together replace the values the scenario holds.";
+
+/**
+ * Help for the `--evaluator` family, shared by the test suite write commands
+ * and `run-plan run`. The gate flags read the evaluator written just before
+ * them, so they are collected in order rather than by commander's last-wins.
+ */
+const EVALUATOR_FLAG_HELP =
+  "A saved evaluator to run after every scenario run, named by ID or by slug. Its input mappings are inferred: input-like inputs read the first user message, output-like ones the last agent message, contexts the retrieved contexts of the trace, and expected-like ones a field of the suite by name. A tool call is never inferred; set it with --evaluators-json. Repeat the flag for more than one.";
+
+const EVALUATOR_REQUIRED_FLAG_HELP =
+  "Make the evaluator written just before it gate the scenario: a failing result fails the scenario. The default for an evaluator that produces a pass or fail verdict.";
+
+const EVALUATOR_NOT_REQUIRED_FLAG_HELP =
+  "Make the evaluator written just before it report only: its result shows beside the verdict and never fails the scenario. The default for a score-only evaluator.";
+
+const EVALUATORS_JSON_FLAG_HELP =
+  "The full evaluator attachment list, as a JSON document or the path of a file holding one: [{ evaluatorId, required, mappings: { <input>: { type: 'source', sourceId: 'conversation'|'scenario'|'trace', path: [...] } | { type: 'value', value } } }]. Conversation paths: first_user_message, last_agent_message, transcript, messages. Scenario paths: situation, criteria, or fields followed by a field identifier. Trace paths: contexts, or tool_calls followed by a tool name and input or output.";
+
+const PLAN_EVALUATOR_FLAG_HELP =
+  "A saved evaluator the plan runs beside the ones its test suites attach, named by ID or by slug. A plan evaluator reads the conversation and the trace, never a scenario field. Repeat the flag for more than one.";
+
 /**
  * Reads the `--test-suite` / `--no-test-suite` pair.
  *
@@ -133,6 +161,38 @@ const trackTestSuiteFlags = (
     };
     testSuite = undefined;
     noTestSuite = false;
+    return read;
+  };
+};
+
+/**
+ * Records `--evaluator`, `--required` and `--not-required` in the order they
+ * were written. A boolean flag keeps only its last value in commander, so the
+ * pairing of a gate flag with the evaluator before it is read from the
+ * option events instead. The reader clears what it read.
+ */
+const trackEvaluatorFlags = (
+  command: Command,
+): (() => Array<{ reference: string; required?: boolean }> | undefined) => {
+  let refs: Array<{ reference: string; required?: boolean }> | undefined;
+  const gate = (required: boolean): void => {
+    const last = refs?.[refs.length - 1];
+    if (!last) {
+      console.error(
+        `Error: ${required ? "--required" : "--not-required"} must follow the --evaluator it applies to`,
+      );
+      process.exit(1);
+    }
+    last.required = required;
+  };
+  command.on("option:evaluator", (value: string) => {
+    refs = [...(refs ?? []), { reference: value }];
+  });
+  command.on("option:required", () => gate(true));
+  command.on("option:not-required", () => gate(false));
+  return () => {
+    const read = refs;
+    refs = undefined;
     return read;
   };
 };
@@ -2850,8 +2910,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--criteria <criteria>", "Comma-separated list of evaluation criteria")
       .option("--labels <labels>", "Comma-separated list of labels")
       .option("--test-suite <test-suite>", TEST_SUITE_FLAG_HELP)
+      .option("--field <pair>", SCENARIO_FIELD_FLAG_HELP, collectParam)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { situation: string; criteria?: string; labels?: string; testSuite?: string }) => {
+    async (name: string, options: { situation: string; criteria?: string; labels?: string; testSuite?: string; field?: string[] }) => {
       const { createScenarioCommand: impl } = await import("./commands/scenarios/create.js");
       return impl(name, options);
     },
@@ -2866,13 +2927,14 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .option("--labels <labels>", "New comma-separated list of labels (replaces existing)")
     .option("--test-suite <test-suite>", TEST_SUITE_FLAG_HELP)
     .option("--no-test-suite", "Take the scenario out of its test suite")
+    .option("--field <pair>", SCENARIO_FIELD_FLAG_HELP, collectParam)
     .option("-f, --format <format>", "Output format: table (default) or json", "table");
 
   const readScenarioTestSuiteFlags = trackTestSuiteFlags(scenarioUpdateCmd);
 
   emitsResult(
     scenarioUpdateCmd,
-    async (id: string, options: { name?: string; situation?: string; criteria?: string; labels?: string }) => {
+    async (id: string, options: { name?: string; situation?: string; criteria?: string; labels?: string; field?: string[] }) => {
       const { testSuite, noTestSuite } = readScenarioTestSuiteFlags();
       const { updateScenarioCommand: impl } = await import("./commands/scenarios/update.js");
       return impl(id, {
@@ -2882,6 +2944,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         labels: options.labels,
         testSuite,
         noTestSuite,
+        field: options.field,
       });
     },
   );
@@ -2955,10 +3018,13 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .command("run-plan")
     .description("Run scenarios and read the plans those runs are filed under");
 
+  const runPlanRunCmd = runPlanCmd
+    .command("run")
+    .description("Run a configuration under a name");
+  const readRunPlanEvaluatorFlags = trackEvaluatorFlags(runPlanRunCmd);
+
   rendersOwnResult(
-    runPlanCmd
-      .command("run")
-      .description("Run a configuration under a name")
+    runPlanRunCmd
       .option("--target <target>", TARGET_FLAG_HELP, collectParam)
       .option("--all", SCOPE_ALL_FLAG_HELP)
       .option("--test-suite <name-or-id>", SCOPE_TEST_SUITE_FLAG_HELP, collectParam)
@@ -2976,6 +3042,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--repeat <n>", REPEAT_FLAG_HELP)
       .option("--simulator-model <model>", SIMULATOR_MODEL_FLAG_HELP)
       .option("--judge-model <model>", JUDGE_MODEL_FLAG_HELP)
+      .option("--evaluator <id-or-slug>", PLAN_EVALUATOR_FLAG_HELP, collectParam)
+      .option("--required", EVALUATOR_REQUIRED_FLAG_HELP)
+      .option("--not-required", EVALUATOR_NOT_REQUIRED_FLAG_HELP)
+      .option("--evaluators-json <file-or-json>", EVALUATORS_JSON_FLAG_HELP)
       .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
       .option("--note <text>", NOTE_FLAG_HELP)
       .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
@@ -2987,12 +3057,14 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   ).action(async (_options: unknown, command: Command) => {
     // Merged globals: a root-position `--output` only lands on the ROOT
     // command, so the leaf's own opts would silently drop it.
-    const { suite, ...rest } = command.optsWithGlobals();
+    const { suite, evaluator: _evaluator, required: _required, notRequired: _notRequired, ...rest } = command.optsWithGlobals();
     const testSuite: string[] = [...(rest.testSuite ?? []), ...(suite ?? [])];
+    const evaluators = readRunPlanEvaluatorFlags();
     const { runRunPlanCommand: impl } = await import("./commands/run-plans/run.js");
     await impl({
       ...rest,
       ...(testSuite.length > 0 ? { testSuite } : {}),
+      ...(evaluators ? { evaluators } : {}),
     });
   });
 
@@ -3049,14 +3121,53 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
+  const testSuiteCreateCmd = testSuiteCmd
+    .command("create <name>")
+    .description("Create a test suite, with the fields and evaluators it declares")
+    .option("--field <definition>", SUITE_FIELD_FLAG_HELP, collectParam)
+    .option("--evaluator <id-or-slug>", EVALUATOR_FLAG_HELP, collectParam)
+    .option("--required", EVALUATOR_REQUIRED_FLAG_HELP)
+    .option("--not-required", EVALUATOR_NOT_REQUIRED_FLAG_HELP)
+    .option("--evaluators-json <file-or-json>", EVALUATORS_JSON_FLAG_HELP)
+    .option("-f, --format <format>", "Output format: table (default) or json", "table");
+  const readSuiteCreateEvaluatorFlags = trackEvaluatorFlags(testSuiteCreateCmd);
+
   emitsResult(
-    testSuiteCmd
-      .command("create <name>")
-      .description("Create an empty test suite")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string) => {
+    testSuiteCreateCmd,
+    async (name: string, options: { field?: string[]; evaluatorsJson?: string }) => {
+      const evaluators = readSuiteCreateEvaluatorFlags();
       const { createTestSuiteCommand: impl } = await import("./commands/test-suites/create.js");
-      return impl(name);
+      return impl(name, {
+        field: options.field,
+        evaluators,
+        evaluatorsJson: options.evaluatorsJson,
+      });
+    },
+  );
+
+  const testSuiteUpdateCmd = testSuiteCmd
+    .command("update <suite>")
+    .description("Edit a test suite: its name, its fields or its evaluators")
+    .option("--name <name>", "The new name. The slug is kept.")
+    .option("--field <definition>", SUITE_FIELD_FLAG_HELP, collectParam)
+    .option("--evaluator <id-or-slug>", EVALUATOR_FLAG_HELP, collectParam)
+    .option("--required", EVALUATOR_REQUIRED_FLAG_HELP)
+    .option("--not-required", EVALUATOR_NOT_REQUIRED_FLAG_HELP)
+    .option("--evaluators-json <file-or-json>", EVALUATORS_JSON_FLAG_HELP)
+    .option("-f, --format <format>", "Output format: table (default) or json", "table");
+  const readSuiteUpdateEvaluatorFlags = trackEvaluatorFlags(testSuiteUpdateCmd);
+
+  emitsResult(
+    testSuiteUpdateCmd,
+    async (suite: string, options: { name?: string; field?: string[]; evaluatorsJson?: string }) => {
+      const evaluators = readSuiteUpdateEvaluatorFlags();
+      const { updateTestSuiteCommand: impl } = await import("./commands/test-suites/update.js");
+      return impl(suite, {
+        name: options.name,
+        field: options.field,
+        evaluators,
+        evaluatorsJson: options.evaluatorsJson,
+      });
     },
   );
 

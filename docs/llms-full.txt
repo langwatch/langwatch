@@ -37272,6 +37272,108 @@ The `CI` half of each expression keeps the default the SDK applies on its own. W
 
 ---
 
+# FILE: ./agent-testing/evaluators.mdx
+
+---
+title: Evaluators
+sidebarTitle: Evaluators
+keywords: langwatch, agent testing, evaluators, test suite, fields, mappings, required, gate, tool call, contexts, golden answer, sql
+description: An evaluator attached to a test suite runs after every scenario run, reads the conversation, the scenario's fields or the trace, and reports beside the judge's verdict. A required one that fails fails the scenario.
+---
+
+## When to attach an evaluator
+
+The judge grades behavior from the criteria. An evaluator compares against a known answer or runs a check an existing evaluator already does well: a SQL query against the golden one, a reply against a reference answer, a transcript through a PII scanner, retrieved contexts through a faithfulness check. Any evaluator of the project's [library](/evaluations/evaluators/overview) can be attached, LLM judges included.
+
+A test suite declares [fields](/agent-testing/test-suites#fields) for the values an evaluator compares against. A scenario may carry a value for each field; a blank value skips the evaluators that read it.
+
+## Attach an evaluator
+
+**Edit suite** on a test suite opens the suite editor. Under **Customize test suite**, **Add evaluators** shows the attached evaluators as chips and **Add evaluator** opens the evaluator list of the project. Picking one attaches it with its mappings inferred; when a required input is still unmapped, or when the evaluator reads an expected value, the evaluator drawer opens on the attachment so you confirm where each input reads from.
+
+<Frame>
+<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" alt="The suite editor with two fields, golden_sql and table_schema, and two evaluator chips, SQL Query Equivalence marked as required and a score judge" />
+</Frame>
+
+A chip with an amber alert has a required input with no mapping. Press it to open the drawer. **Run suite** does not start while an attachment is in that state: it opens the drawer on the offending evaluator instead.
+
+## Mappings
+
+Every evaluator input reads from one source:
+
+| Source | Paths | What it reads |
+|---|---|---|
+| **Conversation** | `first_user_message`, `last_agent_message`, `transcript`, `messages` | The first message of the simulated user, the last reply of the agent, the whole conversation as `role: content` lines, or the messages as JSON. |
+| **Scenario** | `situation`, `criteria`, `fields.<identifier>` | The scenario's own text, or its value for a field the suite declares. |
+| **Trace** | `contexts`, `spans`, `tool_calls.<tool>.input`, `tool_calls.<tool>.output` | The retrieved contexts of the run's traces, every span of those traces as JSON in start order, or the input or output of the last call of a tool. Needs [linked traces](/agent-testing/linking-your-traces). |
+| A value | | A literal, the same for every scenario. |
+
+Mappings are inferred when an evaluator is attached. An input named `input`, `question` or `user_input` reads the first user message; `output`, `response` or `answer` reads the last agent message; `transcript`, `conversation` or `messages` reads the transcript; `contexts` or `retrieved_contexts` reads the trace's contexts.
+
+An input named `expected_output`, `expected_contexts` or another `expected_*` reads the field whose name matches, so `expected_output` matches `golden_sql` and `expected_contexts` matches `table_schema`. A suite with one field maps an expected input to it. A tool call or the spans are never inferred: set them by hand. `spans` hands a code or LLM evaluator the whole run, every span of every trace as JSON, when one tool call at a time is not enough.
+
+The example of a text-to-SQL agent: the suite declares `golden_sql` and `table_schema`, and **SQL Query Equivalence** reads `output` from `tool_calls.run_sql.input`, `expected_output` from `fields.golden_sql` and `expected_contexts` from `fields.table_schema`.
+
+## Required evaluators and scores
+
+**Required to pass** on the attachment makes a failing result fail the scenario. It is on by default for an evaluator that produces a pass or fail verdict. A score-only evaluator reports its score beside the verdict and never gates, whatever the switch says.
+
+## What each run reports
+
+After the conversation and the judge, the platform runs every attached evaluator and stores one result per evaluator on the run:
+
+| Status | Meaning |
+|---|---|
+| `passed`, `failed` | The evaluator's verdict. A failed required evaluator fails the scenario, and the verdict line names it. |
+| `scored` | A score, for an evaluator with no pass or fail verdict. |
+| `skipped` | A field the mapping reads is blank on this scenario. The reason names the field. |
+| `error` | The trace has no such tool call or no retrieved contexts, or the evaluator itself failed. The reason says which. |
+
+The run drawer lists the evaluators under the criteria, and the run header shows a pill per evaluator with its pass rate or its mean score. See [Results](/agent-testing/results#evaluator-results).
+
+## Evaluators on a run plan
+
+The [run dialog](/agent-testing/run-plans#the-run-dialog) shows the evaluators inherited from the test suites in scope, and **Add evaluator** adds one to the plan itself. A plan evaluator reads the conversation and the trace only, because a plan may cover scenarios from suites with different fields. Use it for a check that applies to every scenario, such as a PII scanner.
+
+## From the CLI and the API
+
+```bash
+langwatch test-suite create "Case lookups" \
+  --field golden_sql:text --field table_schema:text \
+  --evaluator sql-query-equivalence --required
+
+langwatch test-suite update "Case lookups" --evaluators-json evaluators.json
+
+langwatch run-plan run --test-suite "Case lookups" --target http:agent_abc123 --evaluator pii-leak-scanner
+
+langwatch simulation-run get <scenarioRunId> --format json   # results.evaluations
+```
+
+`--evaluator` infers the mappings the way the suite editor does. `--evaluators-json` takes the full attachment list, for a tool call mapping:
+
+```json
+[{
+  "id": "attachment_abc123",
+  "evaluatorId": "evaluator_abc123",
+  "required": true,
+  "mappings": {
+    "output": { "type": "source", "sourceId": "trace", "path": ["tool_calls", "run_sql", "input"] },
+    "expected_output": { "type": "source", "sourceId": "scenario", "path": ["fields", "golden_sql"] },
+    "expected_contexts": { "type": "source", "sourceId": "scenario", "path": ["fields", "table_schema"] }
+  }
+}]
+```
+
+The same list travels as `evaluators` on `POST /api/v1/test-suites`, `PATCH /api/v1/test-suites/{id}` and `config.evaluators` on `POST /api/v1/run-plans/run`. `GET /api/simulation-runs/{scenarioRunId}` answers with `results.evaluations`. See the [Test Suites API reference](/api-reference/test-suites/overview) and the [Run Plans API reference](/api-reference/run-plans/overview). The Python and TypeScript SDKs take `fields` and `evaluators` on `test_suites.create` / `testSuites.create`, `test_suites.update` / `testSuites.update` and on `run_plans.run` / `runPlans.run`; the MCP tools `platform_create_test_suite`, `platform_update_test_suite` and `platform_run_plan` take the same.
+
+## From code
+
+A scenario written with the Scenario SDK attaches evaluators in the test itself, with the same mappings and the same gate, and its results appear on the platform beside the judge's verdict like a platform-run scenario's. See [Evaluators on Scenarios](https://langwatch.ai/scenario/advanced/evaluators) in the Scenario documentation.
+
+Also check: [Test suites](/agent-testing/test-suites), [Scenarios](/agent-testing/scenarios), [Results](/agent-testing/results), [Linking your traces](/agent-testing/linking-your-traces).
+
+---
+
 # FILE: ./agent-testing/linking-your-traces.mdx
 
 ---
@@ -38053,7 +38155,7 @@ Press a run plan. The sidebar lists its runs as **Run #n** with the note, the ti
 
 **Show run settings** opens the configuration the run used: **Started**, **Targets**, **Parameters**, **Repeat**, **Simulator model** and **Judge model**.
 
-The **Table** view has one row per scenario execution: **Result**, **Scenario**, **Evaluators** and **Time · cost**. The row menu offers **Open the conversation**, **Rerun this scenario** and **Edit scenario**. The **Grid** view shows the same executions as cards, one colour per result, each ending in `Completed` or `Failed`.
+The **Table** view has one row per scenario execution: **Result**, **Scenario**, **Evaluators** and **Time · cost**. The **Evaluators** cell shows one pill per evaluator that ran, with its verdict or its score. The row menu offers **Open the conversation**, **Rerun this scenario** and **Edit scenario**. The **Grid** view shows the same executions as cards, one colour per result, each ending in `Completed` or `Failed`.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-detail-grid.png" alt="The Grid view of a run, one card per scenario execution" />
@@ -38069,7 +38171,26 @@ Press a row to open the drawer. The header shows the **Status**, the criteria co
 <img className="block" src="/images/agent-testing/run-drawer-failed.png" alt="The conversation drawer of a failed run, with the failed criteria and the judge reasoning" />
 </Frame>
 
-Under the transcript, the **RESULTS** block lists the met criteria, the unmet criteria and the judge's reasoning, then **PARAMETERS** shows the values the run used, a secret parameter masked. **Edit Scenario** opens the scenario in the editor.
+Under the transcript: **FAILED CRITERIA**, **PASSED CRITERIA** and **JUDGE REASONING**, then **Evaluators** when the suite or the plan attached any, then **Parameters** with the values the run used, a secret parameter masked. **Edit Scenario** opens the scenario in the editor.
+
+## Evaluator results
+
+An [evaluator](/agent-testing/evaluators) attached to the test suite or to the run plan runs after the judge, and the run keeps one result per evaluator. The drawer lists them under the criteria, one row each: the status, the name, a mark when it is required, the verdict or the score, and the reason under it.
+
+| Status | Meaning |
+|---|---|
+| `passed`, `failed` | The evaluator's verdict. A failed **required** evaluator fails the scenario: the verdict reads `Failed · <evaluator name>` and the judge reasoning is kept. |
+| `scored` | The score of an evaluator with no pass or fail verdict. A score never fails a scenario. |
+| `skipped` | The scenario has no value for a field the mapping reads. The reason names the field. |
+| `error` | The trace has no such tool call or no retrieved contexts, or the evaluator itself failed. The reason says which. |
+
+The run header shows a pill per evaluator: the pass rate for one with a verdict, the mean for one with a score. The verdict of a run is settled when the evaluators are in. A run whose evaluators all pass, or that has none, keeps the judge's verdict.
+
+Between the judge's verdict and the evaluator results the run reads as `PENDING_EVALUATION`, `evaluating` in the interface. `langwatch test-suite run ... --wait` and the batch counts treat such a run as still going, so nothing reports a batch as green while a required evaluator can still fail one of its runs. The run stays pending until its evaluators are recorded. A grading job that is lost is recorded as errored evaluators once its deadline passes, so a required evaluator that never ran fails the run instead of leaving it pending.
+
+The evaluators a run is graded with are fixed when the run is scheduled. Editing the suite or the run plan while a batch executes changes the runs scheduled after the edit, never the ones already queued.
+
+The results reach the CLI and the API as `results.evaluations` on `langwatch simulation-run get <scenarioRunId> --format json` and `GET /api/simulation-runs/{scenarioRunId}`, one entry per evaluator with `status`, `required`, `passed`, `score`, `label` and `details`.
 
 While the run is going, the drawer shows `The conversation is running…` and then `The judge is reading the conversation…`, and the verdict appears in place when it is in.
 
@@ -38081,6 +38202,7 @@ The **Result** column of the table shows `Passed`, `Failed` or `Running`. The **
 |---|---|---|
 | `completed` | The judge delivered a verdict. The verdict itself is `PASSED` or `FAILED`. | On a fail, read the reasoning in the **RESULTS** block, then the transcript. |
 | `running`, `queued`, `pending` | The conversation, or the verdict, is not done. | Wait, or **Stop**. |
+| `evaluating` | The conversation is over and the judge has decided, but the evaluators the suite and the plan attach have not been recorded yet. A required one can still fail the run. | Wait. The API and the CLI report this run as `PENDING_EVALUATION` and do not count it as finished. |
 | `failed` with an error in the drawer | The target did not answer: the URL is wrong, the agent is down, the authentication was refused, or a local tunnel ended. The drawer shows the error the target returned. | Fix the agent, then **Rerun this scenario**. |
 | `cancelled` | Stopped with **Stop** or **Stop all**. | **Rerun this scenario** when needed. |
 | `stalled` | The run stopped reporting before a verdict. | **Rerun this scenario**. A stalled run counts as not passed. |
@@ -38274,8 +38396,8 @@ curl "https://app.langwatch.ai/api/simulation-runs/batches/batch_xyz789" \
 | Field | Meaning |
 | --- | --- |
 | `totalCount` | Runs in the batch now. |
-| `runningCount` | Runs that are queued or in progress. |
-| `settledCount` | Runs that are neither queued nor in progress: passed, failed, errored, cancelled or stalled. |
+| `runningCount` | Runs that are queued, in progress, or waiting on their evaluators. |
+| `settledCount` | Runs that are none of those: passed, failed, errored, cancelled or stalled, with every attached evaluator recorded. |
 | `isComplete` | True when `settledCount` equals `totalCount`. |
 
 Stop the poll when `isComplete` is true **and** `totalCount` is at least `jobCount`. The two conditions go together: the platform creates the runs asynchronously, so a batch read right after the trigger can have fewer runs than `jobCount`, and a batch of two created runs out of six reports itself complete.
@@ -39157,8 +39279,19 @@ Write criteria about outcomes and actions, not wording. A criterion about an int
 | **Situation** | Who the user is and what they are trying to do. |
 | **Criteria** | One criterion per line. Blank lines are dropped. |
 | **Labels** | Free text tags, any number. A run plan can scope by labels across test suites. |
+| **Fields** | One control per field the test suite declares, after the criteria: a growing text box for a text field, a number input for a number, a switch for a boolean. See [Field values](#field-values). |
 
 **Save** stores the scenario. **Save & Run** stores it and opens the [run dialog](/agent-testing/run-plans#the-run-dialog). **Open recent run** opens the latest run of this scenario.
+
+## Field values
+
+When the test suite declares [fields](/agent-testing/test-suites#fields), the editor shows one control per field after the criteria, and the value is stored on the scenario. An [evaluator](/agent-testing/evaluators) attached to the suite reads the value through its mapping, for example `expected_output` from `golden_sql`.
+
+A blank value is no value: the evaluators that read the field are skipped for this scenario, with the reason `no golden_sql on this scenario`. A scenario moved to another suite keeps the values it holds; the editor lists the ones the new suite does not declare under **Not in this suite**, each with a remove action.
+
+From the CLI, `langwatch scenario create` and `langwatch scenario update` take `--field identifier=value`, repeated once per field. A number field reads a number and a boolean field reads `true` or `false`, and a field the suite does not declare is refused with the list it does. On `update` the flags together replace the values the scenario holds.
+
+The API takes the same values as `fields` on `POST /api/scenarios` and `PUT /api/scenarios/{id}`, where an empty object clears them. The SDKs and the MCP tools take `fields` on create and update.
 
 ## Customize scenario
 
@@ -39205,6 +39338,8 @@ Through the [LangWatch MCP integration](/integration/mcp), a coding assistant su
 | Limit | Value |
 |---|---|
 | Parameters declared on one scenario | 20 |
+| Fields declared on a test suite | 30 |
+| A text field value | 65536 characters |
 | Max turns without a value | 10 |
 | Versions kept | All |
 
@@ -39395,7 +39530,7 @@ Also check: [Scenarios](/agent-testing/scenarios), [Test suites](/agent-testing/
 title: Test Suites
 sidebarTitle: Test suites
 keywords: langwatch, agent testing, test suite, scenarios, default test suite, from code, labels, archive
-description: A test suite is a named group of scenarios that you run together. The targets, the models and the repeat count are set on the run plan, not on the test suite.
+description: A test suite is a named group of scenarios you run together. It defines the fields a scenario may carry a value for and the evaluators that run after each scenario. The targets, the models and the repeat count are set on the run plan.
 ---
 
 ## The rail
@@ -39412,11 +39547,30 @@ The row menu of a test suite offers:
 |---|---|
 | **New scenario** | Opens the editor with this test suite preselected. |
 | **Run suite** | Opens the run dialog with every scenario of the test suite in scope. |
-| **Rename** | Changes the name. Past runs keep the old name. |
+| **Edit** | Opens the suite editor: the name, the fields and the evaluators. Past runs keep the old name. |
 | **Open recent runs** | Lists the latest runs of this test suite. |
 | **Archive suite** | Archives the test suite and the scenarios in it. Test runs are preserved. |
 
 Every project has a **Default** test suite. A scenario saved with **No test suite** goes there.
+
+Under the suite name, the header shows a chip per field and a chip per evaluator, and the count line `N scenarios · N fields · N evaluators`.
+
+## Fields
+
+A test suite reads like a dataset. Beyond the situation and the criteria, it declares typed fields, and a scenario in it may carry a value for each. A blank value skips the evaluators that read it. A field holds what an [evaluator](/agent-testing/evaluators) compares against: the golden SQL query, the reference answer, the tables the answer had to be written against.
+
+**Edit suite** opens the suite editor. Under **Customize test suite**, **Add fields** opens the field rows: an identifier and a type each, with **Add field** for the next one and the arrows to reorder them.
+
+| Setting | Rule |
+|---|---|
+| **Identifier** | Lowercase letters, digits and underscores, starting with a letter, up to 64 characters, for example `golden_sql`. `situation`, `criteria`, `name`, `input` and `output` are reserved. |
+| **Type** | `text`, `number` or `boolean`. A text value is a growing text box on the scenario; a number a number input; a boolean a switch. |
+
+A suite declares up to 30 fields. A field an attached evaluator still reads cannot be removed: detach the evaluator or change its mapping first. Removing a field keeps the values scenarios hold for it; the scenario editor lists them under **Not in this suite** until they are removed.
+
+## Evaluators
+
+The evaluators attached to a suite run after every scenario run and report beside the judge's verdict. A required one that fails fails the scenario. See [Evaluators](/agent-testing/evaluators) for the mappings, the gate and what each run reports.
 
 ## Run a test suite
 
@@ -39442,7 +39596,17 @@ Scenarios written with the Scenario SDK and run from your own test runner report
 <img className="block" src="/images/agent-testing/from-code-suite.png" alt="A From Code test suite, with its scenarios and their last runs" />
 </Frame>
 
-Also check: [Write scenarios in code](/agent-testing/scenarios-in-code), [Scenarios](/agent-testing/scenarios), [Run plans](/agent-testing/run-plans).
+## From the CLI and the API
+
+```bash
+langwatch test-suite create "Case lookups" --field golden_sql:text --field table_schema:text
+langwatch test-suite update "Case lookups" --field golden_sql:text --field table_schema:text --field row_limit:number
+langwatch test-suite get "Case lookups" --format json
+```
+
+`--field identifier:type` repeats, and on `update` the flags together replace the list the suite declares. The same list travels as `fields` on `POST /api/v1/test-suites` and `PATCH /api/v1/test-suites/{id}`; see the [Test Suites API reference](/api-reference/test-suites/overview). The Python and TypeScript SDKs take `fields` on `test_suites.create` / `testSuites.create` and `test_suites.update` / `testSuites.update`; the MCP tools `platform_create_test_suite` and `platform_update_test_suite` take the same.
+
+Also check: [Write scenarios in code](/agent-testing/scenarios-in-code), [Scenarios](/agent-testing/scenarios), [Evaluators](/agent-testing/evaluators), [Run plans](/agent-testing/run-plans).
 
 ---
 
@@ -53995,7 +54159,7 @@ Then drive everything via `langwatch scenario --help`, `langwatch test-suite --h
 | Noun | What it is | Commands |
 | --- | --- | --- |
 | **scenario** | One test: a *situation* plus natural-language *criteria*. It needs a target to run against. | `langwatch scenario …` |
-| **test suite** | A test suite groups scenarios: a name and the scenarios filed under it, and nothing else. Every project has a `Default` test suite, so no scenario is loose. | `langwatch test-suite …` |
+| **test suite** | A test suite groups scenarios: a name, the scenarios filed under it, the typed *fields* every scenario carries a value for, and the *evaluators* that run after every scenario run. Every project has a `Default` test suite, so no scenario is loose. | `langwatch test-suite …` |
 | **run plan** | What you run. Its NAME is its identity: a run under a name that exists replaces that plan's configuration and joins its history, a run under a new name creates the plan. | `langwatch run-plan …` |
 | **simulation run** | One scenario executed once against one target. Runs started together share a `batchRunId`. | `langwatch simulation-run …` |
 
@@ -54025,6 +54189,7 @@ langwatch scenario create "Angry refund request" \
 - `--test-suite` files the scenario into a test suite, by name or by id. The test suite must exist: create it with `langwatch test-suite create "<name>"` first, or leave the flag out and the scenario lands in `Default`. `langwatch scenario update <id> --test-suite "<test-suite>"` moves it later.
 - Returns `{ id, name, situation, criteria, labels, platformUrl }`. Keep the `id`.
 - `langwatch scenario update <id>` **replaces** `--criteria` / `--labels` wholesale rather than merging. Pass the complete list you want to end up with.
+- `--field identifier=value` gives the scenario's value for a field its test suite declares (see [Fields and evaluators](#fields-and-evaluators-on-a-test-suite)). It repeats, and on `update` the flags together replace the values the scenario holds. A number field reads a number, a boolean field reads `true` or `false`, and a field the suite does not declare is refused with the list it does.
 
 #### 2. ASK: run this one scenario, or the whole test suite?
 
@@ -54155,6 +54320,57 @@ Hand over the link instead of narrating what the run is doing. Every run answer 
 
 If you are an in-product assistant, do not paste URLs into prose. Run the command whose result carries the link and let the product render it as a navigable action.
 
+### Fields and evaluators on a test suite
+
+A test suite reads like a dataset. It declares **fields** (typed columns beyond the situation and the criteria) and every scenario in it carries one value per field. **Evaluators** attach to the suite with **mappings** from each evaluator input to a source: the conversation, the scenario (situation, criteria, a field) or the trace (a tool call's input or output, the retrieved contexts). After a scenario run finishes, the platform runs the evaluators and stores one result per evaluator on the run. A **required** pass/fail evaluator that fails fails the scenario. A score-only evaluator reports beside the verdict and never gates.
+
+Use this when a criterion is really a comparison against a known answer (a golden SQL query, a reference reply, the tables an answer had to be written against) or a check an existing evaluator already does well (PII, toxicity, faithfulness). Keep the judge criteria for behavior.
+
+```bash
+# The suite declares the fields, then the evaluators that read them
+langwatch test-suite create "Case lookups" \
+  --field golden_sql:text --field table_schema:text \
+  --evaluator sql-query-equivalence --required \
+  --evaluator answer-quality-judge --not-required --format json
+
+# Every scenario carries a value per field
+langwatch scenario create "Chargebacks by quarter" \
+  --situation "A fraud analyst asks for chargebacks per quarter for merchant ACME Travel" \
+  --test-suite "Case lookups" \
+  --field golden_sql="SELECT quarter, SUM(amount) FROM chargebacks WHERE merchant = 'ACME Travel' GROUP BY quarter" \
+  --field table_schema="CREATE TABLE chargebacks (merchant TEXT, quarter TEXT, amount NUMERIC)" \
+  --format json
+
+# Later: replace the field list or the evaluator list. Each list is the whole of what the suite declares.
+langwatch test-suite update "Case lookups" --field golden_sql:text --field table_schema:text --field row_limit:number
+langwatch test-suite update "Case lookups" --evaluator sql-query-equivalence --evaluator pii-leak-scanner --not-required
+```
+
+- `--field identifier:type` on the suite. Types: `text`, `number`, `boolean`. An identifier is lowercase letters, digits and underscores, starting with a letter; `situation`, `criteria`, `name`, `input` and `output` are reserved. A field an attached evaluator still reads cannot be removed.
+- `--evaluator <id|slug>` names a saved evaluator (`langwatch evaluator list --format json`; create one with `langwatch evaluator create`). Its mappings are **inferred** the way the suite editor infers them: `input`-like inputs read the first user message, `output`-like ones the last agent message, `contexts` the retrieved contexts of the trace, and `expected_*` inputs a field of the suite by name (`expected_output` matches `golden_sql`, `expected_contexts` matches `table_schema`). `--required` / `--not-required` apply to the `--evaluator` written just before them; the default is required for an evaluator that produces a pass/fail verdict and reports-only for a score.
+- A tool call is **never inferred**. For an input that must read what the agent sent to a tool, write the full attachment with `--evaluators-json <file|json>`:
+
+```json
+[{
+  "evaluatorId": "<id from evaluator list>",
+  "required": true,
+  "mappings": {
+    "output":            { "type": "source", "sourceId": "trace",    "path": ["tool_calls", "run_sql", "input"] },
+    "expected_output":   { "type": "source", "sourceId": "scenario", "path": ["fields", "golden_sql"] },
+    "expected_contexts": { "type": "source", "sourceId": "scenario", "path": ["fields", "table_schema"] }
+  }
+}]
+```
+
+Paths: `conversation` → `first_user_message`, `last_agent_message`, `transcript`, `messages`; `scenario` → `situation`, `criteria`, `fields.<identifier>`; `trace` → `contexts`, `tool_calls.<toolName>.input|output`. A literal is `{ "type": "value", "value": "..." }`.
+
+- A required input with no mapping is accepted on the suite and reported on stderr; the platform refuses a **run** until it is set. `langwatch test-suite get <suite> --format json` shows every attachment and its mappings.
+- A scenario whose field is blank skips the evaluators that read it, with a reason. A trace with no such tool call or no contexts fails them, with a reason.
+- `run-plan run --evaluator <id|slug>` adds a plan-level evaluator beside the suite's, for checks that read only the conversation or the trace (a PII scanner across every suite). A plan evaluator never maps to a scenario field.
+- Results: `langwatch simulation-run get <scenarioRunId> --format json` carries `results.evaluations`, one entry per evaluator with `status` (`passed`, `failed`, `scored`, `skipped`, `error`), `required`, `score`, `passed` and `details` (the reason). The verdict of a run with a failed required evaluator is `failed`, and the reasoning names it.
+
+Through MCP the same surface is `platform_create_test_suite` and `platform_update_test_suite` (`fields`, `evaluators`), `platform_create_scenario` and `platform_update_scenario` (`fields`), `platform_run_plan` (`evaluators`) and `platform_get_simulation_run` (`results.evaluations`); `discover_schema({ category: "scenarios" })` lists the field rules and the mapping paths.
+
 ### Iterating
 
 Review the results, sharpen the scenario with `langwatch scenario update <id> --criteria "…"`, and run it again. ALWAYS run the scenario. An unrun scenario is worth nothing.
@@ -54221,7 +54437,10 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - This path uses the CLI. Do NOT write code files
 - Write criteria as natural language descriptions, not regex patterns
 - Create focused scenarios. Each should test one specific behavior
-- Do NOT treat a test suite as a run configuration. A test suite holds a name and its scenarios, nothing else: targets, repeat count and models belong to the run plan, and are given at run time
+- Do NOT treat a test suite as a run configuration. A test suite holds a name, its scenarios, its fields and its evaluators: targets, repeat count and models belong to the run plan, and are given at run time
+- Do NOT write a golden answer into the criteria ("the SQL must be SELECT quarter, SUM(amount) ..."). Declare a field on the suite, put the value on the scenario with `--field`, and attach an evaluator that reads it. The judge grades behavior; an evaluator compares against the known answer
+- Do NOT guess a tool call mapping. `--evaluator` never infers one; write it with `--evaluators-json` and the tool's real name from the agent's traces
+- Do NOT pass `--field` a name the test suite does not declare, or a value that does not read as the field's type. Both are refused before anything is written; declare the field on the suite first
 - Do NOT reuse a run plan name for a different configuration by accident. The name is the identity, so a run under an existing name REPLACES that plan's configuration. Read `run-plan list --format json` before naming one
 - Do NOT invent a target reference. `connected`/`http`/`code`/`workflow` take an **Agent id** from `agent list --format json` (matching that agent's `type`); `connected` also takes `<name>@<environment>`; `prompt` takes the prompt **id** from `prompt list --format json`. Bad ids surface only when the run is scheduled, as `Invalid target references`
 - Do NOT run against a `connected` agent whose `status` is `offline`. The customer's process is not connected, and the run is refused with `agent_offline`. Ask them to start it first
@@ -57095,7 +57314,7 @@ Then drive everything via `langwatch scenario --help`, `langwatch test-suite --h
 | Noun | What it is | Commands |
 | --- | --- | --- |
 | **scenario** | One test: a *situation* plus natural-language *criteria*. It needs a target to run against. | `langwatch scenario …` |
-| **test suite** | A test suite groups scenarios: a name and the scenarios filed under it, and nothing else. Every project has a `Default` test suite, so no scenario is loose. | `langwatch test-suite …` |
+| **test suite** | A test suite groups scenarios: a name, the scenarios filed under it, the typed *fields* every scenario carries a value for, and the *evaluators* that run after every scenario run. Every project has a `Default` test suite, so no scenario is loose. | `langwatch test-suite …` |
 | **run plan** | What you run. Its NAME is its identity: a run under a name that exists replaces that plan's configuration and joins its history, a run under a new name creates the plan. | `langwatch run-plan …` |
 | **simulation run** | One scenario executed once against one target. Runs started together share a `batchRunId`. | `langwatch simulation-run …` |
 
@@ -57125,6 +57344,7 @@ langwatch scenario create "Angry refund request" \
 - `--test-suite` files the scenario into a test suite, by name or by id. The test suite must exist: create it with `langwatch test-suite create "<name>"` first, or leave the flag out and the scenario lands in `Default`. `langwatch scenario update <id> --test-suite "<test-suite>"` moves it later.
 - Returns `{ id, name, situation, criteria, labels, platformUrl }`. Keep the `id`.
 - `langwatch scenario update <id>` **replaces** `--criteria` / `--labels` wholesale rather than merging. Pass the complete list you want to end up with.
+- `--field identifier=value` gives the scenario's value for a field its test suite declares (see [Fields and evaluators](#fields-and-evaluators-on-a-test-suite)). It repeats, and on `update` the flags together replace the values the scenario holds. A number field reads a number, a boolean field reads `true` or `false`, and a field the suite does not declare is refused with the list it does.
 
 #### 2. ASK: run this one scenario, or the whole test suite?
 
@@ -57255,6 +57475,57 @@ Hand over the link instead of narrating what the run is doing. Every run answer 
 
 If you are an in-product assistant, do not paste URLs into prose. Run the command whose result carries the link and let the product render it as a navigable action.
 
+### Fields and evaluators on a test suite
+
+A test suite reads like a dataset. It declares **fields** (typed columns beyond the situation and the criteria) and every scenario in it carries one value per field. **Evaluators** attach to the suite with **mappings** from each evaluator input to a source: the conversation, the scenario (situation, criteria, a field) or the trace (a tool call's input or output, the retrieved contexts). After a scenario run finishes, the platform runs the evaluators and stores one result per evaluator on the run. A **required** pass/fail evaluator that fails fails the scenario. A score-only evaluator reports beside the verdict and never gates.
+
+Use this when a criterion is really a comparison against a known answer (a golden SQL query, a reference reply, the tables an answer had to be written against) or a check an existing evaluator already does well (PII, toxicity, faithfulness). Keep the judge criteria for behavior.
+
+```bash
+# The suite declares the fields, then the evaluators that read them
+langwatch test-suite create "Case lookups" \
+  --field golden_sql:text --field table_schema:text \
+  --evaluator sql-query-equivalence --required \
+  --evaluator answer-quality-judge --not-required --format json
+
+# Every scenario carries a value per field
+langwatch scenario create "Chargebacks by quarter" \
+  --situation "A fraud analyst asks for chargebacks per quarter for merchant ACME Travel" \
+  --test-suite "Case lookups" \
+  --field golden_sql="SELECT quarter, SUM(amount) FROM chargebacks WHERE merchant = 'ACME Travel' GROUP BY quarter" \
+  --field table_schema="CREATE TABLE chargebacks (merchant TEXT, quarter TEXT, amount NUMERIC)" \
+  --format json
+
+# Later: replace the field list or the evaluator list. Each list is the whole of what the suite declares.
+langwatch test-suite update "Case lookups" --field golden_sql:text --field table_schema:text --field row_limit:number
+langwatch test-suite update "Case lookups" --evaluator sql-query-equivalence --evaluator pii-leak-scanner --not-required
+```
+
+- `--field identifier:type` on the suite. Types: `text`, `number`, `boolean`. An identifier is lowercase letters, digits and underscores, starting with a letter; `situation`, `criteria`, `name`, `input` and `output` are reserved. A field an attached evaluator still reads cannot be removed.
+- `--evaluator <id|slug>` names a saved evaluator (`langwatch evaluator list --format json`; create one with `langwatch evaluator create`). Its mappings are **inferred** the way the suite editor infers them: `input`-like inputs read the first user message, `output`-like ones the last agent message, `contexts` the retrieved contexts of the trace, and `expected_*` inputs a field of the suite by name (`expected_output` matches `golden_sql`, `expected_contexts` matches `table_schema`). `--required` / `--not-required` apply to the `--evaluator` written just before them; the default is required for an evaluator that produces a pass/fail verdict and reports-only for a score.
+- A tool call is **never inferred**. For an input that must read what the agent sent to a tool, write the full attachment with `--evaluators-json <file|json>`:
+
+```json
+[{
+  "evaluatorId": "<id from evaluator list>",
+  "required": true,
+  "mappings": {
+    "output":            { "type": "source", "sourceId": "trace",    "path": ["tool_calls", "run_sql", "input"] },
+    "expected_output":   { "type": "source", "sourceId": "scenario", "path": ["fields", "golden_sql"] },
+    "expected_contexts": { "type": "source", "sourceId": "scenario", "path": ["fields", "table_schema"] }
+  }
+}]
+```
+
+Paths: `conversation` → `first_user_message`, `last_agent_message`, `transcript`, `messages`; `scenario` → `situation`, `criteria`, `fields.<identifier>`; `trace` → `contexts`, `tool_calls.<toolName>.input|output`. A literal is `{ "type": "value", "value": "..." }`.
+
+- A required input with no mapping is accepted on the suite and reported on stderr; the platform refuses a **run** until it is set. `langwatch test-suite get <suite> --format json` shows every attachment and its mappings.
+- A scenario whose field is blank skips the evaluators that read it, with a reason. A trace with no such tool call or no contexts fails them, with a reason.
+- `run-plan run --evaluator <id|slug>` adds a plan-level evaluator beside the suite's, for checks that read only the conversation or the trace (a PII scanner across every suite). A plan evaluator never maps to a scenario field.
+- Results: `langwatch simulation-run get <scenarioRunId> --format json` carries `results.evaluations`, one entry per evaluator with `status` (`passed`, `failed`, `scored`, `skipped`, `error`), `required`, `score`, `passed` and `details` (the reason). The verdict of a run with a failed required evaluator is `failed`, and the reasoning names it.
+
+Through MCP the same surface is `platform_create_test_suite` and `platform_update_test_suite` (`fields`, `evaluators`), `platform_create_scenario` and `platform_update_scenario` (`fields`), `platform_run_plan` (`evaluators`) and `platform_get_simulation_run` (`results.evaluations`); `discover_schema({ category: "scenarios" })` lists the field rules and the mapping paths.
+
 ### Iterating
 
 Review the results, sharpen the scenario with `langwatch scenario update <id> --criteria "…"`, and run it again. ALWAYS run the scenario. An unrun scenario is worth nothing.
@@ -57313,7 +57584,10 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
 - This path uses the CLI. Do NOT write code files
 - Write criteria as natural language descriptions, not regex patterns
 - Create focused scenarios. Each should test one specific behavior
-- Do NOT treat a test suite as a run configuration. A test suite holds a name and its scenarios, nothing else: targets, repeat count and models belong to the run plan, and are given at run time
+- Do NOT treat a test suite as a run configuration. A test suite holds a name, its scenarios, its fields and its evaluators: targets, repeat count and models belong to the run plan, and are given at run time
+- Do NOT write a golden answer into the criteria ("the SQL must be SELECT quarter, SUM(amount) ..."). Declare a field on the suite, put the value on the scenario with `--field`, and attach an evaluator that reads it. The judge grades behavior; an evaluator compares against the known answer
+- Do NOT guess a tool call mapping. `--evaluator` never infers one; write it with `--evaluators-json` and the tool's real name from the agent's traces
+- Do NOT pass `--field` a name the test suite does not declare, or a value that does not read as the field's type. Both are refused before anything is written; declare the field on the suite first
 - Do NOT reuse a run plan name for a different configuration by accident. The name is the identity, so a run under an existing name REPLACES that plan's configuration. Read `run-plan list --format json` before naming one
 - Do NOT invent a target reference. `connected`/`http`/`code`/`workflow` take an **Agent id** from `agent list --format json` (matching that agent's `type`); `connected` also takes `<name>@<environment>`; `prompt` takes the prompt **id** from `prompt list --format json`. Bad ids surface only when the run is scheduled, as `Invalid target references`
 - Do NOT run against a `connected` agent whose `status` is `offline`. The customer's process is not connected, and the run is refused with `agent_offline`. Ask them to start it first
@@ -60304,7 +60578,7 @@ Then drive everything via `langwatch scenario --help`, `langwatch test-suite --h
 | Noun | What it is | Commands |
 | --- | --- | --- |
 | **scenario** | One test: a *situation* plus natural-language *criteria*. It needs a target to run against. | `langwatch scenario …` |
-| **test suite** | A test suite groups scenarios: a name and the scenarios filed under it, and nothing else. Every project has a `Default` test suite, so no scenario is loose. | `langwatch test-suite …` |
+| **test suite** | A test suite groups scenarios: a name, the scenarios filed under it, the typed *fields* every scenario carries a value for, and the *evaluators* that run after every scenario run. Every project has a `Default` test suite, so no scenario is loose. | `langwatch test-suite …` |
 | **run plan** | What you run. Its NAME is its identity: a run under a name that exists replaces that plan's configuration and joins its history, a run under a new name creates the plan. | `langwatch run-plan …` |
 | **simulation run** | One scenario executed once against one target. Runs started together share a `batchRunId`. | `langwatch simulation-run …` |
 
@@ -60334,6 +60608,7 @@ langwatch scenario create "Angry refund request" \
 - `--test-suite` files the scenario into a test suite, by name or by id. The test suite must exist: create it with `langwatch test-suite create "<name>"` first, or leave the flag out and the scenario lands in `Default`. `langwatch scenario update <id> --test-suite "<test-suite>"` moves it later.
 - Returns `{ id, name, situation, criteria, labels, platformUrl }`. Keep the `id`.
 - `langwatch scenario update <id>` **replaces** `--criteria` / `--labels` wholesale rather than merging. Pass the complete list you want to end up with.
+- `--field identifier=value` gives the scenario's value for a field its test suite declares (see [Fields and evaluators](#fields-and-evaluators-on-a-test-suite)). It repeats, and on `update` the flags together replace the values the scenario holds. A number field reads a number, a boolean field reads `true` or `false`, and a field the suite does not declare is refused with the list it does.
 
 #### 2. ASK: run this one scenario, or the whole test suite?
 
@@ -60464,6 +60739,57 @@ Hand over the link instead of narrating what the run is doing. Every run answer 
 
 If you are an in-product assistant, do not paste URLs into prose. Run the command whose result carries the link and let the product render it as a navigable action.
 
+### Fields and evaluators on a test suite
+
+A test suite reads like a dataset. It declares **fields** (typed columns beyond the situation and the criteria) and every scenario in it carries one value per field. **Evaluators** attach to the suite with **mappings** from each evaluator input to a source: the conversation, the scenario (situation, criteria, a field) or the trace (a tool call's input or output, the retrieved contexts). After a scenario run finishes, the platform runs the evaluators and stores one result per evaluator on the run. A **required** pass/fail evaluator that fails fails the scenario. A score-only evaluator reports beside the verdict and never gates.
+
+Use this when a criterion is really a comparison against a known answer (a golden SQL query, a reference reply, the tables an answer had to be written against) or a check an existing evaluator already does well (PII, toxicity, faithfulness). Keep the judge criteria for behavior.
+
+```bash
+# The suite declares the fields, then the evaluators that read them
+langwatch test-suite create "Case lookups" \
+  --field golden_sql:text --field table_schema:text \
+  --evaluator sql-query-equivalence --required \
+  --evaluator answer-quality-judge --not-required --format json
+
+# Every scenario carries a value per field
+langwatch scenario create "Chargebacks by quarter" \
+  --situation "A fraud analyst asks for chargebacks per quarter for merchant ACME Travel" \
+  --test-suite "Case lookups" \
+  --field golden_sql="SELECT quarter, SUM(amount) FROM chargebacks WHERE merchant = 'ACME Travel' GROUP BY quarter" \
+  --field table_schema="CREATE TABLE chargebacks (merchant TEXT, quarter TEXT, amount NUMERIC)" \
+  --format json
+
+# Later: replace the field list or the evaluator list. Each list is the whole of what the suite declares.
+langwatch test-suite update "Case lookups" --field golden_sql:text --field table_schema:text --field row_limit:number
+langwatch test-suite update "Case lookups" --evaluator sql-query-equivalence --evaluator pii-leak-scanner --not-required
+```
+
+- `--field identifier:type` on the suite. Types: `text`, `number`, `boolean`. An identifier is lowercase letters, digits and underscores, starting with a letter; `situation`, `criteria`, `name`, `input` and `output` are reserved. A field an attached evaluator still reads cannot be removed.
+- `--evaluator <id|slug>` names a saved evaluator (`langwatch evaluator list --format json`; create one with `langwatch evaluator create`). Its mappings are **inferred** the way the suite editor infers them: `input`-like inputs read the first user message, `output`-like ones the last agent message, `contexts` the retrieved contexts of the trace, and `expected_*` inputs a field of the suite by name (`expected_output` matches `golden_sql`, `expected_contexts` matches `table_schema`). `--required` / `--not-required` apply to the `--evaluator` written just before them; the default is required for an evaluator that produces a pass/fail verdict and reports-only for a score.
+- A tool call is **never inferred**. For an input that must read what the agent sent to a tool, write the full attachment with `--evaluators-json <file|json>`:
+
+```json
+[{
+  "evaluatorId": "<id from evaluator list>",
+  "required": true,
+  "mappings": {
+    "output":            { "type": "source", "sourceId": "trace",    "path": ["tool_calls", "run_sql", "input"] },
+    "expected_output":   { "type": "source", "sourceId": "scenario", "path": ["fields", "golden_sql"] },
+    "expected_contexts": { "type": "source", "sourceId": "scenario", "path": ["fields", "table_schema"] }
+  }
+}]
+```
+
+Paths: `conversation` → `first_user_message`, `last_agent_message`, `transcript`, `messages`; `scenario` → `situation`, `criteria`, `fields.<identifier>`; `trace` → `contexts`, `tool_calls.<toolName>.input|output`. A literal is `{ "type": "value", "value": "..." }`.
+
+- A required input with no mapping is accepted on the suite and reported on stderr; the platform refuses a **run** until it is set. `langwatch test-suite get <suite> --format json` shows every attachment and its mappings.
+- A scenario whose field is blank skips the evaluators that read it, with a reason. A trace with no such tool call or no contexts fails them, with a reason.
+- `run-plan run --evaluator <id|slug>` adds a plan-level evaluator beside the suite's, for checks that read only the conversation or the trace (a PII scanner across every suite). A plan evaluator never maps to a scenario field.
+- Results: `langwatch simulation-run get <scenarioRunId> --format json` carries `results.evaluations`, one entry per evaluator with `status` (`passed`, `failed`, `scored`, `skipped`, `error`), `required`, `score`, `passed` and `details` (the reason). The verdict of a run with a failed required evaluator is `failed`, and the reasoning names it.
+
+Through MCP the same surface is `platform_create_test_suite` and `platform_update_test_suite` (`fields`, `evaluators`), `platform_create_scenario` and `platform_update_scenario` (`fields`), `platform_run_plan` (`evaluators`) and `platform_get_simulation_run` (`results.evaluations`); `discover_schema({ category: "scenarios" })` lists the field rules and the mapping paths.
+
 ### Iterating
 
 Review the results, sharpen the scenario with `langwatch scenario update <id> --criteria "…"`, and run it again. ALWAYS run the scenario. An unrun scenario is worth nothing.
@@ -60530,7 +60856,10 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - This path uses the CLI. Do NOT write code files
 - Write criteria as natural language descriptions, not regex patterns
 - Create focused scenarios. Each should test one specific behavior
-- Do NOT treat a test suite as a run configuration. A test suite holds a name and its scenarios, nothing else: targets, repeat count and models belong to the run plan, and are given at run time
+- Do NOT treat a test suite as a run configuration. A test suite holds a name, its scenarios, its fields and its evaluators: targets, repeat count and models belong to the run plan, and are given at run time
+- Do NOT write a golden answer into the criteria ("the SQL must be SELECT quarter, SUM(amount) ..."). Declare a field on the suite, put the value on the scenario with `--field`, and attach an evaluator that reads it. The judge grades behavior; an evaluator compares against the known answer
+- Do NOT guess a tool call mapping. `--evaluator` never infers one; write it with `--evaluators-json` and the tool's real name from the agent's traces
+- Do NOT pass `--field` a name the test suite does not declare, or a value that does not read as the field's type. Both are refused before anything is written; declare the field on the suite first
 - Do NOT reuse a run plan name for a different configuration by accident. The name is the identity, so a run under an existing name REPLACES that plan's configuration. Read `run-plan list --format json` before naming one
 - Do NOT invent a target reference. `connected`/`http`/`code`/`workflow` take an **Agent id** from `agent list --format json` (matching that agent's `type`); `connected` also takes `<name>@<environment>`; `prompt` takes the prompt **id** from `prompt list --format json`. Bad ids surface only when the run is scheduled, as `Invalid target references`
 - Do NOT run against a `connected` agent whose `status` is `offline`. The customer's process is not connected, and the run is refused with `agent_offline`. Ask them to start it first

@@ -19,9 +19,11 @@ import {
   queryBoolean,
   runPlanRunResultSchema,
   type TestSuiteWire,
+  testSuiteCreateInputSchema,
   testSuiteDetailSchema,
   testSuiteRunInputSchema,
   testSuiteSchema,
+  testSuiteUpdateInputSchema,
   toRunItemsWire,
   toTestSuiteWire,
 } from "~/app/api/shared/suite-wire";
@@ -32,7 +34,6 @@ import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import { SuiteNotFoundError } from "~/server/suites/errors";
-import { MAX_PLAN_NAME_LENGTH } from "~/server/suites/plan-name";
 import { suitePlatformPath } from "~/server/suites/platform-path";
 import { SuiteService } from "~/server/suites/suite.service";
 import { platformUrl } from "../../shared/platform-url";
@@ -56,15 +57,6 @@ const listQuerySchema = z.object({
   includeArchived: queryBoolean.describe(
     "Include archived test suites in the list. true, 1, yes for yes; false, 0, no or omitted for no.",
   ),
-});
-
-const nameInputSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1)
-    .max(MAX_PLAN_NAME_LENGTH)
-    .describe("The test suite name, as it reads in the platform."),
 });
 
 const archiveResultSchema = z.object({
@@ -175,11 +167,11 @@ const registerCollectionEndpoints = (v: TestSuitesVersion): void => {
     "/",
     {
       ...guard("scenarios:create"),
-      input: nameInputSchema,
+      input: testSuiteCreateInputSchema,
       output: testSuiteSchema,
       status: 201,
       description:
-        "Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a run goes against are sent with the run.",
+        "Create a test suite. It starts with no scenario: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. It may declare fields and attach evaluators from the start.",
       docs: { operationId: "createTestSuite", tags: ["Test Suites"] },
     },
     async (
@@ -187,11 +179,18 @@ const registerCollectionEndpoints = (v: TestSuitesVersion): void => {
       {
         input,
         app,
-      }: { input: z.infer<typeof nameInputSchema>; app: TestSuitesApp },
+      }: {
+        input: z.infer<typeof testSuiteCreateInputSchema>;
+        app: TestSuitesApp;
+      },
     ) => {
       const suite = await app.suites.createTestSuite({
         projectId: app.project.id,
         name: input.name,
+        ...(input.fields !== undefined && { fields: input.fields }),
+        ...(input.evaluators !== undefined && {
+          evaluators: input.evaluators,
+        }),
       });
       return suiteWire({ app, suite });
     },
@@ -233,11 +232,11 @@ const registerItemEndpoints = (v: TestSuitesVersion): void => {
     {
       ...guard("scenarios:update"),
       params: idParamsSchema,
-      input: nameInputSchema,
+      input: testSuiteUpdateInputSchema,
       output: testSuiteSchema,
       description:
-        "Rename a test suite. The slug is kept, so links and run history stay where they are.",
-      docs: { operationId: "renameTestSuite", tags: ["Test Suites"] },
+        "Edit a test suite: its name, the fields it declares, the evaluators attached to it. Send only what changes. The slug is kept on a rename, so links and run history stay where they are.",
+      docs: { operationId: "updateTestSuite", tags: ["Test Suites"] },
     },
     async (
       _c,
@@ -247,14 +246,18 @@ const registerItemEndpoints = (v: TestSuitesVersion): void => {
         app,
       }: {
         params: { id: string };
-        input: z.infer<typeof nameInputSchema>;
+        input: z.infer<typeof testSuiteUpdateInputSchema>;
         app: TestSuitesApp;
       },
     ) => {
-      const suite = await app.suites.renameTestSuite({
+      const suite = await app.suites.updateTestSuite({
         projectId: app.project.id,
         testSuiteId: params.id,
-        name: input.name,
+        ...(input.name !== undefined && { name: input.name }),
+        ...(input.fields !== undefined && { fields: input.fields }),
+        ...(input.evaluators !== undefined && {
+          evaluators: input.evaluators,
+        }),
       });
       return suiteWire({ app, suite });
     },

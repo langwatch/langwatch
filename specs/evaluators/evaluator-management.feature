@@ -190,6 +190,13 @@ Feature: Evaluator management
     Then I see "Create your first evaluator" message
     And I see a "New Evaluator" button
 
+  @integration
+  Scenario: The empty state distinguishes no evaluators from all hidden
+    Given every evaluator the project has is already attached and hidden from this list
+    When the EvaluatorListDrawer opens
+    Then it says every evaluator is already attached
+    And it offers no create-first-evaluator prompt
+
   Scenario: Select evaluator from drawer
     Given the EvaluatorListDrawer is open
     And evaluator "Exact Match" exists
@@ -303,6 +310,14 @@ Feature: Evaluator management
     Given the code evaluator drawer
     Then the outputs are shown as the fixed evaluator result fields
     And there is no control to add or remove output fields
+
+  @integration
+  Scenario: A code evaluator attachment gates and removes itself
+    Given the code evaluator drawer open on a suite attachment
+    When the Required to pass switch is flipped
+    Then the attachment's required flag changes
+    When Remove evaluator is chosen
+    Then the attachment is removed
 
   # A function returns any subset of the contract; whichever it returns become
   # the result, so an evaluator that returns only passed does not fail.

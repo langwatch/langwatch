@@ -89,6 +89,27 @@ def test_run_posts_the_name_and_config_to_the_run_route():
     assert result["runPlanId"] == "run_plan_1"
 
 
+# @scenario "A run with plan evaluators carries them in the configuration"
+def test_run_with_evaluators_sends_them_in_the_config():
+    facade, calls = recorder()
+    pii = {
+        "id": "att_pii",
+        "evaluatorId": "evaluator_pii",
+        "required": False,
+        "mappings": {
+            "input": {
+                "type": "source",
+                "sourceId": "conversation",
+                "path": ["transcript"],
+            }
+        },
+    }
+
+    facade.run(targets=[TARGET], evaluators=[pii])
+
+    assert (calls[0][2] or {})["config"]["evaluators"] == [pii]
+
+
 # @scenario "A run with no name lets the server name the plan"
 def test_run_without_a_name_sends_no_name_field():
     facade, calls = recorder()

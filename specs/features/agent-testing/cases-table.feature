@@ -306,33 +306,10 @@ Feature: The scenarios table
     When "critical" is chosen in the label filter
     Then only the scenarios with that label are listed
 
-  # --- Renaming the open suite ---
-
-  @integration
-  Scenario: The name of the open suite carries a rename control
-    Given the suite "Refunds" is open
-    When the line above the table is read
-    Then a rename control sits beside the name
-    And choosing it opens the name dialog on "Refunds"
-
-  @integration
-  Scenario: The rename control is reachable from the keyboard
-    Given the suite "Refunds" is open
-    When the rename control is asked for keyboard focus
-    Then it takes the focus
-    And a person who uses no pointer can still rename the suite
-
-  @integration
-  Scenario: No Edit suite button sits above the table
-    Given the suite "Refunds" is open
-    When the line above the table is read
-    Then no button reads "Edit suite"
-
-  @integration
-  Scenario: A person with read-only access is offered no rename control
-    Given a person with read-only access to the project
-    When the line above the table is read
-    Then no rename control is offered
+  # --- Editing the open suite ---
+  #
+  # The Edit suite button, the chips under the suite name and the count line
+  # are specified in suite-editor.feature.
 
   # --- Recent runs ---
 

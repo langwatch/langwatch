@@ -4,6 +4,10 @@ const TERMINAL_STATUSES = new Set<ScenarioRunStatus>([
   ScenarioRunStatus.SUCCESS,
   ScenarioRunStatus.FAILED,
   ScenarioRunStatus.ERROR,
+  // The conversation is over and the judge has spoken, so the drawer has a
+  // verdict and criteria to draw. The status chip beside them says the
+  // evaluators are still to come.
+  ScenarioRunStatus.PENDING_EVALUATION,
 ]);
 
 /** Returns true when the run has no displayable results (non-terminal or unknown status). */

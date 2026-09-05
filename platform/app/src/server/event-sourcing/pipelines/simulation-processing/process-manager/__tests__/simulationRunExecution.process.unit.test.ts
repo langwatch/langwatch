@@ -13,6 +13,8 @@ import { buildSimulationRunEventView } from "../simulationRunExecution.process";
 import type { SimulationRunExecutionProcessState } from "../simulationRunExecutionProcess.types";
 import {
   CANCEL_GRACE_MS,
+  EVALUATION_DEADLINE_MS,
+  EVALUATION_LOST_DETAILS,
   SIMULATION_RUN_EXECUTION_PROCESS_NAME,
   type SimulationRunProcessEventView,
   simulationRunProcessEventViewSchema,
@@ -33,6 +35,7 @@ const definition = buildProcessDefinition(
   buildProcessManager<SimulationProcessingEvent>({
     name: SIMULATION_RUN_EXECUTION_PROCESS_NAME,
     applier: simulationRunExecutionPM({
+      getAttachedEvaluators: () => Promise.reject(new Error("unused")),
       getPool: () => null,
       publishCancellation: () => Promise.reject(new Error("unused")),
       commands: () => {
@@ -131,6 +134,9 @@ function queuedState(
     queuedAtMs: 10_000,
     lastActivityAtMs: 10_000,
     cancelRequestedAtMs: null,
+    finishedAtMs: null,
+    pendingEvaluators: null,
+    evaluationsRecorded: false,
     ...overrides,
   };
 }
@@ -177,6 +183,9 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
         queuedAtMs: 10_000,
         lastActivityAtMs: 10_000,
         cancelRequestedAtMs: null,
+        finishedAtMs: null,
+        pendingEvaluators: null,
+        evaluationsRecorded: false,
       });
       expect(evolution.intents).toEqual([
         {
@@ -1034,6 +1043,8 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
         parameters: null,
         secretParameters: null,
         secretParameterNames: null,
+        evaluators: null,
+        hasOwnEvaluations: false,
       });
     });
 
@@ -1048,6 +1059,240 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       ]);
 
       expect(persisted.flatMap((value) => contentLeaks(value))).toEqual([]);
+    });
+  });
+
+  describe("when a run finishes owing its evaluator results", () => {
+    const EVALUATORS = {
+      suiteId: "suite-1",
+      planId: null,
+      attachments: [
+        { id: "att-1", evaluatorId: "eval-1", required: true, mappings: {} },
+        { id: "att-2", evaluatorId: "eval-2", required: false, mappings: {} },
+      ],
+    };
+    const PENDING = [
+      { evaluatorId: "eval-1", required: true },
+      { evaluatorId: "eval-2", required: false },
+    ];
+
+    function finishedEvent(data: Record<string, unknown> = {}) {
+      return makeEvent({
+        type: SIMULATION_RUN_EVENT_TYPES.FINISHED,
+        occurredAt: 30_000,
+        data: {
+          scenarioRunId: RUN_ID,
+          results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
+          evaluators: EVALUATORS,
+          ...data,
+        },
+      });
+    }
+
+    function evaluatingState(
+      overrides: Partial<SimulationRunExecutionProcessState> = {},
+    ): SimulationRunExecutionProcessState {
+      return queuedState({
+        phase: "evaluating",
+        lastActivityAtMs: 30_000,
+        finishedAtMs: 30_000,
+        pendingEvaluators: PENDING,
+        ...overrides,
+      });
+    }
+
+    /** @scenario "A run that finishes owing evaluator results arms the evaluation deadline" */
+    it("waits for the evaluators under the evaluation deadline, keeping the ones it owes", () => {
+      const evolution = evolveEvent(runningState(), finishedEvent());
+
+      expect(evolution.state).toEqual(evaluatingState());
+      expect(evolution.nextWakeAt).toBe(30_000 + EVALUATION_DEADLINE_MS);
+      expect(evolution.intents).toEqual([]);
+    });
+
+    it("arms the deadline from the present when the finished event arrives late", () => {
+      const now = 30_000 + 60 * 60_000;
+
+      const evolution = evolveEvent(runningState(), finishedEvent(), now);
+
+      expect(evolution.state.finishedAtMs).toBe(now);
+      expect(evolution.nextWakeAt).toBe(now + EVALUATION_DEADLINE_MS);
+    });
+
+    it("watches an externally reported run, which never sees a queued event", () => {
+      const evolution = evolveEvent(initialState, finishedEvent());
+
+      expect(evolution.state.phase).toBe("evaluating");
+      expect(evolution.state.lastActivityAtMs).toBe(30_000);
+      expect(evolution.nextWakeAt).toBe(30_000 + EVALUATION_DEADLINE_MS);
+    });
+
+    /** @scenario "A run that finishes owing nothing goes terminal" */
+    it.each([
+      ["no attachments", { evaluators: undefined }],
+      [
+        "an empty attachment list",
+        { evaluators: { ...EVALUATORS, attachments: [] } },
+      ],
+      [
+        "its own evaluations",
+        {
+          results: {
+            verdict: "success",
+            metCriteria: [],
+            unmetCriteria: [],
+            evaluations: [
+              {
+                evaluatorId: "eval-1",
+                name: "Exact match",
+                status: "passed",
+                required: true,
+                passed: true,
+              },
+            ],
+          },
+        },
+      ],
+      ["an ERROR status", { status: "ERROR" }],
+      ["a CANCELLED status", { status: "CANCELLED" }],
+    ])("goes terminal and clears the wake when the finished event carries %s", (_label, data) => {
+      const evolution = evolveEvent(runningState(), finishedEvent(data));
+
+      expect(evolution.state.phase).toBe("terminal");
+      expect(evolution.state.pendingEvaluators).toBeNull();
+      expect(evolution.nextWakeAt).toBeNull();
+      expect(evolution.intents).toEqual([]);
+    });
+
+    it("goes terminal when the evaluated event landed before the finished one", () => {
+      const evaluated = evolveEvent(
+        runningState(),
+        makeEvent({
+          type: SIMULATION_RUN_EVENT_TYPES.EVALUATED,
+          occurredAt: 29_000,
+          data: { scenarioRunId: RUN_ID, evaluations: [] },
+        }),
+      );
+      expect(evaluated.state.phase).toBe("running");
+      expect(evaluated.state.evaluationsRecorded).toBe(true);
+      expect(evaluated.nextWakeAt).toBe(10_000 + STALL_THRESHOLD_MS);
+
+      const finished = evolveEvent(evaluated.state, finishedEvent());
+
+      expect(finished.state.phase).toBe("terminal");
+      expect(finished.nextWakeAt).toBeNull();
+    });
+
+    it("is a no-op when the finished event is redelivered while evaluating", () => {
+      const evolution = evolveEvent(evaluatingState(), finishedEvent());
+
+      expect(evolution.state).toEqual(evaluatingState());
+      expect(evolution.nextWakeAt).toBe(30_000 + EVALUATION_DEADLINE_MS);
+      expect(evolution.intents).toEqual([]);
+    });
+
+    it("keeps the deadline when activity arrives while evaluating", () => {
+      const evolution = evolveEvent(
+        evaluatingState(),
+        makeEvent({
+          type: SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT,
+          occurredAt: 31_000,
+          data: { scenarioRunId: RUN_ID, messages: [] },
+        }),
+      );
+
+      expect(evolution.state.phase).toBe("evaluating");
+      expect(evolution.nextWakeAt).toBe(30_000 + EVALUATION_DEADLINE_MS);
+    });
+
+    /** @scenario "The evaluated event ends the wait" */
+    it("goes terminal and clears the wake when the evaluated event lands", () => {
+      const evolution = evolveEvent(
+        evaluatingState(),
+        makeEvent({
+          type: SIMULATION_RUN_EVENT_TYPES.EVALUATED,
+          occurredAt: 40_000,
+          data: { scenarioRunId: RUN_ID, evaluations: [] },
+        }),
+      );
+
+      expect(evolution.state.phase).toBe("terminal");
+      expect(evolution.state.pendingEvaluators).toBeNull();
+      expect(evolution.state.evaluationsRecorded).toBe(true);
+      expect(evolution.nextWakeAt).toBeNull();
+      expect(evolution.intents).toEqual([]);
+    });
+
+    /** @scenario "A lost grading job is recorded as errored evaluators after the deadline" */
+    it("records one errored result per evaluator once the deadline passed", () => {
+      const now = 30_000 + EVALUATION_DEADLINE_MS;
+
+      const evolution = evolveWake(evaluatingState(), now, now);
+
+      expect(evolution.state.phase).toBe("terminal");
+      expect(evolution.nextWakeAt).toBeNull();
+      expect(evolution.intents).toEqual([
+        {
+          messageKey: intentKey(`record_evaluations:${RUN_ID}:lost`),
+          intentType: "record_evaluations",
+          payload: {
+            scenarioRunId: RUN_ID,
+            projectId: PROJECT_ID,
+            evaluators: PENDING,
+            details: EVALUATION_LOST_DETAILS,
+          },
+        },
+      ]);
+    });
+
+    /** @scenario "The deadline wake stays armed while the deadline has not passed" */
+    it("keeps waiting with the same deadline while it has not passed", () => {
+      const now = 30_000 + EVALUATION_DEADLINE_MS - 1;
+
+      const evolution = evolveWake(evaluatingState(), now, now);
+
+      expect(evolution.state).toEqual(evaluatingState());
+      expect(evolution.nextWakeAt).toBe(30_000 + EVALUATION_DEADLINE_MS);
+      expect(evolution.intents).toEqual([]);
+    });
+
+    it("ignores an evaluated event for a terminal run", () => {
+      const evolution = evolveEvent(
+        queuedState({ phase: "terminal" }),
+        makeEvent({
+          type: SIMULATION_RUN_EVENT_TYPES.EVALUATED,
+          occurredAt: 40_000,
+          data: { scenarioRunId: RUN_ID, evaluations: [] },
+        }),
+      );
+
+      expect(evolution.state.phase).toBe("terminal");
+      expect(evolution.nextWakeAt).toBeNull();
+    });
+
+    it("keeps the persisted view and state free of the attachment mappings", () => {
+      const view = buildSimulationRunEventView(
+        finishedEvent({
+          evaluators: {
+            ...EVALUATORS,
+            attachments: [
+              {
+                id: "att-1",
+                evaluatorId: "eval-1",
+                required: true,
+                mappings: {
+                  expected: { source: "literal", value: "MARKER-mapping" },
+                },
+              },
+            ],
+          },
+        }),
+      );
+
+      expect(view.evaluators).toEqual([
+        { evaluatorId: "eval-1", required: true },
+      ]);
+      expect(JSON.stringify(view)).not.toContain("MARKER-mapping");
     });
   });
 });

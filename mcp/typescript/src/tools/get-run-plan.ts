@@ -1,5 +1,6 @@
 import { getRunPlan as apiGetRunPlan } from "../langwatch-api-run-plans.js";
 import { describeRunPlanScope } from "./format-run-plan.js";
+import { formatEvaluatorAttachments } from "./format-suite-details.js";
 
 /**
  * Handles the platform_get_run_plan MCP tool invocation.
@@ -49,6 +50,8 @@ export async function handleGetRunPlan(params: {
       lines.push(`- ${id}`);
     }
   }
+
+  lines.push(...formatEvaluatorAttachments(plan.evaluators));
 
   lines.push(`\n**View**: ${plan.platformUrl}`);
   lines.push(

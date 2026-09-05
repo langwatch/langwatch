@@ -27,7 +27,7 @@ vi.mock("~/utils/api", () => ({
 
 vi.mock("../useFilteredScenarioTargets", () => ({
   isAgentTarget: () => false,
-  ownerOnlyCopy: () => "Only the owner of this agent can run it.",
+  notRunnableCopy: () => "Only the owner of this agent can run it.",
   useFilteredAgents: () => [
     {
       id: "agent-1",

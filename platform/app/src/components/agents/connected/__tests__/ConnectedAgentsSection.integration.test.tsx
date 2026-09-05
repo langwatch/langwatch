@@ -11,6 +11,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { OFFLINE_AGENT_TEST_COPY } from "~/components/agents/offlineAgentCopy";
 import { ConnectedAgentsSection } from "../ConnectedAgentsSection";
 import type {
   ConnectedAgentInstance,
@@ -63,6 +64,7 @@ function renderSection(
   handlers: {
     onOpen?: (agent: ConnectedAgentView) => void;
     onDelete?: (agent: ConnectedAgentView) => void;
+    onTest?: (agent: ConnectedAgentView) => void;
   } = {},
 ) {
   return render(
@@ -70,6 +72,7 @@ function renderSection(
       agents={agents}
       onOpen={handlers.onOpen ?? vi.fn()}
       onDelete={handlers.onDelete}
+      onTest={handlers.onTest}
     />,
     { wrapper: Wrapper },
   );
@@ -249,6 +252,48 @@ describe("<ConnectedAgentsSection />", () => {
         expect.objectContaining({ id: "agent_1" }),
       );
       expect(onOpen).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the menu of an offline agent is opened", () => {
+    /** @scenario "Test agent is disabled for an offline connected agent" */
+    it("disables Test agent and says on hover that the agent is offline", async () => {
+      const onTest = vi.fn();
+      renderSection([agent({ status: "offline", instances: [] })], { onTest });
+
+      await userEvent.click(
+        screen.getByRole("button", { name: "Actions for support-agent" }),
+      );
+
+      const test = await screen.findByRole("menuitem", { name: "Test agent" });
+      expect(test).toHaveAttribute("aria-disabled", "true");
+
+      await userEvent.click(test);
+      expect(onTest).not.toHaveBeenCalled();
+
+      await userEvent.hover(test);
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(
+        OFFLINE_AGENT_TEST_COPY,
+      );
+    });
+  });
+
+  describe("when the menu of an online agent is opened", () => {
+    it("offers Test agent and requests the test on click", async () => {
+      const onTest = vi.fn();
+      renderSection([agent()], { onTest });
+
+      await userEvent.click(
+        screen.getByRole("button", { name: "Actions for support-agent" }),
+      );
+
+      const test = await screen.findByRole("menuitem", { name: "Test agent" });
+      expect(test).not.toHaveAttribute("aria-disabled", "true");
+
+      await userEvent.click(test);
+      expect(onTest).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "agent_1" }),
+      );
     });
   });
 });
