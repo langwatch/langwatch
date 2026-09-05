@@ -26,10 +26,10 @@ Repeat from step 3, and put the suite in CI so a later change cannot undo the ga
 
 ## Where the changes come from
 
-The hypotheses come out of the last run. When a criterion failed, the judge wrote down the turn where it happened, and the trace of that turn has what the agent saw and did; when a scenario passed but took ten turns, you usually find the same tool called twice in a row in the conversation. There are two ways to turn that into a change:
+The hypotheses come out of the last run. When a criterion fails, the judge's reasoning quotes the turn where it happened, and the trace of that turn shows what the agent saw and did; when a scenario passes but takes ten turns, you usually find the same tool called twice in a row in the conversation. There are two ways to turn that into a change:
 
 - **Guided.** Langy, or your coding agent with the `langwatch` CLI, reads the results and the traces and comes back with a hypothesis and the change for it, and you run the suite on that change to prove it made the agent better. See [Prompt optimization with Langy](/langy/prompt-optimization) for the prompt case.
-- **Algorithmic.** A DSPy optimizer rewrites the instructions and the tool descriptions and scores every candidate by running the suite, and GEPA also feeds the judge's reasoning back in as the feedback for the next candidate. See [Optimize with DSPy](/improve-your-agent/optimize-with-dspy).
+- **Algorithmic.** Run a DSPy optimizer: it rewrites the instructions and the tool descriptions and scores every candidate by running the suite, and GEPA also feeds the judge's reasoning back in as the feedback for the next candidate. See [Optimize with DSPy](/improve-your-agent/optimize-with-dspy).
 
 Use the guided loop when the change is in code, in a tool or in the harness, since no optimizer can touch those, and when you want to review each change. Use an optimizer when the change is in text and you have the budget to run the suite fifty or so times.
 

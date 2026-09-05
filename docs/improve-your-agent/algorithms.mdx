@@ -5,7 +5,7 @@ keywords: langwatch, optimization algorithms, dspy optimizers, gepa, miprov2, co
 description: What each optimization algorithm changes, what it needs, how many suite runs it costs, and when to use it.
 ---
 
-Every algorithm below takes a program, a set of examples and a metric, and returns the program with better text in it. With a scenario suite as the metric, one metric call is one simulated conversation, which is why the number of metric calls is the cost that matters in the table. The guided loop is listed first because it is the one to start with: it changes code and tools, and no algorithm does that.
+Every algorithm below takes a program, a set of examples and a metric, and returns the program with better text in it. With a scenario suite as the metric, one metric call is one simulated conversation, which is why the number of metric calls is the cost that matters in the table. The guided loop comes first because it is the one to start with: it changes code and tools, and no algorithm does that.
 
 ## Algorithms side by side
 
@@ -24,8 +24,8 @@ The instruction optimizers above (COPRO, MIPROv2, GEPA, SIMBA) rewrite the instr
 ## Which algorithm to pick
 
 - **Start with the guided loop.** Most of the turns in a long conversation come from a tool contract or a harness setting, and an algorithm cannot change either, while one hypothesis in the guided loop costs one suite run.
-- **GEPA when the metric returns text feedback.** A scenario judge writes why a candidate failed, and GEPA's reflection reads that text and proposes the next candidate from it, without you reviewing each step.
-- **MIPROv2 when the metric is a number.** An evaluator that returns a score with no reasoning, or a dataset with expected outputs, fits MIPROv2, and LangWatch tracks every trial of it.
+- **GEPA when the metric returns text feedback.** The scenario judge writes why a candidate failed, and GEPA's reflection reads that text and proposes the next candidate from it, without you reviewing each step.
+- **MIPROv2 when the metric is a number.** Use MIPROv2 with an evaluator that returns a score and no reasoning, or with a dataset of expected outputs; LangWatch tracks every trial.
 - **COPRO on a small budget**, when you want the instructions rewritten in a few calls and have no examples to add.
 - **BootstrapFewShot when the format is the problem**, meaning the instructions are right and the model gets the shape of the answer wrong.
 
