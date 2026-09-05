@@ -17,10 +17,8 @@ import {
 } from "~/features/guided-onboarding/paths";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import {
-  EMPTY_GUIDED_ONBOARDING_STATE,
   type GuidedOnboardingState,
-  guidedOnboardingStateSchema,
-  type OnboardingVariant,
+  parseGuidedOnboardingState,
 } from "~/server/schemas/sign-up-data.schema";
 import { GuidedOnboardingPathUnknownError } from "./guided-onboarding.errors";
 import {
@@ -29,32 +27,6 @@ import {
 } from "./guided-onboarding.events";
 
 export type TourStatus = "completed" | "skipped" | "replayed";
-
-/**
- * Reads the guided block out of a stored sign-up data value. Anything that is
- * not the expected shape reads as the empty default: a hand-edited row must
- * not turn the welcome flow into an error.
- */
-export function parseGuidedOnboardingState(
-  signupData: unknown,
-): GuidedOnboardingState {
-  const block =
-    signupData && typeof signupData === "object"
-      ? (signupData as Record<string, unknown>).guidedOnboarding
-      : undefined;
-  const parsed = guidedOnboardingStateSchema.safeParse(block);
-  return parsed.success ? parsed.data : EMPTY_GUIDED_ONBOARDING_STATE;
-}
-
-export function parseOnboardingVariant(
-  signupData: unknown,
-): OnboardingVariant | null {
-  const variant =
-    signupData && typeof signupData === "object"
-      ? (signupData as Record<string, unknown>).onboardingVariant
-      : undefined;
-  return variant === "guided" || variant === "classic" ? variant : null;
-}
 
 function assertGuidedPath(path: string): GuidedPath {
   if (!isGuidedPath(path)) throw new GuidedOnboardingPathUnknownError(path);

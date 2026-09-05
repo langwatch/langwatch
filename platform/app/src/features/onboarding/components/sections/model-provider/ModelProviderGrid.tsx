@@ -27,6 +27,10 @@ const variantDescriptions: Record<ModelProviderSurface, string> = {
     "Langy uses this model to chat with you and help you work across the platform.",
   onboarding:
     "The model LangWatch's AI assistant and AI assists run on. You can add more providers later in Settings.",
+  // The guided screen renders its own marks row and never this grid; the
+  // surface exists so the registry's per-surface rules apply to it.
+  guided:
+    "The model LangWatch's AI assistant and AI assists run on. You can add more providers later in Settings.",
 };
 
 /**

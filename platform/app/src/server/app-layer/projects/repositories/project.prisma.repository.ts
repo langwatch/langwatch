@@ -8,7 +8,7 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
-import { parseOnboardingVariant } from "~/server/onboarding/guided-onboarding.service";
+import { parseOnboardingVariant } from "~/server/schemas/sign-up-data.schema";
 import type {
   CreateProjectInput,
   CreateTeamWithBindingInput,

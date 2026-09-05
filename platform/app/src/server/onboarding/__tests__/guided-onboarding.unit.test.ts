@@ -14,12 +14,10 @@ import {
 } from "~/features/guided-onboarding/paths";
 import {
   EMPTY_GUIDED_ONBOARDING_STATE,
-  signUpDataSchema,
-} from "~/server/schemas/sign-up-data.schema";
-import {
   parseGuidedOnboardingState,
   parseOnboardingVariant,
-} from "../guided-onboarding.service";
+  signUpDataSchema,
+} from "~/server/schemas/sign-up-data.schema";
 
 describe("the guided paths", () => {
   /** @scenario "the guided path enum carries the four paths with their titles" */

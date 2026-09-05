@@ -18,7 +18,12 @@ vi.mock("~/hooks/usePublicEnv", () => ({
 const flagState = vi.hoisted(() => ({ enabled: true, isLoading: false }));
 
 vi.mock("~/hooks/useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ ...flagState }),
+  // The intent fork rides the governance flag; the guided experiment flag
+  // stays off so these tests keep describing the classic wizard.
+  useFeatureFlag: (flag: string) =>
+    flag === "release_ui_ai_governance_enabled"
+      ? { ...flagState }
+      : { enabled: false, isLoading: false },
 }));
 
 vi.mock("~/utils/attribution", () => ({

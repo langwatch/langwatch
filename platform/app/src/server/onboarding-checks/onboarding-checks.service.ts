@@ -1,10 +1,10 @@
 import type { GuidedPath } from "~/features/guided-onboarding/paths";
 import { getApp } from "~/server/app-layer/app";
 import {
+  type OnboardingVariant,
   parseGuidedOnboardingState,
   parseOnboardingVariant,
-} from "~/server/onboarding/guided-onboarding.service";
-import type { OnboardingVariant } from "~/server/schemas/sign-up-data.schema";
+} from "~/server/schemas/sign-up-data.schema";
 import { resolveScopeChain } from "~/server/scopes/resolveScopeChain";
 import { prisma } from "../db";
 

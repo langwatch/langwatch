@@ -1,6 +1,8 @@
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { OnboardingVariant } from "~/server/schemas/sign-up-data.schema";
-import { parseOnboardingVariant } from "./guided-onboarding.service";
+import {
+  type OnboardingVariant,
+  parseOnboardingVariant,
+} from "~/server/schemas/sign-up-data.schema";
 
 /**
  * Which onboarding the organization behind a project went through, for a

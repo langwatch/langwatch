@@ -66,3 +66,30 @@ export const signUpDataSchema = z.object({
   guidedOnboarding: guidedOnboardingStateSchema.optional().nullable(),
   ...attributionShape,
 });
+
+/**
+ * Reads the guided block out of a stored sign-up data value. Anything that is
+ * not the expected shape reads as the empty default: a hand-edited row must
+ * not turn the welcome flow into an error. Framework-free, so the welcome
+ * flow reads the organization it just created the same way the server does.
+ */
+export function parseGuidedOnboardingState(
+  signupData: unknown,
+): GuidedOnboardingState {
+  const block =
+    signupData && typeof signupData === "object"
+      ? (signupData as Record<string, unknown>).guidedOnboarding
+      : undefined;
+  const parsed = guidedOnboardingStateSchema.safeParse(block);
+  return parsed.success ? parsed.data : EMPTY_GUIDED_ONBOARDING_STATE;
+}
+
+export function parseOnboardingVariant(
+  signupData: unknown,
+): OnboardingVariant | null {
+  const variant =
+    signupData && typeof signupData === "object"
+      ? (signupData as Record<string, unknown>).onboardingVariant
+      : undefined;
+  return variant === "guided" || variant === "classic" ? variant : null;
+}

@@ -31,3 +31,38 @@ export const GUIDED_PATH_TITLES: Record<GuidedPath, string> = {
 export function isGuidedPath(value: string): value is GuidedPath {
   return (GUIDED_PATHS as readonly string[]).includes(value);
 }
+
+/** The one-line description under each path's title on the value screen. */
+export const GUIDED_PATH_DESCRIPTIONS: Record<GuidedPath, string> = {
+  llmops: "Trace, test and improve the agents you are building",
+  coding: "Track Claude Code and friends and find token savings",
+  gateway:
+    "One endpoint for every provider, with virtual keys, budgets and routing",
+  governance:
+    "Control all AI subscriptions and usage across company departments",
+};
+
+/**
+ * Where a guided onboarding lands once the provider step is over: the page
+ * Langy starts from for that path. The project pages take the project slug;
+ * the organization pages resolve the ambient project on their own, and a
+ * fresh organization has exactly one.
+ */
+export function guidedPathLanding({
+  path,
+  projectSlug,
+}: {
+  path: GuidedPath;
+  projectSlug: string;
+}): string {
+  switch (path) {
+    case "llmops":
+      return `/${projectSlug}/traces`;
+    case "gateway":
+      return "/gateway";
+    case "governance":
+      return "/governance";
+    case "coding":
+      return "/me";
+  }
+}

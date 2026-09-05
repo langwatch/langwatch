@@ -3,7 +3,7 @@ import { prisma } from "../../../../src/server/db";
 import {
   parseGuidedOnboardingState,
   parseOnboardingVariant,
-} from "../../../../src/server/onboarding/guided-onboarding.service";
+} from "../../../../src/server/schemas/sign-up-data.schema";
 import { captureException } from "../../../../src/utils/posthogErrorCapture";
 import type { CioOrgTraits, CioPersonTraits } from "../types";
 import {
