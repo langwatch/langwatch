@@ -291,7 +291,7 @@ class FakeCli {
     );
   }
 
-  register(): void {
+  register(inFlightCallIds: string[] = []): void {
     this.send({
       type: "register",
       cli: { name: "langwatch", version: "1.0.0" },
@@ -301,7 +301,7 @@ class FakeCli {
         username: "dev",
         pid: 4242,
         startedAt: new Date().toISOString(),
-        inFlightCallIds: [],
+        inFlightCallIds,
       },
       workspace: workspaceInfo(),
     });
@@ -363,12 +363,30 @@ async function approvedSessionKey(pod: Pod): Promise<string> {
 async function shareFolder(
   pod: Pod,
   token: string,
+  over: { inFlightCallIds?: string[]; instanceId?: string } = {},
 ): Promise<{ cli: FakeCli; registered: Frame }> {
-  const cli = new FakeCli({ url: pod.url, token });
+  const cli = new FakeCli({
+    url: pod.url,
+    token,
+    ...(over.instanceId ? { instanceId: over.instanceId } : {}),
+  });
   await cli.open();
-  cli.register();
+  cli.register(over.inFlightCallIds ?? []);
   const registered = await cli.next("registered");
   return { cli, registered };
+}
+
+/** Nothing of this type arrived inside the window. */
+async function noFrame(
+  cli: FakeCli,
+  type: string,
+  withinMs = 1_500,
+): Promise<boolean> {
+  const arrived = await cli
+    .next(type, withinMs)
+    .then(() => true)
+    .catch(() => false);
+  return !arrived;
 }
 
 beforeAll(async () => {
@@ -1197,5 +1215,67 @@ describe("given a network that blocks WebSockets", () => {
 
     await podA.longPoll.retire(token, "cli_exit");
     expect(await podA.longPoll.poll({ token })).toMatchObject({ ok: false });
+  });
+});
+
+describe("given a command line that reconnects while a command still runs", () => {
+  describe("when its register frame names the call as still in flight", () => {
+    /** @scenario "A call the command line is still running is not handed over again" */
+    it("does not hand the call over a second time", async () => {
+      const key = await approvedSessionKey(podA);
+      const first = await shareFolder(podA, key);
+      const call = await podA.runtime.dispatcher.start({
+        projectId,
+        conversationId,
+        turnId,
+        call: {
+          tool: "local_bash",
+          params: { command: "pnpm prisma migrate deploy" },
+        },
+        timeoutMs: 60_000,
+      });
+      await first.cli.next("call");
+      first.cli.close();
+      await first.cli.closed();
+
+      // The socket dropped with the migration still running on the machine.
+      const second = await shareFolder(podA, key, {
+        inFlightCallIds: [call.callId],
+        instanceId: first.cli.instanceId,
+      });
+
+      expect(await noFrame(second.cli, "call")).toBe(true);
+
+      // And the result it finally sends is taken, once.
+      second.cli.send({
+        type: "result",
+        callId: call.callId,
+        ok: true,
+        text: "4 migrations applied",
+      });
+      await expect
+        .poll(
+          async () => (await podA.runtime.dispatcher.read(call.callId))?.state,
+          { timeout: 5_000 },
+        )
+        .toBe("done");
+
+      // A second copy of the same result changes nothing and raises nothing.
+      second.cli.send({
+        type: "result",
+        callId: call.callId,
+        ok: false,
+        text: "sent again after the reconnect",
+      });
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(await podA.runtime.dispatcher.read(call.callId)).toMatchObject({
+        state: "done",
+        ok: true,
+        text: "4 migrations applied",
+      });
+
+      second.cli.close();
+      await second.cli.closed();
+    });
   });
 });

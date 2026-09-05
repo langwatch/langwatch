@@ -91,7 +91,18 @@ export type AuthenticateOutcome =
   | { ok: false; code: LocalControlRefusedCode; message: string };
 
 export type RegisterOutcome =
-  | { ok: true; session: ControlSession; reply: PlatformFrame }
+  | {
+      ok: true;
+      session: ControlSession;
+      reply: PlatformFrame;
+      /**
+       * The calls the command line says it is still running. The transport
+       * marks each as already handed over, so the scan of pending calls that
+       * follows a reconnect does not start a second copy of a command the
+       * developer already approved.
+       */
+      inFlightCallIds: string[];
+    }
   | { ok: false; code: LocalControlRefusedCode; message: string };
 
 /** The one conversation read the core makes. */
@@ -351,6 +362,7 @@ export class LocalControlSessionCore {
     return {
       ok: true,
       session,
+      inFlightCallIds: [...new Set(frame.instance.inFlightCallIds)],
       reply: {
         type: "registered",
         protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
@@ -447,7 +459,14 @@ export class LocalControlSessionCore {
     await this.dispatcher.ack(callId);
   }
 
-  /** The command line answered the call. */
+  /**
+   * The command line answered the call.
+   *
+   * A result for a call that already ended changes nothing and is not an
+   * error: the command line keeps a result it could not send while the socket
+   * was down and sends it again on the next connection, so the second copy
+   * has to be accepted quietly.
+   */
   async result(session: ControlSession, frame: ResultFrame): Promise<void> {
     const call = await this.dispatcher.read(frame.callId);
     if (call?.conversationId !== session.conversationId) return;

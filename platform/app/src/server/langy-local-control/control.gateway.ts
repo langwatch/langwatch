@@ -185,6 +185,10 @@ export class LocalControlGateway {
       presence: null,
       released: false,
     };
+    // The command line is still running these; handing them over again would
+    // run them twice on the developer's machine.
+    for (const callId of registered.inFlightCallIds)
+      live.delivered.reserve(callId);
     this.sockets.add(live);
     live.unsubscribe = await this.core.subscribe(
       registered.session,

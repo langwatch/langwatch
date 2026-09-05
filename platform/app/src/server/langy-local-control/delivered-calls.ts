@@ -14,6 +14,19 @@ import type { PlatformFrame } from "./protocol";
 export class DeliveredCalls {
   private readonly ids = new Set<string>();
 
+  /**
+   * Claim an id without sending anything: the command line said it is already
+   * running this call, so the connection must not hand it over again.
+   *
+   * A reconnect used to replay every call the platform still held, and the
+   * command line ran a second copy of a migration, a deploy or whatever else
+   * the developer had already approved. The register frame names what is in
+   * flight; this is where that list is honoured.
+   */
+  reserve(callId: string): void {
+    this.ids.add(callId);
+  }
+
   /** True when the frame should go out: a call already handed over does not. */
   admit(frame: PlatformFrame): boolean {
     if (frame.type !== "call") return true;

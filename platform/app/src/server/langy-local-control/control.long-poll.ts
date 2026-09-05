@@ -117,7 +117,7 @@ export class LocalControlLongPoll {
       unsubscribe: (async () => undefined) as Unsubscribe,
       lastSeenAt: Date.now(),
       released: false,
-      delivered: new DeliveredCalls(),
+      delivered: deliveredWith(registered.inFlightCallIds),
     };
     entry.unsubscribe = await this.core.subscribe(
       registered.session,
@@ -285,4 +285,14 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
     }
     signal?.addEventListener("abort", done, { once: true });
   });
+}
+
+/**
+ * A delivered set that already holds what the command line says it is
+ * running, so a reconnect never starts a second copy of a call in flight.
+ */
+function deliveredWith(inFlightCallIds: readonly string[]): DeliveredCalls {
+  const delivered = new DeliveredCalls();
+  for (const callId of inFlightCallIds) delivered.reserve(callId);
+  return delivered;
 }
