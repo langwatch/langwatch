@@ -466,6 +466,7 @@ function registerMountedRoute({ route, family }: { route: MountedRoute; family: 
       policy,
       family,
       credentialClass: credentialClassFor({ scope: "organization", policy }),
+      isNamespaceGuard: true,
     });
     return;
   }
@@ -498,6 +499,7 @@ function registerMountedRoute({ route, family }: { route: MountedRoute; family: 
       scope: "organization",
       policy: meta.policy,
     }),
+    ...(route.withdrawn ? { withdrawn: true as const } : {}),
   });
 }
 

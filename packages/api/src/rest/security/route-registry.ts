@@ -22,6 +22,16 @@ export interface RegisteredRoute {
    * count it once and still recognise the canonical published URL.
    */
   readonly canonicalPath?: string;
+  /**
+   * True when this mount answers 410 Gone for a withdrawn endpoint. No handler
+   * stands behind it, so the route-coverage gate accounts for it by shape.
+   */
+  readonly withdrawn?: boolean;
+  /**
+   * True for the catch-alls that 404 an unknown version namespace. Real routes
+   * in the table, and undocumentable for the same reason a tombstone is.
+   */
+  readonly isNamespaceGuard?: boolean;
 }
 
 const registry = new Map<string, RegisteredRoute>();
