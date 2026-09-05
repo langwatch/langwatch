@@ -238,6 +238,20 @@ export interface LocalPermissionRequiredFrame {
   timeoutSeconds?: number;
 }
 
+/**
+ * The developer answered a permission ask in the terminal. The platform settles
+ * the wait from it unless the card answered first, in which case it is ignored:
+ * the `permission` frame for that answer is already on its way.
+ */
+export interface LocalPermissionAnsweredFrame {
+  type: "permission_answered";
+  protocol: typeof LOCAL_CONTROL_PROTOCOL_VERSION;
+  callId: string;
+  decision: TerminalPermissionDecision;
+  /** The patterns the session grant covers, when the decision is allow_pattern. */
+  patterns?: string[];
+}
+
 export interface LocalDeregisterFrame {
   type: "deregister";
   protocol: typeof LOCAL_CONTROL_PROTOCOL_VERSION;
@@ -249,6 +263,7 @@ export type LocalCliFrame =
   | LocalAckFrame
   | LocalResultFrame
   | LocalPermissionRequiredFrame
+  | LocalPermissionAnsweredFrame
   | LocalDeregisterFrame;
 
 // ---------------------------------------------------------------------------
@@ -318,6 +333,18 @@ export const PERMISSION_DECISIONS = [
   "expired",
 ] as const;
 export type PermissionDecision = (typeof PERMISSION_DECISIONS)[number];
+
+/**
+ * The answers the terminal can give. It has no "expired": a wait runs out on
+ * the platform, never in the selector.
+ */
+export const TERMINAL_PERMISSION_DECISIONS = [
+  "allow_once",
+  "allow_pattern",
+  "deny",
+] as const;
+export type TerminalPermissionDecision =
+  (typeof TERMINAL_PERMISSION_DECISIONS)[number];
 
 export interface LocalPermissionFrame {
   type: "permission";

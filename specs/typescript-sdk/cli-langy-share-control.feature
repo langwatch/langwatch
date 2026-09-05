@@ -32,7 +32,7 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       When I approve it
       Then the CLI connects the folder to the conversation
       And prints the link to the conversation
-      And prints that permission questions appear in the panel
+      And prints that permission questions are answered here or on the card in LangWatch
 
     @unit
     Scenario: Cancelling tells the conversation
@@ -81,34 +81,72 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       Then the CLI connects
       And the terminal notes that Langy cannot open a pull request from here
 
-  Rule: The terminal shows what Langy does, one line per call
+  Rule: The terminal reads like a coding transcript
+
+    # One line per call with the tool name and its argument, and the result
+    # under it behind a hook glyph. Command output is summarised rather than
+    # echoed: the output belongs to Langy, and repeating all of it buries the
+    # permission question and the disconnect.
 
     @unit
     Scenario: Each call prints as one line
       Given a connected folder
       When Langy reads a file and runs a command
-      Then the terminal prints one line per call with the tool and its target
-      And command output is not echoed, only its exit status and size
+      Then the terminal prints one line per call with the tool name and its argument
+      And the result of each call is printed under it, indented
+      And command output is not echoed in full, only its last lines
 
     @unit
-    Scenario: A permission request points at the panel
+    Scenario: A file call reports what it did, not what it read
       Given a connected folder
-      When Langy asks for permission to run a command
-      Then the terminal prints the command and that the answer is given in the LangWatch panel
-      And prints the outcome when the answer arrives
+      When Langy reads a file and edits it
+      Then the read prints the number of lines it read
+      And the edit prints how many lines it added and removed
+      And neither prints the content of the file
+
+    @unit
+    Scenario: A long command result keeps its last lines and counts the rest
+      Given a connected folder
+      When Langy runs a command that prints forty lines
+      Then the terminal prints the last eight lines of the output
+      And a dim line counting the lines it did not print
+
+    @unit
+    Scenario: A failed command prints its exit code
+      Given a connected folder
+      When a command Langy ran ends with a status
+      Then the terminal prints the exit code in red under the call
+
+    @unit
+    Scenario: A background command prints its process and its log
+      Given a connected folder
+      When Langy starts a command in the background
+      Then the terminal prints the process id and the log path under the call
+
+    @unit
+    Scenario: A refused call reads as a refusal
+      Given a connected folder
+      When the policy refuses a call
+      Then the terminal prints the refusal in yellow under the call
+
+    @unit
+    Scenario: A running command says how long it has run
+      Given a connected folder and a command that takes a while
+      When the command is running
+      Then the terminal draws a line under the call saying how long it has run
+      And that line is replaced by the result when the command ends
+
+    @unit
+    Scenario: A platform notice has no tool name
+      Given a connected folder
+      When LangWatch connects the folder or closes it
+      Then the notice prints as a transcript line with no tool name
 
     @unit
     Scenario: The approval question wraps on word boundaries
       Given a request whose conversation title and folder are wider than the terminal
       When the terminal asks whether to share the folder
       Then the question is broken at the terminal width on spaces, with no word cut in half
-
-    @unit
-    Scenario: A long command is printed once
-      Given a connected folder
-      When Langy asks for permission to run a long chain and I allow the pattern
-      Then the ask prints the chain in full, wrapped at the terminal width
-      And the answer prints as one short line naming the patterns that were granted
 
     @unit
     Scenario: Turning permission checks off is printed in red
@@ -122,6 +160,109 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       When the folder is disconnected from the panel
       Then the CLI prints that LangWatch disconnected the folder
       And exits with code zero
+
+  Rule: A permission question is answered in the terminal or on the card
+
+    # The card in the LangWatch panel and the selector in the terminal ask the
+    # same question at the same time. The first answer wins. The CLI applies
+    # its own answer at once and tells the platform with a permission_answered
+    # frame; it never waits for the platform to relay its own answer back.
+
+    @unit
+    Scenario: The selector offers the session grant first
+      Given a connected folder
+      When Langy asks for permission to run a command
+      Then the terminal draws a selector under the transcript
+      And the first option allows the pattern for this session and is selected
+      And the second option allows it this time only
+      And the third option denies it and offers to tell Langy what to do instead
+
+    @unit
+    Scenario: A chain names every pattern the grant would cover
+      Given a connected folder
+      When Langy asks for permission to run a chain of commands
+      Then the first option names every pattern the grant covers
+
+    @unit
+    Scenario: The selector says what the command is and what it changes
+      Given a connected folder
+      When Langy asks for permission to run a command with a time limit
+      Then the box heading names the folder
+      And the command is printed in full inside the box
+      And the reason and the time limit are printed under it
+
+    @unit
+    Scenario: Allowing the pattern runs the call and settles the line
+      Given a permission selector open in the terminal
+      When I confirm the first option
+      Then the call runs
+      And the platform is told the terminal answered
+      And the selector is replaced by one line naming the patterns it granted
+      And the next matching command runs without asking
+
+    @unit
+    Scenario: Allowing once runs the call and grants nothing
+      Given a permission selector open in the terminal
+      When I choose the second option and confirm
+      Then the call runs
+      And the selector is replaced by one line reading that it was allowed once
+      And the next matching command asks again
+
+    @unit
+    Scenario: Denying reads one line of text and sends it back to Langy
+      Given a permission selector open in the terminal
+      When I choose the third option and type what Langy should do instead
+      Then the call is refused with what I typed as the reason
+      And the settled line reads the reason back
+
+    @unit
+    Scenario: Escape denies with no reason
+      Given a permission selector open in the terminal
+      When I press Escape
+      Then the call is refused with no reason typed
+      And Langy is told the developer denied it
+
+    @unit
+    Scenario: Transcript lines are held while the selector is open
+      Given a permission selector open in the terminal
+      When another call finishes while the question is on the screen
+      Then its lines are printed only after the question is answered
+
+    @unit
+    Scenario: Two questions at once are asked one at a time
+      Given two calls that both need an answer
+      When the second one arrives while the first question is on the screen
+      Then only one selector is drawn
+      And the second question opens when the first one is answered
+
+    @unit
+    Scenario: The card can answer first and the settled line names it
+      Given a permission selector open in the terminal
+      When the card in the panel is answered first
+      Then the selector is erased
+      And the settled line says the answer came from the card in LangWatch
+      And the card's decision is applied
+
+    @unit
+    Scenario: A card answer after the terminal answered is ignored
+      Given a permission answered in the terminal
+      When the platform sends the answer from the card for the same call
+      Then the CLI does nothing with it
+      And the call is not run twice
+
+    @unit
+    Scenario: Without a terminal there is no selector
+      Given output that is piped rather than a terminal
+      When Langy asks for permission to run a command
+      Then no selector is drawn
+      And the terminal prints the command and that the answer is given on the card in LangWatch
+
+    @unit
+    Scenario: A long command is printed once
+      Given a connected folder
+      When Langy asks for permission to run a long chain and I allow the pattern
+      Then the ask prints the chain in full, wrapped at the width of the box
+      And the answer prints as one short line naming the patterns that were granted
 
   Rule: Exiting is clean
 

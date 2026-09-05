@@ -24,6 +24,7 @@ import {
   LOCAL_TOOL_NAMES,
   PERMISSION_DECISIONS,
   PRESENCE_HEARTBEAT_MS,
+  TERMINAL_PERMISSION_DECISIONS,
 } from "../local-control-protocol";
 
 const PLATFORM_DIR = resolve(
@@ -181,6 +182,7 @@ describe("the CLI local control protocol, given the platform's contract module",
       "deregister",
       "disconnect",
       "permission",
+      "permission_answered",
       "permission_required",
       "policy",
       "refused",
@@ -280,6 +282,26 @@ describe("the CLI local control protocol, given the platform's contract module",
       );
     });
 
+    it("permission_answered carries the same keys", () => {
+      expect(
+        sorted(
+          withoutType(
+            cliKeys({ source: cli, name: "LocalPermissionAnsweredFrame" }),
+          ),
+        ),
+      ).toEqual(
+        sorted([
+          "protocol",
+          ...withoutType(
+            platformKeys({
+              source: platform,
+              schema: "permissionAnsweredFrameSchema",
+            }),
+          ),
+        ]),
+      );
+    });
+
     it("names every call error code the platform can carry", () => {
       expect([...LOCAL_CALL_ERROR_CODES]).toEqual(
         stringList({ source: platform, name: "LOCAL_CALL_ERROR_CODES" }),
@@ -368,6 +390,13 @@ describe("the CLI local control protocol, given the platform's contract module",
       expect([...PERMISSION_DECISIONS]).toEqual(
         stringList({ source: platform, name: "PERMISSION_DECISIONS" }),
       );
+    });
+
+    it("answers from the terminal with decisions the platform also knows", () => {
+      for (const decision of TERMINAL_PERMISSION_DECISIONS) {
+        expect([...PERMISSION_DECISIONS]).toContain(decision);
+      }
+      expect([...TERMINAL_PERMISSION_DECISIONS]).not.toContain("expired");
     });
   });
 

@@ -299,11 +299,51 @@ A connected agent needs none of this: it reaches out from your machine, so a loc
 
 ## Share your local folder with Langy
 
-`langwatch langy --share-control` shares this folder with the Langy conversation that asked for it, so Langy can read and change files here.
+`langwatch langy --share-control` shares this folder with the Langy conversation that asked for it, so Langy can read and change files here, with your toolchain.
 
 ```bash
 langwatch langy --share-control
 ```
+
+Ask Langy for a code change in the LangWatch panel first. Its request appears in the terminal, and you approve it there. The command then prints what Langy does, one line per call:
+
+```
+⏺ Read(app/main.py)
+  ⎿  Read 84 lines
+⏺ Edit(app/main.py)
+  ⎿  Added 3 lines, removed 1 line
+⏺ Bash(uv run pytest)
+  ⎿  exit 0, 1.2 KB, 3.1 s
+     2 passed in 3.1s
+```
+
+Reading files and running read-only commands needs no answer. Everything else stops and asks:
+
+```
+╭─ Langy wants to run in acme-support ──────────────────────────────────────╮
+│                                                                           │
+│   uv run pytest                                                           │
+│   This runs checks. Stops after 5 minutes if it has not finished.         │
+│                                                                           │
+│   Do you want to allow this?                                              │
+│ ❯ 1. Yes, allow "uv run" for this session                                 │
+│   2. Yes, this time only                                                  │
+│   3. No, and tell Langy what to do instead                                │
+│                                                                           │
+│   Enter to confirm · ↑↓ to choose · Esc to deny · or answer on the card   │
+│   in LangWatch                                                            │
+╰───────────────────────────────────────────────────────────────────────────╯
+```
+
+Enter confirms the option that is highlighted, the arrow keys and the digits move the highlight, and Escape denies with no reason. Choosing the third option reads one line of text and sends it to Langy as the reason, so you can say what to do instead.
+
+The same question also appears as a card in the LangWatch panel, and the first answer wins. When the card is answered first, the selector closes and the line under the call says the answer came from the card.
+
+With the output piped or redirected there is no selector, because there is no terminal to draw it on. The command prints the question and the card in the panel is the only way to answer it.
+
+Paths outside the folder, `sudo` and files that may hold secrets are refused whatever you answer. A grant lives with this run of the command: stop it and start it again, and Langy asks once more.
+
+The command is a live session with no machine-readable output, so it refuses `-o json`. Press Ctrl-C to stop sharing; commands Langy started in the background keep running, and the terminal prints their process id and log path.
 
 ## Run scenario tests
 

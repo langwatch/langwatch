@@ -15,6 +15,11 @@ import {
   type WorkspaceInfo,
 } from "../../../../agent/local-control-protocol";
 import type { SocketLike } from "../../../../agent/transport";
+import type {
+  ApprovalCard,
+  ApprovalPrompt,
+  TerminalApproval,
+} from "../approval";
 import { startLangySession, type LangySession } from "../session";
 import { createUi, type UiWriter } from "../ui";
 
@@ -90,6 +95,34 @@ const waitUntil = async (
   }
 };
 
+/** A selector the test opens and answers by hand. */
+function fakeApprovals() {
+  const cards: ApprovalCard[] = [];
+  const state = { closed: false, open: 0 };
+  let deliver: ((value: TerminalApproval | null) => void) | null = null;
+  const settle = (value: TerminalApproval | null): void => {
+    const resolve = deliver;
+    deliver = null;
+    if (!resolve) return;
+    state.open -= 1;
+    resolve(value);
+  };
+  const prompt: ApprovalPrompt = (card) => {
+    cards.push(card);
+    state.open += 1;
+    return {
+      answer: new Promise<TerminalApproval | null>((resolve) => {
+        deliver = resolve;
+      }),
+      close: () => {
+        state.closed = true;
+        settle(null);
+      },
+    };
+  };
+  return { prompt, cards, state, answer: settle };
+}
+
 const callFrame = (call: Partial<LocalCall> & Pick<LocalCall, "tool">) => ({
   type: "call",
   call: {
@@ -110,7 +143,9 @@ describe("given a folder connected to a Langy conversation", () => {
 
   const writer: UiWriter = { line: (text) => lines.push(text) };
 
-  const start = (options: { withoutGit?: boolean } = {}) => {
+  const start = (
+    options: { withoutGit?: boolean; approvals?: ApprovalPrompt } = {},
+  ) => {
     socket = new FakeSocket();
     lines = [];
     const workspace: WorkspaceInfo = {
@@ -126,6 +161,7 @@ describe("given a folder connected to a Langy conversation", () => {
       ui: createUi(writer),
       socketFactory: () => socket,
       backoff: { baseMs: 10, maxMs: 10 },
+      approvals: options.approvals ?? null,
       ...(options.withoutGit === true ? { withoutGit: true } : {}),
     });
     return session;
@@ -165,7 +201,9 @@ describe("given a folder connected to a Langy conversation", () => {
       register();
       expect(lines.join("\n")).toContain(CONVERSATION.title);
       expect(lines.join("\n")).toContain(CONVERSATION.url);
-      expect(lines.join("\n")).toContain("Permission questions appear in the panel");
+      expect(lines.join("\n")).toContain(
+        "Permission questions are answered on the card in LangWatch",
+      );
     });
 
     /** @scenario "A folder that is not a git repository still works, with a note" */
@@ -207,10 +245,11 @@ describe("given a folder connected to a Langy conversation", () => {
       });
 
       const printed = lines.join("\n");
-      expect(printed).toContain("read app.py");
-      expect(printed).toContain("bash echo secret-output");
-      expect(printed).toContain("exit 0");
-      expect(printed).not.toContain("secret-output\n1");
+      expect(printed).toContain("Read(app.py)");
+      expect(printed).toContain("Read 2 lines");
+      expect(printed).toContain("Bash(echo secret-output)");
+      // The file the model read is not echoed here, only how much of it there was.
+      expect(printed).not.toContain("print('hi')");
 
       const results = socket.sentOf("result");
       expect(results).toHaveLength(2);
@@ -222,9 +261,9 @@ describe("given a folder connected to a Langy conversation", () => {
     });
   });
 
-  describe("when a call needs the developer's answer", () => {
-    /** @scenario "A permission request points at the panel" */
-    it("asks the panel, prints where to answer, and prints the outcome", async () => {
+  describe("when a call needs the developer's answer and this screen cannot ask", () => {
+    /** @scenario "Without a terminal there is no selector" */
+    it("asks the card, prints where to answer, and prints the outcome", async () => {
       start();
       await settle();
       register();
@@ -244,7 +283,7 @@ describe("given a folder connected to a Langy conversation", () => {
       expect(asked!.pattern).toBe("pnpm typecheck");
       expect(asked!.timeoutSeconds).toBe(300);
       expect(lines.join("\n")).toContain("Langy asked to run pnpm typecheck");
-      expect(lines.join("\n")).toContain("Answer in the LangWatch panel");
+      expect(lines.join("\n")).toContain("Answer on the card in LangWatch");
       // The link belongs to the connect line, so an ask does not repeat it.
       expect(lines.join("\n")).not.toContain(CONVERSATION.url);
       expect(socket.sentOf("result")).toHaveLength(0);
@@ -255,7 +294,7 @@ describe("given a folder connected to a Langy conversation", () => {
         decision: "deny",
       });
       await settle();
-      expect(lines.join("\n")).toContain("denied");
+      expect(lines.join("\n")).toContain("Denied on the card in LangWatch");
       const [result] = socket.sentOf("result");
       expect(result!.ok).toBe(false);
       expect((result!.error as { code: string }).code).toBe("permission_denied");
@@ -357,7 +396,10 @@ describe("given a folder connected to a Langy conversation", () => {
       });
       const answer = lines.filter((line) => line.includes("Allowed"));
       expect(answer).toHaveLength(1);
-      expect(answer[0]).toContain("git add, git commit, git push");
+      expect(answer[0]).toContain(
+        '"git add", "git commit" and "git push" for this session',
+      );
+      expect(answer[0]).toContain("on the card in LangWatch");
       expect(answer[0]).not.toContain("feat: add tracing");
 
       // The grant covers every segment the card named, so the next chain of
@@ -411,6 +453,212 @@ describe("given a folder connected to a Langy conversation", () => {
     });
   });
 
+  describe("when the developer answers in the terminal", () => {
+    const ask = async (command = "pnpm typecheck") => {
+      const approvals = fakeApprovals();
+      start({ approvals: approvals.prompt });
+      await settle();
+      register();
+      lines.length = 0;
+      socket.deliver(
+        callFrame({ tool: "local_bash", params: { command } }),
+      );
+      await settle();
+      return approvals;
+    };
+
+    /** @scenario "The selector offers the session grant first" */
+    it("opens the selector with the folder, the command and the time limit", async () => {
+      const approvals = await ask();
+
+      expect(approvals.cards).toHaveLength(1);
+      const [card] = approvals.cards;
+      expect(card!.title).toContain("Langy wants to run in");
+      expect(card!.subject).toBe("pnpm typecheck");
+      expect(card!.description).toContain(
+        "Stops after 5 minutes if it has not finished.",
+      );
+      expect(card!.options.map((option) => option.value)).toEqual([
+        "allow_pattern",
+        "allow_once",
+        "deny",
+      ]);
+      expect(card!.options[0]!.label).toBe(
+        'Yes, allow "pnpm typecheck" for this session',
+      );
+      // The card in the panel is asked at the same time.
+      expect(socket.sentOf("permission_required")).toHaveLength(1);
+    });
+
+    /** @scenario "Allowing the pattern runs the call and settles the line" */
+    it("runs the call, tells the platform and grants the pattern", async () => {
+      const approvals = await ask("true");
+
+      approvals.answer({ decision: "allow_pattern" });
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the allowed command to answer",
+      });
+
+      const [answered] = socket.sentOf("permission_answered");
+      expect(answered).toBeDefined();
+      expect(answered!.callId).toBe("call-1");
+      expect(answered!.decision).toBe("allow_pattern");
+      expect(answered!.patterns).toEqual(["true *"]);
+      expect(lines.join("\n")).toContain('Allowed "true *" for this session');
+      expect(lines.join("\n")).not.toContain("on the card in LangWatch");
+
+      socket.deliver({
+        ...callFrame({ tool: "local_bash", params: { command: "true again" } }),
+        call: {
+          ...callFrame({
+            tool: "local_bash",
+            params: { command: "true again" },
+          }).call,
+          callId: "call-2",
+        },
+      });
+      await waitUntil(() => socket.sentOf("result").length === 2, {
+        what: "the granted command to answer with no second card",
+      });
+      expect(socket.sentOf("permission_required")).toHaveLength(1);
+    });
+
+    /** @scenario "Allowing once runs the call and grants nothing" */
+    it("runs the call once and carries no patterns", async () => {
+      const approvals = await ask("true");
+
+      approvals.answer({ decision: "allow_once" });
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the allowed command to answer",
+      });
+
+      const [answered] = socket.sentOf("permission_answered");
+      expect(answered!.decision).toBe("allow_once");
+      expect(answered!.patterns).toBeUndefined();
+      expect(lines.join("\n")).toContain("Allowed once");
+    });
+
+    /** @scenario "Denying reads one line of text and sends it back to Langy" */
+    it("refuses the call with the reason the developer typed", async () => {
+      const approvals = await ask();
+
+      approvals.answer({ decision: "deny", reason: "use the staging database" });
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the denied command to answer",
+      });
+
+      const [answered] = socket.sentOf("permission_answered");
+      expect(answered!.decision).toBe("deny");
+      const [result] = socket.sentOf("result");
+      expect(result!.ok).toBe(false);
+      const error = result!.error as { code: string; message: string };
+      expect(error.code).toBe("permission_denied");
+      expect(error.message).toContain("use the staging database");
+      expect(lines.join("\n")).toContain("Denied: use the staging database");
+    });
+
+    /** @scenario "Escape denies with no reason" */
+    it("refuses the call and still says who refused when nothing was typed", async () => {
+      const approvals = await ask();
+
+      approvals.answer({ decision: "deny" });
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the denied command to answer",
+      });
+
+      const error = socket.sentOf("result")[0]!.error as { message: string };
+      expect(error.message).toContain("The developer denied pnpm typecheck");
+      expect(lines.join("\n")).toContain("Denied");
+    });
+
+    /** @scenario "Two questions at once are asked one at a time" */
+    it("asks the second question only after the first one is answered", async () => {
+      const approvals = await ask("true");
+
+      socket.deliver({
+        ...callFrame({ tool: "local_bash", params: { command: "false" } }),
+        call: {
+          ...callFrame({ tool: "local_bash", params: { command: "false" } })
+            .call,
+          callId: "call-2",
+        },
+      });
+      await settle();
+      expect(approvals.cards).toHaveLength(1);
+      expect(approvals.state.open).toBe(1);
+
+      approvals.answer({ decision: "allow_once" });
+      await waitUntil(() => approvals.cards.length === 2, {
+        what: "the second question to open",
+      });
+      expect(approvals.cards[1]!.subject).toBe("false");
+      expect(approvals.state.open).toBe(1);
+    });
+
+    /** @scenario "The card can answer first and the settled line names it" */
+    it("closes the selector when the card answers first and names the card", async () => {
+      const approvals = await ask("true");
+
+      socket.deliver({
+        type: "permission",
+        callId: "call-1",
+        decision: "allow_once",
+      });
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the command the card allowed to answer",
+      });
+
+      expect(socket.sentOf("permission_answered")).toHaveLength(0);
+      expect(lines.join("\n")).toContain("Allowed once on the card in LangWatch");
+      // The selector is closed rather than left waiting for a key.
+      expect(approvals.state.closed).toBe(true);
+    });
+
+    /** @scenario "A card answer after the terminal answered is ignored" */
+    it("ignores the card's answer once the terminal answered", async () => {
+      const approvals = await ask("true");
+
+      approvals.answer({ decision: "allow_once" });
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the allowed command to answer",
+      });
+      lines.length = 0;
+
+      socket.deliver({
+        type: "permission",
+        callId: "call-1",
+        decision: "deny",
+      });
+      await settle();
+
+      expect(socket.sentOf("result")).toHaveLength(1);
+      expect(lines.join("\n")).not.toContain("on the card in LangWatch");
+    });
+
+    /** @scenario "Transcript lines are held while the selector is open" */
+    it("holds the transcript until the question is answered", async () => {
+      const approvals = await ask();
+      lines.length = 0;
+
+      socket.deliver({
+        ...callFrame({ tool: "local_read", params: { path: "app.py" } }),
+        call: {
+          ...callFrame({ tool: "local_read", params: { path: "app.py" } }).call,
+          callId: "call-2",
+        },
+      });
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the read to answer while the question is open",
+      });
+      expect(lines).toEqual([]);
+
+      approvals.answer({ decision: "deny" });
+      await waitUntil(() => lines.join("\n").includes("Read(app.py)"), {
+        what: "the held lines to be printed",
+      });
+    });
+  });
+
   describe("when the platform cancels a call", () => {
     it("stops the command and drops the call", async () => {
       start();
@@ -426,7 +674,7 @@ describe("given a folder connected to a Langy conversation", () => {
         callId: "call-1",
         decision: "allow_once",
       });
-      await waitUntil(() => lines.join("\n").includes("allowed once"), {
+      await waitUntil(() => lines.join("\n").includes("Allowed once"), {
         what: "the command to start",
       });
       socket.deliver({ type: "cancel", callId: "call-1" });
@@ -495,7 +743,7 @@ describe("given a folder connected to a Langy conversation", () => {
         callId: "call-1",
         decision: "allow_once",
       });
-      await waitUntil(() => lines.join("\n").includes("allowed once"), {
+      await waitUntil(() => lines.join("\n").includes("Allowed once"), {
         what: "the command to start",
       });
 

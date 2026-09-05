@@ -15,9 +15,16 @@ import {
   type LocalControlConversation,
   type LocalToolCall,
   type PermissionDecision,
+  type TerminalPermissionDecision,
   type WorkspaceInfo,
 } from "../../../agent/local-control-protocol";
 import type { AgentTransport, SocketFactory } from "../../../agent/transport";
+import {
+  approvalCardFor,
+  createTerminalApprovals,
+  type ApprovalPrompt,
+  type TerminalApproval,
+} from "./approval";
 import { failureCode, failureMessage } from "./errors";
 import {
   startCommand,
@@ -34,7 +41,7 @@ import {
 } from "./fs-ops";
 import { decide } from "./policy";
 import { RelayClient } from "./relay-client";
-import { conversationLink, createUi, type LangyUi } from "./ui";
+import { conversationLink, createUi, settledLine, type LangyUi } from "./ui";
 
 /** How long a Ctrl-C waits for the running work to end before it exits anyway. */
 export const SHUTDOWN_DEADLINE_MS = 5_000;
@@ -50,6 +57,12 @@ export interface LangySessionOptions {
   backoff?: { baseMs: number; maxMs: number };
   /** True when the folder is not a git repository, so the terminal says so. */
   withoutGit?: boolean;
+  /**
+   * How a permission ask is put to the developer in this terminal. Null means
+   * this screen cannot ask, so the card in the panel is the only way to
+   * answer. Left out, it is built from the terminal the UI writes on.
+   */
+  approvals?: ApprovalPrompt | null;
 }
 
 export interface LangySession {
@@ -60,21 +73,36 @@ export interface LangySession {
   client: RelayClient;
 }
 
-/** A call the panel is being asked about. */
+/** A call that is waiting for an answer, from this terminal or from the card. */
 interface PendingPermission {
   call: LocalCall;
   summary: string;
   /** Every pattern an "allow this pattern" answer grants for this call. */
   patterns: string[];
+  /** Closes the selector when the card answered first. */
+  closeSelector?: () => void;
 }
 
 export function startLangySession(options: LangySessionOptions): LangySession {
   const ui = options.ui ?? createUi();
+  const approvals =
+    options.approvals === undefined
+      ? createTerminalApprovals({ writer: ui.writer })
+      : options.approvals;
   const root = options.workspace.root;
   const grants = new Set<string>();
   const running = new Map<string, RunningCommand>();
   const pending = new Map<string, PendingPermission>();
   const background: Array<{ pid: number; logPath: string }> = [];
+  /** Asks waiting for the selector, which draws one question at a time. */
+  const askQueue: Array<{
+    call: LocalCall;
+    summary: string;
+    reason: string;
+    patterns: string[];
+    timeoutSeconds?: number;
+  }> = [];
+  let selectorOpen = false;
 
   let skipPermissions = false;
   let announced = false;
@@ -145,10 +173,10 @@ export function startLangySession(options: LangySessionOptions): LangySession {
     }
     try {
       const text = runFileTool({ call, root });
-      ui.call(call);
+      ui.callResult({ call, text });
       sendResult({ callId: call.callId, text });
     } catch (error) {
-      ui.callFailed({ call, message: failureMessage(error) });
+      ui.callFailed({ message: failureMessage(error) });
       sendFailure({
         callId: call.callId,
         code: failureCode(error),
@@ -171,7 +199,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
         ...(call.params.background === true ? { background: true } : {}),
       });
     } catch (error) {
-      ui.callFailed({ call, message: failureMessage(error) });
+      ui.callFailed({ message: failureMessage(error) });
       sendFailure({
         callId: call.callId,
         code: failureCode(error),
@@ -180,15 +208,18 @@ export function startLangySession(options: LangySessionOptions): LangySession {
       return;
     }
     running.set(call.callId, command);
+    const stopSpinner = ui.startRunning();
     try {
       const output = await command.result;
       if (call.params.background === true && output.pid !== undefined) {
         background.push({ pid: output.pid, logPath: output.logPath ?? "" });
       }
+      stopSpinner();
       ui.callOutcome({ call, output });
       sendResult({ callId: call.callId, output });
     } catch (error) {
-      ui.callFailed({ call, message: failureMessage(error) });
+      stopSpinner();
+      ui.callFailed({ message: failureMessage(error) });
       sendFailure({
         callId: call.callId,
         code: failureCode(error),
@@ -207,8 +238,9 @@ export function startLangySession(options: LangySessionOptions): LangySession {
       grants,
       skipPermissions,
     });
+    ui.call(call);
     if (decision.kind === "refuse") {
-      ui.callFailed({ call, message: decision.message });
+      ui.callRefused({ message: decision.message });
       sendFailure({
         callId: call.callId,
         code: decision.code,
@@ -217,6 +249,10 @@ export function startLangySession(options: LangySessionOptions): LangySession {
       return;
     }
     if (decision.kind === "ask") {
+      const timeoutSeconds =
+        call.tool === "local_bash"
+          ? timeoutSecondsFor(call.params.timeout)
+          : undefined;
       pending.set(call.callId, {
         call,
         summary: decision.summary,
@@ -234,14 +270,120 @@ export function startLangySession(options: LangySessionOptions): LangySession {
           ? {}
           : { segments: decision.segments }),
         // Only a command runs under a time limit, so only a command carries one.
-        ...(call.tool === "local_bash"
-          ? { timeoutSeconds: timeoutSecondsFor(call.params.timeout) }
-          : {}),
+        ...(timeoutSeconds === undefined ? {} : { timeoutSeconds }),
       });
-      ui.permissionAsked({ summary: decision.summary });
+      askInTerminal({
+        call,
+        summary: decision.summary,
+        reason: decision.reason,
+        patterns: decision.patterns,
+        ...(timeoutSeconds === undefined ? {} : { timeoutSeconds }),
+      });
       return;
     }
     void execute(call);
+  };
+
+  /**
+   * Puts the ask to this terminal as well as to the card.
+   *
+   * The transcript is held while the selector owns the bottom of the screen,
+   * so a call that answers itself in the meantime does not scroll the box
+   * away; the held lines are printed the moment the question is gone. Two
+   * calls that both need an answer wait their turn rather than drawing two
+   * boxes over each other, and one the card settled first never opens.
+   */
+  const askInTerminal = (ask: {
+    call: LocalCall;
+    summary: string;
+    reason: string;
+    patterns: string[];
+    timeoutSeconds?: number;
+  }): void => {
+    if (!approvals) {
+      ui.permissionAsked({ summary: ask.summary });
+      return;
+    }
+    askQueue.push(ask);
+    openNextAsk();
+  };
+
+  const openNextAsk = (): void => {
+    if (selectorOpen || !approvals) return;
+    const ask = askQueue.shift();
+    if (!ask) return;
+    const waiting = pending.get(ask.call.callId);
+    if (!waiting) {
+      openNextAsk();
+      return;
+    }
+    selectorOpen = true;
+    const open = approvals(
+      approvalCardFor({
+        call: ask.call,
+        workspaceName: options.workspace.name,
+        summary: ask.summary,
+        reason: ask.reason,
+        patterns: ask.patterns,
+        ...(ask.timeoutSeconds === undefined
+          ? {}
+          : { timeoutSeconds: ask.timeoutSeconds }),
+      }),
+    );
+    waiting.closeSelector = open.close;
+    ui.hold();
+    void open.answer.then((answer) => {
+      selectorOpen = false;
+      ui.release();
+      // A null answer is the card getting there first: `onPermission` has
+      // already settled the call.
+      if (answer) applyTerminalAnswer({ callId: ask.call.callId, answer });
+      openNextAsk();
+    });
+  };
+
+  /** The developer answered here, so the call is settled here and the platform told. */
+  const applyTerminalAnswer = ({
+    callId,
+    answer,
+  }: {
+    callId: string;
+    answer: TerminalApproval;
+  }): void => {
+    const waiting = pending.get(callId);
+    if (!waiting) return;
+    pending.delete(callId);
+    const decision: TerminalPermissionDecision = answer.decision;
+    client.send({
+      type: "permission_answered",
+      protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
+      callId,
+      decision,
+      ...(decision === "allow_pattern" ? { patterns: waiting.patterns } : {}),
+    });
+    ui.permissionSettled({
+      text: settledLine({
+        decision,
+        patterns: waiting.patterns,
+        source: "terminal",
+        ...(answer.reason === undefined ? {} : { reason: answer.reason }),
+      }),
+    });
+    if (decision === "allow_pattern") {
+      for (const pattern of waiting.patterns) grants.add(pattern);
+    }
+    if (decision === "allow_once" || decision === "allow_pattern") {
+      void execute(waiting.call);
+      return;
+    }
+    sendFailure({
+      callId,
+      code: "permission_denied",
+      message: denialMessage({
+        summary: waiting.summary,
+        ...(answer.reason === undefined ? {} : { reason: answer.reason }),
+      }),
+    });
   };
 
   const onPermission = ({
@@ -252,12 +394,18 @@ export function startLangySession(options: LangySessionOptions): LangySession {
     decision: string;
   }): void => {
     const waiting = pending.get(callId);
+    // The terminal already answered, so the call has run or been refused and
+    // the card is only reporting what it settled on.
     if (!waiting) return;
     pending.delete(callId);
-    ui.permissionAnswered({
-      summary: waiting.summary,
-      patterns: waiting.patterns,
-      decision: decision as PermissionDecision,
+    waiting.closeSelector?.();
+    ui.release();
+    ui.permissionSettled({
+      text: settledLine({
+        decision: decision as PermissionDecision,
+        patterns: waiting.patterns,
+        source: "panel",
+      }),
     });
     if (decision === "allow_pattern") {
       for (const pattern of waiting.patterns) grants.add(pattern);
@@ -272,7 +420,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
       message:
         decision === "expired"
           ? `No answer arrived for ${waiting.summary}. Say what you need and end the turn; the next message will ask again.`
-          : `The developer denied ${waiting.summary}. Do not run it again in this turn; say what you needed it for.`,
+          : denialMessage({ summary: waiting.summary }),
     });
   };
 
@@ -282,6 +430,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
       command.cancel();
       running.delete(callId);
     }
+    pending.get(callId)?.closeSelector?.();
     pending.delete(callId);
     client.forgetInFlight(callId);
   };
@@ -349,6 +498,10 @@ export function startLangySession(options: LangySessionOptions): LangySession {
       return;
     }
     shuttingDown = true;
+    askQueue.length = 0;
+    for (const waiting of pending.values()) waiting.closeSelector?.();
+    pending.clear();
+    ui.release();
     ui.leaving();
     for (const command of running.values()) command.cancel();
     running.clear();
@@ -362,6 +515,25 @@ export function startLangySession(options: LangySessionOptions): LangySession {
 
   client.start();
   return { done, requestShutdown, client };
+}
+
+/**
+ * What Langy is told when the developer says no.
+ *
+ * The frame carries no reason, so the reason travels in the call result the
+ * CLI writes itself. With nothing typed, the refusal still says who refused.
+ */
+function denialMessage({
+  summary,
+  reason,
+}: {
+  summary: string;
+  reason?: string;
+}): string {
+  if (reason === undefined || reason === "") {
+    return `The developer denied ${summary}. Do not run it again in this turn; say what you needed it for.`;
+  }
+  return `The developer denied ${summary} and said: ${reason}. Do that instead, and do not run the command again in this turn.`;
 }
 
 /** One file tool, as its text answer. */

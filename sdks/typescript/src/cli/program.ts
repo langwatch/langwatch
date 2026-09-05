@@ -1797,7 +1797,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     program
       .command("langy")
       .description(
-        "Share this folder with the Langy conversation that asked for it. Langy then reads, edits and runs commands here, with your toolchain, and asks you in the LangWatch panel before anything that is not read-only",
+        "Share this folder with the Langy conversation that asked for it. Langy then reads, edits and runs commands here, with your toolchain, and asks you in the terminal, or on the card in LangWatch, before anything that is not read-only",
       )
       .option(
         "--share-control",

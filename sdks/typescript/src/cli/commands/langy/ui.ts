@@ -1,43 +1,81 @@
 /**
  * What the terminal shows while a folder is shared.
  *
- * One line per call, and nothing else: the command output and the failure text
- * belong to Langy, and echoing them here would bury the two lines that matter,
- * the permission question and the disconnect. So a call reads as the tool plus
- * the path or the command, and a failure adds a short reason. The line
- * builders are plain functions so a test reads the words rather than the
- * colours.
+ * The shape is the transcript a coding agent prints: one line per call, the
+ * tool name in bold with its argument in parentheses, and the result under it
+ * behind a hook glyph, dim and indented. Command output is summarised rather
+ * than echoed, because the output belongs to Langy and repeating all of it
+ * buries the two lines that matter, the permission question and the
+ * disconnect.
+ *
+ * The line builders are plain functions so a test reads the words rather than
+ * the colours. The writer owns the screen: `line` appends, `draw` puts lines
+ * under the transcript that the next draw or erase replaces, which is what
+ * the running spinner and the permission selector are drawn with.
+ *
+ * @see specs/typescript-sdk/cli-langy-share-control.feature
  */
 
 import chalk from "chalk";
 import type {
   BashOutput,
   LocalCall,
+  LocalEditReplace,
+  LocalToolName,
   PermissionDecision,
 } from "../../../agent/local-control-protocol";
 
 export interface UiWriter {
   line: (text: string) => void;
+  /**
+   * Draws lines under the transcript that the next `draw`, `erase` or `line`
+   * replaces. A writer with no `draw` prints nothing transient at all.
+   */
+  draw?: (lines: string[]) => void;
+  /** Erases whatever `draw` last put on the screen. */
+  erase?: () => void;
+  /** True when the developer can answer a question in this terminal. */
+  interactive?: boolean;
+}
+
+/** Moves the cursor up and clears the rest of the screen. */
+const eraseRows = (rows: number): string =>
+  `${String.fromCharCode(27)}[${rows}A${String.fromCharCode(27)}[0J`;
+
+/**
+ * The terminal, as a writer that can redraw its last block.
+ *
+ * A block is only drawn on a real terminal: a piped or redirected stream has
+ * no cursor to move, so the spinner and the selector are simply absent there.
+ */
+export function createConsoleWriter(
+  stream: NodeJS.WriteStream = process.stdout,
+): UiWriter {
+  const interactive = stream.isTTY === true;
+  let drawn = 0;
+  const erase = (): void => {
+    if (drawn === 0) return;
+    stream.write(eraseRows(drawn));
+    drawn = 0;
+  };
+  return {
+    line: (text: string) => {
+      erase();
+      stream.write(`${text}\n`);
+    },
+    draw: (lines: string[]) => {
+      if (!interactive) return;
+      erase();
+      stream.write(lines.map((entry) => `${entry}\n`).join(""));
+      drawn = lines.length;
+    },
+    erase,
+    interactive,
+  };
 }
 
 /** The terminal. Everything the session prints goes through it. */
-export const consoleWriter: UiWriter = {
-  line: (text: string) => console.log(text),
-};
-
-const UNITS = ["B", "KB", "MB", "GB"] as const;
-
-/** A byte count as the terminal shows it. */
-export function formatBytes(bytes: number): string {
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1024 && unit < UNITS.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  const rounded = unit === 0 ? String(Math.round(value)) : value.toFixed(1);
-  return `${rounded} ${UNITS[unit]}`;
-}
+export const consoleWriter: UiWriter = createConsoleWriter();
 
 /** A duration as the terminal shows it. */
 export function formatDuration(ms: number): string {
@@ -46,6 +84,14 @@ export function formatDuration(ms: number): string {
   const minutes = Math.floor(ms / 60_000);
   const seconds = Math.round((ms % 60_000) / 1000);
   return `${minutes} min ${seconds} s`;
+}
+
+/** How long a command has been running, as the spinner line carries it. */
+export function elapsedLabel(ms: number): string {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
 }
 
 /**
@@ -88,7 +134,7 @@ export function conversationLink({
   }
 }
 
-/** How much of a path or a command one line carries. */
+/** How much of a path or a command one headline carries. */
 const MAX_TARGET_LENGTH = 60;
 
 /** How much of a failure one line carries. */
@@ -104,7 +150,7 @@ export function shorten(text: string, max: number): string {
   const cut = flat.slice(0, max);
   const lastSpace = cut.lastIndexOf(" ");
   const words = lastSpace > max / 2 ? cut.slice(0, lastSpace) : cut;
-  return `${words.replace(/[\s.,;:!?-]+$/, "")}\u2026`;
+  return `${words.replace(/[\s.,;:!?-]+$/, "")}…`;
 }
 
 /** The width the terminal wraps at when it cannot report its own. */
@@ -161,23 +207,155 @@ export function shortReason(message: string): string {
   return shorten(first ?? "failed", MAX_REASON_LENGTH);
 }
 
-/** What one call reads as: the tool and what it points at. */
-export function callLine(call: LocalCall): string {
+// ---------------------------------------------------------------------------
+// The transcript
+// ---------------------------------------------------------------------------
+
+/** The glyph that opens a call or a notice. */
+export const CALL_GLYPH = "⏺";
+
+/** The glyph that opens the result of a call. */
+export const RESULT_GLYPH = "⎿";
+
+/** The name each local tool reads as. */
+export const TOOL_LABELS: Record<LocalToolName, string> = {
+  local_read: "Read",
+  local_write: "Write",
+  local_edit: "Edit",
+  local_bash: "Bash",
+  local_grep: "Grep",
+  local_find: "Find",
+  local_ls: "List",
+};
+
+/** What one call reads as inside the parentheses. */
+export function callArgument(call: LocalCall): string {
   switch (call.tool) {
     case "local_read":
-      return `read ${shorten(call.params.path, MAX_TARGET_LENGTH)}`;
     case "local_write":
-      return `write ${shorten(call.params.path, MAX_TARGET_LENGTH)}`;
     case "local_edit":
-      return `edit ${shorten(call.params.path, MAX_TARGET_LENGTH)}`;
+      return call.params.path;
     case "local_bash":
-      return `bash ${shorten(call.params.command, MAX_TARGET_LENGTH)}`;
+      return call.params.command;
     case "local_grep":
-      return `grep ${shorten(call.params.pattern, MAX_TARGET_LENGTH)}${call.params.path ? ` in ${shorten(call.params.path, MAX_TARGET_LENGTH)}` : ""}`;
+      return call.params.path
+        ? `${call.params.pattern} in ${call.params.path}`
+        : call.params.pattern;
     case "local_find":
-      return `find ${shorten(call.params.pattern, MAX_TARGET_LENGTH)}`;
+      return call.params.pattern;
     case "local_ls":
-      return `ls ${shorten(call.params.path ?? ".", MAX_TARGET_LENGTH)}`;
+      return call.params.path ?? ".";
+  }
+}
+
+/** The headline of one call: the tool and what it points at. */
+export function callHeadline(call: LocalCall): string {
+  return `${TOOL_LABELS[call.tool]}(${shorten(callArgument(call), MAX_TARGET_LENGTH)})`;
+}
+
+/** How many result lines a command shows before the rest is counted. */
+export const MAX_RESULT_LINES = 8;
+
+/**
+ * The last lines of some output, at most `MAX_RESULT_LINES`, and a count of
+ * what was left out. The last lines are the ones that say how it ended.
+ */
+export function tailLines(text: string): { lines: string[]; hidden: number } {
+  const all = text.split("\n");
+  while (all.length > 0 && all[all.length - 1] === "") all.pop();
+  if (all.length <= MAX_RESULT_LINES) return { lines: all, hidden: 0 };
+  return {
+    lines: all.slice(all.length - MAX_RESULT_LINES),
+    hidden: all.length - MAX_RESULT_LINES,
+  };
+}
+
+const plural = (count: number, word: string): string =>
+  `${count} ${word}${count === 1 ? "" : "s"}`;
+
+/** How many lines an edit puts in and takes out, as a line-level comparison. */
+export function editCounts(edits: LocalEditReplace[]): {
+  added: number;
+  removed: number;
+} {
+  let added = 0;
+  let removed = 0;
+  for (const edit of edits) {
+    const before = edit.oldText.split("\n");
+    const after = edit.newText.split("\n");
+    let head = 0;
+    while (
+      head < before.length &&
+      head < after.length &&
+      before[head] === after[head]
+    ) {
+      head += 1;
+    }
+    let tail = 0;
+    while (
+      tail < before.length - head &&
+      tail < after.length - head &&
+      before[before.length - 1 - tail] === after[after.length - 1 - tail]
+    ) {
+      tail += 1;
+    }
+    removed += before.length - head - tail;
+    added += after.length - head - tail;
+  }
+  return { added, removed };
+}
+
+/** The lines of a text answer that carry content rather than a footer. */
+const contentLines = (text: string): string[] =>
+  text
+    .split("\n")
+    .filter((line) => line !== "" && !/^\[.*\]$/.test(line.trim()));
+
+/**
+ * What the result of a file tool reads as: a count, never the content. The
+ * content is the model's to read, and the terminal is the developer's.
+ */
+export function fileOutcome({
+  call,
+  text,
+}: {
+  call: LocalCall;
+  text: string;
+}): string {
+  switch (call.tool) {
+    case "local_read":
+      return `Read ${plural(contentLines(text).length, "line")}`;
+    case "local_write": {
+      const written =
+        call.params.content === "" ? 0 : call.params.content.split("\n").length;
+      return `Wrote ${plural(written, "line")}`;
+    }
+    case "local_edit": {
+      const { added, removed } = editCounts(call.params.edits);
+      if (added === 0 && removed === 0) return "No line changed";
+      if (added === 0) return `Removed ${plural(removed, "line")}`;
+      if (removed === 0) return `Added ${plural(added, "line")}`;
+      return `Added ${plural(added, "line")}, removed ${plural(removed, "line")}`;
+    }
+    case "local_grep": {
+      const found = contentLines(text);
+      return found.length === 0 || text.startsWith("No line matches")
+        ? "No match"
+        : `Found ${plural(found.length, "line")}`;
+    }
+    case "local_find": {
+      const found = contentLines(text);
+      return found.length === 0 || text.startsWith("No file matches")
+        ? "No file"
+        : `Found ${plural(found.length, "file")}`;
+    }
+    case "local_ls": {
+      // The first line is the directory the listing is of.
+      const entries = Math.max(0, contentLines(text).length - 1);
+      return `${entries} ${entries === 1 ? "entry" : "entries"}`;
+    }
+    case "local_bash":
+      return "";
   }
 }
 
@@ -186,13 +364,19 @@ export function commandFailed(output: BashOutput): boolean {
   return output.pid === undefined && (output.exitCode ?? 0) !== 0;
 }
 
-/** The size and timing of a command, with no output echoed. */
-export function commandOutcome(output: BashOutput): string {
-  if (output.pid !== undefined) {
-    return `started in the background, pid ${output.pid}, log ${output.logPath ?? ""}`;
-  }
-  const bytes = output.stdout.length + output.stderr.length;
-  return `exit ${output.exitCode ?? "none"}, ${formatBytes(bytes)}, ${formatDuration(output.durationMs)}`;
+/** The one line a background command produces: where it runs and where it logs. */
+export function backgroundOutcome(output: BashOutput): string {
+  const log = output.logPath ? `, log ${output.logPath}` : "";
+  return `Running in the background as process ${output.pid}${log}`;
+}
+
+/** Everything a command wrote, standard output first. */
+export const commandText = (output: BashOutput): string =>
+  [output.stdout, output.stderr].filter((part) => part !== "").join("\n");
+
+/** The one line a command that finished quietly produces. */
+export function silentOutcome(output: BashOutput): string {
+  return `Finished in ${formatDuration(output.durationMs)}, no output`;
 }
 
 /** The words a permission answer produces. */
@@ -209,30 +393,51 @@ export function decisionWords(decision: PermissionDecision): string {
   }
 }
 
+/** Where a permission answer came from. */
+export type AnswerSource = "terminal" | "panel";
+
+/** The patterns of a grant, as the settled line names them. */
+export function patternPhrase(patterns: string[]): string {
+  const quoted = patterns.map((pattern) => `"${pattern}"`);
+  if (quoted.length === 0) return "this";
+  if (quoted.length === 1) return quoted[0]!;
+  return `${quoted.slice(0, -1).join(", ")} and ${quoted[quoted.length - 1]!}`;
+}
+
 /**
- * The one line an answer produces.
+ * The one line an answer settles into, under the call it answered.
  *
- * The ask already printed the command in full, and a pull request chain with
- * its own body filled two thirds of the terminal. Printing it again on the
- * answer filled the rest, so the answer names the patterns it granted instead,
- * which is also the thing there was nowhere else to read.
+ * The ask already printed the command in full, so the settled line names the
+ * grant rather than repeating the command, and says where the answer came
+ * from when it did not come from this terminal.
  */
-export function answerLine({
-  summary,
-  patterns,
+export function settledLine({
   decision,
+  patterns = [],
+  reason,
+  source = "terminal",
 }: {
-  summary: string;
-  patterns: string[];
   decision: PermissionDecision;
+  patterns?: string[];
+  reason?: string;
+  source?: AnswerSource;
 }): string {
-  if (decision === "allow_pattern" && patterns.length > 0) {
-    return `Allowed for this session: ${patterns.join(", ")}.`;
+  const where = source === "panel" ? " on the card in LangWatch" : "";
+  switch (decision) {
+    case "allow_pattern":
+      return `Allowed ${patternPhrase(patterns)} for this session${where}`;
+    case "allow_once":
+      return `Allowed once${where}`;
+    case "deny":
+      return reason ? `Denied${where}: ${reason}` : `Denied${where}`;
+    case "expired":
+      return "No answer arrived, so the call was dropped";
   }
-  return `${shorten(summary, MAX_TARGET_LENGTH)}: ${decisionWords(decision)}.`;
 }
 
 export interface LangyUi {
+  /** The screen this interface writes on, for the selector to draw on too. */
+  writer: UiWriter;
   connected: (input: {
     root: string;
     conversationTitle: string;
@@ -240,14 +445,14 @@ export interface LangyUi {
   }) => void;
   noGitRepository: () => void;
   call: (call: LocalCall) => void;
+  callResult: (input: { call: LocalCall; text: string }) => void;
   callOutcome: (input: { call: LocalCall; output: BashOutput }) => void;
-  callFailed: (input: { call: LocalCall; message: string }) => void;
+  callFailed: (input: { message: string }) => void;
+  callRefused: (input: { message: string }) => void;
+  /** Draws the spinner under a running command; the returned function stops it. */
+  startRunning: () => () => void;
   permissionAsked: (input: { summary: string }) => void;
-  permissionAnswered: (input: {
-    summary: string;
-    patterns: string[];
-    decision: PermissionDecision;
-  }) => void;
+  permissionSettled: (input: { text: string }) => void;
   policyChanged: (input: { skipPermissions: boolean }) => void;
   connectionLost: (input: { message: string }) => void;
   reconnected: () => void;
@@ -255,86 +460,179 @@ export interface LangyUi {
   leaving: () => void;
   backgroundKept: (input: Array<{ pid: number; logPath: string }>) => void;
   note: (text: string) => void;
+  /** Holds transcript lines back while a question owns the bottom of the screen. */
+  hold: () => void;
+  /** Prints everything that arrived while the transcript was held. */
+  release: () => void;
 }
 
-const bullet = chalk.gray("  •");
+/** The transcript line that opens a call or carries a notice. */
+export const headlineRow = (text: string): string =>
+  `${chalk.gray(CALL_GLYPH)} ${text}`;
+
+/** The transcript line that carries a result, under its call. */
+export const resultRow = (text: string): string =>
+  `  ${chalk.gray(RESULT_GLYPH)}  ${text}`;
+
+/** A result line after the first one, aligned under it. */
+const continuationRow = (text: string): string => `     ${text}`;
 
 /** The terminal side of a shared folder, over one writer. */
 export function createUi(writer: UiWriter = consoleWriter): LangyUi {
+  let held = false;
+  const queue: string[] = [];
+
+  const emit = (text: string): void => {
+    if (held) {
+      queue.push(text);
+      return;
+    }
+    writer.line(text);
+  };
+
+  const emitResult = (lines: string[]): void => {
+    lines.forEach((text, index) => {
+      emit(
+        (index === 0 ? resultRow(text) : continuationRow(text)).replace(
+          /\s+$/,
+          "",
+        ),
+      );
+    });
+  };
+
+  const notice = (text: string): void => emit(headlineRow(text));
+
   return {
+    writer,
     connected: ({ root, conversationTitle, conversationUrl }) => {
-      writer.line("");
-      writer.line(
-        `${chalk.green("Connected")} ${root} to "${conversationTitle}".`,
+      emit("");
+      notice(`Connected ${root} to "${conversationTitle}".`);
+      emit(continuationRow(`Follow along at ${chalk.cyan(conversationUrl)}`));
+      emit(
+        continuationRow(
+          chalk.gray(
+            writer.interactive === true
+              ? "Permission questions are answered here, or on the card in LangWatch."
+              : "Permission questions are answered on the card in LangWatch.",
+          ),
+        ),
       );
-      writer.line(`  Follow along at ${chalk.cyan(conversationUrl)}`);
-      writer.line(
-        chalk.gray("  Permission questions appear in the panel, not here."),
-      );
-      writer.line(chalk.gray("  Press Ctrl-C to stop sharing."));
-      writer.line("");
+      emit(continuationRow(chalk.gray("Press Ctrl-C to stop sharing.")));
+      emit("");
     },
-    noGitRepository: () => {
-      writer.line(
+    noGitRepository: () =>
+      notice(
         chalk.yellow(
-          "  This folder is not a git repository, so Langy cannot open a pull request from here.",
+          "This folder is not a git repository, so Langy cannot open a pull request from here.",
+        ),
+      ),
+    call: (call) =>
+      emit(
+        headlineRow(
+          `${chalk.bold(TOOL_LABELS[call.tool])}(${chalk.gray(shorten(callArgument(call), MAX_TARGET_LENGTH))})`,
+        ),
+      ),
+    callResult: ({ call, text }) =>
+      emitResult([chalk.gray(fileOutcome({ call, text }))]),
+    callOutcome: ({ output }) => {
+      if (output.pid !== undefined) {
+        emitResult([chalk.gray(backgroundOutcome(output))]);
+        return;
+      }
+      const { lines, hidden } = tailLines(commandText(output));
+      const printed = [
+        ...lines.map((line) => chalk.gray(shorten(line, MAX_TARGET_LENGTH * 2))),
+        ...(hidden > 0 ? [chalk.gray(`… +${plural(hidden, "line")}`)] : []),
+      ];
+      // A command that failed says so first, whatever it printed. One that
+      // worked is its own output, and one that printed nothing says how long
+      // it took, so a line is never empty.
+      if (commandFailed(output)) {
+        emitResult([chalk.red(`Exit code ${output.exitCode}`), ...printed]);
+        return;
+      }
+      emitResult(
+        printed.length === 0 ? [chalk.gray(silentOutcome(output))] : printed,
+      );
+    },
+    callFailed: ({ message }) =>
+      emitResult([chalk.red(`Failed: ${shortReason(message)}`)]),
+    callRefused: ({ message }) =>
+      emitResult([chalk.yellow(`Refused: ${shortReason(message)}`)]),
+    startRunning: () => {
+      if (held || !writer.draw) return () => undefined;
+      const startedAt = Date.now();
+      const paint = (): void =>
+        writer.draw?.([
+          resultRow(chalk.gray(`Running… ${elapsedLabel(Date.now() - startedAt)}`)),
+        ]);
+      paint();
+      const timer = setInterval(paint, 1000);
+      timer.unref?.();
+      return () => {
+        clearInterval(timer);
+        writer.erase?.();
+      };
+    },
+    permissionAsked: ({ summary }) => {
+      // With no selector on this screen the command is the only thing the
+      // developer reads before the card is answered, so it prints in full,
+      // wrapped where the words end.
+      const width = terminalWidth();
+      for (const line of wrapWords(`Langy asked to run ${summary}`, width - 5)) {
+        emit(continuationRow(chalk.yellow(line)));
+      }
+      emit(
+        continuationRow(chalk.gray("Answer on the card in LangWatch.")),
+      );
+    },
+    permissionSettled: ({ text }) => emitResult([chalk.gray(text)]),
+    policyChanged: ({ skipPermissions }) =>
+      notice(
+        skipPermissions
+          ? chalk.red(
+              "Permission checks are off for this session. Langy runs commands here without asking.",
+            )
+          : chalk.green("Permission checks are on again for this session."),
+      ),
+    connectionLost: ({ message }) =>
+      notice(
+        chalk.yellow(
+          `Lost the connection to LangWatch (${message}). Reconnecting.`,
+        ),
+      ),
+    reconnected: () => notice(chalk.green("Reconnected to LangWatch.")),
+    disconnected: ({ reason }) => {
+      emit("");
+      notice(`LangWatch disconnected the folder: ${reason}`);
+    },
+    leaving: () => {
+      emit("");
+      notice("Leaving. Telling LangWatch the folder is gone.");
+    },
+    backgroundKept: (processes) => {
+      if (processes.length === 0) return;
+      emit("");
+      notice("These processes Langy started keep running:");
+      for (const entry of processes) {
+        emit(continuationRow(`process ${entry.pid}, log ${entry.logPath}`));
+      }
+      emit(
+        continuationRow(
+          chalk.gray(
+            `Stop one with: kill ${processes.map((entry) => entry.pid).join(" ")}`,
+          ),
         ),
       );
     },
-    call: (call) => writer.line(`${bullet} ${callLine(call)}`),
-    callOutcome: ({ call, output }) => {
-      if (commandFailed(output)) {
-        writer.line(
-          `${bullet} ${callLine(call)}${chalk.red(`: exit ${output.exitCode}`)}`,
-        );
-        return;
-      }
-      writer.line(
-        `${bullet} ${callLine(call)} ${chalk.gray(`(${commandOutcome(output)})`)}`,
-      );
+    note: (text) => notice(chalk.gray(text)),
+    hold: () => {
+      held = true;
     },
-    callFailed: ({ call, message }) =>
-      writer.line(
-        `${bullet} ${callLine(call)} ${chalk.red(`failed: ${shortReason(message)}`)}`,
-      ),
-    permissionAsked: ({ summary }) => {
-      // The command prints in full, once, wrapped where the words end. This
-      // is the only place the developer reads what they are approving. The
-      // link to the conversation is printed by the connect line, so a long
-      // address does not repeat under every ask.
-      const width = terminalWidth();
-      for (const line of wrapWords(`Langy asked to run ${summary}`, width - 2)) {
-        writer.line(chalk.yellow(`  ${line}`));
-      }
-      writer.line(chalk.gray("  Answer in the LangWatch panel."));
+    release: () => {
+      held = false;
+      while (queue.length > 0) writer.line(queue.shift()!);
     },
-    permissionAnswered: ({ summary, patterns, decision }) =>
-      writer.line(chalk.gray(`  ${answerLine({ summary, patterns, decision })}`)),
-    policyChanged: ({ skipPermissions }) =>
-      writer.line(
-        skipPermissions
-          ? chalk.red(
-              "  Permission checks are off for this session. Langy runs commands here without asking.",
-            )
-          : chalk.green("  Permission checks are on again for this session."),
-      ),
-    connectionLost: ({ message }) =>
-      writer.line(chalk.yellow(`  Lost the connection to LangWatch (${message}). Reconnecting.`)),
-    reconnected: () => writer.line(chalk.green("  Reconnected to LangWatch.")),
-    disconnected: ({ reason }) =>
-      writer.line(`\nLangWatch disconnected the folder: ${reason}`),
-    leaving: () => writer.line("\nLeaving. Telling LangWatch the folder is gone."),
-    backgroundKept: (processes) => {
-      if (processes.length === 0) return;
-      writer.line("");
-      writer.line("These processes Langy started keep running:");
-      for (const entry of processes) {
-        writer.line(`  pid ${entry.pid}, log ${entry.logPath}`);
-      }
-      writer.line(
-        chalk.gray(`  Stop one with: kill ${processes.map((p) => p.pid).join(" ")}`),
-      );
-    },
-    note: (text) => writer.line(chalk.gray(`  ${text}`)),
   };
 }
