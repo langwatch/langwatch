@@ -69095,13 +69095,15 @@ Created without a user association (`userId: null`). Scoped to specific projects
 Service keys without `projectIds` get org-wide ADMIN access. Always scope to specific projects when possible.
 </Info>
 
+`projectIds` is shorthand rather than a separate mechanism: each id becomes one ADMIN binding on that project, added to any `bindings` you sent rather than replacing them. Reach for `bindings` directly when you want a role other than ADMIN, or a team or organization scope. Service keys only, and a personal key that sends it is refused.
+
 Because a service key has no person capping it, and a key minted for somebody else is capped by their access rather than yours, both are reserved for organization administrators. A caller who holds `organization:manage` without being an administrator is refused with 403. Minting a personal key for yourself is always allowed: your own access caps it.
 
 ## Narrowing what a key may do
 
 Three fields decide how far a key reaches:
 
-- `bindings`, the roles the key holds and where, in the same `role` / `scopeType` / `scopeId` shape [role bindings](/api-reference/role-bindings/overview) use.
+- `bindings`, the roles the key holds and where, in the same `role` / `scopeType` / `scopeId` shape [role bindings](/api-reference/role-bindings/overview) use. `scopeType` is `ORGANIZATION`, `TEAM` or `PROJECT`.
 - `permissionMode`, one of `all`, `readonly` or `restricted`. `all` and `readonly` take their meaning from the bindings alone.
 - `permissions`, a list of `resource:action` keys. Only for `restricted` mode, where it is the exact set the key's `CUSTOM` bindings grant.
 
