@@ -66,7 +66,7 @@ describe("the session context hook's silence", () => {
   });
 
   describe("given a telemetry endpoint that cannot be reached", () => {
-    /** @scenario "The hook never writes to stdout even when the post fails" */
+    /** @scenario "The hook writes nothing to stdout when the post fails" */
     it("writes nothing to stdout and exits zero", async () => {
       await hook.runHook({ fetchImpl: unreachableCollector });
 

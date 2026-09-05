@@ -2126,6 +2126,107 @@ Once bytes are flowing, the HTTP status is already 200, so the distinguishing si
 
 ---
 
+# FILE: ./ai-gateway/api/images.mdx
+
+---
+title: POST /v1/images/*
+description: Image generation and editing through the LangWatch AI Gateway, on OpenAI's wire.
+sidebarTitle: Images
+---
+
+OpenAI-compatible image endpoints. Any client that speaks OpenAI's images API works with no code change for the non-streaming requests below: point its `OPENAI_BASE_URL` at the gateway and its `OPENAI_API_KEY` at a LangWatch virtual key. Image traffic gets the same governance as chat: virtual-key auth, model allowlists, budgets, rate limits, and per-call observability.
+
+Both routes are non-streaming. `stream: true` and `partial_images` above zero get a `400` from the gateway before any provider is contacted.
+
+Models: `openai/gpt-image-2`, `openai/gpt-image-1` and `openai/gpt-image-1-mini` on both routes. They are the models the cost catalog carries rates for; another OpenAI image model reaches the provider but its tokens price at zero until the catalog gets an entry. Configure the OpenAI key once in **Settings → Model Providers**; every virtual key routed to that provider can then call its image models.
+
+## Generation
+
+```
+POST /v1/images/generations
+Authorization: Bearer vk-lw-<ULID>
+Content-Type: application/json
+```
+
+Body matches OpenAI's [image generation schema](https://developers.openai.com/api/reference/resources/images/methods/generate/).
+
+```bash
+curl https://gateway.langwatch.ai/v1/images/generations \
+  -H "Authorization: Bearer vk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-image-2",
+    "prompt": "a red bicycle leaning on a white wall",
+    "size": "1024x1024",
+    "quality": "low",
+    "n": 1
+  }'
+```
+
+The response is the standard images JSON, with the base64 image in `data[0].b64_json`.
+
+```javascript
+const image = await client.images.generate({
+  model: "openai/gpt-image-2",
+  prompt: "a red bicycle leaning on a white wall",
+  size: "1024x1024",
+  quality: "low",
+  n: 1,
+});
+const png = Buffer.from(image.data[0].b64_json, "base64");
+```
+
+`response_format` is forwarded only when you send it. The gpt-image family rejects the field and answers in base64; the older dall-e models take it and default to `url`. A value the gateway invented would break one family or the other, so it never sets one.
+
+## Editing
+
+```
+POST /v1/images/edits
+Authorization: Bearer vk-lw-<ULID>
+Content-Type: multipart/form-data
+```
+
+Form matches OpenAI's [image edit schema](https://developers.openai.com/api/reference/resources/images/methods/edit/): one or more `image[]` parts, a `prompt` part, and `model`. A single file may also be sent under `image`. Use one field name or the other: a form carrying files under both gets a `400`, because the parts state an order inside each field and none across them. The optional parts are `mask`, `n`, `size`, `quality`, `background`, `input_fidelity`, `output_format`, `output_compression`, `response_format` and `user`. A part this list does not name is dropped rather than sent to the provider; `stream` and `partial_images` are the exception, and get the same `400` the generation route gives them. `response_format` reaches the provider as sent, and the gpt-image models reject it on this route as well.
+
+```bash
+curl https://gateway.langwatch.ai/v1/images/edits \
+  -H "Authorization: Bearer vk-lw-..." \
+  -F "model=openai/gpt-image-2" \
+  -F "prompt=put the bicycle on a sandy beach" \
+  -F "size=1024x1024" \
+  -F "image[]=@bicycle.png" \
+  -F "mask=@mask.png"
+```
+
+```javascript
+const edited = await client.images.edit({
+  model: "openai/gpt-image-2",
+  prompt: "put the bicycle on a sandy beach",
+  image: [await toFile(fs.createReadStream("bicycle.png"), "bicycle.png")],
+  size: "1024x1024",
+});
+```
+
+Uploads are capped at 64 MiB; larger uploads get a `413` before any provider is contacted.
+
+## Credentials
+
+These routes need a direct OpenAI, Azure OpenAI, Gemini, Vertex or Bedrock credential. An OpenAI credential carrying a base-URL override routes to the generic OpenAI-compatible adapter, which serves no image endpoint, so the gateway refuses it with a message naming the credentials that do work.
+
+## Observability and cost measures
+
+Every image call lands as a gateway trace like chat does. Image tokens are reported apart from the text totals, because an output image token costs several times a text one:
+
+| Attribute | Meaning |
+|---|---|
+| `gen_ai.usage.input_image_tokens` | Image tokens in the prompt, what an edit pays for the pixels it reads |
+| `gen_ai.usage.output_image_tokens` | Image tokens in the answer, what every generated image is billed by |
+| `gen_ai.usage.image_count` | How many images the response carried |
+
+The span carries the prompt as its input. The response body is base64 image data, so it is never written to a span; when the model states a revised prompt, that is the span's output.
+
+---
+
 # FILE: ./ai-gateway/api/management.mdx
 
 ---
@@ -36078,6 +36179,8 @@ langwatch test-suite run "Refunds" \
   --wait
 ```
 
+A connected agent is named the same way: `connected:<name>?plan=free`, or `connected:<name>@<environment>?plan=free` to pick the environment.
+
 On the REST API the same values go in `runParameters` on each target, and `parameters` at the run level sets the values every target shares. See [Run from CI](/agent-testing/run-from-ci#compare-two-agents-or-one-agent-on-two-settings) for the request body.
 
 Also check: [Run plans](/agent-testing/run-plans), [Results](/agent-testing/results), [Run parameters](/agent-testing/run-parameters).
@@ -36364,10 +36467,10 @@ langwatch scenario create 'Order status question' \
   --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate" \
   --test-suite 'Smoke'
 
-langwatch test-suite run 'Smoke' --target connected:support-agent@development --wait
+langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 ```
 
-- `--target connected:<name>@<environment>` names the agent by identity. `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints both.
+- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id.
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
@@ -36379,8 +36482,8 @@ When the first run is green and the agent declares a parameter with an option li
 
 ```bash
 langwatch run-plan run --test-suite 'Smoke' \
-  --target 'connected:support-agent@development?model=gpt-5' \
-  --target 'connected:support-agent@development?model=gpt-5-mini' \
+  --target 'connected:support-agent?model=gpt-5' \
+  --target 'connected:support-agent?model=gpt-5-mini' \
   --name 'Smoke: model comparison' --format json
 ```
 
@@ -36658,13 +36761,13 @@ The agent appears on the **Agents** page with a green **Online** mark, its envir
 langwatch agent list
 ```
 
-Run a test suite against it by name and environment:
+Run a test suite against it by name:
 
 ```bash
-langwatch test-suite run 'Smoke' --target connected:support-agent@development --wait
+langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 ```
 
-`connected:<agent-id>` is the same target. `langwatch agent list --format json` prints both forms.
+`connected:<name>` runs the agent in `development`. When no process is connected there but one other environment is online, the run uses that one. When several are online, or none, the run is refused with `agent_environment_unresolved` and names them: pick one as `connected:<name>@<environment>`. `connected:<agent-id>` is the same target, and `langwatch agent list --format json` prints the id.
 
 ## What the agent receives
 
@@ -36878,7 +36981,7 @@ One deployment with several pods is one row and several instances. The platform 
 
 | Setting | What it does |
 |---|---|
-| `concurrency` | How many calls one instance takes at the same time. Default 1 in `development`, 4 elsewhere. When every instance is full, the platform waits and retries within the call's deadline. |
+| `concurrency` | How many calls one instance takes at the same time. Default 10. When every instance is full, the platform waits and retries within the call's deadline. |
 | `instance_label` (`instanceLabel`) | A name for this instance in the instances table, for example the pod name. Also read from `LANGWATCH_AGENT_INSTANCE_LABEL`. |
 | `enabled` | Whether this process connects. It takes any boolean, so one expression decides which deployments connect: `enabled=os.environ.get("APP_ENV") != "production" and not os.environ.get("CI")` connects everywhere but production and CI. Without the argument the default is true, and false when `CI` is set. An `enabled` argument replaces that rule, so keep the `CI` half unless a CI job is deliberately the target. |
 | `LANGWATCH_AGENT_CONNECT=0` | Turns the connection off for a deployment without a code change. |
@@ -36939,13 +37042,13 @@ The decorator never stops the application from starting. Every problem is one wa
 
     | Option | Default | Effect |
     |---|---|---|
-    | `name` | required | The agent's name, and the first half of a `connected:<name>@<environment>` target. |
+    | `name` | required | The agent's name, and the `connected:<name>` target. |
     | `environment` | resolved, see above | Which environment row this process registers under. |
     | `parameters` | read from the signature | An explicit parameter declaration that replaces what the signature declares. |
     | `enabled` | `True`, `False` under `CI` | Whether this process connects at all. Takes any boolean, and replaces the `CI` default rather than adding to it. |
     | `instance_label` | none | A name for this instance in the instances table. |
     | `timeout` | `120` seconds | How long one call may take. The ceiling is 300 seconds. |
-    | `concurrency` | `1` in `development`, `4` elsewhere | Calls this instance takes at the same time. |
+    | `concurrency` | `10` | Calls this instance takes at the same time. |
     | `sticky` | `False` | Keep every turn of one conversation on one instance. |
     | `api_key` | `LANGWATCH_API_KEY` | The project key the connection authenticates with. |
     | `endpoint` | `LANGWATCH_ENDPOINT` | Which LangWatch instance to connect to. |
@@ -36959,13 +37062,13 @@ The decorator never stops the application from starting. Every problem is one wa
 
     | Option | Default | Effect |
     |---|---|---|
-    | `name` | required | The agent's name, and the first half of a `connected:<name>@<environment>` target. |
+    | `name` | required | The agent's name, and the `connected:<name>` target. |
     | `environment` | resolved, see above | Which environment row this process registers under. |
     | `parameters` | none | A zod schema, a definition map, or a JSON Schema object. |
     | `enabled` | `true`, `false` under `CI` | Whether this process connects at all. Takes any boolean, and replaces the `CI` default rather than adding to it. |
     | `instanceLabel` | none | A name for this instance in the instances table. |
     | `timeoutMs` | `120000` | How long one call may take. The ceiling is 300000. |
-    | `concurrency` | `1` in `development`, `4` elsewhere | Calls this instance takes at the same time. |
+    | `concurrency` | `10` | Calls this instance takes at the same time. |
     | `sticky` | `false` | Keep every turn of one conversation on one instance. |
     | `apiKey` | `LANGWATCH_API_KEY` | The project key the connection authenticates with. |
     | `endpoint` | `LANGWATCH_ENDPOINT` | Which LangWatch instance to connect to. |
@@ -37013,7 +37116,7 @@ The run settings also record which instance served each run, so a result from a 
 | The run is refused with `agent_offline` | No instance was connected when the run started. | Start the agent process, then run again. |
 | The run is refused with `agent_owner_only` | The agent registered under `development` with a personal key, so it belongs to one person. | Run it as its owner, or register it under a shared environment name. |
 | A turn fails with `agent_call_timeout` | The function took longer than the agent's timeout. | Raise `timeout`, up to 300 seconds, or make the agent answer faster. |
-| A turn fails with `agent_busy` | Every instance was already running as many calls as it accepts. | Raise `concurrency`, or start more instances. |
+| A turn fails with `agent_busy` | Every instance was already running as many calls as it accepts. | Raise `concurrency` above its default of 10, or start more instances. |
 | Trace-dependent criteria come back inconclusive | The agent reports its traces to a different project, or it reports none at all. | Point the agent's tracing at the project that runs the scenarios. |
 
 ## Next steps
@@ -37964,7 +38067,7 @@ The filters narrow every grouping: **Scenario**, **Label**, **Target** and **All
 
 ## A run plan and its runs
 
-Press a run plan. The sidebar lists its runs as **Run #n** with the note, the time and the pass rate; **Load More...** loads older ones. The header of the selected run shows **Pass**, **Completed**, **Avg Agent Latency**, **Avg Agent Cost**, **Total Duration** and **Total Cost**.
+Press a run plan. The sidebar lists its runs as **Run #n** with the note, the time and the pass rate; **Load More...** loads older ones. The header of the selected run shows the pass rate, the total duration and the total cost. Hover it for **Completed**, **Avg Agent Latency**, **Avg Agent Cost**, **Total Duration** and **Total Cost**, with percentiles behind the two averages.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-detail-table.png" alt="A run plan with its runs in the sidebar, the summary pills and the table of results" />
@@ -37988,7 +38091,7 @@ Press a row to open the drawer. The header shows the **Status**, the criteria co
 <img className="block" src="/images/agent-testing/run-drawer-failed.png" alt="The conversation drawer of a failed run, with the failed criteria and the judge reasoning" />
 </Frame>
 
-Under the transcript: **FAILED CRITERIA**, **PASSED CRITERIA** and **JUDGE REASONING**, then **Parameters** with the values the run used, a secret parameter masked. **Edit Scenario** opens the scenario in the editor.
+Under the transcript, the **RESULTS** block lists the met criteria, the unmet criteria and the judge's reasoning, then **PARAMETERS** shows the values the run used, a secret parameter masked. **Edit Scenario** opens the scenario in the editor.
 
 While the run is going, the drawer shows `The conversation is running…` and then `The judge is reading the conversation…`, and the verdict appears in place when it is in.
 
@@ -37998,7 +38101,7 @@ The **Result** column of the table shows `Passed`, `Failed` or `Running`. The **
 
 | Status | Meaning | What to do |
 |---|---|---|
-| `completed` | The judge delivered a verdict. The verdict itself is `PASSED` or `FAILED`. | On a fail, read **JUDGE REASONING**, then the transcript. |
+| `completed` | The judge delivered a verdict. The verdict itself is `PASSED` or `FAILED`. | On a fail, read the reasoning in the **RESULTS** block, then the transcript. |
 | `running`, `queued`, `pending` | The conversation, or the verdict, is not done. | Wait, or **Stop**. |
 | `failed` with an error in the drawer | The target did not answer: the URL is wrong, the agent is down, the authentication was refused, or a local tunnel ended. The drawer shows the error the target returned. | Fix the agent, then **Rerun this scenario**. |
 | `cancelled` | Stopped with **Stop** or **Stop all**. | **Rerun this scenario** when needed. |
@@ -38033,7 +38136,9 @@ A CI job starts a test suite, stores the batch id from the response, then polls 
 langwatch test-suite run "Checkout regression" --target http:agent_abc123 --wait
 ```
 
-`--wait` polls until the batch is complete and exits non-zero when a run failed, which is what fails the job. The test suite is named by its id or by its name.
+A connected agent is `connected:<name>`, which runs it in `development` or in the one other environment it is online in. `connected:<name>@<environment>` names the environment.
+
+`--wait` polls until the batch is complete, for up to 45 minutes, and exits non-zero when a run failed, which is what fails the job. `--wait 90` raises the limit to ninety minutes. The test suite is named by its id or by its name.
 
 Add `--format json` (or `-o json`) to get one final document on stdout instead of the progress lines. It contains `outcome`, `tallies` and the per-run `results`, so a job step can read the verdict without parsing prose.
 
@@ -41896,7 +42001,7 @@ sidebarTitle: Custom Optimizer Tracking
 description: Track custom DSPy optimizer logic in LangWatch to visualize optimization steps and improve AI agent testing workflows.
 ---
 
-LangWatch does not track a custom DSPy optimizer out of the box. The three steps below add tracking to any custom optimizer.
+`langwatch.dspy.init` tracks `BootstrapFewShot`, `BootstrapFewShotWithRandomSearch`, `COPRO`, `MIPROv2` and `GEPA` out of the box. The three steps below add tracking to any other optimizer.
 
 ## 1. Initialize LangWatch DSPy with optimizer=None
 
@@ -41996,6 +42101,8 @@ langwatch.dspy.init(experiment="my-awesome-experiment", optimizer=optimizer)
 
 compiled_rag = optimizer.compile(RAG(), trainset=trainset)
 ```
+
+`init` tracks `BootstrapFewShot`, `BootstrapFewShotWithRandomSearch`, `COPRO`, `MIPROv2` and `GEPA`, and a `dspy.Evaluate` through the `evaluator` parameter. A GEPA run gets one step for the seed program and one for every candidate evaluated on the validation set, with the candidate's instructions and the score of each validation example. For any other optimizer, see [Custom optimizer tracking](/dspy-visualization/custom-optimizer).
 
 ## Follow your experiment
 
@@ -54263,10 +54370,10 @@ langwatch scenario create 'Order status question' \
   --criteria "The agent looks up the order before answering,The agent gives a concrete delivery estimate" \
   --test-suite 'Smoke'
 
-langwatch test-suite run 'Smoke' --target connected:support-agent@development --wait
+langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 ```
 
-- `--target connected:<name>@<environment>` names the agent by identity. `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints both.
+- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id.
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
@@ -54278,8 +54385,8 @@ When the first run is green and the agent declares a parameter with an option li
 
 ```bash
 langwatch run-plan run --test-suite 'Smoke' \
-  --target 'connected:support-agent@development?model=gpt-5' \
-  --target 'connected:support-agent@development?model=gpt-5-mini' \
+  --target 'connected:support-agent?model=gpt-5' \
+  --target 'connected:support-agent?model=gpt-5-mini' \
   --name 'Smoke: model comparison' --format json
 ```
 
@@ -60913,7 +61020,7 @@ keywords:
 
 Prompt optimization is a Langy skill that measures your prompt's current score, writes a better version, and proves the improvement with your evaluator and dataset. Open it from the **Optimize this prompt** menu item on any prompt column in the Experiments Workbench.
 
-<Info>**Also check:** [Ask Langy](/langy/chat) (other things you can ask), [Experiments overview](/evaluations/experiments/overview) (what the workbench is), [Evaluators](/evaluations/evaluators/overview) (the scoring functions Langy uses).</Info>
+<Info>**Also check:** [Ask Langy](/langy/chat) (other things you can ask), [Experiments overview](/evaluations/experiments/overview) (what the workbench is), [Evaluators](/evaluations/evaluators/overview) (the scoring functions Langy uses), [Improve your agent](/improve-your-agent/overview) (the same loop on a whole agent, with scenarios as the gate).</Info>
 
 <video
   controls

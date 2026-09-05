@@ -6,7 +6,11 @@ import { parseRunParameterFlags } from "../../utils/keyValueFlags";
 import { parseRunNoteFlag } from "../../utils/runNote";
 import type { RawOutputFlags } from "../../utils/output";
 import { createCliRunPlansService } from "../run-plans/cli-run-plans-service";
-import { parseRepeat, parseTargets } from "../run-plans/scopeFlags";
+import {
+  parseRepeat,
+  parseTargets,
+  parseWait,
+} from "../run-plans/scopeFlags";
 import { emitRunResult } from "../run-plans/reportRun";
 
 export interface RunScenarioOptions extends RawOutputFlags {
@@ -16,7 +20,7 @@ export interface RunScenarioOptions extends RawOutputFlags {
   param?: string[];
   note?: string;
   idempotencyKey?: string;
-  wait?: boolean;
+  wait?: boolean | string;
 }
 
 /**
@@ -39,6 +43,7 @@ export const runScenarioCommand = async (
   const note = parseRunNoteFlag({ note: options.note });
   const targets = parseTargets(options.target);
   const repeatCount = parseRepeat(options.repeat);
+  const wait = parseWait(options.wait);
 
   const service = createCliRunPlansService();
   const spinner = createSpinner(`Scheduling run for scenario "${id}"...`).start();
@@ -65,7 +70,13 @@ export const runScenarioCommand = async (
       `Run scheduled under "${result.planName}": ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} (batch: ${result.batchRunId}${note ? `, note: "${note}"` : ""})`,
     );
 
-    await emitRunResult({ result, note, options, subject: "scenario run" });
+    await emitRunResult({
+      result,
+      note,
+      options,
+      wait,
+      subject: "scenario run",
+    });
   } catch (error) {
     failSpinner({ spinner, error, action: "run the scenario" });
     process.exit(1);

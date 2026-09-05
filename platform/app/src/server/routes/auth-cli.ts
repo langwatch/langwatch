@@ -33,6 +33,7 @@ import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service"
 import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
 import {
   IngestionKeyService,
+  PersonalSourceTypeNotAllowedError,
   PersonalWorkspaceMissingError,
 } from "@ee/governance/services/ingestionKey.service";
 import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
@@ -2116,8 +2117,9 @@ secured
 //
 // Body: { source_type, project?, device_label? }.
 //
-//   - Without `project`: the caller's personal project, rotating in place, so
-//     one user never accumulates keys for a tool. Returns
+//   - Without `project`: the caller's personal project, create-only per
+//     device and capped, so every machine a person signs in from keeps its
+//     own working token and no machine's mint kills another's. Returns
 //     { token, prefix, endpoint }.
 //   - With `project` (a project id or slug inside the caller's organization):
 //     that project, create-only, so two machines instrumenting the same
@@ -2387,7 +2389,9 @@ secured
 
 /**
  * The personal-project branch of the ingestion-key mint: the caller's own
- * workspace, rotating in place so one user never accumulates keys for a tool.
+ * workspace, one key per device. Create-only, because the caller is a
+ * device session and the other devices under this login are still exporting
+ * with theirs; the service's cap is what keeps the list bounded.
  */
 async function mintPersonalIngestionKey(
   c: Context,
@@ -2402,7 +2406,7 @@ async function mintPersonalIngestionKey(
   },
 ): Promise<Response> {
   try {
-    const result = await service.ensureForPersonalProject({
+    const result = await service.issueForPersonalProject({
       userId: tokenRecord.user_id,
       organizationId: tokenRecord.organization_id,
       sourceType,
@@ -2423,11 +2427,20 @@ async function mintPersonalIngestionKey(
       201,
     );
   } catch (err) {
-    // Only the missing workspace is a precondition the caller can fix, so it
-    // is the only failure that reports as one. Everything else is a server
-    // fault: it gets logged and a fixed message, the way the project branch
-    // does, rather than a prompt the user cannot act on and an internal error
-    // string on the wire.
+    // A source type no wrapped tool stamps and a missing workspace are the
+    // two failures the caller can act on, so they are the only ones that
+    // report as such. Everything else is a server fault: it gets logged and a
+    // fixed message, the way the project branch does, rather than a prompt
+    // the user cannot act on and an internal error string on the wire.
+    if (err instanceof PersonalSourceTypeNotAllowedError) {
+      return c.json(
+        {
+          error: "invalid_request",
+          error_description: `No personal ingestion key is minted for source type ${sourceType}. Personal keys are minted for the tools the LangWatch CLI wraps.`,
+        },
+        400,
+      );
+    }
     if (err instanceof PersonalWorkspaceMissingError) {
       return c.json(
         {
@@ -2496,6 +2509,68 @@ secured
           lookup_id: k.lookupId,
           ingestion_template_id: k.ingestionTemplateId,
         })),
+      },
+      200,
+    );
+  });
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/cli/governance/ingestion-keys/:lookup_id
+// ---------------------------------------------------------------------------
+// What became of one of the caller's own personal ingestion keys. The session
+// context hook asks this when the collector rejects the key the device
+// exports with, before it re-mints: a key the cap retired or a rotation
+// replaced is the platform's doing and the device may repair itself, a key a
+// person revoked from the API-keys page stays dead until that person runs
+// `langwatch instrument` again.
+//
+// Response: { lookup_id, status: "live" | "revoked" | "unknown",
+//             source_type?, revocation_cause?: "user" | "rotation" | "cap" | null }
+//
+// `unknown` is a 200, not a 404, so a CLI can tell "no such key of yours"
+// from "a server too old to have this route".
+// ---------------------------------------------------------------------------
+secured
+  .access(CLI_POLICY)
+  .get("/governance/ingestion-keys/:lookup_id", async (c: Context) => {
+    const tokenRecord = await validateAccessToken(
+      c.req.header("Authorization"),
+    );
+    if (!tokenRecord) {
+      return c.json(
+        {
+          error: "unauthorized",
+          error_description:
+            "Bearer access token is missing, malformed, or expired",
+        },
+        401,
+      );
+    }
+    const lookupId = c.req.param("lookup_id");
+    if (!lookupId) {
+      return c.json(
+        {
+          error: "invalid_request",
+          error_description: "lookup_id is required",
+        },
+        400,
+      );
+    }
+    const service = IngestionKeyService.create(prisma);
+    const key = await service.describePersonalKey({
+      userId: tokenRecord.user_id,
+      organizationId: tokenRecord.organization_id,
+      lookupId,
+    });
+    if (!key) {
+      return c.json({ lookup_id: lookupId, status: "unknown" }, 200);
+    }
+    return c.json(
+      {
+        lookup_id: lookupId,
+        status: key.live ? "live" : "revoked",
+        source_type: key.sourceType,
+        revocation_cause: key.revocationCause,
       },
       200,
     );

@@ -63,6 +63,17 @@ describe("IngestionKeyService.ensureForProject", () => {
       expect(apiKeys.revoke).toHaveBeenCalledBefore(apiKeys.create);
       expect(apiKeys.create).toHaveBeenCalledTimes(1);
     });
+
+    /** @scenario "A hard-cut rotation names itself as the cause" */
+    it("names the rotation as the cause of the revoke", async () => {
+      apiKeyRepo.findIngestKey.mockResolvedValue({ id: "ak_prior" });
+
+      await service.ensureForProject(MINT_PARAMS);
+
+      expect(apiKeys.revoke).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "ak_prior", cause: "rotation" }),
+      );
+    });
   });
 
   describe("when no prior key exists", () => {
