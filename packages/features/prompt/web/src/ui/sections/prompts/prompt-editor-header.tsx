@@ -33,14 +33,9 @@ export type PromptEditorHeaderProps = {
 };
 
 /**
- * Shared header component for prompt editing.
- * Used in both the prompt playground and the prompt editor drawer.
- *
- * Features:
- * - Model selector
- * - Version history (if prompt exists)
- * - API snippet button
- * - Save button with "Update to vX" logic
+ * Shared header for prompt editing, used in both the playground and the
+ * editor drawer: model selector, version history, API snippet, and a Save
+ * button with "Update to vX" logic.
  */
 export function PromptEditorHeader({
   onSave,

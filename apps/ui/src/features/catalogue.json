@@ -250,7 +250,8 @@
         "surfaces": [
           "@langwatch/langy-web/surfaces/langy-mark",
           "@langwatch/langy-web/surfaces/langy-store",
-          "@langwatch/navigation-web/surfaces/command-bar"
+          "@langwatch/navigation-web/surfaces/command-bar",
+          "@langwatch/trace-web/surfaces/presence-menu-item"
         ]
       }
     },

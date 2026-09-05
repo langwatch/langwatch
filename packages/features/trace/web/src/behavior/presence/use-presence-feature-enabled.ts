@@ -1,30 +1,26 @@
 import { useMemo } from "react";
+
+import {
+  resolvePresenceAvailability,
+  type PresenceAvailability,
+} from "@langwatch/presence-web/surfaces/presence-state";
+
 import { useOrganizationTeamProject } from "../use-organization-team-project";
 
-export type PresenceDisabledScope = "organization" | "project" | null;
-
-export interface PresenceFeatureState {
-  /** True when presence is allowed for the current project. */
-  enabled: boolean;
-  /** Which level disabled it (org wins over project), or null when enabled. */
-  disabledAt: PresenceDisabledScope;
-}
-
 /**
- * Resolves whether multiplayer presence is enabled for the active project. The
- * org-level toggle is the global kill-switch — when it's off, the project toggle is
- * irrelevant.
+ * Whether multiplayer presence is enabled for the active project, read off the
+ * scope the explorer is already mounted in. The rule itself is the presence
+ * package's, so the account menu and the lens cannot disagree about it.
  */
-export function usePresenceFeatureEnabled(): PresenceFeatureState {
+export function usePresenceFeatureEnabled(): PresenceAvailability {
   const { organization, project } = useOrganizationTeamProject();
 
-  return useMemo(() => {
-    if (organization && organization.presenceEnabled === false) {
-      return { enabled: false, disabledAt: "organization" };
-    }
-    if (project && project.presenceEnabled === false) {
-      return { enabled: false, disabledAt: "project" };
-    }
-    return { enabled: true, disabledAt: null };
-  }, [organization, project]);
+  return useMemo(
+    () =>
+      resolvePresenceAvailability({
+        organizationPresenceEnabled: organization?.presenceEnabled,
+        projectPresenceEnabled: project?.presenceEnabled,
+      }),
+    [organization, project],
+  );
 }

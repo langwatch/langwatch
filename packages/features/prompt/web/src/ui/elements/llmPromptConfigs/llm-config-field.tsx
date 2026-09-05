@@ -31,11 +31,8 @@ type LLMConfigFieldProps = {
 };
 
 /**
- * LLM Config field
- * Can be used outside of the form context (does not use react-hook-form)
- *
- * Displays a compact clickable row with model info and ChevronDown icon.
- * Clicking opens the LLMConfigPopover for model and parameter configuration.
+ * LLM Config field, usable outside form context (no react-hook-form).
+ * Compact clickable row; clicking opens LLMConfigPopover for configuration.
  */
 export function LLMConfigField({
   llmConfig,

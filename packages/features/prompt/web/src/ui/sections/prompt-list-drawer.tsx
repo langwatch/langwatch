@@ -1,22 +1,7 @@
 /**
- * "Choose Prompt": the picker every flow that needs a saved prompt opens.
- *
- * Moved from `platform/app/src/components/prompts/PromptListDrawer.tsx`. It is
- * a REGISTERED drawer — `?drawer.open=promptList` — opened by flows that are
- * not this family's (an evaluation choosing its subject, a target type
- * selector), which is why it belongs to the family that owns prompts rather
- * than to any one of its callers.
- *
- * Three substitutions, none of them behavioural: `Drawer` from the Design
- * System, the drawer navigator from `@langwatch/ui-drawer`, and the provider
- * icons and the prompt catalogue from this package's own neighbours rather than
- * through `~/`.
- *
- * WHAT ITS "NEW PROMPT" STILL ASKS FOR AND DOES NOT YET GET: `promptEditor`,
- * which lives in this package already but drives its own drawer navigation
- * through `@langwatch/workflow-web`'s studio host rather than through this one.
- * Registering it would give the application two module-scope drawer stacks, so
- * the address is written and nothing opens — recorded rather than papered over.
+ * "Choose Prompt": the picker every flow opens, a REGISTERED drawer
+ * belonging to the family that owns prompts. KNOWN GAP: "New Prompt"
+ * still asks for `promptEditor`, whose own navigation isn't wired here yet.
  */
 
 import {
@@ -56,12 +41,9 @@ export type PromptListDrawerProps = {
 };
 
 /**
- * Drawer for selecting an existing prompt or creating a new one.
- * Features:
- * - Shows list of saved prompts grouped by folder
- * - Empty state with create CTA
- * - "+ New Prompt" button at top
- * - Folder collapsible sections
+ * Drawer for selecting an existing prompt or creating a new one: saved
+ * prompts grouped by folder (collapsible), empty state with create CTA,
+ * "+ New Prompt" at top.
  */
 export function PromptListDrawer(props: PromptListDrawerProps) {
   const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();

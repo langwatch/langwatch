@@ -5,15 +5,9 @@ import type { DatasetColumns, DatasetRecordInput } from "@langwatch/dataset-cont
 import { DatasetPreviewTable } from "@langwatch/dataset-web/surfaces/dataset-preview-table";
 
 /**
- * The read-only table a prompt's demonstrations render in.
- *
- * A family-local copy of `platform/app/src/components/datasets/DatasetPreview.tsx`,
- * narrowed twice. The TABLE itself is not copied — `@langwatch/dataset-web`
- * publishes it, and naming that package costs one import line against copying a
- * table the datasets feature owns. What is dropped is the image renderer, whose
- * `ExternalImage` is 279 lines of lightbox with its own escape-key hook, and the
- * error boundary, which read `process.env.NODE_ENV` — a value a browser package
- * may not read. A demonstration cell holding an image URL prints the URL.
+ * The read-only table a prompt's demonstrations render in. The TABLE
+ * itself is not copied — `@langwatch/dataset-web` publishes it. Dropped
+ * the image lightbox; an image cell just prints its URL.
  */
 export function DatasetPreview({
   rows,

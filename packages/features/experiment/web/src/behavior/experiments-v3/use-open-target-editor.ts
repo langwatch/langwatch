@@ -8,7 +8,6 @@ import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
 } from "@langwatch/prompt-web/surfaces/variables";
-import { datasetColumnTypeToFieldType } from "@langwatch/workflow-web/surfaces/studio-dataset-columns";
 import { setFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
@@ -19,6 +18,8 @@ import {
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "../../model/experiments-v3/types";
 import { createEvaluatorEditorCallbacks } from "../../model/experiments-v3/evaluator-editor-callbacks";
+import { buildTargetAvailableSources } from "./target-available-sources";
+import { useResolveTargetName } from "./use-resolve-target-name";
 import {
   convertFromUIMapping,
   convertToUIMapping,
@@ -91,6 +92,7 @@ export const useOpenTargetEditor = () => {
   const { openDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
   const trpcUtils = api.useUtils();
+  const resolveTargetName = useResolveTargetName();
 
   const {
     datasets,
@@ -121,24 +123,19 @@ export const useOpenTargetEditor = () => {
   );
 
   /**
-   * Build available sources for variable mapping (active dataset only).
+   * The sources a target's variables can map onto: the active dataset, and the
+   * other targets whose outputs this one can chain from, each labelled with the
+   * name a reader knows it by.
    */
-  const buildAvailableSources = useCallback((): AvailableSource[] => {
-    const activeDataset = datasets.find((d) => d.id === activeDatasetId);
-    if (!activeDataset) return [];
-
-    return [
-      {
-        id: activeDataset.id,
-        name: activeDataset.name,
-        type: "dataset" as const,
-        fields: activeDataset.columns.map((col) => ({
-          name: col.name,
-          type: datasetColumnTypeToFieldType(col.type),
-        })),
-      },
-    ];
-  }, [datasets, activeDatasetId]);
+  const buildAvailableSources = useCallback(
+    (editedTargetId?: string): AvailableSource[] =>
+      buildTargetAvailableSources({
+        activeDataset: datasets.find((d) => d.id === activeDatasetId),
+        otherTargets: targets.filter((candidate) => candidate.id !== editedTargetId),
+        resolveTargetName,
+      }),
+    [datasets, activeDatasetId, targets, resolveTargetName],
+  );
 
   /**
    * Open the target editor drawer with proper flow callbacks.
@@ -147,7 +144,7 @@ export const useOpenTargetEditor = () => {
     async (target: TargetConfig) => {
       if (target.type === "prompt") {
         // Build available sources for variable mapping (active dataset only)
-        const availableSources = buildAvailableSources();
+        const availableSources = buildAvailableSources(target.id);
         const uiMappings = buildUIMappings(target, activeDatasetId);
 
         // Set flow callbacks for the prompt editor using the centralized helper
@@ -199,7 +196,7 @@ export const useOpenTargetEditor = () => {
             // A workflow-type agent has no code of its own to edit inline — it's a
             // pointer to a Studio graph, which can't be edited meaningfully inside a
             // narrow sidebar.
-            const availableSources = buildAvailableSources();
+            const availableSources = buildAvailableSources(target.id);
             const uiMappings = buildUIMappings(target, activeDatasetId);
 
             setFlowCallbacks("agentWorkflowTargetEditor", {
@@ -237,7 +234,7 @@ export const useOpenTargetEditor = () => {
             // so there is nothing here to edit: the drawer reads what the
             // function declares, and the column maps its inputs to the
             // dataset the same way every other target does.
-            const availableSources = buildAvailableSources();
+            const availableSources = buildAvailableSources(target.id);
             const uiMappings = buildUIMappings(target, activeDatasetId);
 
             setFlowCallbacks("agentConnectedDetail", {
@@ -272,7 +269,7 @@ export const useOpenTargetEditor = () => {
             });
           } else if (agent?.type === "http") {
             // HTTP agent - open HTTP editor drawer
-            const availableSources = buildAvailableSources();
+            const availableSources = buildAvailableSources(target.id);
             const uiMappings = buildUIMappings(target, activeDatasetId);
 
             // Set flow callbacks for the HTTP editor
@@ -309,7 +306,7 @@ export const useOpenTargetEditor = () => {
             });
           } else {
             // Code agent - open code editor drawer
-            const availableSources = buildAvailableSources();
+            const availableSources = buildAvailableSources(target.id);
             const uiMappings = buildUIMappings(target, activeDatasetId);
 
             // Set flow callbacks for the code editor. See the workflow-agent
@@ -399,7 +396,7 @@ export const useOpenTargetEditor = () => {
         }
 
         // Evaluator target - open evaluator editor drawer with mappings config
-        const availableSources = buildAvailableSources();
+        const availableSources = buildAvailableSources(target.id);
         const uiMappings = buildUIMappings(target, activeDatasetId);
 
         // See the workflow-agent branch above for why this captures

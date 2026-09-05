@@ -24,15 +24,9 @@ type ModelSelectFieldMiniProps = {
 };
 
 /**
- * Model Select Field Mini
- *
- * Renders a compact LLM model selector field integrated with react-hook-form
- * that displays the current model and opens a configuration popover on click.
- *
- * Uses Popover.Anchor instead of Popover.Trigger to avoid Zag.js's internal
- * onClick handler that conflicts with the Drawer's dismissable layer.
- * The onClick toggle is handled manually via controlled state.
- * See: https://github.com/langwatch/langwatch/issues/2390
+ * Compact react-hook-form LLM model selector; opens a config popover.
+ * Uses Popover.Anchor, not Trigger, to avoid Zag.js's onClick conflicting
+ * with the Drawer's dismissable layer (#2390).
  */
 export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
   showStructuredOutputs = true,
@@ -89,16 +83,10 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
   }
 
   if (isEmpty) {
-    // Skip the popover trigger entirely when the project has zero
-    // enabled providers — clicking the chip would just open a dropdown
-    // with no items. Honest empty-state callout instead.
-    //
-    // The prompt-playground surface gets an open-by-default tooltip
-    // ('Set up a model to get started') because the playground tries
-    // to actually run the prompt the moment the user hits Send, so
-    // the empty model picker is a far higher-stakes blocker here
-    // than in the workflow / evaluator drawers. Chakra's tooltip
-    // closes naturally on mouseout and re-opens on mouseover.
+    // Skip the popover trigger with zero enabled providers — an honest
+    // empty-state callout instead of an empty dropdown. Prompt-playground
+    // gets an open-by-default tooltip since it runs the prompt on Send, a
+    // higher-stakes blocker than in workflow/evaluator drawers.
     return (
       <Tooltip
         content="Set up a model to get started"

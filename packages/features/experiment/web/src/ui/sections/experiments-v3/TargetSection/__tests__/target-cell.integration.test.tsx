@@ -744,13 +744,9 @@ describe("TargetCellContent", () => {
     });
   });
 
-  // Regression for issue #3441 fix 1: clicking the evaluator chip's edit
-  // path must open the editor drawer with both a mappingsConfig AND an
-  // onMappingChange callback registered via setFlowCallbacks. The drawer's
-  // render gate is `mappingsConfig && onMappingChange` — if either is
-  // missing, the mappings section silently hides and users can't configure
-  // variables. Prior regression lived in TargetCell.tsx bypassing the shared
-  // createEvaluatorEditorCallbacks helper and omitting onMappingChange.
+  // Regression #3441 fix 1: the evaluator chip's edit path must open the
+  // drawer with both mappingsConfig AND onMappingChange, or the render gate
+  // `mappingsConfig && onMappingChange` silently hides the mappings section.
   describe("when the user clicks an evaluator chip's edit", () => {
     const evaluator: EvaluatorConfig = {
       id: "eval-1",

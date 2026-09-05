@@ -54,6 +54,10 @@
       "types": "./src/ui/sections/drawers.ts",
       "default": "./src/ui/sections/drawers.ts"
     },
+    "./surfaces/presence-menu-item": {
+      "types": "./src/ui/sections/presence/presence-menu-item.tsx",
+      "default": "./src/ui/sections/presence/presence-menu-item.tsx"
+    },
     "./surfaces/suggestion-dropdown": {
       "types": "./src/ui/sections/explorer/search-bar/suggestion-dropdown.tsx",
       "default": "./src/ui/sections/explorer/search-bar/suggestion-dropdown.tsx"

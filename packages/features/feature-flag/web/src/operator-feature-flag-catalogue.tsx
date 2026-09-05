@@ -2,32 +2,23 @@ import {
   Badge,
   Box,
   Button,
-  Field,
   Heading,
   HStack,
-  Input,
   Stack,
   Table,
   Text,
   VStack,
   VisuallyHidden,
 } from "@chakra-ui/react";
-import { Dialog } from "@langwatch/design-system/dialog";
-import { Switch } from "@langwatch/design-system/switch";
 import type {
   FeatureFlagRules,
   OperatorFeatureFlag,
   OperatorFeatureFlagCatalogue,
 } from "@langwatch/feature-flag-contract";
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  editorToRules,
-  newEditorRule,
-  rulesToEditor,
-  validCreatedAfter,
-  validPercentage,
-  type FeatureFlagRuleEditorRule,
-} from "./model/rule-editing";
+import { useMemo, useState } from "react";
+import { Switch } from "@langwatch/design-system/switch";
+import { FeatureFlagRulesDialog } from "./feature-flag-rules-dialog";
+import { summarizeTargeting, targetingLabel } from "./model/targeting-summary";
 
 export interface OperatorFeatureFlagCatalogueProps {
   /** True on a shared (multi-tenant) install, where a PRODUCT flag reaches every customer. */
@@ -206,7 +197,7 @@ function FlagRow({
   const [rulesOpen, setRulesOpen] = useState(false);
   const envLocked = row.envOverride !== null;
   const effective = optimistic ?? row.effective;
-  const targeting = summarizeTargeting(row.rules, effective);
+  const targeting = describeTargeting(row.rules, effective);
 
   const setEnabled = async (enabled: boolean) => {
     setOptimistic(enabled);
@@ -321,189 +312,6 @@ function FlagRow({
   );
 }
 
-function FeatureFlagRulesDialog({
-  open,
-  onOpenChange,
-  flagKey,
-  initialRules,
-  onSave,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  flagKey: string;
-  initialRules: FeatureFlagRules;
-  onSave: OperatorFeatureFlagCatalogueProps["onSetRules"];
-}) {
-  const [draft, setDraft] = useState(() => rulesToEditor(initialRules));
-  const [saving, setSaving] = useState(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const wasOpen = useRef(false);
-
-  useEffect(() => {
-    if (open && !wasOpen.current) {
-      setDraft(rulesToEditor(initialRules));
-      setValidationError(null);
-    }
-    wasOpen.current = open;
-  }, [open, initialRules]);
-
-  const save = async () => {
-    if (draft.some((rule) => !validPercentage(rule.percentage))) {
-      setValidationError("A percentage must be a whole number from 0 to 100.");
-      return;
-    }
-    // A date nothing can read is a rule that never matches, which reads to the
-    // operator as a rollout that silently never started.
-    if (draft.some((rule) => !validCreatedAfter(rule.organizationCreatedAfter))) {
-      setValidationError("New organizations needs a date, for example 2026-09-01.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await onSave({ key: flagKey, rules: editorToRules(draft) });
-      onOpenChange(false);
-    } catch {
-      return;
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={(details: { open: boolean }) => onOpenChange(details.open)}
-      size="lg"
-    >
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title>Targeting rules</Dialog.Title>
-          <Dialog.Description>
-            Rules are evaluated top-to-bottom. Conditions in one rule are combined.
-          </Dialog.Description>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="stretch" gap={3}>
-            <Text fontFamily="mono" fontSize="xs" color="fg.muted">
-              {flagKey}
-            </Text>
-            {draft.map((rule, index) => (
-              <RuleEditorRow
-                key={index}
-                rule={rule}
-                onChange={(patch) => {
-                  setDraft((current) =>
-                    current.map((candidate, candidateIndex) => {
-                      return candidateIndex === index ? { ...candidate, ...patch } : candidate;
-                    }),
-                  );
-                }}
-                onRemove={() => {
-                  setDraft((current) =>
-                    current.filter((_, candidateIndex) => candidateIndex !== index),
-                  );
-                }}
-              />
-            ))}
-            {validationError && <Text color="fg.error">{validationError}</Text>}
-            <Button
-              variant="ghost"
-              size="sm"
-              alignSelf="flex-start"
-              onClick={() => setDraft((current) => [...current, newEditorRule()])}
-            >
-              Add rule
-            </Button>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Dialog.ActionTrigger asChild>
-            <Button variant="outline" disabled={saving}>
-              Cancel
-            </Button>
-          </Dialog.ActionTrigger>
-          <Button colorPalette="blue" loading={saving} onClick={() => void save()}>
-            Save rules
-          </Button>
-        </Dialog.Footer>
-        <Dialog.CloseTrigger />
-      </Dialog.Content>
-    </Dialog.Root>
-  );
-}
-
-function RuleEditorRow({
-  rule,
-  onChange,
-  onRemove,
-}: {
-  rule: FeatureFlagRuleEditorRule;
-  onChange: (patch: Partial<FeatureFlagRuleEditorRule>) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <HStack align="flex-end" gap={2} padding={2} borderWidth="1px" borderRadius="md">
-      <RuleInput
-        label="Organization id"
-        value={rule.organizationId}
-        onChange={(organizationId) => onChange({ organizationId })}
-      />
-      <RuleInput
-        label="Project id"
-        value={rule.projectId}
-        onChange={(projectId) => onChange({ projectId })}
-      />
-      <RuleInput
-        label="Percentage"
-        value={rule.percentage}
-        onChange={(percentage) => onChange({ percentage })}
-        type="number"
-      />
-      <RuleInput
-        label="New organizations after"
-        value={rule.organizationCreatedAfter}
-        onChange={(organizationCreatedAfter) => onChange({ organizationCreatedAfter })}
-        type="date"
-      />
-      <Field.Root flexBasis="100px">
-        <Field.Label fontSize="xs">Enabled</Field.Label>
-        <Switch
-          checked={rule.enabled}
-          onCheckedChange={(details) => onChange({ enabled: details.checked })}
-        />
-      </Field.Root>
-      <Button size="xs" variant="ghost" onClick={onRemove}>
-        Remove
-      </Button>
-    </HStack>
-  );
-}
-
-function RuleInput({
-  label,
-  value,
-  onChange,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: "text" | "number" | "date";
-}) {
-  return (
-    <Field.Root flex={1}>
-      <Field.Label fontSize="xs">{label}</Field.Label>
-      <Input
-        size="sm"
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </Field.Root>
-  );
-}
-
 function sourceFor(row: OperatorFeatureFlag): string {
   if (row.envOverride !== null) return "env override";
   if (row.rules.length > 0) return "postgres + rules";
@@ -511,49 +319,16 @@ function sourceFor(row: OperatorFeatureFlag): string {
   return "registry default";
 }
 
-function summarizeTargeting(rules: FeatureFlagRules, effective: boolean) {
-  const organizationIds = new Set<string>();
-  const projectIds = new Set<string>();
-  let percentageRules = 0;
-  let newOrganizationRules = 0;
-  let everyone = false;
+/**
+ * The one line under a flag's toggle: who a rule has already switched the flag
+ * on for, walked the way the resolver walks it.
+ */
+function describeTargeting(rules: FeatureFlagRules, effective: boolean) {
+  const summary = summarizeTargeting(rules);
+  const label = targetingLabel(summary);
+  const partialEnabled = !effective && label !== null;
 
-  for (const rule of rules) {
-    if (!rule.enabled) continue;
-    if (
-      !rule.match.organizationId &&
-      !rule.match.projectId &&
-      !rule.match.percentage &&
-      !rule.match.organizationCreatedAfter
-    ) {
-      everyone = true;
-      break;
-    }
-
-    if (rule.match.organizationId) organizationIds.add(rule.match.organizationId);
-    if (rule.match.projectId) projectIds.add(rule.match.projectId);
-    if (rule.match.percentage) percentageRules += 1;
-    if (rule.match.organizationCreatedAfter) newOrganizationRules += 1;
-  }
-
-  const parts = [
-    organizationIds.size ? `${organizationIds.size} organisation(s)` : "",
-    projectIds.size ? `${projectIds.size} project(s)` : "",
-    percentageRules ? `${percentageRules} percentage rollout(s)` : "",
-    newOrganizationRules ? "new organizations" : "",
-  ].filter(Boolean);
-  const partialEnabled = !effective && (everyone || parts.length > 0);
-  if (effective) {
-    return { partialEnabled, label: null };
-  }
-
-  if (everyone) {
-    return { partialEnabled, label: "Enabled for everyone via rule" };
-  }
-
-  const label = parts.length ? `Enabled for ${parts.join(", ")}` : null;
-
-  return { partialEnabled, label };
+  return { partialEnabled, label: effective ? null : label };
 }
 
 function ScopeBadge({ scope }: { scope: "SYSTEM" | "PRODUCT" }) {

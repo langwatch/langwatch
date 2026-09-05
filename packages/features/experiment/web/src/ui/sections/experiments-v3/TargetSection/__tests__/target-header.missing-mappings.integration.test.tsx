@@ -1,8 +1,7 @@
 /**
- * Header state and play-button gating for prompt targets with unmapped
- * variables.
- *
  * @vitest-environment jsdom
+ *
+ * Header state and play-button gating for prompt targets with unmapped variables.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

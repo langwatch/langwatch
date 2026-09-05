@@ -3,13 +3,13 @@ import {
   extractAiCallFailedInfo,
   extractMissingModelInfo,
   extractProviderDisabledInfo,
-} from "../../../trpc-error";
+} from "@langwatch/model-provider-web/surfaces/model-error";
 import { shouldShowGenericTranslateError } from "../translation-error";
 
 // The gating logic is what we own here; the extractors are a boundary (tested in
 // utils/trpcError). Mock them so we can prove the fallback fires only when none
 // matched.
-vi.mock("../../../trpc-error", () => ({
+vi.mock("@langwatch/model-provider-web/surfaces/model-error", () => ({
   extractMissingModelInfo: vi.fn(),
   extractAiCallFailedInfo: vi.fn(),
   extractProviderDisabledInfo: vi.fn(),

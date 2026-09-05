@@ -37,13 +37,10 @@ export function LLMModelDisplay({
   // Model is disabled if explicitly marked or if provider is disabled
   const isDisabled = modelOption?.isDisabled ?? false;
 
-  // Invalid = model points at a provider that's not enabled for this
-  // project (deleted, scope dropped, or never configured). The
-  // evaluator / prompt config still carries the stored id, but the
-  // resolver will fail on it at runtime. Render the same red strike +
-  // AlertTriangle + tooltip pattern the Default Models table uses.
-  // Skip the warning while the providers query is in flight to avoid
-  // flashing a false-positive before data resolves.
+  // Invalid = model points at a provider not enabled for this project.
+  // Render the same red strike + AlertTriangle pattern the Default Models
+  // table uses. Skip while the providers query is in flight (avoids a
+  // false-positive flash).
   const providerKey = model.split("/")[0] ?? "";
   const isProviderMissing =
     !!model &&

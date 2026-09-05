@@ -5,6 +5,7 @@ import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants";
 import type { TraceAnchor } from "../hooks/use-anchored-annotations";
 import { useTextTranslation } from "../hooks/use-text-translation";
 import { IOViewerBody } from "./io-viewer-body";
+import { AnnotationExpectedOutputs } from "./annotation-expected-outputs";
 import { IOViewerToolbar } from "./io-viewer-toolbar";
 import { safePrettyJson } from "../../../elements/explorer/trace-drawer/json-highlight";
 import {
@@ -386,6 +387,15 @@ export const IOViewer = memo(function IOViewer({
                 ? "Show less"
                 : `Show remaining ${((content.length - TRUNCATE_AT) / 1000).toFixed(0)}K chars`}
             </Button>
+          )}
+
+          {/* Corrections already suggested for this output, read back where the
+              output is, as a list rather than a second editor. Renders nothing
+              when the trace carries none. */}
+          {mode === "output" && traceId && (
+            <Box paddingTop={3}>
+              <AnnotationExpectedOutputs traceId={traceId} output={originalContent} />
+            </Box>
           )}
         </>
       )}

@@ -33,11 +33,9 @@ export type PromptEditorFooterProps = {
 };
 
 /**
- * Footer component for the prompt editor in drawer mode.
- * Renders the action buttons that are hidden from the header when using variant="model-only":
- * History, API snippet, Save, and optionally Discard/Apply.
- *
- * Layout: [Discard?] [Spacer] [History] [API] [Save] [Apply?]
+ * Footer for the prompt editor in drawer mode: the action buttons hidden
+ * from the header under variant="model-only" (History, API snippet, Save,
+ * optionally Discard/Apply), laid out [Discard?] [Spacer] [History] [API] [Save] [Apply?].
  */
 export function PromptEditorFooter({
   onSave,

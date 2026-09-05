@@ -7,6 +7,7 @@
 import {
   navigationApi,
   NavigationHostProvider,
+  type NavigationAccountMenu,
   type NavigationDeployment,
   type NavigationHostPort,
   type NavigationLangy,
@@ -38,6 +39,8 @@ import { useUiRouteReading } from "../../../../behavior/ui-scope-route";
 import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 import { readNavigationFeatureFlag } from "../../behavior/navigation-feature-flag";
 import { rememberNavigationScope } from "../../behavior/navigation-remember-scope";
+import { PresenceMenuItem } from "@langwatch/trace-web/surfaces/presence-menu-item";
+import { showsPresenceMenuItem } from "../../behavior/presence-menu-gate";
 
 /** The two grants that decide how far a reader gets into the operations pages. */
 const OPS_VIEW_PERMISSION = "ops:view";
@@ -57,6 +60,8 @@ const COMMAND_BAR_LANGY_GRADIENT_ID = "command-bar-langy-mark-gradient";
 type OrganizationsRead = ReadonlyArray<{
   id: string;
   name: string;
+  /** The organization-wide presence kill switch; absent means never read. */
+  presenceEnabled?: boolean;
   members?: Array<{ role: string }>;
   teams: Array<{
     id: string;
@@ -68,6 +73,7 @@ type OrganizationsRead = ReadonlyArray<{
       id: string;
       name: string;
       slug: string;
+      presenceEnabled?: boolean;
       lastCodingAgentSessionAt?: string | Date | null;
       lastCodingAgentPullRequestAt?: string | Date | null;
     }>;
@@ -293,6 +299,27 @@ export function NavigationHostSection({
     void signOutUi();
   }, []);
 
+  // THE ACCOUNT DROPDOWN'S ONE ADDITION: the presence toggle, offered only on
+  // the surface that broadcasts presence. The organization and project
+  // switches come off the graph this shell already read, so the row and the
+  // lens read the same two facts.
+  const accountMenu = useMemo<NavigationAccountMenu | null>(() => {
+    if (!showsPresenceMenuItem(routePattern)) return null;
+    const read = (organizations.data ?? []) as OrganizationsRead;
+    const readOrganization = read.find((candidate) => candidate.id === activeScope.organizationId);
+    const readProject = readOrganization?.teams
+      .flatMap((team) => team.projects)
+      .find((candidate) => candidate.id === activeScope.projectId);
+    return {
+      presence: (
+        <PresenceMenuItem
+          organizationPresenceEnabled={readOrganization?.presenceEnabled}
+          projectPresenceEnabled={readProject?.presenceEnabled}
+        />
+      ),
+    };
+  }, [routePattern, organizations.data, activeScope.organizationId, activeScope.projectId]);
+
   const host = useMemo<NavigationHostPort>(
     () => ({
       organizations: () => graph,
@@ -347,8 +374,7 @@ export function NavigationHostSection({
       // this application does not carry it, so the Support menu offers the
       // community and documentation entries and no "Chat with a human".
       supportChat: () => null,
-      // NOTHING ADDED TO THE ACCOUNT DROPDOWN YET.
-      accountMenu: () => null,
+      accountMenu: () => accountMenu,
     }),
     [
       graph,
@@ -374,6 +400,7 @@ export function NavigationHostSection({
       commandBarAnswer,
       langy,
       openDrawerByName,
+      accountMenu,
     ],
   );
 

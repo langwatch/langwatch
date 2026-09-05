@@ -18,6 +18,14 @@ export const traceFeature = uiFeature({
       factory: () => import("./ui/sections/trace-drawers"),
       key: "AddDatasetRecordDrawer",
     }),
+    /**
+     * The legacy trace drawer's name, kept resolvable for links shared before
+     * it was removed: it swaps itself for the Trace Explorer drawer's address.
+     */
+    traceDetails: lazyDrawer({
+      factory: () => import("@langwatch/trace-web/drawers"),
+      key: "LegacyTraceDrawerRedirect",
+    }),
   },
 });
 

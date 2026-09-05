@@ -2,7 +2,7 @@ import {
   extractAiCallFailedInfo,
   extractMissingModelInfo,
   extractProviderDisabledInfo,
-} from "../../trpc-error";
+} from "@langwatch/model-provider-web/surfaces/model-error";
 
 /**
  * Whether the inline-translation failure handler should raise its own generic fallback

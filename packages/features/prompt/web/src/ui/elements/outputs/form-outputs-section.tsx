@@ -23,18 +23,9 @@ type FormOutputsSectionProps = {
 // ============================================================================
 
 /**
- * Form-connected wrapper around OutputsSection.
- *
- * This component bridges the new OutputsSection UI with react-hook-form,
- * allowing it to be used as a drop-in replacement for OutputsFieldGroup
- * in places that already use FormProvider.
- *
- * Usage:
- * ```tsx
- * <FormProvider {...methods}>
- *   <FormOutputsSection />
- * </FormProvider>
- * ```
+ * Form-connected wrapper around OutputsSection: bridges it with
+ * react-hook-form as a drop-in for OutputsFieldGroup wherever FormProvider
+ * is already in scope.
  */
 export const FormOutputsSection = ({
   title = "Outputs",

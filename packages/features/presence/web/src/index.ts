@@ -12,6 +12,11 @@ export {
   selectPeersMatching,
 } from "./presence-store";
 export { usePresencePreferencesStore } from "./presence-preferences-store";
+export {
+  resolvePresenceAvailability,
+  type PresenceAvailability,
+  type PresenceDisabledScope,
+} from "./presence-availability";
 export { useSectionTrackerStore, selectMostVisibleSection } from "./section-tracker-store";
 export {
   presenceUserDisplayName,

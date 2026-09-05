@@ -21,6 +21,10 @@
     "./surfaces/presence-state": {
       "types": "./src/surfaces/presence-state.ts",
       "default": "./src/surfaces/presence-state.ts"
+    },
+    "./surfaces/presence-availability": {
+      "types": "./src/presence-availability.ts",
+      "default": "./src/presence-availability.ts"
     }
   },
   "scripts": {

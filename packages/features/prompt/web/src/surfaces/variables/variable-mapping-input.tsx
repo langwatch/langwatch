@@ -16,13 +16,8 @@ export type SourceType = ComponentType | "dataset";
 export type FieldType = Field["type"];
 
 /**
- * Represents a field that can be selected in the mapping dropdown.
- * Supports nested fields via the `children` property.
- *
- * Examples:
- * - Simple field: { name: "input", type: "str" }
- * - Field with static children: { name: "metadata", type: "dict", children: [...] }
- * - Field with dynamic children: { name: "spans", type: "list", getChildren: () => [...] }
+ * A field selectable in the mapping dropdown, supporting nested fields via
+ * `children` (static array or dynamic `getChildren()`).
  */
 export type NestedField = {
   /** Field name (used as path segment) */
@@ -43,10 +38,9 @@ export type NestedField = {
    */
   getChildren?: () => NestedField[];
   /**
-   * Whether selecting this field is "complete" or requires further selection.
-   * - Default: true if no children/getChildren, false if has children
-   * - Override: Set to true to allow selecting a parent without drilling down
-   *   (e.g., "spans" can be selected as a whole OR drilled into)
+   * Whether selecting this field is "complete" without drilling down.
+   * Defaults to false when it has children; override to allow a parent
+   * like "spans" to be selected whole OR drilled into.
    */
   isComplete?: boolean;
   /**
@@ -65,12 +59,9 @@ export type AvailableSource = {
 };
 
 /**
- * Field mapping - either to a source field or a hardcoded value.
- *
- * For source mappings, `path` is an array of field segments:
- * - Simple field: ["input"]
- * - Nested field: ["metadata", "customer_id"]
- * - Deeply nested: ["spans", "gpt-4", "output"]
+ * Field mapping — either to a source field or a hardcoded value. For
+ * source mappings, `path` is an array of field segments (e.g.
+ * `["spans", "gpt-4", "output"]`).
  */
 export type FieldMapping =
   | { type: "source"; sourceId: string; path: string[] }

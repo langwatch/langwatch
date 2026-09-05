@@ -19,20 +19,9 @@ export type SavePromptButtonProps = {
 };
 
 /**
- * Shared save button for prompts with "Update to vX" logic.
- * Shows:
- * - "Save" for new prompts
- * - "Update to vX" for existing prompts with changes OR not at latest version
- * - "Saved" when no changes AND at latest version
- *
- * Button is enabled when:
- * - There are unsaved changes, OR
- * - The current version is not the latest (allows "rollback" by publishing old version as new)
- *
- * Uses the actual latest version from the database, not just current + 1,
- * to handle cases where the prompt was updated in another tab/session.
- *
- * Used by both prompt playground and prompt editor drawer.
+ * Shared save button: "Save" for new prompts, "Update to vX" when stale,
+ * "Saved" otherwise. Uses the DB's actual latest version, not current+1,
+ * so another tab/session's update isn't missed.
  */
 export function SavePromptButton({
   onSave,

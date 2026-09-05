@@ -5,4 +5,9 @@ export {
   OperatorFeatureFlagCatalogueView,
   type OperatorFeatureFlagCatalogueProps,
 } from "./operator-feature-flag-catalogue";
-export { editorToRules, rulesToEditor, type FeatureFlagRuleEditorRule } from "./model/rule-editing";
+export { rulesToUI, uiToRules, type ScopeKind, type UIRule } from "./model/rule-editing";
+export {
+  summarizeTargeting,
+  targetingLabel,
+  type TargetingSummary,
+} from "./model/targeting-summary";
