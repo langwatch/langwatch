@@ -434,6 +434,8 @@ describe("given what apps/ui serves itself", () => {
         "@langwatch/onboarding-web",
         "@langwatch/ops-web",
         "@langwatch/organization-web",
+        "@langwatch/user-web",
+        "@langwatch/coding-agent-web",
         "@langwatch/project-web/screens/project",
         "@langwatch/prompt-web",
         "@langwatch/enterprise-scim-web",
@@ -442,8 +444,6 @@ describe("given what apps/ui serves itself", () => {
         "@langwatch/topic-web",
         "@langwatch/trace-web",
         "@langwatch/workflow-web",
-        "@langwatch/user-web",
-        "@langwatch/coding-agent-web",
       ]);
     });
 
