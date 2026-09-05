@@ -10,7 +10,7 @@
  * + safeParse at dispatch time so legacy rows are quarantined
  * (skip + warn) instead of silently defaulting.
  *
- * MVP shape — webhook only:
+ * Supported destination shapes include webhooks and organization-member email.
  *
  *   {
  *     destinations: [
@@ -23,7 +23,7 @@
  * X-LangWatch-Signature header so receivers can verify the request
  * came from us.
  *
- * Slack / PagerDuty / email / DLQ are deferred to follow-up rows.
+ * Slack / PagerDuty / DLQ are deferred to follow-up rows.
  * Webhook is the universal escape hatch — point it at a Slack
  * incoming-webhook URL with a small adapter on the receiver side.
  *
@@ -31,7 +31,7 @@
  */
 import { z } from "zod";
 
-export const SUPPORTED_DESTINATION_TYPES = ["webhook"] as const;
+export const SUPPORTED_DESTINATION_TYPES = ["webhook", "email"] as const;
 export type SupportedDestinationType =
   (typeof SUPPORTED_DESTINATION_TYPES)[number];
 
@@ -47,14 +47,46 @@ export const webhookDestinationSchema = z.object({
 });
 export type WebhookDestination = z.infer<typeof webhookDestinationSchema>;
 
+export const emailDestinationSchema = z.object({
+  type: z.literal("email"),
+  to: z
+    .array(z.string().trim().toLowerCase().email())
+    .min(1)
+    .max(10)
+    .refine(
+      (addresses) => new Set(addresses).size === addresses.length,
+      "email addresses must be unique",
+    ),
+});
+export type EmailDestination = z.infer<typeof emailDestinationSchema>;
+
 const destinationSchema = z.discriminatedUnion("type", [
   webhookDestinationSchema,
+  emailDestinationSchema,
 ]);
 export type Destination = z.infer<typeof destinationSchema>;
 
-export const destinationConfigSchema = z.object({
-  destinations: z.array(destinationSchema).max(10),
-});
+export const destinationConfigSchema = z
+  .object({ destinations: z.array(destinationSchema).max(10) })
+  .superRefine(({ destinations }, ctx) => {
+    if (destinations.filter(({ type }) => type === "email").length > 1) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["destinations"],
+        message: "only one email destination is allowed",
+      });
+    }
+    const recipients = destinations.flatMap((destination) =>
+      destination.type === "email" ? destination.to : [],
+    );
+    if (recipients.length > 10) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["destinations"],
+        message: "email destinations may contain at most 10 recipients",
+      });
+    }
+  });
 export type DestinationConfigParsed = z.infer<typeof destinationConfigSchema>;
 
 /**

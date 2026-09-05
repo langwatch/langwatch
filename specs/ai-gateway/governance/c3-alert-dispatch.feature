@@ -4,11 +4,10 @@ Feature: AI Gateway Governance — Anomaly alert dispatch (C3)
   So that an off-hours spend spike or compliance signal pages me, not just lands in a dashboard table
 
   Today (pre-C3), the spendSpikeAnomalyEvaluator persists AnomalyAlert
-  rows in Postgres with `detail.dispatch: "log_only"`. C3 ships the
-  generic webhook adapter as the minimum viable destination. Slack /
-  PagerDuty / email are deferred to follow-up rows; webhook is the
-  universal escape hatch (point it at a Slack incoming-webhook URL with
-  a small adapter on the receiver side).
+  rows in Postgres with `detail.dispatch: "log_only"`. C3 ships generic
+  webhook and organization-member email adapters. Slack / PagerDuty remain
+  deferred; webhook is the universal escape hatch (point it at a Slack
+  incoming-webhook URL with a small adapter on the receiver side).
 
   Background:
     Given organization "acme" exists on an Enterprise plan
@@ -133,3 +132,36 @@ Feature: AI Gateway Governance — Anomaly alert dispatch (C3)
     # Mirrors the threshold-config quarantine path from `1f4ddd04c`:
     # broken config doesn't crash the evaluator and doesn't silently
     # default — it logs and falls back to log-only.
+
+  # ============================================================================
+  # Email destination
+  # ============================================================================
+
+  @unit
+  Scenario: Email destination sends one privacy-safe message per alert
+    Given an anomaly rule has an email destination with two organization member addresses
+    When one alert fires after matching several events
+    Then each recipient receives one email through the platform mailer
+    And the email names the monitor, rule, source, window, and governance dashboard
+    And the email does not contain the alert detail or any raw event payload
+
+  @unit @regression
+  Scenario: Email dispatch skips recipients who are no longer active organization members
+    Given an email destination configured for one active and one departed organization member
+    When an alert fires
+    Then the active member receives the email
+    And the departed member is counted as a failed delivery without blocking the active member
+
+  @integration
+  Scenario: Email destination recipients must be active organization members
+    Given an organization member and an address outside the organization
+    When an admin saves either address in the email destination `to` list
+    Then the member address is accepted
+    And the outside address is rejected as invalid destination configuration
+
+  @unit
+  Scenario: Email delivery failure is recorded on the alert
+    Given an email destination whose mail delivery fails
+    When the alert dispatcher finishes
+    Then its outcome is failed without exposing a recipient address
+    And the alert dispatch status records the email failure

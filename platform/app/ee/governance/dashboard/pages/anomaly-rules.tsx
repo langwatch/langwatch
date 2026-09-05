@@ -27,6 +27,10 @@ import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { docsUrl } from "~/utils/docsUrl";
+import {
+  destinationConfigWithEmailRecipients,
+  emailRecipientsFromDestinationConfig,
+} from "../logic/destinationConfigEditor";
 
 /**
  * Anomaly rule authoring surface, wired to api.anomalyRules.* (Sergey
@@ -980,13 +984,13 @@ function RuleComposer({
               borderRadius="sm"
             >
               <Text fontSize="xs" color="purple.900">
-                <strong>Alert destinations:</strong> alerts surface on the{" "}
+                <strong>Alert destinations:</strong> alerts always surface on
+                the{" "}
                 <Link href="/governance" color="blue.600">
                   governance dashboard
                 </Link>{" "}
-                today. Slack, PagerDuty, webhook, and email destinations ship in
-                a follow-up release — the composer will gain structured
-                destination fields then. (See{" "}
+                . Add up to 10 active organization-member email addresses below,
+                one per line. Existing webhook destinations are preserved. (See{" "}
                 <Link
                   href="/ai-gateway/governance/anomaly-rules"
                   color="blue.600"
@@ -995,6 +999,26 @@ function RuleComposer({
                 </Link>{" "}
                 for the dispatch coverage table.)
               </Text>
+              <Textarea
+                marginTop={3}
+                size="sm"
+                backgroundColor="white"
+                rows={3}
+                aria-label="Email alert recipients"
+                placeholder={"member@example.com\nadmin@example.com"}
+                value={emailRecipientsFromDestinationConfig(
+                  composer.destinationConfig,
+                )}
+                onChange={(event) =>
+                  setComposer({
+                    ...composer,
+                    destinationConfig: destinationConfigWithEmailRecipients({
+                      raw: composer.destinationConfig,
+                      recipientsText: event.target.value,
+                    }),
+                  })
+                }
+              />
             </Box>
           </VStack>
         </Drawer.Body>

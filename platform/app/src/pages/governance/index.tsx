@@ -926,6 +926,13 @@ function AnomalyRow({
     sourceLabel: string;
     detectedAtIso: string;
     currentState: "open" | "acknowledged" | "resolved";
+    emailDeliveryStatus: {
+      status: "accepted" | "partial_failure" | "failed";
+      acceptedCount: number;
+      failedCount: number;
+      totalCount: number;
+      updatedAtIso: string;
+    } | null;
   };
 }) {
   return (
@@ -961,6 +968,16 @@ function AnomalyRow({
           {alert.sourceLabel} · detected {fmtRelative(alert.detectedAtIso)}
         </Text>
       </VStack>
+      {alert.emailDeliveryStatus?.status === "partial_failure" && (
+        <Badge size="sm" colorPalette="orange" variant="surface">
+          Email partially delivered
+        </Badge>
+      )}
+      {alert.emailDeliveryStatus?.status === "failed" && (
+        <Badge size="sm" colorPalette="red" variant="surface">
+          Email delivery failed
+        </Badge>
+      )}
       <Badge size="sm" variant="surface">
         {alert.currentState}
       </Badge>
