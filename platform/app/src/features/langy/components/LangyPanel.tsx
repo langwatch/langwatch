@@ -2014,11 +2014,21 @@ function LangyPanel({
   }, [pendingPrompt, projectId, isBusy]);
 
   // The guided onboarding kickoff, drained like `pendingPrompt`: consumed
-  // first so it sends once, gated on an idle panel and, for an attached
-  // conversation, on its history having loaded. The message carries the typed
-  // kickoff part beside the model brief (see `buildGuidedKickoffParts`).
+  // first so it sends once, gated on an idle panel with a model to run on
+  // and, for an attached conversation, on its history having loaded. A
+  // takeover that skipped the provider lands on the model setup screen; the
+  // kickoff waits there until a model is picked, then sends. The message
+  // carries the typed kickoff part beside the model brief (see
+  // `buildGuidedKickoffParts`).
   useEffect(() => {
-    if (!pendingKickoff || !projectId || isBusy || isRestoringConversation)
+    if (
+      !pendingKickoff ||
+      !projectId ||
+      isBusy ||
+      isRestoringConversation ||
+      !modelQueriesSettled ||
+      langyNeedsModel
+    )
       return;
     const kickoff = pendingKickoff;
     consumePendingKickoff();
@@ -2043,7 +2053,14 @@ function LangyPanel({
       parts: plan.parts as unknown as UIMessage["parts"],
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingKickoff, projectId, isBusy, isRestoringConversation]);
+  }, [
+    pendingKickoff,
+    projectId,
+    isBusy,
+    isRestoringConversation,
+    modelQueriesSettled,
+    langyNeedsModel,
+  ]);
 
   const handleSelectConversation = (id: string) => {
     // Messages are replaced by the selected conversation's history, so don't
