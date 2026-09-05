@@ -80,7 +80,7 @@ export type SuiteEditorModel = {
       index: number,
       patch: Partial<Pick<SuiteFieldRow, "identifier" | "type">>,
     ) => void;
-    move: (index: number, by: -1 | 1) => void;
+    reorder: (input: { from: number; to: number }) => void;
     remove: (index: number) => void;
   };
   evaluators: {
@@ -237,12 +237,11 @@ function useSuiteFieldRows() {
             at === index ? { ...row, ...patch, error: undefined } : row,
           ),
         })),
-      move: (index: number, by: -1 | 1) =>
+      reorder: ({ from, to }: { from: number; to: number }) =>
         update((draft) => {
-          const to = index + by;
           if (to < 0 || to >= draft.fields.length) return draft;
           const fields = [...draft.fields];
-          const [row] = fields.splice(index, 1);
+          const [row] = fields.splice(from, 1);
           if (!row) return draft;
           fields.splice(to, 0, row);
           return { ...draft, fields };

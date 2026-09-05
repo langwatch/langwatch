@@ -79,14 +79,27 @@ Feature: The test suite editor
     And it holds no description
 
   @integration
-  Scenario: Fields can be added, reordered and removed
+  Scenario: Fields can be added and removed
     Given the fields section holds the fields golden_sql and table_schema
     When "Add field" is chosen
     Then a third row is added, empty
-    When the third row is moved up
-    Then the rows read golden_sql, then the new row, then table_schema
     When the first row is removed
-    Then the rows read the new row, then table_schema
+    Then the rows read table_schema, then the new row
+
+  @integration
+  Scenario: The reorder handle appears only when there is more than one field
+    Given the fields section holds one field
+    When the row is read
+    Then it carries no reorder handle, so nothing shifts the identifier input
+    When a second field is added
+    Then every row carries a reorder handle
+
+  @integration
+  Scenario: A field is reordered by its handle
+    Given the fields section holds the fields golden_sql and table_schema
+    When the first row's handle is picked up and moved past the second row, by pointer or by keyboard
+    Then the rows read table_schema, then golden_sql
+    And saving declares them in that order
 
   @integration
   Scenario: Closing the fields section takes the fields away

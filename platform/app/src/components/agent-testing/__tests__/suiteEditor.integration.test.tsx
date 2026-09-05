@@ -11,6 +11,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   act,
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -201,6 +202,57 @@ function openEditor(suite = storedSuite()) {
 
 const draft = () => useSuiteEditorStore.getState().draft;
 
+/** The field identifiers of the draft, in the order the rows read. */
+const identifiers = () => (draft()?.fields ?? []).map((row) => row.identifier);
+
+/**
+ * jsdom lays nothing out, so every rect is zero and dnd-kit cannot tell which
+ * row a keypress moves toward. Stacking siblings 60px apart is the smallest
+ * geometry that makes "the row below" a real answer.
+ */
+function stubVerticalLayout(): () => void {
+  const original = Element.prototype.getBoundingClientRect;
+  Element.prototype.getBoundingClientRect = function (this: Element): DOMRect {
+    const siblings = this.parentElement?.children;
+    const index = siblings ? Array.prototype.indexOf.call(siblings, this) : 0;
+    const top = index * 60;
+    return {
+      x: 0,
+      y: top,
+      top,
+      bottom: top + 50,
+      left: 0,
+      right: 400,
+      width: 400,
+      height: 50,
+      toJSON: () => ({}),
+    } as DOMRect;
+  };
+  return () => {
+    Element.prototype.getBoundingClientRect = original;
+  };
+}
+
+/** One keystroke, delivered where dnd-kit's keyboard sensor listens for it. */
+function press({
+  element,
+  code,
+}: {
+  element: HTMLElement;
+  code: string;
+}): void {
+  fireEvent.keyDown(element, { code, key: code === "Space" ? " " : code });
+}
+
+/**
+ * What dnd-kit is telling screen readers right now. The sensor measures its
+ * droppable rects off the main flow, so waiting on the announcement waits on
+ * the sensor's own account of what it did rather than on a frame count.
+ */
+function announcement(): string {
+  return document.querySelector("[aria-live]")?.textContent ?? "";
+}
+
 describe("the suite editor drawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -318,8 +370,8 @@ describe("the suite editor drawer", () => {
       ).not.toBeInTheDocument();
     });
 
-    /** @scenario "Fields can be added, reordered and removed" */
-    it("adds, moves and removes rows", async () => {
+    /** @scenario "Fields can be added and removed" */
+    it("adds and removes rows", async () => {
       const user = userEvent.setup();
       openEditor(
         storedSuite({
@@ -334,22 +386,78 @@ describe("the suite editor drawer", () => {
       await user.click(screen.getByTestId("suite-add-field"));
       expect(screen.getByLabelText("Field 3 identifier")).toHaveValue("");
 
-      const identifiers = () =>
-        (draft()?.fields ?? []).map((row) => row.identifier);
-
-      await user.click(
-        within(screen.getByTestId("suite-field-row-2")).getByRole("button", {
-          name: "Move up",
-        }),
-      );
-      expect(identifiers()).toEqual(["golden_sql", "", "table_schema"]);
-
       await user.click(
         within(screen.getByTestId("suite-field-row-0")).getByRole("button", {
           name: "Remove field",
         }),
       );
-      expect(identifiers()).toEqual(["", "table_schema"]);
+      expect(identifiers()).toEqual(["table_schema", ""]);
+    });
+
+    /** @scenario "The reorder handle appears only when there is more than one field" */
+    it("hides the handle while one field stands alone and gives every row one once a second arrives", async () => {
+      const user = userEvent.setup();
+      openEditor(
+        storedSuite({ fields: [{ identifier: "golden_sql", type: "text" }] }),
+      );
+      await screen.findByTestId("suite-fields-section");
+
+      expect(
+        screen.queryByRole("button", { name: "Reorder field" }),
+      ).not.toBeInTheDocument();
+
+      await user.click(screen.getByTestId("suite-add-field"));
+
+      expect(
+        screen.getAllByRole("button", { name: "Reorder field" }),
+      ).toHaveLength(2);
+    });
+
+    /** @scenario "A field is reordered by its handle" */
+    it("moves a row past the next one from the handle and saves the order it reads", async () => {
+      const restoreLayout = stubVerticalLayout();
+      try {
+        const user = userEvent.setup();
+        openEditor(
+          storedSuite({
+            fields: [
+              { identifier: "golden_sql", type: "text" },
+              { identifier: "table_schema", type: "text" },
+            ],
+          }),
+        );
+        await screen.findByTestId("suite-fields-section");
+
+        const [firstHandle] = screen.getAllByRole("button", {
+          name: "Reorder field",
+        });
+        if (!firstHandle) throw new Error("no reorder handle to press");
+        // The keys go to the handle rather than to whatever holds focus: what
+        // is under test is dnd-kit's sensor, not the drawer's focus trap.
+        press({ element: firstHandle, code: "Space" });
+        await waitFor(() => expect(announcement()).not.toBe(""));
+        const pickedUp = announcement();
+
+        press({ element: firstHandle, code: "ArrowDown" });
+        await waitFor(() => expect(announcement()).not.toBe(pickedUp));
+
+        press({ element: firstHandle, code: "Space" });
+        await waitFor(() =>
+          expect(identifiers()).toEqual(["table_schema", "golden_sql"]),
+        );
+
+        await user.click(screen.getByTestId("suite-editor-save"));
+        expect(mockUpdateMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            fields: [
+              { identifier: "table_schema", type: "text" },
+              { identifier: "golden_sql", type: "text" },
+            ],
+          }),
+        );
+      } finally {
+        restoreLayout();
+      }
     });
 
     /** @scenario "Closing the fields section takes the fields away" */

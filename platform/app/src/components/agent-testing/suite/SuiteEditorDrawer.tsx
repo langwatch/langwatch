@@ -101,7 +101,7 @@ function SuiteEditorFields({ model }: { model: SuiteEditorModel }) {
           rows={draft.fields}
           error={draft.fieldsError}
           onPatch={model.fields.patch}
-          onMove={model.fields.move}
+          onReorder={model.fields.reorder}
           onRemove={model.fields.remove}
           onAdd={model.fields.add}
           onClose={model.fields.close}

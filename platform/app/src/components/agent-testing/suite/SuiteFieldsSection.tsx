@@ -1,6 +1,7 @@
 /**
  * The fields section of the suite editor: one row per field, each an
- * identifier and a type, with the controls that reorder and remove it.
+ * identifier and a type, dragged into order by its handle and removed by its
+ * X.
  *
  * @see specs/features/agent-testing/suite-editor.feature
  */
@@ -15,7 +16,23 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowDown, ArrowUp, X } from "lucide-react";
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical, X } from "lucide-react";
 import {
   SUITE_FIELD_TYPES,
   type SuiteFieldType,
@@ -50,26 +67,28 @@ export type SuiteFieldsSectionProps = {
     index: number,
     patch: Partial<Pick<SuiteFieldRow, "identifier" | "type">>,
   ) => void;
-  onMove: (index: number, by: -1 | 1) => void;
+  onReorder: (input: { from: number; to: number }) => void;
   onRemove: (index: number) => void;
   onAdd: () => void;
   onClose: () => void;
 };
 
-/** A quiet control of a row: move it, or take it away. */
+/** A quiet control of a row: drag it, or take it away. */
 function RowButton({
   label,
-  disabled,
   onClick,
   children,
   danger,
+  grab,
+  ...rest
 }: {
   label: string;
-  disabled?: boolean;
-  onClick: () => void;
+  onClick?: () => void;
   children: React.ReactNode;
   danger?: boolean;
-}) {
+  /** True for the drag handle, which reads as something to pick up. */
+  grab?: boolean;
+} & Omit<React.ComponentProps<typeof IconButton>, "aria-label" | "onClick">) {
   return (
     <IconButton
       aria-label={label}
@@ -80,9 +99,10 @@ function RowButton({
       minWidth="22px"
       color={FG_MUTED}
       boxShadow={QUIET_BUTTON_SHADOW}
-      disabled={disabled}
+      cursor={grab ? "grab" : undefined}
       _hover={{ color: danger ? "red.fg" : "fg" }}
       onClick={onClick}
+      {...rest}
     >
       {children}
     </IconButton>
@@ -92,19 +112,37 @@ function RowButton({
 function FieldRow({
   row,
   index,
-  count,
+  isSortable,
   autoFocus,
   onPatch,
-  onMove,
   onRemove,
 }: {
   row: SuiteFieldRow;
   index: number;
-  count: number;
+  /** False while the suite has a single field: there is nothing to reorder. */
+  isSortable: boolean;
   autoFocus: boolean;
-} & Pick<SuiteFieldsSectionProps, "onPatch" | "onMove" | "onRemove">) {
+} & Pick<SuiteFieldsSectionProps, "onPatch" | "onRemove">) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: row.key, disabled: !isSortable });
+
   return (
-    <Box data-testid={`suite-field-row-${index}`}>
+    <Box
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Translate.toString(transform),
+        transition,
+        opacity: isDragging ? 0.6 : 1,
+      }}
+      zIndex={isDragging ? 1 : undefined}
+      data-testid={`suite-field-row-${index}`}
+    >
       <HStack
         gap={1.5}
         borderWidth="1px"
@@ -113,6 +151,11 @@ function FieldRow({
         paddingX={2}
         paddingY={1.5}
       >
+        {isSortable && (
+          <RowButton label="Reorder field" grab {...attributes} {...listeners}>
+            <GripVertical size={12} />
+          </RowButton>
+        )}
         <Input
           {...DIALOG_FIELD_STYLE}
           flex={1}
@@ -147,20 +190,6 @@ function FieldRow({
           </NativeSelect.Field>
           <NativeSelect.Indicator />
         </NativeSelect.Root>
-        <RowButton
-          label="Move up"
-          disabled={index === 0}
-          onClick={() => onMove(index, -1)}
-        >
-          <ArrowUp size={12} />
-        </RowButton>
-        <RowButton
-          label="Move down"
-          disabled={index === count - 1}
-          onClick={() => onMove(index, 1)}
-        >
-          <ArrowDown size={12} />
-        </RowButton>
         <RowButton label="Remove field" danger onClick={() => onRemove(index)}>
           <X size={12} />
         </RowButton>
@@ -174,7 +203,7 @@ export function SuiteFieldsSection({
   rows,
   error,
   onPatch,
-  onMove,
+  onReorder,
   onRemove,
   onAdd,
   onClose,
@@ -182,6 +211,24 @@ export function SuiteFieldsSection({
   // The newest empty row takes the focus, so a field added is a field being
   // named. A row that already holds a name is left alone.
   const lastEmpty = rows.findLastIndex((row) => row.identifier === "");
+
+  // A short pointer distance keeps an ordinary click on the handle from
+  // starting a drag. The keyboard sensor is what makes the order reachable
+  // without a pointer, since the arrow buttons are gone.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+    const from = rows.findIndex((row) => row.key === active.id);
+    const to = rows.findIndex((row) => row.key === over.id);
+    if (from === -1 || to === -1) return;
+    onReorder({ from, to });
+  };
 
   return (
     <VStack align="stretch" gap={1.5} data-testid="suite-fields-section">
@@ -192,18 +239,30 @@ export function SuiteFieldsSection({
       <Text fontSize="11px" color={FG_MUTED}>
         {FIELDS_SECTION_HELP}
       </Text>
-      {rows.map((row, index) => (
-        <FieldRow
-          key={row.key}
-          row={row}
-          index={index}
-          count={rows.length}
-          autoFocus={index === lastEmpty}
-          onPatch={onPatch}
-          onMove={onMove}
-          onRemove={onRemove}
-        />
-      ))}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={rows.map((row) => row.key)}
+          strategy={verticalListSortingStrategy}
+        >
+          <VStack align="stretch" gap={1.5}>
+            {rows.map((row, index) => (
+              <FieldRow
+                key={row.key}
+                row={row}
+                index={index}
+                isSortable={rows.length > 1}
+                autoFocus={index === lastEmpty}
+                onPatch={onPatch}
+                onRemove={onRemove}
+              />
+            ))}
+          </VStack>
+        </SortableContext>
+      </DndContext>
       <FieldError message={error} />
       <chakra.button
         type="button"
