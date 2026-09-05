@@ -315,6 +315,28 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       Then the ask prints the chain in full, wrapped at the width of the box
       And the answer prints as one short line naming the patterns that were granted
 
+  Rule: A dropped connection costs no work
+
+    # The platform replays the calls it has no answer for on the next
+    # connection, and the socket carries nothing while it is down. Both are
+    # answered here: the CLI runs a call once, and keeps its answer until a
+    # connection carries it.
+
+    @unit
+    Scenario: A call that arrives again after a reconnect runs once
+      Given a connected folder with a command still running
+      When the connection drops and the platform sends the same call again
+      Then the CLI does not start the command a second time
+      And the register frame lists the call as still running
+      And the platform receives one answer for it
+
+    @unit
+    Scenario: A result that no connection carried is sent again
+      Given a command that finished while the connection was down
+      When the CLI registers again
+      Then it sends the answer of that command on the new connection
+      And the command is not run a second time
+
   Rule: The CLI decides what may run, and the command line is parsed
 
     # The permission rules themselves are in

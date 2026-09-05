@@ -92,6 +92,8 @@ export function startLangySession(options: LangySessionOptions): LangySession {
   const root = options.workspace.root;
   const grants = new Set<string>();
   const running = new Map<string, RunningCommand>();
+  /** Every call this session took, so a replayed one is never taken twice. */
+  const handled = new Set<string>();
   const pending = new Map<string, PendingPermission>();
   const background: Array<{ pid: number; logPath: string }> = [];
   /** Asks waiting for the selector, which draws one question at a time. */
@@ -136,7 +138,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
     output?: BashOutput;
   }) => {
     client.forgetInFlight(callId);
-    client.send({
+    client.sendResult({
       type: "result",
       protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
       callId,
@@ -156,7 +158,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
     message: string;
   }) => {
     client.forgetInFlight(callId);
-    client.send({
+    client.sendResult({
       type: "result",
       protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
       callId,
@@ -231,6 +233,11 @@ export function startLangySession(options: LangySessionOptions): LangySession {
   };
 
   const onCall = (call: LocalCall): void => {
+    // The platform replays the calls it has no answer for after a reconnect.
+    // A call this session already took is running here or has already run, so
+    // taking it again would run the same command a second time.
+    if (handled.has(call.callId)) return;
+    handled.add(call.callId);
     client.noteInFlight(call.callId);
     const decision = decide({
       call: call as LocalToolCall,

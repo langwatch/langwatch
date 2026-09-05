@@ -24,6 +24,7 @@ import {
   type LocalCliFrame,
   type LocalPlatformFrame,
   type LocalRefusedFrame,
+  type LocalResultFrame,
   type LocalRegisteredFrame,
   type WorkspaceInfo,
 } from "../../../agent/local-control-protocol";
@@ -116,6 +117,14 @@ export class RelayClient {
   private readonly startedAt = new Date().toISOString();
   /** Calls this process is working on, re-sent on every register. */
   private readonly inFlight = new Set<string>();
+  /**
+   * Results no open connection carried, kept until one does.
+   *
+   * A result written while the socket is down is dropped by the socket, and
+   * the platform then has a call with no answer and replays it on the next
+   * connection. The answer this machine already has is sent again instead.
+   */
+  private readonly unsentResults = new Map<string, LocalResultFrame>();
 
   private activeTransport: AgentTransport;
   private upgradeStatus: number | null = null;
@@ -168,13 +177,33 @@ export class RelayClient {
     this.inFlight.delete(callId);
   }
 
-  send(frame: LocalCliFrame): void {
+  /** True when the frame went out on an open socket. */
+  send(frame: LocalCliFrame): boolean {
     const socket = this.socket;
-    if (!socket) return;
+    if (!socket) return false;
     try {
       socket.send(serializeLocalFrame(frame));
+      return true;
     } catch {
       // The socket is on its way out; the reconnect re-sends the register.
+      return false;
+    }
+  }
+
+  /**
+   * The answer to one call. It is kept until a connection carries it, so a
+   * command that finished while the connection was down is answered once,
+   * with what it did, rather than run again.
+   */
+  sendResult(frame: LocalResultFrame): void {
+    if (this.registered && this.send(frame)) return;
+    this.unsentResults.set(frame.callId, frame);
+  }
+
+  /** Sends the results that no earlier connection could carry. */
+  private flushResults(): void {
+    for (const [callId, frame] of [...this.unsentResults]) {
+      if (this.send(frame)) this.unsentResults.delete(callId);
     }
   }
 
@@ -364,6 +393,7 @@ export class RelayClient {
         this.heartbeatIntervalMs = frame.heartbeatIntervalMs;
         this.armWatchdog();
         this.handlers.onRegistered(frame);
+        this.flushResults();
         return;
       case "refused":
         this.handlers.onRefused(frame);

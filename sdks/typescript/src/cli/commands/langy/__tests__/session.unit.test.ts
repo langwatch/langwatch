@@ -836,3 +836,121 @@ describe("given a folder connected to a Langy conversation", () => {
     });
   });
 });
+
+describe("given a folder whose connection drops while Langy is working", () => {
+  let root: string;
+  let sockets: FakeSocket[];
+  let session: LangySession;
+  let lines: string[];
+
+  const live = (): FakeSocket => sockets[sockets.length - 1]!;
+
+  const start = () => {
+    sockets = [];
+    lines = [];
+    session = startLangySession({
+      endpoint: "http://localhost:5560",
+      sessionKey: "sk-lw-langy-session",
+      workspace: { root, name: path.basename(root), os: "test" },
+      conversation: CONVERSATION,
+      ui: createUi({ line: (text) => lines.push(text) }),
+      socketFactory: () => {
+        const socket = new FakeSocket();
+        sockets.push(socket);
+        return socket;
+      },
+      backoff: { baseMs: 10, maxMs: 10 },
+      approvals: null,
+    });
+    return session;
+  };
+
+  /** Registers the newest socket, and turns the questions off for the test. */
+  const register = ({ skipPermissions = true } = {}) => {
+    live().deliver({
+      type: "registered",
+      instanceId: "cli_1",
+      heartbeatIntervalMs: 10_000,
+      conversation: CONVERSATION,
+      policy: { skipPermissions },
+    });
+  };
+
+  beforeEach(() => {
+    root = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), "langy-reconnect-")),
+    );
+  });
+
+  afterEach(async () => {
+    await session?.client.stop();
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  /** @scenario "A call that arrives again after a reconnect runs once" */
+  it("runs a replayed call once, and says it is still in flight", async () => {
+    start();
+    await settle();
+    register();
+
+    const marker = path.join(root, "runs.txt");
+    const call = callFrame({
+      tool: "local_bash",
+      params: { command: "echo run >> runs.txt; sleep 1" },
+    });
+    live().deliver(call);
+    await waitUntil(() => fs.existsSync(marker), {
+      what: "the command to start",
+    });
+
+    // The connection drops and comes back while the command is running.
+    live().close(1006);
+    await waitUntil(() => sockets.length === 2, { what: "the reconnect" });
+    register();
+    const registered = live().sentOf("register")[0]!;
+    expect(
+      (registered.instance as { inFlightCallIds: string[] }).inFlightCallIds,
+    ).toEqual(["call-1"]);
+
+    // The platform replays the call it has no answer for.
+    live().deliver(call);
+    await waitUntil(() => live().sentOf("result").length === 1, {
+      what: "the one answer of the command",
+    });
+    await settle(200);
+
+    expect(fs.readFileSync(marker, "utf8").trim().split("\n")).toEqual(["run"]);
+    expect(live().sentOf("result")).toHaveLength(1);
+  });
+
+  /** @scenario "A result that no connection carried is sent again" */
+  it("sends the answer of a command that finished while the socket was down", async () => {
+    start();
+    await settle();
+    register();
+
+    live().deliver(
+      callFrame({
+        tool: "local_bash",
+        params: { command: "sleep 0.4; echo finished > done.txt" },
+      }),
+    );
+    const first = live();
+    first.close(1006);
+
+    await waitUntil(() => sockets.length === 2, { what: "the reconnect" });
+    await waitUntil(() => fs.existsSync(path.join(root, "done.txt")), {
+      what: "the command to finish while no connection is registered",
+    });
+    // Nothing carried the answer: the first socket is gone and the second one
+    // is not registered yet, so a frame sent on it would be dropped.
+    expect(first.sentOf("result")).toHaveLength(0);
+    expect(live().sentOf("result")).toHaveLength(0);
+
+    register();
+    await waitUntil(() => live().sentOf("result").length === 1, {
+      what: "the kept answer to be sent again",
+    });
+    expect(live().sentOf("result")[0]!.callId).toBe("call-1");
+  });
+});
