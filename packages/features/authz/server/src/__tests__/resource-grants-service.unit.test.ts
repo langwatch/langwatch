@@ -1,13 +1,13 @@
 import { GrantValidationError } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { EventingAuthzLedgerAdapter } from "../../adapters/eventing.authz-ledger.adapter";
-import type { AuthzGrantRepository } from "../../repositories/authz-grant.repository";
-import { AuthzGrantsService } from "../authz-grants.service";
-import { AuthzService } from "../authz.service";
-import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub";
-import { StubAuthzEpoch } from "../../ports/__tests__/support/authz-epoch.stub";
-import { StubAuthzListingRepository } from "../../repositories/__tests__/support/authz-listing.stub";
-import { makeReader } from "../../repositories/__tests__/support/authz-read.stub";
+import type { EventingAuthzLedgerAdapter } from "../adapters/eventing.authz-ledger.adapter";
+import type { AuthzGrantRepository } from "../repositories/authz-grant.repository";
+import { AuthzGrantsService } from "../services/authz-grants.service";
+import { AuthzService } from "../services/authz.service";
+import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub";
+import { StubAuthzEpoch } from "../ports/__tests__/support/authz-epoch.stub";
+import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub";
+import { makeReader } from "../repositories/__tests__/support/authz-read.stub";
 import { liveShareLinkRow, ORG, traceScope } from "./support/resource-fixtures";
 
 describe("AuthzService on a resource scope", () => {

@@ -1,13 +1,11 @@
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import type { PrismaClient, PromptTag } from "@langwatch/prisma-client/generated";
+import { PromptTagRepository } from "../prompt-tag.repository";
+
 const SEEDED_TAGS = ["production", "staging"] as const;
 
 const logger = createLogger("langwatch:prompt-tags");
-
-/** Tags that cannot be created or deleted. Only 'latest' is protected — it is resolved at query time. */
-export const PROTECTED_TAGS = ["latest"] as const;
-export type ProtectedTag = (typeof PROTECTED_TAGS)[number];
 
 /**
  * The client slice the tag catalogue binds to, transaction included: seeding
@@ -19,8 +17,14 @@ export type PromptTagDatabase = Pick<PrismaClient, "promptTag" | "$transaction">
  * Repository for managing prompt tag definitions.
  * Production and staging are seeded as custom tags per org.
  */
-export class PromptTagRepository {
-  constructor(private readonly prisma: PromptTagDatabase) {}
+export class PrismaPromptTagRepository extends PromptTagRepository {
+  static create({ prisma }: { prisma: PromptTagDatabase }): PrismaPromptTagRepository {
+    return new PrismaPromptTagRepository(prisma);
+  }
+
+  private constructor(private readonly prisma: PromptTagDatabase) {
+    super();
+  }
 
   /**
    * Creates a custom tag definition for an org.

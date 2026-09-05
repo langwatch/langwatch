@@ -8,24 +8,17 @@ import type {
 } from "@langwatch/prisma-client/generated";
 
 import { NotFoundError, type SchemaVersion } from "@langwatch/prompt-contract";
-import { LlmConfigRepository } from "./prisma.prompt.repository";
+import {
+  LlmConfigVersionsRepository,
+  type CreateLlmConfigVersionParams,
+  type LlmConfigVersionDTO,
+} from "../prompt-version.repository";
+import { PrismaLlmConfigRepository } from "./prisma.prompt.repository";
 import {
   getVersionValidator,
   type LatestConfigVersionSchema,
   parseRuntimeParameters,
 } from "@langwatch/prompt-contract";
-
-/**
- * Interface for LLM Config Version data transfer objects
- */
-export type LlmConfigVersionDTO = Omit<LatestConfigVersionSchema, "version">;
-
-export type CreateLlmConfigVersionParams = Omit<
-  LlmPromptConfigVersion,
-  "id" | "author" | "config" | "createdAt" | "configData" | "name" | "runtimeParameters"
-> & {
-  configData: LatestConfigVersionSchema["configData"];
-};
 
 /**
  * The client slice version persistence binds to, transaction included: a
@@ -47,8 +40,14 @@ export type PromptVersionDatabase = Pick<
  * Generally, you should be using the LlmConfigRepository to get the latest version of a config
  * instead of this repository.
  */
-export class LlmConfigVersionsRepository {
-  constructor(private readonly prisma: PromptVersionDatabase) {}
+export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsRepository {
+  static create({ prisma }: { prisma: PromptVersionDatabase }): PrismaLlmConfigVersionsRepository {
+    return new PrismaLlmConfigVersionsRepository(prisma);
+  }
+
+  private constructor(private readonly prisma: PromptVersionDatabase) {
+    super();
+  }
 
   /**
    * Get all versions for a specific config
@@ -63,7 +62,7 @@ export class LlmConfigVersionsRepository {
     organizationId: string;
   }): Promise<(LlmPromptConfigVersion & { author: User | null })[]> {
     // Verify the config exists
-    const promptRepository = new LlmConfigRepository(this.prisma);
+    const promptRepository = PrismaLlmConfigRepository.create({ prisma: this.prisma });
     const config = await promptRepository.tryGetPromptByIdOrHandle({
       idOrHandle,
       projectId,
@@ -181,7 +180,7 @@ export class LlmConfigVersionsRepository {
   }): Promise<LlmPromptConfigVersion & { schemaVersion: SchemaVersion }> {
     const { versionData, organizationId } = params;
     // Verify the config exists
-    const promptRepository = new LlmConfigRepository(this.prisma);
+    const promptRepository = PrismaLlmConfigRepository.create({ prisma: this.prisma });
     const config = await promptRepository.tryGetConfigByIdOrHandleWithLatestVersion({
       idOrHandle: versionData.configId,
       projectId: versionData.projectId,

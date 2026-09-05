@@ -8,7 +8,7 @@ import {
   PROJECT,
   TEAM,
   traceScope,
-} from "./support/resource-fixtures";
+} from "../../__tests__/support/resource-fixtures";
 
 const engine = new AuthzEngine();
 

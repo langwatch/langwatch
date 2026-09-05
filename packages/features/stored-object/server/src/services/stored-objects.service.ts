@@ -19,11 +19,11 @@ import { createLogger } from "@langwatch/observability";
 import { redactStoredObjectStorageUri } from "@langwatch/stored-object-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { StoredObjectStorageRegistry } from "../adapters/stored-object-storage.registry";
+import type { StoredObjectStoragePort } from "../ports/stored-object-storage.port";
 import { ObjectNotFoundError } from "../errors";
 import type { StoredObjectsTelemetryPort } from "../ports/stored-objects-telemetry.port";
-import type { StoredObject } from "../repositories/clickhouse/stored-objects.row";
-import type { StoredObjectsRepository } from "../repositories/clickhouse/stored-objects.repository";
+import type { StoredObject } from "../repositories/stored-objects.row";
+import type { StoredObjectsRepository } from "../repositories/stored-objects.repository";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.service");
 const logger = createLogger("langwatch:stored-objects:service");
@@ -59,9 +59,7 @@ function deriveStoredObjectId({
  */
 export type MintStorageUri = (args: { projectId: string; sha256: string }) => Promise<string>;
 
-type RegistryResolver =
-  | StoredObjectStorageRegistry
-  | ((projectId: string) => StoredObjectStorageRegistry);
+type RegistryResolver = StoredObjectStoragePort | ((projectId: string) => StoredObjectStoragePort);
 
 /** What the process composes this service from. */
 export type StoredObjectsServiceOptions = Readonly<{
@@ -109,7 +107,7 @@ export class StoredObjectsService {
     return this.options.mintStorageUri(input);
   }
 
-  private registryFor(projectId: string): StoredObjectStorageRegistry {
+  private registryFor(projectId: string): StoredObjectStoragePort {
     const { registry } = this.options;
 
     return typeof registry === "function" ? registry(projectId) : registry;

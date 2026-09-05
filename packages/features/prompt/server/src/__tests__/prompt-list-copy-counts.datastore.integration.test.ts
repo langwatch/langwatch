@@ -20,12 +20,12 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { LlmConfigRepository } from "../../repositories/prisma/prisma.prompt.repository";
-import { PromptTagAssignmentRepository } from "../../repositories/prisma/prisma.prompt-tag-assignment.repository";
-import { PromptTagRepository } from "../../repositories/prisma/prisma.prompt-tag.repository";
-import { PromptTagService } from "../prompt-tag.service";
-import { PromptService } from "../prompt.service";
-import { PromptVersionService } from "../prompt-version.service";
+import { PrismaLlmConfigRepository } from "../repositories/prisma/prisma.prompt.repository";
+import { PrismaPromptTagAssignmentRepository } from "../repositories/prisma/prisma.prompt-tag-assignment.repository";
+import { PrismaPromptTagRepository } from "../repositories/prisma/prisma.prompt-tag.repository";
+import { PromptTagService } from "../services/prompt-tag.service";
+import { PromptService } from "../services/prompt.service";
+import { PromptVersionService } from "../services/prompt-version.service";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 
@@ -35,11 +35,11 @@ describe.skipIf(!DB_URL)("Feature: The prompt list reports live copy counts", ()
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
 
-  const tagRepository = new PromptTagRepository(prisma);
+  const tagRepository = PrismaPromptTagRepository.create({ prisma });
   const service = PromptService.create({
-    repository: new LlmConfigRepository(prisma),
+    repository: PrismaLlmConfigRepository.create({ prisma }),
     versionService: PromptVersionService.create(),
-    tagRepository: new PromptTagAssignmentRepository(prisma),
+    tagRepository: PrismaPromptTagAssignmentRepository.create({ prisma }),
     promptTagRepository: tagRepository,
     tagService: PromptTagService.create(tagRepository),
   });

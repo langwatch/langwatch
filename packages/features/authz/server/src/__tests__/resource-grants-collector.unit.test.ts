@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { AuthzCollectorService } from "../authz-collector.service";
-import { makeReader } from "../../repositories/__tests__/support/authz-read.stub";
+import { AuthzCollectorService } from "../services/authz-collector.service";
+import { makeReader } from "../repositories/__tests__/support/authz-read.stub";
 import { liveShareLinkRow, ORG, PROJECT, TEAM, traceScope } from "./support/resource-fixtures";
 
 const customRoleBinding = [

@@ -15,7 +15,7 @@
  */
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
-import { AzureBlobStoredObjectDriver } from "#adapters/azure-blob.stored-object-driver.adapter";
+import { AzureBlobStoredObjectDriverAdapter } from "#adapters/azure-blob.stored-object-driver.adapter";
 import {
   assertTokenModeTransportSafety,
   type AzureCredentials,
@@ -24,12 +24,12 @@ import {
 import type { StoredObjectStorageDriver } from "#adapters/stored-object-storage.registry";
 import { z } from "zod";
 import {
-  createMigrationStorageEndpoint,
   type MigrationInventory,
-  ObjectStorageMigration,
+  ObjectStorageMigrationService,
+  type ObjectStorageMigrationDeps,
 } from "../services/object-storage-migration.service";
 import {
-  MigrationCutoverRedisAudit,
+  MigrationCutoverRedisAuditAdapter,
   type MigrationCutoverRedisConfig,
 } from "../adapters/redis.object-storage-migration.adapter";
 
@@ -218,27 +218,25 @@ export function createMigrationTask({
 }: {
   config: MigrationTaskConfig;
   inventory: MigrationInventory;
-  publishStoredObject: ConstructorParameters<
-    typeof ObjectStorageMigration
-  >[0]["publishStoredObject"];
-  auditQueues: ConstructorParameters<typeof ObjectStorageMigration>[0]["auditQueues"];
+  publishStoredObject: ObjectStorageMigrationDeps["publishStoredObject"];
+  auditQueues: ObjectStorageMigrationDeps["auditQueues"];
   s3Driver: StoredObjectStorageDriver;
-}): ObjectStorageMigration {
+}): ObjectStorageMigrationService {
   const endpoints = {
-    s3: createMigrationStorageEndpoint({
+    s3: ObjectStorageMigrationService.createStorageEndpoint({
       provider: "s3",
       driver: s3Driver,
       bucket: config.s3.bucket,
     }),
-    azure: createMigrationStorageEndpoint({
+    azure: ObjectStorageMigrationService.createStorageEndpoint({
       provider: "azure",
-      driver: AzureBlobStoredObjectDriver.create(toAzureCredentials(config)),
+      driver: AzureBlobStoredObjectDriverAdapter.create(toAzureCredentials(config)),
       accountName: config.azure.accountName,
       container: config.azure.container,
     }),
   };
 
-  return new ObjectStorageMigration({
+  return ObjectStorageMigrationService.create({
     source: endpoints[config.sourceProvider],
     destination: endpoints[config.targetProvider],
     inventory,
@@ -251,12 +249,12 @@ export function createMigrationTask({
 
 /** The cutover's group-queue check, over the process's own Redis resolution. */
 export async function auditQueuesForCutover(config: MigrationCutoverRedisConfig) {
-  return MigrationCutoverRedisAudit.create({ config, logger }).audit();
+  return MigrationCutoverRedisAuditAdapter.create({ config, logger }).audit();
 }
 
 /** Runs one phase of the migration. */
 export async function runMigrationPhase(
-  migration: ObjectStorageMigration,
+  migration: ObjectStorageMigrationService,
   phase: MigrationTaskPhase,
 ) {
   if (phase === "plan") return migration.plan();
@@ -306,7 +304,7 @@ export function toAzureCredentials(
  * object-storage-migrate <plan|copy|finalize|verify>`. `migration` is a
  * factory rather than a built instance: `apps/tasks` composes every catalogue
  * entry at boot, before a phase is known, so building the
- * {@link ObjectStorageMigration} (via {@link createMigrationTask}) is deferred
+ * {@link ObjectStorageMigrationService} (via {@link createMigrationTask}) is deferred
  * to `run()`, the same way the process's other infrastructure-backed tasks
  * defer `host.require*()`. This class is only the seam that reads the phase
  * off `args[0]`.
@@ -316,14 +314,14 @@ export class ObjectStorageMigrateTask extends Task {
   readonly description =
     "Runs one phase (plan, copy, finalize, verify) of an S3 <-> Azure Blob migration.";
 
-  private constructor(private readonly migration: () => ObjectStorageMigration) {
+  private constructor(private readonly migration: () => ObjectStorageMigrationService) {
     super();
   }
 
   static create({
     migration,
   }: {
-    migration: () => ObjectStorageMigration;
+    migration: () => ObjectStorageMigrationService;
   }): ObjectStorageMigrateTask {
     return new ObjectStorageMigrateTask(migration);
   }

@@ -19,7 +19,7 @@ import { TieredBlobStore } from "@langwatch/group-queue/operational";
 import { mintStoredObjectUri } from "@langwatch/stored-object-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AzureBlobStoredObjectDriver } from "../azure-blob.stored-object-driver.adapter";
+import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter";
 import {
   StoredObjectAzureDestinationPort,
   StoredObjectDestinationPolicy,
@@ -27,8 +27,8 @@ import {
 } from "../stored-object-destination.policy";
 import { StoredObjectStorageRegistry } from "../stored-object-storage.registry";
 import { StoredObjectsService } from "../../services/stored-objects.service";
-import type { StoredObject } from "../../repositories/clickhouse/stored-objects.row";
-import type { StoredObjectsRepository } from "../../repositories/clickhouse/stored-objects.repository";
+import type { StoredObject } from "../../repositories/stored-objects.row";
+import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository";
 import type { StoredObjectsTelemetryPort } from "../../ports/stored-objects-telemetry.port";
 
 const ACCOUNT = "lwacct";
@@ -65,8 +65,8 @@ function installBlobAccount(): Map<string, Buffer> {
   return blobs;
 }
 
-function azureDriver(): AzureBlobStoredObjectDriver {
-  return AzureBlobStoredObjectDriver.create({
+function azureDriver(): AzureBlobStoredObjectDriverAdapter {
+  return AzureBlobStoredObjectDriverAdapter.create({
     mode: "sharedKey",
     accountName: ACCOUNT,
     accountKey: Buffer.from("account-key").toString("base64"),

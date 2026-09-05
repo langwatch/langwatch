@@ -35,9 +35,9 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import type { StoredObjectStorageRegistry } from "../../adapters/stored-object-storage.registry";
-import type { StoredObject } from "../../repositories/clickhouse/stored-objects.row";
-import type { StoredObjectsRepository } from "../../repositories/clickhouse/stored-objects.repository";
+import type { StoredObjectStoragePort } from "../../ports/stored-object-storage.port";
+import type { StoredObject } from "../../repositories/stored-objects.row";
+import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository";
 import type { StoredObjectsTelemetryPort } from "../../ports/stored-objects-telemetry.port";
 import { StoredObjectsService } from "../stored-objects.service";
 
@@ -71,7 +71,7 @@ function makeService(): StoredObjectsService {
       put: vi.fn(async () => undefined),
       delete: vi.fn(async () => undefined),
       exists: vi.fn(async () => true),
-    } as unknown as StoredObjectStorageRegistry,
+    } as unknown as StoredObjectStoragePort,
     mintStorageUri: async ({ projectId, sha256 }) => `file:///tmp/${projectId}/${sha256}`,
     telemetry: {
       recordExtract: vi.fn(),

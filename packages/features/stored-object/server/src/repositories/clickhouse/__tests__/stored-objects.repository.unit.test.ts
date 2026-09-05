@@ -39,8 +39,8 @@ vi.mock("langwatch", () => ({
 // ---------------------------------------------------------------------------
 
 import { StoredObjectsClickHousePort } from "../../../ports/stored-objects-clickhouse.port";
-import type { StoredObject } from "../stored-objects.row";
-import { StoredObjectsRepository } from "../stored-objects.repository";
+import type { StoredObject } from "../../stored-objects.row";
+import { ClickHouseStoredObjectsRepository } from "../stored-objects.repository";
 
 /** The routed connection, as this suite's one project resolves it. */
 class FakeStoredObjectsClickHouse extends StoredObjectsClickHousePort {
@@ -78,12 +78,12 @@ function makeRow(): StoredObject {
 // ---------------------------------------------------------------------------
 
 describe("StoredObjectsRepository", () => {
-  let repo: StoredObjectsRepository;
+  let repo: ClickHouseStoredObjectsRepository;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockQueryResult.json.mockResolvedValue([]);
-    repo = StoredObjectsRepository.create(new FakeStoredObjectsClickHouse());
+    repo = ClickHouseStoredObjectsRepository.create(new FakeStoredObjectsClickHouse());
   });
 
   describe("insert", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { LlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository";
+import { PrismaLlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository";
 
 function makeMockPrisma(findFirstResult: unknown = null) {
   return {
@@ -9,12 +9,12 @@ function makeMockPrisma(findFirstResult: unknown = null) {
   } as unknown as PromptConfigDatabase;
 }
 
-describe("LlmConfigRepository", () => {
+describe("PrismaLlmConfigRepository", () => {
   describe("existsForProjectOrOrg()", () => {
     describe("when prompt exists in same project", () => {
       it("returns true", async () => {
         const prisma = makeMockPrisma({ id: "prompt_1" });
-        const repository = new LlmConfigRepository(prisma);
+        const repository = PrismaLlmConfigRepository.create({ prisma });
 
         const result = await repository.existsForProjectOrOrg({
           id: "prompt_1",
@@ -29,7 +29,7 @@ describe("LlmConfigRepository", () => {
     describe("when prompt is org-scoped", () => {
       it("queries with OR pattern including org scope", async () => {
         const prisma = makeMockPrisma({ id: "prompt_org" });
-        const repository = new LlmConfigRepository(prisma);
+        const repository = PrismaLlmConfigRepository.create({ prisma });
 
         await repository.existsForProjectOrOrg({
           id: "prompt_org",
@@ -49,7 +49,7 @@ describe("LlmConfigRepository", () => {
 
       it("returns true", async () => {
         const prisma = makeMockPrisma({ id: "prompt_org" });
-        const repository = new LlmConfigRepository(prisma);
+        const repository = PrismaLlmConfigRepository.create({ prisma });
 
         const result = await repository.existsForProjectOrOrg({
           id: "prompt_org",
@@ -64,7 +64,7 @@ describe("LlmConfigRepository", () => {
     describe("when prompt does not exist", () => {
       it("returns false", async () => {
         const prisma = makeMockPrisma(null);
-        const repository = new LlmConfigRepository(prisma);
+        const repository = PrismaLlmConfigRepository.create({ prisma });
 
         const result = await repository.existsForProjectOrOrg({
           id: "prompt_missing",
@@ -80,7 +80,7 @@ describe("LlmConfigRepository", () => {
       it("returns false", async () => {
         // findFirst returns null because deletedAt filter excludes it
         const prisma = makeMockPrisma(null);
-        const repository = new LlmConfigRepository(prisma);
+        const repository = PrismaLlmConfigRepository.create({ prisma });
 
         const result = await repository.existsForProjectOrOrg({
           id: "prompt_deleted",
@@ -93,7 +93,7 @@ describe("LlmConfigRepository", () => {
 
       it("queries with deletedAt: null to exclude soft-deleted prompts", async () => {
         const prisma = makeMockPrisma(null);
-        const repository = new LlmConfigRepository(prisma);
+        const repository = PrismaLlmConfigRepository.create({ prisma });
 
         await repository.existsForProjectOrOrg({
           id: "prompt_deleted",
@@ -114,7 +114,7 @@ describe("LlmConfigRepository", () => {
         // The mock returns null because the query filters by organizationId: "org_A"
         // but the prompt belongs to org_B
         const prisma = makeMockPrisma(null);
-        const repository = new LlmConfigRepository(prisma);
+        const repository = PrismaLlmConfigRepository.create({ prisma });
 
         const result = await repository.existsForProjectOrOrg({
           id: "prompt_org_b",

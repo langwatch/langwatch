@@ -26,18 +26,28 @@ export type MigrationS3RegionConfiguration = {
 };
 
 /** Task-owned S3 driver backed by the executable's process-owned AWS transport. */
-export class MigrationS3StorageDriver implements StoredObjectStorageDriver {
+export class MigrationS3StorageDriverAdapter implements StoredObjectStorageDriver {
   static create(input: {
     aws: AwsClientProcessRuntime;
     config: MigrationS3Configuration;
-  }): MigrationS3StorageDriver {
-    return new MigrationS3StorageDriver(input.aws, input.config);
+  }): MigrationS3StorageDriverAdapter {
+    return new MigrationS3StorageDriverAdapter(input.aws, input.config);
+  }
+
+  /**
+   * A custom endpoint that is not AWS gets `"auto"`: an S3-compatible service
+   * has no region, and the SDK refuses to sign without one.
+   */
+  static resolveRegion(config: MigrationS3RegionConfiguration): string | undefined {
+    return (
+      config.region ?? (config.endpoint && !isAwsS3Endpoint(config.endpoint) ? "auto" : undefined)
+    );
   }
 
   private readonly client: S3Client;
 
   private constructor(aws: AwsClientProcessRuntime, config: MigrationS3Configuration) {
-    const region = resolveMigrationS3Region(config);
+    const region = MigrationS3StorageDriverAdapter.resolveRegion(config);
     this.client = new S3Client({
       ...aws.build({
         region,
@@ -95,14 +105,6 @@ export class MigrationS3StorageDriver implements StoredObjectStorageDriver {
   close(): void {
     this.client.destroy();
   }
-}
-
-export function resolveMigrationS3Region(
-  config: MigrationS3RegionConfiguration,
-): string | undefined {
-  return (
-    config.region ?? (config.endpoint && !isAwsS3Endpoint(config.endpoint) ? "auto" : undefined)
-  );
 }
 
 function defaultS3Host(region: string | undefined): string {

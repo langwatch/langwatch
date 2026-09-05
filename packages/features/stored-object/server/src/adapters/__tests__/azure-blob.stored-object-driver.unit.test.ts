@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Unit tests for AzureBlobStoredObjectDriver. The driver talks the Azure
+ * Unit tests for AzureBlobStoredObjectDriverAdapter. The driver talks the Azure
  * Blob REST API directly via global `fetch`, so we stub `fetch` to verify:
  *   - the URI is parsed into account/container/blob correctly
  *   - the request is signed with the SharedKey authorization header
@@ -28,7 +28,7 @@ vi.mock("../azure-blob-token-provider", () => ({
   invalidateAzureBlobToken: (...args: unknown[]) => invalidateAzureBlobTokenMock(...args),
 }));
 
-import { AzureBlobStoredObjectDriver } from "../azure-blob.stored-object-driver.adapter";
+import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter";
 import { StoredObjectStorageRegistry } from "../stored-object-storage.registry";
 import type { StoredObjectStorageDriver } from "../stored-object-storage.registry";
 import { ObjectNotFoundError } from "../../errors";
@@ -58,7 +58,7 @@ afterEach(() => {
 });
 
 function newDriver() {
-  return AzureBlobStoredObjectDriver.create({
+  return AzureBlobStoredObjectDriverAdapter.create({
     mode: "sharedKey",
     accountName: ACCOUNT_NAME,
     accountKey: ACCOUNT_KEY,
@@ -68,7 +68,7 @@ function newDriver() {
 function newTokenModeDriver(
   mode: "workloadIdentity" | "managedIdentity" | "azureCli" = "workloadIdentity",
 ) {
-  return AzureBlobStoredObjectDriver.create({
+  return AzureBlobStoredObjectDriverAdapter.create({
     mode,
     accountName: ACCOUNT_NAME,
     identity: {},
@@ -91,7 +91,7 @@ class NeverCalledDriver implements StoredObjectStorageDriver {
   }
 }
 
-describe("AzureBlobStoredObjectDriver", () => {
+describe("AzureBlobStoredObjectDriverAdapter", () => {
   // Restored in a hook, never inline: a rejected assertion between
   // useFakeTimers() and an inline restore would leave every subsequent test
   // in this file on a frozen clock, failing somewhere unrelated.
@@ -367,7 +367,7 @@ describe("AzureBlobStoredObjectDriver", () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date(KAT_TIMESTAMP));
 
-      const driver = AzureBlobStoredObjectDriver.create({
+      const driver = AzureBlobStoredObjectDriverAdapter.create({
         mode: "sharedKey",
         accountName: KAT_ACCOUNT_NAME,
         accountKey: KAT_ACCOUNT_KEY,
@@ -415,7 +415,7 @@ describe("AzureBlobStoredObjectDriver", () => {
 
   describe("when an alternate endpoint is configured (e.g. Azurite emulator)", () => {
     it("uses the configured endpoint instead of the public-cloud hostname", async () => {
-      const driver = AzureBlobStoredObjectDriver.create({
+      const driver = AzureBlobStoredObjectDriverAdapter.create({
         mode: "sharedKey",
         accountName: ACCOUNT_NAME,
         accountKey: ACCOUNT_KEY,
@@ -452,7 +452,7 @@ describe("AzureBlobStoredObjectDriver", () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date(PATH_STYLE_TIMESTAMP));
 
-      const driver = AzureBlobStoredObjectDriver.create({
+      const driver = AzureBlobStoredObjectDriverAdapter.create({
         mode: "sharedKey",
         accountName: PATH_STYLE_ACCOUNT,
         accountKey: ACCOUNT_KEY,
@@ -500,7 +500,7 @@ describe("AzureBlobStoredObjectDriver", () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date(PATH_STYLE_TIMESTAMP));
 
-      const driver = AzureBlobStoredObjectDriver.create({
+      const driver = AzureBlobStoredObjectDriverAdapter.create({
         mode: "sharedKey",
         accountName: PATH_STYLE_ACCOUNT,
         accountKey: ACCOUNT_KEY,
@@ -648,7 +648,7 @@ describe("AzureBlobStoredObjectDriver", () => {
     it("produces the same Authorization header for a host-style and a path-style endpoint, neither carrying a SharedKey signature", async () => {
       getAzureBlobTokenMock.mockResolvedValue("same-bearer-token");
 
-      const hostStyleDriver = AzureBlobStoredObjectDriver.create({
+      const hostStyleDriver = AzureBlobStoredObjectDriverAdapter.create({
         mode: "workloadIdentity",
         accountName: ACCOUNT_NAME,
         identity: {},
@@ -657,7 +657,7 @@ describe("AzureBlobStoredObjectDriver", () => {
       await hostStyleDriver.put(URI, Buffer.from("x"), "application/octet-stream");
       const hostHeaders = fetchSpy.mock.calls[0]![1].headers as Record<string, string>;
 
-      const pathStyleDriver = AzureBlobStoredObjectDriver.create({
+      const pathStyleDriver = AzureBlobStoredObjectDriverAdapter.create({
         mode: "workloadIdentity",
         accountName: ACCOUNT_NAME,
         identity: {},

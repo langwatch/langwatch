@@ -29,7 +29,7 @@ vi.mock("@azure/identity", () => ({
   },
 }));
 
-import { AzureBlobStoredObjectDriver } from "../azure-blob.stored-object-driver.adapter";
+import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter";
 import {
   AzureBackendMisconfiguredError,
   resolveAzureCredentials,
@@ -146,7 +146,7 @@ function registryFor(
     s3: dispatchedElsewhere,
     file: dispatchedElsewhere,
     "azure-blob": () =>
-      AzureBlobStoredObjectDriver.create(
+      AzureBlobStoredObjectDriverAdapter.create(
         resolveAzureCredentials({ config, purpose: "read", identity }),
       ),
   });

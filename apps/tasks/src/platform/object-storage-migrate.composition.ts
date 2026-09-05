@@ -1,13 +1,13 @@
 import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
 import {
   auditQueuesForCutover,
-  createMigrationInventory,
+  PostgresObjectStorageMigrationInventoryAdapter,
   createMigrationTask,
-  MigrationS3StorageDriver,
+  MigrationS3StorageDriverAdapter,
   ObjectStorageMigrateTask,
   parseMigrationTaskConfig,
   StoredObjectsClickHousePort,
-  StoredObjectsRepository,
+  ClickHouseStoredObjectsRepository,
   type StoredObjectsClickHouseClient,
 } from "@langwatch/stored-object-server";
 import type { TasksHost } from "./tasks-host.composition";
@@ -59,19 +59,19 @@ export function buildObjectStorageMigrateTask({
     migration: () => {
       const config = parseMigrationTaskConfig(process.env);
       const clickhouse = new TasksStoredObjectsClickHouse(() => host.requireClickhouse());
-      const repository = StoredObjectsRepository.create(clickhouse);
+      const repository = ClickHouseStoredObjectsRepository.create(clickhouse);
       const aws = AwsClientProcessRuntime.create({ outboundProxy: new TasksNoOutboundProxy() });
 
       return createMigrationTask({
         config,
-        inventory: createMigrationInventory({
+        inventory: PostgresObjectStorageMigrationInventoryAdapter.create({
           repository,
           prisma: host.requirePrisma(),
           privateOrganizations: new Map(),
         }),
         publishStoredObject: (row) => repository.insert({ projectId: row.project_id, row }),
         auditQueues: () => auditQueuesForCutover({ url: host.config.redisUrl }),
-        s3Driver: MigrationS3StorageDriver.create({ aws, config: config.s3 }),
+        s3Driver: MigrationS3StorageDriverAdapter.create({ aws, config: config.s3 }),
       });
     },
   });

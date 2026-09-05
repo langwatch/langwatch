@@ -27,11 +27,11 @@ import { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   PrismaAuthzBindingRepository,
   type AuthzBindingDatabase,
-} from "../../repositories/prisma/prisma.authz-binding.repository";
-import { PrismaAuthzListingRepository } from "../../repositories/prisma/prisma.authz-listing.repository";
-import { PrismaAuthzReadRepository } from "../../repositories/prisma/prisma.authz-read.repository";
-import type { AuthzDatabase } from "../../repositories/authz-read.repository";
-import { AuthzService } from "../authz.service";
+} from "../repositories/prisma/prisma.authz-binding.repository";
+import { PrismaAuthzListingRepository } from "../repositories/prisma/prisma.authz-listing.repository";
+import { PrismaAuthzReadRepository } from "../repositories/prisma/prisma.authz-read.repository";
+import type { AuthzDatabase } from "../repositories/authz-read.repository";
+import { AuthzService } from "../services/authz.service";
 
 const DB_URL = process.env.DATABASE_URL;
 

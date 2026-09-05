@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Unit tests for LocalFilesystemStoredObjectDriver.
+ * Unit tests for LocalFilesystemStoredObjectDriverAdapter.
  *
  * Each test gets an isolated temporary directory that is cleaned up in afterEach
  * to avoid cross-test interference.
@@ -14,7 +14,7 @@ import type { Readable } from "node:stream";
 import { mintFileStoredObjectUri } from "@langwatch/stored-object-contract";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ObjectNotFoundError } from "../../errors";
-import { LocalFilesystemStoredObjectDriver } from "../local-filesystem.stored-object-driver.adapter";
+import { LocalFilesystemStoredObjectDriverAdapter } from "../local-filesystem.stored-object-driver.adapter";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -34,12 +34,12 @@ async function streamToBuffer(stream: Readable): Promise<Buffer> {
 // ---------------------------------------------------------------------------
 
 let tmpDir: string;
-let driver: LocalFilesystemStoredObjectDriver;
+let driver: LocalFilesystemStoredObjectDriverAdapter;
 
 beforeEach(async () => {
   tmpDir = path.join(os.tmpdir(), `lw-fs-driver-${randomBytes(6).toString("hex")}`);
   await fs.mkdir(tmpDir, { recursive: true });
-  driver = LocalFilesystemStoredObjectDriver.create();
+  driver = LocalFilesystemStoredObjectDriverAdapter.create();
 });
 
 afterEach(async () => {

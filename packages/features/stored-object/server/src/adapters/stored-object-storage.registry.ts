@@ -4,6 +4,7 @@ import {
   redactStoredObjectStorageUri,
   type StoredObjectStorageScheme,
 } from "@langwatch/stored-object-contract";
+import { StoredObjectStoragePort } from "../ports/stored-object-storage.port";
 
 /** Provider byte operations supplied by process composition. */
 export interface StoredObjectStorageDriver {
@@ -23,12 +24,13 @@ export type StoredObjectStorageDriverFactory = () => StoredObjectStorageDriver |
  * configured Azure read driver is not constructed until an azure-blob URI is
  * actually read.
  */
-export class StoredObjectStorageRegistry {
+export class StoredObjectStorageRegistry extends StoredObjectStoragePort {
   constructor(input: {
     s3: StoredObjectStorageDriver;
     file: StoredObjectStorageDriver;
     "azure-blob"?: StoredObjectStorageDriver | StoredObjectStorageDriverFactory;
   }) {
+    super();
     this.drivers = { s3: input.s3, file: input.file };
     const azure = input["azure-blob"];
     if (typeof azure === "function") {

@@ -7,7 +7,7 @@ import { Readable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ObjectNotFoundError, UnsupportedStorageSchemeError } from "../../errors";
 import { StoredObjectS3TargetPort } from "../../ports/stored-object-s3-target.port";
-import { S3StoredObjectDriver } from "../s3.stored-object-driver.adapter";
+import { S3StoredObjectDriverAdapter } from "../s3.stored-object-driver.adapter";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -61,13 +61,13 @@ function assertSentCommand(
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("S3StoredObjectDriver", () => {
+describe("S3StoredObjectDriverAdapter", () => {
   let s3Client: ReturnType<typeof makeMockS3Client>;
-  let driver: S3StoredObjectDriver;
+  let driver: S3StoredObjectDriverAdapter;
 
   beforeEach(() => {
     s3Client = makeMockS3Client();
-    driver = S3StoredObjectDriver.create({
+    driver = S3StoredObjectDriverAdapter.create({
       projectId: TEST_PROJECT_ID,
       targets: new FixedS3Target(),
       policy: { build: () => ({}) },

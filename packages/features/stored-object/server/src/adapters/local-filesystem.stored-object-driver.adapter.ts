@@ -1,5 +1,5 @@
 /**
- * LocalFilesystemStoredObjectDriver — byte operations over the local filesystem.
+ * LocalFilesystemStoredObjectDriverAdapter — byte operations over the local filesystem.
  *
  * **Single-replica only.** This driver stores objects under `file:///root/...`
  * paths on the local filesystem. Multi-pod Kubernetes deployments MUST NOT use
@@ -40,7 +40,9 @@ const logger = createLogger("langwatch:stored-objects:local-filesystem-driver");
 function parseFileUri(uri: string): string {
   const scheme = getStoredObjectStorageScheme(uri);
   if (scheme !== "file") {
-    throw new Error(`LocalFilesystemStoredObjectDriver only handles file: URIs, got: "${uri}"`);
+    throw new Error(
+      `LocalFilesystemStoredObjectDriverAdapter only handles file: URIs, got: "${uri}"`,
+    );
   }
   const parsed = new URL(uri);
   const decoded = decodeURIComponent(parsed.pathname);
@@ -68,7 +70,7 @@ function parseFileUri(uri: string): string {
   // separator is sloppy; only `..` escapes.
   if (decoded.split("/").includes("..")) {
     throw new Error(
-      `LocalFilesystemStoredObjectDriver refuses a file: URI whose decoded path contains a ".." segment — ` +
+      `LocalFilesystemStoredObjectDriverAdapter refuses a file: URI whose decoded path contains a ".." segment — ` +
         `it resolves outside the location it names. Keep every path segment a single component.`,
     );
   }
@@ -80,9 +82,9 @@ function parseFileUri(uri: string): string {
  *
  * See class-level JSDoc for single-replica constraints and atomicity guarantees.
  */
-export class LocalFilesystemStoredObjectDriver implements StoredObjectStorageDriver {
-  static create(): LocalFilesystemStoredObjectDriver {
-    return new LocalFilesystemStoredObjectDriver();
+export class LocalFilesystemStoredObjectDriverAdapter implements StoredObjectStorageDriver {
+  static create(): LocalFilesystemStoredObjectDriverAdapter {
+    return new LocalFilesystemStoredObjectDriverAdapter();
   }
 
   /**

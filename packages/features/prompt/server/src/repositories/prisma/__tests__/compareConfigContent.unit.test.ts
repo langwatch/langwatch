@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository";
+import { PrismaLlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository";
 
 /**
  * Comparing two configs reads no row, so the repository is composed over a
@@ -15,9 +15,9 @@ const noPersistence = {} as PromptConfigDatabase;
  * - Sampling parameter comparison
  * - Structured output comparison
  */
-describe("LlmConfigRepository", () => {
+describe("PrismaLlmConfigRepository", () => {
   describe("compareConfigContent()", () => {
-    const repository = new LlmConfigRepository(noPersistence);
+    const repository = PrismaLlmConfigRepository.create({ prisma: noPersistence });
 
     const baseConfig = {
       model: "gpt-4",

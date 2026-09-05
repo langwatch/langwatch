@@ -21,12 +21,12 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { LlmConfigRepository } from "../../repositories/prisma/prisma.prompt.repository";
-import { PromptTagAssignmentRepository } from "../../repositories/prisma/prisma.prompt-tag-assignment.repository";
-import { PromptTagRepository } from "../../repositories/prisma/prisma.prompt-tag.repository";
-import { PromptTagService } from "../prompt-tag.service";
-import { PromptService } from "../prompt.service";
-import type { PromptVersionService } from "../prompt-version.service";
+import { PrismaLlmConfigRepository } from "../repositories/prisma/prisma.prompt.repository";
+import { PrismaPromptTagAssignmentRepository } from "../repositories/prisma/prisma.prompt-tag-assignment.repository";
+import { PrismaPromptTagRepository } from "../repositories/prisma/prisma.prompt-tag.repository";
+import { PromptTagService } from "../services/prompt-tag.service";
+import { PromptService } from "../services/prompt.service";
+import type { PromptVersionService } from "../services/prompt-version.service";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 
@@ -41,12 +41,12 @@ describe.skipIf(!DB_URL)("given an organization with a prompt version to tag", (
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
 
-  const tagRepository = new PromptTagRepository(prisma);
+  const tagRepository = PrismaPromptTagRepository.create({ prisma });
   const tags = PromptTagService.create(tagRepository);
   const prompts = PromptService.create({
-    repository: new LlmConfigRepository(prisma),
+    repository: PrismaLlmConfigRepository.create({ prisma }),
     versionService: unusedVersions,
-    tagRepository: new PromptTagAssignmentRepository(prisma),
+    tagRepository: PrismaPromptTagAssignmentRepository.create({ prisma }),
     promptTagRepository: tagRepository,
     tagService: tags,
   });
@@ -146,7 +146,9 @@ describe.skipIf(!DB_URL)("given an organization with a prompt version to tag", (
 
       expect(assignment.versionId).toBe(versionId);
       await expect(
-        prisma.promptTagAssignment.findFirst({ where: { id: assignment.id, projectId } }),
+        prisma.promptTagAssignment.findFirst({
+          where: { configId: assignment.configId, versionId: assignment.versionId, projectId },
+        }),
       ).resolves.not.toBeNull();
     });
   });
@@ -164,7 +166,7 @@ describe.skipIf(!DB_URL)("given an organization with a prompt version to tag", (
         projectId,
       });
 
-      expect(assignment.tagId).toBe(recreated.id);
+      expect(assignment.promptTag.id).toBe(recreated.id);
     });
   });
 

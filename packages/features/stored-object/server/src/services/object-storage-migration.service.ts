@@ -14,7 +14,7 @@ import {
   mintS3StoredObjectUri,
   redactStoredObjectStorageUri,
 } from "@langwatch/stored-object-contract";
-import type { StoredObject } from "#repositories/clickhouse/stored-objects.row";
+import type { StoredObject } from "#repositories/stored-objects.row";
 import type { StoredObjectStorageDriver } from "#adapters/stored-object-storage.registry";
 
 export type MigrationProvider = "s3" | "azure";
@@ -65,49 +65,6 @@ export type MigrationStorageEndpoint = {
   datasetChunkUri(projectId: string, datasetId: string, index: number): string;
 };
 
-export function createMigrationStorageEndpoint({
-  provider,
-  driver,
-  bucket,
-  accountName,
-  container,
-}: {
-  provider: MigrationProvider;
-  driver: StoredObjectStorageDriver;
-  bucket?: string;
-  accountName?: string;
-  container?: string;
-}): MigrationStorageEndpoint {
-  if (provider === "s3") {
-    if (!bucket?.trim()) {
-      throw new Error("S3 migration endpoint requires a bucket");
-    }
-
-    return {
-      provider,
-      scheme: "s3",
-      driver,
-      storedObjectUri: (projectId, sha256) => mintS3StoredObjectUri({ bucket, projectId, sha256 }),
-      datasetChunkUri: (projectId, datasetId, index) =>
-        `s3://${bucket}/${chunkKey(projectId, datasetId, index)}`,
-    };
-  }
-
-  if (!accountName?.trim() || !container?.trim()) {
-    throw new Error("Azure migration endpoint requires an account name and container");
-  }
-
-  return {
-    provider,
-    scheme: "azure-blob",
-    driver,
-    storedObjectUri: (projectId, sha256) =>
-      mintAzureBlobStoredObjectUri({ accountName, container, projectId, sha256 }),
-    datasetChunkUri: (projectId, datasetId, index) =>
-      `azure-blob://${accountName}/${container}/${chunkKey(projectId, datasetId, index)}`,
-  };
-}
-
 export type MigrationPlan = {
   eligibleStoredObjects: number;
   eligibleDatasetChunks: number;
@@ -157,7 +114,7 @@ export class MigrationBlockedError extends Error {
   }
 }
 
-type ObjectStorageMigrationDeps = {
+export type ObjectStorageMigrationDeps = {
   source: MigrationStorageEndpoint;
   destination: MigrationStorageEndpoint;
   inventory: MigrationInventory;
@@ -184,10 +141,58 @@ type DatasetChunkUris = {
 
 const INVENTORY_PAGE_SIZE = 250;
 
-export class ObjectStorageMigration {
+export class ObjectStorageMigrationService {
+  static createStorageEndpoint({
+    provider,
+    driver,
+    bucket,
+    accountName,
+    container,
+  }: {
+    provider: MigrationProvider;
+    driver: StoredObjectStorageDriver;
+    bucket?: string;
+    accountName?: string;
+    container?: string;
+  }): MigrationStorageEndpoint {
+    if (provider === "s3") {
+      if (!bucket?.trim()) {
+        throw new Error("S3 migration endpoint requires a bucket");
+      }
+
+      return {
+        provider,
+        scheme: "s3",
+        driver,
+        storedObjectUri: (projectId, sha256) =>
+          mintS3StoredObjectUri({ bucket, projectId, sha256 }),
+        datasetChunkUri: (projectId, datasetId, index) =>
+          `s3://${bucket}/${chunkKey(projectId, datasetId, index)}`,
+      };
+    }
+
+    if (!accountName?.trim() || !container?.trim()) {
+      throw new Error("Azure migration endpoint requires an account name and container");
+    }
+
+    return {
+      provider,
+      scheme: "azure-blob",
+      driver,
+      storedObjectUri: (projectId, sha256) =>
+        mintAzureBlobStoredObjectUri({ accountName, container, projectId, sha256 }),
+      datasetChunkUri: (projectId, datasetId, index) =>
+        `azure-blob://${accountName}/${container}/${chunkKey(projectId, datasetId, index)}`,
+    };
+  }
+
+  static create(deps: ObjectStorageMigrationDeps): ObjectStorageMigrationService {
+    return new ObjectStorageMigrationService(deps);
+  }
+
   private readonly now: () => Date;
 
-  constructor(private readonly deps: ObjectStorageMigrationDeps) {
+  private constructor(private readonly deps: ObjectStorageMigrationDeps) {
     if (deps.source.provider === deps.destination.provider) {
       throw new Error("Migration source and destination providers must differ");
     }

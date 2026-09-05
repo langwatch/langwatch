@@ -109,7 +109,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
         newBindingId: options.newBindingId,
       }),
       AuthzOffboardingService.create(options.repository),
-      new AuthzGrantGuardsService(options.repository),
+      AuthzGrantGuardsService.create({ repository: options.repository }),
     );
   }
 

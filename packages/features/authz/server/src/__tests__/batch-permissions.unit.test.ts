@@ -1,9 +1,9 @@
 import type { CollectedBinding } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
-import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub";
-import { StubAuthzListingRepository } from "../../repositories/__tests__/support/authz-listing.stub";
-import { makeReader } from "../../repositories/__tests__/support/authz-read.stub";
-import { AuthzService } from "../authz.service";
+import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub";
+import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub";
+import { makeReader } from "../repositories/__tests__/support/authz-read.stub";
+import { AuthzService } from "../services/authz.service";
 
 const ORG = "org-1";
 

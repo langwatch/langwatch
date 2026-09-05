@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { PromptTagValidationError } from "@langwatch/prompt-contract";
-import { validateTagName } from "../prompt-tag.service";
+import { PromptTagService } from "../services/prompt-tag.service";
+import { PROTECTED_TAGS } from "../repositories/prompt-tag.repository";
 import {
-  PROTECTED_TAGS,
-  PromptTagRepository,
+  PrismaPromptTagRepository,
   type PromptTagDatabase,
-} from "../../repositories/prisma/prisma.prompt-tag.repository";
+} from "../repositories/prisma/prisma.prompt-tag.repository";
 
 function makeTag(overrides: Record<string, unknown> = {}) {
   return {
@@ -20,7 +20,7 @@ function makeTag(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("PromptTagRepository", () => {
+describe("PrismaPromptTagRepository", () => {
   const organizationId = "org_1";
 
   describe("findByName()", () => {
@@ -32,7 +32,7 @@ describe("PromptTagRepository", () => {
             findFirst: vi.fn().mockResolvedValue(tag),
           },
         } as unknown as PromptTagDatabase;
-        const repo = new PromptTagRepository(mockPrisma);
+        const repo = PrismaPromptTagRepository.create({ prisma: mockPrisma });
 
         const result = await repo.tryFindByName({
           organizationId,
@@ -53,7 +53,7 @@ describe("PromptTagRepository", () => {
             findFirst: vi.fn().mockResolvedValue(null),
           },
         } as unknown as PromptTagDatabase;
-        const repo = new PromptTagRepository(mockPrisma);
+        const repo = PrismaPromptTagRepository.create({ prisma: mockPrisma });
 
         const result = await repo.tryFindByName({
           organizationId,
@@ -84,7 +84,7 @@ describe("PromptTagRepository", () => {
         const mockPrisma = {
           $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<void>) => fn(mockTx)),
         } as unknown as PromptTagDatabase;
-        const repo = new PromptTagRepository(mockPrisma);
+        const repo = PrismaPromptTagRepository.create({ prisma: mockPrisma });
 
         await repo.deleteByName({ organizationId, name: "canary" });
 
@@ -113,7 +113,7 @@ describe("PromptTagRepository", () => {
         const mockPrisma = {
           $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<void>) => fn(mockTx)),
         } as unknown as PromptTagDatabase;
-        const repo = new PromptTagRepository(mockPrisma);
+        const repo = PrismaPromptTagRepository.create({ prisma: mockPrisma });
 
         await repo.deleteByName({ organizationId, name: "nonexistent" });
 
@@ -136,7 +136,7 @@ describe("PromptTagRepository", () => {
         const mockPrisma = {
           $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx)),
         } as unknown as PromptTagDatabase;
-        const repo = new PromptTagRepository(mockPrisma);
+        const repo = PrismaPromptTagRepository.create({ prisma: mockPrisma });
 
         const result = await repo.rename({
           organizationId,
@@ -165,7 +165,7 @@ describe("PromptTagRepository", () => {
         const mockPrisma = {
           $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx)),
         } as unknown as PromptTagDatabase;
-        const repo = new PromptTagRepository(mockPrisma);
+        const repo = PrismaPromptTagRepository.create({ prisma: mockPrisma });
 
         await expect(
           repo.rename({
@@ -179,49 +179,49 @@ describe("PromptTagRepository", () => {
   });
 });
 
-describe("validateTagName()", () => {
+describe("PromptTagService.validateTagName()", () => {
   describe("when name is a valid custom tag", () => {
     /** @scenario "Validation accepts well-formed custom tag names" */
     it("does not throw for 'canary'", () => {
-      expect(() => validateTagName("canary")).not.toThrow();
+      expect(() => PromptTagService.validateTagName("canary")).not.toThrow();
     });
 
     it("does not throw for 'ab-test'", () => {
-      expect(() => validateTagName("ab-test")).not.toThrow();
+      expect(() => PromptTagService.validateTagName("ab-test")).not.toThrow();
     });
 
     it("does not throw for 'my_tag'", () => {
-      expect(() => validateTagName("my_tag")).not.toThrow();
+      expect(() => PromptTagService.validateTagName("my_tag")).not.toThrow();
     });
 
     it("does not throw for 'v2'", () => {
-      expect(() => validateTagName("v2")).not.toThrow();
+      expect(() => PromptTagService.validateTagName("v2")).not.toThrow();
     });
 
     it("does not throw for 'a1b2c3'", () => {
-      expect(() => validateTagName("a1b2c3")).not.toThrow();
+      expect(() => PromptTagService.validateTagName("a1b2c3")).not.toThrow();
     });
 
     it("does not throw for 'production'", () => {
-      expect(() => validateTagName("production")).not.toThrow();
+      expect(() => PromptTagService.validateTagName("production")).not.toThrow();
     });
 
     it("does not throw for 'staging'", () => {
-      expect(() => validateTagName("staging")).not.toThrow();
+      expect(() => PromptTagService.validateTagName("staging")).not.toThrow();
     });
   });
 
   describe("when name is empty", () => {
     /** @scenario "Validation rejects empty tag names" */
     it("throws PromptTagValidationError", () => {
-      expect(() => validateTagName("")).toThrow(PromptTagValidationError);
+      expect(() => PromptTagService.validateTagName("")).toThrow(PromptTagValidationError);
     });
   });
 
   describe("when name is purely numeric", () => {
     /** @scenario "Validation rejects purely numeric tag names" */
     it("throws with message mentioning numeric", () => {
-      expect(() => validateTagName("42")).toThrow(
+      expect(() => PromptTagService.validateTagName("42")).toThrow(
         expect.objectContaining({
           name: "PromptTagValidationError",
           message: expect.stringMatching(/numeric/i),
@@ -230,30 +230,30 @@ describe("validateTagName()", () => {
     });
 
     it("throws for '0'", () => {
-      expect(() => validateTagName("0")).toThrow(PromptTagValidationError);
+      expect(() => PromptTagService.validateTagName("0")).toThrow(PromptTagValidationError);
     });
   });
 
   describe("when name contains invalid characters", () => {
     it("throws for names with spaces", () => {
-      expect(() => validateTagName("my tag")).toThrow(PromptTagValidationError);
+      expect(() => PromptTagService.validateTagName("my tag")).toThrow(PromptTagValidationError);
     });
 
     it("throws for names with slashes", () => {
-      expect(() => validateTagName("can/ary")).toThrow(PromptTagValidationError);
+      expect(() => PromptTagService.validateTagName("can/ary")).toThrow(PromptTagValidationError);
     });
 
     /** @scenario "Validation rejects uppercase tag names" */
     it("throws for uppercase names", () => {
-      expect(() => validateTagName("CANARY")).toThrow(PromptTagValidationError);
+      expect(() => PromptTagService.validateTagName("CANARY")).toThrow(PromptTagValidationError);
     });
 
     it("throws for names starting with a digit", () => {
-      expect(() => validateTagName("1abc")).toThrow(PromptTagValidationError);
+      expect(() => PromptTagService.validateTagName("1abc")).toThrow(PromptTagValidationError);
     });
 
     it("throws for names with special chars", () => {
-      expect(() => validateTagName("foo@bar")).toThrow(PromptTagValidationError);
+      expect(() => PromptTagService.validateTagName("foo@bar")).toThrow(PromptTagValidationError);
     });
   });
 
@@ -262,7 +262,7 @@ describe("validateTagName()", () => {
       /** @scenario 'Only "latest" is a protected tag' */
       /** @scenario 'Validation rejects creating a tag named "latest"' */
       it(`throws for '${protected_}' with message mentioning protected`, () => {
-        expect(() => validateTagName(protected_)).toThrow(
+        expect(() => PromptTagService.validateTagName(protected_)).toThrow(
           expect.objectContaining({
             name: "PromptTagValidationError",
             message: expect.stringMatching(/protected/i),
@@ -273,12 +273,12 @@ describe("validateTagName()", () => {
 
     /** @scenario 'Validation accepts "production" as a tag name' */
     it("does not throw for 'production' (seeded tag, not protected)", () => {
-      expect(() => validateTagName("production")).not.toThrow();
+      expect(() => PromptTagService.validateTagName("production")).not.toThrow();
     });
 
     /** @scenario 'Validation accepts "staging" as a tag name' */
     it("does not throw for 'staging' (seeded tag, not protected)", () => {
-      expect(() => validateTagName("staging")).not.toThrow();
+      expect(() => PromptTagService.validateTagName("staging")).not.toThrow();
     });
   });
 });

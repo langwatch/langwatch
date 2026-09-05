@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { LlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository";
+import { PrismaLlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository";
 
-describe("LlmConfigRepository", () => {
+describe("PrismaLlmConfigRepository", () => {
   let prisma: PromptConfigDatabase;
-  let repository: LlmConfigRepository;
+  let repository: PrismaLlmConfigRepository;
 
   beforeEach(() => {
     prisma = {
@@ -11,7 +11,7 @@ describe("LlmConfigRepository", () => {
         update: vi.fn().mockResolvedValue(undefined),
       },
     } as unknown as PromptConfigDatabase;
-    repository = new LlmConfigRepository(prisma);
+    repository = PrismaLlmConfigRepository.create({ prisma });
   });
 
   describe("setCopiedFromPrompt", () => {

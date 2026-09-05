@@ -27,12 +27,12 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AuthzCompatibilityLedgerPort } from "../../ports/authz-compatibility-ledger.port";
+import type { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port";
 import {
   PrismaAuthzBindingRepository,
   type AuthzBindingDatabase,
-} from "../../repositories/prisma/prisma.authz-binding.repository";
-import { AuthzBindingWriterService } from "../authz-binding-writer.service";
+} from "../repositories/prisma/prisma.authz-binding.repository";
+import { AuthzBindingWriterService } from "../services/authz-binding-writer.service";
 
 const DB_URL = process.env.DATABASE_URL;
 

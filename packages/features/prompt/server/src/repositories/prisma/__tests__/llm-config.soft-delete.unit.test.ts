@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  LlmConfigRepository,
-  type LlmConfigWithLatestVersion,
-  type PromptConfigDatabase,
-} from "../prisma.prompt.repository";
+import { PrismaLlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository";
+import type { LlmConfigWithLatestVersion } from "../../prompt.repository";
 
 function makeMockPrisma(overrides: Record<string, unknown> = {}) {
   return {
@@ -25,7 +22,7 @@ function makeMockPrisma(overrides: Record<string, unknown> = {}) {
   } as unknown as PromptConfigDatabase;
 }
 
-describe("LlmConfigRepository", () => {
+describe("PrismaLlmConfigRepository", () => {
   describe("deleteConfig()", () => {
     describe("when prompt exists and belongs to the project", () => {
       it("soft-deletes by setting deletedAt and frees the handle for reuse", async () => {
@@ -34,7 +31,7 @@ describe("LlmConfigRepository", () => {
 
         // Mock tryGetConfigByIdOrHandleWithLatestVersion to return a config with
         // a prefixed handle (what the DB actually stores) and a non-empty name.
-        const repo = new LlmConfigRepository(prisma);
+        const repo = PrismaLlmConfigRepository.create({ prisma });
         vi.spyOn(repo, "tryGetConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
@@ -72,7 +69,7 @@ describe("LlmConfigRepository", () => {
         const mockUpdate = vi.fn(() => Promise.resolve({ id: "prompt_1", deletedAt: new Date() }));
         const prisma = makeMockPrisma({ update: mockUpdate });
 
-        const repo = new LlmConfigRepository(prisma);
+        const repo = PrismaLlmConfigRepository.create({ prisma });
         vi.spyOn(repo, "tryGetConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
@@ -111,7 +108,7 @@ describe("LlmConfigRepository", () => {
           update: mockUpdate,
         });
 
-        const repo = new LlmConfigRepository(prisma);
+        const repo = PrismaLlmConfigRepository.create({ prisma });
         vi.spyOn(repo, "tryGetConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
@@ -143,7 +140,7 @@ describe("LlmConfigRepository", () => {
         const mockFindMany = vi.fn(() => Promise.resolve([]));
         const prisma = makeMockPrisma({ findMany: mockFindMany });
 
-        const repo = new LlmConfigRepository(prisma);
+        const repo = PrismaLlmConfigRepository.create({ prisma });
         await repo.getAllWithLatestVersion({
           projectId: "proj_1",
           organizationId: "org_1",

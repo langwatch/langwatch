@@ -5,6 +5,12 @@ import {
   PromptTagValidationError,
   type PromptTag,
 } from "@langwatch/prompt-contract";
+import {
+  PROTECTED_TAGS,
+  PromptTagRepository,
+  type ProtectedTag,
+} from "../repositories/prompt-tag.repository";
+
 function isUniqueConstraintError(error: unknown): boolean {
   return (
     typeof error === "object" &&
@@ -13,45 +19,9 @@ function isUniqueConstraintError(error: unknown): boolean {
     (error as { code?: unknown }).code === "P2002"
   );
 }
-import {
-  PROTECTED_TAGS,
-  PromptTagRepository,
-  type ProtectedTag,
-} from "../repositories/prisma/prisma.prompt-tag.repository";
 
 const TAG_NAME_REGEX = /^[a-z][a-z0-9_-]*$/;
 const PURELY_NUMERIC_REGEX = /^\d+$/;
-
-/**
- * Validates a custom tag name.
- * - Must not be empty
- * - Must not be purely numeric
- * - Must match /^[a-z][a-z0-9_-]*$/
- * - Must not clash with protected tags
- */
-export function validateTagName(name: string): void {
-  if (!name) {
-    throw new PromptTagValidationError(`Invalid tag name. Tag name must not be empty.`);
-  }
-
-  if (PURELY_NUMERIC_REGEX.test(name)) {
-    throw new PromptTagValidationError(
-      `Invalid tag name "${name}". Tag names must not be purely numeric.`,
-    );
-  }
-
-  if (!TAG_NAME_REGEX.test(name)) {
-    throw new PromptTagValidationError(
-      `Invalid tag name "${name}". Tag names must start with a lowercase letter and contain only lowercase letters, digits, hyphens, or underscores.`,
-    );
-  }
-
-  if (PROTECTED_TAGS.includes(name as ProtectedTag)) {
-    throw new PromptTagValidationError(
-      `"${name}" is a protected tag and cannot be created as a custom tag.`,
-    );
-  }
-}
 
 /**
  * Service for managing prompt tag definitions.
@@ -62,10 +32,41 @@ export function validateTagName(name: string): void {
  * - enforces the protected tag guard on delete
  */
 export class PromptTagService {
-  constructor(private readonly repo: PromptTagRepository) {}
-
   static create(repository: PromptTagRepository): PromptTagService {
     return new PromptTagService(repository);
+  }
+
+  private constructor(private readonly repo: PromptTagRepository) {}
+
+  /**
+   * Validates a custom tag name.
+   * - Must not be empty
+   * - Must not be purely numeric
+   * - Must match /^[a-z][a-z0-9_-]*$/
+   * - Must not clash with protected tags
+   */
+  static validateTagName(name: string): void {
+    if (!name) {
+      throw new PromptTagValidationError(`Invalid tag name. Tag name must not be empty.`);
+    }
+
+    if (PURELY_NUMERIC_REGEX.test(name)) {
+      throw new PromptTagValidationError(
+        `Invalid tag name "${name}". Tag names must not be purely numeric.`,
+      );
+    }
+
+    if (!TAG_NAME_REGEX.test(name)) {
+      throw new PromptTagValidationError(
+        `Invalid tag name "${name}". Tag names must start with a lowercase letter and contain only lowercase letters, digits, hyphens, or underscores.`,
+      );
+    }
+
+    if (PROTECTED_TAGS.includes(name as ProtectedTag)) {
+      throw new PromptTagValidationError(
+        `"${name}" is a protected tag and cannot be created as a custom tag.`,
+      );
+    }
   }
 
   seedForOrganization(input: { organizationId: string }): Promise<void> {
@@ -94,7 +95,7 @@ export class PromptTagService {
     name: string;
     createdById?: string;
   }): Promise<PromptTag> {
-    validateTagName(name);
+    PromptTagService.validateTagName(name);
 
     try {
       return await this.repo.create({ organizationId, name, createdById });
@@ -185,7 +186,7 @@ export class PromptTagService {
       throw new PromptTagProtectedError(oldName, "renamed");
     }
 
-    validateTagName(newName);
+    PromptTagService.validateTagName(newName);
 
     try {
       return await this.repo.rename({ organizationId, oldName, newName });

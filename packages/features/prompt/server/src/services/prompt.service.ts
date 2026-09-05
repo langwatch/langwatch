@@ -32,11 +32,11 @@ import { PromptTagService } from "./prompt-tag.service";
 import {
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
-} from "../repositories/prisma/prisma.prompt.repository";
+} from "../repositories/prompt.repository";
 import {
   PromptTagAssignmentRepository,
   TagValidationError,
-} from "../repositories/prisma/prisma.prompt-tag-assignment.repository";
+} from "../repositories/prompt-tag-assignment.repository";
 import {
   diffRuntimeParameters,
   type getLatestConfigVersionSchema,
@@ -46,7 +46,7 @@ import {
   parseRuntimeParameters,
   runtimeParametersEqual,
 } from "@langwatch/prompt-contract";
-import { PromptTagRepository } from "../repositories/prisma/prisma.prompt-tag.repository";
+import { PromptTagRepository } from "../repositories/prompt-tag.repository";
 import { transformCamelToSnake, transformSnakeToCamel } from "../ports/prompt-transform-db.port";
 
 const logger = createLogger("langwatch:prompt-service");

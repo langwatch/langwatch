@@ -5,7 +5,7 @@ import {
 } from "@langwatch/redis-client";
 import { Cluster, type Redis } from "ioredis";
 import {
-  auditGroupQueuesForStorageMigration,
+  GroupQueueObjectStorageMigrationAdapter,
   type QueueAuditRedis,
 } from "./group-queue.object-storage-migration.adapter";
 import type { QueueMigrationBlocker } from "../services/object-storage-migration.service";
@@ -112,16 +112,56 @@ class ClusterQueueAuditAdapter implements QueueAuditRedis {
 }
 
 /** Task-local Redis owner for the final GroupQueue cutover audit. */
-export class MigrationCutoverRedisAudit {
+export class MigrationCutoverRedisAuditAdapter {
+  /**
+   * The shared app cluster client runs `scaleReads: "all"`, allowing reads from a
+   * lagging replica. Finalization must instead audit through a master-only
+   * duplicate so a stale replica cannot report a false clean cutover.
+   */
+  static async createAuditLease(
+    sharedConnection: RedisConnection,
+    logger?: RedisLogger,
+  ): Promise<MigrationCutoverAuditLease> {
+    if (!(sharedConnection instanceof Cluster)) {
+      const redis = RedisNodeQueueAuditAdapter.create(sharedConnection);
+      return { redis, scanNodes: [redis], cleanup: () => void 0 };
+    }
+
+    const masterOnly = sharedConnection.duplicate([], { scaleReads: "master" });
+    if (masterOnly.status !== "ready") {
+      try {
+        await waitForClusterReady(masterOnly);
+      } catch (error) {
+        try {
+          masterOnly.disconnect();
+        } catch (cleanupError) {
+          logger?.error(
+            { error: cleanupError },
+            "failed to close cutover-audit Redis duplicate after handshake failure",
+          );
+        }
+        throw error;
+      }
+    }
+
+    const redis = ClusterQueueAuditAdapter.create(masterOnly);
+    const scanNodes = masterOnly.nodes("master").map(RedisNodeQueueAuditAdapter.create);
+    return {
+      redis,
+      scanNodes,
+      cleanup: () => masterOnly.disconnect(),
+    };
+  }
+
   static create(input: {
     config: MigrationCutoverRedisConfig;
     logger: RedisLogger;
     createLease?: MigrationCutoverAuditLeaseFactory;
-  }): MigrationCutoverRedisAudit {
-    return new MigrationCutoverRedisAudit(
+  }): MigrationCutoverRedisAuditAdapter {
+    return new MigrationCutoverRedisAuditAdapter(
       input.config,
       input.logger,
-      input.createLease ?? createCutoverAuditRedis,
+      input.createLease ?? MigrationCutoverRedisAuditAdapter.createAuditLease,
     );
   }
 
@@ -142,7 +182,10 @@ export class MigrationCutoverRedisAudit {
     let firstCloseFailure: unknown;
     try {
       audit = await this.createLease(connection, this.logger);
-      return await auditGroupQueuesForStorageMigration(audit.redis, Date.now(), audit.scanNodes);
+      return await GroupQueueObjectStorageMigrationAdapter.audit({
+        redis: audit.redis,
+        scanNodes: audit.scanNodes,
+      });
     } catch (error) {
       operationFailed = true;
       throw error;
@@ -164,46 +207,6 @@ export class MigrationCutoverRedisAudit {
       }
     }
   }
-}
-
-/**
- * The shared app cluster client runs `scaleReads: "all"`, allowing reads from a
- * lagging replica. Finalization must instead audit through a master-only
- * duplicate so a stale replica cannot report a false clean cutover.
- */
-export async function createCutoverAuditRedis(
-  sharedConnection: RedisConnection,
-  logger?: RedisLogger,
-): Promise<MigrationCutoverAuditLease> {
-  if (!(sharedConnection instanceof Cluster)) {
-    const redis = RedisNodeQueueAuditAdapter.create(sharedConnection);
-    return { redis, scanNodes: [redis], cleanup: () => void 0 };
-  }
-
-  const masterOnly = sharedConnection.duplicate([], { scaleReads: "master" });
-  if (masterOnly.status !== "ready") {
-    try {
-      await waitForClusterReady(masterOnly);
-    } catch (error) {
-      try {
-        masterOnly.disconnect();
-      } catch (cleanupError) {
-        logger?.error(
-          { error: cleanupError },
-          "failed to close cutover-audit Redis duplicate after handshake failure",
-        );
-      }
-      throw error;
-    }
-  }
-
-  const redis = ClusterQueueAuditAdapter.create(masterOnly);
-  const scanNodes = masterOnly.nodes("master").map(RedisNodeQueueAuditAdapter.create);
-  return {
-    redis,
-    scanNodes,
-    cleanup: () => masterOnly.disconnect(),
-  };
 }
 
 const CUTOVER_AUDIT_HANDSHAKE_TIMEOUT_MS = 30_000;

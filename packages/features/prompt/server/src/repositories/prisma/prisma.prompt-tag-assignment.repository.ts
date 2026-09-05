@@ -6,15 +6,12 @@ import type {
   PromptTag,
   PromptTagAssignment,
 } from "@langwatch/prisma-client/generated";
+import {
+  PromptTagAssignmentRepository,
+  TagValidationError,
+} from "../prompt-tag-assignment.repository";
 
 const logger = createLogger("langwatch:prompt-version-tags");
-
-export class TagValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "TagValidationError";
-  }
-}
 
 /**
  * The client slice tag assignments bind to.
@@ -33,8 +30,18 @@ export type PromptTagAssignmentDatabase = Pick<
  * Assignments link a prompt config to a PromptTag definition via FK.
  * Tag validation is the service layer's responsibility.
  */
-export class PromptTagAssignmentRepository {
-  constructor(private readonly prisma: PromptTagAssignmentDatabase) {}
+export class PrismaPromptTagAssignmentRepository extends PromptTagAssignmentRepository {
+  static create({
+    prisma,
+  }: {
+    prisma: PromptTagAssignmentDatabase;
+  }): PrismaPromptTagAssignmentRepository {
+    return new PrismaPromptTagAssignmentRepository(prisma);
+  }
+
+  private constructor(private readonly prisma: PromptTagAssignmentDatabase) {
+    super();
+  }
 
   /**
    * Validates that a version belongs to the specified prompt config.

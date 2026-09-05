@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  auditGroupQueuesForStorageMigration,
+  GroupQueueObjectStorageMigrationAdapter,
   type QueueAuditRedis,
 } from "../group-queue.object-storage-migration.adapter";
 
@@ -103,7 +103,7 @@ describe("auditGroupQueuesForStorageMigration", () => {
       `GQ2|${Buffer.byteLength(header)}|${header}`,
     ]);
 
-    const blockers = await auditGroupQueuesForStorageMigration(redis, 100);
+    const blockers = await GroupQueueObjectStorageMigrationAdapter.audit({ redis, nowMs: 100 });
 
     expect(blockers).toEqual([
       { queueName: "events", kind: "pending", count: 3 },
@@ -127,7 +127,7 @@ describe("auditGroupQueuesForStorageMigration", () => {
       `GQ2|${Buffer.byteLength(header)}|${header}`,
     ]);
 
-    const blockers = await auditGroupQueuesForStorageMigration(redis);
+    const blockers = await GroupQueueObjectStorageMigrationAdapter.audit({ redis });
 
     expect(blockers).toEqual([
       {
@@ -146,7 +146,7 @@ describe("auditGroupQueuesForStorageMigration", () => {
     redis.keys.add("blocked-only:gq:blocked");
     redis.sets.set("blocked-only:gq:blocked", ["tenant/group"]);
 
-    const blockers = await auditGroupQueuesForStorageMigration(redis);
+    const blockers = await GroupQueueObjectStorageMigrationAdapter.audit({ redis });
 
     expect(blockers).toEqual([
       { queueName: "blocked-only", kind: "blocked", count: 1 },
@@ -161,10 +161,10 @@ describe("auditGroupQueuesForStorageMigration", () => {
     secondMaster.sets.set("other-shard:gq:blocked", ["tenant/group"]);
     const cluster = new AuditCluster([firstMaster, secondMaster]);
 
-    const blockers = await auditGroupQueuesForStorageMigration(cluster, Date.now(), [
-      firstMaster,
-      secondMaster,
-    ]);
+    const blockers = await GroupQueueObjectStorageMigrationAdapter.audit({
+      redis: cluster,
+      scanNodes: [firstMaster, secondMaster],
+    });
 
     expect(blockers).toEqual([{ queueName: "other-shard", kind: "blocked", count: 1 }]);
   });

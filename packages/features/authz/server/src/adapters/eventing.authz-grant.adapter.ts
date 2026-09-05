@@ -37,43 +37,51 @@ const GRANT_ID_ENVIRONMENT = "prod";
  * - The AMBIENT ENVIRONMENT is not part of it either (see
  *   `GRANT_ID_ENVIRONMENT`): every byte comes from the arguments below.
  */
-export function deriveGrantId({
-  organizationId,
-  principal,
-  scope,
-  resourceToken,
-  occurredAtMs,
-}: {
-  organizationId: string;
-  principal: LedgerPrincipal;
-  scope: LedgerScope;
-  resourceToken?: string;
-  occurredAtMs: number;
-}): string {
-  const parts = [
+export class EventingAuthzGrantAdapter {
+  static create(): EventingAuthzGrantAdapter {
+    return new EventingAuthzGrantAdapter();
+  }
+
+  private constructor() {}
+
+  static deriveGrantId({
     organizationId,
-    principal.type,
-    principal.id ?? "",
-    scope.type,
-    scope.id,
-    resourceToken ?? "",
-  ];
-  // ASCII unit separator, not a space: no part may smuggle a boundary
-  // character. Written as an escape on purpose - a literal 0x1f byte here is
-  // invisible in a diff, so a reader (or a reviewer) sees `join("")` and
-  // reads an ambiguous pre-image where there is none.
-  const digest = createHash("sha256").update(parts.join("\u001f")).digest();
-  const instance = new Instance(
-    Instance.schemes.RANDOM,
-    new Uint8Array(digest.buffer, digest.byteOffset, 8),
-  );
-  const sequenceId = digest.readUInt32BE(8);
-  const timestampSeconds = Math.floor(occurredAtMs / 1000);
-  return new Ksuid(
-    GRANT_ID_ENVIRONMENT,
-    "grant",
-    timestampSeconds,
-    instance,
-    sequenceId,
-  ).toString();
+    principal,
+    scope,
+    resourceToken,
+    occurredAtMs,
+  }: {
+    organizationId: string;
+    principal: LedgerPrincipal;
+    scope: LedgerScope;
+    resourceToken?: string;
+    occurredAtMs: number;
+  }): string {
+    const parts = [
+      organizationId,
+      principal.type,
+      principal.id ?? "",
+      scope.type,
+      scope.id,
+      resourceToken ?? "",
+    ];
+    // ASCII unit separator, not a space: no part may smuggle a boundary
+    // character. Written as an escape on purpose - a literal 0x1f byte here is
+    // invisible in a diff, so a reader (or a reviewer) sees `join("")` and
+    // reads an ambiguous pre-image where there is none.
+    const digest = createHash("sha256").update(parts.join("\u001f")).digest();
+    const instance = new Instance(
+      Instance.schemes.RANDOM,
+      new Uint8Array(digest.buffer, digest.byteOffset, 8),
+    );
+    const sequenceId = digest.readUInt32BE(8);
+    const timestampSeconds = Math.floor(occurredAtMs / 1000);
+    return new Ksuid(
+      GRANT_ID_ENVIRONMENT,
+      "grant",
+      timestampSeconds,
+      instance,
+      sequenceId,
+    ).toString();
+  }
 }

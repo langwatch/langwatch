@@ -21,44 +21,16 @@ import {
   parseLlmConfigVersion,
   parseRuntimeParameters,
 } from "@langwatch/prompt-contract";
+import type { CreateLlmConfigVersionParams } from "../prompt-version.repository";
+import { PrismaLlmConfigVersionsRepository } from "./prisma.prompt-version.repository";
 import {
-  type CreateLlmConfigVersionParams,
-  LlmConfigVersionsRepository,
-} from "./prisma.prompt-version.repository";
+  LlmConfigRepository,
+  type CreateLlmConfigParams,
+  type LlmConfigWithLatestVersion,
+} from "../prompt.repository";
 import { sortKeysDeep } from "@langwatch/prompt-contract";
 
 const logger = createLogger("langwatch:prompt-config:prisma.prompt.repository");
-
-/**
- * Interface for LLM Config data transfer objects
- */
-export type CreateLlmConfigParams = Omit<
-  LlmPromptConfig,
-  "id" | "createdAt" | "updatedAt" | "deletedAt"
-> & {
-  // Optional authorId to set on the config and version.
-  // This is optional because it's not required for the config to be created,
-  // and wouldn't be available via the API.
-  authorId?: string;
-};
-
-/**
- * Interface for LLM Config with its latest version
- */
-export interface LlmConfigWithLatestVersion extends LlmPromptConfig {
-  latestVersion: LatestConfigVersionSchema & {
-    author?: {
-      id: string;
-      name: string | null;
-      email?: string | null;
-      image?: string | null;
-    } | null;
-    runtimeParameters: Record<string, unknown>;
-  };
-  _count?: {
-    copiedPrompts?: number;
-  } | null;
-}
 
 /**
  * The client slice prompt persistence binds to, transaction included: a
@@ -75,15 +47,28 @@ export type PromptConfigDatabase = Pick<
  * Repository for managing LLM Configurations
  * Follows Single Responsibility Principle by focusing only on LLM config data access
  */
-export class LlmConfigRepository {
-  public readonly versions: LlmConfigVersionsRepository;
+export class PrismaLlmConfigRepository extends LlmConfigRepository {
+  static create({
+    prisma,
+    versions,
+    modelProvider,
+  }: {
+    prisma: PromptConfigDatabase;
+    versions?: PrismaLlmConfigVersionsRepository;
+    modelProvider?: ModelProviderService;
+  }): PrismaLlmConfigRepository {
+    return new PrismaLlmConfigRepository(prisma, versions, modelProvider);
+  }
 
-  constructor(
+  readonly versions: PrismaLlmConfigVersionsRepository;
+
+  private constructor(
     private readonly prisma: PromptConfigDatabase,
-    versions = new LlmConfigVersionsRepository(prisma),
+    versions: PrismaLlmConfigVersionsRepository | undefined,
     private readonly modelProvider?: ModelProviderService,
   ) {
-    this.versions = versions;
+    super();
+    this.versions = versions ?? PrismaLlmConfigVersionsRepository.create({ prisma });
   }
 
   async getOrganizationIdForProject(projectId: string): Promise<string> {

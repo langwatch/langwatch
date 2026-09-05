@@ -59,9 +59,9 @@ const storedObjectSizeBytesHistogram = new Histogram({
   ],
 });
 
-export class PrometheusStoredObjectsTelemetry extends StoredObjectsTelemetryPort {
-  static create(): PrometheusStoredObjectsTelemetry {
-    return new PrometheusStoredObjectsTelemetry();
+export class PrometheusStoredObjectsTelemetryAdapter extends StoredObjectsTelemetryPort {
+  static create(): PrometheusStoredObjectsTelemetryAdapter {
+    return new PrometheusStoredObjectsTelemetryAdapter();
   }
 
   recordExtract(purpose: string): void {

@@ -144,7 +144,7 @@ describe("getAzureBlobToken", () => {
 
       // Two "different driver instances" translate to two independent calls
       // with equal (but not identical object-identity) credential values —
-      // exactly what two AzureBlobStoredObjectDriver instances built from the
+      // exactly what two AzureBlobStoredObjectDriverAdapter instances built from the
       // same resolveAzureCredentials() output would pass.
       const shared = { tenantId: "tenant-shared", clientId: "client-shared" };
       const credentialsA = workloadCredentials({ ...shared });

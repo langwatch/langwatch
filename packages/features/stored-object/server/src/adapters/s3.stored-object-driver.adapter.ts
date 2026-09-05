@@ -1,5 +1,5 @@
 /**
- * S3StoredObjectDriver — byte operations over S3-compatible object storage.
+ * S3StoredObjectDriverAdapter — byte operations over S3-compatible object storage.
  *
  * Constructed per project so the correct BYOC endpoint, region and credentials
  * are resolved for every operation: a URI minted against a tenant's own bucket
@@ -44,13 +44,13 @@ export type StoredObjectS3ClientPolicy = Readonly<{
 }>;
 
 /** Storage driver for S3-compatible object storage, scoped to one project. */
-export class S3StoredObjectDriver implements StoredObjectStorageDriver {
+export class S3StoredObjectDriverAdapter implements StoredObjectStorageDriver {
   static create(options: {
     projectId: string;
     targets: StoredObjectS3TargetPort;
     policy: StoredObjectS3ClientPolicy;
-  }): S3StoredObjectDriver {
-    return new S3StoredObjectDriver(options.projectId, options.targets, options.policy);
+  }): S3StoredObjectDriverAdapter {
+    return new S3StoredObjectDriverAdapter(options.projectId, options.targets, options.policy);
   }
 
   private constructor(

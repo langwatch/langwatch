@@ -1,5 +1,5 @@
 /**
- * AzureBlobStoredObjectDriver — stored-object bytes over Azure Blob Storage.
+ * AzureBlobStoredObjectDriverAdapter — stored-object bytes over Azure Blob Storage.
  *
  * Talks the Azure Blob REST API directly via `fetch` so no Azure SDK
  * dependency is needed at runtime for the shared-key path. Works against
@@ -241,9 +241,9 @@ function normalizeEndpoint(endpointBaseUrl: string): string {
  * The stored-object byte driver for Azure Blob Storage. Talks REST directly so
  * we don't pull in the full @azure/storage-blob SDK for one driver.
  */
-export class AzureBlobStoredObjectDriver implements StoredObjectStorageDriver {
-  static create(credentials: AzureCredentials): AzureBlobStoredObjectDriver {
-    return new AzureBlobStoredObjectDriver(credentials);
+export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDriver {
+  static create(credentials: AzureCredentials): AzureBlobStoredObjectDriverAdapter {
+    return new AzureBlobStoredObjectDriverAdapter(credentials);
   }
 
   private constructor(private readonly credentials: AzureCredentials) {}

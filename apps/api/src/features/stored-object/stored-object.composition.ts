@@ -32,18 +32,18 @@ import {
   StoredObjectService,
 } from "@langwatch/stored-object-contract";
 import {
-  AzureBlobStoredObjectDriver,
-  LocalFilesystemStoredObjectDriver,
-  PrometheusStoredObjectsTelemetry,
+  AzureBlobStoredObjectDriverAdapter,
+  LocalFilesystemStoredObjectDriverAdapter,
+  PrometheusStoredObjectsTelemetryAdapter,
   resolveAzureCredentials,
-  S3StoredObjectDriver,
+  S3StoredObjectDriverAdapter,
   StoredObjectApp,
   StoredObjectDestinationPolicy,
   StoredObjectProjectS3ConfigPort,
   StoredObjectS3TargetPort,
   StoredObjectStorageRegistry,
   StoredObjectsClickHousePort,
-  StoredObjectsRepository,
+  ClickHouseStoredObjectsRepository,
   StoredObjectsService,
   type StoredObjectS3Target,
   type StoredObjectsClickHouseClient,
@@ -137,11 +137,9 @@ export function refusingStoredObjectFeature(): ComposedStoredObjectFeature {
     new Proxy(
       {},
       {
-        get:
-          () =>
-          (): never => {
-            throw new ApiStoredObjectUnavailableError("The object store");
-          },
+        get: () => (): never => {
+          throw new ApiStoredObjectUnavailableError("The object store");
+        },
         has: () => true,
       },
     ) as T;
@@ -208,17 +206,17 @@ function composeStoredObjects(
   });
 
   const service = StoredObjectsService.create({
-    repository: StoredObjectsRepository.create(
+    repository: ClickHouseStoredObjectsRepository.create(
       ApiStoredObjectsClickHouse.create(options.resolveClickHouseClient),
     ),
     registry: (projectId: string) =>
       new StoredObjectStorageRegistry({
-        s3: S3StoredObjectDriver.create({
+        s3: S3StoredObjectDriverAdapter.create({
           projectId,
           targets,
           policy: { build: (input) => aws.build(input) },
         }),
-        file: LocalFilesystemStoredObjectDriver.create(),
+        file: LocalFilesystemStoredObjectDriverAdapter.create(),
         // A FACTORY rather than a driver, which is the registry's own Azure
         // policy: a deployment that never reads an `azure-blob://` URI never
         // resolves credentials, so an install with no Azure block configured
@@ -226,7 +224,7 @@ function composeStoredObjects(
         // resolver's `purpose: "read"` is what lets an operator who migrated
         // OFF Azure keep reading what was written before.
         "azure-blob": () =>
-          AzureBlobStoredObjectDriver.create(
+          AzureBlobStoredObjectDriverAdapter.create(
             resolveAzureCredentials({
               config: storage.azure,
               purpose: "read",
@@ -239,7 +237,7 @@ function composeStoredObjects(
         destination: await destinations.resolve(projectId),
         objectPath: `${projectId}/${sha256}`,
       }),
-    telemetry: PrometheusStoredObjectsTelemetry.create(),
+    telemetry: PrometheusStoredObjectsTelemetryAdapter.create(),
   });
 
   return {

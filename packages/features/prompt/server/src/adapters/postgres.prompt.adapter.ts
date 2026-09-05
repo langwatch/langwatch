@@ -4,15 +4,15 @@ import { PromptService } from "../services/prompt.service";
 import { PromptTagService } from "../services/prompt-tag.service";
 import { PromptVersionService } from "../services/prompt-version.service";
 import {
-  PromptTagAssignmentRepository,
+  PrismaPromptTagAssignmentRepository,
   type PromptTagAssignmentDatabase,
 } from "../repositories/prisma/prisma.prompt-tag-assignment.repository";
 import {
-  PromptTagRepository,
+  PrismaPromptTagRepository,
   type PromptTagDatabase,
 } from "../repositories/prisma/prisma.prompt-tag.repository";
 import {
-  LlmConfigRepository,
+  PrismaLlmConfigRepository,
   type PromptConfigDatabase,
 } from "../repositories/prisma/prisma.prompt.repository";
 import type { PromptVersionDatabase } from "../repositories/prisma/prisma.prompt-version.repository";
@@ -51,17 +51,20 @@ export class PostgresPromptAdapter {
   }
 
   build(): PromptServiceContract {
-    const repository = new LlmConfigRepository(
-      this.options.database,
-      undefined,
-      this.options.modelProvider,
-    );
-    const promptTagRepository = new PromptTagRepository(this.options.database);
+    const repository = PrismaLlmConfigRepository.create({
+      prisma: this.options.database,
+      modelProvider: this.options.modelProvider,
+    });
+    const promptTagRepository = PrismaPromptTagRepository.create({
+      prisma: this.options.database,
+    });
 
     return PromptService.create({
       repository,
       versionService: PromptVersionService.create(),
-      tagRepository: new PromptTagAssignmentRepository(this.options.database),
+      tagRepository: PrismaPromptTagAssignmentRepository.create({
+        prisma: this.options.database,
+      }),
       promptTagRepository,
       tagService: PromptTagService.create(promptTagRepository),
     });

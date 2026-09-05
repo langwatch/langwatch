@@ -23,7 +23,11 @@ import {
 import type { AuthzGrantRepository } from "../repositories/authz-grant.repository";
 
 export class AuthzGrantGuardsService {
-  constructor(private readonly repository: AuthzGrantRepository) {}
+  static create({ repository }: { repository: AuthzGrantRepository }): AuthzGrantGuardsService {
+    return new AuthzGrantGuardsService(repository);
+  }
+
+  private constructor(private readonly repository: AuthzGrantRepository) {}
 
   /**
    * Refused as NOT FOUND rather than forbidden. A distinct answer would tell

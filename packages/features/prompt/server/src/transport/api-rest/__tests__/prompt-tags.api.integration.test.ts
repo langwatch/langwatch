@@ -20,7 +20,7 @@ import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { PromptTagRepository } from "../../../repositories/prisma/prisma.prompt-tag.repository";
+import { PrismaPromptTagRepository } from "../../../repositories/prisma/prisma.prompt-tag.repository";
 import type { PromptTagDatabase } from "../../../repositories/prisma/prisma.prompt-tag.repository";
 import { PromptTagService } from "../../../services/prompt-tag.service";
 import { createPromptsRestApp, type PromptRestPorts, type PromptRestService } from "../prompt.api";
@@ -143,7 +143,7 @@ function testSecurity(): AppRestSecurity {
 }
 
 function buildApi() {
-  const repository = new PromptTagRepository(inMemoryTagDatabase());
+  const repository = PrismaPromptTagRepository.create({ prisma: inMemoryTagDatabase() });
   const tags = PromptTagService.create(repository);
 
   // The three tag operations the routes reach, delegated exactly as

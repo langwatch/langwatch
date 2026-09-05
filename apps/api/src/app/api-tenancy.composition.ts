@@ -5,7 +5,7 @@ import {
   PostgresApiKeyAdapter,
 } from "@langwatch/api-key-server";
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
-import { deriveAuthzGrantId } from "@langwatch/authz-server";
+import { EventingAuthzGrantAdapter } from "@langwatch/authz-server";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import {
@@ -148,7 +148,7 @@ export class ApiTenancyComposition {
       // The import-shaped identity: a compatibility grant minted for a
       // credential that predates the ledger has to derive the same id every
       // time it is re-minted, or a re-run writes a second fact for one access.
-      deriveBindingId: deriveAuthzGrantId,
+      deriveBindingId: EventingAuthzGrantAdapter.deriveGrantId,
       diagnostics: ApiKeyDiagnosticsAdapter.create(createLogger("langwatch:api-key")),
     }).build();
 

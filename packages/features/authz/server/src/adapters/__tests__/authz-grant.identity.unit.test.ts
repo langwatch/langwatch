@@ -1,6 +1,6 @@
 import { getEnvironment, setEnvironment } from "@langwatch/ksuid";
 import { describe, expect, it } from "vitest";
-import { deriveGrantId } from "../eventing.authz-grant.adapter";
+import { EventingAuthzGrantAdapter } from "../eventing.authz-grant.adapter";
 
 const ORG = "org_acme";
 const OCCURRED_AT = 1_755_000_000_000;
@@ -15,8 +15,8 @@ describe("grant identity", () => {
 
   describe("when the same fact is derived twice", () => {
     it("yields the same id — a KSUID with no random bits", () => {
-      const a = deriveGrantId(base);
-      const b = deriveGrantId({ ...base });
+      const a = EventingAuthzGrantAdapter.deriveGrantId(base);
+      const b = EventingAuthzGrantAdapter.deriveGrantId({ ...base });
       expect(a).toBe(b);
       expect(a).toContain("grant_");
     });
@@ -31,9 +31,9 @@ describe("grant identity", () => {
       const original = getEnvironment();
       try {
         setEnvironment("dev");
-        const fromDev = deriveGrantId(base);
+        const fromDev = EventingAuthzGrantAdapter.deriveGrantId(base);
         setEnvironment("staging");
-        const fromStaging = deriveGrantId(base);
+        const fromStaging = EventingAuthzGrantAdapter.deriveGrantId(base);
 
         expect(fromDev).toBe(fromStaging);
         expect(fromDev.startsWith("grant_")).toBe(true);
@@ -46,19 +46,19 @@ describe("grant identity", () => {
   describe("when any part of the fact differs", () => {
     it("yields a different id per scope, principal, org, token, and business time", () => {
       const ids = [
-        deriveGrantId(base),
-        deriveGrantId({ ...base, organizationId: "org_other" }),
-        deriveGrantId({
+        EventingAuthzGrantAdapter.deriveGrantId(base),
+        EventingAuthzGrantAdapter.deriveGrantId({ ...base, organizationId: "org_other" }),
+        EventingAuthzGrantAdapter.deriveGrantId({
           ...base,
           principal: { type: "apiKey", id: "user_alice" },
         }),
-        deriveGrantId({
+        EventingAuthzGrantAdapter.deriveGrantId({
           ...base,
           scope: { type: "PROJECT", id: "team_client_a" },
         }),
-        deriveGrantId({ ...base, resourceToken: "tok_1" }),
-        deriveGrantId({ ...base, resourceToken: "tok_2" }),
-        deriveGrantId({ ...base, occurredAtMs: OCCURRED_AT + 60_000 }),
+        EventingAuthzGrantAdapter.deriveGrantId({ ...base, resourceToken: "tok_1" }),
+        EventingAuthzGrantAdapter.deriveGrantId({ ...base, resourceToken: "tok_2" }),
+        EventingAuthzGrantAdapter.deriveGrantId({ ...base, occurredAtMs: OCCURRED_AT + 60_000 }),
       ];
       expect(new Set(ids).size).toBe(ids.length);
     });
@@ -66,7 +66,9 @@ describe("grant identity", () => {
     it("ignores sub-second differences in business time", () => {
       // KSUID timestamps are second-precision; a retry landing in the same
       // second as the original command derives the same id.
-      expect(deriveGrantId({ ...base, occurredAtMs: OCCURRED_AT + 500 })).toBe(deriveGrantId(base));
+      expect(
+        EventingAuthzGrantAdapter.deriveGrantId({ ...base, occurredAtMs: OCCURRED_AT + 500 }),
+      ).toBe(EventingAuthzGrantAdapter.deriveGrantId(base));
     });
   });
 
@@ -77,12 +79,12 @@ describe("grant identity", () => {
       // different principals at different scopes — share a pre-image, derive
       // one id, and the projection's upsert silently overwrites one with the
       // other.
-      const left = deriveGrantId({
+      const left = EventingAuthzGrantAdapter.deriveGrantId({
         ...base,
         principal: { type: "user", id: "a" },
         scope: { type: "TEAM", id: "bc" },
       });
-      const right = deriveGrantId({
+      const right = EventingAuthzGrantAdapter.deriveGrantId({
         ...base,
         principal: { type: "user", id: "ab" },
         scope: { type: "TEAM", id: "c" },

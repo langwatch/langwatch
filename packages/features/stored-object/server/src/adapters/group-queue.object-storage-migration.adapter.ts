@@ -34,17 +34,29 @@ export interface QueueAuditRedis {
  * queues created by an older release cannot escape the audit. The one-off
  * migration deliberately favors completeness over hot-path cost.
  */
-export async function auditGroupQueuesForStorageMigration(
-  redis: QueueAuditRedis,
-  nowMs = Date.now(),
-  scanNodes: QueueAuditRedis[] = [redis],
-): Promise<QueueMigrationBlocker[]> {
-  const queueNames = await discoverQueueNames(redis, scanNodes);
-  const blockers: QueueMigrationBlocker[] = [];
-  for (const queueName of queueNames) {
-    blockers.push(...(await auditQueue({ redis, scanNodes, queueName, nowMs })));
+export class GroupQueueObjectStorageMigrationAdapter {
+  static create(): GroupQueueObjectStorageMigrationAdapter {
+    return new GroupQueueObjectStorageMigrationAdapter();
   }
-  return blockers;
+
+  private constructor() {}
+
+  static async audit({
+    redis,
+    nowMs = Date.now(),
+    scanNodes = [redis],
+  }: {
+    redis: QueueAuditRedis;
+    nowMs?: number;
+    scanNodes?: QueueAuditRedis[];
+  }): Promise<QueueMigrationBlocker[]> {
+    const queueNames = await discoverQueueNames(redis, scanNodes);
+    const blockers: QueueMigrationBlocker[] = [];
+    for (const queueName of queueNames) {
+      blockers.push(...(await auditQueue({ redis, scanNodes, queueName, nowMs })));
+    }
+    return blockers;
+  }
 }
 
 async function discoverQueueNames(

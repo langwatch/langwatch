@@ -5,9 +5,9 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import { vi } from "vitest";
-import { PromptTagAssignmentRepository } from "../prisma.prompt-tag-assignment.repository";
-import { PromptTagRepository } from "../prisma.prompt-tag.repository";
-import { LlmConfigRepository } from "../prisma.prompt.repository";
+import { PrismaPromptTagAssignmentRepository } from "../prisma.prompt-tag-assignment.repository";
+import { PrismaPromptTagRepository } from "../prisma.prompt-tag.repository";
+import { PrismaLlmConfigRepository } from "../prisma.prompt.repository";
 import { PromptService } from "../../../services/prompt.service";
 import { PromptTagService } from "../../../services/prompt-tag.service";
 import { PromptVersionService } from "../../../services/prompt-version.service";
@@ -34,15 +34,15 @@ function createPromptTestDatabase() {
 /** Builds a composed service whose persistence methods unit tests can spy on. */
 export function createPromptServiceForTest(): PromptService {
   const database = createPromptTestDatabase();
-  const repository = new LlmConfigRepository(database);
+  const repository = PrismaLlmConfigRepository.create({ prisma: database });
   vi.spyOn(repository, "getOrganizationIdForProject").mockResolvedValue("org_test");
   vi.spyOn(repository, "checkModifyPermission").mockResolvedValue({ hasPermission: true });
-  const promptTagRepository = new PromptTagRepository(database);
+  const promptTagRepository = PrismaPromptTagRepository.create({ prisma: database });
 
   return PromptService.create({
     repository,
     versionService: PromptVersionService.create(),
-    tagRepository: new PromptTagAssignmentRepository(database),
+    tagRepository: PrismaPromptTagAssignmentRepository.create({ prisma: database }),
     promptTagRepository,
     tagService: PromptTagService.create(promptTagRepository),
   });

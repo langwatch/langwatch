@@ -28,7 +28,7 @@
 import crypto from "node:crypto";
 import { mintAzureBlobStoredObjectUri } from "@langwatch/stored-object-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { AzureBlobStoredObjectDriver } from "../azure-blob.stored-object-driver.adapter";
+import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter";
 import { ObjectNotFoundError } from "../../errors";
 import { StoredObjectStorageRegistry } from "../stored-object-storage.registry";
 
@@ -60,7 +60,7 @@ const describeTokenAzure = hasTokenModeAzure ? describe : describe.skip;
 const RUN_ID = crypto.randomBytes(6).toString("hex");
 const PROJECT = `test-realazure-${RUN_ID}`;
 
-let driver: AzureBlobStoredObjectDriver;
+let driver: AzureBlobStoredObjectDriverAdapter;
 const writtenUris: string[] = [];
 
 function uriFor(bytes: Buffer): string {
@@ -76,7 +76,7 @@ function uriFor(bytes: Buffer): string {
 
 beforeAll(() => {
   if (!hasRealAzure) return;
-  driver = AzureBlobStoredObjectDriver.create({
+  driver = AzureBlobStoredObjectDriverAdapter.create({
     mode: "sharedKey",
     accountName: ACCOUNT_NAME!,
     accountKey: ACCOUNT_KEY!,
@@ -92,7 +92,7 @@ afterAll(async () => {
 });
 
 describeRealAzure(
-  "AzureBlobStoredObjectDriver against real Azure Blob Storage (host-style addressing)",
+  "AzureBlobStoredObjectDriverAdapter against real Azure Blob Storage (host-style addressing)",
   () => {
     describe("given a host-style production endpoint", () => {
       it("signs the request correctly for the single-account canonicalised resource form", async () => {
@@ -172,12 +172,12 @@ describeRealAzure(
 );
 
 describeTokenAzure(
-  "AzureBlobStoredObjectDriver against real Azure Blob using an Entra identity",
+  "AzureBlobStoredObjectDriverAdapter against real Azure Blob using an Entra identity",
   () => {
     const tokenUris: string[] = [];
 
     function tokenDriver() {
-      return AzureBlobStoredObjectDriver.create({
+      return AzureBlobStoredObjectDriverAdapter.create({
         mode: "azureCli",
         accountName: TOKEN_MODE_ACCOUNT!,
       });

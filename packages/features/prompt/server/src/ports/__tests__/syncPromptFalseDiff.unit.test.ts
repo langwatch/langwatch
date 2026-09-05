@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  LlmConfigRepository,
+  PrismaLlmConfigRepository,
   type PromptConfigDatabase,
 } from "../../repositories/prisma/prisma.prompt.repository";
 import { transformCamelToSnake } from "../prompt-transform-db.port";
@@ -25,7 +25,7 @@ describe("compareConfigContent()", () => {
    * comparison ever grows a query, the double stops compiling.
    */
   const noPersistence = {} as PromptConfigDatabase;
-  const repository = new LlmConfigRepository(noPersistence);
+  const repository = PrismaLlmConfigRepository.create({ prisma: noPersistence });
 
   const jsonSchemaOutputs = [
     {

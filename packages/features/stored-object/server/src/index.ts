@@ -31,7 +31,7 @@ export {
   type StoredObjectStorageDriver,
   type StoredObjectStorageDriverFactory,
 } from "./adapters/stored-object-storage.registry";
-export { AzureBlobStoredObjectDriver } from "./adapters/azure-blob.stored-object-driver.adapter";
+export { AzureBlobStoredObjectDriverAdapter } from "./adapters/azure-blob.stored-object-driver.adapter";
 export {
   ALLOW_INSECURE_TOKEN_ENDPOINT_ENV,
   AzureBackendMisconfiguredError,
@@ -116,21 +116,19 @@ export {
   type StoredObjectS3Credentials,
   type StoredObjectS3Target,
 } from "./ports/stored-object-s3-target.port";
-export {
-  storedObjectSchema,
-  type StoredObject,
-} from "./repositories/clickhouse/stored-objects.row";
-export { StoredObjectsRepository } from "./repositories/clickhouse/stored-objects.repository";
+export { storedObjectSchema, type StoredObject } from "./repositories/stored-objects.row";
+export { StoredObjectsRepository } from "./repositories/stored-objects.repository";
+export { ClickHouseStoredObjectsRepository } from "./repositories/clickhouse/stored-objects.repository";
 export {
   StoredObjectsService,
   deriveStoredObjectId,
   type MintStorageUri,
   type StoredObjectsServiceOptions,
 } from "./services/stored-objects.service";
-export { PrometheusStoredObjectsTelemetry } from "./adapters/prometheus.stored-objects-telemetry.adapter";
-export { LocalFilesystemStoredObjectDriver } from "./adapters/local-filesystem.stored-object-driver.adapter";
+export { PrometheusStoredObjectsTelemetryAdapter } from "./adapters/prometheus.stored-objects-telemetry.adapter";
+export { LocalFilesystemStoredObjectDriverAdapter } from "./adapters/local-filesystem.stored-object-driver.adapter";
 export {
-  S3StoredObjectDriver,
+  S3StoredObjectDriverAdapter,
   type StoredObjectS3ClientPolicy,
 } from "./adapters/s3.stored-object-driver.adapter";
 
@@ -142,11 +140,10 @@ export {
   type MigrationTaskConfig,
   type MigrationTaskPhase,
 } from "./tasks/object-storage-migrate.task";
-export { createMigrationInventory } from "./adapters/postgres.object-storage-migration-inventory.adapter";
+export { PostgresObjectStorageMigrationInventoryAdapter } from "./adapters/postgres.object-storage-migration-inventory.adapter";
 export {
   MigrationBlockedError,
-  ObjectStorageMigration,
-  createMigrationStorageEndpoint,
+  ObjectStorageMigrationService,
   type MigrationCopyReport,
   type MigrationDataset,
   type MigrationFinalizeReport,
@@ -159,16 +156,15 @@ export {
   type QueueMigrationBlocker,
 } from "./services/object-storage-migration.service";
 export {
-  MigrationS3StorageDriver,
-  resolveMigrationS3Region,
+  MigrationS3StorageDriverAdapter,
   type MigrationS3Configuration,
   type MigrationS3RegionConfiguration,
 } from "./adapters/aws.object-storage-migration.adapter";
 export {
-  MigrationCutoverRedisAudit,
+  MigrationCutoverRedisAuditAdapter,
   type MigrationCutoverRedisConfig,
 } from "./adapters/redis.object-storage-migration.adapter";
 export {
-  auditGroupQueuesForStorageMigration,
+  GroupQueueObjectStorageMigrationAdapter,
   type QueueAuditRedis,
 } from "./adapters/group-queue.object-storage-migration.adapter";

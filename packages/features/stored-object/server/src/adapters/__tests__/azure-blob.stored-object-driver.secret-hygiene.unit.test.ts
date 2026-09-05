@@ -1,7 +1,7 @@
 /** Proves the real Azure error path applies the contract-owned redaction. */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AzureBlobStoredObjectDriver } from "../azure-blob.stored-object-driver.adapter";
+import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter";
 
 const ACCOUNT = "lwacct";
 const CONTAINER = "stored-objects";
@@ -27,14 +27,14 @@ function stubFetchReturning(body: string) {
 }
 
 function sharedKeyDriver() {
-  return AzureBlobStoredObjectDriver.create({
+  return AzureBlobStoredObjectDriverAdapter.create({
     mode: "sharedKey",
     accountName: ACCOUNT,
     accountKey: KEY,
   });
 }
 
-describe("AzureBlobStoredObjectDriver error paths", () => {
+describe("AzureBlobStoredObjectDriverAdapter error paths", () => {
   describe("given Azure rejects a PUT with a body echoing authorization detail", () => {
     /** @scenario "Authorization material never reaches logs, errors, or traces" */
     it("throws without the signature, the account key, or the storage account name", async () => {

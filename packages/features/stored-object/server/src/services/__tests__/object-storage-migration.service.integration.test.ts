@@ -10,11 +10,10 @@ import {
   type StoredObjectStorageDriver,
 } from "@langwatch/stored-object-server";
 import {
-  createMigrationStorageEndpoint,
   type MigrationDataset,
   type MigrationInventory,
   type MigrationProject,
-  ObjectStorageMigration,
+  ObjectStorageMigrationService,
   type QueueMigrationBlocker,
 } from "../object-storage-migration.service";
 
@@ -87,14 +86,14 @@ const setup = ({
 } = {}) => {
   const sourceDriver = new MemoryDriver();
   const destinationDriver = new MemoryDriver();
-  const source = createMigrationStorageEndpoint({
+  const source = ObjectStorageMigrationService.createStorageEndpoint({
     provider: sourceProvider,
     driver: sourceDriver,
     bucket: "source-bucket",
     accountName: "source-account",
     container: "source-container",
   });
-  const destination = createMigrationStorageEndpoint({
+  const destination = ObjectStorageMigrationService.createStorageEndpoint({
     provider: destinationProvider,
     driver: destinationDriver,
     bucket: "destination-bucket",
@@ -124,7 +123,7 @@ const setup = ({
       ),
     ),
   };
-  const migration = new ObjectStorageMigration({
+  const migration = ObjectStorageMigrationService.create({
     source,
     destination,
     inventory,

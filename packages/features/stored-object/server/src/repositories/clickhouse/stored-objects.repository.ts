@@ -7,8 +7,9 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { StoredObjectsClickHousePort } from "../../ports/stored-objects-clickhouse.port";
-import type { StoredObject } from "./stored-objects.row";
-import { storedObjectSchema } from "./stored-objects.row";
+import { StoredObjectsRepository } from "../stored-objects.repository";
+import type { StoredObject } from "../stored-objects.row";
+import { storedObjectSchema } from "../stored-objects.row";
 
 const TABLE_NAME = "stored_objects" as const;
 
@@ -20,9 +21,9 @@ const tracer = getLangWatchTracer("langwatch.stored-objects.repository");
  * Clients are resolved at call time through the App's resolver so
  * per-tenant private ClickHouse routing is always respected.
  */
-export class StoredObjectsRepository {
-  static create(clickhouse: StoredObjectsClickHousePort): StoredObjectsRepository {
-    return new StoredObjectsRepository(clickhouse);
+export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
+  static create(clickhouse: StoredObjectsClickHousePort): ClickHouseStoredObjectsRepository {
+    return new ClickHouseStoredObjectsRepository(clickhouse);
   }
 
   /**
@@ -30,7 +31,9 @@ export class StoredObjectsRepository {
    * a private-route tenant's rows live on its own cluster, so which client
    * answers is a function of the project the read names.
    */
-  private constructor(private readonly clickhouse: StoredObjectsClickHousePort) {}
+  private constructor(private readonly clickhouse: StoredObjectsClickHousePort) {
+    super();
+  }
 
   /**
    * Inserts a single stored_objects row.

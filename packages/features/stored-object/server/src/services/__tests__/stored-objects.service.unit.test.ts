@@ -43,9 +43,9 @@ vi.mock("@langwatch/observability", () => ({
 // ---------------------------------------------------------------------------
 
 import { ObjectNotFoundError } from "../../errors";
-import type { StoredObjectStorageRegistry } from "../../adapters/stored-object-storage.registry";
-import type { StoredObject } from "../../repositories/clickhouse/stored-objects.row";
-import type { StoredObjectsRepository } from "../../repositories/clickhouse/stored-objects.repository";
+import type { StoredObjectStoragePort } from "../../ports/stored-object-storage.port";
+import type { StoredObject } from "../../repositories/stored-objects.row";
+import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository";
 import type { StoredObjectsTelemetryPort } from "../../ports/stored-objects-telemetry.port";
 import type { MintStorageUri } from "../stored-objects.service";
 import { deriveStoredObjectId, StoredObjectsService } from "../stored-objects.service";
@@ -64,13 +64,13 @@ function makeRepository(): StoredObjectsRepository {
   } as unknown as StoredObjectsRepository;
 }
 
-function makeRegistry(): StoredObjectStorageRegistry {
+function makeRegistry(): StoredObjectStoragePort {
   return {
     get: vi.fn().mockResolvedValue(Readable.from([])),
     put: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
     exists: vi.fn().mockResolvedValue(true),
-  } as unknown as StoredObjectStorageRegistry;
+  } as unknown as StoredObjectStoragePort;
 }
 
 function makeTelemetry(): StoredObjectsTelemetryPort {
@@ -117,7 +117,7 @@ function makeService({
   mintStorageUri,
 }: {
   repository: StoredObjectsRepository;
-  registry: StoredObjectStorageRegistry;
+  registry: StoredObjectStoragePort;
   mintStorageUri?: MintStorageUri;
 }): StoredObjectsService {
   return StoredObjectsService.create({
@@ -135,7 +135,7 @@ function makeService({
 
 describe("storeFromBytes", () => {
   let repo: StoredObjectsRepository;
-  let registry: StoredObjectStorageRegistry;
+  let registry: StoredObjectStoragePort;
   let service: StoredObjectsService;
   let mockMintStorageUri: ReturnType<typeof vi.fn> & MintStorageUri;
 
@@ -358,7 +358,7 @@ describe("storeFromBytes", () => {
 
 describe("getById", () => {
   let repo: StoredObjectsRepository;
-  let registry: StoredObjectStorageRegistry;
+  let registry: StoredObjectStoragePort;
   let service: StoredObjectsService;
 
   beforeEach(() => {
@@ -433,7 +433,7 @@ describe("getById", () => {
 
 describe("deleteOwnedBy", () => {
   let repo: StoredObjectsRepository;
-  let registry: StoredObjectStorageRegistry;
+  let registry: StoredObjectStoragePort;
   let service: StoredObjectsService;
 
   beforeEach(() => {
@@ -516,7 +516,7 @@ describe("deleteOwnedBy", () => {
 
 describe("headById", () => {
   let repo: StoredObjectsRepository;
-  let registry: StoredObjectStorageRegistry;
+  let registry: StoredObjectStoragePort;
   let service: StoredObjectsService;
 
   beforeEach(() => {
