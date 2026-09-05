@@ -434,7 +434,7 @@ describeWithDatabase("given the saved workbench chart REST endpoints", () => {
           dashboard: () => dashboard,
           platformUrl: ({ path }: { projectSlug: string; path: string }) =>
             `https://app.langwatch.test${path}`,
-        }).hono,
+        }),
       ),
     );
   }, 120_000);

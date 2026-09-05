@@ -18,19 +18,20 @@
  * @see ~/server/analytics/registry — the catalogue the host's schema is built from
  */
 import type { AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
-import { requires } from "@langwatch/api";
 import {
-  type AppRestProjectVariables,
   type AppRestSecurity,
   baseResponses,
   coerceToEpoch,
-  type SecuredApp,
-  validator as zValidator,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  type ServiceContext,
 } from "@langwatch/api/rest";
+import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
+import type { Context, ErrorHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 
 import type { AnalyticsApp } from "#app/analytics.app";
@@ -50,13 +51,32 @@ export type AnalyticsTimeseriesRestBody = Omit<
   Readonly<{ startDate: string | number; endDate: string | number }>;
 
 /**
+ * A bare zod rejection carries no status, so a boundary that reads only
+ * handled errors would answer 500 where this endpoint answers 422.
+ */
+const promotingBoundary =
+  (boundary: ErrorHandler): ErrorHandler =>
+  (error, c) =>
+    boundary(isZodLikeError(error) ? ValidationError.fromZodError(error) : error, c);
+
+/** The project the credential resolved to, as this transport reads it. */
+const projectOf = (c: Context): { id: string } => c.get("project") as { id: string };
+
+/**
+ * The wire answer as this endpoint documents and sends it: two arrays of
+ * buckets, each an open record. Looser than the contract's
+ * `analyticsTimeseriesResultSchema`, which this door never enforced outbound.
+ */
+const timeseriesResponseSchema = z.object({
+  currentPeriod: z.array(z.record(z.string(), z.any())),
+  previousPeriod: z.array(z.record(z.string(), z.any())),
+});
+
+/**
  * REST for a project's analytics timeseries, built against one process's
  * security.
  */
-export function createAnalyticsRestApp<
-  TBody extends AnalyticsTimeseriesRestBody,
-  TBodyRaw,
->(options: {
+export function createAnalyticsRestApp(options: {
   security: AppRestSecurity;
   /**
    * Resolved per request, as reading it off the Hono context used to be:
@@ -67,66 +87,57 @@ export function createAnalyticsRestApp<
   /**
    * The host's published timeseries body — its metric, group and filter-field
    * catalogue — with the period bounds accepting an ISO string as well as
-   * epoch milliseconds. Both the parsed shape and the shape a caller SENDS are
-   * carried, because they differ, and the validator types the 400 body off the
-   * sent shape.
+   * epoch milliseconds.
    */
-  requestSchema: z.ZodType<TBody, TBodyRaw>;
-}): SecuredApp<{ Variables: AppRestProjectVariables }> {
+  requestSchema: z.ZodObject;
+}): MountableRestApp {
   const { security, analytics, requestSchema } = options;
 
-  const secured = security.createProjectApp({
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "analytics",
     basePath: "/api/analytics",
+    errorEnvelope: "legacy",
+    errorHandler: promotingBoundary,
   });
 
-  // POST /timeseries - Query analytics timeseries. Read scope: analytics:view
-  // (mirrors the tRPC analytics router + the dashboards/graphs sibling apps).
-  secured.access(requires("analytics:view")).post(
-    "/timeseries",
-    describeRoute({
-      description: "Query analytics timeseries data with metrics, aggregations, and filters",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Timeseries analytics data with current and previous periods",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  currentPeriod: z.array(z.record(z.string(), z.any())),
-                  previousPeriod: z.array(z.record(z.string(), z.any())),
-                }),
-              ),
-            },
-          },
-        },
-      },
-    }),
-    zValidator("json", requestSchema),
-    async (c) => {
-      const project = c.get("project");
-      const params = c.req.valid("json");
+  const timeseriesHandler = async (
+    c: ServiceContext<EndpointVariables>,
+    params: AnalyticsTimeseriesRestBody,
+  ) => {
+    const project = projectOf(c);
 
-      logger.info({ projectId: project.id }, "Querying analytics timeseries");
+    logger.info({ projectId: project.id }, "Querying analytics timeseries");
 
-      const input = {
-        ...params,
-        projectId: project.id,
-        startDate: coerceToEpoch(params.startDate),
-        endDate: coerceToEpoch(params.endDate),
-      };
+    const input = {
+      ...params,
+      projectId: project.id,
+      startDate: coerceToEpoch(params.startDate),
+      endDate: coerceToEpoch(params.endDate),
+    };
 
-      try {
-        const timeseriesResult = await analytics().getTimeseries(input);
-        return c.json(timeseriesResult);
-      } catch (e) {
-        if (e instanceof TRPCError && e.code === "BAD_REQUEST") {
-          throw new HTTPException(400, { message: e.message });
-        }
-        throw e;
+    try {
+      return await analytics().getTimeseries(input);
+    } catch (e) {
+      if (e instanceof TRPCError && e.code === "BAD_REQUEST") {
+        throw new HTTPException(400, { message: e.message });
       }
-    },
-  );
+      throw e;
+    }
+  };
 
-  return secured;
+  // Read scope: analytics:view (mirrors the tRPC analytics router + the
+  // dashboards/graphs sibling apps).
+  return service
+    .registerRoute("post", "/timeseries", MANAGEMENT_API_VERSION, timeseriesHandler, (b) =>
+      policy("analytics:view")(b)
+        .withInput(requestSchema)
+        .withOutput(timeseriesResponseSchema)
+        .withDocs({
+          operationId: "queryAnalyticsTimeseries",
+          tags: ["Analytics"],
+          description: "Query analytics timeseries data with metrics, aggregations, and filters",
+          responses: baseResponses,
+        }),
+    )
+    .build();
 }

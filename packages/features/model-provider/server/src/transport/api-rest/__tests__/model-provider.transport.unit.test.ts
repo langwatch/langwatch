@@ -85,7 +85,7 @@ function buildApi(upsert: () => Promise<never>) {
     organizations: () => organizations,
   });
 
-  return { hono: family.hono, modelProviders };
+  return { hono: family, modelProviders };
 }
 
 function upsertRequest() {
@@ -178,7 +178,7 @@ function readableApi() {
     organizations: () => organizations,
   });
 
-  return { hono: family.hono, upsert, getForProject };
+  return { hono: family, upsert, getForProject };
 }
 
 describe("the model-providers read route", () => {

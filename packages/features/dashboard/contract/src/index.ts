@@ -1,5 +1,6 @@
 export * from "./dashboard";
 export * from "./dashboard.errors";
+export * from "./dashboard.responses";
 export * from "./dashboard.service";
 export * from "./graph";
 export * from "./graph.schemas";

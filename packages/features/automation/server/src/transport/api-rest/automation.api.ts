@@ -1,20 +1,21 @@
-import { requires } from "@langwatch/api";
 import {
-  type AppRestProjectVariables,
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
   type PlatformUrlBuilder,
-  type SecuredApp,
-  validator as zValidator,
+  promoteSchemaFailures,
+  resolver,
 } from "@langwatch/api/rest";
 import {
   InvalidActionParamsError,
   type Trigger,
+  TriggerNotFoundError,
   type UpdateTriggerCommand,
 } from "@langwatch/automation-contract";
 import { createLogger } from "@langwatch/observability";
-import { describeRoute, resolver } from "hono-openapi";
+import type { Context } from "hono";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 
@@ -47,6 +48,8 @@ const triggerResponseSchema = z.object({
 const triggerResponseWithPlatformUrlSchema = triggerResponseSchema.extend({
   platformUrl: z.string().url(),
 });
+
+const idParamsSchema = z.object({ id: z.string().min(1) });
 
 const createTriggerSchema = z.object({
   name: z.string().min(1, "name is required"),
@@ -99,273 +102,194 @@ export function createTriggerRestApp(options: {
   security: AppRestSecurity;
   automation: () => AutomationApp;
   platformUrl: PlatformUrlBuilder;
-}): SecuredApp<{ Variables: AppRestProjectVariables }> {
+}): MountableRestApp {
   const { security, automation, platformUrl } = options;
 
-  const secured = security.createProjectApp({ basePath: "/api/triggers" });
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "triggers",
+    basePath: "/api/triggers",
+    errorEnvelope: "legacy",
+    // Two refusals this family names itself: the missing automation, whose
+    // one-word body its callers already parse, and a request-schema failure,
+    // which reaches the process's renderer as a bare zod-shaped error carrying
+    // no status of its own.
+    errorHandler: (boundary) =>
+      promoteSchemaFailures((error, c) =>
+        error instanceof TriggerNotFoundError
+          ? c.json({ error: "Trigger not found" }, 404)
+          : boundary(error, c),
+      ),
+  });
 
   const automationDrawerPath = (triggerId: string) =>
     `/automations?drawer.open=automation&drawer.automationId=${triggerId}`;
 
-  // ── List Triggers ──────────────────────────────────────────
-  secured.access(requires("triggers:view")).get(
-    "/",
-    describeRoute({
-      description: "List all active triggers (automations) for the project",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(z.array(triggerResponseWithPlatformUrlSchema)),
-            },
-          },
-        },
-      },
+  const withPlatformUrl = (trigger: Trigger, project: { slug: string }) => ({
+    ...toTriggerResponse(trigger),
+    platformUrl: platformUrl({
+      projectSlug: project.slug,
+      path: automationDrawerPath(trigger.id),
     }),
-    async (c) => {
-      const project = c.get("project");
-      logger.info({ projectId: project.id }, "Listing triggers");
+  });
 
-      const triggers = await automation().getAllForProject({
-        projectId: project.id,
-      });
+  /** The project's automation, or the refusal this family answers for a miss. */
+  const liveTrigger = async (projectId: string, triggerId: string): Promise<Trigger> => {
+    const trigger = await automation().tryGetLiveById({ triggerId, projectId });
+    if (!trigger) throw new TriggerNotFoundError();
+    return trigger;
+  };
 
-      return c.json(
-        triggers.map((t) => ({
-          ...toTriggerResponse(t),
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: automationDrawerPath(t.id),
-          }),
-        })),
+  const listHandler = async (c: Context) => {
+    const project = c.get("project");
+    logger.info({ projectId: project.id }, "Listing triggers");
+
+    const triggers = await automation().getAllForProject({ projectId: project.id });
+    return triggers.map((t) => withPlatformUrl(t, project));
+  };
+
+  const getHandler = async (c: Context, input: z.infer<typeof idParamsSchema>) => {
+    const project = c.get("project");
+    logger.info({ projectId: project.id, triggerId: input.id }, "Getting trigger");
+
+    return withPlatformUrl(await liveTrigger(project.id, input.id), project);
+  };
+
+  const createHandler = async (c: Context, input: z.infer<typeof createTriggerSchema>) => {
+    const project = c.get("project");
+    logger.info({ projectId: project.id }, "Creating trigger");
+
+    // This route only ever writes trace automations (it carries no graph or
+    // report shape), so a condition is always required. The rule is the
+    // application's, and `createTraceAutomation` is the operation that
+    // carries it — the tRPC surface writes through the same one.
+    const trigger = await automation().createTraceAutomation({
+      id: nanoid(),
+      name: input.name,
+      action: input.action,
+      actionParams: input.actionParams,
+      filters: input.filters ?? {},
+      projectId: project.id,
+      message: input.message ?? null,
+      alertType: input.alertType ?? null,
+    });
+
+    return withPlatformUrl(trigger, project);
+  };
+
+  const updateHandler = async (
+    c: Context,
+    input: z.infer<typeof idParamsSchema> & z.infer<typeof updateTriggerSchema>,
+  ) => {
+    const project = c.get("project");
+    if (input.actionParams !== undefined) {
+      throw new InvalidActionParamsError(
+        "Delivery settings are changed in the automation editor, not through this endpoint.",
+        "actionParams",
       );
+    }
+    logger.info({ projectId: project.id, triggerId: input.id }, "Updating trigger");
+
+    const app = automation();
+    const trigger = await liveTrigger(project.id, input.id);
+
+    // Editing is the other route to a match-everything automation: create one
+    // with a real condition, then patch the condition away. The four-clause
+    // rule is the application's; the tRPC surface applies the same one.
+    app.assertConditionSurvivesEdit({ existing: trigger, filters: input.filters });
+
+    const data: UpdateTriggerCommand = { id: input.id, projectId: project.id };
+    if (input.name !== undefined) data.name = input.name;
+    if (input.active !== undefined) data.active = input.active;
+    if (input.message !== undefined) data.message = input.message;
+    if (input.alertType !== undefined) data.alertType = input.alertType;
+    if (input.filters !== undefined) data.filters = input.filters;
+
+    return withPlatformUrl(await app.update({ ...data }), project);
+  };
+
+  const deleteHandler = async (c: Context, input: z.infer<typeof idParamsSchema>) => {
+    const project = c.get("project");
+    logger.info({ projectId: project.id, triggerId: input.id }, "Deleting trigger");
+
+    const app = automation();
+    await liveTrigger(project.id, input.id);
+
+    // One operation, not two: the soft delete and the retirement of the
+    // report's calendar entry belong together, and a door that did one without
+    // the other left the scheduler waking forever.
+    await app.delete({ triggerId: input.id, projectId: project.id });
+
+    return { id: input.id, deleted: true };
+  };
+
+  const notFoundResponse = {
+    404: {
+      description: "Trigger not found",
+      content: { "application/json": { schema: resolver(badRequestSchema) } },
     },
-  );
+  };
 
-  // ── Get Trigger ────────────────────────────────────────────
-  secured.access(requires("triggers:view")).get(
-    "/:id",
-    describeRoute({
-      description: "Get a trigger by its ID",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(triggerResponseWithPlatformUrlSchema),
-            },
-          },
-        },
-        404: {
-          description: "Trigger not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      logger.info({ projectId: project.id, triggerId: id }, "Getting trigger");
-
-      const trigger = await automation().tryGetLiveById({
-        triggerId: id,
-        projectId: project.id,
-      });
-
-      if (!trigger) {
-        return c.json({ error: "Trigger not found" }, 404);
-      }
-
-      return c.json({
-        ...toTriggerResponse(trigger),
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: automationDrawerPath(trigger.id),
-        }),
-      });
-    },
-  );
-
-  // ── Create Trigger ─────────────────────────────────────────
-  // Creating asks for `triggers:create`; `:manage` still implies it, so no
-  // existing caller changes and a viewer is declined as before.
-  secured.access(requires("triggers:create")).post(
-    "/",
-    describeRoute({
-      description: "Create a new trigger (automation)",
-      responses: {
-        ...baseResponses,
-        201: {
-          description: "Trigger created",
-          content: {
-            "application/json": {
-              schema: resolver(triggerResponseWithPlatformUrlSchema),
-            },
-          },
-        },
-      },
-    }),
-    zValidator("json", createTriggerSchema),
-    async (c) => {
-      const project = c.get("project");
-      const body = c.req.valid("json");
-      logger.info({ projectId: project.id }, "Creating trigger");
-
-      // This route only ever writes trace automations (it carries no graph or
-      // report shape), so a condition is always required. The rule is the
-      // application's, and `createTraceAutomation` is the operation that
-      // carries it — the tRPC surface writes through the same one.
-      const trigger = await automation().createTraceAutomation({
-        id: nanoid(),
-        name: body.name,
-        action: body.action,
-        actionParams: body.actionParams,
-        filters: body.filters ?? {},
-        projectId: project.id,
-        message: body.message ?? null,
-        alertType: body.alertType ?? null,
-      });
-
-      return c.json(
-        {
-          ...toTriggerResponse(trigger),
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: automationDrawerPath(trigger.id),
+  return (
+    service
+      .registerRoute("get", "/", MANAGEMENT_API_VERSION, listHandler, (b) =>
+        policy("triggers:view")(b)
+          .withOutput(z.array(triggerResponseWithPlatformUrlSchema))
+          .withDocs({
+            operationId: "listTriggers",
+            tags: ["Triggers"],
+            description: "List all active triggers (automations) for the project",
+            responses: { ...baseResponses },
           }),
-        },
-        201,
-      );
-    },
+      )
+      .registerRoute("get", "/:id", MANAGEMENT_API_VERSION, getHandler, (b) =>
+        policy("triggers:view")(b)
+          .withParams(idParamsSchema)
+          .withOutput(triggerResponseWithPlatformUrlSchema)
+          .withDocs({
+            operationId: "getTrigger",
+            tags: ["Triggers"],
+            description: "Get a trigger by its ID",
+            responses: { ...baseResponses, ...notFoundResponse },
+          }),
+      )
+      // Creating asks for `triggers:create`; `:manage` still implies it, so no
+      // existing caller changes and a viewer is declined as before.
+      .registerRoute("post", "/", MANAGEMENT_API_VERSION, createHandler, (b) =>
+        policy("triggers:create")(b)
+          .withInput(createTriggerSchema)
+          .withOutput(triggerResponseWithPlatformUrlSchema)
+          .withStatus(201)
+          .withDocs({
+            operationId: "createTrigger",
+            tags: ["Triggers"],
+            description: "Create a new trigger (automation)",
+            responses: { ...baseResponses },
+          }),
+      )
+      .registerRoute("patch", "/:id", MANAGEMENT_API_VERSION, updateHandler, (b) =>
+        policy("triggers:update")(b)
+          .withParams(idParamsSchema)
+          .withInput(updateTriggerSchema)
+          .withOutput(triggerResponseWithPlatformUrlSchema)
+          .withDocs({
+            operationId: "updateTrigger",
+            tags: ["Triggers"],
+            description: "Update a trigger (name, active state, message, filters)",
+            responses: { ...baseResponses, ...notFoundResponse },
+          }),
+      )
+      // Destruction deliberately stays at `:manage`.
+      .registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, deleteHandler, (b) =>
+        policy("triggers:manage")(b)
+          .withParams(idParamsSchema)
+          .withOutput(z.object({ id: z.string(), deleted: z.boolean() }))
+          .withDocs({
+            operationId: "deleteTrigger",
+            tags: ["Triggers"],
+            description: "Delete (soft-delete) a trigger",
+            responses: { ...baseResponses, ...notFoundResponse },
+          }),
+      )
+      .build()
   );
-
-  // ── Update Trigger ─────────────────────────────────────────
-  secured.access(requires("triggers:update")).patch(
-    "/:id",
-    describeRoute({
-      description: "Update a trigger (name, active state, message, filters)",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Trigger updated",
-          content: {
-            "application/json": {
-              schema: resolver(triggerResponseWithPlatformUrlSchema),
-            },
-          },
-        },
-        404: {
-          description: "Trigger not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("json", updateTriggerSchema),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      const body = c.req.valid("json");
-      if (body.actionParams !== undefined) {
-        throw new InvalidActionParamsError(
-          "Delivery settings are changed in the automation editor, not through this endpoint.",
-          "actionParams",
-        );
-      }
-      logger.info({ projectId: project.id, triggerId: id }, "Updating trigger");
-
-      const app = automation();
-      const trigger = await app.tryGetLiveById({
-        triggerId: id,
-        projectId: project.id,
-      });
-
-      if (!trigger) {
-        return c.json({ error: "Trigger not found" }, 404);
-      }
-
-      // Editing is the other route to a match-everything automation: create one
-      // with a real condition, then patch the condition away. The four-clause
-      // rule is the application's; the tRPC surface applies the same one.
-      app.assertConditionSurvivesEdit({ existing: trigger, filters: body.filters });
-
-      const data: UpdateTriggerCommand = {
-        id,
-        projectId: project.id,
-      };
-      if (body.name !== undefined) data.name = body.name;
-      if (body.active !== undefined) data.active = body.active;
-      if (body.message !== undefined) data.message = body.message;
-      if (body.alertType !== undefined) data.alertType = body.alertType;
-      if (body.filters !== undefined) data.filters = body.filters;
-
-      const updated = await app.update({
-        ...data,
-      });
-
-      return c.json({
-        ...toTriggerResponse(updated),
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: automationDrawerPath(updated.id),
-        }),
-      });
-    },
-  );
-
-  // ── Delete Trigger ─────────────────────────────────────────
-  // Destruction deliberately stays at `:manage`.
-  secured.access(requires("triggers:manage")).delete(
-    "/:id",
-    describeRoute({
-      description: "Delete (soft-delete) a trigger",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Trigger deleted",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ id: z.string(), deleted: z.boolean() })),
-            },
-          },
-        },
-        404: {
-          description: "Trigger not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      logger.info({ projectId: project.id, triggerId: id }, "Deleting trigger");
-
-      const app = automation();
-      const trigger = await app.tryGetLiveById({
-        triggerId: id,
-        projectId: project.id,
-      });
-
-      if (!trigger) {
-        return c.json({ error: "Trigger not found" }, 404);
-      }
-
-      // One operation, not two: the soft delete and the retirement of the
-      // report's calendar entry belong together, and a door that did one
-      // without the other left the scheduler waking forever.
-      await app.delete({ triggerId: id, projectId: project.id });
-
-      return c.json({ id, deleted: true });
-    },
-  );
-
-  return secured;
 }

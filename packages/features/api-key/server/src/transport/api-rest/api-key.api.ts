@@ -3,24 +3,29 @@ import {
   ApiKeyNotFoundError,
   ApiKeyNotOwnedError,
   apiKeyPermissionFormatSchema as permissionFormatSchema,
+  apiKeyRestDetailSchema,
+  apiKeyRestListSchema,
+  apiKeyRestMintedSchema,
+  apiKeyRestRevokedSchema,
   refineRestrictedPermissions,
   type ApiKeyDetail,
   type ApiKeyService,
 } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { Context } from "hono";
-import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 
 import { requires } from "@langwatch/api";
 import {
   type AppRestManagementAuditPort,
-  type AppRestOrganizationVariables,
   type AppRestSecurity,
   createFamilyErrorHandler,
   emitManagementAudit,
-  type SecuredApp,
-  validator as zValidator,
+  handWrittenDocs,
+  HttpError,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  promoteSchemaFailures,
 } from "@langwatch/api/rest";
 import {
   CREATE_API_KEY,
@@ -251,6 +256,22 @@ const requestedBindings = ({
   })),
 ];
 
+/**
+ * A refusal this family decides in the handler, in the flat body it has always
+ * answered. A plain {@link HttpError} publishes the sentence as the `error`
+ * field; this door publishes the class of refusal there and the sentence
+ * beside it.
+ */
+class ApiKeyForbidden extends HttpError {
+  readonly status = 403;
+  constructor(message: string) {
+    super(message);
+    this.error = "Forbidden";
+  }
+}
+
+const idParamsSchema = z.object({ id: z.string().min(1) });
+
 /** The 403 sentence for the privilege the mint asked for and did not hold. */
 const privilegedMintRefusal = ({
   isService,
@@ -293,24 +314,18 @@ const refuseNonAdminPrivilegedMint = async ({
   callerUserId: string | null;
   isService: boolean;
   assignedToUserId?: string;
-}): Promise<Response | null> => {
+}): Promise<void> => {
   const isAssignedToAnother = !isService && !!assignedToUserId && assignedToUserId !== callerUserId;
   const owner = resolveKeyOwner({ isService, assignedToUserId, callerUserId });
-  if (owner !== null && !isAssignedToAnother) return null;
+  if (owner !== null && !isAssignedToAnother) return;
   const callerIsAdmin = await resolveCallerIsAdmin({
     service,
     organizationId,
     callerUserId,
     apiKeyId: c.get("apiKeyId") as string,
   });
-  if (callerIsAdmin) return null;
-  return c.json(
-    {
-      error: "Forbidden",
-      message: privilegedMintRefusal({ isService, isAssignedToAnother }),
-    },
-    403,
-  );
+  if (callerIsAdmin) return;
+  throw new ApiKeyForbidden(privilegedMintRefusal({ isService, isAssignedToAnother }));
 };
 
 /**
@@ -330,254 +345,264 @@ export function createApiKeysRestApp(options: {
   apiKeys: () => ApiKeyService;
   permissions: () => AuthzService;
   audit: AppRestManagementAuditPort;
-}): SecuredApp<{ Variables: AppRestOrganizationVariables }> {
+}): MountableRestApp {
   const { security, apiKeys, permissions, audit } = options;
 
-  const secured = security.createOrgApp({
+  const { service, policy } = security.createVersionedApp({
+    name: "api-keys",
     basePath: "/api/api-keys",
+    errorEnvelope: "legacy",
+    errorHandler: (boundary) =>
+      promoteSchemaFailures(
+        createFamilyErrorHandler({
+          loggerName: "langwatch:api:api-keys:errors",
+          label: "API Keys Error",
+          boundary,
+        }),
+      ),
   });
 
-  secured.hono.onError(
-    createFamilyErrorHandler({
-      loggerName: "langwatch:api:api-keys:errors",
-      label: "API Keys Error",
-      boundary: security.legacyErrorHandler,
-    }),
-  );
+  const listHandler = async (c: Context) => {
+    const organization = c.get("organization");
+    const userId = c.get("apiKeyUserId");
+    const keys = apiKeys();
 
-  // The route policy is organization:view for the caller's OWN keys. The
-  // org-wide listing a service credential receives is a different disclosure
-  // (every key in the organization), so that branch additionally requires
-  // organization:manage in the handler.
-  secured
-    .access(requires("organization:view"))
-    .get("/", describeRoute(LIST_API_KEYS), async (c) => {
-      const organization = c.get("organization");
-      const userId = c.get("apiKeyUserId");
-      const service = apiKeys();
-
-      if (!userId) {
-        const canManage = await permissions().hasApiKeyPermission({
-          apiKeyId: c.get("apiKeyId"),
-          userId: null,
-          organizationId: organization.id,
-          scope: { type: "org", id: organization.id },
-          permission: "organization:manage",
-        });
-        if (!canManage) {
-          return c.json(
-            {
-              error: "Forbidden",
-              message:
-                "Listing every API key in the organization requires the organization:manage permission",
-            },
-            403,
-          );
-        }
-      }
-
-      const keys = userId
-        ? await service.list({ userId, organizationId: organization.id })
-        : await service.listAll({ organizationId: organization.id });
-
-      return c.json({
-        data: keys.map((key) => ({
-          id: key.id,
-          name: key.name,
-          description: key.description,
-          createdAt: key.createdAt,
-          expiresAt: key.expiresAt,
-          lastUsedAt: key.lastUsedAt,
-          revokedAt: key.revokedAt,
-          roleBindings: key.roleBindings.map((rb) => ({
-            id: rb.id,
-            role: rb.role,
-            scopeType: rb.scopeType,
-            scopeId: rb.scopeId,
-          })),
-        })),
-      });
-    });
-
-  secured
-    .access(requires("organization:manage"))
-    .post("/", describeRoute(CREATE_API_KEY), zValidator("json", createApiKeySchema), async (c) => {
-      const organization = c.get("organization");
-      const callerUserId = c.get("apiKeyUserId");
-      const body = c.req.valid("json");
-      const service = apiKeys();
-
-      const isService = body.keyType === "service";
-
-      const mintRefusal = await refuseNonAdminPrivilegedMint({
-        c,
-        service,
-        organizationId: organization.id,
-        callerUserId,
-        isService,
-        assignedToUserId: body.assignedToUserId,
-      });
-      if (mintRefusal) return mintRefusal;
-
-      const result = await service.create({
-        name: body.name,
-        description: body.description,
-        userId: resolveKeyOwner({
-          isService,
-          assignedToUserId: body.assignedToUserId,
-          callerUserId,
-        }),
-        createdByUserId: callerUserId,
-        organizationId: organization.id,
-        expiresAt: body.expiresAt,
-        permissionMode: body.permissionMode,
-        permissions: body.permissions,
-        bindings: requestedBindings({
-          isService,
-          bindings: body.bindings,
-          projectIds: body.projectIds,
-        }),
-      });
-
-      return c.json(
-        {
-          token: result.token,
-          apiKey: {
-            id: result.apiKey.id,
-            name: result.apiKey.name,
-            createdAt: result.apiKey.createdAt,
-          },
-        },
-        201,
-      );
-    });
-
-  secured
-    .access(requires("organization:view"))
-    .get("/:id", describeRoute(GET_API_KEY), async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization");
-      const callerUserId = c.get("apiKeyUserId");
-      const service = apiKeys();
-
-      const apiKey = await service.getByIdForCaller({
-        id,
-        organizationId: organization.id,
-        callerUserId,
-        callerCanReadAnyKey: await resolveCallerCanReadAnyKey({
-          c,
-          service,
-          permissions: permissions(),
-          organizationId: organization.id,
-          callerUserId,
-        }),
-      });
-
-      // The detail response names the member the key acts as and the member
-      // who minted it, so an admin can walk the organization's credentials one
-      // id at a time. That disclosure is auditable like the writes are.
-      emitManagementAudit({
-        c,
-        audit,
-        organizationId: organization.id,
-        action: "management.apiKey.read",
-        args: { apiKeyId: id },
-      });
-
-      return c.json(apiKeyDetailResponse(apiKey));
-    });
-
-  secured
-    .access(requires("organization:manage"))
-    .patch(
-      "/:id",
-      describeRoute(UPDATE_API_KEY),
-      zValidator("json", updateApiKeySchema),
-      async (c) => {
-        const { id } = c.req.param();
-        const organization = c.get("organization");
-        const callerUserId = c.get("apiKeyUserId");
-        const service = apiKeys();
-        const body = c.req.valid("json");
-
-        const callerIsAdmin = await resolveCallerIsAdmin({
-          service,
-          organizationId: organization.id,
-          callerUserId,
-          apiKeyId: c.get("apiKeyId"),
-        });
-
-        try {
-          await service.update({
-            id,
-            callerUserId,
-            callerIsAdmin,
-            organizationId: organization.id,
-            name: body.name,
-            description: body.description,
-            permissionMode: body.permissionMode,
-            permissions: body.permissions,
-            bindings: body.bindings,
-          });
-        } catch (error) {
-          // Editing somebody else's key answers exactly as fetching it does:
-          // the id names nothing this caller can reach. A 403 here would
-          // confirm it names a real key.
-          if (error instanceof ApiKeyNotOwnedError) {
-            throw new ApiKeyNotFoundError(id, { reasons: [error] });
-          }
-          throw error;
-        }
-
-        emitManagementAudit({
-          c,
-          audit,
-          organizationId: organization.id,
-          action: "management.apiKey.update",
-          args: { apiKeyId: id },
-        });
-
-        // Read back through the same path GET serves, so the two can never
-        // describe the key differently. The route already demanded
-        // organization:manage, so adminness alone decides the ownership
-        // branch.
-        const updated = await service.getByIdForCaller({
-          id,
-          organizationId: organization.id,
-          callerUserId,
-          callerCanReadAnyKey: callerIsAdmin,
-        });
-
-        return c.json(apiKeyDetailResponse(updated));
-      },
-    );
-
-  secured
-    .access(requires("organization:manage"))
-    .delete("/:id", describeRoute(REVOKE_API_KEY), async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization");
-      const userId = c.get("apiKeyUserId");
-      const service = apiKeys();
-
-      // Real adminness, so revoke() can enforce its owner-only path: without
-      // this, any organization:manage holder could revoke anyone's key.
-      const callerIsAdmin = await resolveCallerIsAdmin({
-        service,
-        organizationId: organization.id,
-        callerUserId: userId,
+    if (!userId) {
+      const canManage = await permissions().hasApiKeyPermission({
         apiKeyId: c.get("apiKeyId"),
+        userId: null,
+        organizationId: organization.id,
+        scope: { type: "org", id: organization.id },
+        permission: "organization:manage",
       });
+      if (!canManage) {
+        throw new ApiKeyForbidden(
+          "Listing every API key in the organization requires the organization:manage permission",
+        );
+      }
+    }
 
-      await service.revoke({
-        id,
-        callerUserId: userId,
+    const rows = userId
+      ? await keys.list({ userId, organizationId: organization.id })
+      : await keys.listAll({ organizationId: organization.id });
+
+    return {
+      data: rows.map((key) => ({
+        id: key.id,
+        name: key.name,
+        description: key.description,
+        createdAt: key.createdAt,
+        expiresAt: key.expiresAt,
+        lastUsedAt: key.lastUsedAt,
+        revokedAt: key.revokedAt,
+        roleBindings: key.roleBindings.map((rb) => ({
+          id: rb.id,
+          role: rb.role,
+          scopeType: rb.scopeType,
+          scopeId: rb.scopeId,
+        })),
+      })),
+    };
+  };
+
+  const createHandler = async (c: Context, input: z.infer<typeof createApiKeySchema>) => {
+    const organization = c.get("organization");
+    const callerUserId = c.get("apiKeyUserId");
+    const keys = apiKeys();
+    const isService = input.keyType === "service";
+
+    await refuseNonAdminPrivilegedMint({
+      c,
+      service: keys,
+      organizationId: organization.id,
+      callerUserId,
+      isService,
+      ...(input.assignedToUserId === undefined ? {} : { assignedToUserId: input.assignedToUserId }),
+    });
+
+    const result = await keys.create({
+      name: input.name,
+      description: input.description,
+      userId: resolveKeyOwner({
+        isService,
+        ...(input.assignedToUserId === undefined
+          ? {}
+          : { assignedToUserId: input.assignedToUserId }),
+        callerUserId,
+      }),
+      createdByUserId: callerUserId,
+      organizationId: organization.id,
+      expiresAt: input.expiresAt,
+      permissionMode: input.permissionMode,
+      permissions: input.permissions,
+      bindings: requestedBindings({
+        isService,
+        ...(input.bindings === undefined ? {} : { bindings: input.bindings }),
+        ...(input.projectIds === undefined ? {} : { projectIds: input.projectIds }),
+      }),
+    });
+
+    return {
+      token: result.token,
+      apiKey: {
+        id: result.apiKey.id,
+        name: result.apiKey.name,
+        createdAt: result.apiKey.createdAt,
+      },
+    };
+  };
+
+  const getHandler = async (c: Context, input: z.infer<typeof idParamsSchema>) => {
+    const organization = c.get("organization");
+    const callerUserId = c.get("apiKeyUserId");
+    const keys = apiKeys();
+
+    const apiKey = await keys.getByIdForCaller({
+      id: input.id,
+      organizationId: organization.id,
+      callerUserId,
+      callerCanReadAnyKey: await resolveCallerCanReadAnyKey({
+        c,
+        service: keys,
+        permissions: permissions(),
+        organizationId: organization.id,
+        callerUserId,
+      }),
+    });
+
+    // The detail response names the member the key acts as and the member who
+    // minted it, so an admin can walk the organization's credentials one id at
+    // a time. That disclosure is auditable like the writes are.
+    emitManagementAudit({
+      c,
+      audit,
+      organizationId: organization.id,
+      action: "management.apiKey.read",
+      args: { apiKeyId: input.id },
+    });
+
+    return apiKeyDetailResponse(apiKey);
+  };
+
+  const updateHandler = async (
+    c: Context,
+    input: z.infer<typeof idParamsSchema> & z.infer<typeof updateApiKeySchema>,
+  ) => {
+    const organization = c.get("organization");
+    const callerUserId = c.get("apiKeyUserId");
+    const keys = apiKeys();
+
+    const callerIsAdmin = await resolveCallerIsAdmin({
+      service: keys,
+      organizationId: organization.id,
+      callerUserId,
+      apiKeyId: c.get("apiKeyId"),
+    });
+
+    try {
+      await keys.update({
+        id: input.id,
+        callerUserId,
         callerIsAdmin,
         organizationId: organization.id,
+        name: input.name,
+        description: input.description,
+        permissionMode: input.permissionMode,
+        permissions: input.permissions,
+        bindings: input.bindings,
       });
+    } catch (error) {
+      // Editing somebody else's key answers exactly as fetching it does: the id
+      // names nothing this caller can reach. A 403 here would confirm it names
+      // a real key.
+      if (error instanceof ApiKeyNotOwnedError) {
+        throw new ApiKeyNotFoundError(input.id, { reasons: [error] });
+      }
+      throw error;
+    }
 
-      return c.json({ success: true });
+    emitManagementAudit({
+      c,
+      audit,
+      organizationId: organization.id,
+      action: "management.apiKey.update",
+      args: { apiKeyId: input.id },
     });
 
-  return secured;
+    // Read back through the same path GET serves, so the two can never describe
+    // the key differently. The route already demanded organization:manage, so
+    // adminness alone decides the ownership branch.
+    return apiKeyDetailResponse(
+      await keys.getByIdForCaller({
+        id: input.id,
+        organizationId: organization.id,
+        callerUserId,
+        callerCanReadAnyKey: callerIsAdmin,
+      }),
+    );
+  };
+
+  const revokeHandler = async (c: Context, input: z.infer<typeof idParamsSchema>) => {
+    const organization = c.get("organization");
+    const userId = c.get("apiKeyUserId");
+    const keys = apiKeys();
+
+    // Real adminness, so revoke() can enforce its owner-only path: without
+    // this, any organization:manage holder could revoke anyone's key.
+    const callerIsAdmin = await resolveCallerIsAdmin({
+      service: keys,
+      organizationId: organization.id,
+      callerUserId: userId,
+      apiKeyId: c.get("apiKeyId"),
+    });
+
+    await keys.revoke({
+      id: input.id,
+      callerUserId: userId,
+      callerIsAdmin,
+      organizationId: organization.id,
+    });
+
+    return { success: true };
+  };
+
+  return (
+    service
+      // The route policy is organization:view for the caller's OWN keys. The
+      // org-wide listing a service credential receives is a different
+      // disclosure (every key in the organization), so that branch
+      // additionally requires organization:manage in the handler.
+      .registerRoute("get", "/", MANAGEMENT_API_VERSION, listHandler, (b) =>
+        policy(requires("organization:view"))(b)
+          .withOutput(apiKeyRestListSchema)
+          .withDocs(handWrittenDocs(LIST_API_KEYS)),
+      )
+      .registerRoute("post", "/", MANAGEMENT_API_VERSION, createHandler, (b) =>
+        policy(requires("organization:manage"))(b)
+          .withInput(createApiKeySchema)
+          .withOutput(apiKeyRestMintedSchema)
+          .withStatus(201)
+          .withDocs(handWrittenDocs(CREATE_API_KEY)),
+      )
+      .registerRoute("get", "/:id", MANAGEMENT_API_VERSION, getHandler, (b) =>
+        policy(requires("organization:view"))(b)
+          .withParams(idParamsSchema)
+          .withOutput(apiKeyRestDetailSchema)
+          .withDocs(handWrittenDocs(GET_API_KEY)),
+      )
+      .registerRoute("patch", "/:id", MANAGEMENT_API_VERSION, updateHandler, (b) =>
+        policy(requires("organization:manage"))(b)
+          .withParams(idParamsSchema)
+          .withInput(updateApiKeySchema)
+          .withOutput(apiKeyRestDetailSchema)
+          .withDocs(handWrittenDocs(UPDATE_API_KEY)),
+      )
+      .registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, revokeHandler, (b) =>
+        policy(requires("organization:manage"))(b)
+          .withParams(idParamsSchema)
+          .withOutput(apiKeyRestRevokedSchema)
+          .withDocs(handWrittenDocs(REVOKE_API_KEY)),
+      )
+      .build()
+  );
 }

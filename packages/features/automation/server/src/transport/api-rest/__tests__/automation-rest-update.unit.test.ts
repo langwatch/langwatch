@@ -44,8 +44,7 @@ function mount(options: { realConditionRule?: boolean } = {}) {
       ? (input: Parameters<AutomationApp["assertConditionSurvivesEdit"]>[0]) =>
           rules.assertConditionSurvivesEdit(input)
       : vi.fn(),
-    createTraceAutomation: (command: unknown) =>
-      rules.createTraceAutomation(command as never),
+    createTraceAutomation: (command: unknown) => rules.createTraceAutomation(command as never),
     update: vi.fn(async (command: unknown) => {
       updates.push(command);
       return storedTrigger;
@@ -57,7 +56,7 @@ function mount(options: { realConditionRule?: boolean } = {}) {
       security: projectSecurity(),
       automation: () => app as never,
       platformUrl: () => "https://app.test/automations",
-    }).hono,
+    }),
   );
   return {
     updates,

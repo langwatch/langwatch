@@ -223,8 +223,15 @@ function spine(
         }
         await next();
       },
-    authenticateOrganizationThrowing: async (_c, next) => next(),
-    authorizeOrganizationPermissionThrowing: () => async (_c, next) => next(),
+    // The versioned family's door: the same two checks, in the mode that
+    // family uses.
+    authenticateOrganizationThrowing: authenticateOrganization,
+    authorizeOrganizationPermissionThrowing: (permission) => async (c, next) => {
+      if (!granted.has(permission)) {
+        return c.json({ error: "Forbidden", message: "Missing permission" }, 403);
+      }
+      await next();
+    },
   };
 
   return createRestApiService<AppRestProjectVariables, AppRestOrganizationVariables>(ports);
@@ -241,7 +248,7 @@ function buildApi(
   const projects: ProjectService = Object.assign(new TestProjectService(), options.projects);
   const apiKeys: ApiKeyService = Object.assign(new TestApiKeyService(), options.apiKeys);
 
-  const { hono } = createProjectRestApp({
+  const hono = createProjectRestApp({
     security: spine({
       ...(options.granted ? { granted: options.granted } : {}),
       ...(options.grantedOnProject ? { grantedOnProject: options.grantedOnProject } : {}),

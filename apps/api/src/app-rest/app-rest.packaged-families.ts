@@ -433,8 +433,8 @@ export function mountApiPackagedRestFamilies(options: {
     "dashboards",
     dashboard
       ? () => [
-          createDashboardsRestApp({ security, dashboard, platformUrl: ports.platformUrl }).hono,
-          createGraphsRestApp({ security, dashboard }).hono,
+          createDashboardsRestApp({ security, dashboard, platformUrl: ports.platformUrl }),
+          createGraphsRestApp({ security, dashboard }),
         ]
       : null,
   );
@@ -494,7 +494,7 @@ export function mountApiPackagedRestFamilies(options: {
   const governance = services.governance;
   mount(
     "governance",
-    governance ? () => createGovernanceRestApp({ security, app: governance }).hono : null,
+    governance ? () => createGovernanceRestApp({ security, app: governance }) : null,
   );
 
   const organizations = services.organizations;
@@ -508,7 +508,7 @@ export function mountApiPackagedRestFamilies(options: {
             organizations,
             enterpriseGate: enterpriseGate("GROUPS"),
             ledgerActor: ports.organizationLedgerActor,
-          }).hono
+          })
       : null,
   );
 
@@ -522,7 +522,7 @@ export function mountApiPackagedRestFamilies(options: {
             personalUsage: governance,
             organizations,
             projects,
-          }).hono
+          })
       : null,
   );
 
@@ -532,7 +532,7 @@ export function mountApiPackagedRestFamilies(options: {
     modelProviders && organizations
       ? () => [
           createModelDefaultsRestApp({ security, modelProviders }).hono,
-          createModelProvidersRestApp({ security, modelProviders, organizations }).hono,
+          createModelProvidersRestApp({ security, modelProviders, organizations }),
         ]
       : null,
   );
@@ -565,13 +565,13 @@ export function mountApiPackagedRestFamilies(options: {
             isSaas: ports.isSaas,
             audit: ports.managementAudit,
             reportError: ports.reportError,
-          }).hono
+          })
       : null,
   );
 
   mount(
     "projects",
-    projects && apiKeys ? () => createProjectRestApp({ security, projects, apiKeys }).hono : null,
+    projects && apiKeys ? () => createProjectRestApp({ security, projects, apiKeys }) : null,
   );
 
   const permissions = services.permissions;
@@ -711,7 +711,7 @@ export function mountApiPackagedRestFamilies(options: {
             permissions,
             projects,
             ledgerActor: ports.organizationLedgerActor,
-          }).hono
+          })
       : null,
   );
 
@@ -743,8 +743,8 @@ export function mountApiPackagedRestFamilies(options: {
     "triggers",
     automation
       ? () => [
-          createTriggerRestApp({ security, automation, platformUrl: ports.platformUrl }).hono,
-          createSlackTriggerRestApp({ security, automation }).hono,
+          createTriggerRestApp({ security, automation, platformUrl: ports.platformUrl }),
+          createSlackTriggerRestApp({ security, automation }),
         ]
       : null,
   );

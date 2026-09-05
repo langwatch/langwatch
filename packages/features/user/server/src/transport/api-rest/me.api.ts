@@ -1,16 +1,15 @@
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import { describeRoute, resolver } from "hono-openapi";
+import type { Context } from "hono";
 import { z } from "zod";
 
-import { requires } from "@langwatch/api";
 import {
-  type AppRestProjectVariables,
   type AppRestSecurity,
   baseResponses,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  promoteSchemaFailures,
   resolvePersonalCaller,
-  type SecuredApp,
-  validator as zValidator,
 } from "@langwatch/api/rest";
 
 /**
@@ -139,114 +138,93 @@ export function createMeRestApp(options: {
   personalUsage: () => MePersonalUsageReader;
   organizations: () => OrganizationService;
   projects: () => ProjectService;
-}): SecuredApp<{ Variables: AppRestProjectVariables }> {
-  const secured = options.security.createProjectApp({ basePath: "/api/me" });
+}): MountableRestApp {
+  const { service, policy } = options.security.createProjectVersionedApp({
+    name: "me",
+    basePath: "/api/me",
+    errorEnvelope: "legacy",
+    // A request-schema failure reaches the process's renderer as a bare
+    // zod-shaped error, which carries no status of its own.
+    errorHandler: (boundary) => promoteSchemaFailures(boundary),
+  });
 
-  registerUsageRoute(secured, options);
-  registerProjectRoute(secured);
+  const view = policy("project:view");
 
-  return secured;
-}
+  const usageHandler = async (c: Context, input: z.infer<typeof meUsageQuerySchema>) => {
+    const project = c.get("project");
 
-function registerUsageRoute(
-  secured: SecuredApp<{ Variables: AppRestProjectVariables }>,
-  services: {
-    personalUsage: () => MePersonalUsageReader;
-    organizations: () => OrganizationService;
-    projects: () => ProjectService;
-  },
-): void {
-  secured.access(requires("project:view")).get(
-    "/usage",
-    describeRoute({
-      description:
-        "Personal AI usage for the current month (or an explicit window): spend, billed spend, request + token counts, per-day buckets, and per-model breakdown. Requires a personal-project API key.",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(meUsageResponseSchema),
-            },
-          },
-        },
-      },
-    }),
-    zValidator("query", meUsageQuerySchema),
-    async (c) => {
-      const project = c.get("project");
+    // /api/me/usage is principal-scoped: it only makes sense for a personal
+    // workspace, whose owner identifies whose usage to roll up. Both guards
+    // and both refusals are shared with the coding agent's pull-request
+    // usage read, which needs a person for the same reason.
+    const ownerUserId = resolvePersonalCaller({
+      project,
+      apiKeyUserId: c.get("apiKeyUserId"),
+    });
 
-      // /api/me/usage is principal-scoped: it only makes sense for a personal
-      // workspace, whose owner identifies whose usage to roll up. Both guards
-      // and both refusals are shared with the coding agent's pull-request
-      // usage read, which needs a person for the same reason.
-      const ownerUserId = resolvePersonalCaller({
-        project,
-        apiKeyUserId: c.get("apiKeyUserId"),
-      });
+    const window =
+      input.windowStartMs !== undefined && input.windowEndMs !== undefined
+        ? { startMs: input.windowStartMs, endMs: input.windowEndMs }
+        : undefined;
 
-      const { windowStartMs, windowEndMs } = c.req.valid("query");
-      const window =
-        windowStartMs !== undefined && windowEndMs !== undefined
-          ? { startMs: windowStartMs, endMs: windowEndMs }
-          : undefined;
+    // Ingestion-source ledger rows (Claude Code OTLP, etc.) land under the
+    // org's hidden Governance Project tenant, not the personal project.
+    // Resolve it read-only (never provision on a GET) so the usage union is
+    // scoped to THIS org's tenant — both to prune ClickHouse partitions and to
+    // avoid summing a multi-org user's spend across every org. Absent when the
+    // org never minted an ingestion source, in which case there is no ledger
+    // traffic.
+    const organizationId =
+      c.get("apiKeyOrganizationId") ??
+      (await options.organizations().tryGetOrganizationIdByTeamId({ teamId: project.teamId }));
+    const governanceProject = organizationId
+      ? await options.projects().tryFindInternal({
+          organizationId,
+          kind: "internal_governance",
+        })
+      : null;
 
-      // Ingestion-source ledger rows (Claude Code OTLP, etc.) land under
-      // the org's hidden Governance Project tenant, not the personal
-      // project. Resolve it read-only (never provision on a GET) so the
-      // usage union is scoped to THIS org's tenant — both to prune
-      // ClickHouse partitions and to avoid summing a multi-org user's
-      // spend across every org. Absent when the org never minted an
-      // ingestion source, in which case there is no ledger traffic.
-      const organizationId =
-        c.get("apiKeyOrganizationId") ??
-        (await services.organizations().tryGetOrganizationIdByTeamId({ teamId: project.teamId }));
-      const governanceProject = organizationId
-        ? await services.projects().tryFindInternal({
-            organizationId,
-            kind: "internal_governance",
-          })
-        : null;
+    return options.personalUsage().personalUsage({
+      personalProjectId: project.id,
+      userId: ownerUserId,
+      ...(governanceProject ? { ingestionTenantId: governanceProject.id } : {}),
+      ...(window ? { window } : {}),
+    });
+  };
 
-      const input = {
-        personalProjectId: project.id,
-        userId: ownerUserId,
-        ingestionTenantId: governanceProject?.id,
-        window,
-      };
+  const projectHandler = (c: Context) => {
+    const project = c.get("project");
+    return {
+      id: project.id,
+      name: project.name,
+      slug: project.slug,
+      isPersonal: project.isPersonal,
+    };
+  };
 
-      return c.json(await services.personalUsage().personalUsage(input));
-    },
-  );
-}
-
-function registerProjectRoute(secured: SecuredApp<{ Variables: AppRestProjectVariables }>): void {
-  secured.access(requires("project:view")).get(
-    "/project",
-    describeRoute({
-      description:
-        "Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal workspace project. Lets a client (the CLI's identity notice, a widget) say which project a key targets without any further access.",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(meProjectResponseSchema),
-            },
-          },
-        },
-      },
-    }),
-    (c) => {
-      const project = c.get("project");
-      return c.json({
-        id: project.id,
-        name: project.name,
-        slug: project.slug,
-        isPersonal: project.isPersonal,
-      });
-    },
-  );
+  return service
+    .registerRoute("get", "/usage", MANAGEMENT_API_VERSION, usageHandler, (b) =>
+      view(b)
+        .withQuery(meUsageQuerySchema)
+        .withOutput(meUsageResponseSchema)
+        .withDocs({
+          operationId: "getMyUsage",
+          tags: ["Me"],
+          description:
+            "Personal AI usage for the current month (or an explicit window): spend, billed spend, request + token counts, per-day buckets, and per-model breakdown. Requires a personal-project API key.",
+          responses: { ...baseResponses },
+        }),
+    )
+    .registerRoute("get", "/project", MANAGEMENT_API_VERSION, projectHandler, (b) =>
+      view(b)
+        .withOutput(meProjectResponseSchema)
+        .withDocs({
+          operationId: "getMyProject",
+          tags: ["Me"],
+          description:
+            "Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal workspace project. Lets a client (the CLI's identity notice, a widget) say which project a key targets without any further access.",
+          responses: { ...baseResponses },
+        }),
+    )
+    .build();
 }

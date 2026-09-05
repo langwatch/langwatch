@@ -127,8 +127,15 @@ function spine(options: { granted?: readonly string[] } = {}) {
       },
     authorizeRouteTeamPermission: () => async (_c, next) => next(),
     authorizeRouteProjectPermission: () => async (_c, next) => next(),
-    authenticateOrganizationThrowing: async (_c, next) => next(),
-    authorizeOrganizationPermissionThrowing: () => async (_c, next) => next(),
+    // The versioned family's door: the same two checks, in the mode that
+    // family uses.
+    authenticateOrganizationThrowing: authenticateOrganization,
+    authorizeOrganizationPermissionThrowing: (permission) => async (c, next) => {
+      if (!granted.has(permission)) {
+        return c.json({ error: "Forbidden", message: "Missing permission" }, 403);
+      }
+      await next();
+    },
   };
 
   return createRestApiService<AppRestProjectVariables, AppRestOrganizationVariables>(ports);
@@ -157,7 +164,7 @@ function buildApi(
     await next();
   };
 
-  const { hono } = createGroupRestApp({
+  const hono = createGroupRestApp({
     security: spine(options.granted ? { granted: options.granted } : {}),
     organizations: () => organizations,
     enterpriseGate,

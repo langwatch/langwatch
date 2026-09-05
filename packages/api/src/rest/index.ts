@@ -137,6 +137,7 @@ export { deprecatedAlias } from "./deprecation.js";
 // A family's own `onError`, layered over the spine's.
 export { createCanonicalFamilyErrorHandler } from "./canonical-family-error-handler.js";
 export { createFamilyErrorHandler } from "./family-error-handler.js";
+export { handWrittenDocs } from "./hand-written-docs.js";
 export { promoteSchemaFailures } from "./schema-failure-boundary.js";
 // The OpenAPI schema wrapper a family needs to document a response body of its
 // own. Re-exported so a transport file never reaches for hono-openapi itself.

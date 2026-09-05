@@ -1,32 +1,46 @@
-import { requires } from "@langwatch/api";
 import {
   type AppRestProjectVariables,
   type AppRestSecurity,
-  badRequestSchema,
   baseResponses,
-  type SecuredApp,
-  validator as zValidator,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  type RouteResponse,
+  type ServiceContext,
 } from "@langwatch/api/rest";
+import {
+  graphDeletedResponseSchema,
+  graphListRestResponseSchema,
+  graphRestResponseSchema,
+} from "@langwatch/dashboard-contract";
+import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { describeRoute, resolver } from "hono-openapi";
+import type { Context, ErrorHandler } from "hono";
 import { z } from "zod";
 import { DashboardNotThereError, GraphNotThereError, type DashboardApp } from "#app/dashboard.app";
 
 const logger = createLogger("langwatch:api:graphs");
 
-const graphResponseSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  graph: z.record(z.string(), z.unknown()),
-  filters: z.record(z.string(), z.unknown()).nullable(),
-  dashboardId: z.string().nullable(),
-  gridColumn: z.number(),
-  gridRow: z.number(),
-  colSpan: z.number(),
-  rowSpan: z.number(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-});
+/**
+ * The family's own refusals, in the bare `{ error }` body they have always
+ * had. Everything else goes to the boundary, zod rejections promoted so a
+ * rejected body stays a 422.
+ */
+const graphErrorHandler =
+  (boundary: ErrorHandler): ErrorHandler =>
+  (error, c) => {
+    if (error instanceof GraphNotThereError) {
+      return c.json({ error: "Graph not found" }, 404);
+    }
+    if (error instanceof DashboardNotThereError) {
+      return c.json({ error: "Dashboard not found" }, 404);
+    }
+    return boundary(isZodLikeError(error) ? ValidationError.fromZodError(error) : error, c);
+  };
+
+const listGraphsQuerySchema = z.object({ dashboardId: z.string().optional() });
+
+const graphIdParamsSchema = z.object({ id: z.string().min(1) });
 
 const createGraphSchema = z.object({
   name: z.string().min(1, "name is required"),
@@ -79,8 +93,7 @@ function toGraphResponse(graph: {
  * The application arrives as a provider rather than being read off the
  * request, so this family can be mounted into any process that has one. It is
  * the SAME {@link DashboardApp} the tRPC surfaces are given, which is what lets
- * the handlers below recognise a refusal by its class instead of by comparing
- * `error.name` to a string literal.
+ * the family's error handler recognise a refusal by its class.
  */
 export function createGraphsRestApp(options: {
   security: AppRestSecurity;
@@ -90,231 +103,168 @@ export function createGraphsRestApp(options: {
    * what lets the OpenAPI spec generator build this app with none.
    */
   dashboard: () => DashboardApp;
-}): SecuredApp<{ Variables: AppRestProjectVariables }> {
+}): MountableRestApp {
   const { security, dashboard } = options;
 
-  const secured = security.createProjectApp({
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "graphs",
     basePath: "/api/graphs",
+    errorEnvelope: "legacy",
+    errorHandler: graphErrorHandler,
   });
 
-  // ── List Graphs ────────────────────────────────────────────
-  secured.access(requires("analytics:view")).get(
-    "/",
-    describeRoute({
-      description: "List all custom graphs, optionally filtered by dashboard",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(z.array(graphResponseSchema)),
-            },
+  type GraphContext = ServiceContext<EndpointVariables>;
+
+  const projectOf = (c: Context): AppRestProjectVariables["project"] =>
+    c.get("project") as AppRestProjectVariables["project"];
+
+  const listGraphsHandler = async (
+    c: GraphContext,
+    input: z.infer<typeof listGraphsQuerySchema>,
+  ) => {
+    const project = projectOf(c);
+    logger.info({ projectId: project.id, dashboardId: input.dashboardId }, "Listing graphs");
+
+    const graphs = await dashboard().listGraphs({
+      projectId: project.id,
+      ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
+    });
+
+    return graphs.map(toGraphResponse);
+  };
+
+  const getGraphHandler = async (c: GraphContext, input: z.infer<typeof graphIdParamsSchema>) => {
+    const project = projectOf(c);
+
+    const graph = await dashboard().getGraph({ projectId: project.id, graphId: input.id });
+    return toGraphResponse(graph);
+  };
+
+  const createGraphHandler = async (c: GraphContext, input: z.infer<typeof createGraphSchema>) => {
+    const project = projectOf(c);
+    logger.info({ projectId: project.id }, "Creating graph");
+
+    const graph = await dashboard().createGraph({
+      projectId: project.id,
+      name: input.name,
+      graph: input.graph,
+      ...(input.filters === undefined ? {} : { filters: input.filters }),
+      ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
+      layout: {
+        ...(input.gridColumn === undefined ? {} : { gridColumn: input.gridColumn }),
+        ...(input.gridRow === undefined ? {} : { gridRow: input.gridRow }),
+        ...(input.colSpan === undefined ? {} : { colSpan: input.colSpan }),
+        ...(input.rowSpan === undefined ? {} : { rowSpan: input.rowSpan }),
+      },
+    });
+
+    return toGraphResponse(graph);
+  };
+
+  const updateGraphHandler = async (
+    c: GraphContext,
+    input: z.infer<typeof graphIdParamsSchema> & z.infer<typeof updateGraphSchema>,
+  ) => {
+    const project = projectOf(c);
+
+    const updated = await dashboard().updateGraph({
+      projectId: project.id,
+      graphId: input.id,
+      ...(input.name === undefined ? {} : { name: input.name }),
+      ...(input.graph === undefined ? {} : { graph: input.graph }),
+      ...(input.filters === undefined ? {} : { filters: input.filters }),
+    });
+
+    return toGraphResponse(updated);
+  };
+
+  const deleteGraphHandler = async (
+    c: GraphContext,
+    input: z.infer<typeof graphIdParamsSchema>,
+  ) => {
+    const project = projectOf(c);
+
+    await dashboard().deleteGraph({ projectId: project.id, graphId: input.id });
+
+    return { id: input.id, deleted: true };
+  };
+
+  /** The 404 body this family answers, documented as the shape it really is. */
+  const graphNotFoundResponse: Record<404, RouteResponse> = {
+    404: {
+      description: "Graph not found",
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            properties: { error: { type: "string" } },
           },
         },
       },
-    }),
-    zValidator(
-      "query",
-      z.object({
-        dashboardId: z.string().optional(),
-      }),
-    ),
-    async (c) => {
-      const project = c.get("project");
-      const { dashboardId } = c.req.valid("query");
-      logger.info({ projectId: project.id, dashboardId }, "Listing graphs");
-
-      const graphs = await dashboard().listGraphs({
-        projectId: project.id,
-        ...(dashboardId === undefined ? {} : { dashboardId }),
-      });
-
-      return c.json(graphs.map(toGraphResponse));
     },
+  };
+
+  return (
+    service
+      .registerRoute("get", "/", MANAGEMENT_API_VERSION, listGraphsHandler, (b) =>
+        policy("analytics:view")(b)
+          .withQuery(listGraphsQuerySchema)
+          .withOutput(graphListRestResponseSchema)
+          .withDocs({
+            operationId: "listGraphs",
+            tags: ["Graphs"],
+            description: "List all custom graphs, optionally filtered by dashboard",
+            responses: baseResponses,
+          }),
+      )
+      .registerRoute("get", "/:id", MANAGEMENT_API_VERSION, getGraphHandler, (b) =>
+        policy("analytics:view")(b)
+          .withParams(graphIdParamsSchema)
+          .withOutput(graphRestResponseSchema)
+          .withDocs({
+            operationId: "getGraph",
+            tags: ["Graphs"],
+            description: "Get a custom graph by its ID",
+            responses: { ...baseResponses, ...graphNotFoundResponse },
+          }),
+      )
+      // Creating asks for `analytics:create`; `:manage` still implies it.
+      .registerRoute("post", "/", MANAGEMENT_API_VERSION, createGraphHandler, (b) =>
+        policy("analytics:create")(b)
+          .withInput(createGraphSchema)
+          .withOutput(graphRestResponseSchema)
+          .withStatus(201)
+          .withDocs({
+            operationId: "createGraph",
+            tags: ["Graphs"],
+            description: "Create a custom graph on a dashboard",
+            responses: baseResponses,
+          }),
+      )
+      .registerRoute("patch", "/:id", MANAGEMENT_API_VERSION, updateGraphHandler, (b) =>
+        policy("analytics:update")(b)
+          .withParams(graphIdParamsSchema)
+          .withInput(updateGraphSchema)
+          .withOutput(graphRestResponseSchema)
+          .withDocs({
+            operationId: "updateGraph",
+            tags: ["Graphs"],
+            description: "Update a custom graph's name, definition, or filters",
+            responses: { ...baseResponses, ...graphNotFoundResponse },
+          }),
+      )
+      // Destruction deliberately stays at `:manage`.
+      .registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, deleteGraphHandler, (b) =>
+        policy("analytics:manage")(b)
+          .withParams(graphIdParamsSchema)
+          .withOutput(graphDeletedResponseSchema)
+          .withDocs({
+            operationId: "deleteGraph",
+            tags: ["Graphs"],
+            description: "Delete a custom graph",
+            responses: { ...baseResponses, ...graphNotFoundResponse },
+          }),
+      )
+      .build()
   );
-
-  // ── Get Graph ──────────────────────────────────────────────
-  secured.access(requires("analytics:view")).get(
-    "/:id",
-    describeRoute({
-      description: "Get a custom graph by its ID",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(graphResponseSchema),
-            },
-          },
-        },
-        404: {
-          description: "Graph not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-
-      try {
-        const graph = await dashboard().getGraph({
-          projectId: project.id,
-          graphId: id,
-        });
-        return c.json(toGraphResponse(graph));
-      } catch (error) {
-        if (error instanceof GraphNotThereError) {
-          return c.json({ error: "Graph not found" }, 404);
-        }
-        throw error;
-      }
-    },
-  );
-
-  // ── Create Graph ───────────────────────────────────────────
-  // Creating asks for `analytics:create`; `:manage` still implies it.
-  secured.access(requires("analytics:create")).post(
-    "/",
-    describeRoute({
-      description: "Create a custom graph on a dashboard",
-      responses: {
-        ...baseResponses,
-        201: {
-          description: "Graph created",
-          content: {
-            "application/json": {
-              schema: resolver(graphResponseSchema),
-            },
-          },
-        },
-      },
-    }),
-    zValidator("json", createGraphSchema),
-    async (c) => {
-      const project = c.get("project");
-      const body = c.req.valid("json");
-      logger.info({ projectId: project.id }, "Creating graph");
-
-      let graph;
-      try {
-        graph = await dashboard().createGraph({
-          projectId: project.id,
-          name: body.name,
-          graph: body.graph,
-          ...(body.filters === undefined ? {} : { filters: body.filters }),
-          ...(body.dashboardId === undefined ? {} : { dashboardId: body.dashboardId }),
-          layout: {
-            ...(body.gridColumn === undefined ? {} : { gridColumn: body.gridColumn }),
-            ...(body.gridRow === undefined ? {} : { gridRow: body.gridRow }),
-            ...(body.colSpan === undefined ? {} : { colSpan: body.colSpan }),
-            ...(body.rowSpan === undefined ? {} : { rowSpan: body.rowSpan }),
-          },
-        });
-      } catch (error) {
-        if (error instanceof DashboardNotThereError) {
-          return c.json({ error: "Dashboard not found" }, 404);
-        }
-        throw error;
-      }
-
-      return c.json(toGraphResponse(graph), 201);
-    },
-  );
-
-  // ── Update Graph ───────────────────────────────────────────
-  secured.access(requires("analytics:update")).patch(
-    "/:id",
-    describeRoute({
-      description: "Update a custom graph's name, definition, or filters",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Graph updated",
-          content: {
-            "application/json": {
-              schema: resolver(graphResponseSchema),
-            },
-          },
-        },
-        404: {
-          description: "Graph not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("json", updateGraphSchema),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-      const body = c.req.valid("json");
-
-      let updated;
-      try {
-        updated = await dashboard().updateGraph({
-          projectId: project.id,
-          graphId: id,
-          ...(body.name === undefined ? {} : { name: body.name }),
-          ...(body.graph === undefined ? {} : { graph: body.graph }),
-          ...(body.filters === undefined ? {} : { filters: body.filters }),
-        });
-      } catch (error) {
-        if (error instanceof GraphNotThereError) {
-          return c.json({ error: "Graph not found" }, 404);
-        }
-        throw error;
-      }
-
-      return c.json(toGraphResponse(updated));
-    },
-  );
-
-  // ── Delete Graph ───────────────────────────────────────────
-  // Destruction deliberately stays at `:manage`.
-  secured.access(requires("analytics:manage")).delete(
-    "/:id",
-    describeRoute({
-      description: "Delete a custom graph",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Graph deleted",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ id: z.string(), deleted: z.boolean() })),
-            },
-          },
-        },
-        404: {
-          description: "Graph not found",
-          content: {
-            "application/json": { schema: resolver(badRequestSchema) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-      const { id } = c.req.param();
-
-      try {
-        await dashboard().deleteGraph({ projectId: project.id, graphId: id });
-      } catch (error) {
-        if (error instanceof GraphNotThereError) {
-          return c.json({ error: "Graph not found" }, 404);
-        }
-        throw error;
-      }
-
-      return c.json({ id, deleted: true });
-    },
-  );
-
-  return secured;
 }

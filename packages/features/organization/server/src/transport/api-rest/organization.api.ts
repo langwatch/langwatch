@@ -63,6 +63,7 @@ import {
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
+  promoteSchemaFailures,
   type AppRestSecurity,
   type ServiceContext,
 } from "@langwatch/api/rest";
@@ -433,6 +434,10 @@ export function createOrganizationRestApp(options: {
     name: "organization",
     basePath: "/api/organization",
     routeMiddleware: [enterpriseGate],
+    // A request-schema failure reaches the process's renderer as a bare
+    // zod-shaped error, which carries no status: without this it answered 500
+    // for the 422 the family documents.
+    errorHandler: (boundary) => promoteSchemaFailures(boundary),
   });
 
   /**

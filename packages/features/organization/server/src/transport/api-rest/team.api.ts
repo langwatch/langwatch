@@ -1,21 +1,24 @@
 import type { AuthzService } from "@langwatch/authz-contract";
 import {
+  organizationTeamRestArchivedSchema,
+  organizationTeamRestMemberListSchema,
+  organizationTeamRestPageSchema,
+  organizationTeamRestSchema,
   organizationTeamRoleSchema,
   type OrganizationLedgerActor,
   type OrganizationService,
 } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import { projectSchema, type ProjectService } from "@langwatch/project-contract";
 import type { Context } from "hono";
-import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 
 import { requires, requiresOnTeam } from "@langwatch/api";
 import {
-  type AppRestOrganizationVariables,
   type AppRestSecurity,
   createFamilyErrorHandler,
-  type SecuredApp,
-  validator as zValidator,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  promoteSchemaFailures,
 } from "@langwatch/api/rest";
 
 const paginationQuerySchema = z.object({
@@ -35,6 +38,14 @@ const addMemberSchema = z.object({
   userId: z.string().min(1, "userId is required"),
   role: organizationTeamRoleSchema.optional().default("MEMBER"),
 });
+
+const teamParamsSchema = z.object({ id: z.string().min(1) });
+const teamMemberParamsSchema = teamParamsSchema.extend({ userId: z.string().min(1) });
+
+/** The team's projects, exactly as the project feature stores them. */
+const teamProjectListSchema = z.object({ data: z.array(projectSchema) });
+
+const successSchema = z.object({ success: z.boolean() });
 
 function teamResponse(team: {
   id: string;
@@ -69,231 +80,225 @@ export function createTeamsRestApp(options: {
   projects: () => ProjectService;
   /** Who a REST write is attributed to in the grants ledger (ADR-092). */
   ledgerActor: (c: Context<any>) => OrganizationLedgerActor;
-}): SecuredApp<{ Variables: AppRestOrganizationVariables }> {
+}): MountableRestApp {
   const { security, organizations, permissions, projects, ledgerActor } = options;
 
-  const secured = security.createOrgApp({
+  const { service, policy } = security.createVersionedApp({
+    name: "teams",
     basePath: "/api/teams",
+    errorEnvelope: "legacy",
+    errorHandler: (boundary) =>
+      promoteSchemaFailures(
+        createFamilyErrorHandler({
+          loggerName: "langwatch:api:teams:errors",
+          label: "Teams API Error",
+          boundary,
+        }),
+      ),
   });
 
-  secured.hono.onError(
-    createFamilyErrorHandler({
-      loggerName: "langwatch:api:teams:errors",
-      label: "Teams API Error",
-      boundary: security.legacyErrorHandler,
-    }),
-  );
+  const organizationId = (c: Context): string => c.get("organization").id;
 
-  secured.access(requires("team:view")).get(
-    "/",
-    describeRoute({
-      description: "List all non-archived teams for the organization (paginated)",
-    }),
-    zValidator("query", paginationQuerySchema),
-    async (c) => {
-      const organization = c.get("organization");
-      const { page, limit } = c.req.valid("query");
-      const service = organizations();
+  const listHandler = async (c: Context, input: z.infer<typeof paginationQuerySchema>) => {
+    const result = await organizations().listTeams({
+      organizationId: organizationId(c),
+      page: input.page,
+      limit: input.limit,
+    });
+    return { data: result.data.map(teamResponse), pagination: result.pagination };
+  };
 
-      const result = await service.listTeams({
-        organizationId: organization.id,
-        page,
-        limit,
-      });
-
-      return c.json({
-        data: result.data.map(teamResponse),
-        pagination: result.pagination,
-      });
-    },
-  );
-
-  secured
-    .access(
-      /* no bag grants team:create; only team:manage implies it (registry vocabulary) */ requires(
-        "team:manage",
-      ),
-    )
-    .post(
-      "/",
-      describeRoute({
-        description: "Create a new team that can group projects and members",
+  const createHandler = async (c: Context, input: z.infer<typeof createTeamSchema>) =>
+    teamResponse(
+      await organizations().createTeam({
+        organizationId: organizationId(c),
+        name: input.name,
       }),
-      zValidator("json", createTeamSchema),
-      async (c) => {
-        const organization = c.get("organization");
-        const body = c.req.valid("json");
-        const service = organizations();
-
-        const team = await service.createTeam({
-          organizationId: organization.id,
-          name: body.name,
-        });
-
-        return c.json(teamResponse(team), 201);
-      },
     );
 
-  secured.access(requiresOnTeam("team:view")).get(
-    "/:id",
-    describeRoute({
-      description: "Get a team by its id",
-    }),
-    async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization");
-      const service = organizations();
+  const getHandler = async (c: Context, input: z.infer<typeof teamParamsSchema>) =>
+    teamResponse(
+      await organizations().getTeam({ teamId: input.id, organizationId: organizationId(c) }),
+    );
 
-      const team = await service.getTeam({
-        teamId: id,
-        organizationId: organization.id,
-      });
+  const updateHandler = async (
+    c: Context,
+    input: z.infer<typeof teamParamsSchema> & z.infer<typeof updateTeamSchema>,
+  ) =>
+    teamResponse(
+      await organizations().updateTeam({
+        teamId: input.id,
+        organizationId: organizationId(c),
+        ...(input.name === undefined ? {} : { name: input.name }),
+      }),
+    );
 
-      return c.json(teamResponse(team));
-    },
-  );
+  const archiveHandler = async (c: Context, input: z.infer<typeof teamParamsSchema>) => {
+    const team = await organizations().archiveTeam({
+      teamId: input.id,
+      organizationId: organizationId(c),
+    });
+    return { id: team.id, name: team.name, archivedAt: team.archivedAt };
+  };
 
-  secured.access(requiresOnTeam("team:manage")).patch(
-    "/:id",
-    describeRoute({
-      description: "Update a team by its id",
-    }),
-    zValidator("json", updateTeamSchema),
-    async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization");
-      const body = c.req.valid("json");
-      const service = organizations();
+  const listMembersHandler = async (c: Context, input: z.infer<typeof teamParamsSchema>) => {
+    // Reads the team first so a team outside the organization is a 404 rather
+    // than an empty membership list.
+    await organizations().getTeam({ teamId: input.id, organizationId: organizationId(c) });
 
-      const team = await service.updateTeam({
-        teamId: id,
-        organizationId: organization.id,
-        ...(body.name === undefined ? {} : { name: body.name }),
-      });
-
-      return c.json(teamResponse(team));
-    },
-  );
-
-  secured.access(requiresOnTeam("team:manage")).delete(
-    "/:id",
-    describeRoute({
-      description: "Archive a team (soft-delete)",
-    }),
-    async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization");
-      const service = organizations();
-
-      const team = await service.archiveTeam({
-        teamId: id,
-        organizationId: organization.id,
-      });
-
-      return c.json({
-        id: team.id,
-        name: team.name,
-        archivedAt: team.archivedAt,
-      });
-    },
-  );
-
-  // ── Members ────────────────────────────────────────────────────────────────
-
-  secured
-    .access(requiresOnTeam("team:view"))
-    .get("/:id/members", describeRoute({ description: "List members of a team" }), async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization");
-      const service = organizations();
-
-      await service.getTeam({
-        teamId: id,
-        organizationId: organization.id,
-      });
-
-      const bindings = await permissions().listScopeBindings({
-        organizationId: organization.id,
-        scopeType: "TEAM",
-        scopeIds: [id],
-      });
-
-      return c.json({
-        data: bindings.map((b) => ({
-          userId: b.userId,
-          name: b.user?.name ?? null,
-          email: b.user?.email ?? null,
-          role: b.role,
-        })),
-      });
+    const bindings = await permissions().listScopeBindings({
+      organizationId: organizationId(c),
+      scopeType: "TEAM",
+      scopeIds: [input.id],
     });
 
-  secured
-    .access(requiresOnTeam("team:manage"))
-    .post(
-      "/:id/members",
-      describeRoute({ description: "Add a member to a team" }),
-      zValidator("json", addMemberSchema),
-      async (c) => {
-        const { id } = c.req.param();
-        const organization = c.get("organization");
-        const body = c.req.valid("json");
-        const service = organizations();
+    return {
+      data: bindings.map((b) => ({
+        userId: b.userId,
+        name: b.user?.name ?? null,
+        email: b.user?.email ?? null,
+        role: b.role,
+      })),
+    };
+  };
 
-        await service.addTeamMember({
-          teamId: id,
-          organizationId: organization.id,
-          userId: body.userId,
-          role: body.role,
-          actor: ledgerActor(c),
-        });
-
-        return c.json({ success: true }, 201);
-      },
-    );
-
-  secured
-    .access(requiresOnTeam("team:manage"))
-    .delete(
-      "/:id/members/:userId",
-      describeRoute({ description: "Remove a member from a team" }),
-      async (c) => {
-        const { id, userId } = c.req.param();
-        const organization = c.get("organization");
-        const service = organizations();
-
-        await service.removeTeamMember({
-          teamId: id,
-          organizationId: organization.id,
-          userId,
-          actor: ledgerActor(c),
-        });
-
-        return c.json({ success: true });
-      },
-    );
-
-  // ── Projects ───────────────────────────────────────────────────────────────
-
-  secured
-    .access(requiresOnTeam("team:view"))
-    .get("/:id/projects", describeRoute({ description: "List projects in a team" }), async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization");
-      const service = organizations();
-
-      await service.getTeam({
-        teamId: id,
-        organizationId: organization.id,
-      });
-
-      const teamProjects = await projects().listByTeam({
-        organizationId: organization.id,
-        teamId: id,
-      });
-
-      return c.json({ data: teamProjects });
+  const addMemberHandler = async (
+    c: Context,
+    input: z.infer<typeof teamParamsSchema> & z.infer<typeof addMemberSchema>,
+  ) => {
+    await organizations().addTeamMember({
+      teamId: input.id,
+      organizationId: organizationId(c),
+      userId: input.userId,
+      role: input.role,
+      actor: ledgerActor(c),
     });
+    return { success: true };
+  };
 
-  return secured;
+  const removeMemberHandler = async (c: Context, input: z.infer<typeof teamMemberParamsSchema>) => {
+    await organizations().removeTeamMember({
+      teamId: input.id,
+      organizationId: organizationId(c),
+      userId: input.userId,
+      actor: ledgerActor(c),
+    });
+    return { success: true };
+  };
+
+  const listProjectsHandler = async (c: Context, input: z.infer<typeof teamParamsSchema>) => {
+    await organizations().getTeam({ teamId: input.id, organizationId: organizationId(c) });
+
+    return {
+      data: await projects().listByTeam({
+        organizationId: organizationId(c),
+        teamId: input.id,
+      }),
+    };
+  };
+
+  return (
+    service
+      .registerRoute("get", "/", MANAGEMENT_API_VERSION, listHandler, (b) =>
+        policy(requires("team:view"))(b)
+          .withQuery(paginationQuerySchema)
+          .withOutput(organizationTeamRestPageSchema)
+          .withDocs({
+            operationId: "listTeams",
+            tags: ["Teams"],
+            description: "List all non-archived teams for the organization (paginated)",
+          }),
+      )
+      // No bag grants team:create; only team:manage implies it (registry vocabulary).
+      .registerRoute("post", "/", MANAGEMENT_API_VERSION, createHandler, (b) =>
+        policy(requires("team:manage"))(b)
+          .withInput(createTeamSchema)
+          .withOutput(organizationTeamRestSchema)
+          .withStatus(201)
+          .withDocs({
+            operationId: "createTeam",
+            tags: ["Teams"],
+            description: "Create a new team that can group projects and members",
+          }),
+      )
+      .registerRoute("get", "/:id", MANAGEMENT_API_VERSION, getHandler, (b) =>
+        policy(requiresOnTeam("team:view"))(b)
+          .withParams(teamParamsSchema)
+          .withOutput(organizationTeamRestSchema)
+          .withDocs({
+            operationId: "getTeam",
+            tags: ["Teams"],
+            description: "Get a team by its id",
+          }),
+      )
+      .registerRoute("patch", "/:id", MANAGEMENT_API_VERSION, updateHandler, (b) =>
+        policy(requiresOnTeam("team:manage"))(b)
+          .withParams(teamParamsSchema)
+          .withInput(updateTeamSchema)
+          .withOutput(organizationTeamRestSchema)
+          .withDocs({
+            operationId: "updateTeam",
+            tags: ["Teams"],
+            description: "Update a team by its id",
+          }),
+      )
+      .registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, archiveHandler, (b) =>
+        policy(requiresOnTeam("team:manage"))(b)
+          .withParams(teamParamsSchema)
+          .withOutput(organizationTeamRestArchivedSchema)
+          .withDocs({
+            operationId: "archiveTeam",
+            tags: ["Teams"],
+            description: "Archive a team (soft-delete)",
+          }),
+      )
+      .registerRoute("get", "/:id/members", MANAGEMENT_API_VERSION, listMembersHandler, (b) =>
+        policy(requiresOnTeam("team:view"))(b)
+          .withParams(teamParamsSchema)
+          .withOutput(organizationTeamRestMemberListSchema)
+          .withDocs({
+            operationId: "listTeamMembers",
+            tags: ["Teams"],
+            description: "List members of a team",
+          }),
+      )
+      .registerRoute("post", "/:id/members", MANAGEMENT_API_VERSION, addMemberHandler, (b) =>
+        policy(requiresOnTeam("team:manage"))(b)
+          .withParams(teamParamsSchema)
+          .withInput(addMemberSchema)
+          .withOutput(successSchema)
+          .withStatus(201)
+          .withDocs({
+            operationId: "addTeamMember",
+            tags: ["Teams"],
+            description: "Add a member to a team",
+          }),
+      )
+      .registerRoute(
+        "delete",
+        "/:id/members/:userId",
+        MANAGEMENT_API_VERSION,
+        removeMemberHandler,
+        (b) =>
+          policy(requiresOnTeam("team:manage"))(b)
+            .withParams(teamMemberParamsSchema)
+            .withOutput(successSchema)
+            .withDocs({
+              operationId: "removeTeamMember",
+              tags: ["Teams"],
+              description: "Remove a member from a team",
+            }),
+      )
+      .registerRoute("get", "/:id/projects", MANAGEMENT_API_VERSION, listProjectsHandler, (b) =>
+        policy(requiresOnTeam("team:view"))(b)
+          .withParams(teamParamsSchema)
+          .withOutput(teamProjectListSchema)
+          .withDocs({
+            operationId: "listTeamProjects",
+            tags: ["Teams"],
+            description: "List projects in a team",
+          }),
+      )
+      .build()
+  );
 }

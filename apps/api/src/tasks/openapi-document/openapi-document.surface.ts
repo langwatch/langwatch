@@ -348,7 +348,7 @@ function mountProcessTailFamilies(options: {
       apiKeys: refuse("API keys"),
       permissions: refuse("Authorization"),
       audit: () => {},
-    }).hono as unknown as Hono,
+    }) as unknown as Hono,
   );
 
   app.route(

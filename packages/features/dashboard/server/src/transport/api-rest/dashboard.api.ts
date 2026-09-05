@@ -1,16 +1,25 @@
-import { requires } from "@langwatch/api";
 import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   BadRequestError,
   createFamilyErrorHandler,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
   NotFoundError,
   type PlatformUrlBuilder,
-  type SecuredApp,
-  validator as zValidator,
+  type ServiceContext,
 } from "@langwatch/api/rest";
-import type { DashboardSummary } from "@langwatch/dashboard-contract";
-import { describeRoute } from "hono-openapi";
+import {
+  dashboardDeletedResponseSchema,
+  dashboardDetailResponseSchema,
+  dashboardListResponseSchema,
+  dashboardReorderResponseSchema,
+  dashboardResponseSchema,
+  type DashboardSummary,
+} from "@langwatch/dashboard-contract";
+import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
+import type { Context } from "hono";
 import { z } from "zod";
 import {
   DashboardNotThereError,
@@ -31,6 +40,8 @@ const renameDashboardSchema = z.object({
 const reorderDashboardsSchema = z.object({
   dashboardIds: z.array(z.string().min(1)).min(1, "dashboardIds must not be empty"),
 });
+
+const dashboardIdParamsSchema = z.object({ id: z.string().min(1) });
 
 /**
  * Re-words the application's refusal as this family's own HTTP error.
@@ -75,194 +86,221 @@ export function createDashboardsRestApp(options: {
    */
   dashboard: () => DashboardApp;
   platformUrl: PlatformUrlBuilder;
-}): SecuredApp<{ Variables: AppRestProjectVariables }> {
+}): MountableRestApp {
   const { security, dashboard, platformUrl } = options;
 
-  const secured = security.createProjectApp({
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "dashboards",
     basePath: "/api/dashboards",
+    errorEnvelope: "legacy",
+    // The framework's validators raise a bare zod error, which carries neither
+    // a status nor a fault; promoting it keeps a rejected body a 422 rather
+    // than a 500 the family never sent.
+    errorHandler: (boundary) =>
+      createFamilyErrorHandler({
+        loggerName: "langwatch:api:dashboards:errors",
+        label: "Dashboard API Error",
+        boundary: (error, c) =>
+          boundary(isZodLikeError(error) ? ValidationError.fromZodError(error) : error, c),
+      }),
   });
 
-  secured.hono.onError(
-    createFamilyErrorHandler({
-      loggerName: "langwatch:api:dashboards:errors",
-      label: "Dashboard API Error",
-      boundary: security.legacyErrorHandler,
-    }),
-  );
+  type DashboardContext = ServiceContext<EndpointVariables>;
 
-  // ── List Dashboards ───────────────────────────────────────────
-  secured.access(requires("analytics:view")).get(
-    "/",
-    describeRoute({
-      description: "List all dashboards for the project with graph counts",
-    }),
-    async (c) => {
-      const project = c.get("project");
+  const projectOf = (c: Context): AppRestProjectVariables["project"] =>
+    c.get("project") as AppRestProjectVariables["project"];
 
-      const dashboards = await dashboard().getAll({
+  const linkTo = (project: { slug: string }, dashboardId: string): string =>
+    platformUrl({
+      projectSlug: project.slug,
+      path: `/analytics/reports?dashboard=${dashboardId}`,
+    });
+
+  const listDashboardsHandler = async (c: DashboardContext) => {
+    const project = projectOf(c);
+
+    const dashboards = await dashboard().getAll({
+      projectId: project.id,
+      graphCountScope: "builder",
+    });
+
+    return {
+      data: dashboards.map((d: DashboardSummary) => ({
+        id: d.id,
+        name: d.name,
+        order: d.order,
+        graphCount: d.graphCount,
+        createdAt: d.createdAt,
+        updatedAt: d.updatedAt,
+        platformUrl: linkTo(project, d.id),
+      })),
+    };
+  };
+
+  const createDashboardHandler = async (
+    c: DashboardContext,
+    input: z.infer<typeof createDashboardSchema>,
+  ) => {
+    const project = projectOf(c);
+
+    const created = await dashboard().create({ projectId: project.id, name: input.name });
+
+    return {
+      id: created.id,
+      name: created.name,
+      order: created.order,
+      createdAt: created.createdAt,
+      updatedAt: created.updatedAt,
+      platformUrl: linkTo(project, created.id),
+    };
+  };
+
+  const reorderDashboardsHandler = async (
+    c: DashboardContext,
+    input: z.infer<typeof reorderDashboardsSchema>,
+  ) => {
+    const project = projectOf(c);
+
+    try {
+      return await dashboard().reorder({
         projectId: project.id,
-        graphCountScope: "builder",
+        dashboardIds: input.dashboardIds,
       });
+    } catch (error) {
+      return mapDashboardReorderError(error);
+    }
+  };
 
-      return c.json({
-        data: dashboards.map((d: DashboardSummary) => ({
-          id: d.id,
-          name: d.name,
-          order: d.order,
-          graphCount: d.graphCount,
-          createdAt: d.createdAt,
-          updatedAt: d.updatedAt,
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/analytics/reports?dashboard=${d.id}`,
-          }),
-        })),
+  const getDashboardHandler = async (
+    c: DashboardContext,
+    input: z.infer<typeof dashboardIdParamsSchema>,
+  ) => {
+    const project = projectOf(c);
+
+    try {
+      const found = await dashboard().getById({ projectId: project.id, dashboardId: input.id });
+      return {
+        id: found.id,
+        name: found.name,
+        order: found.order,
+        graphs: found.graphs,
+        createdAt: found.createdAt,
+        updatedAt: found.updatedAt,
+        platformUrl: linkTo(project, found.id),
+      };
+    } catch (error) {
+      return mapDashboardNotFoundError(error);
+    }
+  };
+
+  const renameDashboardHandler = async (
+    c: DashboardContext,
+    input: z.infer<typeof dashboardIdParamsSchema> & z.infer<typeof renameDashboardSchema>,
+  ) => {
+    const project = projectOf(c);
+
+    try {
+      const renamed = await dashboard().rename({
+        projectId: project.id,
+        dashboardId: input.id,
+        name: input.name,
       });
-    },
-  );
+      return {
+        id: renamed.id,
+        name: renamed.name,
+        order: renamed.order,
+        createdAt: renamed.createdAt,
+        updatedAt: renamed.updatedAt,
+        platformUrl: linkTo(project, renamed.id),
+      };
+    } catch (error) {
+      return mapDashboardNotFoundError(error);
+    }
+  };
 
-  // ── Create Dashboard ──────────────────────────────────────────
-  // Creating asks for `analytics:create`; `:manage` still implies it, so nobody
-  // who could create a dashboard yesterday loses that, and a viewer holding only
-  // `analytics:view` is declined exactly as before.
-  secured.access(requires("analytics:create")).post(
-    "/",
-    describeRoute({
-      description: "Create a new dashboard",
-    }),
-    zValidator("json", createDashboardSchema),
-    async (c) => {
-      const project = c.get("project");
-      const { name } = c.req.valid("json");
+  const deleteDashboardHandler = async (
+    c: DashboardContext,
+    input: z.infer<typeof dashboardIdParamsSchema>,
+  ) => {
+    const project = projectOf(c);
 
-      const created = await dashboard().create({ projectId: project.id, name });
+    try {
+      const deleted = await dashboard().delete({ projectId: project.id, dashboardId: input.id });
+      return { id: deleted.id, name: deleted.name };
+    } catch (error) {
+      return mapDashboardNotFoundError(error);
+    }
+  };
 
-      return c.json(
-        {
-          id: created.id,
-          name: created.name,
-          order: created.order,
-          createdAt: created.createdAt,
-          updatedAt: created.updatedAt,
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/analytics/reports?dashboard=${created.id}`,
+  return (
+    service
+      .registerRoute("get", "/", MANAGEMENT_API_VERSION, listDashboardsHandler, (b) =>
+        policy("analytics:view")(b)
+          .withOutput(dashboardListResponseSchema)
+          .withDocs({
+            operationId: "listDashboards",
+            tags: ["Dashboards"],
+            description: "List all dashboards for the project with graph counts",
           }),
-        },
-        201,
-      );
-    },
-  );
-
-  // ── Reorder Dashboards ────────────────────────────────────────
-  // Placed before /:id to avoid route conflict with "reorder" being treated as an id
-  // Reordering rewrites existing dashboards' positions — an `:update`.
-  secured.access(requires("analytics:update")).put(
-    "/reorder",
-    describeRoute({
-      description: "Reorder dashboards by providing an ordered list of IDs",
-    }),
-    zValidator("json", reorderDashboardsSchema),
-    async (c) => {
-      const project = c.get("project");
-      const { dashboardIds } = c.req.valid("json");
-
-      try {
-        const result = await dashboard().reorder({ projectId: project.id, dashboardIds });
-        return c.json(result);
-      } catch (error) {
-        mapDashboardReorderError(error);
-      }
-    },
-  );
-
-  // ── Get Single Dashboard ──────────────────────────────────────
-  secured.access(requires("analytics:view")).get(
-    "/:id",
-    describeRoute({
-      description: "Get a dashboard by its id, including its graphs",
-    }),
-    async (c) => {
-      const { id } = c.req.param();
-      const project = c.get("project");
-
-      try {
-        const found = await dashboard().getById({ projectId: project.id, dashboardId: id });
-        return c.json({
-          id: found.id,
-          name: found.name,
-          order: found.order,
-          graphs: found.graphs,
-          createdAt: found.createdAt,
-          updatedAt: found.updatedAt,
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/analytics/reports?dashboard=${found.id}`,
+      )
+      // Creating asks for `analytics:create`; `:manage` still implies it, so
+      // nobody who could create a dashboard yesterday loses that, and a viewer
+      // holding only `analytics:view` is declined exactly as before.
+      .registerRoute("post", "/", MANAGEMENT_API_VERSION, createDashboardHandler, (b) =>
+        policy("analytics:create")(b)
+          .withInput(createDashboardSchema)
+          .withOutput(dashboardResponseSchema)
+          .withStatus(201)
+          .withDocs({
+            operationId: "createDashboard",
+            tags: ["Dashboards"],
+            description: "Create a new dashboard",
           }),
-        });
-      } catch (error) {
-        return mapDashboardNotFoundError(error);
-      }
-    },
-  );
-
-  // ── Rename Dashboard ──────────────────────────────────────────
-  secured.access(requires("analytics:update")).patch(
-    "/:id",
-    describeRoute({
-      description: "Rename a dashboard",
-    }),
-    zValidator("json", renameDashboardSchema),
-    async (c) => {
-      const { id } = c.req.param();
-      const project = c.get("project");
-      const { name } = c.req.valid("json");
-
-      try {
-        const renamed = await dashboard().rename({
-          projectId: project.id,
-          dashboardId: id,
-          name,
-        });
-        return c.json({
-          id: renamed.id,
-          name: renamed.name,
-          order: renamed.order,
-          createdAt: renamed.createdAt,
-          updatedAt: renamed.updatedAt,
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/analytics/reports?dashboard=${renamed.id}`,
+      )
+      // Registered before /:id so "reorder" is not read as an id. Reordering
+      // rewrites existing dashboards' positions — an `:update`.
+      .registerRoute("put", "/reorder", MANAGEMENT_API_VERSION, reorderDashboardsHandler, (b) =>
+        policy("analytics:update")(b)
+          .withInput(reorderDashboardsSchema)
+          .withOutput(dashboardReorderResponseSchema)
+          .withDocs({
+            operationId: "reorderDashboards",
+            tags: ["Dashboards"],
+            description: "Reorder dashboards by providing an ordered list of IDs",
           }),
-        });
-      } catch (error) {
-        return mapDashboardNotFoundError(error);
-      }
-    },
+      )
+      .registerRoute("get", "/:id", MANAGEMENT_API_VERSION, getDashboardHandler, (b) =>
+        policy("analytics:view")(b)
+          .withParams(dashboardIdParamsSchema)
+          .withOutput(dashboardDetailResponseSchema)
+          .withDocs({
+            operationId: "getDashboard",
+            tags: ["Dashboards"],
+            description: "Get a dashboard by its id, including its graphs",
+          }),
+      )
+      .registerRoute("patch", "/:id", MANAGEMENT_API_VERSION, renameDashboardHandler, (b) =>
+        policy("analytics:update")(b)
+          .withParams(dashboardIdParamsSchema)
+          .withInput(renameDashboardSchema)
+          .withOutput(dashboardResponseSchema)
+          .withDocs({
+            operationId: "renameDashboard",
+            tags: ["Dashboards"],
+            description: "Rename a dashboard",
+          }),
+      )
+      // Hard delete with cascade — deliberately stays at `:manage`.
+      .registerRoute("delete", "/:id", MANAGEMENT_API_VERSION, deleteDashboardHandler, (b) =>
+        policy("analytics:manage")(b)
+          .withParams(dashboardIdParamsSchema)
+          .withOutput(dashboardDeletedResponseSchema)
+          .withDocs({
+            operationId: "deleteDashboard",
+            tags: ["Dashboards"],
+            description: "Delete a dashboard and its graphs (hard delete, cascade)",
+          }),
+      )
+      .build()
   );
-
-  // ── Delete Dashboard ──────────────────────────────────────────
-  // Hard delete with cascade — deliberately stays at `:manage`.
-  secured.access(requires("analytics:manage")).delete(
-    "/:id",
-    describeRoute({
-      description: "Delete a dashboard and its graphs (hard delete, cascade)",
-    }),
-    async (c) => {
-      const { id } = c.req.param();
-      const project = c.get("project");
-
-      try {
-        const deleted = await dashboard().delete({ projectId: project.id, dashboardId: id });
-        return c.json({
-          id: deleted.id,
-          name: deleted.name,
-        });
-      } catch (error) {
-        return mapDashboardNotFoundError(error);
-      }
-    },
-  );
-
-  return secured;
 }

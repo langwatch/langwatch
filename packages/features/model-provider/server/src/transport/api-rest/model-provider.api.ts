@@ -2,17 +2,18 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { toCanonicalCustomModelList } from "../../rules/custom-model-list.rules";
 import { createLogger } from "@langwatch/observability";
 import { type OrganizationService, TeamNotFoundError } from "@langwatch/organization-contract";
-import type { MiddlewareHandler } from "hono";
-import { describeRoute, resolver } from "hono-openapi";
-import { requires } from "@langwatch/api";
+import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
+import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
+import { z } from "zod";
 import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   baseResponses,
   conflictResponses,
-  errorSchema,
-  type SecuredApp,
-  validator as zValidator,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  type ServiceContext,
 } from "@langwatch/api/rest";
 import {
   apiResponseModelProvidersSchema,
@@ -62,6 +63,19 @@ function resolveOrganization(organizations: () => OrganizationService): Middlewa
 }
 
 /**
+ * The framework's validators raise a bare zod error, which carries neither a
+ * status nor a fault, so a boundary that only reads handled errors would
+ * answer a rejected body 500 instead of the 422 this family sends.
+ */
+const promotingBoundary =
+  (boundary: ErrorHandler): ErrorHandler =>
+  (error, c) =>
+    boundary(isZodLikeError(error) ? ValidationError.fromZodError(error) : error, c);
+
+/** The path parameter naming the provider a write is keyed on. */
+const providerParamsSchema = z.object({ provider: z.string().min(1) });
+
+/**
  * REST for a project's model providers.
  */
 export function createModelProvidersRestApp(options: {
@@ -74,13 +88,14 @@ export function createModelProvidersRestApp(options: {
   modelProviders: () => ModelProviderService;
   /** Same, for the organization the resolution above reads. */
   organizations: () => OrganizationService;
-}): SecuredApp<{ Variables: ModelProviderRestVariables }> {
+}): MountableRestApp {
   const { security, modelProviders, organizations } = options;
 
-  const secured = security.createProjectApp<{
-    organization: Readonly<{ id: string }>;
-  }>({
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "model-providers",
     basePath: "/api/model-providers",
+    errorEnvelope: "legacy",
+    errorHandler: promotingBoundary,
   });
 
   // The organization resolution runs AFTER the access chain (which
@@ -88,110 +103,94 @@ export function createModelProvidersRestApp(options: {
   // app-wide.
   const organizationMiddleware = resolveOrganization(organizations);
 
-  // List all model providers — read scope, mirrors the tRPC modelProviders
-  // getAll (project:view).
-  secured.access(requires("project:view")).get(
-    "/",
-    organizationMiddleware,
-    describeRoute({
-      description: "List all model providers for a project with masked API keys",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(apiResponseModelProvidersSchema),
-            },
+  const projectOf = (c: ServiceContext<EndpointVariables>): AppRestProjectVariables["project"] =>
+    (c as unknown as { get: (key: "project") => AppRestProjectVariables["project"] }).get(
+      "project",
+    );
+
+  const listProvidersHandler = async (c: ServiceContext<EndpointVariables>) => {
+    const project = projectOf(c);
+
+    logger.info({ projectId: project.id }, "Getting all model providers for project");
+
+    const providers = await modelProviders().getForProject({ projectId: project.id });
+
+    return toLegacyProviders(providers);
+  };
+
+  const upsertProviderHandler = async (
+    c: ServiceContext<EndpointVariables>,
+    input: z.infer<typeof providerParamsSchema> & z.infer<typeof updateModelProviderInputSchema>,
+  ) => {
+    const service = modelProviders();
+    const project = projectOf(c);
+    const { provider, ...data } = input;
+
+    logger.info({ projectId: project.id, provider }, "Upserting model provider");
+
+    // Ensure defaultModel has the provider prefix (e.g. "openai/gpt-4o")
+    // required by litellm for routing
+    let defaultModel = data.defaultModel;
+    if (defaultModel && !defaultModel.includes("/")) {
+      defaultModel = `${provider}/${defaultModel}`;
+    }
+
+    // REST endpoint is keyed on the provider string in the URL and preserves the legacy single-instance
+    // upsert contract. The multi-instance create flow lives behind the tRPC `update` procedure, which goes
+    // through the id-based path. Nothing is caught here on purpose. Every failure `upsert` raises is a
+    // HandledError carrying its own status and code, and the framework boundary renders it; catching them
+    // to rethrow one 400 replaced every status with 400 and every code with `http_error`.
+    await service.upsert({
+      projectId: project.id,
+      provider,
+      enabled: data.enabled,
+      customKeys: data.customKeys as Record<string, unknown> | undefined,
+      customModels: toCanonicalCustomModelList(data.customModels, "chat"),
+      customEmbeddingsModels: toCanonicalCustomModelList(data.customEmbeddingsModels, "embedding"),
+      extraHeaders: data.extraHeaders,
+      defaultModel,
+    });
+
+    // Return updated providers list with masked keys
+    const providers = await service.getForProject({ projectId: project.id });
+
+    logger.info({ projectId: project.id, provider }, "Successfully upserted model provider");
+
+    return toLegacyProviders(providers);
+  };
+
+  return service
+    .registerRoute("get", "/", MANAGEMENT_API_VERSION, listProvidersHandler, (b) =>
+      // Read scope, mirrors the tRPC modelProviders getAll (project:view).
+      policy("project:view")(b)
+        .withMiddleware(organizationMiddleware)
+        .withOutput(apiResponseModelProvidersSchema)
+        .withDocs({
+          operationId: "listModelProviders",
+          tags: ["Model Providers"],
+          description: "List all model providers for a project with masked API keys",
+          responses: baseResponses,
+        }),
+    )
+    .registerRoute("put", "/:provider", MANAGEMENT_API_VERSION, upsertProviderHandler, (b) =>
+      // Write scope, mirrors the tRPC modelProviders update (project:update).
+      policy("project:update")(b)
+        .withMiddleware(organizationMiddleware)
+        .withParams(providerParamsSchema)
+        .withInput(updateModelProviderInputSchema)
+        .withOutput(apiResponseModelProvidersSchema)
+        .withDocs({
+          operationId: "upsertModelProvider",
+          tags: ["Model Providers"],
+          description: "Create or update a model provider",
+          responses: {
+            ...baseResponses,
+            // 400 comes from `baseResponses` with the framework's envelope.
+            ...conflictResponses,
           },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-
-      logger.info({ projectId: project.id }, "Getting all model providers for project");
-
-      const providers = await modelProviders().getForProject({ projectId: project.id });
-
-      return c.json(apiResponseModelProvidersSchema.parse(toLegacyProviders(providers)));
-    },
-  );
-
-  // Upsert a model provider — write scope, mirrors the tRPC modelProviders
-  // update (project:update).
-  secured.access(requires("project:update")).put(
-    "/:provider",
-    organizationMiddleware,
-    describeRoute({
-      description: "Create or update a model provider",
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(apiResponseModelProvidersSchema),
-            },
-          },
-        },
-        // 400 comes from `baseResponses` with the framework's envelope. The
-        // local override here declared `{ error: string }`, which is not the
-        // shape any failure has ever had, and it shadowed the correct one.
-        ...conflictResponses,
-        404: {
-          description: "Not Found",
-          content: {
-            "application/json": { schema: resolver(errorSchema) },
-          },
-        },
-      },
-    }),
-    zValidator("json", updateModelProviderInputSchema),
-    async (c) => {
-      const service = modelProviders();
-      const project = c.get("project");
-      const { provider } = c.req.param();
-      const data = c.req.valid("json");
-
-      logger.info({ projectId: project.id, provider }, "Upserting model provider");
-
-      // Ensure defaultModel has the provider prefix (e.g. "openai/gpt-4o")
-      // required by litellm for routing
-      let defaultModel = data.defaultModel;
-      if (defaultModel && !defaultModel.includes("/")) {
-        defaultModel = `${provider}/${defaultModel}`;
-      }
-
-      // REST endpoint is keyed on the provider string in the URL and preserves the legacy single-instance
-      // upsert contract. The multi-instance create flow lives behind the tRPC `update` procedure, which goes
-      // through the id-based path. Nothing is caught here on purpose. Every failure `upsert` raises is a
-      // HandledError carrying its own status and code, and the framework boundary renders it; catching them
-      // to rethrow one 400 replaced every status with 400 and every code with `http_error`.
-      await service.upsert({
-        projectId: project.id,
-        provider,
-        enabled: data.enabled,
-        customKeys: data.customKeys as Record<string, unknown> | undefined,
-        customModels: toCanonicalCustomModelList(data.customModels, "chat"),
-        customEmbeddingsModels: toCanonicalCustomModelList(
-          data.customEmbeddingsModels,
-          "embedding",
-        ),
-        extraHeaders: data.extraHeaders,
-        defaultModel,
-      });
-
-      // Return updated providers list with masked keys
-      const providers = await service.getForProject({ projectId: project.id });
-
-      logger.info({ projectId: project.id, provider }, "Successfully upserted model provider");
-
-      return c.json(apiResponseModelProvidersSchema.parse(toLegacyProviders(providers)));
-    },
-  );
-
-  return secured;
+        }),
+    )
+    .build();
 }
 
 function toLegacyProviders(

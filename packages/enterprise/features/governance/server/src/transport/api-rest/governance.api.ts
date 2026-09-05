@@ -26,16 +26,18 @@ import { createLogger } from "@langwatch/observability";
  *
  * Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
  */
-import type { Context, MiddlewareHandler } from "hono";
-import { describeRoute, resolver } from "hono-openapi";
+import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
 import { z } from "zod";
 import { apiKeyPermission } from "@langwatch/api";
 import {
   type AppRestProjectVariables,
   type AppRestSecurity,
   baseResponses,
-  type SecuredApp,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  resolver,
 } from "@langwatch/api/rest";
+import { isZodLikeError } from "@langwatch/handled-error";
 import type { GovernanceApp, GovernanceProjectCaller } from "#app/governance.app";
 
 const logger = createLogger("langwatch:api:governance");
@@ -111,6 +113,12 @@ const cloneTemplateSchema = z.object({
   source_template_id: z.string(),
 });
 
+const templateParamsSchema = z.object({ id: z.string().min(1) });
+
+const templateListSchema = z.object({ data: z.array(ingestionTemplateDtoSchema) });
+const templateDetailSchema = z.object({ ingestion_template: ingestionTemplateDtoSchema });
+const templateArchivedSchema = z.object({ archived: z.literal(true) });
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function toTemplateDto(row: {
@@ -139,6 +147,31 @@ function toTemplateDto(row: {
     enabled: row.enabled,
     organization_id: row.organizationId,
   };
+}
+
+/**
+ * A template failure the writing routes answer in this family's own envelope.
+ *
+ * Only the writes map these: reading one template by id has always let a
+ * missing row fall through to the boundary, which answers the flat body its
+ * caller parses. Carrying the rendered pair on the throw keeps that split
+ * exactly where it was when each handler caught for itself.
+ */
+class MappedTemplateRefusal extends Error {
+  constructor(
+    readonly status: 400 | 403 | 404,
+    readonly body: { error: { type: string; code: string; message: string } },
+  ) {
+    super(body.error.message);
+    this.name = "MappedTemplateRefusal";
+  }
+}
+
+/** Re-raises a mapped template failure; anything else travels untouched. */
+function rethrowMappedTemplateError(error: unknown): never {
+  const mapped = mapTemplateError(error);
+  if (mapped) throw new MappedTemplateRefusal(mapped.status, mapped.body);
+  throw error;
 }
 
 function mapTemplateError(error: unknown): {
@@ -233,324 +266,260 @@ export function createGovernanceRestApp(options: {
    * what lets the OpenAPI spec generator build this app with none.
    */
   app: () => GovernanceApp;
-}): SecuredApp<{ Variables: Variables }> {
+}): MountableRestApp {
   const { security, app } = options;
 
-  const secured = security.createProjectApp({
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "governance",
     basePath: "/api/governance",
+    errorEnvelope: "legacy",
+    errorHandler: governanceErrorHandler,
   });
 
-  // ── Ingestion Templates ───────────────────────────────────────────────
+  const view = policy(apiKeyPermission("aiTools:view"));
+  const manage = policy(apiKeyPermission("aiTools:manage"));
 
-  secured.access(apiKeyPermission("aiTools:view")).get(
-    "/ingestion-templates",
-    describeRoute({
-      summary: "List ingestion templates",
-      description:
-        "Returns the union of platform-published default templates and any org-authored templates visible to the caller's organization. Disabled / archived rows are filtered out. `ottl_rules` is empty in this end-user shape; admins use GET /ingestion-templates/admin to read the canonical OTTL.",
-      tags: ["Governance / Ingestion Templates"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Templates visible to the caller",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ data: z.array(ingestionTemplateDtoSchema) })),
-            },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const rows = await app().listIngestionTemplatesForMember({
-        projectId: c.get("project").id,
-      });
-      return c.json({ data: rows.map(toTemplateDto) });
-    },
-  );
+  const listForMemberHandler = async (c: Context) => ({
+    data: (await app().listIngestionTemplatesForMember({ projectId: c.get("project").id })).map(
+      toTemplateDto,
+    ),
+  });
 
-  secured.access(apiKeyPermission("aiTools:manage")).get(
-    "/ingestion-templates/admin",
-    describeRoute({
-      summary: "List ingestion templates (admin shape, includes OTTL)",
-      description:
-        "Same union as the user list but includes the canonical `ottl_rules` source for every row. Used by admin tooling to render the transparency block / authoring drawer.",
-      tags: ["Governance / Ingestion Templates"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Admin templates",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ data: z.array(ingestionTemplateDtoSchema) })),
-            },
-          },
-        },
-      },
-    }),
-    requireUserBoundCaller,
-    async (c) => {
-      const rows = await app().listIngestionTemplatesForAdmin({
-        projectId: c.get("project").id,
-      });
-      return c.json({ data: rows.map(toTemplateDto) });
-    },
-  );
+  const listForAdminHandler = async (c: Context) => ({
+    data: (await app().listIngestionTemplatesForAdmin({ projectId: c.get("project").id })).map(
+      toTemplateDto,
+    ),
+  });
 
-  // The response carries the canonical `ottl_rules`, which is exactly what
-  // /ingestion-templates blanks and what /ingestion-templates/admin gates on
-  // aiTools:manage plus a user-bound caller. One row at a time is not a
-  // cheaper read of the same secret, so it is gated the same way.
-  secured.access(apiKeyPermission("aiTools:manage")).get(
-    "/ingestion-templates/:id",
-    describeRoute({
-      summary: "Get ingestion template",
-      description:
-        "Single-template lookup by id, scoped to the caller's organization, including the canonical `ottl_rules`. Cross-org probes collapse to 404 (no enumeration vector). Members read the same row without `ottl_rules` from GET /ingestion-templates.",
-      tags: ["Governance / Ingestion Templates"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Template detail",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ ingestion_template: ingestionTemplateDtoSchema })),
-            },
-          },
-        },
-        404: {
-          description: "Not found",
-          content: {
-            "application/json": { schema: resolver(errorSchema) },
-          },
-        },
-      },
-    }),
-    requireUserBoundCaller,
-    async (c) => {
-      const row = await app().getIngestionTemplate({
-        projectId: c.get("project").id,
-        id: c.req.param("id"),
-      });
-      return c.json({ ingestion_template: toTemplateDto(row) });
-    },
-  );
+  const getHandler = async (c: Context, input: z.infer<typeof templateParamsSchema>) => ({
+    ingestion_template: toTemplateDto(
+      await app().getIngestionTemplate({ projectId: c.get("project").id, id: input.id }),
+    ),
+  });
 
-  secured.access(apiKeyPermission("aiTools:manage")).post(
-    "/ingestion-templates",
-    describeRoute({
-      summary: "Create org-authored ingestion template",
-      description:
-        "Creates a brand-new template scoped to the caller's organization. Slug is auto-generated. Platform rows (organizationId IS NULL) are NEVER created via this endpoint — admins customize platform defaults via POST /ingestion-templates/clone instead.",
-      tags: ["Governance / Ingestion Templates"],
-      responses: {
-        ...baseResponses,
-        201: {
-          description: "Template created",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ ingestion_template: ingestionTemplateDtoSchema })),
-            },
-          },
+  const createHandler = async (c: Context, input: z.infer<typeof createTemplateSchema>) => {
+    const by = callerOf(c);
+    const row = await app()
+      .createIngestionTemplate(
+        {
+          sourceType: input.source_type,
+          displayName: input.display_name,
+          description: input.description ?? null,
+          iconAsset: input.icon_asset ?? null,
+          // `otlp_token` is this door's own vocabulary for "no credential
+          // schema at all"; the domain stores it as absent.
+          credentialSchema:
+            input.credential_schema === "otlp_token" ? null : (input.credential_schema ?? null),
+          ottlRules: input.ottl_rules,
         },
-        400: {
-          description: "Validation error",
-          content: { "application/json": { schema: resolver(errorSchema) } },
-        },
-      },
-    }),
-    requireUserBoundCaller,
-    async (c) => {
-      const body = createTemplateSchema.safeParse(await c.req.json());
-      if (!body.success) {
-        return c.json(
-          {
-            error: {
-              type: "bad_request",
-              code: "validation_error",
-              message: body.error.message,
-            },
-          },
-          400,
-        );
-      }
-      const by = callerOf(c);
-      try {
-        const row = await app().createIngestionTemplate(
-          {
-            sourceType: body.data.source_type,
-            displayName: body.data.display_name,
-            description: body.data.description ?? null,
-            iconAsset: body.data.icon_asset ?? null,
-            // `otlp_token` is this door's own vocabulary for "no credential
-            // schema at all"; the domain stores it as absent.
-            credentialSchema:
-              body.data.credential_schema === "otlp_token"
-                ? null
-                : (body.data.credential_schema ?? null),
-            ottlRules: body.data.ottl_rules,
-          },
-          by,
-        );
-        logger.info(
-          { templateId: row.id, projectId: by.projectId, apiKeyUserId: by.userId },
-          "ingestion template created via REST",
-        );
-        return c.json({ ingestion_template: toTemplateDto(row) }, 201);
-      } catch (err) {
-        const mapped = mapTemplateError(err);
-        if (mapped) return c.json(mapped.body, mapped.status);
-        throw err;
-      }
-    },
-  );
+        by,
+      )
+      .catch(rethrowMappedTemplateError);
+    logger.info(
+      { templateId: row.id, projectId: by.projectId, apiKeyUserId: by.userId },
+      "ingestion template created via REST",
+    );
+    return { ingestion_template: toTemplateDto(row) };
+  };
 
-  secured.access(apiKeyPermission("aiTools:manage")).patch(
-    "/ingestion-templates/:id/ottl-rules",
-    describeRoute({
-      summary: "Replace ottl_rules on an org-authored template",
-      description:
-        "Audit-logged with line counts pre/post. Platform-published rows reject with 403. Admins must clone a platform row before editing it.",
-      tags: ["Governance / Ingestion Templates"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Updated",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ ingestion_template: ingestionTemplateDtoSchema })),
-            },
-          },
-        },
-        403: {
-          description: "Platform template immutable",
-          content: { "application/json": { schema: resolver(errorSchema) } },
-        },
-        404: {
-          description: "Template not found",
-          content: { "application/json": { schema: resolver(errorSchema) } },
-        },
-      },
-    }),
-    requireUserBoundCaller,
-    async (c) => {
-      const body = updateOttlRulesSchema.safeParse(await c.req.json());
-      if (!body.success) {
-        return c.json(
-          {
-            error: {
-              type: "bad_request",
-              code: "validation_error",
-              message: body.error.message,
-            },
-          },
-          400,
-        );
-      }
-      try {
-        const row = await app().updateIngestionTemplateOttlRules(
-          { id: c.req.param("id"), ottlRules: body.data.ottl_rules },
+  const updateOttlRulesHandler = async (
+    c: Context,
+    input: z.infer<typeof templateParamsSchema> & z.infer<typeof updateOttlRulesSchema>,
+  ) => ({
+    ingestion_template: toTemplateDto(
+      await app()
+        .updateIngestionTemplateOttlRules(
+          { id: input.id, ottlRules: input.ottl_rules },
           callerOf(c),
-        );
-        return c.json({ ingestion_template: toTemplateDto(row) });
-      } catch (err) {
-        const mapped = mapTemplateError(err);
-        if (mapped) return c.json(mapped.body, mapped.status);
-        throw err;
-      }
-    },
-  );
+        )
+        .catch(rethrowMappedTemplateError),
+    ),
+  });
 
-  secured.access(apiKeyPermission("aiTools:manage")).delete(
-    "/ingestion-templates/:id",
-    describeRoute({
-      summary: "Soft-archive an org-authored template",
-      description:
-        "Marks the row archived; existing ingestion keys continue to land traces but the row disappears from list views. Platform-published rows reject with 403.",
-      tags: ["Governance / Ingestion Templates"],
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Archived",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ archived: z.literal(true) })),
-            },
-          },
-        },
-        403: {
-          description: "Platform template immutable",
-          content: { "application/json": { schema: resolver(errorSchema) } },
-        },
-        404: {
-          description: "Template not found",
-          content: { "application/json": { schema: resolver(errorSchema) } },
-        },
-      },
-    }),
-    requireUserBoundCaller,
-    async (c) => {
-      try {
-        await app().archiveIngestionTemplate({ id: c.req.param("id") }, callerOf(c));
-        return c.json({ archived: true as const });
-      } catch (err) {
-        const mapped = mapTemplateError(err);
-        if (mapped) return c.json(mapped.body, mapped.status);
-        throw err;
-      }
-    },
-  );
+  const archiveHandler = async (c: Context, input: z.infer<typeof templateParamsSchema>) => {
+    await app()
+      .archiveIngestionTemplate({ id: input.id }, callerOf(c))
+      .catch(rethrowMappedTemplateError);
+    return { archived: true as const };
+  };
 
-  secured.access(apiKeyPermission("aiTools:manage")).post(
-    "/ingestion-templates/clone",
-    describeRoute({
-      summary: "Clone a platform-published template into the caller's org",
-      description:
-        "Forks the source row's source_type / display_name / OTTL into a fresh org-authored row that the admin can then edit via PATCH /ingestion-templates/:id/ottl-rules.",
-      tags: ["Governance / Ingestion Templates"],
-      responses: {
-        ...baseResponses,
-        201: {
-          description: "Cloned",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ ingestion_template: ingestionTemplateDtoSchema })),
-            },
-          },
-        },
-        404: {
-          description: "Source template not found",
-          content: { "application/json": { schema: resolver(errorSchema) } },
-        },
-      },
-    }),
-    requireUserBoundCaller,
-    async (c) => {
-      const body = cloneTemplateSchema.safeParse(await c.req.json());
-      if (!body.success) {
-        return c.json(
-          {
-            error: {
-              type: "bad_request",
-              code: "validation_error",
-              message: body.error.message,
-            },
-          },
-          400,
-        );
-      }
-      try {
-        const row = await app().cloneIngestionTemplate(
-          { sourceTemplateId: body.data.source_template_id },
-          callerOf(c),
-        );
-        return c.json({ ingestion_template: toTemplateDto(row) }, 201);
-      } catch (err) {
-        const mapped = mapTemplateError(err);
-        if (mapped) return c.json(mapped.body, mapped.status);
-        throw err;
-      }
-    },
+  const cloneHandler = async (c: Context, input: z.infer<typeof cloneTemplateSchema>) => ({
+    ingestion_template: toTemplateDto(
+      await app()
+        .cloneIngestionTemplate({ sourceTemplateId: input.source_template_id }, callerOf(c))
+        .catch(rethrowMappedTemplateError),
+    ),
+  });
+
+  const errorResponse = (description: string) => ({
+    description,
+    content: { "application/json": { schema: resolver(errorSchema) } },
+  });
+
+  return (
+    service
+      .registerRoute(
+        "get",
+        "/ingestion-templates",
+        MANAGEMENT_API_VERSION,
+        listForMemberHandler,
+        (b) =>
+          view(b)
+            .withOutput(templateListSchema)
+            .withDocs({
+              operationId: "listIngestionTemplates",
+              summary: "List ingestion templates",
+              tags: ["Governance / Ingestion Templates"],
+              description:
+                "Returns the union of platform-published default templates and any org-authored templates visible to the caller's organization. Disabled / archived rows are filtered out. `ottl_rules` is empty in this end-user shape; admins use GET /ingestion-templates/admin to read the canonical OTTL.",
+              responses: { ...baseResponses },
+            }),
+      )
+      .registerRoute(
+        "get",
+        "/ingestion-templates/admin",
+        MANAGEMENT_API_VERSION,
+        listForAdminHandler,
+        (b) =>
+          manage(b)
+            .withMiddleware(requireUserBoundCaller)
+            .withOutput(templateListSchema)
+            .withDocs({
+              operationId: "listIngestionTemplatesForAdmin",
+              summary: "List ingestion templates (admin shape, includes OTTL)",
+              tags: ["Governance / Ingestion Templates"],
+              description:
+                "Same union as the user list but includes the canonical `ottl_rules` source for every row. Used by admin tooling to render the transparency block / authoring drawer.",
+              responses: { ...baseResponses },
+            }),
+      )
+      // The response carries the canonical `ottl_rules`, which is exactly what
+      // /ingestion-templates blanks and what /ingestion-templates/admin gates on
+      // aiTools:manage plus a user-bound caller. One row at a time is not a
+      // cheaper read of the same secret, so it is gated the same way.
+      .registerRoute("get", "/ingestion-templates/:id", MANAGEMENT_API_VERSION, getHandler, (b) =>
+        manage(b)
+          .withMiddleware(requireUserBoundCaller)
+          .withParams(templateParamsSchema)
+          .withOutput(templateDetailSchema)
+          .withDocs({
+            operationId: "getIngestionTemplate",
+            summary: "Get ingestion template",
+            tags: ["Governance / Ingestion Templates"],
+            description:
+              "Single-template lookup by id, scoped to the caller's organization, including the canonical `ottl_rules`. Cross-org probes collapse to 404 (no enumeration vector). Members read the same row without `ottl_rules` from GET /ingestion-templates.",
+            responses: { ...baseResponses, 404: errorResponse("Not found") },
+          }),
+      )
+      .registerRoute("post", "/ingestion-templates", MANAGEMENT_API_VERSION, createHandler, (b) =>
+        manage(b)
+          .withMiddleware(requireUserBoundCaller)
+          .withInput(createTemplateSchema)
+          .withOutput(templateDetailSchema)
+          .withStatus(201)
+          .withDocs({
+            operationId: "createIngestionTemplate",
+            summary: "Create org-authored ingestion template",
+            tags: ["Governance / Ingestion Templates"],
+            description:
+              "Creates a brand-new template scoped to the caller's organization. Slug is auto-generated. Platform rows (organizationId IS NULL) are NEVER created via this endpoint — admins customize platform defaults via POST /ingestion-templates/clone instead.",
+            responses: { ...baseResponses, 400: errorResponse("Validation error") },
+          }),
+      )
+      .registerRoute(
+        "patch",
+        "/ingestion-templates/:id/ottl-rules",
+        MANAGEMENT_API_VERSION,
+        updateOttlRulesHandler,
+        (b) =>
+          manage(b)
+            .withMiddleware(requireUserBoundCaller)
+            .withParams(templateParamsSchema)
+            .withInput(updateOttlRulesSchema)
+            .withOutput(templateDetailSchema)
+            .withDocs({
+              operationId: "updateIngestionTemplateOttlRules",
+              summary: "Replace ottl_rules on an org-authored template",
+              tags: ["Governance / Ingestion Templates"],
+              description:
+                "Audit-logged with line counts pre/post. Platform-published rows reject with 403. Admins must clone a platform row before editing it.",
+              responses: {
+                ...baseResponses,
+                403: errorResponse("Platform template immutable"),
+                404: errorResponse("Template not found"),
+              },
+            }),
+      )
+      .registerRoute(
+        "delete",
+        "/ingestion-templates/:id",
+        MANAGEMENT_API_VERSION,
+        archiveHandler,
+        (b) =>
+          manage(b)
+            .withMiddleware(requireUserBoundCaller)
+            .withParams(templateParamsSchema)
+            .withOutput(templateArchivedSchema)
+            .withDocs({
+              operationId: "archiveIngestionTemplate",
+              summary: "Soft-archive an org-authored template",
+              tags: ["Governance / Ingestion Templates"],
+              description:
+                "Marks the row archived; existing ingestion keys continue to land traces but the row disappears from list views. Platform-published rows reject with 403.",
+              responses: {
+                ...baseResponses,
+                403: errorResponse("Platform template immutable"),
+                404: errorResponse("Template not found"),
+              },
+            }),
+      )
+      .registerRoute(
+        "post",
+        "/ingestion-templates/clone",
+        MANAGEMENT_API_VERSION,
+        cloneHandler,
+        (b) =>
+          manage(b)
+            .withMiddleware(requireUserBoundCaller)
+            .withInput(cloneTemplateSchema)
+            .withOutput(templateDetailSchema)
+            .withStatus(201)
+            .withDocs({
+              operationId: "cloneIngestionTemplate",
+              summary: "Clone a platform-published template into the caller's org",
+              tags: ["Governance / Ingestion Templates"],
+              description:
+                "Forks the source row's source_type / display_name / OTTL into a fresh org-authored row that the admin can then edit via PATCH /ingestion-templates/:id/ottl-rules.",
+              responses: { ...baseResponses, 404: errorResponse("Source template not found") },
+            }),
+      )
+      .build()
   );
-  return secured;
 }
+
+/**
+ * This family's own refusals, in the nested envelope its callers parse.
+ *
+ * A write that mapped a template failure answers the pair it carries, and a
+ * request the schema rejects answers 400 `validation_error` in the same shape
+ * — which is where the door's hand-rolled `safeParse` used to put it. Anything
+ * else is the boundary's.
+ */
+const governanceErrorHandler =
+  (boundary: ErrorHandler): ErrorHandler =>
+  (error, c) => {
+    if (error instanceof MappedTemplateRefusal) return c.json(error.body, error.status);
+    if (isZodLikeError(error)) {
+      return c.json(
+        {
+          error: {
+            type: "bad_request",
+            code: "validation_error",
+            message: error.message,
+          },
+        },
+        400,
+      );
+    }
+    return boundary(error, c);
+  };

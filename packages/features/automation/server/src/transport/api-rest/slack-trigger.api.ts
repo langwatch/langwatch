@@ -18,12 +18,15 @@
  */
 import { requires } from "@langwatch/api";
 import {
-  type AppRestProjectVariables,
   type AppRestSecurity,
-  type SecuredApp,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  resolver,
 } from "@langwatch/api/rest";
+import { isZodLikeError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { describeRoute, resolver } from "hono-openapi";
+import type { Context, ErrorHandler } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 import type { AutomationApp } from "#app/automation.app";
@@ -45,89 +48,92 @@ const slackTriggerBodySchema = z.object({
 export function createSlackTriggerRestApp(options: {
   security: AppRestSecurity;
   automation: () => AutomationApp;
-}): SecuredApp<{ Variables: AppRestProjectVariables }> {
+}): MountableRestApp {
   const { security, automation } = options;
 
   // The basePath is `/api` because the path is `/api/trigger/slack` — the
   // SINGULAR namespace, which the plural `/api/triggers` family does not claim.
-  const secured = security.createProjectApp({ basePath: "/api" });
+  const { service, policy } = security.createProjectVersionedApp({
+    name: "trigger-slack",
+    basePath: "/api",
+    errorEnvelope: "legacy",
+    errorHandler: slackTriggerErrorHandler,
+  });
 
-  secured.access(requires("triggers:manage")).post(
-    "/trigger/slack",
-    describeRoute({
-      summary: "Create a Slack alert trigger",
-      description:
-        "Create a trigger that posts to a Slack incoming webhook when traces match its filters. The `/api/triggers` family supersedes this narrower form, which stays for callers written against it.",
-      tags: ["Triggers"],
-      responses: {
-        200: {
-          description: "The trigger was created",
-          content: {
-            "application/json": {
-              schema: resolver(z.object({ message: z.string() })),
+  const createHandler = async (c: Context, input: z.infer<typeof slackTriggerBodySchema>) => {
+    const project = c.get("project");
+
+    await automation().create({
+      projectId: project.id,
+      action: "SEND_SLACK_MESSAGE",
+      name: input.name,
+      message: input.message,
+      filters: input.filters,
+      actionParams: { slackWebhook: input.slack_webhook },
+      alertType: input.alert_type,
+    });
+
+    return { message: "Slack trigger created successfully" };
+  };
+
+  return service
+    .registerRoute("post", "/trigger/slack", MANAGEMENT_API_VERSION, createHandler, (b) =>
+      policy(requires("triggers:manage"))(b)
+        .withInput(slackTriggerBodySchema)
+        .withOutput(z.object({ message: z.string() }))
+        .withDocs({
+          operationId: "createSlackTrigger",
+          summary: "Create a Slack alert trigger",
+          description:
+            "Create a trigger that posts to a Slack incoming webhook when traces match its filters. The `/api/triggers` family supersedes this narrower form, which stays for callers written against it.",
+          tags: ["Triggers"],
+          responses: {
+            400: {
+              description: "The body was not valid JSON, or failed validation",
+              content: {
+                "application/json": {
+                  schema: resolver(
+                    z.object({
+                      message: z.string(),
+                      errors: z
+                        .array(z.record(z.string(), z.unknown()))
+                        .optional()
+                        .describe("The individual validation failures, when present"),
+                    }),
+                  ),
+                },
+              },
+            },
+            401: {
+              description: "Missing or invalid API key",
+              content: {
+                "application/json": { schema: resolver(z.object({ message: z.string() })) },
+              },
             },
           },
-        },
-        400: {
-          description: "The body was not valid JSON, or failed validation",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.object({
-                  message: z.string(),
-                  errors: z
-                    .array(z.record(z.string(), z.unknown()))
-                    .optional()
-                    .describe("The individual validation failures, when present"),
-                }),
-              ),
-            },
-          },
-        },
-        401: {
-          description: "Missing or invalid API key",
-          content: {
-            "application/json": { schema: resolver(z.object({ message: z.string() })) },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const project = c.get("project");
-
-      let body: unknown;
-      try {
-        body = await c.req.json();
-      } catch {
-        return c.json({ message: "Bad request" }, 400);
-      }
-
-      const parsed = slackTriggerBodySchema.safeParse(body);
-      if (!parsed.success) {
-        return c.json({ message: "Invalid request data", errors: parsed.error.issues }, 400);
-      }
-
-      try {
-        await automation().create({
-          projectId: project.id,
-          action: "SEND_SLACK_MESSAGE",
-          name: parsed.data.name,
-          message: parsed.data.message,
-          filters: parsed.data.filters,
-          actionParams: { slackWebhook: parsed.data.slack_webhook },
-          alertType: parsed.data.alert_type,
-        });
-      } catch (error) {
-        // One 500 sentence, as this door has always answered: the caller has
-        // no branch to take on which of the application's failures it was, and
-        // the structured detail is in this process's log with a trace id.
-        logger.error({ error }, "Error creating trigger");
-        return c.json({ message: "Error creating trigger" }, 500);
-      }
-
-      return c.json({ message: "Slack trigger created successfully" });
-    },
-  );
-
-  return secured;
+        }),
+    )
+    .build();
 }
+
+/**
+ * The three bodies this door has always answered, and no others.
+ *
+ * A body that is not JSON, a body the schema rejects, and everything else —
+ * which for this one-call route is the application refusing to create the
+ * trigger. The caller has no branch to take on which application failure it
+ * was, so it stays one 500 sentence and the structured detail goes to this
+ * process's log with a trace id.
+ */
+const slackTriggerErrorHandler =
+  (_boundary: ErrorHandler): ErrorHandler =>
+  (error, c) => {
+    if (error instanceof HTTPException && error.status === 400) {
+      return c.json({ message: "Bad request" }, 400);
+    }
+    if (isZodLikeError(error)) {
+      return c.json({ message: "Invalid request data", errors: error.issues }, 400);
+    }
+    logger.error({ error }, "Error creating trigger");
+    return c.json({ message: "Error creating trigger" }, 500);
+  };

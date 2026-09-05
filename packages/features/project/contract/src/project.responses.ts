@@ -1,11 +1,12 @@
 /**
- * What the project's transports answer, stated once.
- *
- * The tRPC chain declares each procedure's `withOutput` from here, so the
- * shape a client reads is written down in the contract rather than implied by
- * whatever a handler happened to return. The schemas are checked against real
- * answers in development and test; production returns the handler's own value.
+ * What the project's transports answer, stated once: the tRPC chain declares
+ * each procedure's `withOutput` from here, so the shape a client reads is in
+ * the contract rather than implied by whatever a handler happened to return.
  */
+
+// Checked against real answers in development and test; production returns
+// the handler's own value.
+
 import { z } from "zod";
 
 /** A project was provisioned; the slug is what the caller navigates to. */
@@ -64,3 +65,58 @@ export const recentItemSchema = z
   })
   .strict();
 export type RecentItem = z.infer<typeof recentItemSchema>;
+
+/**
+ * One project, as the `/api/projects` management family answers it: the
+ * identity, the two setup fields and the team it sits in. The stored row's
+ * credential and its archive stamp are deliberately absent — the credential
+ * has its own gated route, and an archived project is not listed.
+ */
+export const projectRestSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string(),
+    slug: z.string(),
+    language: z.string(),
+    framework: z.string(),
+    teamId: z.string().min(1),
+    createdAt: z.date(),
+    updatedAt: z.date(),
+  })
+  .strict();
+export type ProjectRest = z.infer<typeof projectRestSchema>;
+
+/** A page of them, with the count the caller pages through. */
+export const projectRestPageSchema = z
+  .object({
+    data: z.array(projectRestSchema),
+    pagination: z
+      .object({
+        page: z.number().int().positive(),
+        limit: z.number().int().positive(),
+        total: z.number().int().nonnegative(),
+      })
+      .strict(),
+  })
+  .strict();
+export type ProjectRestPage = z.infer<typeof projectRestPageSchema>;
+
+/**
+ * A freshly created project, with the service key minted alongside it. The
+ * token is shown once, on this response only.
+ */
+export const projectRestCreatedSchema = projectRestSchema.extend({
+  serviceApiKey: z.string().min(1),
+  serviceApiKeyId: z.string().min(1),
+});
+export type ProjectRestCreated = z.infer<typeof projectRestCreatedSchema>;
+
+/** What an archive answers: the project it archived, and when. */
+export const projectRestArchivedSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string(),
+    archivedAt: z.date().nullable(),
+  })
+  .strict();
+export type ProjectRestArchived = z.infer<typeof projectRestArchivedSchema>;

@@ -5,16 +5,16 @@ import { timingSafeEqual } from "node:crypto";
 
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import type { Context, Env, Next } from "hono";
-import { describeRoute } from "hono-openapi";
+import type { Context, Next } from "hono";
 import { z } from "zod";
 
 import { internalSecret } from "@langwatch/api";
 import {
   type AppRestManagementAuditPort,
   type AppRestSecurity,
-  type SecuredApp,
-  validator as zValidator,
+  handWrittenDocs,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
 } from "@langwatch/api/rest";
 import {
   CREATE_ORGANIZATION,
@@ -111,6 +111,28 @@ const createOrganizationSchema = z.object({
   adminApiKeyName: z.string().trim().min(1).max(100).optional(),
 });
 
+const organizationParamsSchema = z.object({ id: z.string().min(1) });
+
+/** One organization, as every route here reports it. */
+const provisioningSummarySchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  slug: z.string(),
+  createdAt: z.date(),
+});
+
+const provisionedOrganizationSchema = z.object({
+  organization: z.object({
+    id: z.string().min(1),
+    name: z.string(),
+    slug: z.string(),
+  }),
+  // The team the provisioning port built alongside it, passed through in the
+  // shape that port returns rather than restated here.
+  team: z.unknown(),
+  adminApiKey: z.object({ id: z.string().min(1), token: z.string().min(1) }),
+});
+
 const instanceAdminPolicy = () =>
   internalSecret(
     "instance administrator bearer key (LANGWATCH_INSTANCE_ADMIN_API_KEY) " +
@@ -137,125 +159,139 @@ export function createOrganizationsRestApp(options: {
    * failure, so this one is only reported — never raised over the top of it.
    */
   reportError: (error: Error) => void;
-}): SecuredApp<Env> {
+}): MountableRestApp {
   const { security, organizations, apiKeys, audit, reportError } = options;
 
-  const secured = security.createServiceApp({
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "organizations",
     basePath: "/api/organizations",
+    errorEnvelope: "legacy",
     verifySecret: verifyInstanceAdminKey({
       instanceAdminKey: options.instanceAdminKey,
       isSaas: options.isSaas,
     }),
     // Enforced as a shared secret, published as a credential: the operator who sets
     // LANGWATCH_INSTANCE_ADMIN_API_KEY is the caller, and the document declares
-    // `instance_admin_key` for exactly that. Left at the service app's default the family
+    // `instance_admin_key` for exactly that. Left at the service family's default the family
     // would classify as `internal`, which the spec generator refuses to advertise, and rightly
     // so for a secret nobody outside the deployment holds.
     credentialClass: "instance_admin_api_key",
   });
 
-  secured
-    .access(instanceAdminPolicy())
-    .post(
-      "/",
-      describeRoute(CREATE_ORGANIZATION),
-      zValidator("json", createOrganizationSchema),
-      async (c) => {
-        const body = c.req.valid("json");
-        const service = organizations();
+  const instanceAdmin = policy(instanceAdminPolicy());
 
-        const created = await service.createForProvisioning({
-          name: body.name,
-          ...(body.slug !== undefined ? { slug: body.slug } : {}),
-        });
+  const provisionHandler = async (
+    _c: Context,
+    input: z.infer<typeof createOrganizationSchema>,
+  ) => {
+    const service_ = organizations();
 
-        let adminKey: Awaited<ReturnType<ApiKeyService["create"]>>;
-        let summary: OrganizationProvisioningSummary | null;
-        try {
-          // The bootstrap credential: an org-scoped service key with an
-          // explicit ORGANIZATION-ADMIN binding, so provisioning can continue
-          // through the management APIs without a browser step.
-          adminKey = await apiKeys().create({
-            name: body.adminApiKeyName ?? "Provisioning admin",
-            userId: null,
-            createdByUserId: null,
-            organizationId: created.organization.id,
-            permissionMode: "all",
-            bindings: [
-              {
-                role: "ADMIN",
-                scopeType: "ORGANIZATION",
-                scopeId: created.organization.id,
-              },
-            ],
-          });
+    const created = await service_.createForProvisioning({
+      name: input.name,
+      ...(input.slug !== undefined ? { slug: input.slug } : {}),
+    });
 
-          summary = await service.tryGetProvisioningSummary(created.organization.id);
-          if (!summary) {
-            // The slug is the natural key an infrastructure-as-code caller
-            // stores; answering 201 with a blank one moves the failure far
-            // from its cause.
-            throw new Error(
-              `provisioned organization ${created.organization.id} could not be read back`,
-            );
-          }
-        } catch (error) {
-          // Compensate: without its bootstrap key the organization is
-          // unreachable, and the slug would squat every retry as a 409. The
-          // caller must see the original failure, so a failed compensation is
-          // only reported.
-          try {
-            await service.deleteProvisionedOrganization({
-              organizationId: created.organization.id,
-            });
-          } catch (compensationError) {
-            reportError(
-              compensationError instanceof Error
-                ? compensationError
-                : new Error(String(compensationError)),
-            );
-          }
-          throw error;
-        }
-
-        audit({
-          userId: "instance-admin",
-          organizationId: created.organization.id,
-          action: "management.organization.provision",
-          args: {
-            name: body.name,
-            adminApiKeyId: adminKey.apiKey.id,
-          },
-        });
-
-        return c.json(
+    let adminKey: Awaited<ReturnType<ApiKeyService["create"]>>;
+    let summary: OrganizationProvisioningSummary | null;
+    try {
+      // The bootstrap credential: an org-scoped service key with an explicit
+      // ORGANIZATION-ADMIN binding, so provisioning can continue through the
+      // management APIs without a browser step.
+      adminKey = await apiKeys().create({
+        name: input.adminApiKeyName ?? "Provisioning admin",
+        userId: null,
+        createdByUserId: null,
+        organizationId: created.organization.id,
+        permissionMode: "all",
+        bindings: [
           {
-            organization: {
-              id: created.organization.id,
-              name: created.organization.name,
-              slug: summary.slug,
-            },
-            team: created.team,
-            adminApiKey: { id: adminKey.apiKey.id, token: adminKey.token },
+            role: "ADMIN",
+            scopeType: "ORGANIZATION",
+            scopeId: created.organization.id,
           },
-          201,
+        ],
+      });
+
+      summary = await service_.tryGetProvisioningSummary(created.organization.id);
+      if (!summary) {
+        // The slug is the natural key an infrastructure-as-code caller stores;
+        // answering 201 with a blank one moves the failure far from its cause.
+        throw new Error(
+          `provisioned organization ${created.organization.id} could not be read back`,
         );
-      },
-    );
-
-  secured.access(instanceAdminPolicy()).get("/", describeRoute(LIST_ORGANIZATIONS), async (c) => {
-    const summaries = await organizations().listProvisioningSummaries();
-    return c.json({ organizations: summaries });
-  });
-
-  secured.access(instanceAdminPolicy()).get("/:id", describeRoute(GET_ORGANIZATION), async (c) => {
-    const { id } = c.req.param();
-    const organization = await organizations().tryGetProvisioningSummary(id);
-    if (!organization) {
-      throw new NotFoundError("not_found", "Organization", id);
+      }
+    } catch (error) {
+      // Compensate: without its bootstrap key the organization is unreachable,
+      // and the slug would squat every retry as a 409. The caller must see the
+      // original failure, so a failed compensation is only reported.
+      try {
+        await service_.deleteProvisionedOrganization({
+          organizationId: created.organization.id,
+        });
+      } catch (compensationError) {
+        reportError(
+          compensationError instanceof Error
+            ? compensationError
+            : new Error(String(compensationError)),
+        );
+      }
+      throw error;
     }
-    return c.json({ organization });
+
+    audit({
+      userId: "instance-admin",
+      organizationId: created.organization.id,
+      action: "management.organization.provision",
+      args: {
+        name: input.name,
+        adminApiKeyId: adminKey.apiKey.id,
+      },
+    });
+
+    return {
+      organization: {
+        id: created.organization.id,
+        name: created.organization.name,
+        slug: summary.slug,
+      },
+      team: created.team,
+      adminApiKey: { id: adminKey.apiKey.id, token: adminKey.token },
+    };
+  };
+
+  const listHandler = async () => ({
+    organizations: await organizations().listProvisioningSummaries(),
   });
 
-  return secured;
+  const getHandler = async (
+    _c: Context,
+    input: z.infer<typeof organizationParamsSchema>,
+  ) => {
+    const organization = await organizations().tryGetProvisioningSummary(input.id);
+    if (!organization) {
+      throw new NotFoundError("not_found", "Organization", input.id);
+    }
+    return { organization };
+  };
+
+  return service
+    .registerRoute("post", "/", MANAGEMENT_API_VERSION, provisionHandler, (b) =>
+      instanceAdmin(b)
+        .withInput(createOrganizationSchema)
+        .withOutput(provisionedOrganizationSchema)
+        .withStatus(201)
+        .withDocs(handWrittenDocs(CREATE_ORGANIZATION)),
+    )
+    .registerRoute("get", "/", MANAGEMENT_API_VERSION, listHandler, (b) =>
+      instanceAdmin(b)
+        .withOutput(z.object({ organizations: z.array(provisioningSummarySchema) }))
+        .withDocs(handWrittenDocs(LIST_ORGANIZATIONS)),
+    )
+    .registerRoute("get", "/:id", MANAGEMENT_API_VERSION, getHandler, (b) =>
+      instanceAdmin(b)
+        .withParams(organizationParamsSchema)
+        .withOutput(z.object({ organization: provisioningSummarySchema }))
+        .withDocs(handWrittenDocs(GET_ORGANIZATION)),
+    )
+    .build();
 }
