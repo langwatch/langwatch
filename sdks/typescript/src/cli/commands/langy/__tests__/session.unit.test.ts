@@ -78,6 +78,16 @@ class FakeSocket implements SocketLike {
   }
 }
 
+/** True while a process group still has a leader. */
+const alive = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const settle = (ms = 50) =>
   new Promise<void>((resolve) => {
     setTimeout(resolve, ms);
@@ -726,6 +736,58 @@ describe("given a folder connected to a Langy conversation", () => {
       });
       await expect(session.done).resolves.toBe(0);
       expect(lines.join("\n")).toContain("LangWatch disconnected the folder");
+    });
+  });
+
+  describe("when the folder is disconnected from the panel with work in flight", () => {
+    /** @scenario "A disconnect from the panel stops the commands it started" */
+    it("kills the running command and drops the open question", async () => {
+      const approvals = fakeApprovals();
+      start({ approvals: approvals.prompt });
+      await settle();
+      register();
+
+      // A real child process that writes down the process group it leads.
+      socket.deliver(
+        callFrame({
+          tool: "local_bash",
+          params: { command: "echo $$ > running.pid; sleep 30" },
+        }),
+      );
+      await settle();
+      approvals.answer({ decision: "allow_once" });
+      const pidFile = path.join(root, "running.pid");
+      await waitUntil(() => fs.existsSync(pidFile), {
+        what: "the command to start",
+      });
+      const group = Number(fs.readFileSync(pidFile, "utf8").trim());
+      expect(alive(group)).toBe(true);
+
+      // And one more call waiting for an answer on the screen.
+      socket.deliver({
+        ...callFrame({ tool: "local_bash", params: { command: "sleep 30" } }),
+        call: {
+          ...callFrame({ tool: "local_bash", params: { command: "sleep 30" } })
+            .call,
+          callId: "call-2",
+        },
+      });
+      await waitUntil(() => approvals.state.open === 1, {
+        what: "the second question to open",
+      });
+
+      socket.deliver({
+        type: "disconnect",
+        reason: "the conversation closed the folder",
+      });
+      await expect(session.done).resolves.toBe(0);
+
+      // The process group is gone, not left writing in the folder.
+      await waitUntil(() => !alive(group), {
+        what: "the command to be killed",
+      });
+      expect(approvals.state.closed).toBe(true);
+      expect(lines.join("\n")).toContain("this question was dropped");
     });
   });
 

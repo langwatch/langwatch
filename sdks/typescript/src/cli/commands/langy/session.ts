@@ -426,6 +426,32 @@ export function startLangySession(options: LangySessionOptions): LangySession {
     });
   };
 
+  /**
+   * Everything this session is holding, let go of: the questions on the
+   * screen, the questions waiting for one, and the commands still running in
+   * the folder.
+   *
+   * A folder stops being shared in four ways, and only Ctrl-C used to clear
+   * the work. A disconnect from the panel closed the socket and left the
+   * commands it had started running, writing files and reaching the network
+   * long after the panel said the folder was gone.
+   */
+  const stopEverything = (): void => {
+    askQueue.length = 0;
+    for (const [callId, waiting] of pending) {
+      waiting.closeSelector?.();
+      ui.permissionSettled({
+        call: waiting.call,
+        text: "The folder stopped being shared, so this question was dropped.",
+      });
+      client.forgetInFlight(callId);
+    }
+    pending.clear();
+    ui.release();
+    for (const command of running.values()) command.cancel();
+    running.clear();
+  };
+
   const onCancel = (callId: string): void => {
     const command = running.get(callId);
     if (command) {
@@ -474,15 +500,18 @@ export function startLangySession(options: LangySessionOptions): LangySession {
         ui.policyChanged({ skipPermissions: next });
       },
       onDisconnect: ({ reason }) => {
+        stopEverything();
         ui.disconnected({ reason });
         client.stopNow();
         finish(0);
       },
       onRefused: (frame) => {
+        stopEverything();
         ui.note(frame.message);
         finish(1);
       },
       onGaveUp: ({ reason }) => {
+        stopEverything();
         ui.note(reason);
         finish(1);
       },
@@ -500,13 +529,8 @@ export function startLangySession(options: LangySessionOptions): LangySession {
       return;
     }
     shuttingDown = true;
-    askQueue.length = 0;
-    for (const waiting of pending.values()) waiting.closeSelector?.();
-    pending.clear();
-    ui.release();
+    stopEverything();
     ui.leaving();
-    for (const command of running.values()) command.cancel();
-    running.clear();
     const deadline = setTimeout(() => finish(0), SHUTDOWN_DEADLINE_MS);
     deadline.unref();
     void client.stop().then(() => {

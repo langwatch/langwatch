@@ -361,6 +361,14 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       And exits within five seconds
 
     @unit
+    Scenario: A disconnect from the panel stops the commands it started
+      Given a connected folder with a command in flight and a question on the screen
+      When the folder is disconnected from the panel
+      Then the command and its child processes are killed
+      And the question is closed with a line saying it was dropped
+      And the CLI exits with code zero
+
+    @unit
     Scenario: A second Ctrl-C exits at once
       Given the CLI is shutting down
       When I press Ctrl-C again
