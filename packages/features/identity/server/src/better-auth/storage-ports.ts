@@ -1,5 +1,3 @@
-import type { IdentifierProvider } from "@langwatch/identity-contract";
-
 /**
  * The storage the identity branch of the adapter runs on (ADR-116 §1, §6).
  *

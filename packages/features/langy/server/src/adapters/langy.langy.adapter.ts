@@ -3,10 +3,7 @@ import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type {
   LangyConversationStateData,
-  LangyConversationTurnCapability,
   LangyConversationTurnData,
-  LangyCredentialTurnCapability,
-  LangyMessagePart,
   LangyMessageProjectionRecord,
   LangyService as LangyServiceContract,
   LangyTurnAdmissionCapability,

@@ -1,19 +1,7 @@
 /**
- * The atom reads that back the Results tab: the SQL expressions that read one
- * scenario, run once against one target, off a `simulation_runs` row, and the
- * repository that runs them.
- *
- * Kept apart from `SimulationClickHouseRepository` because it answers a
- * different question. That repository serves v1, which reads runs one batch or
- * one set at a time; this one reads the whole window flat so a filter can cut
- * it and a grouping can fold it. Nothing here changes what v1 reads.
- *
- * The SQL builders would be their own module on main (`atom-sql.ts`). They
- * are folded in here, as static methods of the class, because neither a bare
- * `atom-sql.ts` nor a `rules/atom-sql.rules.ts` matches this package's layout
- * grammar yet, and `feature-module-classes` refuses a standalone exported
- * function in a concrete repository module — see the "Result atoms" module
- * map in `dev/docs/plans/restructure-bug-hunt-2026-09-03.md`.
+ * The Results tab's own atom reads: run once per scenario/target off
+ * `simulation_runs`, kept apart from `SimulationClickHouseRepository` (v1's
+ * batch/set reads) since this reads the whole window flat for filter/group; SQL builders stay static methods per `restructure-bug-hunt-2026-09-03.md`.
  */
 import {
   AGENT_TEST_SET_SUFFIX,
@@ -41,15 +29,9 @@ import { mapStatus } from "./simulation-run.mapper";
 import { RUN_NOTE_EXPR, TABLE_NAME } from "./simulation-clickhouse.repository";
 
 /**
- * Raw `Status` values that read as a failure.
- *
- * A stalled or a cancelled run counts as a failure, the way the rest of the
- * product counts it: it was asked for and it did not pass. `FAILURE` is the
- * legacy spelling that `mapStatus` folds into `FAILED`, so it has to appear
- * here or old rows would read as pending.
- *
- * The list is pinned against `categorizeRunStatus` by a unit test, so the SQL
- * and the TypeScript cannot drift into disagreeing about a verdict.
+ * Raw `Status` values read as failure: stalled/cancelled count, and
+ * `FAILURE` is the legacy spelling `mapStatus` folds into `FAILED`. Pinned
+ * against `categorizeRunStatus` by a unit test so SQL and TS can't drift.
  */
 export const FAILED_STATUS_VALUES = ["ERROR", "FAILED", "FAILURE", "STALLED", "CANCELLED"] as const;
 
@@ -65,62 +47,44 @@ export const OUTCOME_EXPR = `multiIf(
   'pending')`;
 
 /**
- * When the run started, epoch ms.
- *
- * ORDER BY, the cursor predicate and the value handed back as the cursor must
- * all be this one expression. `StartedAt` is nullable on a run the projection
- * opened before its started event landed, and ClickHouse sorts NULLs first, so
- * coalescing here is what stops those rows piling onto page one and becoming
- * unreachable for the rest of the sweep.
+ * When the run started (epoch ms): ORDER BY, the cursor predicate and the
+ * returned cursor must be this ONE coalesced expression, since ClickHouse
+ * sorts a nullable `StartedAt` first and would strand those rows on page one.
  */
 export const ATOM_SORT_KEY = "toUnixTimestamp64Milli(ifNull(StartedAt, CreatedAt))";
 
 /**
- * The reserved namespace the platform stamps onto a run's metadata.
- *
- * Everything the platform knows about a run and did not get from the SDK sits
- * under this one key, so a customer key can never collide with it.
+ * The reserved namespace the platform stamps onto a run's metadata —
+ * everything the platform knows sits under this one key, so a customer key
+ * can never collide with it.
  */
 export const LANGWATCH_METADATA = "JSONExtractRaw(ifNull(Metadata, '{}'), 'langwatch')";
 
 /**
- * The target a run was pointed at, as the bare reference id.
- *
- * The platform stamps it into a reserved `langwatch` namespace on the run
- * metadata; an SDK or CI push carries none. The client already names a
- * reference id through its own target map, so nothing here resolves names.
+ * The target a run was pointed at, as the bare reference id — stamped by
+ * the platform into a reserved namespace; an SDK/CI push carries none, and
+ * nothing here resolves names (the client's own target map does).
  */
 export const TARGET_REF_EXPR = `JSONExtractString(${LANGWATCH_METADATA}, 'targetReferenceId')`;
 
 /**
- * The target key the platform stamped on the run: the reference id alone, or
- * the reference id and a hash of the target's parameter overrides. Empty on
- * a run recorded before targets carried parameters, and on every run pushed
- * from code.
- *
+ * The target key the platform stamped: reference id alone, or id + a hash
+ * of parameter overrides. Empty on pre-target runs and any code-pushed run.
  * @see `@langwatch/suite-contract`'s `target-key.ts`
  */
 export const TARGET_STAMP_KEY_EXPR = `JSONExtractString(${LANGWATCH_METADATA}, 'targetKey')`;
 
 /**
- * The parameter overrides of the run's target alone, as the raw JSON object
- * they were stamped as, or '' when the target carried none.
- *
- * Raw rather than a map read: the values are strings, numbers and booleans,
- * and re-typing them in SQL would lose which they were.
+ * Raw JSON of the run's target parameter overrides ('' when none) — kept
+ * raw rather than mapped, since the values are strings/numbers/booleans and
+ * re-typing them in SQL would lose which they were.
  */
 export const TARGET_PARAMETERS_EXPR = `JSONExtractRaw(${LANGWATCH_METADATA}, 'targetParameters')`;
 
 /**
- * The names the code that pushed the run reported for its agents, joined.
- *
- * The SDK lists every participant of the run on `metadata.agents`, each with a
- * role. Only the `agent` role names what the run was pointed at: the user
- * simulator and the judge drive the run, they are not what it tests. Two
- * agents in one run read the way the plan table already reads two targets.
- *
- * Empty when the run reported no agent, which is every run pushed by an older
- * SDK.
+ * Agent names the run reported, joined. Only the `agent` role (not the user
+ * simulator or judge) names what the run tested; empty on any run pushed by
+ * an older SDK that reported no agent.
  */
 export const CODE_TARGET_NAME_EXPR = `arrayStringConcat(
   arrayMap(agent -> JSONExtractString(agent, 'name'),
@@ -143,16 +107,9 @@ function nameSlug(expr: string): string {
 export const CODE_TARGET_SLUG_EXPR = nameSlug(CODE_TARGET_NAME_EXPR);
 
 /**
- * The key a target folds under.
- *
- * A run started on the platform carries the key the platform stamped, which
- * tells one agent's parameter variants apart. A run recorded before that
- * stamp existed names only its stored agent or prompt, and that reference id
- * is the key, so every key that existed before is unchanged. A run pushed
- * from code names its own agent instead, so its key is built from that name:
- * `code:acme-support-agent`. Two runs of one agent therefore read as one
- * target. A run that names none of these keeps the `unknown` key, which the
- * page reads as the default target.
+ * The key a target folds under: the platform's stamped key when present, a
+ * stored agent/prompt reference id for pre-stamp runs, `code:<name>` for a
+ * code-pushed run, otherwise `unknown` (the page's default target).
  */
 export const TARGET_KEY_EXPR = `multiIf(
   ${TARGET_STAMP_KEY_EXPR} != '', ${TARGET_STAMP_KEY_EXPR},
@@ -161,12 +118,9 @@ export const TARGET_KEY_EXPR = `multiIf(
   '${UNKNOWN_TARGET_KEY}')`;
 
 /**
- * What started the run.
- *
- * There is no trigger column. A platform run always stamps a target, through
- * both the one-off path and the suite path, and an SDK or CI push never does,
- * so the presence of the target IS the signal. It costs nothing extra because
- * the target is already extracted for the target key.
+ * What started the run: no trigger column exists, since a platform run
+ * always stamps a target (both the one-off and suite paths) and an SDK/CI
+ * push never does — the target's presence IS the signal, at no extra cost.
  */
 export const TRIGGER_EXPR = `if(${TARGET_REF_EXPR} = '', 'code', 'app')`;
 
@@ -180,43 +134,27 @@ export const SET_KEY_EXPR = `if(ScenarioSetId = '', 'default', ScenarioSetId)`;
 export const NAME_SLUG_EXPR = nameSlug("ifNull(Name, '')");
 
 /**
- * The key a scenario folds under.
- *
- * A run started on the platform names a stored scenario, and that id is the
- * key. A run pushed from code carries an id the SDK made up for that one run
- * unless the code set one, so two runs of one scenario would never fold on it;
- * its key is built from its set and its name instead, the id the SDK would
- * have derived: `german-list-agents`. A code run with no name keeps its id,
- * since there is nothing else to fold it on.
- *
- * The filter on scenarios reads this same key, so an opened row asks for the
- * runs it shows and a stored scenario is still found by its id.
+ * The key a scenario folds under: a platform run's stored scenario id, or
+ * for a code run `<set>:<name>` (what the SDK would have derived) so two
+ * runs of one scenario fold together; the filter reads this same key.
  */
 export const SCENARIO_KEY_EXPR = `if(${TARGET_REF_EXPR} = '' AND ${NAME_SLUG_EXPR} != '', concat(${SET_KEY_EXPR}, '-', ${NAME_SLUG_EXPR}), ScenarioId)`;
 
 const TRACE_METRIC_KEYS = "JSONExtractKeys(TraceMetricsJson)";
 
 /**
- * The per-trace costs the fold stored on the run, summed.
- *
- * `TraceMetricsJson` is a map keyed by trace id, so its keys are already
- * distinct. That matters: the `TraceIds` array is NOT distinct — on local data
- * it held 1,450 entries over 493 distinct traces — so summing over that column
- * instead would report roughly three times the real cost.
+ * Per-trace costs, summed from `TraceMetricsJson` (keyed by trace id, so
+ * already distinct) — NOT from `TraceIds`, which held ~3x as many entries as
+ * distinct traces on local data and would triple the reported cost.
  */
 const TRACE_COST_SUM = `arraySum(arrayMap(
   traceKey -> JSONExtractFloat(JSONExtractRaw(TraceMetricsJson, traceKey), 'totalCost'),
   ${TRACE_METRIC_KEYS}))`;
 
 /**
- * Where the atom's cost comes from. See `AtomCostSource` for what each means.
- *
- * The order is what makes the answer correct. The fold writes `TotalCost` as
- * NULL when the traces sum to zero, so a NULL alone cannot tell a run that was
- * measured and cost nothing from one that was never measured at all. Reading
- * the per-trace map next separates the two: on local data it resolves 260 of
- * the 309 NULL rows, leaving 14 of 527 atoms genuinely unmeasured instead of
- * 309. Summing `TotalCost` on its own is the shape that silently under-reports.
+ * Cost source, ordered so NULL `TotalCost` (traces summed to zero) is told
+ * apart from truly unmeasured: reading the per-trace map next resolved 260
+ * of 309 NULL rows on local data; summing `TotalCost` alone under-reports.
  */
 export const COST_SOURCE_EXPR = `multiIf(
   TotalCost IS NOT NULL, 'run',
@@ -241,23 +179,8 @@ export const COST_NUMERIC_EXPR = `multiIf(
 export const COST_UNKNOWN_EXPR = `if(${COST_SOURCE_EXPR} = 'unknown', 1, 0)`;
 
 /**
- * How far the dedup subquery's partition predicate reaches past the window.
- *
- * `StartedAt` is not immutable across a run's versions: the projection opens a
- * run with `StartedAt` null, persisted as `CreatedAt`, and overwrites it when
- * the started event lands. Range-filtering the `max(UpdatedAt)` scope on a
- * column that moves can drop the true latest version out of its own dedup
- * group, which resolves the group to a stale in-window version — non-null,
- * plausible, and caught by nothing.
- *
- * Leaving the column out of the subquery entirely, the way the export sweep
- * does, is always correct but stops the subquery pruning partitions at all,
- * which for a read that re-runs on every filter change is a whole-history scan.
- * The slack is the middle: the two timestamps are the same moment give or take
- * the delay between an insert and its started event, seconds at worst, so a
- * week on each side cannot exclude the winning version while still pruning
- * every partition outside the window and its margin.
- *
+ * `StartedAt` moves (null -> `CreatedAt` -> started event), so a tight
+ * range filter can drop the true latest version from its own dedup group.
  * @see dev/docs/best_practices/clickhouse-queries.md — "A range filter on a MOVABLE column"
  */
 export const DEDUP_WINDOW_SLACK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -270,10 +193,9 @@ export interface AtomFilterSql {
    */
   stableClause: string;
   /**
-   * Predicates that may only be applied AFTER dedup, because the column they
-   * read can differ between versions of one run. `Status` is the clearest case:
-   * filtering versions by it would resolve a finished run to whichever old
-   * version still said "running".
+   * Predicates only valid AFTER dedup, since the column they read can differ
+   * between versions of one run — e.g. `Status` could resolve a finished run
+   * to an old version that still said "running".
    */
   volatileClause: string;
   /** The widened window for the dedup subquery. See {@link DEDUP_WINDOW_SLACK_MS}. */
@@ -405,11 +327,9 @@ function decodeCursor(cursor: string): AtomCursor | null {
 }
 
 /**
- * True when the caller asked for an empty set of scenarios or targets.
- *
- * An empty list means "none of them", not "all of them". Turning it into an
- * unfiltered query is how a filter that should show nothing shows everything,
- * so it short-circuits before any query is sent.
+ * An empty requested set means "none of them", not "all" — turning it into
+ * an unfiltered query would show everything instead of nothing, so this
+ * short-circuits before any query is sent.
  */
 function isEmptyScope(filter: ResultsFilter): boolean {
   return (
@@ -423,10 +343,9 @@ function isEmptyScope(filter: ResultsFilter): boolean {
 type RawAtomQueryRow = Omit<RawAtomRow, "Status"> & { Status: string };
 
 /**
- * The narrow slice of `@clickhouse/client`'s `ClickHouseClient` this
- * repository reads through. Duck-typed rather than the real class so the
- * composition root can hand it the same routed-tenant client the v1
- * simulation reads already compose (`SimulationReadClient`), with no cast.
+ * Narrow duck-typed slice of `ClickHouseClient` this repository reads
+ * through, so the composition root can hand it the same routed-tenant
+ * client v1's `SimulationReadClient` already composes, with no cast.
  */
 type ResultAtomsClickHouseClient = {
   query(input: {
@@ -458,21 +377,17 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsReadPort {
   }
 
   /**
-   * The grain of one sparkline bar.
-   *
-   * A run plan row covers many scenarios, so a single scenario's verdict says
-   * nothing about it and the bar folds a whole run. A scenario row or a target
-   * row already names one thing, so each bar is one execution of it.
+   * The grain of one sparkline bar: a run plan row covers many scenarios (so
+   * folds a whole run), while a scenario or target row already names one
+   * thing, so each bar is one execution of it.
    */
   static trendKeyExpr(groupBy: ResultsGroupBy): string {
     return groupBy === "plan" ? "BatchRunId" : "ScenarioRunId";
   }
 
   /**
-   * Builds the WHERE fragments both reads share, split by where each may go.
-   *
-   * One builder on purpose: the overview and the atom list must never disagree
-   * about what is in scope, and two copies of this logic is how they would.
+   * Builds the WHERE fragments both reads share: one builder on purpose, so
+   * the overview and the atom list can never disagree about what's in scope.
    */
   static buildAtomFilters(filter: ResultsFilter): AtomFilterSql {
     const stable = stableFilterParts(filter);
@@ -488,11 +403,9 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsReadPort {
   }
 
   /**
-   * The scope every atom read runs over: the latest version of each run in the
-   * window, archived runs left out.
-   *
-   * Written once and reused so the overview and the atom list cannot end up
-   * scanning different sets of rows.
+   * The scope every atom read runs over (latest version per run in window,
+   * archived excluded) — written once so the overview and atom list can't
+   * scan different row sets.
    */
   static atomScopeSql(filters: AtomFilterSql): string {
     const dedupFilters = `TenantId = {tenantId:String} ${filters.stableClause} ${filters.dedupWindowClause}`;
@@ -531,12 +444,9 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsReadPort {
   }
 
   /**
-   * One page of atoms, newest first, keyset paginated.
-   *
-   * Newest first because that is the order the page reads in; the cursor
-   * therefore walks backwards through the same expression it sorts by. Ties on
-   * the timestamp break on the scenario run id, so two runs that started in the
-   * same millisecond cannot both sit on a page boundary and be skipped.
+   * One page of atoms, newest first, keyset paginated: the cursor walks
+   * backwards through the same sort expression, breaking ties on scenario run
+   * id so same-millisecond runs can't both sit on a page boundary.
    */
   async findAtoms({
     filter,
@@ -613,14 +523,9 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsReadPort {
   }
 
   /**
-   * The number every run carries inside its plan, oldest first.
-   *
-   * Counted over the window, not over all time, because the run numbers the
-   * runs sidebar already draws are window-scoped too and two numbers for one
-   * run would be worse than a number that moves with the period.
-   *
-   * Read at batch grain rather than atom grain: a window holds far fewer runs
-   * than scenario runs, so this stays small even where the atom list does not.
+   * The run's number within its plan, oldest first, counted over the window
+   * (not all time) to match the window-scoped numbers the runs sidebar
+   * already draws — read at batch grain since a window holds far fewer runs.
    */
   async findRunOrdinals(filter: ResultsFilter): Promise<RunOrdinalRow[]> {
     if (isEmptyScope(filter)) return [];
@@ -718,12 +623,9 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsReadPort {
   }
 
   /**
-   * The scenarios that ran from code inside the window, one per key, each
-   * under the name its newest run carried.
-   *
-   * These have no row in Postgres, so the window is the only place they can
-   * be listed from. The caller sends a filter that names no scenario, so the
-   * list never hides the way back out of a scenario filter.
+   * Code-run scenarios inside the window, one per key under their newest
+   * run's name — these have no Postgres row, so the window is the only place
+   * to list them, and an unfiltered caller sees the full set.
    */
   async findCodeScenarios(filter: ResultsFilter): Promise<RawCodeScenarioRow[]> {
     if (isEmptyScope(filter)) return [];
@@ -752,16 +654,9 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsReadPort {
   }
 
   /**
-   * The targets the window names that the stored agent and prompt lists
-   * cannot, one per key: a target a run from code named, under the name its
-   * newest run reported, and a stored target run with parameter overrides,
-   * under its reference id and those overrides.
-   *
-   * Neither has a row of its own in Postgres, so the window is the only place
-   * they can be listed from. A run from code that named no agent is left out:
-   * it groups under the `unknown` key, which the page already reads as the
-   * default target. A platform run with no overrides is left out too: the
-   * agent list already names it.
+   * Targets the window names that stored agent/prompt lists cannot: a
+   * code-named target under its newest run's name, and a stored target under
+   * its reference id and overrides — omitting any already covered elsewhere.
    */
   async findRunTargets(filter: ResultsFilter): Promise<RawRunTargetRow[]> {
     if (isEmptyScope(filter)) return [];
@@ -794,29 +689,9 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsReadPort {
   }
 
   /**
-   * The sparkline points of every group, at the grain that grouping calls for,
-   * trimmed to the points a sparkline actually draws.
-   *
-   * Read whole rather than per group: one aggregate over the window is cheaper
-   * than one query per row of the table, and the result is bounded by the run
-   * count, not the atom count.
-   *
-   * The trim happens HERE and not after the rows land. A plan grouping keys a
-   * point per batch, so a plan run twice a day for 30 days sent 60 rows for the
-   * 14 a sparkline shows; the Results tab is now the default view of the page,
-   * so those rows crossed the wire on the common path to be dropped. The newest
-   * are the ones kept, because a sparkline is read to see where a plan is
-   * heading.
-   *
-   * `LIMIT n BY` is safe in this position and would not be one level down. The
-   * warning it carries is about running it against the table, where it
-   * materialises every selected column for whole granules and the heavy
-   * payload columns make that an out-of-memory risk. Here it runs over the
-   * output of a GROUP BY: five scalar columns, one row per group and trend key,
-   * with no granule to materialise.
-   *
-   * The caller re-sorts and re-slices, which is now a no-op and stays as the
-   * guard for a caller that asks for a different cap.
+   * Sparkline points per group, trimmed to what a sparkline actually draws —
+   * read whole (one aggregate, bounded by run count) and trimmed HERE rather
+   * than after, since Results is now the default view. `LIMIT n BY` is safe over this GROUP BY output, not the base table.
    */
   async aggregateTrend({
     filter,
@@ -858,11 +733,9 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsReadPort {
   }
 
   /**
-   * Pass rate over time, in fixed buckets.
-   *
-   * Buckets that hold nothing are absent here and filled in by the caller, so
-   * the chart can draw a gap rather than a zero, which would read as a total
-   * failure instead of as no data.
+   * Pass rate over time in fixed buckets: empty buckets are absent here and
+   * filled in by the caller, so the chart draws a gap rather than a
+   * misleading zero (total failure) for periods with no data.
    */
   async aggregateSeries({
     filter,

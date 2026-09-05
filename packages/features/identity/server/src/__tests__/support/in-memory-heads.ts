@@ -78,10 +78,10 @@ export class InMemoryHeads implements IdentityHeadsRepository {
   /** Fold facts into a user's heads, the way the app's projection would. */
   fold(userId: string, facts: IdentityFactInput[], occurredAt = T0): void {
     const heads = facts.reduce(
-      (current, fact) =>
+      (current, factInput) =>
         reduceIdentity({
           heads: current,
-          fact: { ...fact, occurredAt } as IdentityFact,
+          fact: { ...factInput, occurredAt } as IdentityFact,
         }),
       this.heads.get(userId) ?? emptyIdentityHeads({ userId }),
     );

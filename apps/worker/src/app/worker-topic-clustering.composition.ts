@@ -1,4 +1,4 @@
-import { histogram, type HistogramHandle } from "@langwatch/observability/metrics";
+import { histogram } from "@langwatch/observability/metrics";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { ModelProviderExecutionAdapter } from "@langwatch/model-provider-server";
 import type {

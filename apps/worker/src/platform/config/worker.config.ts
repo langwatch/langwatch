@@ -69,101 +69,45 @@ export const workerConfigDefinition = RuntimeConfig.define({
     }),
   },
   /**
-   * The GitHub App this instance is, if it is one.
-   *
-   * Optional in exactly the way the application's own environment schema has
-   * it: a deployment without a GitHub App still runs pull-request linkage
-   * retention, and a standalone worker has to be able to boot without one.
+   * Optional in the same way as the app's schema, since a worker must boot
+   * without a GitHub App configured.
    */
   github: {
     ...githubAppConfigDefinition,
     privateKey: Config.secret({ optional: true, env: "GITHUB_LANGY_PRIVATE_KEY" }),
   },
   /**
-   * Which product this deployment is, as the one variable both graphs read.
-   *
-   * The App gates its cross-pipeline billable-events meter on `config.isSaas`
-   * and this process gates its own on this leaf, and the pair's `global:*`
-   * routing keys share `event-sourcing/jobs` with every pipeline's. Two graphs
-   * that disagreed would not fail loudly: a consumer without the pair rejects
-   * every billable span, evaluation, experiment and simulation event for
-   * redelivery forever, and a consumer that has it where the producer does not
-   * meters a self-hosted install into a table nobody bills from.
-   *
-   * `environmentOneOrTrueSchema` is the App's own reading of the variable,
-   * spelling for spelling; see its frozen-twin note in `@langwatch/config`.
+   * The one variable both graphs gate their cross-pipeline billing meter on.
+   * Disagreement silently drops or double-meters billable events.
+   * `environmentOneOrTrueSchema` matches the App's reading exactly.
    */
   deployment: {
     saas: Config.value(environmentOneOrTrueSchema, { env: "IS_SAAS" }),
     /**
-     * The deployment's operator list, read at the App's own spelling.
-     *
-     * It is what already decides who reaches the back office, and the SSO
-     * connection guards refuse an organization administrator's hand on the
-     * strength of it (ADR-117 D05 tier 1). Unset means nobody, which is the
-     * fail-closed answer the back office also takes — so a worker that read a
-     * different list than the App would let a domain attestation land through
-     * one surface that the other refuses.
+     * Read at the App's own spelling; SSO admin gating relies on it
+     * (ADR-117 D05 tier 1). Unset means nobody — the fail-closed answer
+     * both surfaces must agree on.
      */
     adminEmails: Config.value(optionalEnvironmentString, { env: "ADMIN_EMAILS" }),
     /**
-     * The key an activated Enterprise licence's signature is checked against.
-     *
-     * Optional, and absent is the normal case: the licensing contract embeds
-     * the production public key, so a deployment verifies every licence
-     * LangWatch issues without configuring anything. The variable exists for
-     * ROTATION, and it is the App's own spelling because plan resolution runs
-     * in BOTH processes (ADR-027) — a worker checking a signature against a
-     * different key than the App is one deployment with two answers to whether
-     * it is licensed at all. Blank is not a key, so it resolves to nothing
-     * rather than to an empty string that would refuse every licence.
+     * Rotation-only variable; unset falls back to the embedded production
+     * public key. Read at the App's spelling since plan resolution runs in
+     * both processes (ADR-027); blank resolves to undefined, never "".
      */
     licensePublicKey: licensingConfigDefinition.publicKey,
   },
   /**
-   * The Stripe secret the monthly usage report is sent with.
-   *
-   * Optional in exactly the way the application's own environment schema has
-   * it, and read from the same variable. A self-hosted worker composes no
-   * sender and never asks for one; a SaaS worker resolves one and refuses to
-   * compose without a key, which is the refusal the App already makes at
-   * `AppStripeRuntime.create`. A SaaS process that metered without a sender
-   * would count every billable event correctly and report none of them.
+   * Optional as the app's schema is: a self-hosted worker composes no
+   * sender, a SaaS worker refuses to compose without a key — matching
+   * `AppStripeRuntime.create`.
    */
   stripe: {
     secretKey: Config.secret({ optional: true, env: "STRIPE_SECRET_KEY" }),
   },
   /**
-   * The PostHog project this deployment's product analytics belong to.
-   *
-   * Both variables are the application's own spelling and its own parse
-   * (`POSTHOG_KEY` and `POSTHOG_HOST` in `platform/app/src/env-create.mjs`, each
-   * `z.string().optional()`), because the ingest path's one product event —
-   * `first_trace_integrated`, the terminal step of the onboarding funnel — is
-   * emitted by whichever graph owns the trace pipeline, and the funnel is one
-   * funnel. A worker pointed at a different project would file the milestone
-   * where nobody reads it, and a worker holding no key at all would undercount
-   * the funnel on the deployment that paid for the analytics.
-   *
-   * `Config.value` rather than `Config.secret` on BOTH counts. A PostHog
-   * project key is write-only and already public — `apps/ui` serves it to the
-   * browser as public configuration — so it is not a secret; and
-   * `Config.secret` is `z.string().min(1)`, which REFUSES `POSTHOG_KEY=` where
-   * the application accepts it and quietly runs without analytics. A worker
-   * that would not boot on an environment its twin boots on is the drift.
-   *
-   * `host` has NO default here because it has none there: the application
-   * passes `env.POSTHOG_HOST` straight into the client, so an unset variable
-   * means the vendor's own default on both sides. Inventing one here would be
-   * a second answer to which region the events land in.
-   */
-  /**
-   * What the operational loops this process owns are told about the install.
-   *
-   * `INSTALL_METHOD` and `DISABLE_USAGE_STATS` are the two the anonymous daily
-   * telemetry reads, at the same spelling and the same one-or-true rule the
-   * application read them with — a self-hosted operator who turned the report
-   * off on one tier must not find it back on from another.
+   * PostHog vars read at the app's spelling since both graphs feed one
+   * `first_trace_integrated` funnel; not secrets, hence `Config.value`.
+   * Ops vars (`INSTALL_METHOD`, `DISABLE_USAGE_STATS`) match the app too.
    */
   ops: {
     disableUsageStats: Config.value(environmentOneOrTrueSchema, {
@@ -179,83 +123,24 @@ export const workerConfigDefinition = RuntimeConfig.define({
     host: Config.value(optionalEnvironmentString, { env: "POSTHOG_HOST" }),
   },
   /**
-   * The one outbound mail gateway this process sends through.
-   *
-   * Every variable below is the application's own spelling
-   * (`platform/app/src/runtime/app/mailer.private-config.ts`), because both
-   * graphs still send while the pipelines are twinned: a reminder that left
-   * this process from a different sender domain than the same reminder leaving
-   * the App would fail one deployment's SPF and pass the other's, and the half
-   * that failed is the half nobody is watching.
-   *
-   * `BASE_HOST` is what makes the whole leaf resolvable or not. Every mail this
-   * process sends carries a link back to the deployment, and the sender address
-   * a deployment did not name is derived from the same host — so a worker
-   * without it cannot compose a delivery capability at all, rather than
-   * composing one that sends mail nobody can act on. What that absence costs is
-   * decided by the graph, not here: see `resolveWorkerMailConfig`.
-   *
-   * The gateway settings themselves stay optional. A deployment with no email
-   * provider configured is an ordinary self-hosted install: it composes, mounts
-   * every pipeline, and fails at the moment of a send, which the notification
-   * fan-outs survive because the durable fact is the request and never the
-   * courtesy.
+   * App's own spelling (`mailer.private-config.ts`): mismatched sender
+   * domains fail SPF on one side only. `BASE_HOST` is load-bearing — see
+   * `resolveWorkerMailConfig` for what its absence refuses.
    */
   mail: {
     baseHost: Config.value(optionalEnvironmentString, { env: "BASE_HOST" }),
     ...mailConfigDefinition,
   },
   /**
-   * What the graph-alert half of Automation needs that is not a transport.
-   *
-   * The two ceilings are read from the application's own variables, with the
-   * application's own defaults, because both graphs count into ONE Redis
-   * keyspace while the pipelines are twinned: two processes with different
-   * hourly ceilings for the same automation would let the higher one spend the
-   * budget the lower one was protecting, and the customer would see a burst
-   * from one pod and silence from the next.
-   *
-   * `credentialsEncryptionKey` is the at-rest key a stored Slack bot token and
-   * a stored webhook secret were written under, read with the application's own
-   * precedence (`CREDENTIALS_SECRET`, then `NEXTAUTH_SECRET`) — the same pair
-   * the API executable resolves. A process holding the wrong one composes
-   * perfectly and then fails to decrypt the first credential it needs, which is
-   * why it is resolved at boot rather than at the first alert.
-   */
-  /**
-   * The application's `NEXTAUTH_SECRET`, which two unrelated things still rest
-   * on and which is therefore read once, here, rather than twice under the
-   * names of its uses.
-   *
-   * It SIGNS every unsubscribe footer link (ADR-031) — a link this process
-   * mints is verified months later by the application's public `/unsubscribe`
-   * route, out of somebody's inbox, so a second key would 404 every link the
-   * other half signed — and it is the ENCRYPTION key stored automation
-   * credentials fall back to when `CREDENTIALS_SECRET` is absent, because
-   * `platform/app/src/utils/encryption.ts` reads the pair in that order and
-   * the rows were written by whichever it found.
-   *
-   * The legacy empty-string value is kept as the application keeps it: the
-   * token signer refuses an empty key at the security boundary, while the
-   * no-reply tag deliberately degrades instead.
+   * Automation ceilings: app's own vars/defaults, since both graphs share
+   * one Redis keyspace. `nextauthSecret` below signs unsubscribe links
+   * (ADR-031) AND is the `CREDENTIALS_SECRET` fallback (ADR-027 order).
    */
   nextauthSecret: Config.value(optionalEnvironmentString, { env: "NEXTAUTH_SECRET" }),
   /**
-   * The two AuthZ switches, read raw and interpreted below.
-   *
-   * Read at the API tier's exact spellings and with its exact rule, because
-   * both answer a question that must have ONE answer across the fleet.
-   * `AUTHZ_EPOCH_CACHE` is a legacy opt-in the platform app reads as "1 or
-   * true, anything else off", and two processes disagreeing about whether a
-   * permission read may be served from the epoch cache is worse than either
-   * answer. `DEMO_PROJECT_ID` names the one project everybody may read; blank
-   * is not a project id, so a blank export means no demo project rather than a
-   * project whose id is the empty string — a filter on `""` widens rather than
-   * narrows.
-   *
-   * The demo project's OWNING user is deliberately not read here. It is
-   * attribution for work the demo project does on a request path, and this
-   * process serves none.
+   * Both switches at the API tier's exact spelling/rule — one deployment
+   * needs one answer. `DEMO_PROJECT_ID` blank means no demo project, never
+   * a project id of "" (a blank filter widens rather than narrows).
    */
   authz: { ...authzConfigDefinition },
   automation: {
@@ -267,20 +152,9 @@ export const workerConfigDefinition = RuntimeConfig.define({
     }),
     credentialsEncryptionKey: Config.secret({ optional: true, env: "CREDENTIALS_SECRET" }),
     /**
-     * The daily ceiling on CONFIRMED persist-class matches, per project.
-     *
-     * Three numbers rather than one because the tier comes from the
-     * organization's active plan, which this process now resolves for itself
-     * whenever it opened a typed Prisma client. A graph without one settles on
-     * the paid number and says so by name.
-     *
-     * **The defaults are the interactive process's own numbers**, because the
-     * ceiling is a FLEET fact and the customer reads it from the other half:
-     * `automation.persistCapUsage` answers the automations screen with the cap
-     * this project resolves to, and a worker enforcing a different one either
-     * skips matches the screen said were allowed or lets through matches it
-     * said were not. They stayed 100/1000/10000 for as long as the ceiling here
-     * was a flat fallback nobody could compare against.
+     * All three carried though only one tier is used, since the tier is
+     * resolved per-project. Defaults match `automation.persistCapUsage`,
+     * which the automations screen reports back to the customer.
      */
     persistDailyCapFree: Config.value(z.coerce.number().int().positive().default(50), {
       env: "TRIGGER_PERSIST_DAILY_CAP_FREE",
@@ -293,23 +167,9 @@ export const workerConfigDefinition = RuntimeConfig.define({
     }),
   },
   /**
-   * What the trace, log and metric ingestion paths need to redact personal
-   * data, read from the application's own four variables.
-   *
-   * These four decide WHETHER content is scrubbed and BY WHAT, so a process
-   * holding a different answer than the one beside it does not fail — it
-   * stores the span with the personal data still in it. `LANGEVALS_ENDPOINT`
-   * absent means the strict analyzer cannot run at all, which is fatal in
-   * production and a marked-incomplete span everywhere else;
-   * `LANGWATCH_DATA_PRIVACY_ENFORCEMENT=off` is the kill switch that sends
-   * every span down the analysis-service path with no native floor;
-   * `LANGWATCH_DISABLE_GOOGLE_DLP` and `GOOGLE_APPLICATION_CREDENTIALS`
-   * together decide whether the DLP fallback exists when Presidio is down.
-   *
-   * The credentials are carried as the raw document, unparsed, exactly as the
-   * application carries them: `resolveWorkerTracePrivacyConfig` owns the parse
-   * and keeps the application's deliberate behaviour of leaving DLP
-   * unavailable after invalid JSON rather than failing an unrelated boot.
+   * Same four vars the app reads for redaction; missing `LANGEVALS_ENDPOINT`
+   * is fatal in production. Credentials carried raw/unparsed — the parse
+   * and its degrade-on-invalid-JSON behaviour live in `resolveWorkerTracePrivacyConfig`.
    */
   tracePrivacy: {
     googleApplicationCredentials: Config.secret({
@@ -317,12 +177,9 @@ export const workerConfigDefinition = RuntimeConfig.define({
       env: "GOOGLE_APPLICATION_CREDENTIALS",
     }),
     /**
-     * Carried as the application carries it — a raw boolean-or-string, not a
-     * parsed boolean. `environmentBooleanSchema` would disagree with the
-     * application twice: it reads `"1"` as true, which the application reads
-     * as false, and it REFUSES any other spelling, which would turn
-     * `LANGWATCH_DISABLE_GOOGLE_DLP=yes` from "DLP stays available" into a
-     * process that will not boot.
+     * Raw boolean-or-string, not parsed: `environmentBooleanSchema` reads
+     * "1" as true (app reads it false) and refuses any other spelling,
+     * which would stop this process booting where the app just proceeds.
      */
     googleDlpDisabled: Config.value(z.union([z.boolean(), z.string()]).optional(), {
       env: "LANGWATCH_DISABLE_GOOGLE_DLP",
@@ -335,19 +192,9 @@ export const workerConfigDefinition = RuntimeConfig.define({
     }),
   },
   /**
-   * Where this process finds the BPE tables it counts tokens with, and how long
-   * it will wait to fetch one it has not got.
-   *
-   * The App reads these two in the same projection as the four privacy
-   * variables (`platform/app/src/runtime/trace-privacy.config.ts`), but they
-   * decide a different thing — whether a span that arrived without usage
-   * attributes gets estimated ones — so they are their own leaf here.
-   *
-   * The timeout is carried as a raw string-or-number, not a coerced number.
-   * `z.coerce.number()` refuses `TIKTOKEN_FETCH_TIMEOUT_MS=10s`, where the App
-   * reads it as 10 through `Number.parseInt` and carries on; and it accepts
-   * `-1`, where the App falls back to the default. `resolveWorkerTraceTokenizerConfig`
-   * owns the parse so both processes wait the same number of milliseconds.
+   * Decides something different from the four privacy vars it's projected
+   * alongside (estimating usage for spans that arrived without it). Timeout
+   * carried raw: `z.coerce.number()` would reject "10s", where the app parses it as 10.
    */
   tokenizer: {
     bpeDirectory: Config.value(optionalEnvironmentString, { env: "TIKTOKENS_PATH" }),
@@ -356,12 +203,9 @@ export const workerConfigDefinition = RuntimeConfig.define({
     }),
   },
   /**
-   * The two unsafe opt-ins the webhook endpoint policy reads.
-   *
-   * Both default OFF and both are read at the App's own spellings, because
-   * they decide what a customer is ALLOWED to point an endpoint at: a
-   * deployment that answered differently in the two processes would accept an
-   * endpoint through one surface and refuse to deliver it from the other.
+   * Both default OFF, read at the app's spelling: these gate what a
+   * customer is ALLOWED to point an endpoint at, so disagreement here
+   * means one surface accepts an endpoint the other refuses to deliver.
    */
   webhooks: {
     allowInsecureLocalUrls: Config.value(optionalEnvironmentString, {
@@ -372,27 +216,18 @@ export const workerConfigDefinition = RuntimeConfig.define({
     }),
   },
   /**
-   * Where this process reaches the Langy agent manager, and the secret it
-   * presents to it.
-   *
-   * Read from the App's own two variables, and refused TOGETHER the way
-   * `resolveLangyWorkerConfig` refuses them: a URL without a secret dispatches
-   * every turn unauthenticated, and a secret without a URL dispatches nowhere.
-   * Both absent is a deployment that runs no agent manager, which is a named
-   * absence rather than a failure.
+   * URL and secret are refused TOGETHER, as `resolveLangyWorkerConfig`
+   * refuses them: a URL alone dispatches unauthenticated, a secret alone
+   * dispatches nowhere. Both absent is a valid "no agent manager" deployment.
    */
   langy: {
     agentUrl: Config.value(optionalEnvironmentString, { env: "OPENCODE_AGENT_URL" }),
     internalSecret: Config.secret({ optional: true, env: "LANGY_INTERNAL_SECRET" }),
   },
   /**
-   * The AI Gateway knobs this process resolves for the pipelines it consumes.
-   *
-   * The raw string is carried rather than a number: `settlementGraceMs` in
-   * `@langwatch/gateway-server` owns the parse, its bound and the warning it
-   * logs, and the REST settlement policy the App serves calls the same
-   * function on the same variable. Parsing here as well is how the two ends of
-   * one grace window drift apart.
+   * Carried raw (not a number): `settlementGraceMs` in
+   * `@langwatch/gateway-server` owns the parse, bound and warning — the
+   * same function the REST settlement policy calls on the same variable.
    */
   gateway: {
     spendSettlementGraceMs: Config.value(optionalEnvironmentString, {
@@ -400,35 +235,25 @@ export const workerConfigDefinition = RuntimeConfig.define({
     }),
   },
   /**
-   * How many ordered lanes the metric and log command paths spread across.
-   *
-   * Read from the same two variables the App reads, and resolved by the same
-   * two functions, because the App produces into these pipelines while this
-   * process consumes them: two graphs that clamped a lane count differently
-   * would put one point's command and its retry on different lanes.
+   * Same vars/functions the app reads, since the app produces into these
+   * pipelines while this process consumes them — a differently-clamped
+   * lane count would split a command from its own retry.
    */
   processing: {
     metricShards: Config.value(optionalEnvironmentString, { env: "METRIC_PROCESSING_SHARDS" }),
     logShards: Config.value(optionalEnvironmentString, { env: "LOG_PROCESSING_SHARDS" }),
     /**
-     * How many GroupQueue lanes a hot trace's `recordSpan` commands spread
-     * across. Read from the variable the App already reads: producer and
-     * consumer must clamp the lane count identically or a span is staged onto a
-     * group nothing claims.
+     * Same var the app reads: producer and consumer must clamp the lane
+     * count identically or a span lands on a group nothing claims.
      */
     traceSpanShards: Config.value(optionalEnvironmentString, {
       env: "TRACE_SPAN_PROCESSING_SHARDS",
     }),
   },
   /**
-   * The Eventing fold cache's consistency TTL (ADR-066).
-   *
-   * Read from the same variable the App reads. The App still produces into the
-   * pipelines this process folds, and both graphs cache one Redis keyspace, so
-   * two TTLs would expire each other's entries early — and a fold-cache miss is
-   * treated as authoritative, which makes an early expiry a stale read rather
-   * than an error. An unparseable value is no value: the store's own default
-   * already sits at the replication-lag floor, and it clamps anything below it.
+   * ADR-066. Same var the app reads: both graphs cache one Redis keyspace,
+   * so a different TTL expires the other's entries early, and a fold-cache
+   * miss is treated as authoritative. Unparseable falls back to the store's floor.
    */
   eventing: {
     foldCacheTtlSeconds: Config.value(
@@ -445,23 +270,17 @@ export const workerConfigDefinition = RuntimeConfig.define({
     ),
   },
   /**
-   * The worker's one HTTP listener, and the bearer gate in front of it.
-   *
-   * Read at the application's own spellings and defaulted to the same port
-   * (2999), because the chart's `startupProbe` and `livenessProbe` already
-   * name it: a worker that listened elsewhere would be restarted by the
-   * kubelet on every rollout.
+   * App's spelling, port 2999 default: the chart's startupProbe/
+   * livenessProbe name this port, so listening elsewhere gets the pod
+   * restarted by the kubelet on every rollout.
    */
   liveness: {
     metricsPort: Config.value(optionalEnvironmentString, { env: "WORKER_METRICS_PORT" }),
     metricsToken: Config.secret({ optional: true, env: "METRICS_API_KEY" }),
   },
   /**
-   * The fallback retention for event rows whose tenant declares no override.
-   *
-   * The same variable the application reads, and the same platform default
-   * when it is unset: the two graphs stamp rows in one ClickHouse, so a
-   * worker with a different default would expire a tenant's events early.
+   * Same var/default the app reads: both graphs stamp rows in one
+   * ClickHouse, so a different default here expires a tenant's events early.
    */
   retention: {
     defaultDays: Config.value(optionalEnvironmentString, {
@@ -470,20 +289,14 @@ export const workerConfigDefinition = RuntimeConfig.define({
   },
   infrastructure: {
     /**
-     * The one Postgres connection this process opens.
-     *
-     * Read at the application's own spelling, because the process store, every
-     * ledger head and every read-side repository in this process live in the
-     * same database the control plane writes.
+     * App's own spelling: the process store, every ledger head and every
+     * read-side repository live in the database the control plane writes.
      */
     database: { ...postgresConfigDefinition },
     /**
-     * The event store's endpoint, plus the per-organization private routes.
-     *
-     * The routes are read off the raw environment rather than declared as
-     * leaves: their names carry the organization id
-     * (`CLICKHOUSE_URL__<label>__<organizationId>`), so there is no fixed set
-     * to declare and the shared parser is what both processes read them with.
+     * Event store endpoint plus per-org private routes. Routes are read off
+     * the raw environment (names carry the org id,
+     * `CLICKHOUSE_URL__<label>__<organizationId>`) via the shared parser.
      */
     clickhouse: { ...clickhouseConfigDefinition },
     redis: { ...redisConfigDefinition },
@@ -491,19 +304,9 @@ export const workerConfigDefinition = RuntimeConfig.define({
     storage: {
       ...objectStorageConfigDefinition,
       /**
-       * The operator's assertion that the Azure container reaps orphaned trace
-       * spool objects.
-       *
-       * Read through `environmentOneOrTrueSchema` because that is exactly how
-       * the App reads it (`"1"` or a case-insensitive `"true"`, and nothing
-       * else). `environmentBooleanSchema` would disagree twice: it refuses
-       * `TRUE`, which the App accepts, and it refuses every other spelling
-       * outright, so `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED=yes` would stop this
-       * process booting where the App reads it as "not confirmed" and carries
-       * on. Both disagreements are silent in the direction that matters: a
-       * process that reads the assertion differently from its twin either
-       * writes spool objects nothing will ever reap, or refuses to write them
-       * and quietly ingests every oversized span inline.
+       * Read via `environmentOneOrTrueSchema`, matching the App exactly
+       * ("1" or case-insensitive "true", nothing else) — disagreement either
+       * writes spool objects nothing reaps, or ingests oversized spans inline.
        */
       azureSpoolRetentionConfirmed: Config.value(environmentOneOrTrueSchema, {
         env: "AZURE_BLOB_SPOOL_RETENTION_CONFIRMED",
@@ -515,44 +318,9 @@ export const workerConfigDefinition = RuntimeConfig.define({
       noProxy: Config.value(optionalProxyValue, { env: "NO_PROXY" }),
     },
     /**
-     * The address policy an outbound model-provider credential probe is judged
-     * by.
-     *
-     * These two are the whole of what the model gateway needs from the
-     * environment that this module does not already read. The other three
-     * inputs are projections rather than new leaves, and each is a deliberate
-     * refusal to declare a twin:
-     *
-     *   isSaas          `deployment.saas`, already read from `IS_SAAS` through
-     *                   the same one-or-true schema the App reads it with. A
-     *                   second leaf over one variable is how two answers to
-     *                   "is this the hosted install" get into one process, and
-     *                   that answer decides whether a SYSTEM provider is
-     *                   switched on for every project.
-     *   cipher key      `automation.credentialsEncryptionKey`, which already
-     *                   resolves `CREDENTIALS_SECRET` then `NEXTAUTH_SECRET`
-     *                   in the App's own order. A provider credential is
-     *                   written by whichever tier the customer saved it on and
-     *                   read back by the other, so a second key here would
-     *                   report every configured provider as unusable.
-     *   environment     the raw string bag, resolved below. WHICH variable
-     *                   carries a provider's key is the provider registry's
-     *                   business; whether this deployment set it is the
-     *                   environment's.
-     *
-     * An unset allowlist is an empty one rather than a wildcard: a wildcard
-     * read out of an absent variable is how a fence stops fencing without
-     * anyone deciding it should. Both are read exactly as `apps/api` reads
-     * them, because a probe answered differently by the two tiers is a
-     * credential that saves on one screen and fails on the other.
-     */
-    /**
-     * What a prepared simulation child is booted with.
-     *
-     * One leaf only: the endpoint the child reports its own run events to is
-     * `observability.endpoint`, already read once for this process's own
-     * exporter, and a second leaf over one variable is how two answers to
-     * "where does this deployment collect telemetry" get into one process.
+     * Only two new leaves; three more inputs are deliberate projections of
+     * existing ones (`deployment.saas`, `automation.credentialsEncryptionKey`)
+     * so a credential fence never disagrees between App and worker.
      */
     execution: {
       defaultModel: Config.value(optionalEnvironmentString, {
@@ -561,13 +329,10 @@ export const workerConfigDefinition = RuntimeConfig.define({
     },
     modelProvider: {
       ...egressConfigDefinition,
-      // Where the OpenAI-compatible execution proxy answers. The SAME variable
-      // `apps/api` resolves its authoring model handles through, because a
-      // model call this process makes and a model call that one makes must
-      // reach one engine — two addresses would bill two different proxies for
-      // one project's key. Optional: a deployment that named no engine
-      // composes no execution handle and every model CALL this process would
-      // make is absent by name, while every provider READ still answers.
+      // Same variable `apps/api` resolves its authoring model handles
+      // through — two addresses would bill two different proxies for one
+      // project's key. Unset: no execution handle, but provider READS
+      // still work.
       nlpServiceUrl: Config.value(optionalEnvironmentString, {
         env: "LANGWATCH_NLP_SERVICE",
       }),
@@ -584,12 +349,9 @@ export type WorkerOutboundProxyConfig = Readonly<{
 }>;
 
 /**
- * One organization's own S3, for a deployment that routes some tenants to
- * their own bucket rather than the shared one (BYOC).
- *
- * Every field is required together, because a half-configured route is worse
- * than none: a bucket without credentials would fall back to the shared
- * identity and write one tenant's objects into another tenant's account.
+ * One organization's own S3 (BYOC). All fields required together — a
+ * half-configured route would fall back to the shared identity and write
+ * one tenant's objects into another tenant's account.
  */
 export type WorkerDataplaneS3Config = Readonly<{
   endpoint: string;
@@ -629,24 +391,16 @@ export type WorkerStorageConfig = Readonly<{
     }>;
   }>;
   /**
-   * Organization id to that organization's own S3, keyed exactly as the
-   * application keys it.
-   *
-   * Read here rather than declared as one variable per tenant because the
-   * names carry the data: `DATAPLANE_S3__<label>__<organizationId>`. A process
-   * that did not read them would resolve every project to the shared bucket
-   * and write a BYOC customer's objects into the wrong account — silently, and
-   * for as long as it ran.
+   * Org id -> that org's own S3, keyed as the app keys it
+   * (`DATAPLANE_S3__<label>__<organizationId>`) — read here rather than
+   * declared per-tenant since there's no fixed set to declare.
    */
   dataplaneS3: ReadonlyMap<string, WorkerDataplaneS3Config>;
 }>;
 
 /**
- * The two deployment facts a prepared scenario run carries into its child.
- *
- * `langwatchEndpoint` is where the child reports its own scenario events —
- * this deployment's ingestion origin rather than the SDK default, which is
- * somebody else's deployment.
+ * `langwatchEndpoint` is where a prepared scenario child reports its own
+ * run events — this deployment's ingestion origin, not the SDK default.
  */
 export type WorkerExecutionConfig = Readonly<{
   langwatchEndpoint: string | undefined;
@@ -654,11 +408,9 @@ export type WorkerExecutionConfig = Readonly<{
 }>;
 
 /**
- * The operational loops' own configuration.
- *
- * `usageStats.disabled` folds `IS_SAAS` in, because the hosted product reports
- * its own usage through a different path entirely and a second sender there
- * would double-count every organization.
+ * `usageStats.disabled` folds in `IS_SAAS`: the hosted product reports
+ * its own usage through a different path, so a second sender there would
+ * double-count every organization.
  */
 export type WorkerOpsConfig = Readonly<{
   usageStats: Readonly<{
@@ -683,35 +435,23 @@ export type WorkerInfrastructureConfig = Readonly<{
 }>;
 
 /**
- * What the model gateway was told about this deployment.
- *
- * `isSaas` is deliberately NOT here: it is `deployment.saas`, and the gateway
- * composition reads it from there so one variable keeps one meaning across
- * this process. What is here is the fence a credential probe is judged by,
- * plus the environment bag a SYSTEM provider's credential and a managed
- * organization's Bedrock configuration are read out of.
+ * `isSaas` deliberately absent: it's `deployment.saas`, read there so one
+ * variable keeps one meaning. What's here: the address fence a credential
+ * probe is judged by, plus the env bag providers/Bedrock read keys from.
  */
 export type WorkerModelProviderConfig = Readonly<{
   blockLocalHttpCalls: boolean;
   allowedProxyHosts: readonly string[];
   /**
-   * The NLP engine's address, or nothing where the deployment named none.
-   *
-   * The address rather than the proxy PATH: the path belongs to the workflow
-   * feature and the composition root joins the two, which is what keeps this
-   * module the process's only environment reader without it also owning a
-   * route another package defines.
+   * The engine address, not the proxy path (that's the workflow feature's;
+   * the composition root joins them) — keeps this module the process's
+   * only environment reader.
    */
   nlpServiceUrl: string | undefined;
   /**
-   * The process environment the provider registry resolves a system
-   * credential from.
-   *
-   * A map rather than named leaves, and it is the one place in this config
-   * where that is right: sixteen providers each with their own `apiKey` and
-   * optional `endpointKey`, plus custom providers naming keys no schema here
-   * could enumerate. Reading it here rather than at the gateway is what keeps
-   * this module the process's only environment reader.
+   * Raw env bag rather than named leaves on purpose: sixteen providers each
+   * with their own keys, plus custom providers naming keys no schema here
+   * could enumerate. Read here to keep this module the only env reader.
    */
   environment: Readonly<Record<string, string | undefined>>;
 }>;
@@ -768,12 +508,9 @@ export type WorkerStripeConfig = Readonly<{
 }>;
 
 /**
- * Everything one process needs to send mail, or nothing at all.
- *
- * `baseHost` rides alongside the gateway configuration rather than inside it
- * because the two answer different questions: the gateway decides how a message
- * leaves, the host decides what the message can link to. A notifier needs both,
- * and neither is derivable from the other.
+ * `baseHost` sits beside the gateway rather than inside it: the gateway
+ * decides how a message leaves, the host decides what it can link to —
+ * neither is derivable from the other.
  */
 export type WorkerMailConfig = Readonly<{
   baseHost: string;
@@ -789,12 +526,9 @@ export type WorkerAutomationConfig = Readonly<{
   /** Absent on a deployment that stored no encrypted automation credentials. */
   credentialsEncryptionKey?: string;
   /**
-   * The three daily persist ceilings, by plan tier.
-   *
-   * All three are carried even though this process settles on the paid one:
-   * the tier is chosen by an entitlement provider it does not compose, and
-   * carrying only the number in use would hide from a reader that the choice
-   * exists at all.
+   * All three carried even though only one is used: the tier is chosen by
+   * an entitlement provider this process doesn't compose, and hiding the
+   * unused numbers would hide that the choice exists.
    */
   persistDailyCapFree: number;
   persistDailyCapPaid: number;
@@ -802,12 +536,9 @@ export type WorkerAutomationConfig = Readonly<{
 }>;
 
 /**
- * The Google DLP service-account document, narrowed to the one field the
- * client cannot be built without.
- *
- * `passthrough` on purpose: the whole document is handed to the SDK, and
- * dropping the private key while keeping the project id would produce a client
- * that constructs and then fails to authenticate.
+ * Narrowed to the one required field. `.passthrough()` on purpose: the
+ * whole document goes to the SDK, and dropping the key while keeping
+ * `project_id` would build a client that authenticates with nothing.
  */
 const googleDlpCredentialsSchema = z.object({ project_id: z.string().trim().min(1) }).passthrough();
 
@@ -818,11 +549,9 @@ export type GoogleDlpCredentialsFailure =
   | Readonly<{ reason: "missing-project-id"; error: z.ZodError }>;
 
 /**
- * The privacy knobs this process ingests under, projected the way
- * `platform/app/src/runtime/trace-privacy.config.ts` projects the same four
- * variables. `presidio.timeoutMs` is the application's own constant rather
- * than a fifth variable: neither graph reads it from the environment, and a
- * second spelling would be a knob nobody sets and nobody notices.
+ * Projected the way `trace-privacy.config.ts` projects the same four vars.
+ * `presidio.timeoutMs` is the app's own constant, not a fifth variable —
+ * neither graph reads a timeout from the environment.
  */
 export type WorkerTracePrivacyConfig = Readonly<{
   googleDlp: Readonly<{
@@ -845,13 +574,9 @@ export type WorkerTraceTokenizerConfig = Readonly<{
 }>;
 
 /**
- * The application's default and its parse, both.
- *
- * `Number.parseInt` on a non-numeric string yields NaN and on `"10s"` yields
- * 10; anything not finite or not positive falls back. Copied rather than
- * tightened: a process that refused a value its twin accepts would not boot,
- * and one that accepted a value its twin rejects would wait a different time
- * for the same download.
+ * Copied from the app rather than tightened: a stricter parse here would
+ * refuse a value the app accepts (booting one twin and not the other),
+ * and a looser one would wait a different time for the same download.
  */
 const DEFAULT_TIKTOKEN_FETCH_TIMEOUT_MS = 10_000;
 
@@ -868,11 +593,8 @@ export function resolveWorkerTraceTokenizerConfig(
 }
 
 /**
- * The PostHog project the ingest path's one product event is captured into.
- *
- * Both absent is a supported deployment and not a degraded one: it is the
- * application's own behaviour when `POSTHOG_KEY` is unset, and it means this
- * install chose not to run product analytics.
+ * Both absent is a supported deployment, not a degraded one — it mirrors
+ * the app's own behaviour when `POSTHOG_KEY` is unset (no analytics).
  */
 export type WorkerProductAnalyticsConfig = Readonly<{
   key?: string;
@@ -880,11 +602,8 @@ export type WorkerProductAnalyticsConfig = Readonly<{
 }>;
 
 /**
- * The webhook endpoint policy's two unsafe opt-ins, as booleans.
- *
- * `"1"` and nothing else, which is the App's own reading: it compares the raw
- * variable to the string `"1"`, so `true`, `yes` and `TRUE` all mean off on
- * both sides.
+ * "1" and nothing else — the app's own reading (compares raw value to
+ * the string "1"), so `true`/`yes`/`TRUE` all mean off on both sides.
  */
 export type WorkerWebhookConfig = Readonly<{
   allowInsecureLocalUrls: boolean;
@@ -892,12 +611,9 @@ export type WorkerWebhookConfig = Readonly<{
 }>;
 
 /**
- * Where the Langy conversation pipeline dispatches a turn.
- *
- * Absent exactly when this deployment named neither variable. The pipeline
- * still mounts without it — a turn dispatched into no manager is answered
- * `unavailable`, which the process manager already treats as a failed turn
- * rather than a lost one.
+ * Absent exactly when neither variable is named. The pipeline still
+ * mounts without it: a turn dispatched into no manager answers
+ * `unavailable`, already treated as a failed (not lost) turn.
  */
 export type WorkerLangyConfig = Readonly<{
   agentUrl: string;
@@ -917,11 +633,8 @@ export type WorkerGithubConfig = Readonly<{
 }>;
 
 /**
- * The AuthZ decisions this process was configured with, already interpreted.
- *
- * The same two fields `apps/api` projects, resolved from the same variables by
- * the same rule: one deployment, one answer to whether the epoch cache is on
- * and which project is the demo.
+ * Same two fields `apps/api` projects, from the same vars by the same
+ * rule — one deployment, one answer for the epoch cache and demo project.
  */
 export type WorkerAuthzConfig = Readonly<{
   /** Whether an organization's permission reads may be served from the epoch cache. */
@@ -939,12 +652,9 @@ export type WorkerConfig = Readonly<{
   logger: WorkerConfigProjection["logger"];
   observability: WorkerConfigProjection["observability"];
   /**
-   * Where this process pushes its own metrics, if it was told to push any.
-   *
-   * This process serves an empty Prometheus exposition on purpose — every
-   * series it records goes out over OTLP — so until something starts this
-   * export the worker's instruments write into a no-op meter and its metrics
-   * exist nowhere at all.
+   * This process serves an empty Prometheus exposition — every series
+   * goes out over OTLP — so until an exporter is wired, its instruments
+   * write into a no-op meter and the metrics exist nowhere.
    */
   otlpMetrics: OtlpMetricsExportOptions;
   shutdown: WorkerShutdownConfig;
@@ -955,12 +665,9 @@ export type WorkerConfig = Readonly<{
   authz: WorkerAuthzConfig;
   tracePrivacy: WorkerTracePrivacyConfig;
   /**
-   * Where the evaluator service answers, for the callers that are not privacy.
-   *
-   * The SAME `LANGEVALS_ENDPOINT` the privacy projection reads, projected a
-   * second time rather than read a second time: one variable names one
-   * service, and two leaves over it could be answered differently by a future
-   * default. Topic clustering posts its pages here.
+   * Projects the SAME `LANGEVALS_ENDPOINT` the privacy block also reads,
+   * a second time rather than reusing it: two leaves over one variable
+   * risk a future default answering the question differently.
    */
   langevals: Readonly<{ endpoint: string | undefined }>;
   tokenizer: WorkerTraceTokenizerConfig;
@@ -979,14 +686,9 @@ export type WorkerConfig = Readonly<{
   eventing: WorkerEventingConfig;
   infrastructure: WorkerInfrastructureConfig;
   /**
-   * The flag overrides this deployment set in its environment.
-   *
-   * Resolved from the raw source rather than from the projection above,
-   * because the names are the flags' own — one variable per flag plus the
-   * `FEATURE_FLAG_FORCE_ENABLE` list — and the feature owns that vocabulary.
-   * Absent variables give an empty override map, which is a deployment that
-   * runs every flag on its stored rules. No new configuration leaf: these are
-   * the same variables the application already reads.
+   * Resolved from the raw source, not the projection above: these are the
+   * flags' own vocabulary (one var per flag, plus `FEATURE_FLAG_FORCE_ENABLE`).
+   * No variable here that the app doesn't already read.
    */
   featureFlags: FeatureFlagConfig;
 }>;
@@ -1142,21 +844,9 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
 }
 
 /**
- * Refuses a boot whose telemetry exporter points back at this deployment.
- *
- * The platform process this one replaced refused `LANGWATCH_API_KEY` outright,
- * because with a key set the SDK ships the process's own operational telemetry
- * into whatever ingest it is pointed at, and that ingest was always this one:
- * a feedback loop in which every ingested span does work that emits more
- * spans. This process accepts the key on purpose — exporting to a DIFFERENT
- * LangWatch install is a supported shape — so the refusal narrowed to the one
- * case the blanket rule was protecting.
- *
- * A worker serves no listener, so the deployment's addresses are the two
- * origins it links back to. `NEXTAUTH_URL` is taken from the source rather
- * than from a projection leaf because this process consumes no such value —
- * it needs only to recognise its own front door — and a leaf nothing reads
- * would be a configuration field with no consumer.
+ * Narrows the predecessor's blanket `LANGWATCH_API_KEY` refusal to true
+ * self-ingestion only, since exporting to a DIFFERENT install is supported.
+ * `NEXTAUTH_URL` read from source to recognise this deployment's front door.
  */
 function refuseWorkerSelfIngest(
   value: WorkerConfigProjection,
@@ -1177,13 +867,8 @@ function refuseWorkerSelfIngest(
 }
 
 /**
- * The Langy agent manager's address and secret, or nothing.
- *
- * The pair is refused TOGETHER, at the App's own spelling of the refusal:
- * either both are configured or neither is. Half a pair is not a smaller
- * deployment — a URL without a secret would dispatch every turn without
- * authentication, and the manager would reject it turn by turn rather than at
- * boot.
+ * Refused TOGETHER, at the app's own spelling of the refusal: a URL
+ * without a secret would dispatch every turn unauthenticated.
  */
 function resolveWorkerLangyConfig(
   langy: WorkerConfigProjection["langy"],
@@ -1199,14 +884,9 @@ function resolveWorkerLangyConfig(
 }
 
 /**
- * The mail configuration, or nothing.
- *
- * Nothing exactly when `BASE_HOST` is absent or blank. It is the one variable
- * the whole capability rests on — the sender address is derived from it and
- * every mail links back through it — so a half-filled value would produce mail
- * addressed from a host that is not the deployment's and pointing at links
- * that are not either. What an absent capability costs is a decision for the
- * graph that would have consumed it, not for this projection.
+ * Nothing exactly when `BASE_HOST` is absent/blank — every link and the
+ * sender address derive from it. What an absent capability costs is
+ * decided by the caller, not here.
  */
 function resolveWorkerMailConfig(
   mail: WorkerConfigProjection["mail"],
@@ -1246,14 +926,9 @@ function resolveWorkerMailConfig(
 }
 
 /**
- * The automation knobs, with the credentials key resolved the way the
- * application resolves it.
- *
- * `CREDENTIALS_SECRET` first and `NEXTAUTH_SECRET` second, because that is the
- * order `platform/app/src/utils/encryption.ts` reads them in and the rows were
- * written by whichever it found. Falling back to neither is a valid
- * deployment: an install that never stored a Slack bot token or a webhook
- * secret has nothing to decrypt.
+ * `CREDENTIALS_SECRET` then `NEXTAUTH_SECRET`, matching
+ * `utils/encryption.ts`'s own order — rows were written by whichever it
+ * found. Neither present is valid: nothing was ever encrypted.
  */
 function resolveWorkerAutomationConfig(
   automation: WorkerConfigProjection["automation"],
@@ -1273,14 +948,9 @@ function resolveWorkerAutomationConfig(
 }
 
 /**
- * The privacy knobs, projected once at boot.
- *
- * Invalid service-account JSON deliberately preserves the application's
- * old unavailable-DLP behaviour rather than making an unrelated boot fail:
- * DLP is a FALLBACK for a Presidio outage, and refusing to start a worker
- * because the fallback's credentials are malformed would turn a degraded
- * path into no ingestion at all. The failure is reported to the caller so a
- * boot can log it.
+ * Invalid service-account JSON preserves the app's old degrade-to-
+ * unavailable behaviour rather than failing an unrelated boot — DLP is
+ * only a Presidio-outage fallback. Reported to the caller so a boot can log it.
  */
 export function resolveWorkerTracePrivacyConfig(
   input: {
@@ -1361,19 +1031,9 @@ function resolveWorkerShutdownConfig(input: {
 }
 
 /**
- * The per-organization S3 routes this deployment declares.
- *
- * Parsed by the shared helper rather than by a second reader here: the
- * variable NAMES carry the organization id and the declarative projection can
- * only name variables it knows in advance, so a worker that split
- * `<label>__<organizationId>` differently from the API would write a
- * customer's objects where that customer cannot read them.
- *
- * A malformed entry is skipped; a duplicate organization id is raised by the
- * helper, because two routes for one tenant is a question this process cannot
- * answer. The skipped list is dropped rather than logged because this
- * projection is pure — it runs before the process has a logger, and the API
- * reads the same variables and names them.
+ * Parsed by the shared helper, not a second reader: variable names carry
+ * the org id, so splitting them differently from the API would write a
+ * customer's objects where that customer can't read them.
  */
 export function resolveWorkerDataplaneS3Config(
   source: Readonly<Record<string, unknown>>,
@@ -1382,12 +1042,9 @@ export function resolveWorkerDataplaneS3Config(
 }
 
 /**
- * The per-organization ClickHouse endpoints this deployment declared.
- *
- * Parsed by the shared helper rather than by a second reader here: the
- * variable names carry the organization id, and a worker that split them
- * differently from the application would route one organization's folds to
- * another organization's cluster.
+ * Parsed by the shared helper: variable names carry the org id, and
+ * splitting them differently from the app would route one org's folds
+ * to another org's cluster.
  */
 function resolveWorkerPrivateClickHouseRoutes(
   source: Readonly<Record<string, unknown>>,
@@ -1402,13 +1059,8 @@ function resolveWorkerPrivateClickHouseRoutes(
 
 /** The environment bag as the shared ClickHouse helpers read it. */
 /**
- * The deployment's answers for the model gateway.
- *
- * The allowlist is split on commas and trimmed, and blank entries are dropped:
- * an empty host matches nothing useful and would otherwise sit in the list
- * looking like a rule. The flag arrived already read as `1`-or-`true`, which
- * is the App's own spelling and `apps/api`'s, so the three tiers cannot
- * disagree about whether the fence is up.
+ * Allowlist split on commas, trimmed, blanks dropped. Flag arrives
+ * pre-read as 1-or-true (App's spelling), so all three tiers agree.
  */
 function resolveWorkerModelProviderConfig(
   value: Readonly<{
@@ -1459,11 +1111,8 @@ function resolveWorkerMetricsPort(value: string | undefined): number {
 }
 
 /**
- * The platform default, unless this deployment named another.
- *
- * Unparseable is the default rather than a refusal, which is the reading the
- * application takes: a retention override is an operator convenience, and a
- * typo in it must not stop the fleet folding.
+ * Unparseable falls back to the default (not a refusal), matching the
+ * app: a typo in an operator's override must not stop the fleet folding.
  */
 function resolveWorkerRetentionDays(value: string | undefined): number {
   if (value === undefined || value === "") return PLATFORM_DEFAULT_RETENTION_DAYS;
@@ -1475,12 +1124,9 @@ function resolveWorkerRetentionDays(value: string | undefined): number {
 const BACKUP_METRICS_OFF_VALUES = new Set(["false", "0", "no", "off"]);
 
 /**
- * Whether this deployment reads `system.backup_log`.
- *
- * ON unless explicitly disabled, and only a deliberate opt-OUT stops it: the
- * gauges predate the flag and the production alerts built on them already
- * depend on them, while the deployments that emit them set nothing. Defaulting
- * to off would silently disarm live backup monitoring on the next deploy.
+ * ON unless explicitly disabled: the gauges predate this flag and
+ * production alerts already depend on them, while emitting deployments
+ * set nothing. Defaulting off would silently disarm live monitoring.
  */
 function collectsClickHouseBackupMetrics(raw: string | undefined): boolean {
   if (typeof raw !== "string") return true;

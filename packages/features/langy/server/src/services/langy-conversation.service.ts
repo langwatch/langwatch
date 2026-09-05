@@ -57,11 +57,9 @@ import type { LangyTurnOrderReader, LangyTurnSegment } from "../streaming/langy-
 export type { LangyConversationRepository as LangyConversationReadRepository } from "../repositories/langy-conversation-projection.repository";
 
 /**
- * Narrow read port over the canonical event log, for the tail read (ADR-059).
- * Structurally satisfied by `EventStore.getEventsOccurredSince` — the service
- * never sees appends, pagination internals, or other aggregates. The explicit
- * lower bound is what lets ClickHouse prune weekly partitions instead of
- * cold-scanning a long conversation's whole history on every tail fetch.
+ * Narrow read port over the canonical event log (ADR-059), satisfied by
+ * `EventStore.getEventsOccurredSince`. The explicit lower bound lets
+ * ClickHouse prune weekly partitions instead of cold-scanning the history.
  */
 export interface LangyConversationEventsReader {
   getEventsOccurredSince(
@@ -73,35 +71,23 @@ export interface LangyConversationEventsReader {
 }
 
 /**
- * Hard ceiling on one tail response. A conversation's whole event set is
- * inherently small (a turn is a handful of transitions), so a tail this long
- * means something is wrong — the client gets the truncated flag and the next
- * fetch continues from the returned cursor, and we log rather than silently
- * cap.
+ * Hard ceiling on one tail response — a conversation's whole event set is
+ * inherently small, so hitting it means something is wrong. The client gets
+ * a truncated flag and resumes from the cursor; we log rather than silently cap.
  */
 const CONVERSATION_EVENT_TAIL_LIMIT = 1_000;
 
 /**
- * How long a read will wait out the dispatch window — the gap between a
- * create command being ACCEPTED and its projection row landing.
- *
- * 1.5s was not enough. A turn that has to wake a cold worker takes far longer
- * than the projector's usual few hundred milliseconds, and the read landed a
- * beat before the row did — so the reader was told their conversation did not
- * exist, and then it did.
+ * How long a read waits out the dispatch window (accept -> projection row).
+ * 1.5s was not enough: a cold-worker wake takes longer than the projector's
+ * usual latency, so the read arrived before the row and reported false absence.
  */
 const DISPATCH_LAG_ATTEMPTS = 12;
 const DISPATCH_LAG_RETRY_MS = 400;
 /**
- * How many attempts may pass with NO pending handoff before we conclude the id
- * is simply unknown.
- *
- * It cannot be zero, which is the second half of the same bug: the handoff row
- * is written by the very dispatch we are waiting on, so a read that arrives
- * before IT lands found no evidence, took the fast path, and returned "not
- * found" without ever retrying. A couple of beats of grace is the difference
- * between "no create is in flight" and "the create is a few milliseconds
- * younger than this read".
+ * How many attempts may pass with no pending handoff before concluding the id
+ * is unknown. Cannot be zero: the handoff row is written by the dispatch
+ * itself, so an immediate read can find no evidence and wrongly return not-found.
  */
 const DISPATCH_HANDOFF_GRACE_ATTEMPTS = 3;
 
@@ -121,20 +107,15 @@ export type ConversationListItem = {
 export type ConversationDetail = ConversationListItem & {
   status: string;
   /**
-   * The turn in flight right now, or null when none is (`CurrentTurnId` on the
-   * fold — set at `agent_turn_accepted`, cleared by the turn's terminal).
-   *
-   * The durable answer to "which turn would a Stop stop?" (ADR-078). A browser
-   * tab only learns a turn id from its own send, so a turn it merely adopted —
-   * another tab's, or one rejoined after a refresh — had no id to stop with.
-   * The record has always known; nobody read it back.
+   * The turn in flight right now (`CurrentTurnId` on the fold), the durable
+   * answer to "which turn would a Stop stop?" (ADR-078) — a browser tab that
+   * merely adopted a turn (another tab's, or post-refresh) had no id to stop with.
    */
   currentTurnId: string | null;
   /**
-   * Why the last turn failed, when it did (`agent_response_failed` sets it on the
-   * fold). DURABLE, unlike the browser's `useChat` error — which is why a refresh
-   * after a failed turn used to leave the user's question sitting there with no
-   * answer and no explanation at all.
+   * Why the last turn failed (`agent_response_failed` sets it on the fold).
+   * DURABLE, unlike the browser's `useChat` error, which used to leave a
+   * refresh after a failed turn with no question, answer or explanation.
    */
   lastError: string | null;
   /**
@@ -197,10 +178,8 @@ const defaultRuntime: LangyConversationRuntime = {
 
 /**
  * Shape gate for ADOPTED conversation ids (`ensureConversation` with
- * `adoptUnknownId`). Caller-chosen ids become aggregate keys, so keep them to
- * the same alphabet our own KSUID-prefixed ids use; long enough to make
- * accidental cross-caller collisions implausible, short enough for every index
- * they land in. A scenario `threadId` (`scenariothread_<ksuid>`) fits.
+ * `adoptUnknownId`): caller-chosen ids become aggregate keys, so they must fit
+ * our KSUID-prefixed alphabet — a scenario `threadId` fits.
  */
 export const ADOPTABLE_CONVERSATION_ID = /^[A-Za-z0-9_-]{6,120}$/;
 
@@ -220,18 +199,9 @@ export class LangyConversationService {
   ) {}
 
   /**
-   * The visibility read, tolerant of the DISPATCH window.
-   *
-   * A conversation whose create was just accepted has a pending handoff —
-   * written synchronously at dispatch — before its projection row lands, so
-   * "missing row + pending handoff" means NOT YET, never "never". In that
-   * window this retries briefly instead of reporting the very lie the
-   * `getById` doc below spends three paragraphs on: the panel used to render
-   * "conversation not found" moments before the same conversation's turn was
-   * accepted. A miss with NO handoff stays an immediate not-found — an
-   * unknown id must not grow a probe-friendly delay, and the retried read
-   * still enforces visibility, so the handoff's existence never widens
-   * access.
+   * The visibility read, tolerant of the DISPATCH window: a just-accepted
+   * create has a pending handoff before its projection row lands, so "missing
+   * row + pending handoff" means NOT YET, retried briefly rather than reported as absent.
    */
   private async findVisibleToleratingDispatchLag({
     id,
@@ -273,25 +243,9 @@ export class LangyConversationService {
   }
 
   /**
-   * A conversation the caller may see.
-   *
-   * THROWS `LangyConversationNotFoundError` when there is no such conversation —
-   * it does not return null, and that is the whole point of this method's shape.
-   *
-   * The old signature returned `null` for THREE different situations: the
-   * conversation does not exist, the caller may not see it, and — the one that
-   * hid — the conversation exists but its asynchronous projection has not been
-   * written yet. Three call sites hand-rolled a 404 out of that ambiguous null, and so
-   * the live-stream routes answered 404 on the first turn of every conversation,
-   * because "not yet" and "never" were indistinguishable. Stream B never ran once.
-   *
-   * A repository saying "not found" when it means "not yet" is how a bug lives
-   * for the lifetime of a feature. So the absence is now a NAMED error, and a
-   * caller who wants to tolerate it has to say so out loud.
-   *
-   * Not-visible is reported as not-found ON PURPOSE: a conversation you may not
-   * see must not be distinguishable from one that does not exist, or the error
-   * itself becomes an existence oracle across users.
+   * A conversation the caller may see; THROWS `LangyConversationNotFoundError`
+   * rather than returning null, since the old null conflated "doesn't exist",
+   * "not visible" and "projection not written yet" — the last one hid a real bug.
    */
   async getById({
     id,
@@ -322,22 +276,9 @@ export class LangyConversationService {
   }
 
   /**
-   * The conversation's durable TURN events strictly after a cursor — the tail
-   * the browser folds locally with the shared reducer (ADR-059 §2/§3).
-   *
-   * Authorized exactly like `getById` (owner-or-shared, reported as not-found
-   * so it cannot probe), and restricted to the TURN vocabulary
-   * (`LANGY_CONVERSATION_TURN_EVENT_TYPES`): those payloads carry no
-   * server-only fields, so the wire schema is secure by construction — spine
-   * events (which carry `runToken` / handoff tokens) never enter this read.
-   *
-   * Served from a partition-pruned storage read: the cursor's `acceptedAt` is
-   * the event's ACCEPT time, storage's lower bound is on OCCURRED time, and an
-   * event accepted after the cursor may have occurred earlier (delayed relays,
-   * replays) — so the floor sits a full rehydration window below the cursor.
-   * Still strictly filtered by the shared cursor comparator in memory; the
-   * bound only exists so ClickHouse skips the weekly partitions a long
-   * conversation left behind.
+   * The conversation's durable TURN events after a cursor (ADR-059 §2/§3),
+   * authorized like `getById`, restricted to the TURN vocabulary so no
+   * server-only spine field (`runToken`, handoff tokens) ever reaches the wire.
    */
   async getEventsAfter({
     projectId,
@@ -413,12 +354,9 @@ export class LangyConversationService {
   }
 
   /**
-   * `getById`, but absence is an answer rather than an error.
-   *
-   * For the callers that genuinely want to tolerate "there is no fold yet" — the
-   * chat route's busy-guard, which asks "is a turn already running?" and for
-   * which an unprojected conversation correctly means "no". Every OTHER caller
-   * should use `getById` and let the domain error travel.
+   * `getById`, but absence is an answer, not an error — for callers that
+   * genuinely tolerate "no fold yet" (the chat route's busy-guard). Every
+   * other caller should use `getById` and let the domain error travel.
    */
   async tryFindByIdVisible({
     id,
@@ -499,18 +437,9 @@ export class LangyConversationService {
   }
 
   /**
-   * Resolve the conversation id for a chat turn. Does NOT write — the aggregate
-   * is created by the first `message_recorded`. Verifies ownership against the fold;
-   * a stale/archived/unknown id yields a fresh conversation.
-   *
-   * With `adoptUnknownId`, an id that never existed is ADOPTED — returned as a
-   * new conversation under the caller's chosen id instead of a minted one. This
-   * is how a caller that binds continuity to an externally-chosen id (a
-   * scenario run's `{{ threadId }}`, fixed once per run) gets a stable
-   * conversation across turns: turn 1 adopts, turns 2+ find it `owned`.
-   * Adoption never falls back to minting — an id that cannot be adopted
-   * (bad shape, archived collision) fails the turn loudly, because a silently
-   * minted fresh id degrades a multi-turn run to single-turn with no signal.
+   * Resolves the conversation id for a chat turn without writing (the
+   * aggregate is created by the first `message_recorded`). With
+   * `adoptUnknownId`, an unknown id is ADOPTED rather than minted, so a scenario run's fixed `threadId` gets one stable conversation across turns.
    */
   async ensureConversation({
     projectId,
@@ -552,11 +481,9 @@ export class LangyConversationService {
   }
 
   /**
-   * Explicitly create a conversation: emits `conversation_started`, seeding the
-   * owner (first-writer-wins) and an optional title before any message. Mints a
-   * fresh conversationId when none is supplied. Idempotent on the conversation
-   * (the command keys on `${tenantId}:${conversationId}:created`), so a retried
-   * create collapses to one event.
+   * Explicitly creates a conversation (`conversation_started`), seeding the
+   * owner and optional title. Idempotent on the conversation
+   * (`${tenantId}:${conversationId}:created`), so a retry collapses to one event.
    */
   async createConversation({
     projectId,
@@ -570,13 +497,9 @@ export class LangyConversationService {
     conversationId?: string;
     title?: string | null;
     /**
-     * The per-conversation runToken (see `streaming/langyFrameAuth.ts`). The caller
-     * mints it (or reuses one) and passes it so it can ALSO stash it in the turn
-     * handoff — the dispatch reads it from there, not from operational state,
-     * which may not have consumed the creation event before the first-turn
-     * dispatch intent runs.
-     * Defaults to a fresh mint when omitted. Idempotent + first-writer-wins on the
-     * fold, so a retried create collapses to one token.
+     * The per-conversation runToken (`streaming/langyFrameAuth.ts`): stashed in
+     * the turn handoff since dispatch reads it from there, not operational
+     * state, which may not have consumed the creation event yet.
      */
     runToken?: string;
   }): Promise<{ id: string }> {
@@ -594,13 +517,9 @@ export class LangyConversationService {
   }
 
   /**
-   * Branch a visible conversation into a fresh conversation owned by the
-   * caller. Shared conversations may be forked but never mutated in place.
-   *
-   * The source projection is read exactly once at command time. From there the
-   * new aggregate is self-contained: its lineage and every imported message
-   * are canonical events, so replay never needs the old projection or source
-   * conversation to still exist.
+   * Branches a visible conversation into a fresh one owned by the caller.
+   * Source projection is read once at command time; the new aggregate is
+   * self-contained, so replay never needs the source to still exist.
    */
   async forkById({
     id,
@@ -682,11 +601,9 @@ export class LangyConversationService {
   }
 
   /**
-   * The per-conversation `runToken` (see `streaming/langyFrameAuth.ts`), or null
-   * when the conversation has none (lazily created / predates the field). READ
-   * ONLY server-side: the worker-provisioning path injects it at spawn and the
-   * relay uses it to verify the worker's stream frames. It is deliberately not
-   * part of any client-facing read — the same posture as the handoff token.
+   * Per-conversation `runToken` (`streaming/langyFrameAuth.ts`), or null when
+   * none exists. READ ONLY server-side — the worker-provisioning path injects
+   * it and the relay verifies stream frames with it, same posture as the handoff token.
    */
   async tryGetRunToken({
     projectId,
@@ -699,10 +616,9 @@ export class LangyConversationService {
   }
 
   /**
-   * Record the user's message. Replaces the old separate message/activity
-   * writes: one command emits one `message_recorded` event that feeds both
-   * the conversation state (count/activity/owner/title) and the operational
-   * message projection.
+   * Records the user's message: one `message_recorded` event feeds both
+   * conversation state (count/activity/owner/title) and the operational
+   * message projection, replacing the old separate writes.
    */
   async recordUserMessage({
     projectId,
@@ -738,11 +654,9 @@ export class LangyConversationService {
   }
 
   /**
-   * Durably accept an agent turn. Returns the turnId to correlate finalize.
-   * Accepts an optional turnId so a caller can stash the out-of-band spawn
-   * handoff (ADR-044) under the same id BEFORE the `agent_turn_accepted` event is
-   * dispatched — closing the race where the process-outbox dispatch effect runs
-   * before the handoff exists.
+   * Durably accepts an agent turn; returns the turnId to correlate finalize.
+   * Accepts an optional turnId so a caller can stash the spawn handoff
+   * (ADR-044) before `agent_turn_accepted` dispatches, closing an outbox race.
    */
   async acceptTurn({
     projectId,
@@ -820,11 +734,9 @@ export class LangyConversationService {
   }
 
   /**
-   * Record a durable response milestone: a tool the agent finished running.
-   * A tool call reaches exactly one terminal — `isError` routes it to the
-   * `tool_call_failed` event (carrying `errorText`), otherwise to
-   * `tool_call_succeeded`. Both share the `tool-done:<toolCallId>` idempotency
-   * slot, so the first terminal for a call wins.
+   * Records a tool call's terminal: `isError` routes to `tool_call_failed`
+   * (carrying `errorText`), otherwise `tool_call_succeeded`. Both share the
+   * `tool-done:<toolCallId>` idempotency slot, so the first terminal wins.
    */
   async recordToolCallCompleted({
     projectId,
@@ -872,11 +784,9 @@ export class LangyConversationService {
   }
 
   /**
-   * Record a plan snapshot for the turn (a settled `todowrite` the manager typed
-   * into a `plan` frame). Snapshot-typed, last-write-wins on the turn fold — one
-   * durable `plan_updated` event per todowrite call, so the checklist survives a
-   * reload from the fold. The relay already dropped redelivered frames by nonce,
-   * so this is dispatched at-most-once per distinct snapshot.
+   * Records a plan snapshot (a settled `todowrite`). Last-write-wins on the
+   * turn fold, dispatched at-most-once per snapshot since the relay already
+   * drops redelivered frames by nonce.
    */
   async recordPlanUpdated({
     projectId,
@@ -899,10 +809,9 @@ export class LangyConversationService {
   }
 
   /**
-   * Terminal failure for a response that has no answer to carry (stalled/
-   * orphaned response drained by the liveness sweep, or drained on shutdown).
-   * Emits `agent_response_failed`, which clears the fold's CurrentTurnId and
-   * surfaces the error to the user.
+   * Terminal failure for a response with nothing to carry (stalled/orphaned,
+   * drained by the liveness sweep or on shutdown). Emits
+   * `agent_response_failed`, clearing CurrentTurnId and surfacing the error.
    */
   async failTurn({
     projectId,
@@ -925,32 +834,9 @@ export class LangyConversationService {
   }
 
   /**
-   * Ingest a turn result the agent posted directly over HTTP (the
-   * `langy-internal` durable path). This is the independent, at-least-once
-   * completion path: it survives the backend relay dropping the agent's NDJSON
-   * stream after the agent finished — the failure mode where a completed turn
-   * would otherwise stall until the liveness subscriber wrongly fails it.
-   *
-   * Idempotent on `turnId`: it dispatches the same `recordAgentResponse` /
-   * `failAgentResponse` commands the relay does, whose events carry a
-   * `turnId`-scoped idempotencyKey, so a duplicate (the relay already finalized,
-   * or the agent's bounded retry re-posted) collapses to one event at the store.
-   * Whichever path lands first wins; the other is a no-op.
-   *
-   * The agent posts a compact `{ text, toolCalls }` (success) or an error
-   * `code` (failure); part assembly and error classification happen HERE, in one
-   * place, so the durable body is identical to the relay's and never carries raw
-   * agent prose (`LastError` is a vetted domain error, rendered on history load).
-   */
-  /**
-   * True when the (projectId, conversationId, turnId) triple names a turn that
-   * was really accepted under this conversation in this project. The durable
-   * result-ingest route checks this before writing: unlike the relay (which
-   * verifies an HMAC over the conversation's runToken), that route has only
-   * the shared bearer, so without this cross-check a caller who holds the
-   * secret could forge a result into any tenant's conversation, and a benign
-   * projectId/conversationId mix-up in the multiplexing manager would write
-   * one tenant's output into another's with nothing to catch it.
+   * Ingests a turn result posted directly over HTTP — the independent,
+   * at-least-once path used when the relay's NDJSON stream dropped.
+   * Idempotent on `turnId`; also verifies the turn triple was really accepted, since this route has no HMAC, only the shared bearer.
    */
   async turnExists({
     projectId,
@@ -982,10 +868,9 @@ export class LangyConversationService {
     toolCalls?: LangyFinalToolCall[];
     errorCode?: string;
     /**
-     * The failure's typed cause chain when the manager knew it (deserialized
-     * from the wire at the boundary) — classified here so `LastError` names
-     * the REAL failure (e.g. the gateway's no_provider_configured) with the
-     * chain as reasons.
+     * The failure's typed cause chain when known (deserialized at the
+     * boundary) — classified here so `LastError` names the REAL failure (e.g.
+     * gateway's no_provider_configured) with the chain as reasons.
      */
     errorCause?: HandledError;
   }): Promise<void> {
@@ -1020,16 +905,9 @@ export class LangyConversationService {
   }
 
   /**
-   * The turn's own account of what happened when, folded off its live stream.
-   *
-   * Read here rather than by the caller because two paths finalize a turn — the
-   * relay's terminal frame and the agent's own HTTP post — and whichever lands
-   * first is the one the record keeps. Reading in one place is what makes the
-   * two produce the same parts.
-   *
-   * Best effort by design: a turn long enough to outlive its buffer, or one
-   * whose read fails, records the shape it always did rather than failing a
-   * finalize that is otherwise complete.
+   * The turn's own account of what happened, folded off its live stream. Read
+   * here since two paths finalize a turn (relay + agent HTTP post) and
+   * whichever lands first wins. Best effort: a failed read still records what it can rather than failing an otherwise-complete finalize.
    */
   private async readTurnOrder(at: {
     conversationId: string;
@@ -1066,9 +944,8 @@ export class LangyConversationService {
   }
 
   /**
-   * Persist an opaque, worker-authored resume token a turn left when it
-   * checkpointed on pod termination (ADR-048): `conversation_handoff_pending`.
-   * Clears the fold's CurrentTurnId (the turn handed off, it did not fail) and
+   * Persists an opaque worker-authored resume token left on pod termination
+   * (ADR-048, `conversation_handoff_pending`). Clears CurrentTurnId and
    * stores the token for the next turn to resume from.
    */
   async recordTurnHandoff({
@@ -1114,18 +991,9 @@ export class LangyConversationService {
   }
 
   /**
-   * Finalize an agent response: `agent_responded` carries the whole final
-   * answer as the source of truth (streamed tokens were never events). Replaces
-   * the old persistMessage(assistant) write.
-   *
-   * The messageId is DERIVED from the turnId, never minted fresh. Finalize has
-   * two independent writers by design — the live relay's final frame and the
-   * manager's durable turn-result POST — and the event store is at-least-once
-   * (its idempotency key dedups at merge time, not at write time), so both
-   * writes can land. Every layer downstream dedups on MessageId; a fresh KSUID
-   * per call gave the two writes different ids and the reply rendered twice
-   * after a reload. Same turn ⇒ same id ⇒ the duplicate collapses everywhere
-   * it lands.
+   * Finalizes an agent response (`agent_responded` carries the whole answer).
+   * messageId is DERIVED from turnId, never minted fresh: finalize has two
+   * independent writers (relay + durable POST), and a fresh KSUID per call made the reply render twice after reload.
    */
   async finalizeTurn({
     projectId,
@@ -1269,10 +1137,9 @@ export class LangyConversationService {
   }
 
   /**
-   * Adopt a caller-chosen id as a NEW conversation, or refuse loudly. The id
-   * becomes an aggregate key, so its shape is gated before anything durable is
-   * written under it. Archived is a refusal, not a resume: adopting would append
-   * fresh events to a closed aggregate.
+   * Adopts a caller-chosen id as a NEW conversation, or refuses loudly — the
+   * id becomes an aggregate key, gated before anything is written. Archived is
+   * a refusal, not a resume: adopting would append to a closed aggregate.
    */
   private static adoptConversationId(
     conversationId: string,
@@ -1290,10 +1157,9 @@ export class LangyConversationService {
   }
 
   /**
-   * The assistant message id for a turn — deterministic, so however many times a
-   * turn's finalize lands (live relay + durable backup, retries), it is always
-   * the SAME message and dedups on MessageId everywhere. Ordering is unaffected:
-   * the messages read sorts by CreatedAt first (MessageId is only a tiebreak).
+   * The assistant message id for a turn — deterministic, so however many
+   * times finalize lands (relay + durable backup, retries) it dedups on
+   * MessageId everywhere; ordering still sorts by CreatedAt first.
    */
   private static turnMessageId(turnId: string): string {
     return `langymsg_turn-${turnId}`;

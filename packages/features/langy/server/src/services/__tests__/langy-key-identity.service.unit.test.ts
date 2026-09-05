@@ -65,14 +65,14 @@ describe("LangyKeyIdentityService", () => {
   it("rechecks Langy access for each use of the same key", async () => {
     // One token value, used for both calls: nothing about the key is edited
     // between them. Only the cohort answer changes.
-    const featureFlags = MemoryFeatureFlagService.create();
-    featureFlags.setFlag("release_langy_enabled", true);
+    const featureFlagService = MemoryFeatureFlagService.create();
+    featureFlagService.setFlag("release_langy_enabled", true);
     const resolved = apiKeyToken({ userId: "customer-3" });
 
-    const identities = LangyKeyIdentityService.create({ featureFlags });
+    const identities = LangyKeyIdentityService.create({ featureFlags: featureFlagService });
 
     const before = await identities.resolve({ resolved });
-    featureFlags.setFlag("release_langy_enabled", false);
+    featureFlagService.setFlag("release_langy_enabled", false);
     const after = await identities.resolve({ resolved });
 
     expect(before).toEqual({ ok: true, userId: "customer-3" });

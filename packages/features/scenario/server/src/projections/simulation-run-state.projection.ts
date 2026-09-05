@@ -35,30 +35,17 @@ import {
 const projectionLogger = createLogger("simulationRunState.foldProjection");
 
 /**
- * Per-message size cap for `Messages.Content` / `Messages.Rest`.
- *
- * Set generously (64 KiB) so normal text turns — even verbose multi-paragraph
- * assistant replies — are never truncated. Messages that exceed this are
- * almost always the symptom of an upstream SDK shipping inline binary media
- * that the stored-objects pipeline failed to externalise (the original
- * symptom: scenario voice runs persisting full base64 PCM16 audio in
- * `Messages.Content`, which then leaked into every `getSuiteRunData`
- * response). Truncation here keeps the list path bounded and makes the
- * regression visible (via logs + the surfaced marker) instead of silently
- * blowing up the simulations page.
+ * Per-message size cap for `Messages.Content`/`Rest`, set generously (64
+ * KiB) so normal verbose replies are never truncated — exceeding it is
+ * almost always an SDK shipping inline binary media the pipeline failed to externalise; truncating here surfaces the regression instead of silently blowing up the page.
  */
 const MAX_MESSAGE_CONTENT_BYTES = 64 * 1024;
 const MAX_MESSAGE_REST_BYTES = 64 * 1024;
 
 /**
- * Serialise a run's metadata for the stored column, without the encrypted
- * secret values.
- *
- * The queued event carries those beside the metadata, so this is the second
- * line rather than the first. It matters for the started event: the SDK
- * ingestion route forwards whatever metadata the caller sent, so a caller can
- * put the key there. `secretParameterNames` stays, because names are what a
- * person reads back off the run.
+ * Serialises a run's metadata for the stored column, without encrypted
+ * secret values — the queued event carries those beside metadata, so this
+ * is the second line, not the first (the started event's ingest route forwards caller metadata verbatim). `secretParameterNames` stays for readback.
  */
 function storedMetadata(metadata: Record<string, unknown> | undefined): string | null {
   if (!metadata) return null;
@@ -82,10 +69,9 @@ function parseMetadataObject(metadata: string | null): Record<string, unknown> {
 }
 
 /**
- * Cap an oversized message-content / rest string and emit a structured warn
- * log so an SDK regression doesn't silently land 90+ MB rows in ClickHouse.
- * The returned marker has a stable prefix so monitoring + retroactive scans
- * can find affected rows.
+ * Caps an oversized message-content/rest string and emits a structured warn
+ * log so an SDK regression doesn't silently land 90+ MB rows in ClickHouse
+ * — the marker has a stable prefix so monitoring/retroactive scans can find affected rows.
  */
 function capOversizedString({
   value,
@@ -98,12 +84,9 @@ function capOversizedString({
   field: "Content" | "Rest";
   ctx: { scenarioRunId: string; messageId?: string; messageRole?: string };
 }): string {
-  // String length is char-count (UTF-16 code units); UTF-8 may use up to 3
-  // bytes per code unit (4 for surrogate pairs, but a pair occupies two code
-  // units so the per-code-unit ceiling is still 3). The only safe length-only
-  // short-circuit is the inverse bound: when length*3 <= maxBytes the UTF-8
-  // byte length is guaranteed to fit. Using length <= maxBytes as the bypass
-  // would let a multibyte string ~3× over the cap slip through.
+  // String length is char-count (UTF-16 code units); UTF-8 uses up to 3
+  // bytes per unit, so length*3 <= maxBytes safely bounds byte length —
+  // length <= maxBytes alone would let a ~3x-over multibyte string through.
   if (value.length * 3 <= maxBytes) return value;
   const byteLength = Buffer.byteLength(value, "utf8");
   if (byteLength <= maxBytes) return value;
@@ -122,12 +105,9 @@ function capOversizedString({
 }
 
 function buildMessageRestJson(messageFields: Record<string, unknown>): string {
-  // When `content` is an array, preserve it in Rest so the renderer can route
-  // each part through <MediaPart>. Flat-string content goes to the top-level
-  // Content column and is omitted here. The AG-UI `parts` field (alternative
-  // location for content parts on ChatMessage) is already preserved via the
-  // ...restFields spread below; only `content` needs the special-case to
-  // bypass the flat-string column.
+  // Array `content` is preserved in Rest so the renderer can route each
+  // part through <MediaPart>; flat-string content goes to the top-level
+  // Content column instead. AG-UI's `parts` field is already covered by the ...restFields spread; only `content` needs this special-case.
   const { id: _id, role: _role, content, trace_id: _traceId, ...restFields } = messageFields;
   const rest: Record<string, unknown> = { ...restFields };
   if (Array.isArray(content)) {
@@ -149,11 +129,9 @@ export interface SimulationMessageRow {
 }
 
 /**
- * State data for a simulation run.
- * Matches the simulation_runs ClickHouse table schema.
- *
- * This is both the fold state and the stored data -- one type, not two.
- * Handlers do all computation. Store is a dumb read/write layer.
+ * State data for a simulation run, matching the simulation_runs ClickHouse
+ * schema — fold state and stored data are one type, not two. Handlers do
+ * all computation; the store is a dumb read/write layer.
  */
 export interface SimulationRunStateData {
   ScenarioRunId: string;
@@ -199,30 +177,9 @@ export interface SimulationRunState extends Projection<SimulationRunStateData> {
 }
 
 /**
- * Guards a non-terminal Status transition once a run is already finished.
- *
- * Orphaned-run reconciliation writes a terminal `finished` event for a run
- * whose worker died. If that worker's child process actually outlived its
- * parent (reparented) and later POSTs a real started/snapshot whose
- * client-supplied `occurredAt` is AFTER the reconciliation time, the event
- * applies in-order (the executor only re-folds when occurredAt is STRICTLY
- * less than what we've already seen) and would otherwise clobber Status back to
- * a non-terminal value while FinishedAt stays set — an unrecoverable zombie:
- * stored status is the only truth at read time, and the stall watchdog has
- * already gone terminal for the run.
- *
- * Once FinishedAt is set, Status stays terminal. Three things hold that line
- * together, and all three are load-bearing:
- *   1. this guard, at EVERY non-terminal Status writer — queued, started,
- *      snapshot, and textMessageStart. Miss one and the invariant is gone: a
- *      `queued` event folded after `finished` used to resurrect Status=QUEUED
- *      with FinishedAt still set. If you add a handler that writes a
- *      non-terminal Status, it goes through here too;
- *   2. `handleSimulationRunFinished` returning early once FinishedAt is set, so
- *      a run finishes exactly once;
- *   3. that same handler refusing a non-terminal explicit status, since the
- *      finished event's `status` is only typed `z.string().optional()` on the
- *      internal event schema — any string can reach the fold.
+ * Guards a non-terminal Status transition once a run is finished — an
+ * out-of-order event could otherwise clobber Status non-terminal while
+ * FinishedAt stays set (an unrecoverable zombie); must run on EVERY non-terminal Status writer, alongside the finished handler's early-return and status refusal.
  */
 function statusAfter({
   state,
@@ -235,10 +192,9 @@ function statusAfter({
 }
 
 /**
- * The statuses a run may hold once FinishedAt is set. A `finished` event whose
- * explicit status is outside this set is not describing a finished run, so its
- * status is discarded in favour of the verdict-derived one — writing it would
- * strand the run non-terminal but finished, which nothing reconciles.
+ * Statuses a run may hold once FinishedAt is set. A `finished` event's
+ * explicit status outside this set is discarded for the verdict-derived one
+ * — writing it would strand the run non-terminal-but-finished, unrecoverable.
  */
 const TERMINAL_STATUSES = new Set([
   "SUCCESS",
@@ -267,11 +223,9 @@ const simulationRunEvents = [
 ] as const;
 
 /**
- * Type-safe fold projection for simulation run state.
- *
- * - `implements FoldEventHandlers` enforces a handler exists for every event schema
- * - Handler names derived from event type strings (e.g. `"lw.simulation_run.queued"` -> `handleSimulationRunQueued`)
- * - `UpdatedAt` is auto-managed by the base class after each handler call
+ * Type-safe fold projection for simulation run state: `implements
+ * FoldEventHandlers` enforces a handler per event schema, handler names
+ * derive from event type strings, and `UpdatedAt` is auto-managed by the base class.
  */
 export class SimulationRunStateFoldProjection
   extends AbstractFoldProjection<SimulationRunStateData, typeof simulationRunEvents>
@@ -310,9 +264,8 @@ export class SimulationRunStateFoldProjection
 
   /**
    * Whether the fold has seen an event that DEFINES the run, and so whether
-   * the state is worth a `simulation_runs` row. Every lifecycle event names
-   * its run; the metrics event carries a cost and no identity, so cost alone
-   * must not mint a run.
+   * the state is worth a `simulation_runs` row — every lifecycle event names
+   * its run, but the metrics event carries cost with no identity, so cost alone must not mint a run.
    */
   static hasRunDefiningEvent(state: SimulationRunStateData): boolean {
     return state.ScenarioRunId.length > 0;
@@ -418,14 +371,10 @@ export class SimulationRunStateFoldProjection
         }
         const message = parsedMessage.data;
 
-        // Content can be either:
-        //   - a string (legacy SDK output, possibly a Python-repr-stringified array)
-        //   - an array of rich-content parts (the canonical AG-UI/OpenAI shape,
-        //     produced by the stored-objects extractor's rewrite pass)
-        //   - null / undefined / something else (we tolerate by storing "")
-        // We always serialize to a string for the parallel-array CH column.
-        // Array content gets JSON.stringify'd; the renderer's
-        // safeJsonParseOrStringFallback in flattenContent parses it back.
+        // Content is either a string (legacy, possibly Python-repr), an array of
+        // rich-content parts (canonical AG-UI/OpenAI shape), or null/undefined
+        // (tolerated as ""). Always serialized to a string for the parallel-array
+        // CH column; arrays are JSON.stringify'd, parsed back by flattenContent's safeJsonParseOrStringFallback.
         let content = "";
         if (typeof message.content === "string") {
           content = message.content;
@@ -592,13 +541,10 @@ export class SimulationRunStateFoldProjection
     const results = event.data.results;
     const verdict = results?.verdict ?? null;
 
-    // Derive status: an explicit TERMINAL status takes priority, otherwise
-    // derive from verdict. The explicit status arrives from the scenario-events
-    // ingest route, whose schema types it as the full ScenarioRunStatus enum —
-    // non-terminal members included. Taking it at face value would write a
-    // non-terminal Status alongside FinishedAt below, which is the one state
-    // nothing can recover: the orphan reconciler skips it (FinishedAt IS NULL)
-    // and no read-time status derivation remains to mask it.
+    // Derive status: an explicit TERMINAL status takes priority, else derive
+    // from verdict. The ingest route types explicit status as the full enum
+    // (non-terminal included); taking it at face value would write non-terminal
+    // Status alongside FinishedAt — unrecoverable, since the orphan reconciler skips FinishedAt-set rows.
     let status: string;
     const explicit = event.data.status?.toUpperCase();
     if (explicit && isTerminalStatus(explicit)) {
@@ -620,14 +566,10 @@ export class SimulationRunStateFoldProjection
       MetCriteria: results?.metCriteria ?? [],
       UnmetCriteria: results?.unmetCriteria ?? [],
       Error: results?.error ?? null,
-      // Derived when the event does not carry it, which is every real run:
-      // the SDK ingest path dispatches finishRun with results and status only.
-      // Left underived, DurationMs was null for every run a customer actually
-      // executed, and populated only for runs seeded with a synthetic event.
-      //
-      // The fold already holds both ends, so this needs no new field on the
-      // wire. A supplied value still wins — the runner knows its own elapsed
-      // time better than two projected timestamps do.
+      // Derived when the event doesn't carry it (every real run — the SDK
+      // ingest path sends only results and status): left underived, DurationMs
+      // was null for every real run and populated only for synthetic ones. A
+      // supplied value still wins, since the runner knows its own elapsed time better.
       DurationMs:
         event.data.durationMs ??
         (state.StartedAt !== null && event.occurredAt >= state.StartedAt

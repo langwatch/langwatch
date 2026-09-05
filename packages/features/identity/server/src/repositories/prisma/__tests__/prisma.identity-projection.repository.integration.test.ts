@@ -12,7 +12,6 @@ import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaTenancyGuardService,
-  type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PrismaIdentityProjectionRepository } from "../prisma.identity-projection.repository";
@@ -64,15 +63,11 @@ const fact = (id: string, state: "ATTACHED" | "VERIFIED" | "DETACHED"): Identifi
 });
 
 describe.skipIf(!DB_URL)("PrismaIdentityProjectionRepository", () => {
-  let connection: PrismaConnection | undefined;
-  let prisma: PrismaClient | undefined;
-  let repository: PrismaIdentityProjectionRepository;
-
-  connection = PrismaConnectionService.create({
+  const connection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
-  prisma = connection.client as PrismaClient;
-  repository = new PrismaIdentityProjectionRepository(
+  const prisma = connection.client as PrismaClient;
+  const repository = new PrismaIdentityProjectionRepository(
     prisma,
     PrismaIdentityReservationRepository.create(prisma),
   );

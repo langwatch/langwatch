@@ -14,22 +14,19 @@ import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaTenancyGuardService,
-  type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
 describe.skipIf(!DB_URL)("AccountCredential cascade on User delete", () => {
-  let connection: PrismaConnection | undefined;
-  let prisma: PrismaClient | undefined;
   const testNamespace = `acc-cred-cascade-${nanoid(8)}`;
   let userId: string;
 
-  connection = PrismaConnectionService.create({
+  const connection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
-  prisma = connection.client as PrismaClient;
+  const prisma = connection.client as PrismaClient;
 
   afterAll(async () => {
     if (!prisma) return;

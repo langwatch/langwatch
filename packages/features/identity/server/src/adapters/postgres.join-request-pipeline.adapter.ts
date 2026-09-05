@@ -2,7 +2,7 @@ import { JoinRequestGuards } from "../join-request-guards";
 import type { JoinRequestMailPort } from "../ports/join-request-mail.port";
 import { JoinRequestService } from "../join-request.service";
 import { PostgresJoinRequestNotificationAdapter } from "./postgres.join-request-notification.adapter";
-import type { EventSourcing, EventStore } from "@langwatch/eventing";
+import type { EventSourcing } from "@langwatch/eventing";
 import {
   JoinRequestPipelineDefinitionAdapter,
   type JoinRequestPipeline,

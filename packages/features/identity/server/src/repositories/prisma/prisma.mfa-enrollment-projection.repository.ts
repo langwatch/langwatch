@@ -1,9 +1,3 @@
-import type {
-  MfaDisableVia,
-  MfaEnrollmentLifecycleState,
-  MfaEnrollmentState,
-  MfaMethod,
-} from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { mfaEnrollmentRowToState } from "./prisma.mfa-enrollment.mapper";
 import type { MfaFoldState } from "../../projections/mfa-enrollment-state.projection";

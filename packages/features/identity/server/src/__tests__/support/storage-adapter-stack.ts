@@ -1,9 +1,4 @@
-import {
-  type IdentityCommand,
-  type IdentityFact,
-  type IdentityFactInput,
-  normalizeIdentifierValue,
-} from "@langwatch/identity-contract";
+import { type IdentityCommand, normalizeIdentifierValue } from "@langwatch/identity-contract";
 import type { BetterAuthOptions } from "better-auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
@@ -19,7 +14,6 @@ import { createIdentityStorageAdapter } from "../../better-auth/identity-storage
 import type { IdentityAccountsPort, IdentityResolutionPort } from "../../better-auth/storage-ports";
 import { IdentityGuards } from "../../guards";
 import { adoptUserEmailCommandId, newIdentityCommandId } from "../../identity-command-id";
-import type { IdentityLedger } from "../../identity-ledger";
 import type { IdentityUsersRepository } from "../../identity-users.repository";
 import { IdentityService } from "../../identity.service";
 import { InMemoryIdentityEventStore, inMemoryIdentityLedger } from "./in-memory-event-store";

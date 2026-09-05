@@ -45,7 +45,10 @@ function build({
     audit,
     clock: {
       now: () => 1_700_000_000_000,
-      newCommandId: () => `cmd_${(minted += 1)}`,
+      newCommandId: () => {
+        minted += 1;
+        return `cmd_${minted}`;
+      },
     },
     newProposalId: () => "proposal_1",
   });

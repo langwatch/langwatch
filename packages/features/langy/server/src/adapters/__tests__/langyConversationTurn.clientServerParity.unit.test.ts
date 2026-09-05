@@ -148,7 +148,12 @@ function asWireEvent(step: RecordedStep) {
  * `LangyConversationTurnFoldState` type omits all three by construction.
  */
 function foldOwnedFields(state: LangyConversationTurnData): LangyConversationTurnFoldState {
-  const { CreatedAt, UpdatedAt, LastEventOccurredAt, ...folded } = state;
+  const {
+    CreatedAt: _CreatedAt,
+    UpdatedAt: _UpdatedAt,
+    LastEventOccurredAt: _LastEventOccurredAt,
+    ...folded
+  } = state;
   return folded;
 }
 

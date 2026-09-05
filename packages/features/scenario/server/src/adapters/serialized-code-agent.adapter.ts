@@ -1,12 +1,7 @@
 /**
- * Serialized code agent adapter for scenario worker execution.
- *
- * Operates with pre-fetched configuration data and doesn't require
- * database access. Designed to run in isolated worker threads.
- *
- * Executes Python code by building a minimal DSL workflow (entry -> code -> end)
- * and sending it to the nlpgo service's /go/studio/execute_sync endpoint
- * as an execute_flow event.
+ * Serialized code agent adapter for scenario worker execution: operates on
+ * pre-fetched config with no database access, so it can run in isolated
+ * worker threads. Executes Python via a minimal entry->code->end DSL workflow sent to nlpgo's /go/studio/execute_sync as an execute_flow event.
  */
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
@@ -74,19 +69,15 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
   private readonly config: CodeAgentData;
   private readonly nlpServiceUrl: string;
   /**
-   * The LangWatch platform API key (project.apiKey), sent as workflow.api_key
-   * on the synthesized entry->code->end workflow. nlpgo forwards it verbatim
-   * as the X-Auth-Token header on its callbacks into the platform
-   * (agentblock/workflow_runner.go, evaluatorblock/executor.go, engine.go),
-   * never an LLM provider credential, so it must not be sourced from litellm
-   * params (issue #6634).
+   * The LangWatch platform API key, sent as workflow.api_key; nlpgo forwards
+   * it verbatim as X-Auth-Token on its platform callbacks. Never an LLM
+   * provider credential, so it must not be sourced from litellm params (#6634).
    */
   private readonly projectApiKey: string;
   /**
-   * The run's resolved parameter values, carried on the DSL as
-   * `workflow.params` beside `workflow.secrets`. The engine exposes them to
-   * the Python under test as `params.NAME`, keeping their native types: a
-   * boolean stays a boolean, a number stays a number.
+   * The run's resolved parameter values, carried as `workflow.params` beside
+   * `workflow.secrets`. The engine exposes them as `params.NAME`, keeping
+   * native types (a boolean stays a boolean, a number stays a number).
    */
   private readonly parameters: RunParameterValues;
 
@@ -119,11 +110,8 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
 
   /**
    * The `params` namespace for one turn: the run's resolved values plus this
-   * turn's trace context, so the code under test can forward
-   * `params.trace_id` or `params.traceparent` to whatever it calls. Captured
-   * per call, because every turn opens its own trace. `trace_id` and
-   * `traceparent` are reserved names: they win over a run parameter with the
-   * same name.
+   * turn's trace context, so tested code can forward `params.trace_id`/
+   * `traceparent`. Captured per call (every turn opens its own trace); these two names are reserved and win over a same-named run parameter.
    */
   private turnParameters(): RunParameterValues {
     const { headers, traceId } = injectTraceContextHeaders({ headers: {} });
@@ -136,10 +124,9 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
   }
 
   /**
-   * Build a minimal DSL workflow with entry -> code -> end nodes for execution.
-   *
-   * The /studio/execute_sync endpoint returns result.get("end"), so we need
-   * an end node to capture the code node's outputs.
+   * Builds a minimal entry->code->end DSL workflow: /studio/execute_sync
+   * returns result.get("end"), so an end node is needed to capture the code
+   * node's outputs.
    */
   private buildWorkflow(resolvedValues: Record<string, unknown>, params: RunParameterValues) {
     const { ENTRY_NODE_ID, CODE_NODE_ID, END_NODE_ID } = SerializedCodeAgentAdapter;
@@ -236,15 +223,9 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
   }
 
   /**
-   * Build the code node that executes the agent's Python code.
-   *
-   * A configured `timeoutMs` travels as the node's `timeout_ms` parameter —
-   * the identifier and units the engine reads (`nodeTimeout` in
-   * services/nlpgo/app/engine/engine.go). It is a request for a SHORTER
-   * budget only: the code executor clamps it to the operator's ceiling
-   * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`, 600s when unset — see
-   * `services/nlpgo/config.go`), so a larger value buys the agent nothing. Omitted when unset, which leaves the engine
-   * on that operator default.
+   * Builds the code node that executes the agent's Python code. A configured
+   * `timeoutMs` travels as `timeout_ms` (`nodeTimeout` in engine.go) but is a
+   * request for a SHORTER budget only — the executor clamps to the operator's ceiling (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`), so a larger value buys nothing.
    */
   private buildCodeNode(
     inputs: { identifier: string; type: string; value: unknown }[],
@@ -281,27 +262,9 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
   }
 
   /**
-   * How long to wait on the NLP service for one turn.
-   *
-   * Always at least {@link NlpFetchAdapter.floorTimeoutMs}'s result — the engine's
-   * own code-block ceiling plus headroom — and above the agent's own code
-   * budget when that budget is longer, so the engine gets to enforce (and
-   * report) the timeout rather than the request being aborted from here —
-   * bounded by {@link NlpFetchAdapter.maxTimeoutMs}, this platform's operator-
-   * configurable maximum for one turn.
-   *
-   * An over-large `timeoutMs` is clamped rather than rejected. The schemas
-   * that carry it (`CodeAgentDataSchema`, `RawCodeAgentConfigSchema`) stay
-   * `.positive()` with no `.max()` on purpose: they mirror what is already
-   * stored on the agent, and the engine's contract for the same number is
-   * "clamp to the operator's ceiling", not "fail the call". Adding a `.max()`
-   * would make a stored value that the engine handles fine fail the whole
-   * scenario run at prefetch time instead — and there is no constant to put in
-   * a `.max()` any more, since the ceiling is now read from the environment.
-   *
-   * The ceiling bounds the deadline whether or not the agent named a budget:
-   * an operator who sets it below the floor has asked for a shorter socket
-   * hold than the engine's own ceiling, and gets it.
+   * How long to wait on the NLP service for one turn: at least
+   * {@link NlpFetchAdapter.floorTimeoutMs} (the engine's ceiling plus
+   * headroom), above the agent's own budget when longer (so the engine enforces the timeout), bounded by {@link NlpFetchAdapter.maxTimeoutMs}. An over-large `timeoutMs` is clamped, not rejected — the schemas stay unbounded since the engine's own contract is to clamp, not fail.
    */
   private fetchTimeoutMs(): number {
     const { timeoutMs } = this.config;
@@ -331,16 +294,9 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
   }
 
   /**
-   * Execute the workflow via the NLP service's /go/studio/execute_sync endpoint.
-   *
-   * Uses execute_flow (not execute_component) because /execute_sync only
-   * monitors ExecutionStateChange events, which are emitted by execute_flow.
-   *
-   * The whole call is wrapped in an OTel span so that timeouts and fetch
-   * failures always leave a footprint in the trace (lw#3438). The span's
-   * `setStatus(ERROR)` + `recordException` are handled by `withActiveSpan`,
-   * and we annotate `error.kind` + `http.status_code` so the failure mode
-   * is greppable without reading the message string.
+   * Executes the workflow via /go/studio/execute_sync, using execute_flow
+   * (not execute_component) since /execute_sync only monitors
+   * ExecutionStateChange events. Wrapped in an OTel span (lw#3438, via `withActiveSpan`) annotated with `error.kind`/`http.status_code` so failures are greppable without reading the message string.
    */
   private async executeOnNlpService(
     workflow: ReturnType<typeof this.buildWorkflow>,
@@ -455,12 +411,9 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
   }
 
   /**
-   * Resolve input values from scenarioMappings (on the agent config) or fall
-   * back to legacy behavior.
-   *
-   * With scenarioMappings: resolve each declared agent input from its mapping.
-   *   Orphan mappings (for inputs that don't exist on the agent) are ignored.
-   * Without scenarioMappings: first input gets the last user message, rest get "".
+   * Resolves input values from scenarioMappings when set (each declared
+   * agent input from its mapping, orphan mappings ignored), else legacy
+   * behavior: first input gets the last user message, rest get "".
    */
   private resolveInputValues(agentInput: AgentInput): Record<string, unknown> {
     const declaredInputs =
@@ -497,16 +450,9 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
   }
 
   /**
-   * Extract the output string from the NLP service response.
-   *
-   * The /studio/execute_sync endpoint returns:
-   * { trace_id, status: "success", result: <end node outputs> }
-   *
-   * The result is the output from the "end" node, which is a dict
-   * of output identifier -> value.
-   *
-   * When scenarioOutputField is set: extract that specific field (throw if missing).
-   * When unset: use first configured output (legacy behavior).
+   * Extracts the output string from the response (`{ trace_id, status,
+   * result }` where `result` is the end node's identifier->value dict): the
+   * named `scenarioOutputField` when set (throws if missing), else the first configured output.
    */
   private extractOutput(result: Record<string, unknown> | null): string {
     if (!result) return "";
@@ -537,13 +483,9 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
   }
 
   /**
-   * One value per declared input, from its mapping. Orphan mappings, for
-   * inputs the agent does not declare, are ignored.
-   *
-   * An input mapped to the scenario session receives the JSON value the code
-   * returned, not text: the engine passes a non-string entry input through
-   * untouched, so the code reads back exactly what it returned, and None on
-   * the first turn of a thread.
+   * One value per declared input, from its mapping (orphan mappings, for
+   * undeclared inputs, are ignored). An input mapped to the scenario session
+   * receives the code's JSON value untouched (not text), and None on a thread's first turn.
    */
   private resolveMappedInputValues({
     declaredInputs,
@@ -571,9 +513,8 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
 
   /**
    * The `session` the code returned beside its outputs, read from the code
-   * node's own state rather than the end node: the runner keeps every key the
-   * code returns, declared or not, so the session needs no declared output
-   * and no edge, and a code that returns none leaves the held value as it is.
+   * node's own state (not the end node): the runner keeps every key the code
+   * returns, declared or not, so returning none leaves the held value as-is.
    */
   private extractSession(
     nodes: Record<string, { outputs?: Record<string, unknown> | null } | null> | undefined,

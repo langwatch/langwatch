@@ -99,8 +99,7 @@ export function createLangyRelayRestApp(options: {
         const { done, value } = await reader.read();
         if (done) break;
         pending += decoder.decode(value, { stream: true });
-        let nl: number;
-        while ((nl = pending.indexOf("\n")) >= 0) {
+        for (let nl = pending.indexOf("\n"); nl >= 0; nl = pending.indexOf("\n")) {
           const line = pending.slice(0, nl).trim();
           pending = pending.slice(nl + 1);
           if (line) await applyLine(relay, line, tally);

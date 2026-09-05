@@ -253,7 +253,6 @@ function canonicalLogRecord(): CanonicalLogRecord {
 
 describe("WorkerProductionComposition", () => {
   it("composes one canonical durable Eventing graph with consumers disabled", () => {
-    const assignments = new TraceAssignments();
     const createServer = EventingServerRuntime.create.bind(EventingServerRuntime);
     const create = vi
       .spyOn(EventingServerRuntime, "create")

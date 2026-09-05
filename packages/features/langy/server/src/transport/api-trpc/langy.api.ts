@@ -49,7 +49,7 @@ import { z } from "zod";
 import { AGENT_CHAT_TIMEOUT_MS } from "../../services/langy-turn-errors.errors";
 import { ADOPTABLE_CONVERSATION_ID } from "../../services/langy-conversation.service";
 import type { LangyChatMessageInput } from "../../services/langy-turn.shared";
-import type { LangyStreamEntry } from "../../streaming/langy-token-buffer";
+import type { LangyStreamEntry, LangyTokenBuffer } from "../../streaming/langy-token-buffer";
 import { LangySessionRequiredError, type LangyApp } from "#app/langy.app";
 
 const logger = createLogger("langwatch:langy:router");
@@ -226,6 +226,76 @@ function sessionOf(ctx: LangyTrpcContext): LangyCredentialSession {
   const session = ctx.session;
   if (!session) throw new LangySessionRequiredError();
   return session;
+}
+
+/**
+ * Tails the live edge of a turn from `fromId`, watching the durable fold +
+ * per-turn heartbeat concurrently so a settled turn whose terminal frame
+ * never reached the buffer still resolves for the client instead of
+ * blocking until the hard per-turn deadline.
+ */
+async function* followMissedTerminal({
+  app,
+  projectId,
+  conversationId,
+  turnId,
+  userId,
+  buffer,
+  fromId,
+  signal,
+}: {
+  app: LangyApp;
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  userId: string;
+  buffer: LangyTokenBuffer;
+  fromId: string;
+  signal: AbortSignal;
+}): AsyncGenerator<LangyStreamEntry> {
+  const settle = new AbortController();
+  const followSignal = AbortSignal.any([signal, settle.signal]);
+  let synthesized: LangyStreamEntry | null = null;
+
+  const watcher = app
+    .watchForMissedTerminal({
+      projectId,
+      conversationId,
+      turnId,
+      userId,
+      buffer,
+      signal: followSignal,
+    })
+    .then((entry) => {
+      if (!entry) return;
+      synthesized = entry;
+      settle.abort(); // unblock the follow() below
+    })
+    // Attached HERE, not in the finally below: follow() can block for
+    // minutes, so a rejection would sit unhandled until then — and Node's
+    // default --unhandled-rejections=throw would take the process down
+    // first. A failed watcher just means no synthesized terminal.
+    .catch(() => undefined);
+
+  try {
+    for await (const { entry } of buffer.follow({
+      conversationId,
+      turnId,
+      fromId,
+      signal: followSignal,
+    })) {
+      yield entry;
+      if (entry.type === "end" || entry.type === "error") {
+        synthesized = null;
+        return;
+      }
+    }
+  } finally {
+    settle.abort();
+    await watcher;
+  }
+
+  if (synthesized) yield synthesized;
 }
 
 /**
@@ -990,49 +1060,16 @@ export class LangyTrpcApi {
               // though the turn already finished. While we tail the live edge, watch
               // the durable fold + per-turn heartbeat; if the turn has settled with
               // no terminal in the buffer, synthesize one so the client resolves.
-              const settle = new AbortController();
-              const followSignal = AbortSignal.any([signal, settle.signal]);
-              let synthesized: LangyStreamEntry | null = null;
-
-              const watcher = opts.ctx.app.langy
-                .watchForMissedTerminal({
-                  projectId,
-                  conversationId,
-                  turnId,
-                  userId,
-                  buffer,
-                  signal: followSignal,
-                })
-                .then((entry) => {
-                  if (!entry) return;
-                  synthesized = entry;
-                  settle.abort(); // unblock the follow() below
-                })
-                // Attached HERE, not in the finally below: follow() can block for
-                // minutes, so a rejection would sit unhandled until then — and Node's
-                // default --unhandled-rejections=throw would take the process down
-                // first. A failed watcher just means no synthesized terminal.
-                .catch(() => undefined);
-
-              try {
-                for await (const { entry } of buffer.follow({
-                  conversationId,
-                  turnId,
-                  fromId: lastId,
-                  signal: followSignal,
-                })) {
-                  yield entry;
-                  if (entry.type === "end" || entry.type === "error") {
-                    synthesized = null;
-                    return;
-                  }
-                }
-              } finally {
-                settle.abort();
-                await watcher;
-              }
-
-              if (synthesized) yield synthesized;
+              yield* followMissedTerminal({
+                app: opts.ctx.app.langy,
+                projectId,
+                conversationId,
+                turnId,
+                userId,
+                buffer,
+                fromId: lastId,
+                signal,
+              });
             }
           } finally {
             stream.close();

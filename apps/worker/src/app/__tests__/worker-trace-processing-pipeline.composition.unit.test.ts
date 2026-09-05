@@ -8,7 +8,6 @@ import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import {
   createWorkerTraceProcessingPipeline,
-  WorkerTraceProcessingPipeline,
   type WorkerTraceProcessingPipelineOptions,
 } from "../worker-trace-processing-pipeline.composition";
 

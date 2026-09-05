@@ -33,23 +33,16 @@ export const TABLE_NAME = "simulation_runs" as const;
 export const RUN_ID_CAP = 10000;
 
 /**
- * Sort key for the export sweep, as a single SQL expression.
- *
- * ORDER BY, the cursor predicate and the value returned as the cursor must all
- * be *the same* expression. Sorting on StartedAt while seeding the cursor from
- * a CreatedAt fallback makes the next page filter on a column it did not sort
- * by, which silently drops or repeats runs at the boundary — and ClickHouse
- * sorts NULLs first under ASC, so any NULL StartedAt rows land on page one and
- * become unreachable for the rest of the sweep while the count still includes
- * them. Coalescing here means there is one definition and no fallback in TS.
+ * Sort key for the export sweep as one SQL expression: ORDER BY, the cursor
+ * predicate and the returned cursor must all be it, or the next page filters
+ * on a column it didn't sort by and silently drops/repeats boundary runs — also coalesces NULL StartedAt so those rows don't strand on page one.
  */
 const EXPORT_SORT_KEY = "toUnixTimestamp64Milli(ifNull(t.StartedAt, t.CreatedAt))";
 
 /**
- * Every status a run carries while the batch still owes work.
- *
- * QUEUED and RUNNING belong here beside PENDING and IN_PROGRESS: the queue
- * writes them, and a batch that still holds one of the four is not finished.
+ * Every status a run carries while the batch still owes work: QUEUED and
+ * RUNNING belong beside PENDING/IN_PROGRESS since the queue writes them and
+ * a batch holding any of the four is not finished.
  */
 const RUNNING_STATUSES = "'IN_PROGRESS','PENDING','QUEUED','RUNNING'";
 
@@ -61,13 +54,9 @@ const RUNNING_STATUSES = "'IN_PROGRESS','PENDING','QUEUED','RUNNING'";
 const AGENT_TEST_SET_EXCLUSION = `AND NOT endsWith(ScenarioSetId, '${AGENT_TEST_SET_SUFFIX}')`;
 
 /**
- * Batch-level aggregate SELECT list, shared by the batch history page and the
- * single-batch summary so the two queries cannot drift.
- *
- * SettledCount is the complement of RUNNING_STATUSES, never a list of terminal
- * names: ClickHouse stores a raw FAILURE status that the terminal status enum
- * does not carry, so a positive list would report a failed batch as unfinished
- * forever.
+ * Batch-level aggregate SELECT list shared by the batch history page and
+ * the single-batch summary, so the two cannot drift. SettledCount is the
+ * complement of RUNNING_STATUSES (never a terminal-name list) since a raw FAILURE status the terminal enum doesn't carry would else report forever-unfinished.
  */
 const BATCH_AGGREGATE_COLUMNS = `BatchRunId,
         toString(count())                                               AS TotalCount,
@@ -122,19 +111,9 @@ const RUN_COLUMNS = `
   toString(toUnixTimestamp64Milli(ArchivedAt)) AS ArchivedAt` as const;
 
 /**
- * Columns for list/grid views — truncated messages and no heavy JSON blobs.
- * Keeps first 6 messages (3 turns) for grid card previews.
- * Omits Messages.Rest (tool call JSON), Messages.TraceId, TraceIds,
- * Reasoning and Error (detail-drawer-only payloads; Reasoning is the judge's
- * multi-paragraph rationale and Error can carry stack traces). MetCriteria /
- * UnmetCriteria stay: the list renders "Passed (met/total)" from their counts.
- *
- * `TotalMessageCount` is the one addition the slice itself needs: reading the
- * array length costs nothing next to the payload, and without it a caller
- * cannot tell a 6-message page from a 6-message conversation. It MUST stay
- * table-qualified (`t.`) — ClickHouse resolves it against the SELECT aliases
- * otherwise, so it would measure the sliced array and always report 6.
- * This projection is therefore only valid in a query that reads through `t`.
+ * Columns for list/grid views — truncated messages (first 6), no heavy JSON
+ * (Messages.Rest/TraceId, TraceIds, Reasoning, Error — detail-drawer only).
+ * `TotalMessageCount` must stay table-qualified (`t.`) or it measures the sliced array and always reports 6.
  */
 const LIST_COLUMNS = `
   ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
@@ -159,26 +138,16 @@ const LIST_COLUMNS = `
   toString(toUnixTimestamp64Milli(ArchivedAt)) AS ArchivedAt` as const;
 
 /**
- * The run note, read out of the run metadata server-side so only the short
- * string crosses the wire.
- *
- * The note is a top-level metadata key, the same one an SDK or CI caller
- * writes, so a batch reports its note whether it came from the platform or from
- * outside it. A run without one extracts as the empty string.
- *
+ * The run note, read server-side from run metadata so only the short
+ * string crosses the wire — a top-level key an SDK/CI caller also writes;
  * @see specs/suites/run-note-metadata-convention.feature
  */
 export const RUN_NOTE_EXPR = "JSONExtractString(ifNull(Metadata, '{}'), 'note')";
 
 /**
- * Who started the run, read out of the reserved namespace of the run metadata
- * server-side so only the two short strings cross the wire.
- *
- * The pair is written together, so an empty id means the run names no person
- * and the label is not read on its own. A run started by a project key, and
- * any run recorded before this was stamped, extracts as the empty string.
- *
- * @see specs/scenarios/run-actor-on-runs.feature
+ * Who started the run, read server-side from the reserved metadata
+ * namespace; the id/label pair is written together — empty id means no
+ * person (a project key, or a pre-stamp run). @see specs/scenarios/run-actor-on-runs.feature
  */
 export const RUN_ACTOR_ID_EXPR =
   "JSONExtractString(ifNull(Metadata, '{}'), 'langwatch', 'actorId')";
@@ -186,10 +155,9 @@ export const RUN_ACTOR_LABEL_EXPR =
   "JSONExtractString(ifNull(Metadata, '{}'), 'langwatch', 'actorLabel')";
 
 /**
- * Page size ceilings for the set-level list reads. The trimmed projection
- * takes up to 100 runs a page; a caller asking for whole conversations reads
- * the full message arrays, which is what the trim exists to avoid, so its
- * page is capped far lower rather than refused.
+ * Page size ceilings for set-level list reads: the trimmed projection caps
+ * at 100, a whole-conversation read caps far lower since it reads the full
+ * message arrays the trim exists to avoid.
  */
 export const LIST_PAGE_LIMIT = 100;
 export const FULL_MESSAGES_PAGE_LIMIT = 20;
@@ -267,12 +235,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /**
-   * Cuts a full-message page at a batch boundary.
-   *
-   * The page limit selects batches, and one batch holds every run of a suite,
-   * so a page stops before the batch that would pass the run ceiling. The cut
-   * is always at a batch boundary, because the cursor advances by batch; the
-   * first batch is kept whole so an oversized one still moves the cursor.
+   * Cuts a full-message page at a batch boundary: the page limit selects
+   * batches (one batch holds every run of a suite) so the cursor always
+   * advances by batch; the first batch is kept whole even if oversized.
    */
   static capRunsAtBatchBoundary({
     runs,
@@ -536,25 +501,11 @@ export class SimulationClickHouseRepository extends SimulationRepository {
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
 
-    // Bound the heavy step-2 read to the StartedAt window of the batches on this
-    // page (aggregated in step 1) so it prunes partitions instead of scanning
-    // every weekly partition including cold storage — routed through
-    // queryWindowed so the outcome lands on clickhouse_windowed_read_total{table}
-    // exactly once per call (ADR-067):
-    //
-    //   - Page has a StartedAt range: the read runs windowed and is metered
-    //     `hit` — the cheap, pruned path.
-    //   - Page has no usable StartedAt (empty / provisional): the hint is null,
-    //     so the read runs unbounded and is metered `unwindowed`. This is the
-    //     widening the old empty-clause helper did *silently*; it is now counted.
-    //
-    // The page carries a [min, max] RANGE, not a point, so it maps as a midpoint
-    // hint with a half-range window — the emitted fragment covers exactly
-    // [min, max]. fallback "none": step 1 already bounded these batches to
-    // [min, max], so a run's latest StartedAt always lies inside the window; an
-    // empty windowed read is a genuine empty page and is never widened (widening
-    // here would issue a second unbounded scan the old code never did, changing
-    // the SQL that runs — precisely what byte-identical adoption forbids).
+    // Bounds the heavy step-2 read to the page's StartedAt window (from step
+    // 1) via queryWindowed so it's metered exactly once (ADR-067): a range
+    // runs windowed/hit; no usable range runs unbounded/unwindowed (the old
+    // silent widening, now counted). fallback "none": step 1 already bounded
+    // these batches, so an empty windowed read is a genuine empty page.
     const startedAtBounds = SimulationClickHouseRepository.tryStartedAtBoundsForPage(pageRows);
 
     // Step 2: fetch slim item rows (preview columns only)
@@ -656,11 +607,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /**
-   * One batch's counts, addressed by its batch run id alone.
-   *
-   * The batch run id is unique inside the tenant, so the read needs no scenario
-   * set and skips the preview items the history page fetches. Returns null when
-   * the tenant holds no run for that batch.
+   * One batch's counts, addressed by batch run id alone — unique inside the
+   * tenant, so this skips the scenario set and preview items the history page
+   * fetches. Returns null when the tenant holds no run for that batch.
    */
   async tryGetBatchSummary({
     projectId,
@@ -933,11 +882,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /**
-   * The newest UpdatedAt across every live run, for the cheap change check.
-   *
-   * Reads the same rows the page reads. An agent test run is left out here
-   * too: it never reaches the page, so counting it would report a change the
-   * page cannot show and hold the caller's freshness cursor still.
+   * Newest UpdatedAt across every live run, for the cheap change check. Reads
+   * the same rows the page reads; an agent test run is excluded here too
+   * since it never reaches the page and would report a phantom change.
    */
   private async readMaxUpdatedAt(projectId: string): Promise<number> {
     const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
@@ -952,13 +899,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /**
-   * One page of batch ids, newest first, with the cursor and the date filter
-   * applied.
-   *
-   * NOTE: The aggregate is aliased as NormalizedSetId (not ScenarioSetId) on
-   * purpose — aliasing as ScenarioSetId would shadow the underlying column
-   * referenced in the dedup IN-tuple below, causing ClickHouse to reject the
-   * query with "Aggregate function ... is found in WHERE in query".
+   * One page of batch ids, newest first, cursor + date filter applied. NOTE:
+   * aliased as NormalizedSetId, not ScenarioSetId, on purpose — aliasing as
+   * ScenarioSetId would shadow the dedup IN-tuple's column and ClickHouse would reject the query.
    */
   private async selectBatchPage({
     projectId,
@@ -1202,10 +1145,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /**
-   * ⚠️  KEEP IN SYNC: The content panel computes pass rate on the frontend
+   * ⚠️  KEEP IN SYNC: the content panel computes pass rate on the frontend
    * with its own formula (passed / settled, excluding in-progress/queued).
-   * If you change the aggregation here, also update:
-   *   - run-history-transforms.ts → computeGroupSummary() (content panel)
+   * Update run-history-transforms.ts → computeGroupSummary() too.
    */
   private async getSetSummaries({
     projectId,
@@ -1283,14 +1225,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /**
-   * The latest run result per scenario inside the window, for the last-result
-   * cells of the scenarios table.
-   *
-   * "Latest" is resolved with argMax over UpdatedAt across the scenario's
-   * deduped runs, matching how every other latest-wins read in this file
-   * picks a row. The dedup subquery keeps the ArchivedAt filter honest: an
-   * archived run's older versions still carry a NULL ArchivedAt, so the
-   * filter runs on deduped rows only (the getScenarioSetsData pattern).
+   * Latest run result per scenario in the window, for the scenarios table's
+   * last-result cells. "Latest" via argMax(UpdatedAt) on deduped runs; the
+   * dedup subquery keeps ArchivedAt honest since older versions carry NULL.
    */
   async getLastResultSummaries({
     projectId,
@@ -1407,20 +1344,11 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       return new Set();
     }
 
-    // simulation_runs is a ReplacingMergeTree, so each run is read at its
-    // latest version. Rather than the IN-tuple dedup pattern — which scans the
-    // table twice (once to build the latest-version key set, once for the
-    // outer filter) and materialises a key set sized to every run — fold each
-    // run to its latest version in a single GROUP BY pass and keep the sets
-    // whose latest run is not archived. Light columns only; the distinct
-    // external set ids are identical.
-    //
-    // We fold over `argMax(ArchivedAt IS NULL, UpdatedAt)` rather than
-    // `argMax(ArchivedAt, UpdatedAt)`: ArchivedAt is Nullable, and argMax
-    // skips rows whose first argument is NULL, so a freshly un-archived run
-    // (latest ArchivedAt = NULL) would otherwise be ignored and the run would
-    // look archived. The `IS NULL` expression is non-nullable, so the fold
-    // reads the true latest version.
+    // simulation_runs is a ReplacingMergeTree; fold each run to its latest
+    // version in one GROUP BY (light columns only) rather than the two-scan
+    // IN-tuple dedup. Folds on `argMax(ArchivedAt IS NULL, UpdatedAt)`, not
+    // `argMax(ArchivedAt, ...)`, since argMax skips NULL-first-arg rows and
+    // would otherwise miss a freshly un-archived run's true latest version.
     const rows = await this.queryRows<{ ScenarioSetId: string }>(
       `SELECT DISTINCT IF(ScenarioSetId = '', '${DEFAULT_SET_ID}', ScenarioSetId) AS ScenarioSetId
        FROM (
@@ -1476,21 +1404,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /**
-   * Forward-only page of runs for a CSV export sweep.
-   *
-   * Distinct from getRunDataForAllSuites, which caps at 100 and is shaped for
-   * the UI's freshness protocol (it can answer `changed: false` and skip the
-   * read entirely). An export needs a plain chronological sweep it can drive to
-   * exhaustion, so it gets its own read rather than bending that one.
-   *
-   * Keyset (not OFFSET) pagination on (StartedAt, ScenarioRunId): OFFSET makes
-   * ClickHouse re-scan and re-sort every preceding row for each page, so a large
-   * export degrades quadratically. The tuple is unique because ScenarioRunId
-   * breaks ties within a millisecond.
-   *
-   * Reads RUN_COLUMNS, never LIST_COLUMNS — the latter nulls out Reasoning and
-   * Error and truncates the conversation to 6 messages for grid cards, which
-   * would silently ship an export with empty judge reasoning.
+   * Forward-only page for a CSV export sweep — distinct from
+   * getRunDataForAllSuites (capped, freshness-shaped); an export needs a plain
+   * chronological sweep to exhaustion via keyset (not OFFSET) pagination on (StartedAt, ScenarioRunId), reading RUN_COLUMNS (never LIST_COLUMNS, which nulls Reasoning/Error).
    */
   async findRunsForExport({
     projectId,
@@ -1571,11 +1487,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /**
-   * Keeps export rows and their count on one filter definition. Stable identity
-   * filters may narrow the dedup subquery; StartedAt may change between row
-   * versions, so its range applies only after the latest version wins. Outcome
-   * filtering stays after mapping because it uses the same derived categories
-   * as run history.
+   * Keeps export rows and their count on one filter definition. StartedAt
+   * range applies only after the latest version wins (it changes between
+   * row versions); outcome filtering stays after mapping (run history's derived categories).
    */
   private buildExportFilters({
     scenarioSetId,
@@ -1728,12 +1642,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /**
-   * Maps a batch aggregate row to the shared summary counts.
-   *
-   * stalledCount stays out: the history page counts it from the preview items it
-   * already holds, and the single-batch summary reads the StalledCount column.
-   * The note stays out for the same reason: the history page reads it off the
-   * preview rows, the single-batch summary off its own aggregate.
+   * Maps a batch aggregate row to the shared summary counts. stalledCount and
+   * note stay out: the history page reads them from its own preview items,
+   * the single-batch summary from its own aggregate/StalledCount column.
    */
   private static mapBatchAggregateRow(
     row: BatchAggregateRow,
@@ -1756,17 +1667,8 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /**
-   * Returns an IN-tuple dedup predicate for simulation_runs.
-   *
-   * simulation_runs uses ReplacingMergeTree(UpdatedAt) with dedup key
-   * (TenantId, ScenarioSetId, BatchRunId, ScenarioRunId). This predicate
-   * resolves dedup using only lightweight key columns in the inner GROUP BY,
-   * avoiding the per-row dedup anti-pattern which materializes ALL columns
-   * per granule (~8K rows).
-   *
-   * @param whereFilters - The same WHERE filters from the outer query,
-   *   duplicated here for partition pruning in the inner subquery.
-   *
+   * IN-tuple dedup for simulation_runs, resolved with lightweight key columns only.
+   * @param whereFilters - duplicated here for inner-subquery partition pruning.
    * @see dev/docs/best_practices/clickhouse-queries.md — "Safe Pattern: IN-Tuple Dedup"
    */
   private static simulationRunDedupPredicate(whereFilters: string): string {
@@ -1779,15 +1681,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /**
-   * Dedup predicate for a query that reads simulation_runs through the `t` alias.
-   *
-   * The outer columns MUST be table-qualified. RUN_COLUMNS aliases the timestamp
-   * columns to strings (`toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt`)
-   * and ClickHouse resolves WHERE against SELECT aliases, so an unqualified
-   * `UpdatedAt` here compares a String against the subquery's DateTime64 and the
-   * IN-tuple matches nothing. That failure is silent — the query succeeds and
-   * returns zero rows — so it surfaces as a mysteriously empty result rather than
-   * an error. Qualifying with `t.` binds to the column instead of the alias.
+   * Dedup predicate for a query reading simulation_runs through the `t`
+   * alias — outer columns MUST be `t.`-qualified, since RUN_COLUMNS aliases
+   * timestamps to strings and an unqualified column silently matches zero rows (String vs DateTime64) instead of erroring.
    */
   private static qualifiedDedupPredicate(whereFilters: string): string {
     return `AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
@@ -1807,17 +1703,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /**
-   * Builds date filter clauses from startDate/endDate:
-   *
-   * - `havingClause`: Filters on max(CreatedAt) for exact batch-level filtering
-   *   (post-aggregation). Used in HAVING.
-   * - `whereClause`: Filters on StartedAt for partition pruning (pre-scan).
-   *   simulation_runs is partitioned by toYearWeek(StartedAt). Without this,
-   *   ClickHouse scans ALL partitions including cold storage.
-   *
-   * Both clauses use the same startDate/endDate range but on different columns.
-   * The WHERE on StartedAt enables partition pruning (~12x faster), the HAVING
-   * on max(CreatedAt) ensures exact filtering for edge cases where they differ.
+   * Date filter clauses: `whereClause` filters StartedAt for partition
+   * pruning (simulation_runs is partitioned by toYearWeek(StartedAt); without
+   * it ClickHouse scans cold storage too), `havingClause` filters max(CreatedAt) post-aggregation for exact edge cases.
    */
   private static buildDateFilter({
     startDate,

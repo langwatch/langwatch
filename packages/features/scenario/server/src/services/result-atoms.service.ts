@@ -31,14 +31,9 @@ const HOUR_SECONDS = 60 * 60;
 const DAY_SECONDS = 24 * HOUR_SECONDS;
 
 /**
- * Reads results as atoms, and folds them the four ways the Results tab groups.
- *
- * The database does the folding. Returning atoms and grouping them in the
- * browser works for a small project and does not survive a real one: an atom
- * is one scenario run, so a suite of 50 scenarios against 2 targets running on
- * every merge produces around 60,000 atoms in 30 days, roughly 27 MB of JSON.
- * The overview therefore aggregates server-side and the atom list is a bounded
- * drill-down, not the source the page adds up.
+ * Reads results as atoms and folds them the four ways the Results tab
+ * groups — server-side, since a suite of 50 scenarios x 2 targets on every
+ * merge produces ~60,000 atoms (~27 MB JSON) in 30 days; the atom list is a bounded drill-down, not what the page adds up.
  */
 export class ResultAtomsService {
   static create(
@@ -54,11 +49,9 @@ export class ResultAtomsService {
   ) {}
 
   /**
-   * How wide one bucket of the pass-rate chart is, from the width of the window.
-   *
+   * How wide one bucket of the pass-rate chart is, from the window's width.
    * A fixed bucket count would make a one-day window draw 30 buckets of 48
-   * minutes, which reads as precision the data does not have. Anchoring on time
-   * instead keeps a bucket a unit a person recognises.
+   * minutes, reading as precision the data doesn't have; anchoring on time keeps a bucket a unit a person recognises.
    */
   static bucketSecondsFor({ startDate, endDate }: { startDate: number; endDate: number }): number {
     const days = (endDate - startDate) / (DAY_SECONDS * 1000);
@@ -125,10 +118,9 @@ export class ResultAtomsService {
   }
 
   /**
-   * The targets the window names that the stored lists cannot, for the
-   * target filter: those named by a run from code, and the parameter
-   * variants of stored targets. Read over the window alone, for the same
-   * reason the scenarios that ran from code are.
+   * Targets the window names that stored lists cannot, for the target
+   * filter: those named by a code-run, and parameter variants of stored
+   * targets — read over the window alone, for the same reason code-run scenarios are.
    */
   async getRunTargets({
     projectId,
@@ -207,17 +199,9 @@ export class ResultAtomsService {
   }
 
   /**
-   * Turns a label or a test suite filter into the scenario ids it names.
-   *
-   * Labels and test suite membership live in Postgres and the run row carries
-   * neither, so this is the only place the two stores meet. The result
-   * INTERSECTS with an explicit scenario filter rather than replacing it: two
-   * filters both narrow, and a union would widen the page when a person added
-   * a second condition.
-   *
-   * An intersection that comes out empty stays empty. The repository reads an
-   * empty list as "none of them" and sends no query, which is what a filter
-   * matching nothing should do.
+   * Turns a label or test-suite filter into the scenario ids it names — the
+   * only place Postgres labels/suite membership meet the run row, which
+   * carries neither. INTERSECTS with an explicit scenario filter (two filters both narrow); an empty result stays empty, read as "none of them".
    */
   private async resolveScenarioScope(filter: ResultsFilter): Promise<ResultsFilter> {
     const hasLabels = (filter.labels?.length ?? 0) > 0;
@@ -242,12 +226,9 @@ export class ResultAtomsService {
   }
 
   /**
-   * The project's run plans, keyed both ways.
-   *
-   * Read whole rather than by the ids the window happens to hold, because the
-   * plan grouping must list a plan that did not run: the person who opens this
-   * page to check on a plan they are worried about is exactly the person whose
-   * plan has been quiet.
+   * The project's run plans, keyed both ways. Read whole rather than by the
+   * ids the window holds, because the plan grouping must list a plan that
+   * didn't run — the worried person checking on a quiet plan is exactly who this is for.
    */
   private async readPlans(projectId: string): Promise<PlanIndex> {
     const plans = await this.scenarios.findPlans({ projectId });
@@ -262,11 +243,9 @@ export class ResultAtomsService {
   }
 
   /**
-   * The name each group row reads under.
-   *
-   * Only the scenario grouping needs a second read: a plan is already in the
-   * plan index, a target is named by the client from its reference id, and a
-   * group of one execution takes its title from the run itself.
+   * The name each group row reads under. Only the scenario grouping needs a
+   * second read: a plan is already in the plan index, a target is named by
+   * the client from its reference id, and a one-execution group takes its title from the run itself.
    */
   private async readGroupTitles({
     projectId,
@@ -311,11 +290,9 @@ interface PlanIndex {
 }
 
 /**
- * Where a group row takes its title from.
- *
- * The two arms are told apart by `kind`, so the scenario arm must be excluded
- * from the other one: a `kind` that still holds "scenario" on both arms
- * narrows to neither and the map is then unreachable.
+ * Where a group row takes its title from. The two arms are told apart by
+ * `kind`, so the scenario arm must be excluded from the other: a `kind`
+ * holding "scenario" on both arms narrows to neither, and the map is unreachable.
  */
 type GroupTitles =
   | { kind: "scenario"; byId: Map<string, { title: string; subtitle: string }> }
@@ -339,11 +316,9 @@ function targetParametersOf(raw: string): RunParameterValues | null {
 }
 
 /**
- * How a set id reads when no suite owns it.
- *
- * A code-pushed set keeps the name the SDK gave it, which is what the person
- * who pushed it will recognise. The on-platform ad-hoc set has a friendly name
- * of its own, because its raw id is an internal namespace nobody chose.
+ * How a set id reads when no suite owns it: a code-pushed set keeps the
+ * SDK-given name (what the pusher recognises), and the on-platform ad-hoc
+ * set has its own friendly name, since its raw id is an internal namespace nobody chose.
  */
 function planFor(setId: string, plans: Map<string, PlanRecord>): PlanRecord {
   const known = plans.get(setId);
@@ -480,10 +455,9 @@ function headline({
 }
 
 /**
- * A pass rate as a percentage, or null when nothing settled.
- *
- * Null and zero are different colours: a run still in flight is not a run that
- * failed, and coercing one to the other paints an unfinished plan red.
+ * A pass rate as a percentage, or null when nothing settled. Null and zero
+ * are different colours: a run still in flight is not a run that failed,
+ * and coercing one to the other paints an unfinished plan red.
  */
 function rate(passed: number, settled: number): number | null {
   if (settled <= 0) {
@@ -506,11 +480,9 @@ function toCost({
 }
 
 /**
- * Sparkline points per group, oldest first, capped.
- *
- * When a group holds more than the cap, the MOST RECENT points are kept: a
- * sparkline is read to see where a plan is heading, so the distant past is what
- * can be dropped.
+ * Sparkline points per group, oldest first, capped. When a group holds
+ * more than the cap, the MOST RECENT points are kept: a sparkline is read
+ * to see where a plan is heading, so the distant past is what can be dropped.
  */
 function foldTrend(rows: RawTrendRow[]): Map<string, TrendPoint[]> {
   const byGroup = new Map<string, RawTrendRow[]>();
@@ -542,11 +514,9 @@ function foldTrend(rows: RawTrendRow[]): Map<string, TrendPoint[]> {
 }
 
 /**
- * Every bucket in the window, including the ones nothing ran in.
- *
- * A missing bucket is returned as empty rather than dropped, so the chart draws
- * a gap. A zero-height bar there would read as a run in which everything
- * failed, which is the opposite of what an empty bucket means.
+ * Every bucket in the window, including the ones nothing ran in. A missing
+ * bucket is returned as empty rather than dropped, so the chart draws a
+ * gap — a zero-height bar would read as total failure, the opposite of what an empty bucket means.
  */
 function fillSeries({
   rows,
@@ -578,11 +548,9 @@ function fillSeries({
 }
 
 /**
- * Adds the plans that did not run in the window, so none of them vanishes.
- *
- * They read as nothing in the period: no runs, no scenarios, no pass rate and
- * an empty trend. Dropping them would hide exactly the plan a worried person
- * came to check on.
+ * Adds the plans that did not run in the window, so none of them vanishes
+ * — they read as nothing in the period (no runs, no scenarios, no pass
+ * rate, empty trend). Dropping them would hide exactly the plan a worried person came to check on.
  */
 function withQuietPlans({
   groups,

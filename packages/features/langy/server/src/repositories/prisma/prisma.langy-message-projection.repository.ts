@@ -3,8 +3,6 @@ import type { LangyMessageProjectionRecord } from "@langwatch/langy-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 import type { LangyDatabase } from "./langy-database.port";
 
-type Row = Prisma.LangyMessageProjectionGetPayload<object>;
-
 /** Append-only Postgres adapter for operational message rows. */
 export class PrismaLangyMessageProjectionRepository implements AppendStore<LangyMessageProjectionRecord> {
   constructor(private readonly prisma: LangyDatabase) {}

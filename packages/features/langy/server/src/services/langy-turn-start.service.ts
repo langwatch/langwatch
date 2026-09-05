@@ -3,12 +3,10 @@ import {
   LangyEmptyMessageError,
   LangyIdempotencyMismatchError,
   LangyInsufficientScopeError,
-  LangyModelNotAllowedError,
   LangyModelNotConfiguredError,
   LangyTurnInProgressError,
   extractLangyTextFromParts,
 } from "@langwatch/langy-contract";
-import { createLogger } from "@langwatch/observability";
 import { trace } from "@opentelemetry/api";
 import { LangyTurnAttemptService } from "./langy-turn-attempt.service";
 import { LangyTurnBaseDependenciesService } from "./langy-turn-base-dependencies.service";
@@ -20,7 +18,6 @@ import {
 } from "./langy-turn.shared";
 import { LangySessionKeyScopeError } from "../ports/langy-turn-runtime.port";
 
-const logger = createLogger("langwatch:langy:turn-start");
 type ClaimedTurn = {
   conversation: { id: string; isNew: boolean };
   turnId: string;

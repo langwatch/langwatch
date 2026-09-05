@@ -15,7 +15,6 @@
  */
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import { z } from "zod";
 import { LangyTrpcApi, type LangyTrpcContext } from "../langy.api";
 
 const PROJECT_ID = "project_1";

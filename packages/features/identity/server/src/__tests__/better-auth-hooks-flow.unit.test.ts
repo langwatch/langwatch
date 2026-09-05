@@ -25,11 +25,7 @@
  * Hermetic (no database, no network), so it stays in the unit bucket like
  * the app's `resetRecoversOauthUser.test.ts`.
  */
-import type {
-  IdentityCommand,
-  IdentityFact,
-  IdentityFactInput,
-} from "@langwatch/identity-contract";
+import type { IdentityCommand } from "@langwatch/identity-contract";
 import type { BetterAuthOptions } from "better-auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
@@ -37,7 +33,6 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { IdentityCeremonies } from "../better-auth/identity-ceremonies";
 import { IdentityGuards } from "../guards";
 import { newIdentityCommandId } from "../identity-command-id";
-import type { IdentityLedger } from "../identity-ledger";
 import type { IdentityUsersRepository } from "../identity-users.repository";
 import { IdentityService } from "../identity.service";
 import {
