@@ -41,20 +41,12 @@ export type PostgresSsoConnectionPipelineOptions = {
   database: SsoConnectionPipelineDatabase;
   /**
    * The runtime this pipeline is registered on.
-   *
-   * Taken rather than a resolved event store and sender, because the teardown
-   * grace wake dispatches `completeTeardown` back into this same pipeline: a
-   * writer that resolved its sender eagerly could only be built after the
-   * pipeline it needs, and this graph would then have no order that composes.
    */
   eventSourcing: EventSourcing;
   /**
-   * The deployment's operator list, as a port.
-   *
-   * `ADMIN_EMAILS` is the same variable that already decides who reaches the
-   * back office, and deliberately not `ops:*` — if that permission ever
-   * widens, "who may attest a customer's domain" must not widen with it
-   * silently. The composition root reads it once; unset means nobody.
+   * The deployment's operator list, as a port. `ADMIN_EMAILS` is the same variable that already
+   * decides who reaches the back office, and deliberately not `ops:*` — if that permission ever
+   * widens, "who may attest a customer's domain" must not widen with it silently.
    */
   operators: PlatformOperatorPort;
   /** How a torn-down connection's directory tokens are retired, if at all. */
@@ -62,24 +54,9 @@ export type PostgresSsoConnectionPipelineOptions = {
 };
 
 /**
- * The Postgres composition seam for the SSO connection pipeline (D04,
+ * The Postgres composition seam for the SSO connection pipeline (D04, This is the ONLY graph that
+ * can advance TEARDOWN_PENDING to TORN_DOWN:
  * ADR-117 §5).
- *
- * This is the ONLY graph that can advance TEARDOWN_PENDING to TORN_DOWN: the
- * transition happens through the process manager's wake and nowhere else, so
- * a connection whose teardown was requested sits at pending for as long as no
- * process registers this pipeline.
- *
- * What used to keep the graph in the application was the teardown port, whose
- * wake dispatched through a service bound to the App singleton and then
- * revoked directory tokens through the SCIM capability. Both are seams now:
- * the ledger resolves its event store and sender off the runtime it is
- * registered on, and the revocation is a one-method port a process without a
- * directory answers by name.
- *
- * The head is composed ONCE and shared: the guards read the state the fold
- * writes, and two instances reading one table would still agree today, but the
- * seam is what makes a divergent second reader unexpressible.
  */
 export class PostgresSsoConnectionPipelineAdapter {
   static create(

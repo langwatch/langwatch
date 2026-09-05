@@ -1,23 +1,7 @@
 /**
+ * Issue #6634 (key finding i):
  * @vitest-environment node
- *
- * Issue #6634 (key finding i): `workflow.api_key` on the execute_flow
- * request nlpgo receives is the LangWatch PLATFORM API key (`X-Auth-Token`
- * nlpgo uses to call back into the platform — agentblock/workflow_runner.go,
- * evaluatorblock/executor.go, engine.go), never an LLM provider credential.
- * The registry used to pass `modelParams.api_key` (an LLM key) into the
- * workflow/code adapter constructors, which is a latent 401 for any
- * agent/evaluator/custom node in that workflow — masked in scenario runs
- * only because `run_evaluations: false` skips the path that would surface
- * it.
- *
- * These tests exercise `SerializedAgentRegistryAdapter.build` (the actual composition point, not
- * an adapter constructed by hand) and assert on the EMITTED request body —
- * asserting a constructor argument would pass even if the registry still
- * wired the wrong value through, since nothing downstream would catch it.
- *
  * @see specs/scenarios/simulation-run-model-resolution.feature
- *   ("The workflow/code adapter sends the project's platform API key")
  */
 import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";

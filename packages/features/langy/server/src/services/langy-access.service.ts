@@ -1,14 +1,9 @@
 import type { FeatureFlagService, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 
 /**
- * The rollout flag Langy access hangs off, and the only lever that opens it.
- *
- * Declared here rather than imported: the other holder of the key is a BROWSER
- * module (`useShowLangy`), which a server package may not reach. The key is
- * the flag registry's own identifier, so the registry is what pins the two
- * together, not a shared constant. Registered with `defaultValue: false`, so
- * Langy is dark everywhere until the flag is turned on for a project, an
- * organization, or a user.
+ * The rollout flag Langy access hangs off, and the only lever that opens it. Declared here rather
+ * than imported: the other holder of the key is a BROWSER module (`useShowLangy`), which a server
+ * package may not reach.
  */
 export const LANGY_RELEASE_FLAG = "release_langy_enabled" as const;
 

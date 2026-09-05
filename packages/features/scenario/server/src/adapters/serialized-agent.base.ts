@@ -1,14 +1,6 @@
 /**
- * The base of every serialized adapter: what a target keeps between the
- * turns of one conversation.
- *
- * An agent may answer a turn with a `session`, an opaque JSON value it owns
+ * The base of every serialized adapter: what a target keeps between the turns of one conversation.
  * for that conversation (ADR-128). The platform holds it here, per thread,
- * for the life of the run, and the adapter sends it back on the next turn of
- * the same thread. Nothing else ever reads or writes it, so the agent keeps
- * its own state with no stickiness and no store of its own. The value is
- * capped so a session never grows into a copy of the conversation that every
- * later turn has to carry.
  */
 
 import { AgentAdapter } from "@langwatch/scenario";
@@ -54,12 +46,9 @@ export abstract class SerializedAgentAdapter extends AgentAdapter {
   }
 
   /**
-   * Keep what the agent returned for the thread. An absent value (`undefined`)
-   * is a turn that said nothing about the session, and leaves the held value
-   * as it was; `null` is a value the agent chose and is kept as such.
-   *
-   * @throws AgentSessionTooLargeError when the value is above the cap. The
-   *   held value is untouched, so the thread keeps what it had.
+   * Keep what the agent returned for the thread. An absent value (`undefined`) is a turn that said
+   * nothing about the session, and leaves the held value as it was; `null` is a value the agent
+   * chose and is kept as such. @throws AgentSessionTooLargeError when the value is above the cap.
    */
   protected storeSession({ threadId, session }: { threadId: string; session: unknown }): void {
     if (session === undefined) return;

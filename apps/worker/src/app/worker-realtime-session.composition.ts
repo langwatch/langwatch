@@ -1,18 +1,5 @@
 /**
  * Reconciling brokered voice sessions the post-call webhook never closed.
- *
- * The webhook is the fast path and it is one slot per ElevenLabs workspace — a
- * slot a customer may already be using for something else. Without this loop
- * the broker would need that slot before a customer could adopt it at all, so
- * the poller is what makes the webhook an optimisation rather than a
- * prerequisite for being billed correctly.
- *
- * The poll is EXACT rather than a guess: the mint recorded the vendor's own
- * conversation id, and each open session is read back by that id. A session
- * with no recorded id is left alone and settles as cost-unknown on the spend
- * grace, which is visible, instead of being charged whatever conversation
- * happened to be nearby.
- *
  * @see specs/ai-gateway/realtime-sessions.feature
  */
 
@@ -39,11 +26,9 @@ import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 
 const realtimeSessions = GatewayRealtimeSessionService.create();
 /**
- * Reports the composition decision an absent poller would otherwise hide.
- *
- * Silent in production, and expensive: brokered voice spend then settles only
- * when a customer's post-call webhook arrives, and a workspace that never
- * configured one bills nothing at all.
+ * Reports the composition decision an absent poller would otherwise hide. Silent in production, and
+ * expensive: brokered voice spend then settles only when a customer's post-call webhook arrives,
+ * and a workspace that never configured one bills nothing at all.
  */
 export abstract class WorkerRealtimeSessionAbsenceReportPort {
   abstract withoutPoller(reason: "no-typed-prisma-connection" | "no-encryption-key"): void;
@@ -54,12 +39,9 @@ export type WorkerRealtimeSessionCompositionInput = Readonly<{
   /** The deployment's stored-credential key, which a provider row is read under. */
   encryptionKey: string | undefined;
   /**
-   * The gateway spend pipeline's own `confirmSpend`, as this process registered
-   * it.
-   *
-   * A reconciled session confirms into the SAME pipeline the data plane's own
-   * drainer sends to: two paths writing one spend record is how they come to
-   * disagree about what a call cost.
+   * The gateway spend pipeline's own `confirmSpend`, as this process registered it. A reconciled
+   * session confirms into the SAME pipeline the data plane's own drainer sends to: two paths
+   * writing one spend record is how they come to disagree about what a call cost.
    */
   spendConfirmation: GatewaySpendConfirmationPort;
   absence?: WorkerRealtimeSessionAbsenceReportPort;
@@ -104,11 +86,6 @@ export function tryCreateWorkerRealtimeSessionPoller(
 
 /**
  * The session rows, read and closed through the feature's own operations.
- *
- * Only the LISTING is a query of this module's own: everything that changes a
- * row goes through the gateway package's exported operations, so a session
- * closed by the poller and one closed by the webhook take the same path
- * through the same idempotency.
  */
 class WorkerRealtimeSessionRepository {
   static create(options: {
@@ -201,11 +178,9 @@ class WorkerElevenLabsCredentials implements ElevenLabsCredentialReader {
 }
 
 /**
- * A provider row's stored keys, read leniently.
- *
- * A legacy plaintext row, an absent column and a value written under a rotated
- * key all read as "no custom keys" rather than throwing: one unreadable
- * credential must not stop the sweep that settles every other session.
+ * A provider row's stored keys, read leniently. A legacy plaintext row, an absent column and a
+ * value written under a rotated key all read as "no custom keys" rather than throwing: one
+ * unreadable credential must not stop the sweep that settles every other session.
  */
 class WorkerGatewayModelProviderCredentials extends GatewayModelProviderCredentialsPort {
   static create(encryption: AesGcmSecretEncryptionAdapter): WorkerGatewayModelProviderCredentials {
@@ -224,16 +199,6 @@ class WorkerGatewayModelProviderCredentials extends GatewayModelProviderCredenti
 
 /**
  * One conversation, read back from the vendor.
- *
- * Fenced rather than a plain `fetch`, and redirects refused outright: the base
- * URL comes from a customer-configured credential and the request carries that
- * customer's `xi-api-key`, so a followed redirect would hand the key to
- * whatever host answered.
- *
- * A 404 is reported as such rather than as a failure to read. A credential
- * minted and never used produces no conversation at all, so the vendor answers
- * 404 for it forever, and polling it every minute until the expiry sweep is an
- * hour of pointless vendor calls per unused mint.
  */
 class WorkerElevenLabsConversations implements ElevenLabsConversationReader {
   static create(): WorkerElevenLabsConversations {

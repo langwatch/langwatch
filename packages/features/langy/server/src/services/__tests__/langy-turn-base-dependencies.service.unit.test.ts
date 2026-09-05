@@ -1,8 +1,7 @@
 /**
- * LangyTurnBaseDependenciesService resolves the harness once per turn and
- * threads it into credentials — from there it rides along on the worker
- * probe, the handoff stash, and the dispatch payload, unset when no harness
- * resolver is composed.
+ * LangyTurnBaseDependenciesService resolves the harness once per turn and threads it into
+ * credentials — from there it rides along on the worker probe, the handoff stash, and the dispatch
+ * payload, unset when no harness resolver is composed.
  */
 import { describe, expect, it, vi } from "vitest";
 import type { LangyWorkerProbeInput } from "../../ports/langy-turn-runtime.port";

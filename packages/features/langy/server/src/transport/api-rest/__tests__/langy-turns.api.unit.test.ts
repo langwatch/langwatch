@@ -1,10 +1,6 @@
 /**
- * `Prefer: wait=<seconds>` synchronous delivery and the dark-rollout refusal
- * chain on `/api/langy/conversations`, driven through the real route.
- *
- * Ports are faked rather than the framework auth chain: every route on this
- * family declares `handlerManagedAuth`, so `resolveLangyRestCaller` IS the
- * authentication, and the security spine below authenticates nothing.
+ * `Prefer: wait=<seconds>` synchronous delivery and the dark-rollout refusal chain on
+ * `/api/langy/conversations`, driven through the real route.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import {
@@ -15,10 +11,7 @@ import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyApp } from "#app/langy.app";
-import {
-  createLangyTurnsRestApp,
-  type LangyTurnsRestPorts,
-} from "../langy-turns.api";
+import { createLangyTurnsRestApp, type LangyTurnsRestPorts } from "../langy-turns.api";
 
 const PROJECT_ID = "project-123";
 const ORGANIZATION_ID = "org-1";
@@ -54,7 +47,11 @@ type TailPage = {
   truncated: boolean;
 };
 
-const emptyTail: TailPage = { events: [], cursor: { acceptedAt: 0, eventId: "" }, truncated: false };
+const emptyTail: TailPage = {
+  events: [],
+  cursor: { acceptedAt: 0, eventId: "" },
+  truncated: false,
+};
 
 /** No route here is expected to throw, so a failure must be legible, not swallowed. */
 const renderUnexpected: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);
@@ -160,8 +157,7 @@ function buildApi(options: { surfaceOpen?: boolean } = {}) {
     // Same app, a path that was never registered — the ground truth the dark
     // surface has to match (sharing the app matters: it proves no handler in
     // THIS chain overrides the default 404).
-    unmounted: () =>
-      app.request("http://api.test/api/langy/not-a-real-route", { method: "POST" }),
+    unmounted: () => app.request("http://api.test/api/langy/not-a-real-route", { method: "POST" }),
   };
 }
 

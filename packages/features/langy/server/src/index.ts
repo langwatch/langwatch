@@ -214,14 +214,8 @@ export type {
   TurnSettlement,
 } from "./streaming/langy-turn-settlement-waiter";
 
-// ---------------------------------------------------------------------------
-// The four public and internal REST doors.
-//
-// The turn surface and the UI-action surface share one credential chain
-// (`langy-rest.credentials`), because the ORDER of its refusals — credential,
-// dark 404, ceiling, identity — is the contract rather than an implementation
-// detail, and two copies of it would drift into two different leaks.
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------- The four public and
+// internal REST doors.
 export {
   createLangyTurnsRestApp,
   type LangyTurnsRestPorts,

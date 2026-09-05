@@ -12,30 +12,22 @@ type WorkerPipelineDefinition = Parameters<WorkerEventingRuntime["eventSourcing"
 /** Gateway spend's worker-facing capability after its graph is composed. */
 export interface GatewaySpendWorkerCapability<TSettleSpend = unknown> {
   /**
-   * Builds the spend definition: gateway requests as aggregates, spend records
-   * as a fold over `gateway_spend`, and rating inside the pipeline. The
-   * settlement sweeper, the webhook delivery process manager and the debit
-   * adapter are already bound by the composition root.
+   * Builds the spend definition: gateway requests as aggregates, spend records as a fold over
+   * `gateway_spend`, and rating inside the pipeline. The settlement sweeper, the webhook delivery
+   * process manager and the debit adapter are already bound by the composition root.
    */
   buildProcessing(): WorkerPipelineDefinition;
   /**
-   * Hands the settlement sweeper its own pipeline's `settleSpend` sender.
-   *
-   * The sweeper is part of the definition being built, so it cannot receive
-   * the sender as a constructor argument. The legacy registry resolved this by
-   * looking the pipeline up by name from inside the sweep, which meant a
-   * mis-registered graph failed at settlement time, tenant by tenant. Binding
-   * it once here moves that failure to boot.
+   * Hands the settlement sweeper its own pipeline's `settleSpend` sender. The sweeper is part of
+   * the definition being built, so it cannot receive the sender as a constructor argument.
    */
   connectSettlement(sendSettleSpend: (data: TSettleSpend) => Promise<void>): void;
 }
 
 /**
- * Worker registration for the Gateway spend pipeline.
- *
- * Registered only where ClickHouse is on, because the spend table has no
- * Postgres fallback, and always immediately after Governance events, whose
- * commands its debit adapter delivers into.
+ * Worker registration for the Gateway spend pipeline. Registered only where ClickHouse is on,
+ * because the spend table has no Postgres fallback, and always immediately after Governance events,
+ * whose commands its debit adapter delivers into.
  */
 export class GatewaySpendWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
@@ -52,13 +44,9 @@ export class GatewaySpendWorkerFeatureInstaller implements WorkerFeatureInstalle
   );
 
   /**
-   * The pipeline's own `confirmSpend`, safe to hand over before this installer
-   * runs.
-   *
-   * The realtime voice reconciler confirms a settled call through it, and the
-   * reconciler is composed before any pipeline is registered. A callable proxy
-   * is what lets the two be wired in composition order without the confirmation
-   * being silently dropped by a sender that does not exist yet.
+   * The pipeline's own `confirmSpend`, safe to hand over before this installer runs. The realtime
+   * voice reconciler confirms a settled call through it, and the reconciler is composed before any
+   * pipeline is registered.
    */
   readonly spendConfirmation: GatewaySpendConfirmationPort = new DeferredGatewaySpendConfirmation(
     this.confirmSpend.fn,

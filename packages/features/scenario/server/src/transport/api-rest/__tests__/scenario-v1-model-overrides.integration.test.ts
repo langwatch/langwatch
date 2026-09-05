@@ -1,8 +1,5 @@
 /**
  * The `/api/scenarios` REST family's model-override and turn-limit fields,
- * driven through the real Hono app `createScenariosRestApp` mounted over a
- * real `ScenarioService` on an in-memory `ScenarioRepository`.
- *
  * @see specs/scenarios/scenario-api.feature
  */
 import {

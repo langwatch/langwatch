@@ -281,14 +281,11 @@ export class ScenarioPrefetchCompletionService {
 
       return { success: true, adapter, simulator: simulatorModel, judge: judgeModel };
     } catch (error) {
-      // A project with no model set for scenarios is the customer's to fix and
-      // carries its own remediation message, so it is named rather than left
-      // reasonless — otherwise the caller cannot tell it from a fault of ours.
-      //
-      // Any other failure here is ours. `error` reaches the customer as the
-      // reason a run was refused, so only a message LangWatch authored may go
-      // in it. A HandledError carries a customer-safe message by contract;
-      // everything else is logged and named in one sentence.
+      // A project with no model set for scenarios is the customer's to fix and carries its own
+      // remediation message, so it is named rather than left reasonless — otherwise the caller
+      // cannot tell it from a fault of ours. Any other failure here is ours. `error` reaches the
+      // customer as the reason a run was refused, so only a message LangWatch authored may go in
+      // it.
       if (!(error instanceof HandledError)) {
         logger.error(
           { projectId: context.projectId, error },

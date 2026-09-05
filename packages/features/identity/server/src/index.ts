@@ -1,47 +1,7 @@
 /**
  * @langwatch/identity-server — the server-side runtime of the identity
- * platform (ADR-101, ADR-115), in the app-layer service/repository shape:
- * service CLASSES over repository INTERFACES.
- *
- *   IdentityGuards               veto-before-write over IdentityHeadsRepository;
- *                                one implementation for the calling path AND
- *                                the queue's staged re-run
- *   IdentityService              the five verbs: parse → guard → IdentityLedger.commit,
- *                                sliced by role into IdentityCeremonyWrites /
- *                                IdentityVerificationWrites / IdentityAdoptionWrites
- *   VerificationCeremonyService  PKCE magic-link mint / complete
- *   IdentityBackfillService      one user's ADR-101 §6 pass: adopt, establish,
- *                                detach orphans, prove
- *   crypto                       deriveIdentifierId, computeIdentifierHash,
- *                                mintUserHashKey, the PKCE helpers
- *   IdentityEmailService         the READ fork: User.email answered from the
- *                                identifiers for a finalized user
- *   identity-command-id          every form a command id takes, in one place
- *   identity-backfill-plan       what the legacy rows imply, as a pure plan
- *   ./better-auth                the ceremonies better-auth's databaseHooks
- *                                call; no adapter, no storage (ADR-116's
- *                                bridge phase)
- *
- * No storage engine lives here, no environment read, and no event-sourcing
- * framework: the heads, the ledger and the records are ports the app
- * implements (platform/app/src/server/app-layer/identity/repositories/ and
- * ledger.ts) and composes once in its runtime
- * (platform/app/src/server/app-layer/identity/runtime.ts). The pure half —
- * vocabulary, facts, the reducer, the errors — is `@langwatch/identity-contract`.
- *
- * Server-only by construction: nothing in the browser reaches this package,
- * and the app's frontend-boundary test fails the build the day that stops
- * being true. That is why node:crypto sits on the root entry rather than
- * behind a subpath.
- *
- * The event-sourcing layer ADR-115 split out into its own package
- * (the envelope, the command handlers, the folds, the two process managers
- * and the four pipeline definitions the worker registers) — folded back into
- * this package below, since nothing outside it composed the two separately
- * and the split had become a same-package import graph wearing two package
- * names. `IdentityProducerPipelinesAdapter` and the four
- * `Postgres*PipelineAdapter` composition seams are what apps/api and
- * apps/worker still reach from here.
+ * platform (ADR-101, ADR-115): guards, services and crypto over the app's
+ * heads/ledger/records ports. The pure half is `@langwatch/identity-contract`.
  */
 export {
   computeIdentifierHash,
@@ -65,39 +25,15 @@ export {
 } from "./identity-backfill.service";
 export { IdentityEmailService } from "./identity-email.service";
 /**
- * The synthetic issuer better-auth 1.7 expects on an account row, exported
- * from the root as well as from `./better-auth` because it is a PERSISTED
- * format rather than a better-auth shape: a process that writes a credential
- * account row has to write the issuer this mints, and every one of those
- * processes should reach the same function rather than restate the prefix.
- * Reaching it through `./better-auth` would put better-auth's own types on
- * the import graph of a composition root that never touches the library.
+ * The synthetic issuer better-auth 1.7 expects on an account row. Exported
+ * from the root, not just `./better-auth`, because it is a PERSISTED format
+ * every writer of a credential account row must reach and reuse.
  */
 export { issuerForProviderId } from "./better-auth/account-queries";
 /**
- * The row mappings the fold writes through and every guard reads back
- * through. Exported because the Postgres projection stores that write these
- * rows live beside the fold that owns their shape, in this same package, and
- * a second copy of either mapping would eventually disagree with this one
- * about what a column means.
- */
-/**
+ * The row mappings the fold writes through and every guard reads back through.
  * The identity platform's event-sourcing layer (ADR-101, ADR-115, ADR-116,
  * ADR-117), folded into this package in the core-application exit: the
- * framework envelope over `@langwatch/identity-contract`'s fact payloads,
- * the thin command handlers that run this package's own guards, the fold
- * projections, the two process managers, the four pipeline definitions the
- * worker registers, and the Postgres binding of the two folds this package
- * owns outright — the Identifier/MfaEnrollment head and the ScimSyncState
- * head — behind postgres.*.adapter seams. Every factory still takes its
- * stores and ports as arguments; the app supplies the connection-teardown
- * and join-lifecycle ports.
- *
- * Producer variants exist for a process that only SENDS commands on a
- * pipeline (the API): the same definition the worker drains, with every
- * consumer-side dependency (a fold store, a guard's reads, mail, teardown)
- * a stand-in that refuses by name if ever called, so a producer's routing
- * triple can never drift from the worker's.
  */
 export { IdentityProducerPipelinesAdapter } from "./adapters/producer.identity-pipelines.adapter";
 export {
@@ -249,17 +185,11 @@ export {
   type VerificationCeremonyDeps,
 } from "./verification-ceremony.service";
 
-// ---------------------------------------------------------------------------
-// The composition half the platform application used to own
-//
-// Every module below was `platform/app/src/server/app-layer/identity/`: the
-// Postgres repositories the guards and the fold read and write through, the two
-// ledger writers, the join-request orchestration around the event-sourced
-// lifecycle, and the instance's sign-in method policy. They moved WHOLE — same
-// classes, same rules — with exactly three seams turned into arguments: the
-// event stack (an {@link IdentityEventingPort} rather than a service locator),
-// the shared rate-limit counter, and the deployment's four sign-in facts.
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------- The composition half
+// the platform application used to own Every module below was `platform/app/src/server/app-
+// layer/identity/`: the Postgres repositories the guards and the fold read and write through, the
+// two ledger writers, the join-request orchestration around the event-sourced lifecycle, and the
+// instance's sign-in method policy.
 export { IdentityEventingPort } from "./ports/identity-eventing.port";
 export { PlatformOperatorPort } from "./ports/platform-operator.port";
 export {

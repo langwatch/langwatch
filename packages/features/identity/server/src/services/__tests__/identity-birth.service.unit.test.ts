@@ -1,18 +1,7 @@
 /**
+ * The package's own suite proves what better-auth sees; this proves the leg ORDER,
  * @vitest-environment node
- *
  * The born-finalized entrance's SEQUENCE (ADR-116 §3).
- *
- * The package's own suite proves what better-auth sees; this proves the leg
- * ORDER, which is the part nothing else can observe. Three orderings are wrong
- * in ways that look fine from outside: staging after the rows commit means an
- * unavailable engine fails a sign-up that already created a user; claiming the
- * tenant after the facts reach the engine leaves an abandoned stream with no
- * handle for the reconciliation sweep to find it by; and adopting whatever
- * user already stands at the pinned id hands the signer somebody else's
- * account.
- *
- * Corresponds to specs/identity/identity-storage-adapter.feature.
  */
 import { IdentityGuards } from "../../guards";
 import { IdentityEngineUnavailableError } from "../../better-auth/identity-birth";

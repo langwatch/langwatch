@@ -1,17 +1,7 @@
 /**
+ * The four identity definitions, as a process that only SENDS on them builds them. What this pins
+ * is the pair of properties a producer variant exists for.
  * @vitest-environment node
- *
- * The four identity definitions, as a process that only SENDS on them builds
- * them.
- *
- * What this pins is the pair of properties a producer variant exists for. The
- * definition must be the SAME one the worker registers — same pipeline name,
- * same aggregate, same command names — because the routing triple every job
- * carries is derived from those, and two descriptions of one event stream drift
- * into jobs the worker cannot route. And every consumer-side stand-in must
- * REFUSE BY NAME rather than answer, because a fold store that silently
- * succeeded in a process that folds nothing would report a projection as
- * written when the row will never appear.
  */
 import { describe, expect, it } from "vitest";
 import { IdentityProducerPipelinesAdapter } from "../producer.identity-pipelines.adapter";
@@ -73,10 +63,9 @@ describe("given a process that produces identity commands without consuming them
     });
 
     /**
-     * The discriminator against a FORKED definition: a producer that declared
-     * only the commands it sends would still register, still dispatch, and
-     * still stamp a routing triple — one the worker's registry does not carry,
-     * so the queue would reject the job for redelivery forever.
+     * The discriminator against a FORKED definition: a producer that declared only the commands it
+     * sends would still register, still dispatch, and still stamp a routing triple — one the
+     * worker's registry does not carry, so the queue would reject the job for redelivery forever.
      */
     it("declares the same commands the Postgres composition declares", () => {
       const producer = IdentityProducerPipelinesAdapter.create({
@@ -93,11 +82,9 @@ describe("given a process that produces identity commands without consuming them
     });
 
     /**
-     * The same discriminator for `scim-sync`, and the one that decides whether
-     * an Enterprise directory's push has a history at all: the API resolves
-     * these five names out of the registration at boot, so a producer
-     * declaring four of them would fail the boot rather than lose the fifth
-     * verb's facts in one provider's nightly run.
+     * The same discriminator for `scim-sync`: the API resolves these five
+     * names out of the registration at boot, so a producer declaring four of
+     * them would fail the boot rather than lose the fifth verb's facts.
      */
     it("declares the directory-sync verbs the Postgres composition declares", () => {
       const producer = IdentityProducerPipelinesAdapter.create({
@@ -152,11 +139,9 @@ describe("given a process that produces identity commands without consuming them
     });
 
     /**
-     * The directory-sync guard's read, which is the one a producer is most
-     * likely to reach by accident: the SCIM boundary runs the SAME guards on
-     * the calling path, over the real Postgres head, and only the STAGED
-     * re-run uses the definition's copy. A stand-in that answered an empty
-     * head here would state a fact the fold has already recorded.
+     * The directory-sync guard's read, which is the one a producer is most likely to reach by
+     * accident: the SCIM boundary runs the SAME guards on the calling path, over the real Postgres
+     * head, and only the STAGED re-run uses the definition's copy.
      */
     it("refuses the directory-sync head rather than answering an empty one", async () => {
       const definition = IdentityProducerPipelinesAdapter.create({

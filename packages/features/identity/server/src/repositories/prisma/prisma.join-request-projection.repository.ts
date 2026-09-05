@@ -14,18 +14,8 @@ import type {
 } from "@langwatch/eventing";
 
 /**
+ * `JoinRequest` head and its cursor, written under the queue's per-request lock.
  * The join-request pipeline's projection store (D12, ADR-117): the Postgres
- * `JoinRequest` head and its cursor, written under the queue's per-request
- * lock.
- *
- * One row per aggregate, so the cursor rides on the row itself rather than in
- * a sibling table — and the row is written last-field-wins in one upsert,
- * which makes the whole apply the commit marker. A crash before it leaves
- * nothing; a crash after it is a completed apply.
- *
- * Nothing outside the fold writes here. A hand-edited row is not an approval,
- * it is a value the next event or the next replay overwrites — which is why
- * every answer an admin gives goes through a command.
  */
 export class PrismaJoinRequestProjectionRepository implements StateProjectionStore<JoinRequestFoldState> {
   static create(prisma: PrismaClient): PrismaJoinRequestProjectionRepository {

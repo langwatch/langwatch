@@ -88,41 +88,23 @@ export type WorkerAutomationSettlementCompositionOptions = Readonly<{
   /** Reads the recency the heartbeat sweep decides absence from. */
   heartbeat: AutomationHeartbeatPort;
   /**
-   * Where an `ADD_TO_DATASET` automation appends its mapped rows.
-   *
-   * The dataset feature's own service, narrowed to the one call this path
-   * makes. Absent exactly when this graph composed no typed Prisma client, in
-   * which case the record it would map cannot be read either.
+   * Where an `ADD_TO_DATASET` automation appends its mapped rows. The dataset feature's own
+   * service, narrowed to the one call this path makes. Absent exactly when this graph composed no
+   * typed Prisma client, in which case the record it would map cannot be read either.
    */
   datasets?: WorkerAutomationDatasetWriter | undefined;
   /**
-   * Where an `ADD_TO_ANNOTATION_QUEUE` automation puts the trace it settled.
-   *
-   * Annotation's own queueing call plus the existence check it asks for, which
-   * is trace storage's answer rather than Annotation's. Absent exactly when
-   * this graph composed no typed Prisma client, since the queue rows and the
-   * project and organization directories the write authorizes against are all
-   * on it.
+   * Where an `ADD_TO_ANNOTATION_QUEUE` automation puts the trace it settled. Annotation's own
+   * queueing call plus the existence check it asks for, which is trace storage's answer rather than
+   * Annotation's.
    */
   annotations?: WorkerAutomationAnnotationWriter | undefined;
   /**
    * Which plan a project's organization is on, for the daily persist ceiling.
-   *
-   * Absent exactly when this graph composed no typed Prisma client — the
-   * subscription rows the ceiling's tier is read from and the project directory
-   * it is resolved through are both on it — in which case the ceiling falls
-   * back to the paid tier and says so.
    */
   plans?: WorkerAutomationPlanSource | undefined;
   /**
    * What this process does about an automation that ran past its daily ceiling.
-   *
-   * The POLICY is Automation's own `RunawayContainmentService`; these are the
-   * three substrates it names that settlement does not otherwise hold — the
-   * mailer a limit notice leaves through, the directories an organization's
-   * administrators are read from, and the routed client a project's 24-hour
-   * trace count is taken on. Absent when this graph composed no tenancy, in
-   * which case there is nobody to tell.
    */
   containment?: WorkerAutomationContainment | undefined;
   redis?: RedisConnection | null;
@@ -131,12 +113,7 @@ export type WorkerAutomationSettlementCompositionOptions = Readonly<{
 }>;
 
 /**
- * The delivery collaborators settlement SHARES with the graph vertical.
- *
- * Shared deliberately. Both halves send to the same customer through the same
- * transports and count against the same hourly and daily email ceilings, so a
- * process composing two of each would let one half spend the budget the other
- * was protecting — a burst from settlement and silence from the graph alerts.
+ * The delivery collaborators settlement SHARES with the graph vertical. Shared deliberately.
  */
 export type AutomationSettlementDeliveryComposition = Readonly<{
   delivery: AutomationNotificationDeliveryPort;
@@ -149,33 +126,14 @@ export type AutomationSettlementNotifications = AutomationSettlementDeliveryComp
   Readonly<{ baseHost: string }>;
 
 /**
- * The ONE dataset write `ADD_TO_DATASET` makes, declared where it is made.
- *
- * `DatasetService` is twenty-odd methods over datasets, records, uploads and
- * chunked content; this path reaches one, and it is the same one the
- * application called. Naming the method rather than the service is what keeps a
- * process that settles matches from having to compose the upload half.
+ * The ONE dataset write `ADD_TO_DATASET` makes, declared where it is made. `DatasetService` is
+ * twenty-odd methods over datasets, records, uploads and chunked content; this path reaches one,
+ * and it is the same one the application called.
  */
 export type WorkerAutomationDatasetWriter = Pick<DatasetService, "batchCreateRecords">;
 
 /**
  * The annotation-queue write, and the trace-existence check it asks for.
- *
- * Both members are named off `createOrUpdateQueueItems` rather than restated,
- * so this process cannot drift from the call it makes: `annotations` is
- * Annotation's own service and `findExistingTraceIds` is the answer Annotation
- * deliberately does NOT give itself — which trace ids a project actually holds
- * is trace storage's question, and answering it anywhere else would queue items
- * a reviewer can open and never read.
- */
-/**
- * The plan lookup behind the persist ceiling, and the directory it goes through.
- *
- * Two collaborators rather than one because the ceiling is keyed by PROJECT and
- * a plan is bought by an ORGANIZATION: `AutomationPersistCapService` owns that
- * hop, along with the ten-minute cache and the fall back to the paid tier when
- * the lookup itself fails — so a plan-store outage loosens the ceiling for one
- * dispatch instead of skipping a customer's matches.
  */
 export type WorkerAutomationPlanSource = Readonly<{
   plans: AutomationPlanProvider;
@@ -184,11 +142,6 @@ export type WorkerAutomationPlanSource = Readonly<{
 
 /**
  * The three substrates runaway containment adds on top of settlement's own.
- *
- * The claim leases, the trigger row it pauses and the clock it buckets a day
- * on are already this composition's; what containment needs beyond them is a
- * way to reach an administrator and a way to see how much of a project's
- * traffic one automation is claiming.
  */
 export type WorkerAutomationContainment = Readonly<{
   mailer: EmailDeliveryPort;
@@ -203,69 +156,36 @@ export type WorkerAutomationAnnotationWriter = Readonly<{
 
 /**
  * What this process CANNOT do about a settled match, said once at composition.
- *
- * Every member is a capability the application has and this process does not,
- * and each one is reported rather than inferred: a settlement graph that
- * quietly did four fifths of the job would look identical from the outside to
- * one that did all of it, right up until a customer asked why their dataset
- * never filled.
  */
 export abstract class WorkerAutomationSettlementAbsenceReportPort {
   /**
-   * The full trace record, spans and all.
-   *
-   * Two paths want it: the digest's fallback when the summary fold has not
-   * landed, and `ADD_TO_DATASET`'s row mapping. Reported by the trace-read
-   * composition rather than here, because that is where the decision is made:
-   * the read is Trace's own packaged legacy read over the typed Prisma client,
-   * and a graph given no client can compose none.
+   * The full trace record, spans and all. Two paths want it: the digest's fallback when the summary
+   * fold has not landed, and `ADD_TO_DATASET`'s row mapping.
    */
   abstract withoutTraceRecordRead(): void;
 
   /**
-   * `ADD_TO_DATASET`'s WRITE.
-   *
-   * The row MAPPING is composed unconditionally — `mapTraceToDatasetEntry` and
-   * `TRACE_EXPANSIONS` are `@langwatch/trace-contract`'s, so the columns this
-   * process fills are the columns the customer previewed. What can be absent is
-   * the dataset service the mapped rows are appended through, which is composed
-   * over the typed Prisma client and this process's own object storage.
+   * `ADD_TO_DATASET`'s WRITE. The row MAPPING is composed unconditionally —
+   * `mapTraceToDatasetEntry` and `TRACE_EXPANSIONS` are `@langwatch/trace-contract`'s, so the
+   * columns this process fills are the columns the customer previewed.
    */
   abstract withoutDatasetPersist(): void;
 
   /**
    * `ADD_TO_ANNOTATION_QUEUE`, whose writer is Annotation's own service.
-   *
-   * `createOrUpdateQueueItems` is `@langwatch/annotation-server`'s — the SAME
-   * call the application made, including the id hygiene it owns: blanks are
-   * dropped, a repeated id survives once so a rerun does not un-finish a
-   * reviewer's work, and an id no trace answers to is skipped rather than
-   * queued as an item nobody can get past. Absent exactly when this graph
-   * composed no typed Prisma client, which is also when the annotator
-   * directories the write authorizes against cannot be read.
    */
   abstract withoutAnnotationQueuePersist(): void;
 
   /**
-   * Runaway containment.
-   *
-   * Reported when this graph composed no outbound mail or no tenancy — the
-   * first leaves a limit notice with no origin to link back to, the second
-   * leaves nobody to send it to, since an automation's administrators are its
-   * ORGANIZATION's role bindings. The breach is still counted and still logged
-   * with the project, the trigger and the skipped total; what is lost is the
-   * mail and the auto-pause of a misconfigured automation.
+   * Runaway containment. Reported when this graph composed no outbound mail or no tenancy — the
+   * first leaves a limit notice with no origin to link back to, the second leaves nobody to send it
+   * to, since an automation's administrators are its ORGANIZATION's role bindings.
    */
   abstract withoutRunawayContainment(): void;
 
   /**
-   * The plan lookup behind the daily persist ceiling.
-   *
-   * Reported when this graph composed no typed Prisma client, which is when the
-   * subscription rows a tier is read from cannot be reached. The ceiling then
-   * settles on the PAID tier for every project, which is deliberately the
-   * generous answer: a background process that guessed low would skip confirmed
-   * matches a customer had bought the right to keep.
+   * The plan lookup behind the daily persist ceiling. Reported when this graph composed no typed
+   * Prisma client, which is when the subscription rows a tier is read from cannot be reached.
    */
   abstract withoutPlanResolvedPersistCap(): void;
 
@@ -273,33 +193,16 @@ export abstract class WorkerAutomationSettlementAbsenceReportPort {
   abstract withoutGraphAlertEvaluation(): void;
 
   /**
-   * Every outbound transport a settled digest would leave through.
-   *
-   * Reported when the deployment named no `BASE_HOST`. Matches still settle,
-   * still claim and still stamp their automation's last run; what cannot happen
-   * is the notification, because a digest with no origin to link back to is
-   * mail nobody can act on.
+   * Every outbound transport a settled digest would leave through. Reported when the deployment
+   * named no `BASE_HOST`.
    */
   abstract withoutNotificationDelivery(): void;
 }
 
 /**
- * Automation's settlement half, composed from this process's own substrates.
- *
- * The pipeline itself was already packaged — `createAutomationsPipeline` is the
- * feature's own definition and takes exactly three collaborators. What was not
- * packaged is the settlement EXECUTOR behind one of them, which named three
- * whole capability services (`AutomationService`, `ProjectService`,
- * `TraceService`) to reach ten methods, one method and four methods
- * respectively. Those are now three narrow ports, so this root composes the ten
- * over its own Prisma client and the five reads over its own ClickHouse rather
- * than borrowing the application's graph.
- *
- * Two of the three process managers register no routing key: `graphAlertSweep`
- * and `webhookDeliveryPrune` declare no event types, and
- * `ProcessRuntime.registerPipeline` skips the subscriber for a definition with
- * an empty event list. They still WAKE on their schedules here, which is why
- * their collaborators are composed for real rather than refused.
+ * Automation's settlement half, composed from this process's own substrates. The pipeline itself
+ * was already packaged — `createAutomationsPipeline` is the feature's own definition and takes
+ * exactly three collaborators.
  */
 export function createWorkerAutomationSettlement(
   options: WorkerAutomationSettlementCompositionOptions,
@@ -329,12 +232,11 @@ export function createWorkerAutomationSettlement(
         },
       })
     : undefined;
-  // Containment and the ledger each need the other: the ledger is what raises
-  // the breach, and the notice containment sends is filtered through the
-  // ledger's own suppression rows — the SAME rows a digest is filtered
-  // through, because two readers of that table would let one half of
-  // automation honour an unsubscribe the other ignored. The knot is tied with
-  // one late read rather than a second suppression reader.
+  // Containment and the ledger each need the other: the ledger is what raises the breach, and the
+  // notice containment sends is filtered through the ledger's own suppression rows — the SAME rows
+  // a digest is filtered through, because two readers of that table would let one half of
+  // automation honour an unsubscribe the other ignored. The knot is tied with one late read rather
+  // than a second suppression reader.
   let containment: RunawayContainmentService | undefined;
   const ledger = PostgresAutomationSettlementLedgerAdapter.create({
     prisma: options.prisma,
@@ -405,11 +307,6 @@ export function createWorkerAutomationSettlement(
 
 /**
  * The transports of a process that has none, refusing by name.
- *
- * Every member throws rather than resolving, so a deployment that settles
- * matches but named no `BASE_HOST` dead-letters its first digest with a message
- * saying exactly that — instead of claiming the send, stamping the automation
- * and delivering nothing.
  */
 function unavailableNotifications(): AutomationSettlementNotifications {
   const message =
@@ -456,17 +353,9 @@ class UnavailableNotificationDelivery extends AutomationNotificationDeliveryPort
 }
 
 /**
- * A settled match's re-check against its own trace, over the two grammars
- * automations are written in.
- *
- * Both halves are the packaged decision, so an automation confirms here the
- * way it confirmed in the application. `TraceQueryEvaluationAdapter` is
- * Trace's own LangWatchQL evaluator; `LegacyFilterMatchingService` is
- * Analytics' in-memory twin of the ClickHouse filter builder, reading the
- * settled fold state through `PreconditionTraceDataService`. Neither is
- * reimplemented here, which is the point: a matcher written twice is a
- * customer whose automation fires in the list view and stays silent in the
- * alert, or the reverse.
+ * A settled match's re-check against its own trace, over the two grammars automations are written
+ * in. Both halves are the packaged decision, so an automation confirms here the way it confirmed in
+ * the application.
  */
 class WorkerSettlementFilterEvaluator extends AutomationSettlementFilterEvaluatorPort {
   private readonly legacy = LegacyFilterMatchingService.create();
@@ -513,17 +402,6 @@ class WorkerSettlementFilterEvaluator extends AutomationSettlementFilterEvaluato
 
 /**
  * `ADD_TO_DATASET`'s row mapping, over the rules the customer previewed with.
- *
- * `mapTraceToDatasetEntry` and `TRACE_EXPANSIONS` are `@langwatch/trace-contract`'s
- * — the SAME functions the mapping editor drives its preview from — so a
- * dataset filled here holds the columns the customer saw before saving. A
- * second implementation of the expansion rules is what would fill datasets that
- * disagreed with the preview, which is why this maps rather than re-derives.
- *
- * Composed unconditionally: it is a pure function of the record it is handed,
- * so it has nothing to be absent. A process that cannot read a record never
- * reaches it (`dispatchToDataset` reads first), and one that cannot write the
- * mapped rows refuses at the writer below.
  */
 class WorkerAutomationDatasetMapper extends AutomationDatasetMapperPort {
   map(input: {
@@ -544,17 +422,6 @@ class WorkerAutomationDatasetMapper extends AutomationDatasetMapperPort {
 
 /**
  * The two persist writes, both of them the feature's own packaged call.
- *
- * The dataset half is Dataset's own `batchCreateRecords`, which is the one call
- * the application made — including the chunked `s3_jsonl` branch, because the
- * service is composed with this process's own storage resolver rather than
- * with the Postgres half alone.
- *
- * The annotation half is Annotation's own `createOrUpdateQueueItems`, so a
- * trace queued by an automation lands as the same item, with the same
- * annotator validation and the same id hygiene, as one a reviewer queues by
- * hand. Neither half re-implements anything: what this class owns is the
- * refusal when a graph was composed without the client both writes stand on.
  */
 class WorkerAutomationPersistActionWriter extends AutomationPersistActionWriterPort {
   constructor(
@@ -582,13 +449,11 @@ class WorkerAutomationPersistActionWriter extends AutomationPersistActionWriterP
     try {
       await createOrUpdateQueueItems({ ...input, ...annotations });
     } catch (error) {
-      // Annotation answers a caller who sent a malformed annotator reference
-      // with a 400, which is right for the surface a person typed it into and
-      // wrong for this one: the reference is SAVED on the automation, so it
-      // parses the same way on every redelivery. Settlement retries anything
-      // that is not a terminal `DispatchError`, so left alone this would be a
-      // page that fails forever. Named terminally instead, so it dead-letters
-      // once with the reference in the message.
+      // Annotation answers a caller who sent a malformed annotator reference with a 400, which is
+      // right for the surface a person typed it into and wrong for this one: the reference is SAVED
+      // on the automation, so it parses the same way on every redelivery. Settlement retries
+      // anything that is not a terminal `DispatchError`, so left alone this would be a page that
+      // fails forever.
       if (error instanceof AnnotationAnnotatorReferenceInvalidError) {
         throw new DispatchError({
           message: `This automation names an annotator that parses as neither a queue nor a member (${String(error.meta?.annotator ?? "")}), so a queue item cannot be written for it. Re-save the automation with a queue or a member that still exists.`,
@@ -623,11 +488,6 @@ class WorkerAutomationPersistActionWriter extends AutomationPersistActionWriterP
 
 /**
  * The two schedules, and the graph evaluation one of them drives.
- *
- * Neither registers a routing key — both process managers declare no event
- * types — but both still wake on their own interval in this process, so
- * composing them as refusals would stop a no-data alert firing and let the
- * webhook delivery log grow without bound.
  */
 class WorkerAutomationScheduledIntents extends AutomationScheduledIntentPort {
   static create(input: {
@@ -705,12 +565,8 @@ class WorkerSettlementLogger extends AutomationLoggerPort {
 }
 
 /**
- * Settlement's two observability calls, over this process's logger.
- *
- * The application increments a Prometheus counter and captures to PostHog.
- * This process has neither registry, and inventing a second counter name for
- * the same event would split one series in two — so both land as log lines
- * carrying the same fields the counter carried as labels.
+ * Settlement's two observability calls, over this process's logger. The application increments a
+ * Prometheus counter and captures to PostHog.
  */
 class LoggedSettlementObservability extends AutomationSettlementObservabilityPort {
   constructor(private readonly logger: Logger) {
@@ -727,14 +583,9 @@ class LoggedSettlementObservability extends AutomationSettlementObservabilityPor
 }
 
 /**
- * What this process does about an automation past its ceiling.
- *
- * Containment is resolved LATE — the containment service reads the suppression
- * rows off the ledger this port is handed to — so the thunk is the knot, not
- * an optional dependency nobody supplies. When it resolves to nothing, the
- * breach is still recorded with everything an operator needs to act on it by
- * hand, and the log line says which half is missing rather than reading like a
- * containment that ran and decided to do nothing.
+ * What this process does about an automation past its ceiling. Containment is resolved LATE — the
+ * containment service reads the suppression rows off the ledger this port is handed to — so the
+ * thunk is the knot, not an optional dependency nobody supplies.
  */
 class WorkerSettlementBreach extends AutomationSettlementBreachPort {
   constructor(

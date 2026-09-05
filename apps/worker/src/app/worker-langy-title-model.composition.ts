@@ -1,31 +1,7 @@
 /**
- * The model handle a Langy conversation's title call runs on.
- *
- * `@langwatch/langy-server` owns the prompt, the character budget and the
- * transcript; it declares {@link LangyTitleModelPort} for the one thing it does
- * not own, which is WHICH model a project's title call reaches. This composes
- * that port over this process's own model gateway.
- *
- * ## The two-step resolution lives here
- *
- * A project may point `langy.conversation_title` at a model of its own, and
- * most projects point it nowhere. `ModelProviderExecutionHandleService.getVercelAIModel` answers the second case
- * with `ModelNotConfiguredError`, and only that error means "the cascade
- * resolved nothing" — a disabled provider, an unknown project or an
- * unreachable proxy are different failures that must NOT be answered by
- * quietly running the call on a model nobody chose. Distinguishing them needs
- * the model-provider contract's own error type, which is why the fallback is
- * the adapter's and not the feature package's.
- *
- * ## Three preconditions, and each is a refusal rather than a default
- *
- * The gateway decrypts the project's stored credential, the project directory
- * says which team and organization a project belongs to, and the execution
- * proxy is where an OpenAI-compatible request is actually sent. A composition
- * missing any of the three cannot make the call at all, so it composes NO port
- * and the conversation keeps whatever title it has — reported by name at boot
- * through the langy absence report, never as a title call that silently
- * disappears.
+ * The model handle a Langy conversation's title call runs on. `@langwatch/langy-server` owns the
+ * prompt, the character budget and the transcript; it declares {@link LangyTitleModelPort} for the
+ * one thing it does not own, which is WHICH model a project's title call reaches.
  */
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
@@ -34,13 +10,9 @@ import { LangyTitleModelPort } from "@langwatch/langy-server";
 import { nlpProxyBaseUrl } from "@langwatch/workflow-server";
 
 /**
- * The project read the model cascade needs.
- *
- * Declared structurally rather than as `ProjectService`, because what the
- * cascade uses is these two reads and nothing else — and this process composes
- * the READ half of Project only. Naming the full service would have made this
- * composable only where the write half exists, which is not what the model
- * call needs.
+ * The project read the model cascade needs. Declared structurally rather than as `ProjectService`,
+ * because what the cascade uses is these two reads and nothing else — and this process composes the
+ * READ half of Project only.
  */
 export type WorkerLangyTitleProjectDirectory = {
   tryGetWithTeam: Parameters<
@@ -62,11 +34,6 @@ export type WorkerLangyTitleModelOptions = Readonly<{
 
 /**
  * Composes the port, or nothing where a precondition is missing.
- *
- * `undefined` rather than a port that throws, because the caller's absence
- * report is what a deployment reads: a port that rejected every call would
- * turn one boot-time fact into one warning per conversation, all of them
- * saying the same thing.
  */
 export function tryCreateWorkerLangyTitleModel(
   options: WorkerLangyTitleModelOptions,

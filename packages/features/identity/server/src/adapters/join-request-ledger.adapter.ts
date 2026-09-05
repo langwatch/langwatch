@@ -1,36 +1,7 @@
 /**
- * The join-request ledger writer: the app's implementation of
- * `@langwatch/identity-server`'s JoinRequestLedger, in the shape the identity,
  * connection and grants ledgers already have (ADR-110, ADR-116):
- *
- *   1. the command staged onto the per-request GroupQueue — the queued run is
- *      what APPENDS, re-running the same guard the calling path ran;
- *   2. a bounded read-your-writes wait, watching the projection's cursor reach
- *      the events the guard decided.
- *
- * The staged command is the SOLE appender. This ledger used to append to the
  * durable log here and stage afterwards, which is ADR-101's original order —
  * and ADR-110 corrected it for exactly this reason: the queued run re-executes
- * `guards[verb]` against heads the fold has not advanced yet, so it restates
- * and appends a second row. The log converges either way (the store dedupes
- * `commandId:index` on read) but would carry two rows per ceremony, and "a
- * re-run costs no row" would stop being true.
- *
- * It also decides where the write may HAPPEN. The tier a person's click
- * arrives at is a producer: its event store refuses `storeEvents` by name, so
- * an append on the calling path failed the whole ceremony at the door with an
- * unhandled `ConfigurationError` — a generic "unknown error" for a request the
- * queue was perfectly able to serve. Staging is the only leg a producer needs.
- *
- * The wait is an OBSERVATION, not inline processing. A fold that cannot run
- * makes it time out; the command is still queued, the caller still succeeds,
- * and the row appears when the queue drains. This leg matters more here than
- * elsewhere: an admin who clicks Approve and is returned to a panel still
- * showing the request believes the click did nothing.
- *
- * Like the other ledgers, the pipeline handle is resolved lazily off the App:
- * a bare script that never composes one must still be able to import the
- * runtime.
  */
 import {
   APPROVE_JOIN_COMMAND_TYPE,
@@ -73,10 +44,8 @@ const SENDER_NAME_BY_COMMAND: Record<JoinRequestCommandType, string> = {
 export interface JoinRequestLedgerWriterDeps {
   projectionStore: StateProjectionStore<JoinRequestFoldState>;
   /**
-   * The event stack this ledger stages through.
-   *
-   * Required, and asked per command rather than held: the pipeline handle is
-   * resolved when a ceremony actually commits, which is what lets a ledger
+   * The event stack this ledger stages through. Required, and asked per command rather than held:
+   * the pipeline handle is resolved when a ceremony actually commits, which is what lets a ledger
    * composed before the process finished wiring its eventing still stage.
    */
   eventing: IdentityEventingPort;
@@ -110,15 +79,7 @@ export class JoinRequestLedgerWriterAdapter implements JoinRequestLedger {
   }
 
   /**
-   * The events the command states, returned to the caller after the queue has
-   * taken it.
-   *
-   * They are computed HERE as well as in the queued run, and that is not a
-   * second append: `JoinRequestStateFoldProjection.eventsFor` is a pure
-   * envelope over the facts the guard already decided, so the caller gets what
-   * it asked for without waiting on the fold. The queued run computes the same
-   * envelope from the same
-   * `commandId`, which is what makes the two identical rather than a race.
+   * The events the command states, returned to the caller after the queue has taken it.
    */
   async commit({
     command,
@@ -137,14 +98,8 @@ export class JoinRequestLedgerWriterAdapter implements JoinRequestLedger {
   }
 
   /**
-   * Leg one: the command handed to the queue, which is where the append
-   * happens.
-   *
-   * Loud on a missing sender, and that is the whole of its error handling.
-   * This used to resolve the handle inside a wrapper that answered `undefined`
-   * for an unregistered pipeline, so a process that had not registered
-   * `join-requests` dropped the command silently and told the person their
-   * request was in — the failure mode the identity ledger has never had.
+   * Leg one: the command handed to the queue, which is where the append happens. Loud on a missing
+   * sender, and that is the whole of its error handling.
    */
   private async stage({ command }: { command: JoinRequestCommand }): Promise<void> {
     const senderName = SENDER_NAME_BY_COMMAND[command.type];

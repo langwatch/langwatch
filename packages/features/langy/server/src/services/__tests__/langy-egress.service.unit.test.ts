@@ -1,19 +1,6 @@
 /**
- * @vitest-environment node
- *
  * The egress allow-list door, through the composition production uses.
- *
- * `LangyService` carries two heads: an older repository-backed set of methods
- * and a newer one over the composed feature services. `create` — the
- * only construction outside tests — passes `null` for the repositories, so
- * every method still reading `this.persistence` throws "Langy persistence is
- * not configured".
- *
- * Both egress methods were in that half, and unlike the rest of it they are
- * reached: `LangyApp.egressAllowlist` calls them, and the `langyEgress` tRPC
- * router calls that. The first customer to open the egress settings would have
- * got a generic unknown error. These cases drive the composed path, so a
- * regression puts the throw back.
+ * @vitest-environment node
  */
 import { describe, expect, it, vi } from "vitest";
 import type { LangyConversationService } from "../langy-conversation.service";

@@ -1,9 +1,7 @@
 /**
- * The panel-open pre-warm (specs/langy/langy-worker-prewarm.feature): the warm
- * resolves the same credential surface a turn would, probes, mints a session
- * key only on a probe miss, and never lets a failure reach the caller. These
- * bind the warm service's own decisions, the worker port, credential service
- * and key mint are fakes.
+ * The panel-open pre-warm (specs/langy/langy-worker-prewarm.feature): the warm resolves the same
+ * credential surface a turn would, probes, mints a session key only on a probe miss, and never lets
+ * a failure reach the caller.
  */
 import {
   LangyConversationIdUnadoptableError,
@@ -15,10 +13,7 @@ import {
   type LangyWorkerProbeInput,
   type LangyWorkerWarmInput,
 } from "../../ports/langy-turn-runtime.port";
-import type {
-  LangyTurnServiceDependencies,
-  LangyTurnServiceDeps,
-} from "../langy-turn.shared";
+import type { LangyTurnServiceDependencies, LangyTurnServiceDeps } from "../langy-turn.shared";
 import { LangyTurnWarmService } from "../langy-turn-warm.service";
 
 const SESSION = { user: { id: "user-1" } };

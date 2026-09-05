@@ -11,17 +11,9 @@ const logger = createLogger("langwatch:langy:session-key");
 const sessionKeyLifetimeMs = 6 * 60 * 60 * 1000;
 
 /**
- * The permission ceiling a Langy session key may ask for, DERIVED from the
- * policy rather than hand-kept beside it (#7389).
- *
- * A hand-written list cannot say why a line is absent, and three production
- * 403s came from lines nobody remembered to add. `langyCandidatePermissions()`
- * walks the permission registry and keeps every grain the policy calls
- * `granted`, so the list can no longer fall behind the vocabulary.
- *
- * This is a CEILING, not a grant: `mint` intersects it with the permissions
- * the requesting human actually holds, so widening it can never give anyone
- * access they did not already have by hand.
+ * The permission ceiling a Langy session key may ask for, DERIVED from the policy rather than hand-
+ * kept beside it (#7389). A hand-written list cannot say why a line is absent, and three production
+ * 403s came from lines nobody remembered to add.
  */
 export const LANGY_CANDIDATE_PERMISSIONS = Object.freeze(langyCandidatePermissions());
 
@@ -141,13 +133,9 @@ export class LangySessionKeyService extends LangySessionKeyPort {
   }
 
   /**
-   * The fleet-wide sweep, delegated rather than repeated.
-   *
-   * Two graphs run this reap — the App's registered pipeline and the packaged
-   * worker's — and only one of them reaches it through this service. Composing
-   * the sweep here means both run the same reserved-name gate and the same
-   * single clock read, so the two can never come to disagree about which keys
-   * are in scope.
+   * The fleet-wide sweep, delegated rather than repeated. Two graphs run this reap — the App's
+   * registered pipeline and the packaged worker's — and only one of them reaches it through this
+   * service.
    */
   reapExpired(now = new Date()): Promise<number> {
     return LangySessionKeyReapService.create({

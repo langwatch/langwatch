@@ -1,34 +1,5 @@
 /**
  * The scenario feature's application: what all of its doors call.
- *
- * Five tRPC sub-surfaces answer for this feature — CRUD, run reads and the
- * live stream, the simulation runner, cancellation and version history — and
- * they shared a `ScenarioApplication` bag of six services declared in the
- * transport's own context module. That bag was a description of the
- * composition living inside one transport: nothing but a tRPC context could be
- * handed it, so a REST family for the same feature would have had to restate
- * it.
- *
- * Most operations are the services' own, reached through {@link scenarios},
- * {@link simulations}, {@link scenarioExecution}, {@link scenarioTabs},
- * {@link users} and {@link broadcast}. What lives here as a method is what a
- * door would otherwise have to know:
- *
- *   - attributing a write to its caller — four handlers across two doors
- *     stamped it for themselves, under two field names: `lastUpdatedById` on a
- *     create, an update and a duplicate, and `actor: { userId, label: "user" }`
- *     on an update and a version restore;
- *   - which read answers "the runs of a suite" — a single set id reads one
- *     set and files each batch under it, an absent one reads across every
- *     suite and supports a conditional fetch. Two handlers asked that
- *     question;
- *   - the metadata envelope a queued run carries, which decides what the fold
- *     projection may copy into the runs store and, deliberately, what it may
- *     not: the secret VALUES travel beside it, never inside it.
- *
- * A caller arrives as an argument, never read from a session or a request.
- * That is what lets one operation serve a browser session, an API key and a
- * background job without knowing which it is serving.
  */
 import {
   startScenarioTabPresence,
@@ -95,10 +66,9 @@ import type {
 import type { ResultAtomsService } from "../services/result-atoms.service";
 
 /**
- * The process's per-tenant fan-out, as this feature uses it: one emitter per
- * project that relays the events another pod published. Structural rather than
- * the concrete broadcast service, because the subscription needs nothing else
- * from it.
+ * The process's per-tenant fan-out, as this feature uses it: one emitter per project that relays
+ * the events another pod published. Structural rather than the concrete broadcast service, because
+ * the subscription needs nothing else from it.
  */
 export type ScenarioBroadcast = Readonly<{
   getTenantEmitter(projectId: string): EventEmitter;
@@ -155,11 +125,9 @@ export class ScenarioApp {
   private constructor(private readonly dependencies: ScenarioAppDependencies) {}
 
   /**
-   * The author a versioned write is recorded under.
-   *
-   * One spelling, in one place. Two doors built this literal for themselves —
-   * the CRUD update and the version restore — which is two chances for a saved
-   * version to name the wrong author or none.
+   * The author a versioned write is recorded under. One spelling, in one place. Two doors built
+   * this literal for themselves — the CRUD update and the version restore — which is two chances
+   * for a saved version to name the wrong author or none.
    */
   private authorFor(by: ScenarioCaller): { userId: string; label: "user" } {
     return { userId: by.id, label: "user" };
@@ -188,10 +156,9 @@ export class ScenarioApp {
   }
 
   /**
-   * Creates a scenario, attributed to the caller who asked for it.
-   *
-   * The attribution is here rather than in each door because "who last touched
-   * this" is a property of the act, not of the transport it arrived over.
+   * Creates a scenario, attributed to the caller who asked for it. The attribution is here rather
+   * than in each door because "who last touched this" is a property of the act, not of the
+   * transport it arrived over.
    */
   create(
     input: Omit<ScenarioCreateInput, "lastUpdatedById">,
@@ -201,10 +168,9 @@ export class ScenarioApp {
   }
 
   /**
-   * Saves a scenario, attributed to the caller who asked for it.
-   *
-   * Both fields are stamped: `lastUpdatedById` is who the row says last
-   * touched it, and `actor` is who the saved VERSION names as its author.
+   * Saves a scenario, attributed to the caller who asked for it. Both fields are stamped:
+   * `lastUpdatedById` is who the row says last touched it, and `actor` is who the saved VERSION
+   * names as its author.
    */
   update(
     input: Omit<ScenarioUpdateInput, "lastUpdatedById" | "actor">,
@@ -270,10 +236,8 @@ export class ScenarioApp {
   }
 
   /**
-   * The profiles behind a set of author ids.
-   *
-   * The version history stores only the id of whoever saved each version; the
-   * name a person reads is resolved from it.
+   * The profiles behind a set of author ids. The version history stores only the id of whoever
+   * saved each version; the name a person reads is resolved from it.
    */
   getUserProfiles(input: UserProfilesInput): Promise<UserFullProfile[]> {
     return this.dependencies.users.getProfiles(input);
@@ -300,16 +264,9 @@ export class ScenarioApp {
   }
 
   /**
-   * Dispatches the queued command, which is what writes QUEUED state before
-   * the execution job is scheduled — the same order the suite execution port
-   * uses. The resolved parameters travel on the metadata, which is the only
-   * channel that carries them into execution.
-   *
-   * The secret VALUES travel beside the metadata rather than inside it, so the
-   * fold projection cannot copy them into the runs store. Only their names go
-   * on the metadata. That is the rule this method exists to hold: it is a fact
-   * about what a stored run may contain, and a transport that assembled the
-   * envelope itself would be the thing deciding it.
+   * Dispatches the queued command, which is what writes QUEUED state before the execution job is
+   * scheduled — the same order the suite execution port uses. The resolved parameters travel on the
+   * metadata, which is the only channel that carries them into execution.
    */
   queueSimulationRun(input: QueueSimulationRunInput): Promise<void> {
     const secretParameterNames = Object.keys(input.secretParameters);
@@ -358,17 +315,9 @@ export class ScenarioApp {
   // -- reading what ran ------------------------------------------------------
 
   /**
-   * The runs of one suite, or of every suite when no set is named.
-   *
-   * Which read answers is a domain question, not a paging one: a named set
-   * reads that set and files each batch under it, and an absent one reads
-   * across every suite and honours a conditional fetch. Two handlers asked it,
-   * so it is answered once.
-   *
-   * The answer keeps the cross-suite read's own discriminated shape, so a
-   * caller still has to look at `changed` before reaching for `runs`. Widening
-   * it to one flat object here would hand every client an unconditional `runs`
-   * that is absent whenever nothing moved.
+   * The runs of one suite, or of every suite when no set is named. Which read answers is a domain
+   * question, not a paging one: a named set reads that set and files each batch under it, and an
+   * absent one reads across every suite and honours a conditional fetch.
    */
   async readSuiteRunData(input: {
     projectId: string;
@@ -487,11 +436,6 @@ export class ScenarioApp {
 
   /**
    * Registers a browser tab as present, and claims any navigate parked for it.
-   *
-   * Presence is refreshed from the server rather than the browser, so the
-   * registry is the application's rather than a transport's: a background
-   * tab's timers get throttled to once a minute, which would expire presence
-   * on exactly the tab this exists to reuse.
    */
   startTabPresence(registration: ScenarioTabRegistration): Promise<ScenarioTabPresence> {
     return startScenarioTabPresence({

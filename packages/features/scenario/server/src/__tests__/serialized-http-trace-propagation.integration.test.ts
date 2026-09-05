@@ -1,16 +1,6 @@
 /**
- * @vitest-environment node
- *
  * Integration test for OTEL trace context propagation through the HTTP agent adapter.
- *
- * Uses a REAL OpenTelemetry TracerProvider and a local echo server to validate
- * the full propagation path: TracerProvider -> active span -> propagation.inject()
- * -> HTTP headers received by the target server.
- *
- * Covers feature spec scenarios:
- * - Serialized HTTP adapter injects traceparent header
- * - Trace headers coexist with custom headers
- * - Same trace ID is propagated across all turns of a conversation
+ * @vitest-environment node
  */
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";

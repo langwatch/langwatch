@@ -92,10 +92,9 @@ describe("buildAtomFilters", () => {
 
   describe("when the query dedups a run to its latest version", () => {
     /**
-     * StartedAt moves between versions of one run, so a dedup scope bounded
-     * exactly to the window can drop the true latest version out of its own
-     * group and resolve to a stale in-window one. The slack is what keeps the
-     * subquery pruning partitions without that risk.
+     * StartedAt moves between versions of one run, so a dedup scope bounded exactly to the window
+     * can drop the true latest version out of its own group and resolve to a stale in-window one.
+     * The slack is what keeps the subquery pruning partitions without that risk.
      */
     it("reaches a week past the window it prunes for", () => {
       const startDate = Date.UTC(2026, 0, 15);
@@ -130,10 +129,9 @@ describe("buildAtomFilters", () => {
 
   describe("when the filter names sets", () => {
     /**
-     * A run never moves between sets, and ScenarioSetId is part of the dedup
-     * key already, so narrowing on it picks the same version either way.
-     * Keeping it in the subquery is what stops it grouping over the whole
-     * tenant.
+     * A run never moves between sets, and ScenarioSetId is part of the dedup key already, so
+     * narrowing on it picks the same version either way. Keeping it in the subquery is what stops
+     * it grouping over the whole tenant.
      */
     it("puts them where the dedup subquery can use them", () => {
       const filters = buildAtomFilters({ ...base, scenarioSetIds: ["set-1"] });

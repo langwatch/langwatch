@@ -46,11 +46,8 @@ const base = {
 };
 
 /**
- * The aggregate type is the storage partition key, not a label: the event
- * store refuses at append any event whose type differs from the one its
- * pipeline declares (#7406). Every verb's event is run through the store's
- * own validator against the pipeline's declared type, so the envelope and
- * the pipeline cannot drift apart without this going red.
+ * The aggregate type is the storage partition key, not a label: the event store refuses at append
+ * any event whose type differs from the one its pipeline declares (#7406).
  */
 describe("directory sync event aggregate type", () => {
   describe("when every verb emits", () => {
@@ -162,10 +159,9 @@ describe("directory sync event aggregate type", () => {
 
   describe("the command envelope's tenancy", () => {
     /**
-     * A caller wiring the tenant apart from the organization would persist
-     * events under one tenant's stream and fold them into another
-     * organization's projection, which nothing downstream can detect. Refused
-     * at the wire boundary instead.
+     * A caller wiring the tenant apart from the organization would persist events under one
+     * tenant's stream and fold them into another organization's projection, which nothing
+     * downstream can detect. Refused at the wire boundary instead.
      */
     it("refuses a command whose tenant is not its organization", () => {
       const refused = IssueScimTokenCommand.schema.validate({

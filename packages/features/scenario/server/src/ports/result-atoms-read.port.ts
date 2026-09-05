@@ -17,11 +17,9 @@ export const MAX_CODE_SCENARIOS = 500;
 export const MAX_RUN_TARGETS = 500;
 
 /**
- * An atom as the store returns it: everything that lives on the run row.
- *
- * The plan slug, the plan name and the scenario name are NOT here. They live
- * in Postgres, and joining them in the query would mean a second store in the
- * hot path for values the caller already holds.
+ * An atom as the store returns it: everything that lives on the run row. The plan slug, the plan
+ * name and the scenario name are NOT here. They live in Postgres, and joining them in the query
+ * would mean a second store in the hot path for values the caller already holds.
  */
 export interface RawAtomRow {
   SetId: string;
@@ -125,12 +123,9 @@ export interface RawTotalsRow {
 }
 
 /**
- * The atom reads that back the Results tab.
- *
- * Kept apart from `SimulationRepository` because it answers a different
- * question. That repository serves v1, which reads runs one batch or one set
- * at a time; this one reads the whole window flat so a filter can cut it and
- * a grouping can fold it. Nothing here changes what v1 reads.
+ * The atom reads that back the Results tab. Kept apart from `SimulationRepository` because it
+ * answers a different question. That repository serves v1, which reads runs one batch or one set at
+ * a time; this one reads the whole window flat so a filter can cut it and a grouping can fold it.
  */
 export abstract class ResultAtomsReadPort {
   /** One page of atoms, newest first, keyset paginated. */

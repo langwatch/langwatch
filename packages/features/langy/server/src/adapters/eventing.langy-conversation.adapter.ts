@@ -63,39 +63,9 @@ export interface LangyConversationProcessingPipelineDeps {
 }
 
 /**
+ * Aggregate: `langy_conversation` (aggregateId = conversationId, TenantId = projectId).
  * Creates the langy-conversation-processing pipeline definition (ADR-046).
- *
- * Aggregate: `langy_conversation` (aggregateId = conversationId,
- * TenantId = projectId). A Langy conversation is a projection of its event
- * stream; Postgres is its low-latency operational read model.
- *
- * Operational Projection: langyConversationState
- * - Conversation-level spine (owner, title, status, counts, timestamps,
- *   sharing). Stored directly in Postgres with no Redis projection cache.
- *
- * Operational Projection: langyConversationTurn
- * - Per-turn render document — a SECOND fold over the same stream, keyed by
- *   `${conversationId}:${turnId}` (the fold's custom key). Folds one turn into
- *   its final state (status, answer parts, tool-call lifecycle). Stored in Postgres.
- *
- * Map Projection: langyMessageOperational
- * - Per-message rows for `message_recorded` (user) and `agent_responded`
- *   (assistant), stored in Postgres.
- *
- * Commands (write surface):
- * - createConversation: explicit creation -> conversation_started
- * - recordMessage: append a message -> message_recorded
- * - acceptAgentTurn: durable turn admission -> agent_turn_accepted
- * - recordAgentResponse: streamed answer completes -> agent_responded
- * - archiveConversation: soft-delete -> conversation_archived
- * - updateConversationMetadata: rename/share -> conversation_metadata_updated
- *
- * The response-lifecycle events (tool_call_*, agent_response_failed) are defined
- * with fold handlers dispatched by the agent during a response.
- *
  * Status/progress are EPHEMERAL signals (ADR-046): NOT commands and NOT durable
- * events — they are published to a Redis buffer via LangyEphemeralPublisher
- * (./ephemeral.ts), never through this pipeline. PR3 wires that transport.
  */
 function buildLangyConversationPipeline(deps: LangyConversationProcessingPipelineDeps) {
   let builder = definePipeline<LangyConversationProcessingEvent>({

@@ -45,16 +45,8 @@ import {
 import { z } from "zod";
 
 /**
- * The connection pipeline's wire schemas: the framework envelope (id,
- * aggregate, tenant, cursor time) over the payloads `@langwatch/identity-contract`
- * declares. Defined here, beside the fold that is their one collector, for
- * the reason every other identity pipeline's events live beside its own
- * fold: the pipeline definition adapter builds itself FROM this projection,
- * so an import back the other way would be a cycle.
- *
- * Time lives on the envelope: `occurredAt` is business time (a grandfathered
- * connection's history carries the migration's pass time), `createdAt` is
- * ledger-accepted time.
+ * The connection pipeline's wire schemas: the framework envelope (id, aggregate, tenant, cursor
+ * time) over the payloads `@langwatch/identity-contract` declares.
  */
 
 export const connectionRegisteredEventSchema = EventSchema.extend({
@@ -181,19 +173,9 @@ export type SsoConnectionFoldState = SsoConnectionState & {
 };
 
 /**
+ * Postgres `SsoConnection` row per connection, applied through `.withProjection()`'s direct
+ * load/apply/store cycle under the queue's per-connection lock.
  * The connection pipeline's operational projection (D04, ADR-117 §5): one
- * Postgres `SsoConnection` row per connection, applied through
- * `.withProjection()`'s direct load/apply/store cycle under the queue's
- * per-connection lock.
- *
- * A pure event-truth head with whole-row replay semantics, exactly like the
- * identity pipeline's `Identifier`: every column is fold-written and rows are
- * never deleted — TORN_DOWN is a tombstone the router reads as INACTIVE, not
- * an absence.
- *
- * Every handler is the same move: validate the wire event and hand it to
- * `@langwatch/identity`'s reducer — live dispatch, the queue's fold and the
- * replay proof run the identical function.
  */
 export class SsoConnectionStateFoldProjection
   extends AbstractFoldProjection<
@@ -335,20 +317,7 @@ export class SsoConnectionStateFoldProjection
   /**
    * The ONE place a connection fact becomes a framework event: the guards
    * (`SsoConnectionGuards`) decide what a command states, and this stamps the
-   * envelope from the command that produced it — the aggregate type the store
-   * validates (#7406), the connection as aggregate, the organization as
-   * tenant, the command's business time, and the `commandId:index`
-   * idempotency key.
-   *
-   * Both the pipeline's command handlers (the staged re-run) and the app's
-   * ledger writer (the calling path) go through here, so the two legs cannot
-   * stamp a fact differently — and the grandfather migration's second pass
-   * derives the identical keys, which is the whole of its idempotency.
-   *
-   * Defined here, beside the fold and the schemas it stamps, rather than in
-   * the pipeline definition adapter: the intents that call this ARE inputs to
-   * that adapter's pipeline builder, so an import back the other way would be
-   * a cycle.
+   * envelope, so every producer stamps a fact identically.
    */
   static eventsFor({
     command,

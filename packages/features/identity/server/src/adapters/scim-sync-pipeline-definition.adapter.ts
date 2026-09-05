@@ -41,27 +41,9 @@ export interface ScimSyncPipelineDeps {
 }
 
 /**
- * The directory-sync pipeline (D08). One aggregate per connection's sync; the
- * organization is the tenant. Commands append (waited) and the operational
- * projection folds into the Postgres `ScimSyncState` head in per-sync FIFO.
- *
- * NO PROCESS MANAGER, deliberately. A SCIM push is a synchronous request an
- * identity provider makes and retries on its own schedule, so the retry this
- * aggregate records is the DIRECTORY's, not one of ours: a push that lands
- * states its own recovery, and a failure that will never succeed is retired
- * by the guard into a dead letter the projection keeps. Adding a queue that
- * re-attempted the apply behind the provider's back would mean two things
- * pushing the same state and neither able to say which one the customer is
- * looking at.
- *
- * Ships DARK: `SCIM_V2_GRANTS` defaults off, so no SCIM request path
- * dispatches these commands and the previous write path is unchanged. A
- * deploy changes nothing on its own.
- *
- * Lanes: the commands keep the default per-aggregate group key — one
- * connection's sync is one lane, so a directory that starts failing cannot
- * hold up the connection beside it.
- */
+ * The directory-sync pipeline (D08). One aggregate per connection's sync; the organization is the
+ * tenant. Commands append (waited) and the operational projection folds into the Postgres
+ * `ScimSyncState` head in per-sync FIFO. NO PROCESS MANAGER, deliberately.
 /** The directory-sync pipeline as a TYPE, derived from the builder below. */
 export type ScimSyncPipeline = ReturnType<typeof ScimSyncPipelineDefinitionAdapter.create>;
 

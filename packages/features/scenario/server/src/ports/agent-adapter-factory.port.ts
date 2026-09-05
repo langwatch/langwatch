@@ -19,11 +19,9 @@ export type AgentAdapterBuildInput = {
 };
 
 /**
- * Builds the adapter that speaks to one agent.
- *
- * A port rather than a direct import of the serialized-adapter registry: a
- * service may not reach into its package's concrete adapters, so the process
- * that holds both supplies the registry.
+ * Builds the adapter that speaks to one agent. A port rather than a direct import of the
+ * serialized-adapter registry: a service may not reach into its package's concrete adapters, so the
+ * process that holds both supplies the registry.
  */
 export abstract class AgentAdapterFactoryPort {
   abstract build(input: AgentAdapterBuildInput): AgentAdapter;

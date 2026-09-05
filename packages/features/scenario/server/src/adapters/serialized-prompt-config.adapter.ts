@@ -1,8 +1,7 @@
 /**
- * Serialized prompt config adapter for scenario worker execution.
- *
- * Operates with pre-fetched configuration data and doesn't require
- * database access. Designed to run in isolated worker threads.
+ * Serialized prompt config adapter for scenario worker execution. Operates with pre-fetched
+ * configuration data and doesn't require database access. Designed to run in isolated worker
+ * threads.
  */
 
 import { createSandboxedLiquid } from "@langwatch/automation-contract";
@@ -117,13 +116,8 @@ export class SerializedPromptConfigAdapter extends SerializedAgentAdapter {
 
   /**
    * Whether the template (system prompt or any message) reads the conversation
-   * history itself, in either the prose or the structured form.
-   *
-   * ⚠ This used to test `/\bmessages\b/` against the raw template text, so a
-   * system prompt containing the ordinary word "messages" in prose dropped the
-   * conversation history from the request entirely; and it knew only the prose
-   * binding, so a template reading the structured one was shown every prior
-   * turn twice.
+   * history itself, in either the prose or the structured form. ⚠ This used
+   * to test `/\bmessages\b/` against the raw template text, which false-hit.
    */
   private templateReadsConversation(): boolean {
     if (PromptTemplateAdapter.referencesConversation(this.config.systemPrompt)) return true;
@@ -134,11 +128,6 @@ export class SerializedPromptConfigAdapter extends SerializedAgentAdapter {
 
   /**
    * Record the declared inputs a simulation has nothing to bind to.
-   *
-   * The rendered prompt already shows a placeholder where each one would have
-   * gone; this puts the same list on the run's trace and in the worker log, so
-   * the cause is findable from the run rather than only from reading the
-   * prompt. The values themselves are never recorded — only the names.
    */
   private reportUnboundInputs(unboundInputs: string[]): void {
     trace.getActiveSpan()?.addEvent("langwatch.prompt.unbound_inputs", {

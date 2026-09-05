@@ -1,16 +1,6 @@
 /**
+ * the backend fold the SAME recorded steps into the SAME turn state,
  * ADR-059's central claim, asserted rather than asserted-about: the browser and
- * the backend fold the SAME recorded steps into the SAME turn state, because it
- * is literally the same reducer.
- *
- * The two sides differ only in their RIG. The server routes each event to a
- * handler derived from its `type` and stamps bookkeeping timestamps
- * (`AbstractFoldProjection`); the browser walks a fetched tail behind a cursor
- * guard (`applyLangyTurnEvents`). This test drives one identical recorded
- * sequence through both rigs and compares the fold-owned fields — so a rig that
- * drops an event type, mis-routes one, or filters the tail differently breaks
- * here, at the seam, instead of as a rendering difference nobody can reproduce.
- *
  * Spec: specs/langy/langy-event-sourced-frontend.feature
  */
 
@@ -142,10 +132,7 @@ function asWireEvent(step: RecordedStep) {
 }
 
 /**
- * The fold-owned fields, with the rig's bookkeeping stamps removed. The server
- * projection stamps `CreatedAt`/`UpdatedAt` from the wall clock and tracks
- * `LastEventOccurredAt`; none of them is a fold decision, and the shared
- * `LangyConversationTurnFoldState` type omits all three by construction.
+ * The fold-owned fields, with the rig's bookkeeping stamps removed.
  */
 function foldOwnedFields(state: LangyConversationTurnData): LangyConversationTurnFoldState {
   const {

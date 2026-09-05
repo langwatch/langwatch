@@ -47,40 +47,9 @@ export interface IdentityPipelineDeps {
 }
 
 /**
- * The identity pipeline (ADR-101, D01). One aggregate per user; commands
- * append (waited) and the operational projection folds into the Postgres
- * `Identifier` head in per-user FIFO. Its production writers are the
- * identity adapter and the identifier backfill, both through
- * `IdentityService` and the app's ledger writer, and both sit behind the
- * per-user write gate (app-layer/identity/write-gate.ts), which ships CLOSED
- * and opens only when a user's backfill is finalized - so deploying this
- * pipeline emits nothing on its own.
- *
- * It also carries two-step verification (D06). Different kind of thing, same
- * aggregate, because they share a key: an enrollment belongs to exactly the
- * person their identifiers belong to. `trace` does the same with spans, logs
- * and annotations.
- *
- * Sharing the aggregate is a CORRECTNESS property, not a tidiness one. The
- * queue composes its group key as
- * `${tenantId}/${jobPath}/${aggregateType}:${aggregateId}`, and here the
- * tenant IS the person, so one person's identifier commands and their
- * two-step commands land in the SAME lane and serialise against each other.
- * Turning two-step verification off and detaching a sign-in method cannot
- * interleave — each reads the state the other left. Split across two
- * aggregates they would have raced, and the strands guard could have read a
- * state that was already stale by the time it refused.
- *
- * There is nothing narrower to shard by (ADR-114's sharded per-organization
- * lane exists because many grants share one tenant), and a person holds a
- * handful of identifiers, so a lane never has a batch to coalesce either.
- */
-/**
- * The identity pipeline as a TYPE, for the seams that hold one.
- *
- * Derived rather than restated: the definition's event union, projections and
- * command names all come from the builder below, and a hand-written twin of it
- * would be one command rename away from being a lie that still compiles.
+ * The identity pipeline (ADR-101, D01). One aggregate per user; commands and
+ * two-step verification (D06) share it, since a person's identifier and
+ * two-step commands must serialise against each other.
  */
 export type IdentityPipeline = ReturnType<typeof IdentityPipelineDefinitionAdapter.create>;
 

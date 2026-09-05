@@ -1,8 +1,6 @@
 /**
- * @vitest-environment node
- *
  * The per thread session store every serialized adapter shares.
- *
+ * @vitest-environment node
  * @see specs/agents/agent-session-echo.feature
  */
 

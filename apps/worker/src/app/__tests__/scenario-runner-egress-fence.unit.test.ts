@@ -1,10 +1,6 @@
 /**
- * The fence a scenario run dials an HTTP target through, composed the way the
- * runner composes it: the worker resolves the deployment's egress leaves,
- * states them on the child's environment, and the child turns that document
- * back into the validator it calls per request. TLS is the parent's other
- * stated decision, carried as the child's NODE_TLS_REJECT_UNAUTHORIZED.
- *
+ * The fence a scenario run dials an HTTP target through, composed the way the runner composes it:
+ * the worker resolves the deployment's egress leaves, states them on the child's environment,
  * @see specs/features/scenarios/on-prem-hostname-validation.feature
  */
 import dns from "node:dns/promises";

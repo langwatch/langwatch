@@ -1,16 +1,6 @@
 /**
- * The configuration read has to survive the whole recording path, not the
- * query alone: the run dialog dispatches a queue command per scheduled run,
- * the command handler turns it into an event, the fold projection turns the
- * event's metadata into a stored column, and only then is there anything to
- * group. A break in any of those hops looks the same from the outside, a
- * dropdown that lists nothing, so every test here starts at a suite execution
- * and ends at a real ClickHouse read.
- *
- * The scenario store is the one boundary that is stubbed. The plan rows
- * contribute a name and a scope and nothing else, and what is under test is
- * the fold over the runs.
- *
+ * The configuration read has to survive the whole recording path, not the query alone: the run
+ * dialog dispatches a queue command per scheduled run, the command handler turns it into an event,
  * @see specs/features/agent-testing/run-configuration-history.feature
  */
 
@@ -105,11 +95,6 @@ function scenariosWith(plans: ScenarioPlanRecord[]): ScenarioRepository {
 
 /**
  * Starts one batch and records every run of it at a chosen moment.
- *
- * Through the real execution service and the real command handler, not a
- * hand-built event: the metadata this read groups on is written by the suite
- * execution and carried by `QueueRunCommand`, so copying the fields here would
- * keep the tests green on the day either of them stopped carrying one.
  */
 async function runBatch(params: {
   suiteId: string;
@@ -186,11 +171,9 @@ async function runBatch(params: {
 }
 
 /**
- * Folds one queued command into stored state, at a chosen start time.
- *
- * `StartedAt` is the only field pinned by hand. A queued run leaves it null
- * until its started event lands, and these tests need runs at known moments to
- * say anything about ordering or about a window.
+ * Folds one queued command into stored state, at a chosen start time. `StartedAt` is the only field
+ * pinned by hand. A queued run leaves it null until its started event lands, and these tests need
+ * runs at known moments to say anything about ordering or about a window.
  */
 async function recordQueuedRun({
   command,

@@ -310,7 +310,9 @@ describe("resolveWorkerConfig", () => {
       ENVIRONMENT: "production",
     }).shutdown;
 
-    expect(processDeadlineMs / 1_000).toBe(DRAIN_SECONDS + (REQUIRED_MARGIN_SECONDS - KUBELET_SLACK_SECONDS));
+    expect(processDeadlineMs / 1_000).toBe(
+      DRAIN_SECONDS + (REQUIRED_MARGIN_SECONDS - KUBELET_SLACK_SECONDS),
+    );
     expect(processDeadlineMs / 1_000 + KUBELET_SLACK_SECONDS).toBe(
       DRAIN_SECONDS + REQUIRED_MARGIN_SECONDS,
     );
@@ -417,10 +419,8 @@ describe("resolveWorkerConfig", () => {
   });
 
   /**
-   * What a prepared scenario child is booted with.
-   *
-   * A blank override is not a model: an operator who exported the variable
-   * empty has chosen nothing, and an empty string reaching the child would be
+   * What a prepared scenario child is booted with. A blank override is not a model: an operator who
+   * exported the variable empty has chosen nothing, and an empty string reaching the child would be
    * carried to the provider as a model named "".
    */
   it("hands a scenario child a real model whether or not a default was named", () => {
@@ -434,13 +434,7 @@ describe("resolveWorkerConfig", () => {
   });
 
   /**
-   * The two leaves the model gateway adds, read exactly as the API tier reads
-   * them.
-   *
-   * The flag opts in for `1` or a case-insensitive `true` and for nothing
-   * else, because two tiers disagreeing about whether a fence is up is worse
-   * than either answer; the allowlist drops blank entries, which would
-   * otherwise sit in the list looking like a rule while matching nothing.
+   * The two leaves the model gateway adds, read exactly as the API tier reads them.
    */
   it("reads the model-provider egress fence the way the API tier reads it", () => {
     expect(
@@ -544,13 +538,9 @@ describe("resolveWorkerConfig", () => {
 
   describe("when the deployment names itself SaaS", () => {
     /**
-     * Every spelling the App accepts, and one it does not. The App reads the
-     * same variable as `=== "1" || ?.toLowerCase() === "true"`, and this
-     * process gates the cross-pipeline billable-events meter on the answer
-     * while the App gates its own producer half on it. A worker that read
-     * `yes` as SaaS would meter an install whose App configured no meter, and
-     * one that refused `TRUE` would leave a SaaS install's billable events
-     * counted by nobody. Neither disagreement fails loudly.
+     * Every spelling the App accepts, and one it does not. The App reads the same variable as `===
+     * "1" || ?.toLowerCase() === "true"`, and this process gates the cross-pipeline billable-events
+     * meter on the answer while the App gates its own producer half on it.
      */
     it.each([
       ["1", true],
@@ -582,11 +572,6 @@ describe("resolveWorkerConfig", () => {
 
   /**
    * The self-ingest refusal, at the boundary that owns it.
-   *
-   * `assertObservabilityDoesNotSelfIngest` is tested exhaustively in
-   * `@langwatch/config`; what belongs here is the WIRING — that this process
-   * hands the guard the two origins it links back to, and that a boot which
-   * would loop refuses before any consumer is composed.
    */
   describe("when the observability exporter is configured", () => {
     /** @scenario "A process pointed at its own ingest refuses to boot" */

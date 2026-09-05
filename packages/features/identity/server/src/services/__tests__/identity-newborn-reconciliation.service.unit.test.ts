@@ -1,17 +1,7 @@
 /**
- * @vitest-environment node
- *
- * The sweep ADR-116 §3 calls a required companion to the born-finalized
  * entrance (specs/identity/identity-storage-adapter.feature).
- *
- * A flagged sign-up abandoned between the append and the row commit leaves
- * facts under a tenant that never gained a user row. Nothing SERVES them —
- * but the facts carry the address the customer typed, and "nothing serves
- * them" is not "they are gone".
- *
- * Two mistakes this pins against, both of which look like a working sweep:
- * erasing a stream a retry was about to converge on, and erasing a HELD user
- * — who carries the same `migrated` status and a very real user row.
+ * @vitest-environment node
+ * The sweep ADR-116 §3 calls a required companion to the born-finalized
  */
 import type { IdentityReservationRepository } from "../../identity-reservations.repository";
 import { describe, expect, it, vi } from "vitest";

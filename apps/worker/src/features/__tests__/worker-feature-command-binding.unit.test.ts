@@ -16,10 +16,9 @@ import { SuiteWorkerFeatureInstaller } from "../suite/suite-worker-feature.insta
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /**
- * A registration surface, not a runtime. These installers do exactly one thing
- * with the Eventing runtime — register a definition and read back its command
- * senders — so a stub that records what was registered characterises them
- * without booting a queue.
+ * A registration surface, not a runtime. These installers do exactly one thing with the Eventing
+ * runtime — register a definition and read back its command senders — so a stub that records what
+ * was registered characterises them without booting a queue.
  */
 function eventingStub(commandNames: readonly string[], options?: { queue?: boolean }) {
   const sent = new Map<string, unknown[]>();

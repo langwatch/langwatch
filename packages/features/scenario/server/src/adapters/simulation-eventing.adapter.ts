@@ -30,17 +30,7 @@ import { SimulationRunMetricsAppendStore } from "../stores/eventing/eventing.sim
 const logger = createLogger("scenario:simulation-run-state-fold-store");
 
 /**
- * Fold store for simulation run state, with the gate that keeps a cost figure
- * from inventing a run.
- *
- * The run id a cost is attributed to comes off a span attribute, so a
- * misattributed value addresses an aggregate with no lifecycle events, and a
- * naive write takes `ScenarioRunId` straight from the aggregate key — putting
- * a row in `simulation_runs` for a run that never existed, with no name, no
- * verdict, no end, and cost that rises with every further trace.
- * {@link SimulationRunStateFoldProjection.hasRunDefiningEvent} is the gate:
- * metrics still accumulate in the
- * fold state, and reach the table with the run's first lifecycle event.
+ * Fold store for simulation run state, with the gate that keeps a cost figure from inventing a run.
  */
 class GatedSimulationRunStateFoldStore implements FoldProjectionStore<SimulationRunStateData> {
   constructor(private readonly inner: FoldProjectionStore<SimulationRunStateData>) {}

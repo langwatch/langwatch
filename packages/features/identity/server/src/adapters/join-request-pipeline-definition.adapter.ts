@@ -45,11 +45,8 @@ import {
 } from "@langwatch/identity-contract";
 
 /**
- * Every verb the aggregate has, and the name its queue sender is resolved by
- * (the ledger writer maps a command type to one of these strings).
- *
- * A table rather than five near-identical `.withCommandInstance(...)` blocks:
- * every one takes the same guards and differs only in its name and class.
+ * Every verb the aggregate has, and the name its queue sender is resolved by (the ledger writer
+ * maps a command type to one of these strings).
  */
 const JOIN_REQUEST_COMMANDS = [
   ["requestJoin", RequestJoinCommand],
@@ -72,18 +69,9 @@ export interface JoinRequestPipelineDeps {
 export type JoinRequestPipeline = ReturnType<typeof JoinRequestPipelineDefinitionAdapter.create>;
 
 /**
+ * organization is the tenant. Commands append (waited) and the operational projection folds into
+ * the Postgres `JoinRequest` head in per-request FIFO.
  * The join-request pipeline (D12, ADR-117). One aggregate per request; the
- * organization is the tenant. Commands append (waited) and the operational
- * projection folds into the Postgres `JoinRequest` head in per-request FIFO.
- *
- * Ships DARK: `JOIN_REQUESTS` defaults off, so nothing dispatches these
- * commands, no interstitial renders and no panel appears — a deploy changes
- * nothing on its own, and rollback is the flag.
- *
- * Lanes: the commands keep the default per-aggregate group key — one request
- * is one lane, which is already the narrowest useful shard, and a request
- * sees a handful of human actions in its life so a lane never has a batch to
- * coalesce.
  */
 export class JoinRequestPipelineDefinitionAdapter {
   static create(deps: JoinRequestPipelineDeps) {
@@ -121,15 +109,9 @@ export class JoinRequestPipelineDefinitionAdapter {
 }
 
 /**
- * The two timers (D12): the day-7 reminder and the day-14 expiry, on ONE wake
- * column. PENDING → EXPIRED happens through this wake and nowhere else, and
- * the reminder is the only nudge admins ever get about a given request.
- *
- * Every ending disarms it, which is what makes "no reminder and no expiry
- * wake follows" true for a withdrawal rather than merely likely.
- *
- * The process holds two timestamps and a flag, and the events it reads are
- * ids, a domain and enums, so no content boundary is needed on the payload.
+ * The two timers (D12): the day-7 reminder and the day-14 expiry, on ONE wake column. PENDING →
+ * EXPIRED happens through this wake and nowhere else, and the reminder is the only nudge admins
+ * ever get about a given request.
  */
 function mountRequestLifecycle(
   pm: ProcessManagerInitialStage<JoinRequestEvent>,

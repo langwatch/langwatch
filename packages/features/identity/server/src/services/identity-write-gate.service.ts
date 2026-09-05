@@ -1,29 +1,7 @@
 /**
+ * re-tenanted).
  * The per-USER write fork (ADR-101 §2, the grants ledger's decision-4 shape
- * re-tenanted). The gate ships CLOSED: in every pod, for every user, until
- * that user's identifier backfill lands — deploying the identity adapter
- * changes nothing on its own.
- *
- * The gate's question is the one fact that already means "this user's whole
- * identifier history is in the log": their `SystemMigrationTenantState` row
- * for the D01 backfill (tenant = the user, driven by the runner's user-rooted
- * tenant source). Only `finalized` opens it — the same predicate as the authz
  * engine gate (ADR-110: finishing the migration IS the switch). `migrated`
- * is the HELD state: the history landed but the proof found the projection
- * behind or disagreeing, so the ceremony performs its protocol write only,
- * exactly as the stock adapter would, and the next backfill pass restates
- * the rows it wrote. Anything else (absent, parked, rolled back) is closed.
- *
- * Rollback is an ops action, not a deploy: `rolled_back` on the user's row
- * closes the gate fleet-wide within the cache TTL — there is no
- * cross-pod invalidation, so both directions take effect within
- * `IDENTITY_WRITE_GATE_TTL_MS`, which is the bound an operator should expect.
- * Fail-safe direction is CLOSED — an unreadable state table can only delay
- * event history, never break sign-in.
- *
- * The state reads are the caller's (the runtime composes the port): this
- * module reads no Prisma of its own, the way the engine gate takes its
- * client from the caller.
  */
 import { createLogger } from "@langwatch/observability";
 import { perSubjectCachedFlag } from "../per-subject-cached-gate";
@@ -44,15 +22,7 @@ const gate = perSubjectCachedFlag({
 });
 
 /**
- * The pre-rollout short-circuit. The per-user read is cheap but the READ fork
- * asks it on every authenticated request, so before any operator has enrolled
- * anybody it is one indexed lookup per active user per TTL to learn something
- * a single row already settles: whether ANY user has finalized at all.
- *
- * Same cache primitive, one constant subject — so it is one read per pod per
- * TTL, coalesced across concurrent requests, and it self-disables the moment
- * the first organization is enrolled. Both directions take effect within the
- * TTL, which is the same bound the per-user gate already documents.
+ * The pre-rollout short-circuit.
  */
 const anyoneGate = perSubjectCachedFlag({
   name: "identity-identifier-anyone-finalized",
@@ -66,23 +36,9 @@ export class IdentityWriteGateService {
   }
 
   /**
-   * Drop this user's cached answer, and the fleet-wide "has anyone finalized"
+   * Drop this user's cached answer, and the fleet-wide "has anyone finalized" The born-finalized
+   * entrance is what needs this, and needs it explicitly.
    * one with it (ADR-116 §3).
-   *
-   * The born-finalized entrance is what needs this, and needs it explicitly.
-   * When a newborn's rows commit, two cached answers are freshly wrong: their
-   * own, if anything asked before the state row existed, and — far more
-   * damaging — the anyone-finalized short-circuit, which may have cached
-   * `false` for the whole pod and would keep EVERY user off the identity
-   * branch for the rest of its TTL, including the user just born.
-   *
-   * Invalidating rather than seeding `true` on purpose: the next read goes to
-   * the state row, which is the actual truth. A seeded `true` would be this
-   * class asserting a row it never read.
-   *
-   * Static because the caches are the PROCESS's, not one instance's: two
-   * graphs holding two services still answer off one pod-wide cache, which is
-   * what the TTL bound above is written about.
    */
   static forget({ userId }: { userId: string }): void {
     gate.invalidate({ subject: userId });
@@ -100,14 +56,8 @@ export class IdentityWriteGateService {
   private constructor(private readonly state: IdentityWriteGateStatePort) {}
 
   /**
-   * Whether ANY user has finalized, fleet-wide — the short-circuit above, on
-   * its own.
-   *
+   * Whether ANY user has finalized, fleet-wide — the short-circuit above, on its own.
    * Public because the storage adapter asks it directly (ADR-116 §7): an
-   * `account` query that names no user has no per-user gate to consult, and a
-   * shape the identity branch has not enumerated must run untouched on a fleet
-   * where nobody is latched rather than failing loudly for a population the
-   * branch can never serve.
    */
   isAnyoneOnIdentityWrites(): Promise<boolean> {
     return anyoneGate.get({

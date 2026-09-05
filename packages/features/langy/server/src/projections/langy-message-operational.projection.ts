@@ -17,10 +17,8 @@ const messageEvents = [
 ] as const;
 
 /**
- * Type-aware event-to-row projection for Postgres operational messages. The
+ * Type-aware event-to-row projection for Postgres operational messages.
  * mapping itself is the contract's `mapLangyMessageEvent` (ADR-059) —
- * shared with the browser's local message list; this class is only the server
- * rig (schema routing, store, per-message grouping).
  */
 export class LangyMessageOperationalMapProjection
   extends AbstractMapProjection<LangyMessageProjectionRecord, typeof messageEvents>

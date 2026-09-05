@@ -1,9 +1,7 @@
 /**
- * LangyTurnRelay is the successor to runTurn's streaming role and a SECURITY
- * boundary: it verifies each pushed frame, pins it to the connection's turn,
- * dedups replays, and fans it to the live buffer + the durable event log. These
- * drive it with REAL signed envelopes (langyFrameAuth.signFrame) so the auth
- * path is exercised end to end, and lock which frames become durable events.
+ * LangyTurnRelay is the successor to runTurn's streaming role and a SECURITY boundary: it verifies
+ * each pushed frame, pins it to the connection's turn, dedups replays, and fans it to the live
+ * buffer + the durable event log.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -594,13 +592,9 @@ describe("LangyTurnRelay", () => {
     });
 
     it("fires a navigate CHAINED onto another command — while the call keeps its normal card life", async () => {
-      // Live failure: the model chained `…get X && langwatch navigate open X`
-      // into ONE bash call. Only the sole plain invocation was intercepted,
-      // so the chained form rendered as an ordinary tool card and nothing
-      // navigated. The chained call must stay on the normal path (its other
-      // segments are real work) while each navigate segment still fires —
-      // the id is read off the command string, the address only ever from
-      // the link store, so compound stdout changes nothing.
+      // Live failure: the model chained `…get X && langwatch navigate open X` into ONE bash call.
+      // Only the sole plain invocation was intercepted, so the chained form rendered as an ordinary
+      // tool card and nothing navigated.
       const { relay, buffer, conversations } = makeRelay();
       for (const f of surfaceResourceFrames({ resourceId: "run_1" })) {
         await relay.handle(f);
@@ -634,12 +628,11 @@ describe("LangyTurnRelay", () => {
 
     /** @scenario "A chained lookup-and-open compound resolves through the platform fallback" */
     it("resolves a CHAINED lookup-and-open through the platform fallback when the link store is empty", async () => {
-      // The reported failure: "take me to the prompt playground" made the
-      // model run ONE compound call (`langwatch prompt list --format json &&
-      // langwatch navigate open prompt_x`). Compound stdout never seeds the
-      // link store (stdout provenance), so the store is EMPTY, and the old
-      // fallback resolved only scenariorun_ ids, so the navigate silently
-      // dropped for every other resource. The fallback table must answer.
+      // The reported failure: "take me to the prompt playground" made the model run ONE compound
+      // call (`langwatch prompt list --format json && langwatch navigate open prompt_x`). Compound
+      // stdout never seeds the link store (stdout provenance), so the store is EMPTY, and the old
+      // fallback resolved only scenariorun_ ids, so the navigate silently dropped for every other
+      // resource. The fallback table must answer.
       const resolveResourceUrl = vi.fn(
         async () => "https://app.langwatch.ai/acme/prompts?promptId=prompt_x",
       );
@@ -808,16 +801,11 @@ describe("LangyTurnRelay", () => {
 
     it("never caches a link surfaced by a compound command — chained stdout is agent-forgeable, not the CLI's", async () => {
       const { relay, buffer } = makeRelay();
-      // The lookup LOOKS legitimate to the command parser, but the chained
-      // `echo` means stdout (and the platformUrl in it) is agent-authored —
-      // a prompt-injected turn could plant any same-origin address this way.
-      //
-      // The forged URL is deliberately PRECISE (a query param, so
-      // `isPreciseResourceHref` accepts it) and SAME-ORIGIN (so
-      // `toRelativeSameOriginHref` would resolve it). Both of those checks
-      // pass on their own, which means `isSoleLangwatchInvocation` is the ONLY
-      // thing standing between this forged address and a cached navigate
-      // target — delete the provenance gate and this test goes red.
+      // The lookup LOOKS legitimate to the command parser, but the chained `echo` means stdout (and
+      // the platformUrl in it) is agent-authored — a prompt-injected turn could plant any same-
+      // origin address this way. The forged URL is deliberately PRECISE (a query param, so
+      // `isPreciseResourceHref` accepts it) and SAME-ORIGIN (so `toRelativeSameOriginHref` would
+      // resolve it).
       const forged = "https://app.langwatch.ai/other-project/settings?drawer.open=secrets";
       for (const f of surfaceResourceFrames({
         resourceId: "run_1",

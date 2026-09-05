@@ -10,15 +10,8 @@ import type { LangyFailTurnCommandPort } from "../subscribers/langy-conversation
 const logger = createLogger("langwatch:langy:process-effects");
 
 /**
- * Slack the outbox lease MUST keep on top of the slowest in-flight effect: a
- * handoff read plus the transactional commit that retires the message. The
- * lease has to OUTLIVE a healthy long-running dispatch — if it expires while
- * `dispatchTurn` is still awaiting the manager, a second dispatcher instance
- * re-leases the row and re-delivers the same intent concurrently, and the
- * original handler's `markDispatched` is then fenced out by the superseding
- * lease token. A persistently slow-but-live effect would redeliver forever
- * and never be retired. Keep this comfortably above the network jitter around
- * a commit.
+ * Slack the outbox lease MUST keep on top of the slowest in-flight effect: a handoff read plus the
+ * transactional commit that retires the message.
  */
 
 export interface CreateLangyEffectPortsOptions {

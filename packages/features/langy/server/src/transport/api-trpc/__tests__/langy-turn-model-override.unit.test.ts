@@ -1,17 +1,7 @@
 /**
- * The `createConversation` mutation's `modelOverride` shape gate (the
- * `provider/model` regex documented on `langyModelOverrideSchema`): a custom
- * aggregator id with extra slashes is forwarded intact, the canonical
- * `mp_<rowId>/...` wire form is accepted, and a reference missing its
- * provider segment or carrying an empty one is rejected before the app layer
- * ever sees it.
- *
- * Ported from platform/app/src/server/api/routers/__tests__/langy.turnErrors.unit.test.ts
- * (origin/main), adapted from the deleted app-router `langyRouter` +
- * `createInnerTRPCContext`/`errorFormatter` harness to `LangyTrpcApi.create`
- * mounted on a bare `initTRPC` root, mirroring
- * apps/api/src/features/evaluation/__tests__/evaluation-trpc.mount.unit.test.ts.
- * See specs/langy/langy-model-selection.feature.
+ * The `createConversation` mutation's `modelOverride` shape gate: a custom
+ * aggregator id with extra slashes is forwarded intact, and the canonical
+ * `mp_<rowId>/...` wire form is accepted.
  */
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";

@@ -1,10 +1,6 @@
 /**
+ * `scenarios.moveToTestSuite` is wired to the `scenarios:manage` policy,
  * @vitest-environment node
- *
- * `scenarios.moveToTestSuite` is wired to the `scenarios:manage` policy, so a
- * caller who holds only read access is refused before the move ever reaches
- * the application.
- *
  * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
 import { initTRPC, TRPCError } from "@trpc/server";

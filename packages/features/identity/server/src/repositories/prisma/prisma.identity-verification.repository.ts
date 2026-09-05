@@ -6,27 +6,9 @@ import { z } from "zod";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**
- * The verification ceremony's row-truth storage (D01): ceremony records live
- * on the better-auth `VerificationToken` protocol table — the same table the
- * adapter's routing table classifies as protocol — never as events. The
- * legacy table has exactly three business columns, so the structured payload
- * rides as JSON in the `token` column the way better-auth itself stores
- * state blobs, and the `identifier` column is the namespaced lookup key.
- *
- * One key per IDENTIFIER (not per verification): minting replaces any prior
- * record for the same identifier, which is what makes "invalidated by any
- * newer mint" a delete-then-insert rather than bookkeeping. The token column
- * carries the HASH of the emailed token — the raw token exists only in the
- * magic link.
- *
- * `identifier` carries no unique constraint (it is better-auth's legacy table,
- * and the key it IS unique on is the whole `(identifier, token)` pair), so
- * "replaces" is a convention this module keeps rather than one the database
- * enforces: two mints racing each other both find nothing to replace and both
- * insert. Reads take the newest, and CONSUMPTION reaps every generation it
- * read — otherwise the older row becomes selectable again the moment the newer
- * one is consumed, and a link a newer mint was supposed to invalidate still
- * completes.
+ * The verification ceremony's row-truth storage (D01): ceremony records live on the better-auth
+ * `VerificationToken` protocol table — the same table the adapter's routing table classifies as
+ * protocol — never as events.
  */
 
 const IDENTITY_VERIFY_KEY_PREFIX = "identity-verify:";
@@ -132,16 +114,11 @@ export class PrismaIdentityVerificationRepository implements IdentityVerificatio
       if (!current) return false;
       const payload = parsePayload(current.token);
       if (!payload || payload.verificationId !== verificationId) return false;
-      // Every row this read saw, not just the pair — and that is the whole
-      // point. `identifier` carries no unique constraint, so two mints racing
-      // each other both find nothing to replace and both insert; the newest
-      // answers every read until it is consumed, and then the OLDER one
-      // becomes selectable again, its token and PKCE proof intact. A record a
-      // newer mint superseded must never complete, so consuming the current
-      // generation reaps the generations behind it.
-      //
-      // Bounded to the ids this transaction read, so a mint that lands after
-      // it is a fresh generation rather than collateral.
+      // Every row this read saw, not just the pair — and that is the whole point. `identifier`
+      // carries no unique constraint, so two mints racing each other both find nothing to replace
+      // and both insert; the newest answers every read until it is consumed, and then the OLDER one
+      // becomes selectable again, its token and PKCE proof intact. A record a newer mint superseded
+      // must never complete, so consuming the current generation reaps the generations behind it.
       const deleted = await tx.verificationToken.deleteMany({
         where: { identifier, token: { in: rows.map((row) => row.token) } },
       });

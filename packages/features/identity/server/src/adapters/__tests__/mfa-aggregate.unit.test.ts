@@ -97,12 +97,8 @@ const noopStore = {
 } as never;
 
 /**
- * Two-step verification rides `user_identity` — same person, same key, so
- * the same aggregate and the same lane. Every verb's event is run through
- * the store's own validator against the identity pipeline's declared type,
- * which is what pins the two together: a fact stamped with anything else
- * would be refused at append (#7406), and the shared lane that serialises a
- * disable against an identifier detach depends on them matching.
+ * Two-step verification rides `user_identity` — same person, same key, so the same aggregate and
+ * the same lane.
  */
 describe("two-step verification event aggregate type", () => {
   describe("when every verb emits", () => {

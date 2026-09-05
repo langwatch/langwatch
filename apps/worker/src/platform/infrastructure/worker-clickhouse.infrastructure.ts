@@ -1,20 +1,6 @@
 /**
- * Worker-owned ClickHouse construction: one routed, pooled, bounded connection
- * per process, and its shutdown.
- *
- * The event store, every fold and every projection resolve their client
- * through here, and the resolution is TENANT-KEYED rather than global: a
- * project belonging to an organization with its own endpoint reaches that
- * endpoint, and everything else reaches the shared one. That routing is
- * `@langwatch/clickhouse-client`'s, not this module's — what this module owns
- * is the three process-shaped decisions the package deliberately does not
- * make: which vendor driver to build, how many sockets it may hold, and what a
- * refused statement becomes.
- *
- * UNLIKE THE API, THERE IS NO ABSENCE ARM. A worker without an event store
- * cannot fold anything; the packaged consumer refusal already says so, and a
- * process that composed a connection over a blank string would discover the
- * problem on its first append instead of at boot.
+ * Worker-owned ClickHouse construction: one routed, pooled, bounded connection per process, and its
+ * shutdown.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createClient } from "@clickhouse/client";
@@ -42,10 +28,8 @@ import type { ResourceScope } from "@langwatch/runtime-composition";
 import type { WorkerClickHouseConfig } from "../config/worker.config";
 
 /**
- * Which organization a tenant belongs to.
- *
- * Declared as the one question the router asks rather than as a Prisma client,
- * because that is all the routing needs. A worker composes it over the client
+ * Which organization a tenant belongs to. Declared as the one question the router asks rather than
+ * as a Prisma client, because that is all the routing needs. A worker composes it over the client
  * it has already opened.
  */
 export type WorkerTenantDirectory = TenantDirectory;
@@ -58,11 +42,9 @@ export type WorkerClickHouseInfrastructureOptions = {
 };
 
 /**
- * This process refused the statement itself: its concurrency slots were taken
- * and its wait queue was full, so the statement never reached ClickHouse.
- *
- * Raised here rather than imported because the package asks the PROCESS what a
- * shedding refusal becomes.
+ * This process refused the statement itself: its concurrency slots were taken and its wait queue
+ * was full, so the statement never reached ClickHouse. Raised here rather than imported because the
+ * package asks the PROCESS what a shedding refusal becomes.
  */
 class ClickHouseOverloadedError extends HandledError {
   declare readonly code: "clickhouse_overloaded";
@@ -86,11 +68,9 @@ class WorkerOverloadErrorFactory extends ClickHouseOverloadErrorFactory {
 }
 
 /**
- * The vendor driver, built once per physical endpoint.
- *
- * `@clickhouse/client` is named in exactly this one place: everything above it
- * receives a client the package has already wrapped in retries, a statement
- * limiter and the default query settings.
+ * The vendor driver, built once per physical endpoint. `@clickhouse/client` is named in exactly
+ * this one place: everything above it receives a client the package has already wrapped in retries,
+ * a statement limiter and the default query settings.
  */
 class WorkerVendorClickHouseClientFactory implements ClickHouseVendorClientFactory<
   ClickHouseClient & ClickHouseVendorClient
@@ -113,11 +93,9 @@ class WorkerVendorClickHouseClientFactory implements ClickHouseVendorClientFacto
 }
 
 /**
- * The statement limiter's counters, as this process reports them.
- *
- * Logged rather than exported as metrics: this process has no prom-client
- * registry to register a gauge against, and shedding still says so out loud,
- * which is the fact an operator acts on.
+ * The statement limiter's counters, as this process reports them. Logged rather than exported as
+ * metrics: this process has no prom-client registry to register a gauge against, and shedding still
+ * says so out loud, which is the fact an operator acts on.
  */
 class LoggingClickHouseTelemetry extends ClickHouseManagedClientTelemetry {
   private readonly logger: Pick<Logger, "warn"> = createLogger("langwatch:worker:clickhouse");
@@ -197,35 +175,17 @@ export class WorkerClickHouseInfrastructure {
   ) {}
 
   /**
-   * The tenant-keyed resolver every fold and every append runs through.
-   *
-   * Bound as a closure rather than handed out as the connection, so a caller
-   * cannot reach `shared()` and write one organization's rows on another's
-   * endpoint. The one question they may ask is "the client for THIS tenant".
+   * The tenant-keyed resolver every fold and every append runs through. Bound as a closure rather
+   * than handed out as the connection, so a caller cannot reach `shared()` and write one
+   * organization's rows on another's endpoint.
    */
   readonly resolveClient = (tenantId: string): Promise<ClickHouseClient> =>
     this.connection.resolve(tenantId);
 
   /**
-   * Every physical endpoint this deployment configured, the shared one and
-   * each private route, each labelled with the target it serves.
-   *
-   * The one question above deliberately answers "the client for THIS tenant",
-   * and every fold and append must keep asking only that. This second one is
-   * for the work that is not a tenant's: an install-wide sweep settles the
-   * shared instance and every private one in the same pass, so it needs the
-   * directory rather than a route. It is a separate closure rather than the
-   * connection itself for the original reason — a caller still cannot reach
-   * `shared()` and write one organization's rows on another's endpoint.
-   */
-  /**
-   * The endpoint one ORGANIZATION's rows live on, with no directory lookup.
-   *
-   * The tenant resolver above answers "the client for this project", and the
-   * anonymous usage report counts an organization's projects together — it
-   * already knows the organization, so routing through a project id would be a
-   * lookup to arrive back where it started. A deployment with no private route
-   * for that organization gets the shared endpoint, which is where its rows are.
+   * Every physical endpoint this deployment configured, the shared one and each private route, each
+   * labelled with the target it serves. The one question above deliberately answers "the client for
+   * THIS tenant", and every fold and append must keep asking only that.
    */
   readonly resolveOrganizationClient = (organizationId: string): ClickHouseClient =>
     this.connection.resolveOrganization(organizationId);

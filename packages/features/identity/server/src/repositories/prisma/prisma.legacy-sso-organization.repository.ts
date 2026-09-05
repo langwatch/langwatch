@@ -2,15 +2,9 @@ import type { LegacySsoOrganizationRepository } from "../../sso-connection-grand
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**
- * The two string columns the grandfather migration reads
+ * The two string columns the grandfather migration reads organization holding one without the other
+ * is not configured for SSO — the legacy matcher needs both to route — so it is not something to
  * (`Organization.ssoDomain` / `ssoProvider`, ADR-027 §Context). An
- * organization holding one without the other is not configured for SSO — the
- * legacy matcher needs both to route — so it is not something to grandfather.
- *
- * Read-only, deliberately. This slice stops no string write: the columns keep
- * being written and keep deciding sign-in until `SSOCONN_ROUTING` reaches
- * `enforce`, which is what makes the rollback "flag off" rather than "restore
- * the data".
  */
 export class PrismaLegacySsoOrganizationRepository implements LegacySsoOrganizationRepository {
   static create(prisma: PrismaClient): PrismaLegacySsoOrganizationRepository {

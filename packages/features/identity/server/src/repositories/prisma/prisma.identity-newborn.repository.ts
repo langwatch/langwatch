@@ -12,25 +12,15 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 /**
+ * It is what makes an abandoned entrance FINDABLE.
  * The report a born-finalized state row carries (ADR-116 §3).
- *
- * It is what makes an abandoned entrance FINDABLE. The event store
- * enumerates no aggregates, and an entrance that died before its rows
- * committed staged no fold — so it leaves no `Identifier` row and no `User`
- * row either. Without a claim written before the append, the orphaned stream
  * would be invisible to any sweep, and ADR-116 §3 calls the sweep a required
- * companion rather than optional hygiene.
  */
 export const IDENTITY_BORN_REPORT_KIND = "born" as const;
 
 /**
- * The row writes the born-finalized entrance performs, and the sweep that
- * cleans up after the ones that never happened.
- *
- * These are identity tables under the multitenancy middleware's
- * Identifier/Account exemption: `User`, `AccountCredential` and
- * `SystemMigrationTenantState` are not project-scoped, so none of these
- * queries carries a `projectId`.
+ * The row writes the born-finalized entrance performs, and the sweep that cleans up after the ones
+ * that never happened.
  */
 export class PrismaIdentityNewbornRepository implements IdentityNewbornRepository {
   static create(prisma: PrismaClient): PrismaIdentityNewbornRepository {
@@ -40,14 +30,9 @@ export class PrismaIdentityNewbornRepository implements IdentityNewbornRepositor
   constructor(private readonly prisma: PrismaClient) {}
 
   /**
-   * Stake the newborn's tenant BEFORE the append, so an entrance that fails
-   * between the append and the row commit leaves something the sweep can
-   * find. `migrated` and not `finalized`: the history is going into the log,
-   * but nothing has proven it, and only `finalized` opens the write gate.
-   *
-   * The user tenant source enumerates `User` rows, so a claim for a user who
-   * never existed is never picked up by the migration runner — it sits inert
-   * until the sweep removes it.
+   * Stake the newborn's tenant BEFORE the append, so an entrance that fails between the append and
+   * the row commit leaves something the sweep can find. `migrated` and not `finalized`: the history
+   * is going into the log, but nothing has proven it, and only `finalized` opens the write gate.
    */
   async claim({ userId }: { userId: string }): Promise<void> {
     await this.prisma.systemMigrationTenantState.upsert({
@@ -68,15 +53,9 @@ export class PrismaIdentityNewbornRepository implements IdentityNewbornRepositor
   }
 
   /**
-   * The user already standing at a pinned id, if any.
-   *
-   * The entrance asks BEFORE it states anything, because the id is derived
-   * from the normalized address and normalization strips plus-tags: a second
-   * sign-up at `sam+x@acme.com` derives the id `sam@acme.com` was born under.
-   * A pinned id is a convergence key for a retry of the same birth, never a
-   * claim on a user who already exists, so an occupied one is refused rather
-   * than adopted — and refused before the append, so the attach fact never
-   * lands in the standing user's stream.
+   * The user already standing at a pinned id, if any. The entrance asks BEFORE it states anything,
+   * because the id is derived from the normalized address and normalization strips plus-tags: a
+   * second sign-up at `sam+x@acme.com` derives the id `sam@acme.com` was born under.
    */
   async tryFindUserAtPinnedId({ userId }: { userId: string }): Promise<{ id: string } | null> {
     return this.prisma.user.findUnique({
@@ -86,21 +65,8 @@ export class PrismaIdentityNewbornRepository implements IdentityNewbornRepositor
   }
 
   /**
+   * writes.
    * ADR-116 §3 leg two: ONE Postgres transaction over the newborn's row
-   * writes. They can share one because they are one store, and sharing it is
-   * what makes the newborn either wholly present or wholly absent — an
-   * entrance that dies mid-leg must not leave a user row whose gate stays
-   * shut forever.
-   *
-   * Idempotent on the pinned ids, because a retry re-executes every leg: an
-   * attempt that failed before this transaction left no user row, so the
-   * retry creates the same one, and the state row is flipped to `finalized`
-   * rather than re-created.
-   *
-   * A row already at the id is a COLLISION, never something to adopt: the
-   * caller checked, so reaching this means two sign-ups for one normalized
-   * address raced. `identity_email_in_use` is the same answer the loser would
-   * have got a moment earlier.
    */
   async commitNewborn({
     userId,

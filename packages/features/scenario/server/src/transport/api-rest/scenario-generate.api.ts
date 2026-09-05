@@ -1,26 +1,6 @@
 /**
  * `POST /api/scenario/generate` — the scenario editor's author-assist.
- *
- * A `handlerManagedAuth({ credential: "session" })` family: it resolves the
- * signed-in person itself and answers a bare `{ error }` at 401, 400 and 403.
- * The session arrives as a port for that reason, the same as the sibling
- * generators.
- *
- * Three of its five answers exist because of one incident, and they are
- * transcribed rather than reshaped:
- *
- *  - the generation is capped by `AbortSignal.timeout` and answers **504**
- *    when the cap fires, so a hung gateway can never hold the request open
- *    long enough for a front proxy to substitute its own HTML error page —
- *    which the browser then tries to `JSON.parse` (langwatch#5758);
- *  - `maxRetries` is **1**, not the SDK's 3, because three unbounded attempts
- *    were what made that window wide enough to reach;
- *  - a refusal the Go engine names arrives as a handled envelope and is
- *    forwarded with its CODE and serialized form, never its message — the
  *    browser keys its own copy off `error.code` (ADR-045).
- *
- * The timeout is read at call time rather than at module load so a test can
- * drive a real abort without waiting thirty seconds for one.
  */
 import { handlerManagedAuth } from "@langwatch/api";
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
@@ -51,10 +31,9 @@ export interface ScenarioGenerateRestPorts<TSession extends ScenarioGenerateRest
   /** The model a feature key resolves to on this deployment. */
   resolveModel(input: { projectId: string; featureKey: string }): Promise<LanguageModel>;
   /**
-   * How long one generation may run before it is aborted, in milliseconds.
-   *
-   * A port because the cap is what keeps a hung gateway from reaching the
-   * front proxy's timeout, and that budget belongs to the deployment.
+   * How long one generation may run before it is aborted, in milliseconds. A port because the cap
+   * is what keeps a hung gateway from reaching the front proxy's timeout, and that budget belongs
+   * to the deployment.
    */
   timeoutMs(): number;
 }

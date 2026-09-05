@@ -10,12 +10,8 @@ import { ScenarioProcessorServiceMetricsPort } from "../ports/scenario-processor
 const JOB_TYPE = "scenario";
 
 /**
- * The processor's own counts, on the two instruments every other job in the
- * fleet already reports to.
- *
- * `job_type` rather than a scenario-specific metric name, because the question
- * an operator asks is "which job class is failing", and an instrument only
- * simulations write to cannot be compared against the others on one panel.
+ * The processor's own counts, on the two instruments every other job in the fleet already reports
+ * to.
  */
 export class OtelScenarioProcessorMetricsAdapter extends ScenarioProcessorServiceMetricsPort {
   static create(): OtelScenarioProcessorMetricsAdapter {

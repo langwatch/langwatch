@@ -1,35 +1,6 @@
 /**
- * The pod that actually RUNS a simulation.
- *
- * The simulation pipeline's `execute` intent has always been mounted; what was
- * missing everywhere in the tree was something for it to submit to. This
- * composition is that something: an in-process pool, the processor that drains
- * it, and the run preparer the processor asks for a target before it spawns a
- * child.
- *
- *     simulationRunExecutionPM  execute intent
- *       `- ScenarioExecutionService.submit
- *            `- ScenarioExecutionPoolService     concurrency, cancellation
- *                 `- ScenarioProcessorService    one child per run
- *                      |- prepare / prefetch     eleven collaborators, below
- *                      |- NodeScenarioChildProcessAdapter
- *                      `- finishUnsuccessfulRun  back into this pipeline
- *
- * PREPARING A RUN REACHES ELEVEN VERTICALS, and this process composes all of
- * them from its own Postgres client and its own routed ClickHouse: the
- * scenario and its stored secrets, the suite whose plan may override the two
- * simulation models, the prompt, agent, workflow and project directories, the
- * model gateway all three roles resolve on, the project secret store a run's
- * secret parameters are decrypted from, and the trace reads an HTTP target's
- * ingest wait is measured against. A pool wired to a preparer that could not
- * answer would fail every run at execution time instead of at boot, which is
- * why the whole set is a precondition rather than a set of optionals.
- *
- * ONE thing here refuses by name, and it is a door rather than a capability:
- * STARTING a suite run. That is the API's write path — the browser posts it,
- * the API dispatches `startSuiteRun` on its own producer, and this process
- * drains it. A suite service that could start one from here would be a second
- * door onto one command.
+ * The pod that actually RUNS a simulation. The simulation pipeline's `execute` intent has always
+ * been mounted; what was missing everywhere in the tree was something for it to submit to.
  */
 
 import path from "node:path";
@@ -90,12 +61,9 @@ import { nanoid } from "nanoid";
 import type { WorkerConfig } from "../platform/config/worker.config";
 
 /**
- * Reports the composition decision an absent executor would otherwise hide.
- *
- * A worker that composes no executor is not broken — the `execute` intent
- * refuses into the outbox and another pod takes the run. A fleet where NO pod
- * composes one looks identical from the outside and never runs anything, so
- * the reason belongs in the boot log rather than in a run that stays queued.
+ * Reports the composition decision an absent executor would otherwise hide. A worker that composes
+ * no executor is not broken — the `execute` intent refuses into the outbox and another pod takes
+ * the run.
  */
 export abstract class WorkerScenarioExecutionAbsenceReportPort {
   abstract withoutExecutor(
@@ -140,13 +108,7 @@ export type WorkerScenarioExecutionPrerequisites = Readonly<{
 }>;
 
 /**
- * Whether this process can run simulations, decided ONCE and before anything
- * is built.
- *
- * The decision is taken up front because the pool is handed to the simulation
- * pipeline as it is composed: a pool created here and left unconnected would
- * throw a different sentence into the same outbox, and the boot report would
- * then say a pool exists on a pod that cannot run a single run.
+ * Whether this process can run simulations, decided ONCE and before anything is built.
  */
 export function resolveWorkerScenarioExecutionPrerequisites(
   options: WorkerScenarioExecutionCompositionInput,
@@ -189,11 +151,6 @@ function refuse(
 
 /**
  * The executor, over this process's own graph.
- *
- * `simulations` is the SAME service the pipeline's own commands write through,
- * handed in rather than built: a run this processor finishes as failed has to
- * append into the graph that is mounted, and a second simulation service would
- * write a terminal event nobody folds.
  */
 export function createWorkerScenarioExecution(input: {
   prerequisites: WorkerScenarioExecutionPrerequisites;
@@ -296,11 +253,6 @@ export function createWorkerScenarioExecution(input: {
 
 /**
  * The trace reads an HTTP target's ingest wait is measured on.
- *
- * The stored-span stack alone: the ingest-lag sample the wait is derived from
- * is a query over stored spans, and every other leg of the service — the
- * summary projection, the offloaded payload and the full-IO recomputation —
- * belongs to reads this preparer never makes.
  */
 function composeTraceReads(deps: WorkerScenarioExecutionPrerequisites) {
   return ClickHouseTraceAdapter.create({
@@ -314,12 +266,9 @@ function composeTraceReads(deps: WorkerScenarioExecutionPrerequisites) {
 }
 
 /**
- * How a child is started, and where its sources are.
- *
- * `packageRoot` is this application's own directory, so the spawn resolves
- * `dist/server/scenario-child-process.cjs` and the `tsx` fallback against the
- * tree the entrypoint actually lives in. The branch ships no bundle yet, so the
- * fallback is what runs and the spawn adapter logs the remediation itself.
+ * How a child is started, and where its sources are. `packageRoot` is this application's own
+ * directory, so the spawn resolves `dist/server/scenario-child-process.cjs` and the `tsx` fallback
+ * against the tree the entrypoint actually lives in.
  */
 function resolveChildProcessConfig(deps: WorkerScenarioExecutionPrerequisites) {
   const packageRoot = fileURLToPath(new URL("../..", import.meta.url));
@@ -368,11 +317,9 @@ class SystemScenarioClock extends ScenarioClockPort {
 }
 
 /**
- * A scenario's stored secret, under the deployment's own cipher.
- *
- * The SAME AES-256-GCM key the API tier writes with: a run's secret parameters
- * are encrypted on one tier and decrypted on this one, so a second key here
- * would fail every run that carries one.
+ * A scenario's stored secret, under the deployment's own cipher. The SAME AES-256-GCM key the API
+ * tier writes with: a run's secret parameters are encrypted on one tier and decrypted on this one,
+ * so a second key here would fail every run that carries one.
  */
 class WorkerScenarioSecretCipher extends ScenarioSecretCipherPort {
   constructor(private readonly encryption: AesGcmSecretEncryptionAdapter) {
@@ -389,11 +336,9 @@ class WorkerScenarioSecretCipher extends ScenarioSecretCipherPort {
 }
 
 /**
- * Starting a suite run, on the process that DRAINS suite runs.
- *
- * Refused rather than composed: the start is a browser write dispatched on the
- * API's own producer, and this process reads a suite only to resolve the plan
- * overrides a simulation already in flight was configured with.
+ * Starting a suite run, on the process that DRAINS suite runs. Refused rather than composed: the
+ * start is a browser write dispatched on the API's own producer, and this process reads a suite
+ * only to resolve the plan overrides a simulation already in flight was configured with.
  */
 class WorkerSuiteStartRefusal extends SuiteExecutionPort {
   constructor(private readonly processName: string) {
@@ -431,12 +376,9 @@ class UnrecomputedWorkerTraceFullIo extends TraceFullIoPort {
 }
 
 /**
- * Which of a workflow's models this project can actually run, and why not.
- *
- * Three outcomes rather than two, exactly as the API tier resolves them: a
- * provider the project never configured, one configured and switched off, and
- * one that is on and hands back prepared credentials. The provider rows
- * themselves never leave here.
+ * Which of a workflow's models this project can actually run, and why not. Three outcomes rather
+ * than two, exactly as the API tier resolves them: a provider the project never configured, one
+ * configured and switched off, and one that is on and hands back prepared credentials.
  */
 class WorkerWorkflowLlmParameters extends WorkflowLlmParametersPort {
   static create(input: { modelProviders: ModelProviderService }): WorkerWorkflowLlmParameters {

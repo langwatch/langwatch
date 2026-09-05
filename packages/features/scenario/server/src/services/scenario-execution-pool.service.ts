@@ -1,13 +1,6 @@
 /**
- * In-process execution pool for scenario child processes.
- *
- * Manages concurrency: spawns immediately if capacity available, buffers
- * pending jobs when full, dequeues on completion. Each worker pod has its
- * own pool instance (concurrency=3 by default → 6 pods × 3 = 18 total).
- *
- * The pool tracks running children by scenarioRunId so the cancel
- * subscription can find and SIGTERM the right child.
- *
+ * In-process execution pool for scenario child processes. Manages concurrency: spawns immediately
+ * if capacity available, buffers pending jobs when full, dequeues on completion.
  * @see specs/scenarios/event-driven-execution-prep.feature
  */
 
@@ -28,11 +21,9 @@ type ActiveExecution = {
 
 export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
   /**
-   * In-flight job data keyed by scenarioRunId, tracked from the moment a job
-   * starts (before the child is registered) so the spawn window — where the
-   * child exists but is not registered yet — is still covered. Used by
-   * `inFlightJobs` so a draining worker can emit a terminal failure for every
-   * run it owns and none orphan at QUEUED.
+   * In-flight job data keyed by scenarioRunId, tracked from the moment a job starts (before the
+   * child is registered) so the spawn window — where the child exists but is not registered yet —
+   * is still covered.
    */
   private readonly _active = new Map<string, ActiveExecution>();
   private readonly _pending: ExecutionJobData[] = [];
@@ -54,16 +45,9 @@ export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
   }
 
   /**
-   * The runner, or a throw naming the job that could not be served.
-   *
-   * `connect` is late — `ScenarioProcessorService.create` calls it during
-   * worker boot, so a job submitted before that lands on an unconnected pool.
-   * `startJob` has always thrown there on purpose: the execute intent's outbox
-   * retries, which is what `startWorkers.ts` relies on. The two CANCELLED
-   * branches used `this.runner?.skipCancelled(...)` and then returned, so the
-   * same window silently dropped the terminal event and left the run at QUEUED
-   * — the exact outcome `inFlightJobs` exists to prevent. One field, one
-   * policy, and it is the loud one.
+   * The runner, or a throw naming the job that could not be served. `connect` is late —
+   * `ScenarioProcessorService.create` calls it during worker boot, so a job submitted before that
+   * lands on an unconnected pool.
    */
   private requireRunner(scenarioRunId: string): ScenarioExecutionRunnerPort {
     if (!this.runner) {
@@ -95,10 +79,9 @@ export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
   }
 
   /**
-   * Job data for every run still in flight: those running (tracked from
-   * startJob, covering the pre-registration spawn window) plus those buffered
-   * pending. Drained on worker shutdown so each run reaches a terminal state
-   * instead of orphaning at QUEUED.
+   * Job data for every run still in flight: those running (tracked from startJob, covering the pre-
+   * registration spawn window) plus those buffered pending. Drained on worker shutdown so each run
+   * reaches a terminal state instead of orphaning at QUEUED.
    */
   get inFlightJobs(): ExecutionJobData[] {
     return [...[...this._active.values()].map((execution) => execution.job), ...this._pending];

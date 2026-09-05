@@ -1,34 +1,6 @@
 /**
- * The `simulation_processing` pipeline as a PRODUCER registers it.
- *
- * One definition, two registrations. The consumer — the worker — supplies the
- * real run-state fold, the metrics map, the trace-summary reads behind
- * `computeRunMetrics`, the three cross-feature subscribers and the run-execution
- * process manager, and drains every routing key the definition declares. A
- * producer registers the SAME definition only to obtain its command
- * dispatchers: the eight writes a customer's action turns into, off a tRPC
- * call, and nothing else. It starts no consumer loop, holds no event log, folds
- * nothing and runs no process manager.
- *
- * Every dependency the definition takes is consumer-side, and a producer has
- * none of them. That is what this module supplies — stand-ins that exist so the
- * definition can be CONSTRUCTED and refuse by name if they are ever CALLED.
- * Refusing rather than no-op'ing is the whole point: a silently-succeeding fold
- * store in a process that was never meant to fold would report a projection as
- * written when nothing was, and the row would simply never appear.
- *
- * THE PROCESS MANAGER IS DECLARED HERE AND RUN THERE. `simulation_processing`
- * mounts `simulation_run_execution`, and the runtime used to refuse to register
- * any pipeline declaring one without a durable `ProcessStore` — which made all
- * eight commands unsendable from the tier a customer's action actually arrives
- * at. A producer-only runtime registers the definition whole and declines the
- * manager by name instead (`EventSourcingOptions.processManagerMode`), so the
- * inbox, outbox and wakes stay the consumer's alone.
- *
- * Forking the definition instead — declaring only the commands a producer
- * sends — is the thing this avoids. The routing triple every job carries is
- * derived from the pipeline and command names, so two descriptions of one event
- * stream drift into jobs the worker cannot route.
+ * The `simulation_processing` pipeline as a PRODUCER registers it. One definition, two
+ * registrations.
  */
 import type { AppendStore, FoldProjectionStore } from "@langwatch/eventing";
 import type {
@@ -86,11 +58,6 @@ class ProducerOnlyAppendStore<TRow> implements AppendStore<TRow> {
 
 /**
  * The run executor the `execute` and `cancel` intents reach.
- *
- * Unreachable here by construction — a producer runs no process manager, so
- * neither intent is ever leased — and it refuses anyway, so a graph that
- * somehow mounted one says which process it reached rather than submitting a
- * run into a pool that does not exist.
  */
 class ProducerOnlyScenarioExecution extends ScenarioExecutionService {
   constructor(private readonly processName: string) {
@@ -119,12 +86,8 @@ class ProducerOnlyScenarioExecution extends ScenarioExecutionService {
 }
 
 /**
- * The eight writes, as the process manager's `finish` intent would reach them.
- *
- * This is the seat a REAL dispatcher takes in a producer — the commands the
- * registration itself hands back. It is a refusal here because the definition
- * has to be constructed before those dispatchers exist, and because a producer
- * never leases the intent that would use it.
+ * The eight writes, as the process manager's `finish` intent would reach them. This is the seat a
+ * REAL dispatcher takes in a producer — the commands the registration itself hands back.
  */
 class ProducerOnlySimulationExecution extends SimulationExecutionPort {
   constructor(private readonly processName: string) {
@@ -162,11 +125,9 @@ class ProducerOnlySimulationExecution extends SimulationExecutionPort {
 }
 
 /**
- * Builds the simulation-processing definition for a process that only sends
- * commands on it.
- *
- * `processName` names the refusal, so a stand-in reached by accident says which
- * process reached it rather than reporting an anonymous failure.
+ * Builds the simulation-processing definition for a process that only sends commands on it.
+ * `processName` names the refusal, so a stand-in reached by accident says which process reached it
+ * rather than reporting an anonymous failure.
  */
 function buildSimulationProcessingProducerPipeline(input: { processName: string }) {
   const { processName } = input;

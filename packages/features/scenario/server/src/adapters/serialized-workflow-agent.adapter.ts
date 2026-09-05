@@ -1,21 +1,6 @@
 /**
- * Serialized workflow agent adapter for scenario worker execution.
- *
- * Operates with pre-fetched workflow DSL and doesn't require database access.
- * Designed to run in isolated worker threads, mirroring the code-agent adapter
- * but executing the user's published workflow rather than a synthesized one.
- *
- * Input resolution uses the same fieldMappings contract as code and HTTP agents:
- * - With scenarioMappings: each declared agent input is resolved via
- *   `resolveFieldMappings` (source or static value), keyed by agent input id.
- * - Without scenarioMappings: legacy behavior — the first declared input gets
- *   the last user message, remaining inputs get "".
- *
- * Output extraction mirrors the code adapter:
- * - When scenarioOutputField is set: pull that specific key from the end-node
- *   result dict (throw if missing).
- * - When unset: use the first declared output identifier, then fall back to
- *   the first value, then to a stringified result.
+ * Serialized workflow agent adapter for scenario worker execution. Operates with pre-fetched
+ * workflow DSL and doesn't require database access.
  */
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
@@ -30,16 +15,6 @@ import { SerializedAgentAdapter } from "./serialized-agent.base";
 
 /**
  * How long to wait on the NLP service for one turn.
- *
- * This adapter has no per-agent `timeoutMs` budget to add headroom above
- * (unlike the code adapter's `CodeAgentData`, `WorkflowAgentData` carries
- * none) — so the deadline is simply the floor, bounded by the platform's
- * operator-configurable maximum. See `../../../nlpgo/timeouts.ts` for what
- * the floor derives from and why: it used to be this file's own hardcoded
- * `NLP_FETCH_TIMEOUT_MS = 120_000`, entirely independent of the code
- * adapter's copy and with no env override, which is exactly the drift that
- * caused a live production timeout when the engine's own ceiling was
- * raised and this one wasn't told.
  */
 function fetchTimeoutMs(): number {
   const transport = NlpFetchAdapter.create();
@@ -66,19 +41,13 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
   private readonly config: WorkflowAgentData;
   private readonly nlpServiceUrl: string;
   /**
-   * The LangWatch platform API key (project.apiKey), sent as
-   * workflow.api_key. nlpgo forwards it verbatim as the X-Auth-Token header
-   * on its callbacks into the platform (agentblock/workflow_runner.go,
-   * evaluatorblock/executor.go, engine.go) — never an LLM provider
-   * credential, so it must not be sourced from litellm params (issue #6634).
+   * The LangWatch platform API key (project.apiKey), sent as workflow.api_key.
+   * Never an LLM provider credential, so it must not be sourced from litellm
+   * params (issue #6634).
    */
   private readonly projectApiKey: string;
   /**
-   * The run's resolved parameter values. They reach the workflow twice, and
-   * both are needed: as entry inputs, which is how a published workflow wires
-   * a value on to its downstream nodes, and on the workflow itself as
-   * `params`, which is how a code node inside it reads `params.NAME` with the
-   * value's native type intact.
+   * The run's resolved parameter values.
    */
   private readonly parameters: RunParameterValues;
 
@@ -108,12 +77,9 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
   }
 
   /**
-   * Resolve input values from scenarioMappings (on the agent config) or fall
-   * back to legacy behavior — identical to the code agent's resolver.
-   *
-   * With scenarioMappings: resolve each declared agent input from its mapping.
-   *   Orphan mappings (for inputs that don't exist on the agent) are ignored.
-   * Without scenarioMappings: first input gets the last user message, rest get "".
+   * Resolve input values from scenarioMappings (on the agent config) or fall back to legacy
+   * behavior — identical to the code agent's resolver. With scenarioMappings: resolve each declared
+   * agent input from its mapping.
    */
   private resolveInputValues(agentInput: AgentInput): Record<string, string> {
     // A declared input wins over a parameter of the same name. Spread the other
@@ -127,12 +93,9 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
   }
 
   /**
-   * The `params` namespace for one turn: the run's resolved values plus this
-   * turn's trace context, so a code node inside the workflow can forward
-   * `params.trace_id` or `params.traceparent` to whatever it calls. Captured
-   * per call, because every turn opens its own trace. `trace_id` and
-   * `traceparent` are reserved names: they win over a run parameter with the
-   * same name.
+   * The `params` namespace for one turn: the run's resolved values plus this turn's trace context,
+   * so a code node inside the workflow can forward `params.trace_id` or `params.traceparent` to
+   * whatever it calls. Captured per call, because every turn opens its own trace.
    */
   private turnParameters(): RunParameterValues {
     const { headers, traceId } = injectTraceContextHeaders({ headers: {} });
@@ -192,11 +155,9 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
   }
 
   /**
-   * Execute the pre-fetched workflow DSL via /go/studio/execute_sync.
-   *
-   * The DSL is passed through unchanged (unlike the code adapter which
-   * synthesizes a minimal entry→code→end workflow). The NLP service injects
-   * the inputs dict into the entry node when evaluating the graph.
+   * Execute the pre-fetched workflow DSL via /go/studio/execute_sync. The DSL is passed through
+   * unchanged (unlike the code adapter which synthesizes a minimal entry→code→end workflow). The
+   * NLP service injects the inputs dict into the entry node when evaluating the graph.
    */
   private async executeOnNlpService(
     inputRecord: Record<string, string>,
@@ -304,11 +265,9 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
   }
 
   /**
-   * Extract the output string from the NLP service response.
-   *
-   * When scenarioOutputField is set: extract that specific field (throw if missing).
-   * When unset: use first declared output, then first available value,
-   * then stringify the entire result.
+   * Extract the output string from the NLP service response. When scenarioOutputField is set:
+   * extract that specific field (throw if missing). When unset: use first declared output, then
+   * first available value, then stringify the entire result.
    */
   private extractOutput(result: Record<string, unknown> | null): string {
     if (!result) return "";

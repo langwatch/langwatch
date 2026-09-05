@@ -1,11 +1,7 @@
 /**
+ * The reconciler was built and never started, and that is invisible from the outside: every
+ * workspace whose post-call webhook arrives is billed correctly either way,
  * Spec: specs/ai-gateway/realtime-sessions.feature
- *
- * The reconciler was built and never started, and that is invisible from the
- * outside: every workspace whose post-call webhook arrives is billed correctly
- * either way, and every workspace whose does not is billed nothing at all. So
- * what is asserted here is the START — the installer runs the loop, its first
- * tick reaches the database, and closing it stops the loop.
  */
 import { describe, expect, it, vi } from "vitest";
 import { GatewayRealtimeSessionWorkerFeatureInstaller } from "../../features/gateway/gateway-realtime-session-worker-feature.installer";

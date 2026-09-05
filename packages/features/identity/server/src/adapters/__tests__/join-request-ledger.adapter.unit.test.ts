@@ -1,10 +1,7 @@
 /**
- * The join-request ledger writer, which had no test of its own at all.
- *
+ * The join-request ledger writer, which had no test of its own at all. appender, so this writer
+ * touches no event log — and a process that never registered the pipeline is told,
  * What is pinned here is the ADR-110 shape: the staged command is the SOLE
- * appender, so this writer touches no event log — and a process that never
- * registered the pipeline is told, rather than being allowed to answer
- * "your request is in" over a command nothing received.
  */
 import {
   APPROVE_JOIN_COMMAND_TYPE,

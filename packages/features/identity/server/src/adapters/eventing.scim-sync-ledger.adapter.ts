@@ -1,49 +1,7 @@
 /**
- * The directory-sync ledger writer: the app's implementation of
- * `@langwatch/identity-server`'s ScimSyncLedger, in the shape the identity,
+ * The directory-sync ledger writer:
  * grants, connection and join-request ledgers already have (ADR-110):
- *
- *   1. the command staged onto the per-sync GroupQueue — the queued run is what
- *      APPENDS, re-running the same guard the calling path ran.
- *
- * That is the whole of it. This writer used to append to the durable log here
  * and stage afterwards, ADR-101's original order, which ADR-110 corrected for
- * every sibling: the queued run re-executes `guards[verb]` and states the same
- * facts, so appending on the calling path writes each one twice. It also could
- * not work where it runs — the tier a directory's push arrives at is a
- * producer, whose event store refuses `storeEvents` by name — so the append
- * was a guaranteed failure that took the whole history down with it.
- *
- * NO read-your-writes wait, unlike the connection ledger. Nothing on the SCIM
- * request path reads this projection back: the endpoints answer from Postgres
- * exactly as they did before, and holding an identity provider's HTTP request
- * open while a fold converged would buy an unread row at the cost of the one
- * property the protocol surface has to keep — answering as it always did.
- *
- * A push must never fail because its HISTORY could not be written. What the
- * customer is owed is the membership consequence, which travels the grants
- * ledger and is already durable by the time this runs; a sync fact that
- * cannot land is logged and swallowed. The opposite choice — refusing a push
- * whose bookkeeping failed — would turn an event-stack blip into a directory
- * outage.
- *
- * The swallow is LOUD and NAMES THE MISSING PIECE. A process that composes
- * this writer without registering the `scim-sync` pipeline on its own eventing
- * has no sender to stage through, and then every push's history is lost for as
- * long as that is true — permanently, not transiently. The log line says which
- * registration is absent, at `error`, so the state is read as the composition
- * defect it is rather than as an event-stack blip that will clear.
- *
- * The API process registers that pipeline now
- * (`api-identity-pipelines.composition.ts`, the fourth of four), so what is
- * left on this branch is a deployment that composed no queue at all and a
- * script that composed no eventing — both of which have already been told so
- * at boot. The branch stays because the swallow is what makes it invisible
- * otherwise: nothing else on the push path would report it.
- *
- * Like the identity ledger, the pipeline handle is resolved lazily off the
- * App: a bare script that never composes one must still be able to import
- * the runtime.
  */
 import {
   ISSUE_SCIM_TOKEN_COMMAND_TYPE,
@@ -130,13 +88,6 @@ export class ScimSyncLedgerWriterAdapter implements ScimSyncLedger {
 
   /**
    * The command handed to the queue, which is where the append happens.
-   *
-   * An absent sender is NOT a transient and is not logged as one: it means
-   * this process composed the writer without registering `scim-sync` on its
-   * own eventing, so every push's history is lost for as long as that holds.
-   * The line names the pipeline and the command so the missing registration is
-   * the first thing read, rather than "the stack is unavailable" — which it is
-   * not.
    */
   private async stage({
     command,

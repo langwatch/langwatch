@@ -1,6 +1,5 @@
 /**
  * Batch completion counts and the batch-scoped run list, read off real rows.
- *
  * @see specs/features/simulation-runs-batch-completion.feature
  * @see specs/features/simulation-runs-batch-filter.feature
  */

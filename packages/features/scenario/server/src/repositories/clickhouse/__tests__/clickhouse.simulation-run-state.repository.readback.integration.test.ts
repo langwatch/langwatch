@@ -1,7 +1,6 @@
 /**
- * A stored projection must be readable by the very next fold, without
- * waiting for the write to become eventually visible.
- *
+ * A stored projection must be readable by the very next fold, without waiting for the write to
+ * become eventually visible.
  * @see specs/scenarios/event-driven-execution-prep.feature
  */
 

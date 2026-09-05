@@ -8,19 +8,8 @@ import type {
 } from "@langwatch/eventing";
 
 /**
- * The two-step verification pipeline's projection store (D06): the Postgres
- * `MfaEnrollment` head and its cursor, written under the queue's per-person
- * lock.
- *
- * One row per aggregate, so the cursor rides on the row itself rather than in
- * a sibling table — the `SsoConnection` shape rather than `Identifier`'s,
- * because a person has one enrollment rather than a fan-out. The row is
- * written in one upsert, which makes the whole apply the commit marker.
- *
- * Nothing outside the fold writes here, and nothing here is a secret: the
- * shared secret and the backup codes are the two-factor plugin's, in its own
- * table, and this row holds lifecycle plus the POSITIONS of codes already
- * spent.
+ * The two-step verification pipeline's projection store (D06): the Postgres `MfaEnrollment` head
+ * and its cursor, written under the queue's per-person lock.
  */
 export class PrismaMfaEnrollmentProjectionRepository implements StateProjectionStore<MfaFoldState> {
   static create(prisma: PrismaClient): PrismaMfaEnrollmentProjectionRepository {

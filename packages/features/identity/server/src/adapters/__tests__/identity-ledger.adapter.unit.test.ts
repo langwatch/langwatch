@@ -105,12 +105,8 @@ function foldInto(store: InMemoryStateStore, events: IdentityEvent[]): void {
 }
 
 /**
- * The queue, standing in for the real one: it re-runs the SAME guard the
- * calling path ran, appends whatever that guard states, and folds it.
- *
- * That fidelity is the point of this harness. A sender that only recorded the
- * send would say nothing about the second appender — and the second appender
- * is exactly what "one event row per ceremony" is about.
+ * The queue, standing in for the real one: it re-runs the SAME guard the calling path ran, appends
+ * whatever that guard states, and folds it. That fidelity is the point of this harness.
  */
 function harness(overrides?: {
   shouldAppendFail?: boolean;

@@ -39,11 +39,8 @@ import {
 
 /**
  * The EXACT definition the runtime mounts — built through the pipeline's own
- * `langyConversationProcess` applier and the runtime's
- * `buildProcessDefinition`, so these tests cover the generated evolve
- * (intent-key prefixing, undeclared-event guard, schema-validated intent
- * payloads) rather than a re-implementation. The effect ports are stubs:
- * evolve never dispatches.
+ * `langyConversationProcess` applier and `buildProcessDefinition`, so these
+ * tests cover the generated evolve, not a re-implementation.
  */
 const langyConversationProcessDefinition = buildProcessDefinition(
   buildProcessManager<LangyConversationProcessingEvent>({

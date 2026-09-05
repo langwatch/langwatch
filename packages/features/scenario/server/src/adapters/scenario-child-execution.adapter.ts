@@ -1,26 +1,5 @@
 /**
  * Child process entry point for isolated scenario execution.
- *
- * This process is self-contained and self-reporting:
- * - Receives job data via stdin
- * - Reports results via LangWatch SDK (OTEL traces/events)
- * - Exits with code 0 when execution completes (regardless of test pass/fail)
- * - Exits with code 1 only on actual errors (crashes, network failures, etc.)
- *
- * Note: A "failed" test result is still a successful execution - the scenario
- * ran to completion and reported its results. Only actual errors should cause
- * a non-zero exit code.
- *
- * OTEL isolation is achieved by:
- * 1. Parent injects LANGWATCH_API_KEY (project.apiKey) and LANGWATCH_ENDPOINT
- *    as env vars via buildChildProcessEnv in scenario.processor.ts
- * 2. This process imports @langwatch/scenario which calls setupObservability()
- *    at module load time, reading from those env vars
- * 3. Each child process gets its own OTEL TracerProvider
- *
- * IMPORTANT: We must flush OTEL traces before exiting. The scenario SDK doesn't
- * expose the observability handle, so we access the global TracerProvider directly.
- *
  * @see specs/scenarios/simulation-runner.feature (Worker-Based Execution scenarios)
  */
 
@@ -37,13 +16,8 @@ import type { ChildProcessJobData } from "@langwatch/scenario-contract";
 import type { ScenarioHttpPort } from "../ports/scenario-http.port";
 
 /**
- * Some TracerProvider implementations (like ProxyTracerProvider) wrap a delegate.
- * This interface allows accessing the underlying concrete provider.
- *
- * OpenTelemetry's ProxyTracerProvider is used when the SDK hasn't been fully
- * initialized yet, and it delegates to the real provider once available.
- * We need the concrete provider to call forceFlush/shutdown methods that
- * exist on the SDK's TracerProvider but not on the API's TracerProvider interface.
+ * Some TracerProvider implementations (like ProxyTracerProvider) wrap a delegate. This interface
+ * allows accessing the underlying concrete provider.
  */
 function delegatedProvider(provider: TracerProvider): TracerProvider {
   if ("getDelegate" in provider && typeof provider.getDelegate === "function") {
@@ -73,14 +47,8 @@ export interface ScenarioChildExecutionResult {
 }
 
 /**
- * Who takes part in the run, and whether the conversation is written down.
- *
- * A scripted run (an agent test) carries its user's lines and decides its
- * own verdict, so it builds no model. Every other run lets a user simulator
- * play the person and a judge decide: both resolve their own models (run-plan
- * or scenario override, else the DEFAULT-role scenarios.* defaults). A job
- * queued before that split carried only modelParams, so both roles fall
- * back to it, preserving the previous single-model behavior across a deploy.
+ * Who takes part in the run, and whether the conversation is written down. A scripted run (an agent
+ * test) carries its user's lines and decides its own verdict, so it builds no model.
  */
 function buildRunCast({
   jobData,
@@ -245,14 +213,9 @@ async function flushScenarioOtelTracesValue(logger: Logger): Promise<void> {
 }
 
 /**
- * Flatten an error and its `cause` chain into a single string.
- *
- * Node's `fetch`/undici surface TLS and network failures as a generic
- * `TypeError: fetch failed` whose real reason (e.g. "self-signed certificate in
- * certificate chain", `SELF_SIGNED_CERT_IN_CHAIN`) lives on `error.cause`.
- * Reporting only `error.message` would drop that signal, so the parent — and
- * the failure classifier — would never see why the run died. Walk the chain and
- * include any error `code` so the classification is accurate.
+ * Flatten an error and its `cause` chain into a single string. Node's `fetch`/undici surface TLS
+ * and network failures as a generic `TypeError: fetch failed` whose real reason (e.g. "self-signed
+ * certificate in certificate chain", `SELF_SIGNED_CERT_IN_CHAIN`) lives on `error.cause`.
  */
 function formatScenarioChildErrorValue(error: unknown): string {
   const parts: string[] = [];

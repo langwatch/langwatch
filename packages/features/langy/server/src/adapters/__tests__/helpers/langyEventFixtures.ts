@@ -254,14 +254,8 @@ export function titleGeneratedEvent(params: { id: string; occurredAt: number; tu
 }
 
 /**
- * Builds the envelope ProcessRuntime's generated `pm:langyConversation`
- * subscriber would hand the process for this event.
- *
- * This mirrors `ProcessRuntime.registerPipeline` deliberately: the unit tests
- * drive `ProcessManagerService` directly (no pipeline, no queue), but they
- * must see the same envelope production does — in particular the content
- * boundary, applied here via the real `buildLangyProcessEventView`, and the
- * `idempotencyKey ?? id` inbox key that makes a redelivered command a no-op.
+ * Builds the envelope ProcessRuntime's generated `pm:langyConversation` subscriber would hand the
+ * process for this event.
  */
 export function toLangyProcessEnvelope(
   event: LangyConversationProcessingEvent,

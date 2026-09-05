@@ -12,17 +12,9 @@ import {
 } from "../worker-trace-processing-pipeline.composition";
 
 /**
+ * THE DEFINITION, driven through the function the installer registers.
  * Spec: specs/trace-processing/worker-trace-projection-runtime.feature
  * Spec: specs/trace-processing/worker-trace-pipeline-conversion.feature
- *
- * THE DEFINITION, driven through the function the installer registers. Trace
- * has converted: this process composes and mounts the pipeline, so these tests
- * assert what it REGISTERS and what a real span folds to, and read the
- * byte-frozen job registry rather than a list retyped here — a key that stops
- * being registered fails against the registry the queue routes on.
- *
- * The composition that builds the handlers behind those names is asserted in
- * `worker-trace-processing-mount.composition.unit.test.ts`.
  */
 
 const noop = async () => {};
@@ -175,14 +167,7 @@ describe("given the worker composition root and no application module", () => {
 
   describe("when a real span is folded through the composed pipeline", () => {
     /**
-     * THE THREE ASSERTIONS THE SABOTAGE PASS PRODUCED. Handing the pipeline a
-     * media-reference port that collects nothing, a cost port that prices
-     * everything at zero, or an extraction port that finds no input or output
-     * all left the definition structurally identical, so every registration
-     * assertion above stayed green. Each is a customer-visible loss — a trace
-     * with no thumbnails, a trace that appears free, a trace whose list row
-     * shows `<empty>` — and none of them raises anything. So the fold is
-     * driven for real and its output is asserted.
+     * THE THREE ASSERTIONS THE SABOTAGE PASS PRODUCED.
      */
     function foldOneSpan(definition: ReturnType<typeof build>) {
       const registered = definition.foldProjections.get("traceSummary");

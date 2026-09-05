@@ -44,37 +44,20 @@ import type { EvaluationWorkerCapability } from "../features/evaluation/evaluati
 import { TraceAnalyticsAttributePolicy } from "../features/evaluation/evaluation-analytics-attribute-policy.adapter";
 
 /**
- * Reports the composition decision an unrunnable evaluator would otherwise
- * hide.
- *
- * Stated at boot rather than inferred from a command that always throws: the
- * pipeline mounts either way, so every routing key stays claimed and every
- * evaluation reported by a customer's own SDK is still folded, rolled up and
- * alerted on. What is absent is the ONLINE path — the one where LangWatch runs
- * the evaluator itself.
+ * Reports the composition decision an unrunnable evaluator would otherwise hide.
  */
 export abstract class WorkerEvaluationAbsenceReportPort {
   abstract withoutEvaluatorExecution(): void;
 
   /**
-   * Reported when the online path IS composed but its durable execution
-   * receipt is not: a redelivery after a crash calls the evaluator a second
-   * time. The cost row is unaffected — the recorder derives its id from the
-   * operation key — so this is a duplicated provider call, not duplicated
-   * spend.
+   * Reported when the online path IS composed but its durable execution receipt is not: a
+   * redelivery after a crash calls the evaluator a second time.
    */
   abstract withoutExecutionReceiptLedger(): void;
 }
 
 /**
  * Everything the ONLINE evaluation path needs, handed in by the process.
- *
- * It is one bundle rather than eight options because the path is all-or-
- * nothing: an execution that could read the trace but not resolve the model
- * would score against inputs the customer did not map, and one that could call
- * the evaluator but not read the monitor would run whatever the command
- * happened to name. A process that cannot build all of it composes none of it
- * and says so at boot.
  */
 export type WorkerEvaluationExecutionCollaborators = Readonly<{
   /** The monitor the command names, and the trace its preconditions read. */
@@ -90,14 +73,8 @@ export type WorkerEvaluationExecutionCollaborators = Readonly<{
 }>;
 
 /**
- * The two collaborators Automation's evaluation subscribers reach, plus the
- * recorder they write matches through.
- *
- * Named as three ports rather than as `AutomationService` because that is what
- * the two handlers actually call: the project's active trace triggers, one
- * graph re-evaluation, and the durable match write. `AutomationService`
- * satisfies all three, so the application's own composition would be
- * unchanged; this process composes each over what it already holds.
+ * The two collaborators Automation's evaluation subscribers reach, plus the recorder they write
+ * matches through.
  */
 export type WorkerEvaluationAutomationPorts = Readonly<{
   triggers: AutomationTraceTriggerCataloguePort;
@@ -126,31 +103,8 @@ export type WorkerEvaluationProcessingOptions = Readonly<{
 
 /**
  * Evaluation's durable processing pipeline, composed from this process's own
- * substrates.
- *
- *     command:startEvaluation      EvaluationCommandAdapter     (no collaborators)
- *     command:completeEvaluation   EvaluationCommandAdapter
- *     command:reportEvaluation     EvaluationCommandAdapter
- *     command:executeEvaluation    ExecuteEvaluationCommand ── ABSENT INTENT
- *     projection:evaluationRun     EvaluationRunProjectionService ─ ClickHouse
- *     projection:evaluationAnalytics  RedisCachedFoldStore("evaluation_analytics")
- *     handler:evaluationAnalyticsRollup  append-only, never cached
- *     reactor:triggerMatch         AutomationEvaluationSubscriberService
- *     subscriber:graphTriggerActivity            "
- *
- * THE ANALYTICS CACHE PREFIX IS A WIRE CONTRACT, for the same reason Trace's
- * two are: while both graphs ingest, either process may advance an
- * evaluation's analytics fold, and both read the warm tier out of the same
- * Redis keyspace. `evaluation_analytics` is a literal here rather than
- * anything derived — a prefix spelled differently would not fail, it would
- * give this process its own empty cache and lose the shared applied-event-id
- * set that stops a redelivered batch folding twice.
- *
- * THE RUN STORE IS THE THREE-METHOD PROJECTION SERVICE, not `EvaluationService`.
- * The fold stores a run row and reads one back; the capability around it
- * additionally demands an evaluator executor and the whole Workflow service,
- * so composing it here would mean naming two collaborators this path provably
- * never calls.
+ * substrates: commands, the ClickHouse run projection, the Redis-cached
+ * analytics fold, and the automation trigger-match reactor.
  */
 export function createWorkerEvaluationProcessing(
   options: WorkerEvaluationProcessingOptions,
@@ -196,14 +150,8 @@ export function createWorkerEvaluationProcessing(
 }
 
 /**
- * The ONLINE path, composed for real when the process handed in the whole
- * bundle and refused by name when it did not.
- *
- * The chain is the package's own: `EvaluationExecutionIntentService` prepares
- * (monitor lookup, sampling, preconditions, settings recovery), the receipt
- * runs `EvaluationExecutionService` and bills it, and the outcome service turns
- * what came back into the reported event. Nothing here re-implements a step —
- * this composition only says which substrate each one runs on.
+ * The ONLINE path, composed for real when the process handed in the whole bundle and refused by
+ * name when it did not.
  */
 function createEvaluationExecutionIntent(
   options: WorkerEvaluationProcessingOptions,
@@ -233,12 +181,9 @@ function createEvaluationExecutionIntent(
 }
 
 /**
- * Adapts the engine's own call shape to the port the receipt drives.
- *
- * The one translation is the mappings: the command carries them as an opaque
- * record because a queue payload is JSON, and the engine reads a parsed
- * `MappingState`. Parsing here rather than inside the engine keeps the refusal
- * at the boundary the malformed row actually crosses.
+ * Adapts the engine's own call shape to the port the receipt drives. The one translation is the
+ * mappings: the command carries them as an opaque record because a queue payload is JSON, and the
+ * engine reads a parsed `MappingState`.
  */
 class WorkerEvaluationEngine extends EvaluationExecutionPort {
   constructor(private readonly engine: EvaluationExecutionService) {
@@ -254,41 +199,9 @@ class WorkerEvaluationEngine extends EvaluationExecutionPort {
 }
 
 /**
- * The one named absence: running the evaluator.
- *
- * The command class itself is real — its schema, aggregate id, span attributes
- * and the job id that deduplicates a thread's evaluations are all the
- * package's own, so the routing key is claimed and a redelivery still collapses
- * onto one job. What refuses is the INTENT behind it, and it refuses by name.
- *
- * WHY IT CANNOT BE COMPOSED HERE, exactly. It is no longer the model-provider
- * cascade: this process composes its own gateway, and the bridge an execution
- * reads its `X_LITELLM_*` environment through is written and sits in
- * `worker-evaluation-model-env.composition.ts`. Four things are genuinely
- * missing, and every one of them is load-bearing for a correct score:
- *
- *   - the EVALUATOR CATALOG. `EvaluationExecutionService` takes an
- *     `EvaluatorService`, and `@langwatch/evaluator-server` is not a dependency
- *     of this process.
- *   - the MONITOR READ BY ID. This process composes `MonitorCatalogService`,
- *     whose one method lists a project's enabled monitors; resolving ONE by id
- *     lives on the wide `MonitorService`, which itself wants the evaluator
- *     catalog above.
- *   - the TRACE EVIDENCE reads. `getEvaluationSpans` and
- *     `getEvaluationEvents` exist only on the eight-collaborator
- *     `TraceService`, which this process does not build.
- *   - SETTINGS RECOVERY and INPUTS OFFLOAD. Both are declared ports with no
- *     implementation anywhere in the tree, in any process.
- *
- * An intent that guessed at any of those would bill a customer's key against a
- * provider they did not choose, or score a trace against inputs they did not
- * map.
- *
- * A THROW RATHER THAN A SKIP, deliberately. A skipped evaluation is a real
- * outcome in this pipeline — it folds, it rolls up, and it can satisfy an
- * alert — so answering "skipped" here would tell a customer their evaluation
- * ran and found nothing. Throwing returns the job to the queue, which is the
- * same shape every other absent executor in this process takes.
+ * The one named absence: running the evaluator. The command class itself is real — its schema,
+ * aggregate id, span attributes and the job id that deduplicates a thread's evaluations are all the
+ * package's own, so the routing key is claimed and a redelivery still collapses onto one job.
  */
 class AbsentEvaluatorExecution extends EvaluationExecutionIntentPort {
   execute(input: ExecuteEvaluationCommandData): Promise<never> {
@@ -301,11 +214,9 @@ class AbsentEvaluatorExecution extends EvaluationExecutionIntentPort {
 }
 
 /**
- * The floor a run read will not look below, derived from the one retention
- * default this process configures its event store with.
- *
- * The same class the settlement reader uses, for the same reason: a second
- * number would let the fold read back runs the writer had already expired.
+ * The floor a run read will not look below, derived from the one retention default this process
+ * configures its event store with. The same class the settlement reader uses, for the same reason:
+ * a second number would let the fold read back runs the writer had already expired.
  */
 class WorkerEvaluationRetentionFloor extends EvaluationRetentionFloorPort {
   constructor(private readonly defaultRetentionDays: number) {

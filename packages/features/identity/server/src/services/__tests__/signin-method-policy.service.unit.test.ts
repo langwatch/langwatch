@@ -1,12 +1,7 @@
 /**
- * The instance's method-set policy, over the four facts a deployment answers.
- *
+ * The instance's method-set policy, over the four facts a deployment answers. semantics survive
+ * being expressed as method policy — it proves the same way,
  * The suite moved with the policy. What it proved before — that ADR-027's
- * semantics survive being expressed as method policy — it proves the same way,
- * except that the environment read and the licence gate are now the inputs the
- * policy takes rather than modules mocked out from under it. That is a
- * stronger test of the same rule: the deployment's four answers are stated
- * here, and nothing in the policy can reach around them.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { routeSignIn } from "@langwatch/identity-contract";

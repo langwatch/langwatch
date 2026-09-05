@@ -12,12 +12,9 @@ for (const name of metricNames) {
 }
 
 /**
- * The write gate's migration-state read failed (`write-gate.ts`):
- * for up to the negative-cache TTL this user's ceremonies emit no identity
- * events regardless of their true backfill status. Protocol behavior is
- * unaffected — the gap is event history, which the backfill's next pass
- * adopts. The failure already logs a structured warn; the counter is what
- * lets an outage that reopens the window page rather than sit unread.
+ * The write gate's migration-state read failed (`write-gate.ts`): for up to the negative-cache TTL
+ * this user's ceremonies emit no identity events regardless of their true backfill status. Protocol
+ * behavior is unaffected — the gap is event history, which the backfill's next pass adopts.
  */
 export const identityWriteGateReadFailuresTotal = new Counter({
   name: "identity_write_gate_read_failures_total",
@@ -25,11 +22,8 @@ export const identityWriteGateReadFailuresTotal = new Counter({
 });
 
 /**
- * A ceremony's read-your-writes wait expired before the fold landed its
- * events in the `Identifier` projection (the grants ledger's
- * `awaitProjection` shape). The facts are durable either way — this counts
- * the callers that returned before the projection agreed, which is the
- * signal that the fold is lagging.
+ * A ceremony's read-your-writes wait expired before the fold landed its events in the `Identifier`
+ * projection (the grants ledger's `awaitProjection` shape).
  */
 export const identityProjectionConvergenceTimeoutsTotal = new Counter({
   name: "identity_projection_convergence_timeouts_total",

@@ -49,13 +49,8 @@ import {
 } from "@langwatch/identity-contract";
 
 /**
- * Every verb the aggregate has, and the name its queue sender is resolved by
- * (the ledger writer maps a command type to one of these strings).
- *
- * A table rather than fourteen near-identical `.withCommandInstance(...)`
- * blocks: every one takes the same guards and differs only in its name and
- * class, so a list says that, and adding a verb is one line in one place
- * instead of five in two.
+ * Every verb the aggregate has, and the name its queue sender is resolved by (the ledger writer
+ * maps a command type to one of these strings).
  */
 const CONNECTION_COMMANDS = [
   ["registerConnection", RegisterConnectionCommand],
@@ -85,20 +80,9 @@ export interface SsoConnectionPipelineDeps {
 }
 
 /**
+ * connection; the organization is the tenant. Commands append (waited) and the operational
+ * projection folds into the Postgres `SsoConnection` head in per-connection FIFO.
  * The SSO connection pipeline (D04, ADR-117 §5). One aggregate per
- * connection; the organization is the tenant. Commands append (waited) and
- * the operational projection folds into the Postgres `SsoConnection` head in
- * per-connection FIFO.
- *
- * Ships DARK: `SSOCONN_ROUTING` defaults to `off`, so nothing routes off this
- * projection and no string write stops. The grandfather migration is the only
- * production writer until D05's self-service, and it is paced by the same
- * per-organization enrollment every other in-place migration is.
- *
- * Lanes: the commands keep the default per-aggregate group key — one
- * connection is one lane, which is already the narrowest useful shard, and a
- * connection sees a handful of human actions in its lifetime so a lane never
- * has a batch to coalesce.
  */
 export class SsoConnectionPipelineDefinitionAdapter {
   static create(deps: SsoConnectionPipelineDeps) {
@@ -136,10 +120,9 @@ export class SsoConnectionPipelineDefinitionAdapter {
 }
 
 /**
+ * this wake and nowhere else. The process holds only a deadline, and the events it reads are ids
+ * and timestamps, so no content boundary is needed on the payload.
  * The grace timer (ADR-117 §5): TEARDOWN_PENDING → TORN_DOWN happens through
- * this wake and nowhere else. The process holds only a deadline, and the
- * events it reads are ids and timestamps, so no content boundary is needed on
- * the payload.
  */
 function mountTeardownGrace(
   pm: ProcessManagerInitialStage<SsoConnectionEvent>,

@@ -1,25 +1,7 @@
 /**
- * The join-request ledger writer, in the shape the identity, connection and
+ * The join-request ledger writer, in the shape the identity, connection and 1. the durable
+ * ClickHouse append, WAITED — the fact lands before the caller returns;
  * grants ledgers already have (ADR-110, ADR-101):
- *
- *   1. the durable ClickHouse append, WAITED — the fact lands before the
- *      caller returns;
- *   2. the command staged onto the per-request GroupQueue, awaited — the fold
- *      is the queue's, and this module never applies a projection itself;
- *   3. a bounded read-your-writes wait, watching the projection's cursor reach
- *      the events just appended.
- *
- * The wait is an OBSERVATION, not inline processing. A fold that cannot run
- * makes it time out; the facts are still durable, the caller still succeeds,
- * and the row appears when the queue drains. This leg matters more here than
- * elsewhere: an admin who clicks Approve and is returned to a panel still
- * showing the request believes the click did nothing.
- *
- * The event store and the staged senders are resolved LAZILY, from the runtime
- * this pipeline is registered on. That is not deferral for its own sake: the
- * expiry wake dispatches `expireJoin` back into the same pipeline, so a writer
- * that resolved a sender at construction would have to be built after the
- * pipeline that needs it.
  */
 import {
   APPROVE_JOIN_COMMAND_TYPE,

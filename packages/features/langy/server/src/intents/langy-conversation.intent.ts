@@ -58,10 +58,9 @@ export const createLangyGenerateTitleIntent =
 export { langyGenerateTitleIntentSchema, langyWorkerDispatchIntentSchema };
 
 /**
- * Langy conversation commands. Most are pure 1:1 command → event mappings via
- * defineCommand; AcceptAgentTurn deliberately emits one ordered boundary batch.
- * Aggregate = `langy_conversation`, aggregateId = conversationId, TenantId =
- * projectId.
+ * Langy conversation commands. Most are pure 1:1 command → event mappings via defineCommand;
+ * AcceptAgentTurn deliberately emits one ordered boundary batch. Aggregate = `langy_conversation`,
+ * aggregateId = conversationId, TenantId = projectId.
  */
 
 /** CreateConversation → conversation_started (explicit creation). */
@@ -127,10 +126,8 @@ export const ImportMessageCommand = defineCommand({
 });
 
 /**
- * AcceptAgentTurn atomically stores the accepted turn and, when resuming, the
- * prior handoff consumption. The token itself stays out of the event log; only
- * the producing turn id is recorded. One command/store batch means a crash can
- * never commit the new turn while losing the durable consume.
+ * AcceptAgentTurn atomically stores the accepted turn and, when resuming, the prior handoff
+ * consumption. The token itself stays out of the event log; only the producing turn id is recorded.
  */
 const acceptAgentTurnDataSchema = langyAgentTurnAcceptedEventDataSchema.extend({
   conversationStart: langyConversationStartedEventDataSchema
@@ -228,13 +225,11 @@ export class AcceptAgentTurnCommand implements CommandHandler<
   }
 }
 
-// NOTE: status_reported / progress_reported are EPHEMERAL signals, not durable
-// commands — they are published to the Redis buffer via LangyEphemeralPublisher
+// NOTE: status_reported / progress_reported are EPHEMERAL signals, not durable commands — they are
+// published to the Redis buffer via LangyEphemeralPublisher The commands below ARE durable: a
+// meaningful result the agent produces during a response (a tool call it ran, an intermediate
+// answer, a hard failure) is worth persisting on the event log,
 // (see ../ephemeral.ts), never dispatched through this pipeline (ADR-046).
-//
-// The commands below ARE durable: a meaningful result the agent produces during
-// a response (a tool call it ran, an intermediate answer, a hard failure) is
-// worth persisting on the event log, unlike a transient "42% through" tick.
 
 /** InitiateToolCall → tool_call_initiated (a durable response milestone). */
 export const InitiateToolCallCommand = defineCommand({
@@ -269,10 +264,7 @@ export const SucceedToolCallCommand = defineCommand({
 });
 
 /**
- * FailToolCall → tool_call_failed (a durable response milestone). The failing
- * terminal of a tool call; a call reaches exactly one of succeed/fail, so the
- * idempotency key matches SucceedToolCall's `tool-done` slot — the first
- * terminal for a toolCallId wins and a contradictory second is collapsed.
+ * FailToolCall → tool_call_failed (a durable response milestone).
  */
 export const FailToolCallCommand = defineCommand({
   commandType: LANGY_CONVERSATION_COMMAND_TYPES.FAIL_TOOL_CALL,
@@ -290,15 +282,8 @@ export const FailToolCallCommand = defineCommand({
 });
 
 /**
- * UpdatePlan → plan_updated (a durable snapshot of the agent's todo list).
- *
- * Snapshot-typed, last-write-wins on the turn fold. The idempotency key is
- * turn-scoped AND per-dispatch (occurredAt), mirroring UpdateConversationMetadata's
- * `metadata:<occurredAt>` slot: a mutable, legitimately-repeated event where each
- * distinct snapshot is its own event and the fold applies them in occurredAt
- * order (the latest wins). A REDELIVERED frame is already dropped upstream by the
- * relay's frameNonce dedup before this command is ever dispatched, so the key is
- * a store-level backstop, not the primary dedup.
+ * UpdatePlan → plan_updated (a durable snapshot of the agent's todo list). Snapshot-typed, last-
+ * write-wins on the turn fold.
  */
 export const UpdatePlanCommand = defineCommand({
   commandType: LANGY_CONVERSATION_COMMAND_TYPES.UPDATE_PLAN,
@@ -316,16 +301,9 @@ export const UpdatePlanCommand = defineCommand({
 });
 
 /**
- * FailAgentResponse → agent_response_failed. The terminal a stalled/orphaned
- * response reaches when there is no answer to carry (the liveness sweep drains
- * it). Distinct from RecordAgentResponse/agent_responded, which carries the
- * completed answer.
- *
- * A turn reaches exactly ONE terminal (answer or failure), so the idempotency
- * key shares the `turn-terminal` slot with RecordAgentResponse — mirroring the
- * tool-call commands' shared `tool-done` slot. The first terminal for a turnId
- * wins; a contradictory second (a stale liveness failure racing the real
- * answer, or vice versa) collapses instead of double-terminating the turn.
+ * FailAgentResponse → agent_response_failed. The terminal a stalled/orphaned response reaches when
+ * there is no answer to carry (the liveness sweep drains it). Distinct from
+ * RecordAgentResponse/agent_responded, which carries the completed answer.
  */
 export const FailAgentResponseCommand = defineCommand({
   commandType: LANGY_CONVERSATION_COMMAND_TYPES.FAIL_AGENT_RESPONSE,
@@ -376,10 +354,9 @@ export const ArchiveConversationCommand = defineCommand({
 });
 
 /**
- * GenerateConversationTitle → conversation_title_generated (auto title).
- * Dispatched after a successful agent-response boundary while the title is
- * still derived. Idempotency is scoped to the triggering turn, so duplicate
- * delivery cannot record a second automatic title.
+ * GenerateConversationTitle → conversation_title_generated (auto title). Dispatched after a
+ * successful agent-response boundary while the title is still derived. Idempotency is scoped to the
+ * triggering turn, so duplicate delivery cannot record a second automatic title.
  */
 export const GenerateConversationTitleCommand = defineCommand({
   commandType: LANGY_CONVERSATION_COMMAND_TYPES.GENERATE_TITLE,
@@ -416,10 +393,9 @@ export const UpdateConversationMetadataCommand = defineCommand({
 });
 
 /**
+ * opaque, worker-authored resume token for a turn that checkpointed on pod termination. Idempotency
+ * keyed on the turn so a retried handoff writes one event.
  * RecordTurnHandoff → conversation_handoff_pending (ADR-048). Persists the
- * opaque, worker-authored resume token for a turn that checkpointed on pod
- * termination. Idempotency keyed on the turn so a retried handoff writes one
- * event.
  */
 export const RecordTurnHandoffCommand = defineCommand({
   commandType: LANGY_CONVERSATION_COMMAND_TYPES.RECORD_TURN_HANDOFF,

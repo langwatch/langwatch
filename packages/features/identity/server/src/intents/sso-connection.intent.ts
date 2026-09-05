@@ -50,14 +50,9 @@ import { SsoConnectionStateFoldProjection } from "../projections/sso-connection-
 import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection";
 
 /**
- * The connection pipeline's thirteen verbs plus grandfathering, as the queue's
- * STAGED RE-RUN of each: the same guard the calling path ran, the same
- * envelope. A retried command carries the same commandId, so the re-run
- * costs no second event.
- *
- * Every one is the identical move, so it is written once here rather than
- * thirteen times across thirteen files — the authz pipeline's
- * `grantsLedgerCommands.ts` shape, for the same reason.
+ * The connection pipeline's thirteen verbs plus grandfathering, as the queue's STAGED RE-RUN of
+ * each: the same guard the calling path ran, the same envelope. A retried command carries the same
+ * commandId, so the re-run costs no second event.
  */
 
 type GuardVerb = {

@@ -1,28 +1,7 @@
 /**
- * The SSO connection ledger writer: the app's implementation of
- * `@langwatch/identity-server`'s SsoConnectionLedger, in the shape the
+ * The SSO connection ledger writer: the app's implementation of `@langwatch/identity-server`'s
+ * SsoConnectionLedger, in the shape the 1. the durable ClickHouse append,
  * identity and grants ledgers already have (ADR-110, ADR-101):
- *
- *   1. the durable ClickHouse append, WAITED — the fact lands before the
- *      caller returns;
- *   2. the command staged onto the per-connection GroupQueue, awaited — the
- *      fold is the queue's, and this package never applies a projection
- *      itself;
- *   3. a bounded read-your-writes wait, watching the projection's cursor
- *      reach the events just appended.
- *
- * The wait is an OBSERVATION, not inline processing. A fold that cannot run
- * makes it time out; the facts are still durable, the caller still succeeds,
- * and the row appears when the queue drains. The grandfather migration's
- * routing proof depends on this leg: it reads the projection through the
- * routing port immediately after appending, and a proof run before the fold
- * landed would hold every organization for no reason.
- *
- * The event store and the staged senders are resolved LAZILY, through the
- * resolvers the composition root hands in. That is not deferral for its own
- * sake: the teardown grace wake dispatches `completeTeardown` back into the
- * same pipeline, so a writer that resolved a sender at construction would
- * have to be built after the pipeline that needs it.
  */
 import {
   ACTIVATE_CONNECTION_COMMAND_TYPE,

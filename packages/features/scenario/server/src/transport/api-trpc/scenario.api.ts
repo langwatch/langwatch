@@ -1,12 +1,7 @@
 /**
- * The complete `scenarios.*` tRPC surface: a flat merge of CRUD, run reads and
- * the live stream, the simulation runner, cancellation, version history, the
- * Results tab's reads and the run dialog's configuration history.
- *
- * The sub-surfaces are merged flat rather than nested because that is how
- * the surface has always been addressed — `scenarios.create`,
- * `scenarios.getSuiteRunData`, `scenarios.run` — and a transport move is not
- * the place to rename a client-facing procedure.
+ * The complete `scenarios.*` tRPC surface: a flat merge of CRUD, run reads and the live stream, the
+ * simulation runner, cancellation, version history, the Results tab's reads and the run dialog's
+ * configuration history.
  */
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { createResultAtomsRouter } from "./result-atoms.api";

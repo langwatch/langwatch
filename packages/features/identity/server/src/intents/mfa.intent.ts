@@ -22,18 +22,9 @@ import { MfaEnrollmentStateFoldProjection } from "../projections/mfa-enrollment-
 import type { MfaEvent } from "../projections/mfa-enrollment-state.projection";
 
 /**
- * The seven two-step verification verbs, as the queue's STAGED RE-RUN of
- * each: the same guard the calling path ran, the same envelope. A retried
- * command carries the same commandId, so the re-run costs no second event.
- *
- * Every one is the identical move, so it is written once here rather than
- * seven times across seven files — the connection pipeline's shape, for the
- * same reason.
- *
- * They stamp through `MfaEnrollmentStateFoldProjection.eventsFor`, which sits
- * beside the identity fold's own `eventsFor`. Same aggregate and same lane, but its
- * own `version`: fold read-back is version-gated, and sharing one stamp would
- * tie an MFA payload change to an identifier-vocabulary bump.
+ * The seven two-step verification verbs, as the queue's STAGED RE-RUN of each: the same guard the
+ * calling path ran, the same envelope. A retried command carries the same commandId, so the re-run
+ * costs no second event.
  */
 
 type GuardVerb = {

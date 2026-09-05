@@ -682,10 +682,8 @@ describe("SerializedCodeAgentAdapter", () => {
   });
 
   /**
-   * Span emission on success and on failure paths.
-   *
-   * Regression for lw#3438 — customer trace had no adapter span on a hung
-   * NLP request, making the failure invisible.
+   * Span emission on success and on failure paths. Regression for lw#3438 — customer trace had no
+   * adapter span on a hung NLP request, making the failure invisible.
    */
   describe("when emitting spans for the NLP request (lw#3438)", () => {
     const findExecuteSpan = () =>

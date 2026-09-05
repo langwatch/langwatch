@@ -123,13 +123,6 @@ class InMemoryProjectionStore implements StateProjectionStore<SsoConnectionFoldS
 
 /**
  * The COLUMNS the Postgres store writes, out of a stored projection.
- *
- * `CreatedAt` / `UpdatedAt` / `LastEventOccurredAt` are the base class's
- * bookkeeping stamps and are deliberately absent: `apply()` derives
- * `UpdatedAt` from `Date.now()`, and no column is written from any of the
- * three — the row's `occurredAt` comes from the projection's own
- * `occurredAt`, and its `createdAt`/`updatedAt` are Postgres-managed. So this
- * IS the whole row, and comparing the stamps would be comparing wall clocks.
  */
 function persistedRow(stored: StoredProjection<SsoConnectionFoldState>) {
   const {

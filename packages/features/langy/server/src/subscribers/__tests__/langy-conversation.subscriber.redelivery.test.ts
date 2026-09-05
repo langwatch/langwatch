@@ -1,28 +1,6 @@
 /**
- * Redelivery contract for the three Langy conversation subscribers, required by
- * the `eventing-subscriber-idempotency` architecture rule.
- *
- * Each of the three earns its idempotency a different way, and the rule's own
- * wording is why they are worth separating: queue deduplication alone is not
- * sufficient. All three declare a `deduplication.makeId`, and every one of those
- * windows expires — 15 seconds for the broadcast, twice the heartbeat grace for
- * liveness, and the admission lifecycle's default. A redelivery after the window
- * reaches `handle` for real, so what follows exercises `handle` directly rather
- * than the dedup key.
- *
- *   * `agentTurnLiveness` is LEVEL-TRIGGERED on the conversation projection. It
- *     acts only while the conversation is still RUNNING on the turn the event
- *     names, so the write it performs is also what makes the second delivery a
- *     no-op.
- *   * `langyConversationUpdateBroadcast` is an INVALIDATION. A second broadcast
- *     is a second message on the wire and that is fine — what matters is that
- *     the payload is identical, because a client applying it twice lands in the
- *     same place. A payload that carried a delta rather than a cursor would not
- *     have that property.
- *   * `langyTurnAdmissionLifecycle` DELEGATES idempotency to the admission
- *     capability, so what is pinned here is that a redelivery asks for exactly
- *     the same thing on the same turn, which is the precondition for the
- *     capability's own guarantee to hold.
+ * Redelivery contract for the three Langy conversation subscribers, required by the `eventing-
+ * subscriber-idempotency` architecture rule.
  */
 import { createTenantId, type EventSubscriberContext } from "@langwatch/eventing";
 import {

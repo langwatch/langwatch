@@ -19,10 +19,9 @@ export interface LangyMessageRecord {
 
 export interface LangyTrustedMessageReader {
   /**
-   * Internal automation may read a transcript after its triggering event has
-   * already established the conversation scope. This capability is kept
-   * separate from the user-facing service so transports cannot omit userId by
-   * accident.
+   * Internal automation may read a transcript after its triggering event has already established
+   * the conversation scope. This capability is kept separate from the user-facing service so
+   * transports cannot omit userId by accident.
    */
   getRecordsByConversation(params: {
     conversationId: string;

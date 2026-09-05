@@ -1,11 +1,6 @@
 /**
+ * `POST /api/scenario-events/browser-tab` — the endpoint the SDK asks before it opens a browser.
  * @vitest-environment node
- *
- * `POST /api/scenario-events/browser-tab` — the endpoint the SDK asks before
- * it opens a browser. The URL is always built from server-side ids through
- * `platformUrl`, never echoed from the caller, and delivery is gated on a
- * live tab under the caller's own project.
- *
  * @see specs/scenarios/scenario-tab-handoff.feature
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";

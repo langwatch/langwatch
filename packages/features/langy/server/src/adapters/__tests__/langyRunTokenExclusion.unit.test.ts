@@ -1,12 +1,6 @@
 /**
- * SECURITY invariant (see the Langy server frame-auth capability): the per-conversation
- * `runToken` is the HMAC key that authenticates the worker's stream. It must
- * live ONLY on the server-only state column and must NEVER reach a client-facing
- * projection — above all the turn (render) document the browser reads.
- *
- * This pins the split: the state fold retains the token; the turn fold has no
- * field for it and never emits it, even across a full turn lifecycle. If someone
- * later threads the token into the render doc, this fails loudly.
+ * SECURITY invariant (see the Langy server frame-auth capability): the per-conversation `runToken`
+ * is the HMAC key that authenticates the worker's stream.
  */
 
 import type { StateProjectionStore } from "@langwatch/eventing";

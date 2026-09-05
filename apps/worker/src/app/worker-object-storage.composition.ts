@@ -28,10 +28,9 @@ export type WorkerObjectStorage = {
   runtime: StoredObjectStorageRuntime;
   aws: AwsClientProcessRuntime;
   /**
-   * The BYOC lookup, exposed because two consumers need the tenant's ENDPOINT
-   * and CREDENTIALS and not only its bucket: the destination policy answers
-   * where an object belongs, and an S3 client still has to be built to reach
-   * it.
+   * The BYOC lookup, exposed because two consumers need the tenant's ENDPOINT and CREDENTIALS and
+   * not only its bucket: the destination policy answers where an object belongs, and an S3 client
+   * still has to be built to reach it.
    */
   projects: WorkerProjectS3SourcePort;
   /** The shared bucket, for a project with no route of its own. */
@@ -39,17 +38,15 @@ export type WorkerObjectStorage = {
   /**
    * The `AZURE_BLOB_*` block this process read, exposed alongside the runtime
    * so a second consumer (dataset normalization) can build its OWN Azure
-   * driver rather than reaching through the registry's scheme dispatch — it
-   * needs `head()`, which is deliberately outside `StoredObjectStorageDriver`.
+   * driver rather than reaching through the registry's scheme dispatch.
    */
   azureConfig: WorkerStorageConfig["azure"];
 };
 
 /**
- * This deployment's Azure Blob driver, or undefined when no account is
- * configured. Shared by the general object-storage registry (narrowed to
- * `StoredObjectStorageDriver`) and dataset normalization (which keeps the
- * concrete type for `head()`).
+ * This deployment's Azure Blob driver, or undefined when no account is configured. Shared by the
+ * general object-storage registry (narrowed to `StoredObjectStorageDriver`) and dataset
+ * normalization (which keeps the concrete type for `head()`).
  */
 export function createWorkerAzureBlobDriver(
   azure: WorkerStorageConfig["azure"],
@@ -89,31 +86,9 @@ class WorkerAzureStorageAdapter extends WorkerAzureStorageFactoryPort {
 }
 
 /**
- * The object storage this process reads and writes through.
- *
- * IT IS NOT OPTIONAL FOR TRACE, and that is what makes it a composition of its
- * own rather than a field on one. Two of the trace pipeline's keys stand on it:
+ * The object storage this process reads and writes through. IT IS NOT OPTIONAL FOR TRACE, and that
+ * is what makes it a composition of its own rather than a field on one.
  * `command:recordSpan` resolves the ADR-022 claim check for any span whose
- * payload was too large to travel inline, and `job:datasetNormalize` streams a
- * customer's uploaded file out of staging. A process that mounted those keys
- * without storage would accept both kinds of work and complete neither — the
- * span would lose its payload and the upload would sit "processing" forever.
- *
- * BYOC ROUTING IS PART OF THE COMPOSITION, not a refinement of it. A
- * deployment may route particular organizations to their own S3 account, and
- * the routing is keyed by organization on the variable's own NAME. A process
- * that ignored those routes would resolve every project to the shared bucket:
- * it would still work, which is precisely the danger — one tenant's objects
- * would be written into an account they do not own and cannot read, and
- * nothing would report it.
- *
- *     WorkerObjectStorage
- *       ├─ AwsClientProcessRuntime            the deployment's egress policy
- *       └─ StoredObjectStorageRuntime
- *            └─ StoredObjectDestinationPolicy  BYOC first, then the backend
- *                 └─ WorkerProjectS3SourceAdapter
- *                      ├─ config.storage.dataplaneS3   organization -> bucket
- *                      └─ one Prisma read              project -> organization
  */
 export function createWorkerObjectStorage(options: {
   config: WorkerConfig;
@@ -149,17 +124,8 @@ export function createWorkerObjectStorage(options: {
 }
 
 /**
- * Which S3 account a project's objects belong in.
- *
- * THE PROJECT'S ORGANIZATION IS RE-READ ON EVERY RESOLUTION, deliberately.
- * Projects move between organizations, and a cached answer would keep writing
- * to the previous tenant's bucket — and keep reading from it, so the customer
- * would see their own new objects disappear.
- *
- * A project that no longer resolves answers "no route" rather than raising:
- * the shared bucket is the correct destination for a project with no
- * organization of its own, and a deleted project's in-flight job should fail
- * on the work it is doing, not on a routing lookup.
+ * Which S3 account a project's objects belong in. THE PROJECT'S ORGANIZATION IS RE-READ ON EVERY
+ * RESOLUTION, deliberately.
  */
 class WorkerProjectS3SourceAdapter extends WorkerProjectS3SourcePort {
   static create(options: {

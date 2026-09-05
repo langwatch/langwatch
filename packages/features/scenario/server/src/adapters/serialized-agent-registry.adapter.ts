@@ -1,9 +1,7 @@
 /**
- * Registry for serialized adapter factories.
- *
- * Uses the registry pattern for Open/Closed Principle (OCP) compliance:
- * - Open for extension: Add new adapters by registering a factory
- * - Closed for modification: No changes to `build` needed
+ * Registry for serialized adapter factories. Uses the registry pattern for Open/Closed Principle
+ * (OCP) compliance: - Open for extension: Add new adapters by registering a factory - Closed for
+ * modification: No changes to `build` needed
  */
 
 import type { AgentAdapter } from "@langwatch/scenario";
@@ -18,11 +16,9 @@ import { SerializedConnectedAgentAdapter } from "./serialized-connected-agent.ad
 import { SerializedWorkflowAgentAdapter } from "./serialized-workflow-agent.adapter";
 
 /**
- * Creates an adapter from serialized data using the registry.
- *
- * @throws Error if adapter type is not registered, or if the resolved
- *   factory is missing the credential it needs (modelParams for prompt,
- *   projectApiKey for workflow/code).
+ * Creates an adapter from serialized data using the registry. @throws Error if adapter type is not
+ * registered, or if the resolved factory is missing the credential it needs (modelParams for
+ * prompt, projectApiKey for workflow/code).
  */
 export class SerializedAgentRegistryAdapter extends AgentAdapterFactoryPort {
   static create(): SerializedAgentRegistryAdapter {

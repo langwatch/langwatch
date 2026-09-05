@@ -34,11 +34,9 @@ import { JOIN_REQUEST_EXPIRY_MS } from "../processes/join-request-lifecycle.proc
 const logger = createLogger("langwatch:identity:join-requests");
 
 /**
- * How often somebody may ask, and how often they may look. The sign-in
- * endpoints' own shape (`frontDoor.ts`): a per-actor sliding window, generous
- * enough that nobody legitimate meets it and tight enough that volume is not
- * free. A request costs an admin attention, which is the thing being
- * protected here.
+ * How often somebody may ask, and how often they may look. The sign-in endpoints' own shape
+ * (`frontDoor.ts`): a per-actor sliding window, generous enough that nobody legitimate meets it and
+ * tight enough that volume is not free.
  */
 export const JOIN_REQUEST_RATE_WINDOW_SECONDS = 60 * 60;
 export const JOIN_REQUESTS_PER_WINDOW = 5;
@@ -46,11 +44,6 @@ export const JOIN_LOOKUPS_PER_WINDOW = 60;
 
 /**
  * How long a rejected person waits before asking the same organization again.
- *
- * Seven days, and refused with the THROTTLE code rather than a rejection
- * code, deliberately: a refusal that said "you were rejected" would hand back
- * the very thing the silent-ish rejection keeps quiet, and an admin who says
- * no should not have to say it again next morning.
  */
 export const JOIN_REJECTION_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -122,10 +115,8 @@ export interface JoinRequestsServiceDeps {
   /** Whether any of this exists at all. Flag off, nothing here runs. */
   enabled: (args: { userId: string }) => Promise<boolean>;
   /**
-   * The shared counter behind the two throttles.
-   *
-   * The process's, not this service's: it is the same counter the sign-in
-   * doors and the public REST surface meter through, and a second one here
+   * The shared counter behind the two throttles. The process's, not this service's: it is the same
+   * counter the sign-in doors and the public REST surface meter through, and a second one here
    * would let somebody spend a budget twice by asking on two paths.
    */
   rateLimit: (input: {
@@ -137,18 +128,9 @@ export interface JoinRequestsServiceDeps {
 }
 
 /**
+ * The event-sourced service owns the lifecycle; this owns everything around it — which
+ * organizations a person may see, whether they are asking too often, who is told,
  * Join requests, as the app orchestrates them (D12, ADR-117).
- *
- * The event-sourced service owns the lifecycle; this owns everything around
- * it — which organizations a person may see, whether they are asking too
- * often, who is told, and how an approval becomes a membership. Three of
- * those are refusals a customer reads, so all three carry a stable code.
- *
- * The reveal discipline is the load-bearing part and it is enforced HERE
- * rather than in the UI: a lookup answers only for an address the caller has
- * verified, a request is refused for an organization that was not offered,
- * and every closed door answers `join_not_available`. Telling those apart is
- * the leak.
  */
 export class JoinRequestsService {
   static create(deps: JoinRequestsServiceDeps): JoinRequestsService {
@@ -164,13 +146,9 @@ export class JoinRequestsService {
   }
 
   /**
-   * Which organizations are open to one of the caller's OWN verified
-   * addresses.
-   *
-   * The address is not an input a caller chooses freely: it is handed in
-   * having already been proved to belong to them, which is what makes this
-   * safe to answer at all. An unverified address gets the same nothing a
-   * domain nobody holds gets.
+   * Which organizations are open to one of the caller's OWN verified addresses. The address is not
+   * an input a caller chooses freely: it is handed in having already been proved to belong to them,
+   * which is what makes this safe to answer at all.
    */
   async lookup({
     userId,
@@ -214,12 +192,9 @@ export class JoinRequestsService {
   }
 
   /**
-   * Ask one organization to let you in.
-   *
-   * The organization has to have been OFFERED — the service re-derives that
-   * from the caller's verified address rather than trusting the client, so
-   * naming an organization directly is refused exactly as an organization
-   * that does not exist is.
+   * Ask one organization to let you in. The organization has to have been OFFERED — the service re-
+   * derives that from the caller's verified address rather than trusting the client, so naming an
+   * organization directly is refused exactly as an organization that does not exist is.
    */
   async request({
     userId,
@@ -273,12 +248,9 @@ export class JoinRequestsService {
   }
 
   /**
-   * The automatic path. NOT a second mechanism: the same request, the same
-   * events, the same panel and the same audit trail — approved by policy the
-   * moment it is made instead of by a person later.
-   *
-   * Returns null when nothing admits this address automatically, which is the
-   * ordinary case and not a failure.
+   * The automatic path. NOT a second mechanism: the same request, the same events, the same panel
+   * and the same audit trail — approved by policy the moment it is made instead of by a person
+   * later.
    */
   async joinAutomaticallyIfAdmitted({
     userId,
@@ -430,12 +402,9 @@ export class JoinRequestsService {
   }
 
   /**
-   * D11 crossing point, invitation → request: sending a formal invitation to
-   * somebody with an open request ANSWERS it. The invitation carries the role
-   * and the teams, which is the flow that owns them.
-   *
-   * Silent when there is nothing open — an invitation is never blocked by a
-   * request, in either direction.
+   * D11 crossing point, invitation → request: sending a formal invitation to somebody with an open
+   * request ANSWERS it. The invitation carries the role and the teams, which is the flow that owns
+   * them.
    */
   async resolveByInvitation({
     userId,
@@ -504,11 +473,9 @@ export class JoinRequestsService {
   }
 
   /**
-   * Turn automatic joining on, off, or back to asking.
-   *
-   * Three refusals, in the order that costs the customer least to fix: the
-   * licence, then the identity provider that already admits people, then the
-   * domain nobody has proved.
+   * Turn automatic joining on, off, or back to asking. Three refusals, in the order that costs the
+   * customer least to fix: the licence, then the identity provider that already admits people, then
+   * the domain nobody has proved.
    */
   async setJoining({
     organizationId,
@@ -576,16 +543,8 @@ export class JoinRequestsService {
   }
 
   /**
-   * The approval's two halves: state the fact, then attach the membership.
-   *
-   * They are separate on purpose and in this order. The fact is durable
-   * before anything else happens, and the attach is idempotent, so a crash
-   * between them leaves a request that says APPROVED and a retry that
-   * finishes the job — rather than a membership nobody can account for.
-   *
-   * Approving somebody who is ALREADY a member — because an invitation landed
-   * while the request was open — resolves the request and adds nothing: the
-   * attach is skipped rather than duplicated.
+   * The approval's two halves: state the fact, then attach the membership. They are separate on
+   * purpose and in this order.
    */
   private async resolveApproved({
     joinRequestId,

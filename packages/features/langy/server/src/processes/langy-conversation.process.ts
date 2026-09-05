@@ -18,14 +18,8 @@ import {
 } from "../intents/langy-conversation.intent";
 
 /**
- * The content boundary (`toPayload`): narrows a committed Langy pipeline event
- * to identities and flags only.
- *
- * Everything else is dropped here, before the runtime builds the envelope —
- * message parts, question/answer text, tool commands and inputs, plan items,
- * error text, titles, run tokens, handoff tokens. The process manager persists
- * its payload verbatim into process state and outbox rows, so anything this
- * function keeps becomes durable. It keeps nothing that is customer content.
+ * The content boundary (`toPayload`): narrows a committed Langy pipeline event to identities and
+ * flags only.
  */
 export function buildLangyProcessEventView(
   event: LangyConversationProcessingEvent,
@@ -61,18 +55,16 @@ type LangyIntents = {
 };
 
 /**
- * Handlers receive the envelope payload built by {@link
- * buildLangyProcessEventView}, not the raw event, so they are typed `unknown`
- * and parse the view — the same shape topic-clustering uses for a process with
- * a content boundary.
+ * Handlers receive the envelope payload built by {@link buildLangyProcessEventView}, not the raw
+ * event, so they are typed `unknown` and parse the view — the same shape topic-clustering uses for
+ * a process with a content boundary.
  */
 type LangyHandler = EventHandler<LangyConversationProcessState, unknown, LangyIntents>;
 
 /**
- * Automatic titling is a one-shot logical transition: the first SUCCESSFUL
- * agent_responded while the title is still the derived placeholder. Once
- * requested, or once titleSource becomes auto or user, no counter or timer
- * may ever retitle.
+ * Automatic titling is a one-shot logical transition: the first SUCCESSFUL agent_responded while
+ * the title is still the derived placeholder. Once requested, or once titleSource becomes auto or
+ * user, no counter or timer may ever retitle.
  */
 function shouldGenerateTitle(state: LangyConversationProcessState): boolean {
   return state.titleSource === LANGY_TITLE_SOURCE.DERIVED && !state.autoTitleRequested;
@@ -168,34 +160,15 @@ export const handleHandoffConsumed: LangyHandler = (state) => ({
 });
 
 /**
- * Conversation-level or turn-progress activity with no process decision to
- * make.
- *
- * Declared rather than omitted. The runtime derives its subscription from the
- * declared handlers AND throws on an undeclared event, so leaving these out
- * would both stop delivery and turn any other delivery path into a hard
- * failure. The hand-rolled evolve this replaces had a `default:` arm that
- * returned unchanged state; this is that arm, made explicit per event.
- *
- * Tool and plan events land here — they only ever mattered to the liveness
- * window, which the heartbeat-aware subscriber still owns.
+ * Conversation-level or turn-progress activity with no process decision to make. Declared rather
+ * than omitted.
  */
 export const handleNoDecision: LangyHandler = (state) => ({ state });
 
 /**
+ * Only the effect ports are injected; the topology — state, intents, the content boundary,
  * The Langy conversation process, as a pipeline declaration (ADR-049 §4,
  * ADR-052).
- *
- * Only the effect ports are injected; the topology — state, intents, the
- * content boundary, every event decision, and the outbox lease — is declared
- * here, so the pipeline is the single place that describes what this process
- * does.
- *
- * The intent names are the pre-existing dotted intent types rather than the
- * short camelCase names newer processes use. That is deliberate: the name IS
- * the persisted `intentType`, and renaming it would leave any in-flight outbox
- * row without a handler, to retry-churn until it died. They can be shortened
- * once the table is known drained.
  */
 export function langyConversationProcess(
   ports: LangyEffectPorts,

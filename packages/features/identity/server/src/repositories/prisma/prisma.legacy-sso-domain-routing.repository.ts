@@ -3,26 +3,9 @@ import type { SignInDomainRoutingPort } from "../../signin-router.service";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**
- * The router's domain-lookup port, over the data that exists TODAY:
- * `Organization.ssoDomain` / `ssoProvider`, two staff-set strings.
- *
- * D04 replaces this implementation with one over the `SsoConnection`
- * projection, behind `SSOCONN_ROUTING`. That is why the port exists at all:
- * the router and the service above it never learn which side of the flip they
+ * The router's domain-lookup port, over the data that exists TODAY: `Organization.ssoDomain` /
+ * `ssoProvider`, two staff-set strings.
  * are on, so the swap is a line in `runtime.ts` (ADR-117 §1, §5).
- *
- * Two shapes of connection come out of here, and neither is a real aggregate
- * yet:
- *
- *   `org:<id>`  a domain-owning connection, from the string columns. The
- *               legacy columns carry no lifecycle, so it is always ACTIVE —
- *               SUSPENDED arrives with D04's aggregate, and the router already
- *               knows what to do with it.
- *   `env:<id>`  the instance-wide `NEXTAUTH_PROVIDER`, presented as the single
- *               connection a self-hosted deployment auto-redirects to. It is
- *               what "the provider env becomes the default method set" means
- *               in port terms, and its JIT allowance is today's behavior:
- *               an OAuth callback for an unknown person creates them.
  */
 export class LegacySsoDomainRoutingRepository implements SignInDomainRoutingPort {
   static create({

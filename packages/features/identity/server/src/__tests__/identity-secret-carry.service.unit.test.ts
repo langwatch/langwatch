@@ -1,16 +1,6 @@
 /**
+ * The forward direction is the adapter's, at write time.
  * Both pass-time directions of the bridge mirror's row half (ADR-116 §4).
- *
- * The forward direction is the adapter's, at write time. These two are the
- * pass's, and they differ only in whether the credential row exists yet: a
- * missing one is a user LATCHING, an older one is a secret that landed on
- * the legacy branch after they latched.
- *
- * The second is the one that is easy to get wrong and impossible to notice.
- * A finalized user's password change can still reach the legacy branch —
- * deterministically for up to the write gate's TTL per pod right after their
- * latch — and their sign-in then reads `AccountCredential`. Without the heal
- * leg that password is rejected forever, and nothing in the system says so.
  */
 import { describe, expect, it, vi } from "vitest";
 import type {

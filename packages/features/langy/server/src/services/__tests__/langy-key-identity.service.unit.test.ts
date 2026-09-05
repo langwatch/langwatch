@@ -7,11 +7,9 @@ import type { LangyIdentityToken } from "../langy-key-identity.service";
 import { LangyKeyIdentityService } from "../langy-key-identity.service";
 
 /**
- * A resolved project API key, carrying exactly the fields the identity bridge
- * reads. No cast: the fixture satisfies `LangyIdentityToken` structurally, so
- * it stops compiling if the bridge's input contract changes. That a real
- * `ResolvedApiKeyToken` still fits that contract is enforced where the REST
- * credential chain passes one in, which is the only place a real one exists.
+ * A resolved project API key, carrying exactly the fields the identity bridge reads. No cast: the
+ * fixture satisfies `LangyIdentityToken` structurally, so it stops compiling if the bridge's input
+ * contract changes.
  */
 function apiKeyToken({ userId }: { userId: string | null }): LangyIdentityToken {
   return {

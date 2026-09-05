@@ -1,20 +1,6 @@
 /**
+ * `ScenarioApp.queueSimulationRun` — the metadata envelope a queued run carries.
  * @vitest-environment node
- *
- * `ScenarioApp.queueSimulationRun` — the metadata envelope a queued run
- * carries.
- *
- * The envelope decides what the fold projection may copy into the runs store,
- * and, deliberately, what it may not: the resolved secret VALUES travel BESIDE
- * the metadata, never inside it, so only their names can ever be folded into a
- * stored run. That is a fact about what a stored run may contain, not a
- * transport detail, which is why the application assembles the envelope rather
- * than each door assembling its own.
- *
- * No tRPC here. `simulation-runner.api.unit.test.ts` covers what the run
- * procedure refuses before anything is queued; this covers what the queued
- * command is made of once it gets there.
- *
  * @see specs/scenarios/simulation-runner.feature
  */
 import type {

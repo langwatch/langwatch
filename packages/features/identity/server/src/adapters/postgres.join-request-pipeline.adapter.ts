@@ -26,11 +26,6 @@ export type PostgresJoinRequestPipelineOptions = {
   database: JoinRequestPipelineDatabase;
   /**
    * The runtime this pipeline is registered on.
-   *
-   * Taken rather than a resolved event store and sender, because the expiry
-   * wake dispatches `expireJoin` back into this same pipeline: a writer that
-   * resolved its sender eagerly could only be built after the pipeline it
-   * needs, and this graph would then have no order that composes.
    */
   eventSourcing: EventSourcing;
   /** How the reminder and the lapse notice are rendered and sent. */
@@ -38,18 +33,9 @@ export type PostgresJoinRequestPipelineOptions = {
 };
 
 /**
+ * What used to keep this graph in the application was the lifecycle port: its two wakes send mail,
+ * and no process but the App had a mail gateway.
  * The Postgres composition seam for the join-request pipeline (D12, ADR-117).
- *
- * What used to keep this graph in the application was the lifecycle port: its
- * two wakes send mail, and no process but the App had a mail gateway. With
- * outbound delivery packaged, everything left is a Postgres binding or the
- * runtime this pipeline already runs on — the `JoinRequest` head serving both
- * the fold and its guards, the audience the two notices are addressed to, and
- * the command lane the expiry dispatches through.
- *
- * The head is composed ONCE and shared: the guards read the state the fold
- * writes, and two instances reading one table would still agree today, but the
- * seam is what makes a divergent second reader unexpressible.
  */
 export class PostgresJoinRequestPipelineAdapter {
   static create(options: PostgresJoinRequestPipelineOptions): PostgresJoinRequestPipelineAdapter {

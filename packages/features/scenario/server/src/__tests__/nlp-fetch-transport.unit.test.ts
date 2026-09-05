@@ -1,22 +1,6 @@
 /**
+ * Transport-level regression guard for the two scenario adapters that post to nlpgo.
  * @vitest-environment node
- *
- * Transport-level regression guard for the two scenario adapters that post to
- * nlpgo.
- *
- * Both adapters send their request with a `dispatcher` built by the `undici`
- * npm package, so that undici's own `headersTimeout`/`bodyTimeout` can be
- * raised past its 300s default. That dispatcher can only be given to a `fetch`
- * from the SAME package: Node's global `fetch` is bound to the undici bundled
- * with the Node runtime (7.29.0 on Node 24), which builds a request handler of
- * a different shape, and the npm undici (8.x) rejects it immediately with
- * `InvalidArgumentError: invalid onRequestStart method`. Every agent call then
- * failed in about a second, before a byte reached the network.
- *
- * The rest of the adapter suites mock `fetch`, so a mismatch between the fetch
- * and the dispatcher is invisible to them - that is exactly how the fault
- * reached production. This file mocks NO part of the transport: real undici,
- * real dispatcher, real sockets, against a real loopback server.
  */
 
 import { createServer, type Server } from "node:http";

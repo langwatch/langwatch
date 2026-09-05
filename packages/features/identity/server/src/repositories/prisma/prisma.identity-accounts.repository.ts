@@ -33,10 +33,9 @@ interface CredentialRow {
 }
 
 /**
- * The secret columns the `AccountCredential` table carries, by better-auth's
- * own canonical name. The table was created with these names so the identity
- * branch needs no field mapping of its own; the list exists so a patch writes
- * only the fields it actually names.
+ * The secret columns the `AccountCredential` table carries, by better-auth's own canonical name.
+ * The table was created with these names so the identity branch needs no field mapping of its own;
+ * the list exists so a patch writes only the fields it actually names.
  */
 const CREDENTIAL_COLUMNS = [
   "password",
@@ -49,12 +48,9 @@ const CREDENTIAL_COLUMNS = [
 ] as const;
 
 /**
+ * `refreshTokenExpiresAt` is deliberately absent: better-auth declares the field but the `Account`
+ * table has never had a column for it, so the legacy branch has never written one either.
  * The same secrets, on the legacy `Account` row (ADR-116 §4, forward leg).
- *
- * `refreshTokenExpiresAt` is deliberately absent: better-auth declares the
- * field but the `Account` table has never had a column for it, so the legacy
- * branch has never written one either. Mirroring it would fail the write for
- * a column that holds nothing on either branch today.
  */
 const ACCOUNT_MIRROR_COLUMNS = {
   password: "password",
@@ -83,14 +79,9 @@ function accountMirrorData(secrets: IdentityAccountSecrets): Record<string, unkn
 }
 
 /**
- * better-auth's `account` model over the two tables that replaced it
+ * better-auth's `account` model over the two tables that replaced it `AccountCredential` — keyed by
+ * the identifier's pinned `accountId` — says what secrets it carries.
  * (ADR-116 §6): `Identifier` says who holds the sign-in method, and
- * `AccountCredential` — keyed by the identifier's pinned `accountId` — says
- * what secrets it carries.
- *
- * Only LIVE identifiers assemble into a row. A tombstone is a sign-in method
- * the user no longer holds, and answering with one would sign somebody in
- * through an account they unlinked.
  */
 export class PrismaIdentityAccountsRepository implements IdentityAccountsPort {
   static create(prisma: PrismaClient): PrismaIdentityAccountsRepository {
@@ -260,12 +251,9 @@ export class PrismaIdentityAccountsRepository implements IdentityAccountsPort {
 }
 
 /**
- * One identifier plus its credential row, as better-auth reads it.
- *
- * An identifier with no credential row still answers — it is a real sign-in
- * method the user holds, and hiding it because the secrets table has not
- * caught up would make a linked account vanish from their settings page. The
- * secrets are simply absent, which is what they are.
+ * One identifier plus its credential row, as better-auth reads it. An identifier with no credential
+ * row still answers — it is a real sign-in method the user holds, and hiding it because the secrets
+ * table has not caught up would make a linked account vanish from their settings page.
  */
 function toAccountRow({
   identifier,

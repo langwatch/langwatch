@@ -18,25 +18,7 @@ const NON_TERMINAL_STATUSES = ["QUEUED", "PENDING", "IN_PROGRESS"] as const;
 /**
  * Finds the latest version of every non-terminal run whose last activity is
  * older than `now - thresholdMs`, across all tenants on the given client.
- *
- * - Dedups the ReplacingMergeTree(UpdatedAt) to the latest version per run via
- *   the IN-tuple pattern (light key columns only, so the scan is
- *   memory-bounded).
- * - Deliberately has NO lookback lower bound: reaching rows older than the
- *   deleted sweeps' windows is the entire point, and as a one-shot manual
- *   task the single cold-partition scan is an accepted cost (the boot sweeps
- *   this replaces bounded their scan because they ran on every boot).
- *
- * Cross-tenant sweep BY DESIGN: a backfill has no single tenant to scope to,
- * so this intentionally omits the per-tenant `WHERE TenantId =` filter
- * clickhouse-queries.md mandates for tenant-scoped reads. TenantId is
- * SELECTed (not filtered), and each terminal write downstream is scoped to
- * its own run's tenant — the same "system sweeps" carve-out the deleted boot
- * reconciler documented.
- */
-/**
- * The one read this sweep issues, as it asks for it. Narrower than the driver
- * client so the install-wide statement can carry its `unscoped` reason.
+ * Cross-tenant sweep BY DESIGN — a backfill has no single tenant to scope to.
  */
 export interface StalledSimulationRunClickHouseClient {
   query(input: {

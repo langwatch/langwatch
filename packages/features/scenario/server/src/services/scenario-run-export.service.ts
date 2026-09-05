@@ -1,10 +1,5 @@
 /**
  * ScenarioRunExportService — domain layer for scenario run CSV export.
- *
- * Sweeps the run history in keyset-paginated pages and yields serialized CSV
- * chunks through an AsyncGenerator, so the API layer can stream straight to the
- * HTTP response and memory stays flat regardless of how many runs match.
- *
  * @see specs/scenarios/scenario-run-export.feature
  */
 
@@ -28,16 +23,6 @@ const logger = createLogger("langwatch:export:scenario-runs");
 
 /**
  * The run-history dropdown's values, mapped onto outcome categories.
- *
- * Deliberately not pushed into SQL: categories group several stored statuses
- * (ERROR and FAILED are both "failure"), and categorizeRunStatus is the single
- * source of truth for bucketing, so the filter applies after mapping and can
- * never drift from what the list shows.
- *
- * Note "stalled" only matches legacy rows still stored as STALLED — no run
- * reaches that status anymore (the process-manager stall watchdog finishes
- * quiet runs ERROR), so the filter now yields an empty export in practice.
- * Kept so the dropdown/API contract stays valid.
  */
 const FILTER_TO_CATEGORY: Record<ScenarioRunExportStatusFilter, RunStatusCategory> = {
   pass: "success",
@@ -72,10 +57,9 @@ export class ScenarioRunExportService {
   }
 
   /**
+   * download keeps sweeping ClickHouse to exhaustion: `controller.enqueue` only throws on the
+   * *next* chunk, so a large export would go on paging long after nobody is reading it.
    * @param signal - The client request's abort signal. Without it a cancelled
-   *   download keeps sweeping ClickHouse to exhaustion: `controller.enqueue`
-   *   only throws on the *next* chunk, so a large export would go on paging
-   *   long after nobody is reading it.
    */
   async *exportRuns({
     request,

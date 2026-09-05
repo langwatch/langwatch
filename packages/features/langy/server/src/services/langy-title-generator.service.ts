@@ -1,19 +1,7 @@
 /**
- * The title a conversation gets when nobody named it.
- *
- * Moved here from the retired application, which is where it had to live while
- * `getVercelAIModel` was reachable only through the app's own module graph.
- * Nothing about the work was ever the application's: the transcript comes from
- * this package's own trusted message reader, the prompt and the character
- * budget are Langy's, and the model handle is a port.
- *
- * Everything the model call can do wrong ends in the same place — the
- * conversation keeps the title it has. That is deliberate and it is the whole
- * error contract of this service: a title is a convenience, and a failed title
- * call must never fail the turn that asked for one. It is logged at `warn`
- * rather than swallowed, because "the transcript was empty" and "the model
- * refused" are different facts and a deployment reading neither cannot tell
- * which it has.
+ * The title a conversation gets when nobody named it. Moved here from the retired application,
+ * which is where it had to live while `getVercelAIModel` was reachable only through the app's own
+ * module graph.
  */
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
@@ -44,11 +32,6 @@ export type LangyTitleGeneratorDeps = Readonly<{
 
 /**
  * The generator, bound to one message reader and one model gateway.
- *
- * A class holding the two collaborators rather than a closure over them,
- * because {@link LangyTitleGeneratorService.generator} is the shape the effect
- * ports take and the sanitiser is the shape a test reaches for — two callers,
- * one instance, and neither can be handed a differently-composed half.
  */
 export class LangyTitleGeneratorService {
   static create(deps: LangyTitleGeneratorDeps): LangyTitleGeneratorService {
@@ -114,12 +97,8 @@ export class LangyTitleGeneratorService {
 }
 
 /**
- * What a model actually returns, reduced to a title.
- *
- * Every rule here answers something a model has been seen to do: fence the
- * answer, prefix it with "Title:", quote it, or end it with a full stop. The
- * character budget is applied LAST, after the trimming, so a title that only
- * exceeded it because of a fence is not truncated for it.
+ * What a model actually returns, reduced to a title. Every rule here answers something a model has
+ * been seen to do: fence the answer, prefix it with "Title:", quote it, or end it with a full stop.
  */
 function sanitizeTitle(raw: string): string {
   let title = raw.trim();
@@ -142,11 +121,9 @@ function sanitizeTitle(raw: string): string {
 }
 
 /**
- * The last few messages, one per line, each truncated.
- *
- * Both bounds are the contract's rather than this file's: a conversation that
- * has run for an hour must not turn one title call into the most expensive
- * request the deployment makes.
+ * The last few messages, one per line, each truncated. Both bounds are the contract's rather than
+ * this file's: a conversation that has run for an hour must not turn one title call into the most
+ * expensive request the deployment makes.
  */
 function buildTranscript(messages: { role: string; content: string }[]): string {
   return messages

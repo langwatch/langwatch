@@ -1,9 +1,6 @@
 /**
- * The dispatch → claim → complete round trip against a REAL Redis, so the
- * BLPOP wait, the SET NX claim race and the pending-record lifecycle stay
- * exact (specs/langy/langy-ui-actions.feature). The unit tests drive the same
- * protocol through an in-memory fake; a blocking-read or NX subtlety would
- * slip past them silently.
+ * The dispatch → claim → complete round trip against a REAL Redis, so the BLPOP wait, the SET NX
+ * claim race and the pending-record lifecycle stay exact (specs/langy/langy-ui-actions.feature).
  */
 import { RedisContainer, type StartedRedisContainer } from "@testcontainers/redis";
 import Redis from "ioredis";

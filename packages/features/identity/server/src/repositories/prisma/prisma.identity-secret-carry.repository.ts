@@ -6,12 +6,8 @@ import type { IdentityAccountSecrets } from "../../better-auth/storage-ports";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**
- * The `Account` row's secret columns, by the canonical name
- * `AccountCredential` stores them under. The legacy table is NextAuth's, so
- * four of the six are renamed across the copy.
- *
- * `refreshTokenExpiresAt` has no `Account` column and never did, so there is
- * nothing to carry or heal for it — the legacy branch has never written one.
+ * The `Account` row's secret columns, by the canonical name `AccountCredential` stores them under.
+ * The legacy table is NextAuth's, so four of the six are renamed across the copy.
  */
 const CARRIED_COLUMNS = {
   password: "password",
@@ -37,18 +33,9 @@ interface LegacyAccountRow {
 }
 
 /**
- * The reads and writes behind both pass-time directions of the bridge
+ * The reads and writes behind both pass-time directions of the bridge healing back a secret that
+ * landed on the legacy branch afterwards.
  * mirror (ADR-116 §4): carrying a latching user's secrets across, and
- * healing back a secret that landed on the legacy branch afterwards.
- *
- * `Account`, `AccountCredential` and `Identifier` are identity tables under
- * the multitenancy middleware's exemption, so none of these queries carries
- * a `projectId` — none of the models has one.
- *
- * The `updatedAt` comparison itself is NOT done here. It reads as one line
- * of SQL and it is the rule the whole feature turns on, so it lives in the
- * service where it can be read and tested; this port hands over both
- * timestamps and does what it is told.
  */
 export class PrismaIdentitySecretCarryRepository implements IdentitySecretCarryRepository {
   static create(prisma: PrismaClient): PrismaIdentitySecretCarryRepository {
@@ -98,14 +85,9 @@ export class PrismaIdentitySecretCarryRepository implements IdentitySecretCarryR
   }
 
   /**
-   * Idempotent by construction: keyed on the pinned account id, a row that
-   * already exists is left exactly as it is. Running the carry again inserts
-   * nothing, which is what makes it safe on every pass.
-   *
-   * The timestamps are the `Account` row's own, not `now()`. They are what
-   * every later comparison reads, so stamping the copy with the time of the
-   * copy would make the credential row claim to be newer than the secret it
-   * holds — and the heal leg would then never fire for it again.
+   * Idempotent by construction: keyed on the pinned account id, a row that already exists is left
+   * exactly as it is. Running the carry again inserts nothing, which is what makes it safe on every
+   * pass. The timestamps are the `Account` row's own, not `now()`.
    */
   async insertCredentialIfMissing({
     accountId,

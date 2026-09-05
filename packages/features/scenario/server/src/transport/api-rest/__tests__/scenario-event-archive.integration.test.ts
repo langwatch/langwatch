@@ -1,11 +1,6 @@
 /**
+ * `DELETE /api/scenario-events` archives a whole scenario set.
  * @vitest-environment node
- *
- * `DELETE /api/scenario-events` archives a whole scenario set. A
- * `scenarioSetId` is MANDATORY — an unscoped request, or one that names an
- * empty set id, is refused before anything is archived, so a single call can
- * never wipe every run in a project.
- *
  * @see specs/scenarios/scenario-events-scoped-archive.feature
  */
 import { bodyLimit, createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";

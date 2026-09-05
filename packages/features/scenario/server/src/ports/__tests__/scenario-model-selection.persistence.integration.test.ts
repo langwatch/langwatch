@@ -1,7 +1,4 @@
 /**
- * Real-Postgres coverage for persisting the simulator and judge model
- * overrides on a Scenario and a run plan (SimulationSuite).
- *
  * @see specs/scenarios/scenario-model-selection.feature
  * @see specs/scenarios/simulation-run-model-resolution.feature
  * @see specs/suites/suite-model-selection.feature

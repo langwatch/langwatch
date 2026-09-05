@@ -14,11 +14,9 @@ const IDENTIFIER = "idf_1";
 const ACCOUNT = "acct_1";
 
 /**
- * A recording stand-in for the composition root's typed client, ordered.
- *
- * The order matters as much as the calls: the cursor is the commit marker for
- * this fold, so a store that wrote it before the rows would turn a crash
- * mid-apply into a completed apply over a half-written projection.
+ * A recording stand-in for the composition root's typed client, ordered. The order matters as much
+ * as the calls: the cursor is the commit marker for this fold, so a store that wrote it before the
+ * rows would turn a crash mid-apply into a completed apply over a half-written projection.
  */
 function recordingDatabase() {
   const calls: string[] = [];

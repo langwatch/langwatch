@@ -9,10 +9,9 @@ import { PrismaScenarioRepository } from "../repositories/prisma/scenario.reposi
 import { ResultAtomsReadPort } from "../ports/result-atoms-read.port";
 
 /**
- * The narrow slice of `@clickhouse/client`'s `ClickHouseClient` this feature
- * reads through. Duck-typed rather than the real class so the composition
- * root can hand it the same routed-tenant client the v1 simulation reads
- * already compose (`SimulationReadClient`), with no cast.
+ * The narrow slice of `@clickhouse/client`'s `ClickHouseClient` this feature reads through. Duck-
+ * typed rather than the real class so the composition root can hand it the same routed-tenant
+ * client the v1 simulation reads already compose (`SimulationReadClient`), with no cast.
  */
 export type ResultAtomsClickHouseClient = {
   query(input: {

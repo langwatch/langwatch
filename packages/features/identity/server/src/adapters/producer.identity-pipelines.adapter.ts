@@ -1,37 +1,5 @@
 /**
- * The four identity pipelines as a PRODUCER registers them.
- *
- * One definition, two registrations. The consumer — the worker — supplies the
- * real Postgres heads, the guards that read them, the mail the join lifecycle
- * sends and the teardown the connection grace completes, and drains every
- * routing key each definition declares. A producer registers the SAME
- * definition only to obtain its command dispatchers: the writes a person's
- * action turns into, off a tRPC call, and nothing else. It starts no consumer
- * loop, folds nothing and runs no process manager.
- *
- * Every dependency these definitions take is consumer-side, and a producer has
- * none of them. That is what this module supplies — stand-ins that exist so a
- * definition can be CONSTRUCTED and refuse by name if one is ever CALLED.
- * Refusing rather than no-op'ing is the whole point: a silently-succeeding fold
- * store in a process that was never meant to fold would report a projection as
- * written when nothing was, and the row would simply never appear.
- *
- * TWO OF THE FOUR DECLARE A PROCESS MANAGER AND RUN IT THERE. `join-requests`
- * mounts the reminder-and-expiry lifecycle and `sso-connections` mounts the
- * teardown grace, and the runtime used to refuse to register any pipeline
- * declaring one without a durable `ProcessStore` — which made every command on
- * both unsendable from the tier a person's action actually arrives at. A
- * producer-only runtime registers the definition whole and declines the manager
- * by name instead (`EventSourcingOptions.processManagerMode`), so the inbox,
- * outbox and wakes stay the consumer's alone. `identity` and `scim-sync` mount
- * none and needed only to be registered at all — a directory's push is retried
- * by the DIRECTORY, so `scim-sync` has no manager to decline.
- *
- * Forking a definition instead — declaring only the commands a producer sends —
- * is the thing this avoids. The routing triple every job carries is derived
- * from the pipeline and command names, so two descriptions of one event stream
- * drift into jobs the worker cannot route, and the queue rejects an unroutable
- * job for redelivery rather than dropping it.
+ * The four identity pipelines as a PRODUCER registers them. One definition, two registrations.
  */
 import { IdentityGuards } from "../guards";
 import { JoinRequestGuards } from "../join-request-guards";
@@ -106,13 +74,6 @@ class ProducerOnlyStateProjectionStore<TState> implements StateProjectionStore<T
 
 /**
  * A guard's repository, refusing every read by name.
- *
- * A proxy rather than nine hand-written doubles: these repositories carry
- * dozens of reads between them, a producer reaches NONE of them — the guards
- * run inside the command handler, which is the consumer's work — and a
- * hand-written double would be a second description of nine interfaces that
- * has to be edited every time one of them gains a method. What matters is that
- * a call says which process reached it, and that is what this answers.
  */
 function producerOnlyReads<TRepository extends object>(input: {
   processName: string;
@@ -175,12 +136,8 @@ class ProducerOnlyConnectionTeardown implements ConnectionTeardownPort {
 }
 
 /**
- * The four identity pipelines as a process that only SENDS commands on them
- * sees them: every read, projection and process-manager seam is a stand-in
- * that refuses by name.
- *
- * `processName` names the refusal, so a stand-in reached by accident says
- * which process reached it rather than reporting an anonymous failure.
+ * The four identity pipelines as a process that only SENDS commands on them sees them: every read,
+ * projection and process-manager seam is a stand-in that refuses by name.
  */
 export class IdentityProducerPipelinesAdapter {
   static create({ processName }: { processName: string }): IdentityProducerPipelinesAdapter {
@@ -287,13 +244,6 @@ export class IdentityProducerPipelinesAdapter {
 
   /**
    * The directory-sync pipeline for a process that only sends commands on it.
-   *
-   * NO PROCESS MANAGER to decline, unlike its two neighbours: `scim-sync`
-   * declares none on purpose — a push is the DIRECTORY's to retry, so there is
-   * no inbox, outbox or wake for a producer-only runtime to keep off. What a
-   * producer needs from this definition is the same five command dispatchers the
-   * worker's registration carries, so an Enterprise directory push has a sender
-   * to stage its history through.
    */
   scimSyncPipeline(): ScimSyncPipeline {
     const pipeline = "scim-sync";

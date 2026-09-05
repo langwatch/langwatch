@@ -1,25 +1,6 @@
 /**
- * What `src/features/catalogue.json` declares, and why it needs a test at all.
- *
- * The file shipped listing one feature — `["topic"]` — while sixteen more
- * installers sat beside it on disk. Nothing noticed, because nothing reads it:
- * `packages/architecture-lint` has a catalogue reader for
- * `packages/features/catalogue.json` and another for
- * `apps/ui/src/features/catalogue.json`, and neither looks here. A declaration
- * no tool checks is not a declaration, and a stale one is worse than none —
- * it reads as a complete inventory while naming a sixteenth of the graph.
- *
- * This suite is what makes it true. It compares the catalogue against the
- * installer names the feature sources actually declare, so adding an installer
- * without declaring it fails here rather than passing silently.
- *
- * It also holds `job-registry.json` to the same standard. That file names
- * every routing key on the shared `event-sourcing/jobs` queue, in mount order,
- * against the feature that owns it — the checklist the packaged consumer must
- * satisfy before it may claim the queue. Its keys are compared against the
- * live legacy registry by `worker-pipeline-parity` in `platform/app`, which is
- * the only place both graphs can be built; what belongs here is the half that
- * needs no other package: that the two declarations name the same features.
+ * What `src/features/catalogue.json` declares, and why it needs a test at all. The file shipped
+ * listing one feature — `["topic"]` — while sixteen more installers sat beside it on disk.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -40,12 +21,9 @@ const jobRegistry = JSON.parse(readFileSync(join(featuresRoot, "job-registry.jso
 };
 
 /**
- * The installer names as the sources declare them.
- *
- * Read from the files rather than imported, deliberately: `name` is an
- * instance property on a class with a private constructor, so importing would
- * mean composing every feature's dependencies to ask a question about the
- * declaration.
+ * The installer names as the sources declare them. Read from the files rather than imported,
+ * deliberately: `name` is an instance property on a class with a private constructor, so importing
+ * would mean composing every feature's dependencies to ask a question about the declaration.
  */
 function declaredInstallerNames(): string[] {
   const names: string[] = [];

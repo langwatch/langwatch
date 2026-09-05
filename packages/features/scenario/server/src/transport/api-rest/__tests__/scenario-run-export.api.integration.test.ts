@@ -1,9 +1,5 @@
 /**
- * The download's own headers: the gzip framing and the filename the browser
- * saves it under. Both live in the route itself (scenario-run-export.api.ts),
- * independent of the process it is mounted in, so exercised directly against
- * createScenarioRunExportRestApp with fake ports rather than through a host.
- *
+ * The download's own headers: the gzip framing and the filename the browser saves it under.
  * @see specs/scenarios/scenario-run-export.feature
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
@@ -26,10 +22,7 @@ async function inflate(response: Response): Promise<string> {
   return await new Response(stream).text();
 }
 
-function mount(overrides: {
-  chunks?: readonly string[];
-  totalCount?: number;
-}) {
+function mount(overrides: { chunks?: readonly string[]; totalCount?: number }) {
   const chunks = overrides.chunks ?? ["run_scenario_name\nRefund Request\n"];
   const totalCount = overrides.totalCount ?? chunks.length;
 
@@ -138,8 +131,6 @@ describe("given the caller is allowed to export", () => {
     expect(response.headers.get("Content-Disposition")).toBe(
       `attachment; filename="my-project - Scenario Runs - ${today} - criteria.csv"`,
     );
-    expect(response.headers.get("Access-Control-Expose-Headers")).toContain(
-      "Content-Disposition",
-    );
+    expect(response.headers.get("Access-Control-Expose-Headers")).toContain("Content-Disposition");
   });
 });

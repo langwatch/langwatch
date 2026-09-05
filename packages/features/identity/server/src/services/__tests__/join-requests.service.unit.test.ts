@@ -27,16 +27,9 @@ import {
 } from "../join-requests.service";
 
 /**
- * Everything AROUND the lifecycle: the reveal discipline at the boundary, the
- * anti-abuse limits, the licence asymmetry, and how an approval becomes a
- * membership.
- *
- * Assertions are on `code`, never on message prose — every refusal here
- * crosses a serialisation boundary on its way to a customer.
- *
+ * Everything AROUND the lifecycle: the reveal discipline at the boundary, the anti-abuse limits,
+ * the licence asymmetry, and how an approval becomes a membership.
  * Spec: specs/identity/join-requests.feature,
- *       specs/identity/join-matching-and-privacy.feature,
- *       specs/identity/domain-auto-join.feature
  */
 
 const NOW = 1_700_000_000_000;

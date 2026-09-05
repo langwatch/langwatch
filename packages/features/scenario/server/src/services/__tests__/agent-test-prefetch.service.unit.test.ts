@@ -1,10 +1,6 @@
 /**
+ * What an agent test run's prefetch prepares: the scripted conversation,
  * @vitest-environment node
- *
- * What an agent test run's prefetch prepares: the scripted conversation, the
- * agent's own adapter data, and no model at all — no scenario row is read
- * either, since the agent test scenario has none.
- *
  * @see specs/agents/agent-test-run.feature
  */
 import type { HttpAgentData } from "@langwatch/scenario-contract";

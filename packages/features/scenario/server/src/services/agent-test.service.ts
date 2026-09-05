@@ -1,20 +1,6 @@
 /**
- * "Test agent": one turn sent through the same adapter a simulation turn
- * uses (or, for a connected agent, through the same live dispatcher a
- * simulation's connected column uses), and one scripted run queued through
- * the same execution path, with nothing saved.
- *
- * A connected agent's TEST RUN is refused rather than queued: the queued-run
- * wire schema this service writes to (`SimulationQueueRun.target`) does not
- * accept a `connected` target yet, so nothing here could prepare the child
- * job even if it tried. That is a named absence — `agent_test_refused` with a
- * customer-safe reason — never a stub that pretends to queue something the
- * worker could not run. A connected TURN dispatches for real, through
- * {@link AgentTestConnectedDispatchPort}; with no live instance registered it
- * answers `agent_offline`, the same way the runtime answers everywhere else
- * until the connected-agents transport (`connect.gateway`, long-poll) is
- * restored.
- *
+ * "Test agent": one turn sent through the same adapter a simulation turn uses (or, for a connected
+ * agent, through the same live dispatcher a simulation's connected column uses),
  * @see specs/agents/agent-test-run.feature
  */
 import { AgentCallTimeoutError, AgentTestRefusedError } from "@langwatch/agent-contract";

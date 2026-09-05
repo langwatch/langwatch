@@ -1,8 +1,7 @@
 /**
- * Serialized HTTP agent adapter for scenario worker execution.
- *
- * Operates with pre-fetched configuration data and doesn't require
- * database access. Designed to run in isolated worker threads.
+ * Serialized HTTP agent adapter for scenario worker execution. Operates with pre-fetched
+ * configuration data and doesn't require database access. Designed to run in isolated worker
+ * threads.
  */
 
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -38,16 +37,8 @@ function previewResponseBody(body: string): string {
 }
 
 /**
- * A call that never reached the target: DNS did not resolve, the connection
- * was refused or reset, or the request timed out at the socket. This is not
- * the target rejecting the request — a non-2xx answer keeps its own error —
- * and what fetch throws for it reads as a Node crash ("TypeError: fetch
- * failed") rather than a reason a customer can act on.
- *
- * The message names the host and the failure kind, and ends with the
- * underlying text so the infra-error classifier still recognises the
- * ECONNREFUSED / getaddrinfo markers it keys on. The raw error rides on
- * `cause`, so the log and any debugger keep everything.
+ * A call that never reached the target: DNS did not resolve, the connection was refused or reset,
+ * or the request timed out at the socket.
  */
 export class HttpAgentTransportError extends Error {
   constructor({ host, reason, cause }: { host: string; reason: string; cause: unknown }) {
@@ -70,11 +61,9 @@ function hostForMessage(url: string): string {
 }
 
 /**
- * Flattens an error and its causes into one line of messages.
- *
- * undici reports a transport failure as a bare `TypeError: fetch failed`
- * whose real reason lives on `cause`, so the top message alone classifies as
- * nothing. Messages only — a stack never enters the text a customer reads.
+ * Flattens an error and its causes into one line of messages. undici reports a transport failure as
+ * a bare `TypeError: fetch failed` whose real reason lives on `cause`, so the top message alone
+ * classifies as nothing. Messages only — a stack never enters the text a customer reads.
  */
 function flattenErrorMessages(error: unknown): string {
   const parts: string[] = [];
@@ -219,12 +208,8 @@ export class SerializedHttpAgentAdapter extends SerializedAgentAdapter {
   }
 
   /**
-   * Header values for a log line: masked by name, then scrubbed by value.
-   *
-   * The name list only covers the headers that carry a credential by
-   * convention. A target may write `{{ secrets.NAME }}` into any header it
-   * likes, so `X-Custom-Token` holds a real credential and no name list can
-   * know that. The value scrub is what covers the rest.
+   * Header values for a log line: masked by name, then scrubbed by value. The name list only covers
+   * the headers that carry a credential by convention.
    */
   private headersForLogs(headers: Record<string, string>): Record<string, string> {
     return Object.fromEntries(
@@ -234,13 +219,6 @@ export class SerializedHttpAgentAdapter extends SerializedAgentAdapter {
 
   /**
    * Scrubs an error and everything it was caused by, in place.
-   *
-   * The whole chain matters, not just the top: undici reports a transport
-   * failure as a bare `TypeError: fetch failed` whose real reason, request
-   * url and all, lives on `cause`, and the child process flattens the chain
-   * into the message the run records. Rewriting messages rather than wrapping
-   * keeps the error's class, its `code`, and the chain the failure classifier
-   * reads. With no secrets configured this does nothing at all.
    */
   private scrubErrorChain(error: unknown): unknown {
     if (Object.keys(this.secrets).length === 0) return error;
@@ -256,14 +234,8 @@ export class SerializedHttpAgentAdapter extends SerializedAgentAdapter {
   }
 
   /**
-   * Each configured header value renders through the header engine with the
-   * same fence/restore discipline as `buildUrl` (see its comment for why the
-   * order matters). The fence is also what resolves the references, so
-   * rendered output is never re-scanned for them: a conversation turn or a
-   * run parameter that spells `{{ secrets.NAME }}` stays literal text instead
-   * of pulling the credential into the request. Auth goes on top as before,
-   * and the propagation headers merge last without clobbering one the target
-   * configured itself.
+   * Each configured header value renders through the header engine with the same fence/restore
+   * discipline as `buildUrl` (see its comment for why the order matters).
    */
   private buildRequestHeaders(
     context: Record<string, unknown>,
@@ -298,15 +270,9 @@ export class SerializedHttpAgentAdapter extends SerializedAgentAdapter {
   }
 
   /**
-   * Render the url, with secret references resolved first.
-   *
-   * Order matters: `secrets` is not a name the url engine binds, so rendering
-   * first would turn `{{ secrets.AGENT_TOKEN }}` into an empty string and send
-   * an unauthenticated request. Resolution therefore runs first, and what it
-   * resolved is held out of the render entirely and put back afterwards, so a
-   * resolved value reaches the wire byte for byte without ever being read as
-   * template source, and a reference to a name the project does not have stays
-   * exactly as written.
+   * Render the url, with secret references resolved first. Order matters: `secrets` is not a name
+   * the url engine binds, so rendering first would turn `{{ secrets.AGENT_TOKEN }}` into an empty
+   * string and send an unauthenticated request.
    */
   private buildUrl(context: Record<string, unknown>): string {
     const { template, restore } = ScenarioSecretReferenceAdapter.fence({
@@ -447,10 +413,9 @@ export class SerializedHttpAgentAdapter extends SerializedAgentAdapter {
   }
 
   /**
-   * The session the response carries at `sessionPath`, or nothing: no path
-   * configured, a body that is not JSON, a path that matches nothing and a
-   * path that does not parse all leave the held value as it is. A match is
-   * kept as the JSON value found there, so the next turn renders exactly it.
+   * The session the response carries at `sessionPath`, or nothing: no path configured, a body that
+   * is not JSON, a path that matches nothing and a path that does not parse all leave the held
+   * value as it is.
    */
   private extractSession(data: unknown): unknown {
     const path = this.config.sessionPath?.trim();

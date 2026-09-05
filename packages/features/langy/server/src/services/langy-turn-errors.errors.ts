@@ -1,19 +1,5 @@
 /**
  * Langy turn-execution domain errors + the failure classifier (ADR-045/046).
- *
- * A turn can fail in a handful of ways we KNOW the shape of, and one way we
- * don't. The processor throws (or is handed) an error; `classifyLangyTurnError`
- * turns it into the platform `SerializedHandledError` shape the browser parses
- * out of the chat stream (`readLangyStreamError` → `explainLangyError`), so the
- * user gets copy that names what actually happened instead of a blanket
- * "something went wrong".
- *
- * Content rule: `meta` carries ONLY what
- * a user or the UI can act on or safely see — an HTTP status, the timeout we
- * gave up at. NEVER the raw manager/opencode message, a stack, a URL, or an
- * internal identifier. The raw detail keeps going to the server log, which is
- * where it belongs.
- *
  * @see src/features/langy/logic/langyErrorExplainer.ts (the copy for each kind)
  * @see app-layer/langyagent/app/app.go (the error frames the manager emits)
  */
@@ -78,19 +64,9 @@ export class LangyAgentSessionLostError extends HandledError {
 }
 
 /**
- * The agent reached for GitHub — `gh`, or a `git` command that talks to the
- * remote — on a turn whose credentials carry no GitHub token, because the user
- * has never connected their account.
- *
- * NOT a fault, and not a blanket pre-flight: most turns never touch GitHub and
- * must not be stopped. The turn is stopped at the exact moment the agent tries
- * to use a capability it does not have, which the control plane can SEE in the
- * tool stream (`needsGithubAuth`) without asking the model to announce it.
- *
- * The browser renders this as the in-chat Connect card rather than a red error
- * (`render: "suppress"` + a `connect-github` action), and connecting re-drives
- * the turn — so the user never retypes. See
- * `features/langy/logic/langyRecoveryPolicy.ts` (`awaiting-user`).
+ * The agent reached for GitHub — `gh`, or a `git` command that talks to the remote — on a turn
+ * whose credentials carry no GitHub token, because the user has never connected their account. NOT
+ * a fault, and not a blanket pre-flight: most turns never touch GitHub and must not be stopped.
  */
 export class LangyGithubNotConnectedError extends HandledError {
   declare readonly code: "langy_github_not_connected";
@@ -105,17 +81,8 @@ export class LangyGithubNotConnectedError extends HandledError {
 }
 
 /**
- * The turn HAD GitHub access, but the repository the agent reached for isn't
- * covered by the organization's GitHub App installation — the clone/push 404'd.
- * The manager's GitHub gate classifies the failed tool call (a 404/not-found on
- * a GitHub-reaching command while a credential was present) and stops the turn
- * with this code instead of letting the model flounder through the failure in
- * prose.
- *
- * Not a fault: the fix is granting the app access to that repository (GitHub's
- * installation settings — Settings → Integrations → Configure deep-links
- * there). Terminal with no auto-retry: the identical request 404s identically
- * until a human changes the installation.
+ * The turn HAD GitHub access, but the repository the agent reached for isn't covered by the
+ * organization's GitHub App installation — the clone/push 404'd.
  */
 export class LangyGithubRepoNotAccessibleError extends HandledError {
   declare readonly code: "langy_github_repo_not_accessible";
@@ -135,16 +102,6 @@ export class LangyGithubRepoNotAccessibleError extends HandledError {
 
 /**
  * The manager could not START a worker for this turn (`worker_spawn_failed`).
- *
- * Distinct from `at-capacity` (there was no free slot) and from `unavailable`
- * (the manager did not answer at all): the manager answered, tried, and the
- * opencode subprocess never came up — a readiness timeout, a failed skill
- * install, a home-directory or egress-guard failure.
- *
- * This is what was landing in `unknown`. The manager emits it as a typed error
- * frame, but `langyAgentErrorFromFrame` only knew two frames, so the third fell
- * through to a bare `Error` and the user got "Something went wrong" plus a trace
- * id — for a failure we can name exactly.
  */
 export class LangyWorkerSpawnFailedError extends HandledError {
   declare readonly code: "langy_worker_spawn_failed";
@@ -160,20 +117,8 @@ export class LangyWorkerSpawnFailedError extends HandledError {
 }
 
 /**
- * The worker STOPPED before the turn finished, and the control plane has
- * exhausted its own recovery for it. Two roads reach this:
- *
- *   - the manager observed the worker's stream die mid-reply (the opencode
- *     subprocess crashed / was OOM-killed / the pod went away) and emitted a
- *     `worker_stopped` error frame; or
- *   - the liveness subscriber re-dispatched the silent turn across its whole
- *     grace budget and it still never came back, so it terminalized the turn.
- *
- * Either way the browser must NOT auto-retry: the server already tried, and a
- * client re-drive only walks into the same dead worker — which is exactly the
- * flicker (card → silent retry → card, minutes apart) this kind exists to end.
- * It is a FINAL state with a manual "Try again". Nothing was lost — the user's
- * message is on record — so retrying is safe, it is just the user's call to make.
+ * The worker STOPPED before the turn finished, and the control plane has exhausted its own recovery
+ * for it.
  */
 export class LangyWorkerStoppedError extends HandledError {
   declare readonly code: "langy_worker_stopped";
@@ -189,15 +134,8 @@ export class LangyWorkerStoppedError extends HandledError {
 }
 
 /**
- * The agent itself reported the turn failed (`agent_error`): the worker is
- * alive and answered deterministically — typically its LLM call was rejected
- * by the provider or gateway. Distinct from `langy_worker_stopped` (the
- * process died or went silent): nothing crashed, the reply just failed, and
- * saying "the worker stopped" for a provider rejection is dishonest copy.
- * Terminal with a manual retry — the server must NOT re-drive a deterministic
- * failure through the liveness budget. `reasons` carries the received herr
- * chain (e.g. the gateway's typed failure) so the full context persists into
- * `LastError` — herr ⇄ HandledError, one model across every wire.
+ * The agent itself reported the turn failed (`agent_error`): the worker is alive and answered
+ * deterministically — typically its LLM call was rejected by the provider or gateway.
  */
 export class LangyAgentErroredError extends HandledError {
   declare readonly code: "langy_agent_errored";
@@ -248,13 +186,8 @@ export class LangyWorkerRestartingError extends HandledError {
 }
 
 /**
- * The two error frames the manager emits as a deliberate, typed contract
- * (`app.go`: `sink.ErrorEvent("at-capacity")` / `sink.ErrorEvent("session-not-found")`).
- * Anything else on that frame is `err.Error()` — an arbitrary internal string
- * we must NOT pattern-match on and must NOT show. It becomes a plain `Error`,
- * so the classifier files it under `unknown` (calm copy + trace id) while the
- * raw text still reaches the log via `error.message`.
- */
+ * The two error frames the manager emits as a deliberate, typed contract (`app.go`:
+ * `sink.ErrorEvent("at-capacity")` / `sink.ErrorEvent("session-not-found")`).
 /** Node/undici connect-level failures: the manager isn't answering the socket. */
 const UNREACHABLE_CODES = new Set([
   "ECONNREFUSED",
@@ -270,14 +203,8 @@ const UNREACHABLE_CODES = new Set([
 ]);
 
 /**
- * What a failed Langy turn is, and what the client is told about it.
- *
- * The ten HandledError classes above are the named failures. This is the
- * machinery that decides WHICH of them an arbitrary thrown value is, by
- * walking the cause chain and the agent's own error frames, and falls back to
- * an unhandled shape when it can name nothing — that fallback is deliberate,
- * not a gap: a failure we cannot name must degrade to a generic error with a
- * trace id rather than be dressed up as one we understand.
+ * What a failed Langy turn is, and what the client is told about it. The ten HandledError classes
+ * above are the named failures.
  */
 export class LangyTurnErrors {
   /** Walk a HandledError chain (the error + its reasons, depth-first) for a kind. */
@@ -313,14 +240,9 @@ export class LangyTurnErrors {
   }
 
   /**
-   * The unhandled shape: nothing but an id to correlate on.
-   *
-   * The id must IDENTIFY THE INCIDENT. It used to be the ACTIVE TRACE id, which in
-   * the worker is the long-lived process/turn-processor span — so every failure,
-   * in every conversation, showed the user the SAME id. An id that does not
-   * identify the thing it is attached to is worse than no id: it sends whoever
-   * receives it looking for the wrong incident. The SPAN id is per-failure, so we
-   * lead with it and keep the trace id only as a correlation hint.
+   * The unhandled shape: nothing but an id to correlate on. The id must IDENTIFY THE INCIDENT. It
+   * used to be the ACTIVE TRACE id, which in the worker is the long-lived process/turn-processor
+   * span — so every failure, in every conversation, showed the user the SAME id.
    */
   private static unhandledShape(): SerializedHandledError {
     const spanContext = trace.getActiveSpan()?.spanContext();
@@ -340,14 +262,9 @@ export class LangyTurnErrors {
   }
 
   /**
-   * Classify the manager's terminal error frame, preferring the typed cause
-   * chain when present (the wire's herr envelope, already deserialized into a
-   * HandledError by the relay-frame schema — this code never sees the wire
-   * dialect): a KNOWN cause anywhere in the chain gets its own kind (so a
-   * gateway `no_provider_configured` renders the model-setup card, not a
-   * generic failure), and the generic `agent_error` keeps the received chain as
-   * reasons so the full context persists into `LastError`. Falls back to the
-   * bare-code mapping for frames without a cause.
+   * Classify the manager's terminal error frame, preferring the typed cause chain when present (the
+   * wire's herr envelope, already deserialized into a HandledError by the relay-frame schema — this
+   * code never sees the wire dialect):
    */
   static fromErrorFrame({ code, cause }: { code?: string; cause?: HandledError }): Error {
     if (cause) {
@@ -426,10 +343,9 @@ export class LangyTurnErrors {
   }
 
   /**
-   * Serialize a turn failure into the JSON the token buffer's `error` entry
-   * carries, which `attachTurnStream` re-emits as a structured error PART. The
-   * copy the user sees is derived from `kind` in the browser — the raw message
-   * never crosses the wire.
+   * Serialize a turn failure into the JSON the token buffer's `error` entry carries, which
+   * `attachTurnStream` re-emits as a structured error PART. The copy the user sees is derived from
+   * `kind` in the browser — the raw message never crosses the wire.
    */
   static serialize(error: unknown): string {
     return JSON.stringify(LangyTurnErrors.classify(error));

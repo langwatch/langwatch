@@ -1,9 +1,6 @@
 /**
  * Message truncation on the set-level and batch-scoped run reads: the
- * trimmed projection keeps the first six messages, and `include=messages`
- * (or a batch-scoped read, which always carries whole conversations) turns
- * that off.
- *
+ * trimmed projection keeps the first six messages.
  * @see specs/scenarios/simulation-runs-api.feature
  */
 

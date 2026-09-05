@@ -1,12 +1,7 @@
 /**
+ * The PR cap is the only thing standing between a runaway worker (bad skill, prompt-injected pull)
+ * and a user's GitHub account getting flagged for abuse.
  * @vitest-environment node
- *
- * The PR cap is the only thing standing between a runaway worker (bad
- * skill, prompt-injected pull) and a user's GitHub account getting flagged
- * for abuse. Pin the counter math here:
- *  - no Redis → fails open (dev box stays usable)
- *  - first bump sets a 2-day TTL (no counter leakage across day buckets)
- *  - the post-increment count drives `allowed` / `remaining`
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

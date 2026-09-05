@@ -8,15 +8,8 @@ import type { PrismaClient, SsoConnection } from "@langwatch/prisma-client/gener
 
 /**
  * The router's domain-lookup port over the `SsoConnection` PROJECTION — what
- * `SSOCONN_ROUTING=enforce` composes, and what `shadow` compares the strings
+ * `SSOCONN_ROUTING=enforce` composes,
  * against (ADR-117 §5).
- *
- * The same port the legacy strings implement, so neither the router nor the
- * engine learns which side of the flip it is on: the swap is a line in
- * `runtime.ts`. What it answers that the strings cannot is real lifecycle —
- * a SUSPENDED connection comes back SUSPENDED rather than absent, which is
- * what lets the picker say "your organization has paused this" instead of
- * silently offering a password form.
  */
 export class SsoConnectionDomainRoutingRepository implements SignInDomainRoutingPort {
   static create({

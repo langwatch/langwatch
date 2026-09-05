@@ -1,20 +1,9 @@
 import type { SignInBreakGlassLimiter } from "../signin-router.service";
 
 /**
+ * audited"). already a per-process memo,
  * The budget on `?local=1` (ADR-117 §2: break-glass "is rate-limited,
- * audited").
- *
  * A fixed window in process memory, deliberately. The gate ADR-027 froze is
- * already a per-process memo, break-glass is an operator action measured in
- * ones per incident rather than per pod, and a Redis round trip in front of
- * the door that exists FOR the days the infrastructure is broken would defeat
- * the door. Per-pod counting means a fleet of N pods allows N budgets; the
- * budget is small enough that this is still a limit and not a formality.
- *
- * Spending the budget never refuses anyone. It only stops the parameter from
- * bypassing an auto-redirect, so a spray of `?local=1` against an SSO-only
- * deployment routes to the IdP like any other request — see the port's
- * docblock in `@langwatch/identity-server`.
  */
 export const BREAK_GLASS_WINDOW_MS = 60_000;
 export const BREAK_GLASS_WINDOW_BUDGET = 10;

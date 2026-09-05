@@ -9,20 +9,9 @@ import { newSsoConnectionCommandId, newSsoConnectionId } from "../sso-connection
 import type { SsoConnectionBackofficeRepository } from "../sso-connection-backoffice.repository";
 
 /**
- * What the back office reads and commands (D05 tier 1).
- *
- * The write half is a THIN pass-through on purpose: every verb here mints a
- * command id, stamps the operator as the actor, and hands the rest to
- * `SsoConnectionService`, whose guards are the only thing that decides
- * anything. There is no second copy of the lifecycle here, no branch on
- * state, and no path from this class to an `SsoConnection` row — the row is a
- * projection of the log, and a write to it would be overwritten by the next
- * fold.
- *
- * The read half exists because the back office needs a LIST, and the guards'
- * read port answers about one connection at a time. It resolves organization
- * names alongside, because an operator confirming a destructive action on
- * `org_LVYcVYGW1AJqvp2G8vcVd` has not been told anything they can check.
+ * What the back office reads and commands (D05 tier 1). The write half is a THIN pass-through on
+ * purpose: every verb here mints a command id, stamps the operator as the actor, and hands the rest
+ * to `SsoConnectionService`, whose guards are the only thing that decides anything.
  */
 
 /** One row of the back office's connection list. */
@@ -117,12 +106,9 @@ export class SsoConnectionBackofficeService {
   }
 
   /**
-   * Register a connection for an organization.
-   *
-   * SAML is refused by name here rather than at the aggregate: the aggregate
-   * is protocol-agnostic on purpose, and D09 will terminate SAML through it.
-   * What is not available is registering one through a SELF-SERVE surface,
-   * which is a property of the surface and belongs on it.
+   * Register a connection for an organization. SAML is refused by name here rather than at the
+   * aggregate: the aggregate is protocol-agnostic on purpose, and D09 will terminate SAML through
+   * it.
    */
   async registerConnection({
     organizationId,

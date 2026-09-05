@@ -4,21 +4,8 @@ import { IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME } from "../identity-migr
 
 /**
  * D04 — the connection grandfather as the runner sees it (ADR-117 §5): the
- * `SystemMigration` contract over `@langwatch/identity-server`'s
- * SsoConnectionGrandfatherService, which owns the pass. The runner's shape
- * stays the app's, the way AuthzEngineMigration and the D01 identifier
- * backfill keep it for their domains.
- *
- * Tenant = ORGANIZATION, so it rides the organization-rooted leg of the pass
- * (the D01 backfill is the user-rooted one). Finalization means the routing
- * proof agreed for every domain the organization carries; a disagreement
- * HOLDS the organization with those domains named, and a later pass re-proves
- * it. Held is not failed, and nothing about the organization's sign-in
- * changes either way — `SSOCONN_ROUTING` is what would change it, and it
- * ships `off`.
- *
- * Spec: specs/identity/sso-connection-lifecycle.feature ("A legacy SSO
- * organization is grandfathered without noticing").
+ * `SystemMigration` contract over `SsoConnectionGrandfatherService`.
+ * Spec: specs/identity/sso-connection-lifecycle.feature.
  */
 export class IdentitySsoConnectionGrandfatherMigration implements SystemMigration {
   // Never rename: the stable state-table key.

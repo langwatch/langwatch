@@ -1,16 +1,7 @@
 /**
- * The person a key-authenticated Langy turn is attributed to.
- *
- * A turn runs as a HUMAN, never as a key: the worker's credentials are minted
- * from the acting user and the conversation is filed under them, so a key
- * whose owner no longer exists cannot start one.
- *
- * The session this builds is {@link LangyCredentialSession} — the three fields
- * the Langy application actually reads — rather than the browser session the
- * platform route used to synthesize. The browser session carried an `expires`
- * stamped with the current instant, which said nothing: nothing downstream
- * read it, and a synthesized expiry that is always "now" is a field that can
- * only mislead.
+ * The person a key-authenticated Langy turn is attributed to. A turn runs as a HUMAN, never as a
+ * key: the worker's credentials are minted from the acting user and the conversation is filed under
+ * them, so a key whose owner no longer exists cannot start one.
  */
 import type { LangyCredentialSession } from "@langwatch/langy-contract";
 

@@ -1,18 +1,5 @@
 /**
- * The order in which the worker mounts its feature installers.
- *
- * It is not incidental. The live `PipelineRegistry` registers Automation
- * first because every trigger match in the trace, evaluation and governance
- * graphs is written through its command; Metric and Log before Trace because
- * their dispatch subscribers feed the same contribution commands; Trace before
- * Topic because Topic dispatches assignments through Trace's canonical
- * assignment port; and the AuthZ grants ledger last, so its durable write path
- * opens only once every producer exists. Reordering any of those silently
- * gives a late-bound port a caller before it has a delegate.
- *
- * The composition is also allowed to be INCOMPLETE while the remaining Wave 4
- * pipeline groups are still owned by the legacy registry, so this pins the
- * relative order of what is present rather than a fixed list.
+ * The order in which the worker mounts its feature installers. It is not incidental.
  */
 import {
   InMemoryProcessStore,
@@ -134,14 +121,11 @@ function createEventing(registered: string[]) {
     warnWhenProjectionsRunInline: false,
     consumers: { enabled: false },
   });
-  // Registration itself is the eventing package's contract; what this suite
-  // observes is which definition reaches it, and in what order.
-  //
-  // Every installer reads back the command senders it binds its cross-feature
-  // proxies to and refuses to install when one is missing, so the stub answers
-  // with the union of those names rather than a bare object: a registration
-  // that returned nothing would fail the guard for a reason this suite is not
-  // asking about.
+  // Registration itself is the eventing package's contract; what this suite observes is which
+  // definition reaches it, and in what order. Every installer reads back the command senders it
+  // binds its cross-feature proxies to and refuses to install when one is missing, so the stub
+  // answers with the union of those names rather than a bare object: a registration that returned
+  // nothing would fail the guard for a reason this suite is not asking about.
   const commands = Object.fromEntries(
     [
       "recordTriggerMatch",

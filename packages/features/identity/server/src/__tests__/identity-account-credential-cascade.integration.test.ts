@@ -1,11 +1,6 @@
 /**
- * `AccountCredential.userId` cascades under `relationMode = "prisma"`
- * (packages/prisma-client/prisma/schema.prisma), which is the Prisma client's
- * own emulated cascade rather than a database foreign key — a path that
- * deletes a `User` row some other way than the identity branch's own unlink
- * must still not leave a password hash or provider token behind.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it.
+ * `AccountCredential.userId` cascades under `relationMode = "prisma"` (packages/prisma-
+ * client/prisma/schema.prisma),
  * Spec: specs/identity/identity-storage-adapter.feature.
  */
 import { nanoid } from "nanoid";

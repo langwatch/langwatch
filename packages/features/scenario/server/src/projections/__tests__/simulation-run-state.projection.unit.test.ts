@@ -478,12 +478,10 @@ describe("simulationRunStateFoldProjection", () => {
     });
 
     it("caps oversized multi-byte (UTF-8) Content (fast-path doesn't bypass on character count)", () => {
-      // A char-count fast-path (`value.length <= maxBytes`) would WRONGLY
-      // bypass this string: 30 KiB of chars = under the 64 KiB length, but
-      // each 4-byte UTF-8 emoji (😀) pushes the actual byte length to ~120 KiB.
-      // The safe fast-path uses `value.length * 3 <= maxBytes`, so this
-      // string falls through to the real Buffer.byteLength check and gets
-      // truncated.
+      // A char-count fast-path (`value.length <= maxBytes`) would WRONGLY bypass this string: 30
+      // KiB of chars = under the 64 KiB length, but each 4-byte UTF-8 emoji (😀) pushes the actual
+      // byte length to ~120 KiB. The safe fast-path uses `value.length * 3 <= maxBytes`, so this
+      // string falls through to the real Buffer.byteLength check and gets truncated.
       const oversizedMultibyte = "😀".repeat(30 * 1024);
       const state = foldEvents([
         createRunStartedEvent(),
@@ -1070,15 +1068,7 @@ describe("simulationRunStateFoldProjection", () => {
 });
 
 describe("simulationRunStateFoldProjection finalized-status guard", () => {
-  // Orphaned-run reconciliation writes a terminal `finished` event for a run
-  // whose worker died. If the worker's child process actually outlived its
-  // parent (reparented) and later POSTs a real started/snapshot whose
-  // client-supplied occurredAt is AFTER the reconciliation time, that event
-  // applies in-order (no re-fold, since occurredAt is not strictly less than
-  // LastEventOccurredAt) and would otherwise clobber Status back to a
-  // non-terminal value while FinishedAt stays set — an unrecoverable zombie
-  // nothing can rescue: stored status is the only truth at read time. Once
-  // FinishedAt is set, Status must stay terminal.
+  // Orphaned-run reconciliation writes a terminal `finished` event for a run whose worker died.
   describe("given a run that already finished", () => {
     describe("when a later started event arrives", () => {
       it("keeps the terminal status instead of resurrecting IN_PROGRESS", () => {
@@ -1292,7 +1282,10 @@ describe("simulationRunStateFoldProjection metrics_computed handling", () => {
     /** @scenario "Metrics computed regardless of arrival order — trace first" */
     it("accepts a metrics_computed event that arrives before the run finishes", () => {
       const state = foldEvents([
-        createMetricsComputedEvent({ traceId: "trace-abc", totalCost: 0.003 }, { occurredAt: 1000 }),
+        createMetricsComputedEvent(
+          { traceId: "trace-abc", totalCost: 0.003 },
+          { occurredAt: 1000 },
+        ),
         createRunFinishedEvent({}, { occurredAt: 2000 }),
       ]);
 
@@ -1305,7 +1298,10 @@ describe("simulationRunStateFoldProjection metrics_computed handling", () => {
     it("accepts a metrics_computed event that arrives after the run finishes", () => {
       const state = foldEvents([
         createRunFinishedEvent({}, { occurredAt: 1000 }),
-        createMetricsComputedEvent({ traceId: "trace-abc", totalCost: 0.003 }, { occurredAt: 2000 }),
+        createMetricsComputedEvent(
+          { traceId: "trace-abc", totalCost: 0.003 },
+          { occurredAt: 2000 },
+        ),
       ]);
 
       expect(state.TraceMetrics["trace-abc"]?.totalCost).toBe(0.003);

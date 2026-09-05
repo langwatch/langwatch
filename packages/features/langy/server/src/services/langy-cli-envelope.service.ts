@@ -1,31 +1,7 @@
 /**
- * The CLI envelope: re-typing a shell tool call as the LangWatch capability it
- * really was.
- *
- * Langy runs on opencode and reaches LangWatch through the `langwatch` CLI, so
- * every tool call arrives named `bash` with the intent buried in a command
- * string. Left alone that flattens the product: the durable event log records
- * "the agent ran bash" instead of "the agent searched traces", and the browser
- * has nothing to key a card off.
- *
- * This service is the one place that translation happens. It sits at the very
- * top of the turn processor's tool handling, BEFORE anything is recorded, so a
- * single rewrite reaches every consumer downstream:
- *
- *     bash("langwatch trace search --format json | jq .")
- *       -> name:   langwatch.trace.search      (durable event + live buffer)
- *       -> output: {"traces":[…],"pagination":…}  (the document, not the console)
- *
- * Nothing after this point knows a shell was involved.
- *
- * It owns the POLICY — which tools are shells, where the command lives in a tool
- * input, when an output is worth reducing. The two grammars it depends on are
- * separate, pure modules: `langwatchCommand` (shell string -> resource + verb)
- * and `cliJson` (noisy stdout -> the JSON document).
- *
+ * The CLI envelope: re-typing a shell tool call as the LangWatch capability it really was.
  * @see specs/langy/langy-cli-tool-envelope.feature
  * @see src/features/langy/components/capabilities/capabilityRegistry.ts — the
- *      other half: `langwatch.<resource>.<verb>` -> the card that renders it.
  */
 import {
   type CliResultDigest,
@@ -41,13 +17,9 @@ import {
 import { type LangwatchCommand, parseLangwatchCommand } from "@langwatch/langy-contract";
 
 /**
- * A tool-call lifecycle frame the manager forwards from opencode (`langy.tool`).
- * `phase:"start"` carries the tool name + input; `phase:"end"` carries the
- * result (`output`, a string) and whether it errored. Paired by `id`.
- *
- * `digest` is never on the wire — it is COMPUTED here on a successful end
- * frame: the compact reference (ids, query, counts) the card hydrates fresh
- * data from, so the stored output only ever has to be the fallback.
+ * A tool-call lifecycle frame the manager forwards from opencode (`langy.tool`). `phase:"start"`
+ * carries the tool name + input; `phase:"end"` carries the result (`output`, a string) and whether
+ * it errored. Paired by `id`.
  */
 export interface LangyToolFrame {
   id: string;
@@ -74,10 +46,9 @@ export class LangyCliEnvelopeService {
   }
 
   /**
-   * Re-type a tool frame that is really a LangWatch CLI call. Everything else —
-   * a real shell command, a file edit, a frame whose stdout held no document —
-   * is returned unchanged (identity, not a copy), so the caller can treat this
-   * as a transparent pass-through.
+   * Re-type a tool frame that is really a LangWatch CLI call. Everything else — a real shell
+   * command, a file edit, a frame whose stdout held no document — is returned unchanged (identity,
+   * not a copy), so the caller can treat this as a transparent pass-through.
    */
   normalizeToolFrame({ frame }: { frame: LangyToolFrame }): LangyToolFrame {
     const command = this.tryShellCommandOf(frame);
@@ -95,15 +66,11 @@ export class LangyCliEnvelopeService {
       return { ...frame, name };
     }
 
-    // A FAILED CALL STILL PRINTED ITS FAILURE DOCUMENT.
-    //
-    // Under a machine format the CLI writes `{ok:false, error:{…}}` to stdout
-    // and a one-line human summary to stderr, then exits non-zero. This branch
-    // used to pass the frame straight through, so whichever of the two the
-    // worker happened to put in `output` was what the card got — and when that
-    // was the stderr line, every scrap of structure (the code, the meta, the
-    // tips) was gone before the panel ever saw it. Look for the document in
-    // both, and keep it whole when it is there.
+    // A FAILED CALL STILL PRINTED ITS FAILURE DOCUMENT. Under a machine format the CLI writes
+    // `{ok:false, error:{…}}` to stdout and a one-line human summary to stderr, then exits non-
+    // zero. This branch used to pass the frame straight through, so whichever of the two the worker
+    // happened to put in `output` was what the card got — and when that was the stderr line, every
+    // scrap of structure (the code, the meta, the tips) was gone before the panel ever saw it.
     if (frame.isError) {
       const reportedOnFailure = readCliErrorDocument(
         parseCliJson(frame.output ?? "") ?? frame.output,
@@ -148,27 +115,22 @@ export class LangyCliEnvelopeService {
     // as the fallback tier and the agent-history record.
     const document = parseCliJson(frame.output);
 
-    // A FAILURE THE CLI REPORTED IN ITS OWN DOCUMENT.
-    //
-    // `frame.isError` only catches what the WORKER marked as failed. A command
-    // that writes `{"ok":false,"error":{…}}` to stdout and exits cleanly is a
-    // failure the worker never noticed, so it fell through this success path,
-    // failed its card's schema, and landed on the raw `{kind:"json"}` receipt —
-    // which is how a validation error ended up rendered to the user as a wall of
-    // JSON instead of an error card. The CLI already has a reader for its own
-    // failure document; the boundary just never asked.
+    // A FAILURE THE CLI REPORTED IN ITS OWN DOCUMENT. `frame.isError` only catches what the WORKER
+    // marked as failed. A command that writes `{"ok":false,"error":{…}}` to stdout and exits
+    // cleanly is a failure the worker never noticed, so it fell through this success path, failed
+    // its card's schema, and landed on the raw `{kind:"json"}` receipt — which is how a validation
+    // error ended up rendered to the user as a wall of JSON instead of an error card.
     const reported = readCliErrorDocument(document ?? frame.output);
     if (reported) {
       return {
         ...frame,
         name,
         isError: true,
-        // The failure document, whole. Keeping only `reported.message` here
-        // discarded the code, the meta, and the tips/docsUrl the platform sent
-        // for exactly this consumer — so the error card, which reads the
-        // document structurally, had nothing left to show and fell back to
-        // "This step couldn't be completed". The card renders the sentence and
-        // the next steps FROM the document; it never prints the JSON.
+        // The failure document, whole. Keeping only `reported.message` here discarded the code, the
+        // meta, and the tips/docsUrl the platform sent for exactly this consumer — so the error
+        // card, which reads the document structurally, had nothing left to show and fell back to
+        // "This step couldn't be completed". The card renders the sentence and the next steps FROM
+        // the document; it never prints the JSON.
         output: JSON.stringify(toCliErrorDocument(reported)),
       };
     }
@@ -217,16 +179,9 @@ export class LangyCliEnvelopeService {
   }
 
   /**
-   * The command string behind a shell tool call, or null when the frame is not a
-   * shell call at all. opencode's bash tool passes `{ command: "…" }`, but the
-   * input is whatever the model produced, so a bare string is tolerated too.
-   */
-  /**
-   * The shell command a tool frame is carrying, or null when the frame is not a
-   * shell call. Public because it is the ONE place that knows which tools are
-   * shells and where a command hides in a tool input — the turn processor reuses
-   * it to spot the agent reaching for GitHub (`needsGithubAuth`) rather than
-   * re-deriving that knowledge and letting the two drift.
+   * The shell command a tool frame is carrying, or null when the frame is not
+   * a shell call. Public because it is the ONE place that knows which tools
+   * are shells and where a command hides in a tool input.
    */
   tryShellCommandOf(frame: LangyToolFrame): string | null {
     if (!SHELL_TOOL_NAMES.has(frame.name.trim().toLowerCase())) {

@@ -33,17 +33,9 @@ import {
 import { z } from "zod";
 
 /**
- * The two-step verification pipeline's wire schemas: the framework envelope
- * (id, aggregate, tenant, cursor time) over the MFA payloads
- * `@langwatch/identity-contract` declares.
- *
- * Nothing here can carry a secret or a backup code, because none of the
- * payloads it extends has a field for one.
- *
- * Defined here, beside the fold that is their one collector, for the same
- * reason the identity pipeline's events live beside its own fold: the
- * pipeline definition adapter builds itself FROM this projection, so an
- * import back the other way would be a cycle.
+ * The two-step verification pipeline's wire schemas: the framework envelope (id, aggregate, tenant,
+ * cursor time) over the MFA payloads `@langwatch/identity-contract` declares. Nothing here can
+ * carry a secret or a backup code, because none of the payloads it extends has a field for one.
  */
 
 export const mfaEnrolledEventSchema = EventSchema.extend({
@@ -120,15 +112,9 @@ export type MfaFoldState = MfaEnrollmentState & {
 };
 
 /**
- * The two-step verification pipeline's operational projection (D06): one
- * Postgres row per person, applied through `.withProjection()`'s direct
- * load/apply/store cycle under the queue's per-user lock.
- *
- * A pure event-truth head — the row is never deleted, DISABLED is a
- * tombstone, and a replay rebuilds it whole-row. Every handler is the same
- * move: validate the wire event and hand it to `@langwatch/identity`'s
- * reducer, so live dispatch, the queue's fold and the replay proof all run
- * the identical function.
+ * The two-step verification pipeline's operational projection (D06): one Postgres row per person,
+ * applied through `.withProjection()`'s direct load/apply/store cycle under the queue's per-user
+ * lock.
  */
 export class MfaEnrollmentStateFoldProjection
   extends AbstractFoldProjection<
@@ -221,19 +207,9 @@ export class MfaEnrollmentStateFoldProjection
   }
 
   /**
-   * The same envelope stamp the identity pipeline's events get, and a
-   * separate function for one reason that matters: SCHEMA VERSION. An
-   * envelope stamps exactly one `version`, fold read-back is version-gated,
-   * and these two families evolve independently.
-   *
-   * They still ride `USER_IDENTITY_AGGREGATE_TYPE`, keyed on the same
-   * `userId` — deliberately, and it is the whole reason this lives on the
-   * identity pipeline. The queue keys its lane on the aggregate id, so a
-   * person's identifier commands and their two-step commands serialise
-   * against each other.
-   *
-   * Defined here, beside the fold and the schemas it stamps, for the same
-   * reason `identityEventsFor` lives beside its own fold.
+   * The same envelope stamp the identity pipeline's events get, and a separate function for one
+   * reason that matters: SCHEMA VERSION. An envelope stamps exactly one `version`, fold read-back
+   * is version-gated, and these two families evolve independently.
    */
   static eventsFor({ command, facts }: { command: MfaCommand; facts: MfaFactInput[] }): MfaEvent[] {
     const { userId, tenantId, commandId, occurredAtMs } = command.data;

@@ -84,11 +84,8 @@ const held: IdentityHeads = {
 const base = { tenantId: USER, userId: USER, occurredAtMs: T0, actor: ACTOR };
 
 /**
- * The aggregate type is the storage partition key, not a label: the event
- * store refuses at append any event whose type differs from the one its
- * pipeline declares (#7406). Every verb's event is run through the store's
- * own validator against the pipeline's declared type, so the envelope and
- * the pipeline cannot drift apart without this going red.
+ * The aggregate type is the storage partition key, not a label: the event store refuses at append
+ * any event whose type differs from the one its pipeline declares (#7406).
  */
 describe("identity event aggregate type", () => {
   describe("when every verb emits", () => {

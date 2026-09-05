@@ -7,12 +7,9 @@ export interface SsoConnectionBackofficePage {
 }
 
 /**
- * The reads the operator back office serves its list and detail from (D05
- * tier 1).
- *
- * Reads only, and deliberately: the `SsoConnection` row is a projection of the
- * log, so a write here would be overwritten by the next fold. Every back
- * office write goes through `SsoConnectionService` instead.
+ * The reads the operator back office serves its list and detail from (D05 tier 1). Reads only, and
+ * deliberately: the `SsoConnection` row is a projection of the log, so a write here would be
+ * overwritten by the next fold.
  */
 export interface SsoConnectionBackofficeRepository {
   /**

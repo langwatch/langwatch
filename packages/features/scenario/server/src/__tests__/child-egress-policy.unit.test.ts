@@ -1,11 +1,7 @@
 /**
+ * The fence a child dials an HTTP target through is the parent's decision, carried across the
+ * process boundary.
  * Spec: specs/scenarios/child-execution-contract.feature
- *
- * The fence a child dials an HTTP target through is the parent's decision,
- * carried across the process boundary. Both directions are asserted here: that
- * the parent puts the deployment's own policy on the environment it starts the
- * child with, and that a child handed none refuses instead of falling back to a
- * default that would be permissive.
  */
 import { describe, expect, it } from "vitest";
 import {

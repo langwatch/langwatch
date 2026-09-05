@@ -19,12 +19,8 @@ import type {
 } from "@langwatch/scenario-contract";
 
 /**
- * One run plan row, read for the results tab and the run-configuration
- * history — a `SimulationSuite` row of any kind, not only `test_suite`.
- *
- * `scope` and `targets` stay `unknown`: they are Prisma `Json` columns and
- * each reader parses them with its own schema (`SuiteScope`/`SuiteTarget`
- * from `@langwatch/suite-contract`).
+ * One run plan row, read for the results tab and the run-configuration history — a
+ * `SimulationSuite` row of any kind, not only `test_suite`.
  */
 export interface ScenarioPlanRecord {
   id: string;

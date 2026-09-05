@@ -7,10 +7,9 @@ import type { IdentityNewbornRepository } from "../identity-newborn.repository";
 const logger = createLogger("langwatch:identity:newborn-reconciliation");
 
 /**
- * How long an entrance is given to finish before its claim reads as
- * abandoned. Generously above any sign-up's own latency: the cost of
- * sweeping too early is erasing a stream a retry was about to converge on,
- * and the cost of sweeping late is a few inert rows.
+ * How long an entrance is given to finish before its claim reads as abandoned. Generously above any
+ * sign-up's own latency: the cost of sweeping too early is erasing a stream a retry was about to
+ * converge on, and the cost of sweeping late is a few inert rows.
  */
 export const IDENTITY_NEWBORN_ABANDONED_AFTER_MS = 60 * 60 * 1000;
 
@@ -35,29 +34,9 @@ export interface IdentityNewbornSweepSummary {
 }
 
 /**
- * The reconciliation sweep ADR-116 §3 calls a required companion to the
  * born-finalized entrance, not optional hygiene.
- *
- * A flagged sign-up abandoned between the append and the row commit leaves
- * facts under a tenant that never gained a user row. Nothing SERVES them —
- * the fold declines to project a user that does not exist, and resolution
- * reads resolve nothing — but "nothing serves them" is not the same as "they
- * are gone": the facts carry the address the customer typed, and they carry
- * it forever.
- *
- * So the sweep erases the stream. It reaches for the same `erase_user`
+ * The reconciliation sweep ADR-116 §3 calls a required companion to the
  * command a real deletion uses (ADR-101 R11) rather than a deletion path of
- * its own — the facts are wiped by the fold the way every other erasure is,
- * and the audit record of the erasure is itself a fact.
- *
- * It also reaps the OTHER residue the entrance and the ceremonies leave: an
- * address lock claimed before a fact that never landed. Same shape, same
- * horizon, and the same reason — a lock nothing backs is an address nobody can
- * ever take again.
- *
- * Shaped like the backfill's pass: one bounded pass over candidates, a
- * summary rather than a promise of completion, and a failure on one tenant
- * that does not abort the rest.
  */
 export class IdentityNewbornReconciliationService {
   static create(deps: IdentityNewbornReconciliationDeps): IdentityNewbornReconciliationService {
@@ -106,15 +85,9 @@ export class IdentityNewbornReconciliationService {
   }
 
   /**
+   * A claim is taken before the fact is stated, which is the whole point — so a ceremony that
+   * claimed and then failed leaves a lock on an address no live identifier holds,
    * Address locks nothing backs (ADR-116 §6).
-   *
-   * A claim is taken before the fact is stated, which is the whole point — so
-   * a ceremony that claimed and then failed leaves a lock on an address no
-   * live identifier holds, and nobody could ever take it again. The horizon is
-   * what keeps the sweep off a ceremony that is merely still in flight.
-   *
-   * Bounded and best-effort like the rest of the pass: a reap that fails costs
-   * one pass, not the stream erasures beside it.
    */
   private async reapAddressLocks(): Promise<number> {
     try {

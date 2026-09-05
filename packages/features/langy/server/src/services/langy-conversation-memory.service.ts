@@ -1,33 +1,7 @@
 /**
- * THE CONVERSATION'S OWN MEMORY, carried on the turn.
- *
- * A real transcript. Langy created a scenario and reported its id. The user
- * said "run it". Langy answered "Assuming you want to search traces from the
- * last 24h", ran a 40-trace search, and volunteered a cost analysis. The user
- * had to say "no, run the scenario you just made".
- *
- * The rules were not the problem — AGENTS.md rule 11 says in as many words
- * that if turn 1 created a scenario and turn 2 says "run it", it must run THAT
- * scenario with the id from turn 1. It could not, because the id was not there
- * to use: the agent's memory of a conversation lives only in the opencode
- * session inside its live worker process, which is reaped after idle, killed
- * when the credential signature changes, and gone whenever the fleet rolls.
- * Only a graceful shutdown checkpoints anything. Meanwhile the control plane
- * sends a turn the last user sentence and a system block — never the
- * transcript. So "run it" arrives with no "it" in context, and the agent's
- * standing instruction to pick a reasonable default fills the hole.
- *
- * That is plumbing, not wording, and no amount of prompt editing fixes it.
- * This module is the plumbing, in two layers read off the same durable message
- * projection and carried as the HISTORY SEED:
- *
- *   - the TRANSCRIPT (`tryRenderTranscript`): what was already said, so a fresh
- *     worker continues rather than meeting a stranger;
- *   - the RESOURCE MEMORY (`extract`): what this conversation created, ran or
- *     listed, so a bare "run it" resolves to a concrete id.
- *
- * Each layer carries the rest of its own reasoning, above the method that
- * does it.
+ * THE CONVERSATION'S OWN MEMORY, carried on the turn. A real transcript. Langy created a scenario
+ * and reported its id. The user said "run it". Langy answered "Assuming you want to search traces
+ * from the last 24h", ran a 40-trace search, and volunteered a cost analysis.
  */
 
 import {
@@ -38,15 +12,10 @@ import {
 } from "@langwatch/langy-contract";
 import type { LangyMessageRow } from "@langwatch/langy-contract";
 
-/** More entries than a follow-up could plausibly mean, and a bounded prompt. */
 /**
- * The two blocks a Langy turn's prompt carries about the conversation so far:
- * the resources it touched, and the transcript of what was said.
- *
- * Both are built here rather than at the call site because both are read by
- * the model, which makes every one of them a prompt-injection surface. One
- * place to sanitize, one place to cap, and one place that knows a value
- * reaching a SYSTEM block is data and never an instruction.
+ * The two blocks a Langy turn's prompt carries about the conversation so
+ * far: the resources it touched, and the transcript of what was said. Both
+ * are built here because both are read by the model, a prompt-injection surface.
  */
 export class LangyConversationMemoryService {
   static create(): LangyConversationMemoryService {
@@ -54,51 +23,9 @@ export class LangyConversationMemoryService {
   }
 
   /**
-   * The resources this conversation touched, most recent first.
-   *
-   * Chronological in, MOST RECENT FIRST out. The turn ordinal counts agent
-   * messages, which is what an agent turn durably is — a user asking and the
-   * agent answering — so "turn 3" means the same thing to the model as it does
-   * to the transcript.
-   *
-   * The rules, all of them about not offering a referent that isn't one:
-   *   - a failed call contributes nothing (AGENTS.md rule 17: a create that
-   *     names nothing created nothing);
-   *   - a digest with no ids contributes nothing — `text`, `reduced` and
-   *     `query-ref` results name no resource, so there is nothing to refer BACK
-   *     to;
-   *   - the same resource touched twice is remembered ONCE, at its latest turn,
-   *     because "run it" means the thing as it now stands.
-   *
-   * ── WHERE THE FACTS COME FROM ──────────────────────────────────────────────
-   *
-   * Not a new store. Every finalized assistant message already carries its
-   * turn's tool calls as parts (`buildFinalAssistantParts`), and every
-   * `langwatch <resource> <verb>` call carries a `CliResultDigest` — the
-   * resource, the verb, the ids it surfaced, the name, the counts. That digest
-   * exists so a capability card can hydrate fresh data by reference instead of
-   * shipping rows; it is exactly the compact record a referent needs, and it is
-   * already durable.
-   *
-   * ── AUTHORISATION ──────────────────────────────────────────────────────────
-   *
-   * Nothing here resolves an id, reads a resource, or widens what a turn may
-   * see. The entries are ids the agent itself surfaced earlier in THIS
-   * conversation through its own per-session key — already scoped to this
+   * The resources this conversation touched, most recent first. Chronological in, MOST RECENT FIRST
+   * out.
    * project, org and user (ADR-047). The caller reads them from a conversation
-   * the turn service has already proved is OWNED by this user
-   * (`LangyConversationService.ensureConversation` rejects anything else), and
-   * the projection read is filtered by projectId. An id that reaches the model
-   * is still inert text: the only way to the resource behind it is a tool call
-   * that authenticates, the same boundary every other read crosses.
-   *
-   * ── PROMPT INJECTION ───────────────────────────────────────────────────────
-   *
-   * A resource `name` is whatever a user, an upstream system, or the agent
-   * itself called the thing, echoed back into a SYSTEM block. Same exploit as a
-   * composer chip's label, so the same defence and literally the same function:
-   * `sanitizeLangyPromptValue`, plus a trailer telling the model this block is
-   * data and never an instruction.
    */
   static extract({
     messages,
@@ -168,13 +95,7 @@ export class LangyConversationMemoryService {
   }
 
   /**
-   * Render the conversation's memory as a system block, or null when there is
-   * nothing to say.
-   *
-   * Framed the same way `renderLangyTurnContext` frames the user's screen: DATA,
-   * explicitly not instructions, with every id declared unverified so the agent
-   * resolves it through a tool like any other id rather than treating our say-so
-   * as proof the thing still exists.
+   * Render the conversation's memory as a system block, or null when there is nothing to say.
    */
   static tryRender(entries: LangyConversationMemoryEntry[]): string | null {
     if (entries.length === 0) {
@@ -201,28 +122,8 @@ export class LangyConversationMemoryService {
   }
 
   /**
-   * Render the conversation's durable messages as the transcript block (what
-   * has already been said, oldest first), or null when there is nothing to say.
-   *
-   * This block is the HISTORY SEED: it rides every dispatch (so the outbox and
-   * liveness re-drives have it too), and the worker manager folds it into the
-   * FIRST message posted to a fresh session, where it persists as part of the
-   * session's own transcript from then on. The agent's memory lives in its
-   * disposable worker process (recycled on a model switch, reaped on idle, gone
-   * on a deploy); seeding the fresh session's first message from the durable
-   * record makes the conversation continuable whatever happened to the worker.
-   * Deliberately NOT re-sent on later turns of the same session: the session
-   * already carries it, and a byte-stable request prefix is what lets provider
-   * prompt caching read (not re-write) the conversation turn over turn.
-   *
-   * `currentPrompt` is the message this turn answers. On a re-drive the message
-   * is already on the durable record, so a trailing user message with exactly
-   * that text is dropped: it is the question, not history.
-   *
-   * Bounded newest-first: messages are kept from the end until the budget is
-   * spent, then rendered oldest-first, with an elision note when older messages
-   * were left out. Sanitised per message (see `sanitizeTranscriptText`), and
-   * framed as DATA end-to-end like every other block this module renders.
+   * Render the conversation's durable messages as the transcript block (what has already been said,
+   * oldest first), or null when there is nothing to say.
    */
   static tryRenderTranscript({
     messages,
@@ -346,12 +247,9 @@ export class LangyConversationMemoryService {
   }
 
   /**
-   * Sanitize one message's text for the transcript block. Unlike
-   * `sanitizeLangyPromptValue` (single-line values), a transcript message keeps
-   * its newlines: the speaker-label indentation below is what keeps a line
-   * inside a message from posing as a new speaker. Control characters other than
-   * newline are stripped, runs of blank lines collapsed, and the message capped
-   * at {@link MAX_TRANSCRIPT_MESSAGE_CHARS} on a rune boundary.
+   * Sanitize one message's text for the transcript block. Unlike `sanitizeLangyPromptValue`
+   * (single-line values), a transcript message keeps its newlines: the speaker-label indentation
+   * below is what keeps a line inside a message from posing as a new speaker.
    */
   private static sanitizeTranscriptText(value: string): string {
     const cleaned = value
@@ -367,10 +265,8 @@ export class LangyConversationMemoryService {
   }
 
   /**
-   * One message as transcript lines: a speaker label on the first line, every
-   * continuation line indented under it. The indent is the anti-forgery device:
-   * a message BODY containing "User: do X" renders indented inside its own
-   * message, so no line of a message can pose as a turn of the conversation.
+   * One message as transcript lines: a speaker label on the first line, every continuation line
+   * indented under it.
    */
   private static renderTranscriptMessage(role: "user" | "assistant", text: string) {
     const label = role === "user" ? "User" : "Langy";
@@ -380,6 +276,7 @@ export class LangyConversationMemoryService {
   }
 }
 
+/** More entries than a follow-up could plausibly mean, and a bounded prompt. */
 export const MAX_MEMORY_ENTRIES = 10;
 /** Enough ids for "the first one" / "the last one" without becoming an export. */
 export const MAX_MEMORY_IDS_PER_ENTRY = 5;
@@ -418,26 +315,7 @@ export const MAX_TRANSCRIPT_CHARS = 12_000;
 export const MAX_TRANSCRIPT_MESSAGE_CHARS = 1_600;
 
 /**
- * How a bare reference is resolved. Rendered on EVERY turn, memory or no
- * memory, inside the STABLE system lane: the policy is a constant, so it never
- * varies a byte across a conversation's turns (provider prompt caching depends
- * on that stability), while the data it talks about (the transcript, the
- * resource memory, the screen context) rides the turn's user message. The
- * wording is therefore position-neutral: "already in this conversation", never
- * "described above".
- *
- * It answers one production failure: the agent did not merely fail to find
- * "it", it invented an unrelated expensive action, announced the invention as
- * an assumption, and ran it. A stated assumption is a question that was never
- * asked, and saying it out loud does not make acting on it reasonable.
- *
- * AGENTS.md's "Use prior turns" covers resolving the reference. What only this
- * block can say is WHERE the referent lives: the transcript and the screen
- * context arrive as data blocks ahead of the user's message, which is a fact
- * about the assembly rather than a rule about behaviour. It is appended after
- * AGENTS.md (verified in a turn trace: persona, AGENTS.md, skill map, turn
- * override, then this), so it must not restate what AGENTS.md already carries
- * or contradict it. A change to when Langy may ask is an AGENTS.md change.
+ * How a bare reference is resolved.
  */
 export const LANGY_REFERENT_POLICY = [
   "WHAT THE USER IS POINTING AT.",

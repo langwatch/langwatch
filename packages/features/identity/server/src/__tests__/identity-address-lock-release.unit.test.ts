@@ -2,11 +2,9 @@ import { describe, expect, it } from "vitest";
 import { InMemoryReservations } from "./support/in-memory-reservations";
 
 /**
+ * `releaseAddressLocks` (prisma.identity-projection.repository.ts) calls exactly this: a user's
+ * claim survives while a live identifier of theirs still carries the value,
  * The address lock's release half (ADR-116 §6). The fold's
- * `releaseAddressLocks` (prisma.identity-projection.repository.ts) calls
- * exactly this: a user's claim survives while a live identifier of theirs
- * still carries the value, and unlinking is what stops that — the holding
- * set it passes no longer names the unlinked identifier.
  */
 describe("IdentityReservationRepository.release", () => {
   describe("given a finalized user holding a verified secondary address", () => {

@@ -1,9 +1,6 @@
 /**
- * What an agent test run needs before its child starts: the project's key,
- * the agent's adapter data and the fixed scenario. No scenario row is read
- * and no model is resolved, because the conversation is written down and the
- * script decides the verdict.
- *
+ * What an agent test run needs before its child starts: the project's key, the agent's adapter data
+ * and the fixed scenario.
  * @see specs/agents/agent-test-run.feature
  */
 

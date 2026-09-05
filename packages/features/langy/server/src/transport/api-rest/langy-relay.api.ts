@@ -1,23 +1,6 @@
 /**
- * Langy relay — the worker's INBOUND authenticated frame stream
- * (implemented by the package-owned relay service). Mounted at
- * `/api/internal/langy/relay`,
- * protected by the shared `LANGY_INTERNAL_SECRET` (so only the worker can push),
- * with per-frame HMAC + frameNonce dedup layered INSIDE that trusted channel.
- *
- * The worker holds one streaming connection per turn and pushes ndjson frames;
- * this handler decodes them line by line and drives a `LangyTurnRelay`, which
- * fans each verified frame to the live Redis Stream buffer and — for named
- * (tool) and terminal (final/error) frames — the durable event log. It is the
- * successor to `runTurn`'s streaming role; the worker no longer holds the /chat
- * response open, and any web instance can serve the connection (all state —
- * runToken, the turn, the dedup set, the stream — is in Redis).
- *
- * On instance death the worker reconnects and re-pushes from the stream's last
- * id; redelivered frames are dropped by the dedup set. Never expose publicly —
- * the Helm chart
- * blocks `/api/internal` at the ingress by default, and in-cluster callers reach
- * the app through its internal Service rather than the ingress.
+ * Langy relay — the worker's INBOUND authenticated frame stream (implemented by the package-owned
+ * relay service).
  */
 
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
@@ -42,10 +25,9 @@ export type LangyRelayRestPorts = Readonly<{
   /** The SAME application every other Langy door reads. */
   langy: () => LangyApp;
   /**
-   * Whether this process holds the Redis the live edge lives in.
-   *
-   * The relay refuses rather than degrades: no Redis is no live buffer and no
-   * dedup set, so a frame accepted here would be a frame silently dropped.
+   * Whether this process holds the Redis the live edge lives in. The relay refuses rather than
+   * degrades: no Redis is no live buffer and no dedup set, so a frame accepted here would be a
+   * frame silently dropped.
    */
   hasLiveBuffer: () => boolean;
   /** The shared bearer this surface is gated on, or none. */

@@ -14,12 +14,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PrismaJoinRequestProjectionRepository } from "./prisma.join-request-projection.repository";
 
 /**
- * What the join-request guards and the matcher read, out of Postgres (D12).
- *
- * The whole file answers in counts and flags. No member of any organization
- * is ever named to make a join decision, and no query here returns an email
- * address — which is what keeps the lookup from becoming a directory of who
- * works where even by accident.
+ * What the join-request guards and the matcher read, out of Postgres (D12). The whole file answers
+ * in counts and flags.
  */
 
 /** The identifier states that count as PROOF. ATTACHED is a typed-in address
@@ -101,18 +97,6 @@ export class PrismaJoinRequestReadRepository implements JoinRequestListReadRepos
 
 /**
  * Which organizations a domain could reach, as the matcher needs to see them.
- *
- * Four reads, deliberately separate rather than one clever join: who holds a
- * verified address on the domain, which organizations those people are in,
- * how big those organizations are, and whether an identity provider already
- * admits the domain. Each is an index seek, and each is legible on its own —
- * a matching rule nobody can read is a matching rule nobody can audit.
- *
- * There is no fifth read asking whether an organization is "personal". This
- * schema has no such thing: `Team.isPersonal` marks a per-member workspace
- * INSIDE an organization, and every organization the product creates gets a
- * shared team, so any predicate built on it would be permanently false. See
- * `join-matching.ts` for what holds the privacy instead.
  */
 export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
   static create(prisma: PrismaClient): PrismaJoinCandidateRepository {
@@ -232,10 +216,9 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
   }
 
   /**
-   * A stored setting back into the vocabulary. An unrecognised value reads as
-   * the default rather than throwing: a column somebody hand-edited must not be
-   * able to take an organization's members' sign-in down, and `request` is the
-   * setting that needs an admin's approval anyway.
+   * A stored setting back into the vocabulary. An unrecognised value reads as the default rather
+   * than throwing: a column somebody hand-edited must not be able to take an organization's
+   * members' sign-in down, and `request` is the setting that needs an admin's approval anyway.
    */
   static readDomainJoin(stored: string): DomainJoinSetting {
     return (DOMAIN_JOIN_SETTINGS as readonly string[]).includes(stored)

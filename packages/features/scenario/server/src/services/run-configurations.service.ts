@@ -33,11 +33,8 @@ function defaultConfigurationWindowStart(now = Date.now()): number {
 }
 
 /**
- * What a configuration covers, with the hand-picked list inside the rule.
- *
- * The stored scope names no scenarios, because a plan keeps its hand-picked list
- * in its own `scenarioIds` column. The dialog needs the list inside the rule,
- * so two hand-picked scopes over different scenarios read as two scopes.
+ * What a configuration covers, with the hand-picked list inside the rule. The stored scope names no
+ * scenarios, because a plan keeps its hand-picked list in its own `scenarioIds` column.
  */
 export type RunConfigurationScope =
   | { mode: "all" }
@@ -69,10 +66,9 @@ export interface RunConfigurationEntry {
   /** The parameter values this configuration ran with. */
   runParameters: RunParameterValues;
   /**
-   * Whether a run of this configuration carried a note.
-   *
-   * A run plan that takes a note takes one every run, and the text changes
-   * every run, so the fact is worth remembering and the text is not.
+   * Whether a run of this configuration carried a note. A run plan that takes a note takes one
+   * every run, and the text changes every run, so the fact is worth remembering and the text is
+   * not.
    */
   usesNote: boolean;
   /** When the newest run of this configuration started. */
@@ -80,20 +76,8 @@ export interface RunConfigurationEntry {
 }
 
 /**
- * The configurations a project's run plans already ran with.
- *
- * The run dialog's Run name dropdown reads this. It cannot read the plan rows
- * instead: a plan row holds the configuration of its LAST run only, while
- * configuration identity is wider than plan identity, so one plan run twice
- * with different parameters is two entries that both have to be offered.
- *
- * Two stores meet here and each answers what only it knows. ClickHouse holds
- * what each run was asked to do: its targets, its models, its parameters, and
- * the repeat count its batch was started with. Postgres holds what the plan
- * covers and what it is called. A run row carries no scope, so the scope of an
- * entry is the plan's current one, which is what the plan-row read already
- * offered.
- *
+ * The configurations a project's run plans already ran with. The run dialog's Run name dropdown
+ * reads this.
  * @see specs/features/agent-testing/run-configuration-history.feature
  */
 export class RunConfigurationsService {
@@ -110,15 +94,7 @@ export class RunConfigurationsService {
   ) {}
 
   /**
-   * Every configuration of the project, newest first, one entry per
-   * configuration.
-   *
-   * The whole project rather than one scope: the dialog already filters by
-   * scope key, and the scopes a plan covers live on the plan row, so cutting
-   * by scope here would mean resolving every plan's scope before the query
-   * instead of after it, for a list the caller filters anyway.
-   *
-   * An empty list is the ordinary state of a project whose plans never ran.
+   * Every configuration of the project, newest first, one entry per configuration.
    */
   async getEntries({
     projectId,
@@ -158,11 +134,9 @@ export class RunConfigurationsService {
   }
 
   /**
-   * The plans that may own a configuration, keyed by the set id their runs
-   * carry.
-   *
-   * Archived plans are left out, which is also what keeps their runs out of
-   * the query: the set ids read here are the set filter the query runs under.
+   * The plans that may own a configuration, keyed by the set id their runs carry. Archived plans
+   * are left out, which is also what keeps their runs out of the query: the set ids read here are
+   * the set filter the query runs under.
    */
   private async readPlans(projectId: string): Promise<Map<string, ScenarioPlanRecord>> {
     const plans = await this.scenarios.findPlans({ projectId });
@@ -172,10 +146,9 @@ export class RunConfigurationsService {
 }
 
 /**
- * What a plan covers, with the hand-picked list inside the rule.
- *
- * A test suite is only a grouping, so its scope is itself. Every other plan
- * carries its rule, and a hand-picked one carries its stored list.
+ * What a plan covers, with the hand-picked list inside the rule. A test suite is only a grouping,
+ * so its scope is itself. Every other plan carries its rule, and a hand-picked one carries its
+ * stored list.
  */
 function scopeOf(plan: ScenarioPlanRecord): RunConfigurationScope {
   if (plan.kind === "test_suite") {
@@ -229,15 +202,8 @@ interface PlanTargets {
 }
 
 /**
- * A recorded `<type>:<targetKey>` pair and its overrides, as the target the
- * dialog reopens.
- *
- * The identity comes from the run: its reference id, and the overrides it
- * ran with. The plan row's target contributes only what the run row never
- * held, the prompt bindings and the secret parameter names, matched by key
- * and then by reference. Neither takes part in the configuration key, so
- * this cannot change which configurations are listed; without it a picked
- * prompt target would come back with its bindings lost.
+ * A recorded `<type>:<targetKey>` pair and its overrides, as the target the dialog reopens. The
+ * identity comes from the run: its reference id, and the overrides it ran with.
  */
 function toTarget({
   pair,
@@ -280,12 +246,9 @@ function toTarget({
 }
 
 /**
- * The run-level values a run recorded.
- *
- * The stored parameters are the merged set the first scenario run resolved,
- * which includes the overrides of the target that run went against. Those
- * belong to the target, so they are taken back out; what is left is what was
- * set for the run as a whole.
+ * The run-level values a run recorded. The stored parameters are the merged set the first scenario
+ * run resolved, which includes the overrides of the target that run went against. Those belong to
+ * the target, so they are taken back out; what is left is what was set for the run as a whole.
  */
 function runLevelParameters(row: RawRunConfigurationRow): RunParameterValues {
   const merged = parseRunParametersJson(row.Parameters);
@@ -347,12 +310,9 @@ function toEntry({
 }
 
 /**
- * One entry per key, keeping the newest, newest first.
- *
- * The database already folds most of this. It cannot fold all of it: the key
- * sorts the targets and the parameter names, and it folds in the plan's scope,
- * none of which the grouping in SQL can see. So two rows that differ only in
- * the order their parameters were written land on one entry here.
+ * One entry per key, keeping the newest, newest first. The database already folds most of this. It
+ * cannot fold all of it: the key sorts the targets and the parameter names, and it folds in the
+ * plan's scope, none of which the grouping in SQL can see.
  */
 function collapse(entries: RunConfigurationEntry[]): RunConfigurationEntry[] {
   const newestByKey = new Map<string, RunConfigurationEntry>();

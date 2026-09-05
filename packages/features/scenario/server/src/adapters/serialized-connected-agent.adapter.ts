@@ -1,12 +1,7 @@
 /**
- * Serialized connected agent adapter for scenario worker execution.
- *
- * The child process has no Redis and no database, so it reaches a connected
- * agent the way every other caller does: one POST per turn to the relay
- * route with the project key. The adapter sends the thread's held `session`
- * on every turn and keeps what the agent returned, adopts the turn's trace
- * context so the judge can read the agent's own spans, and turns the relay's
- * handled errors into typed errors the failure classifier names.
+ * Serialized connected agent adapter for scenario worker execution. The child process has no Redis
+ * and no database, so it reaches a connected agent the way every other caller does: one POST per
+ * turn to the relay route with the project key.
  */
 
 import type { Logger } from "@langwatch/observability";
@@ -233,14 +228,9 @@ export class SerializedConnectedAgentAdapter extends SerializedAgentAdapter {
 }
 
 /**
- * The handled code the relay named, from whichever field of its body carries
- * it.
- *
- * The REST boundary writes `code` and repeats it under `error` on the routes
- * that answer the older envelope, where `error` is the status text instead
- * (`Service Unavailable`). A refusal from the authentication chain nests the
- * whole thing under `error`. The code is what the failure classifier names
- * the run by, so reading the status text as the code loses the name.
+ * The handled code the relay named, from whichever field of its body carries it. The REST boundary
+ * writes `code` and repeats it under `error` on the routes that answer the older envelope, where
+ * `error` is the status text instead (`Service Unavailable`).
  */
 function codeOf({
   parsed,

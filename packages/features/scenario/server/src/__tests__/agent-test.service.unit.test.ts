@@ -1,9 +1,6 @@
 /**
+ * "Test agent": one turn sent through the same adapter a simulation turn uses,
  * @vitest-environment node
- *
- * "Test agent": one turn sent through the same adapter a simulation turn
- * uses, and one scripted run queued with nothing saved.
- *
  * @see specs/agents/agent-test-run.feature
  */
 import {

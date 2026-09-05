@@ -34,19 +34,9 @@ import {
 import { z } from "zod";
 
 /**
- * The identity pipeline's wire schemas: the framework envelope (id,
- * aggregate, tenant, cursor time) over the payloads `@langwatch/identity-contract`
- * declares. What a fact SAYS is the contract's; how it travels the event log
- * is the framework's, and this file is where the two meet.
- *
- * Time lives on the envelope: `occurredAt` is business time (a backfilled
- * identifier carries the legacy row's `createdAt`), `createdAt` is
- * ledger-accepted time.
- *
- * Defined here, beside the fold that is their one collector, rather than in
- * the pipeline definition adapter: that file builds the pipeline FROM this
- * projection, so a schema defined there and imported back here would be an
- * import cycle two ES modules cannot resolve at evaluation time.
+ * The identity pipeline's wire schemas: the framework envelope (id, aggregate, tenant, cursor time)
+ * over the payloads `@langwatch/identity-contract` declares. What a fact SAYS is the contract's;
+ * how it travels the event log is the framework's, and this file is where the two meet.
  */
 
 export const identifierAttachedEventSchema = EventSchema.extend({
@@ -123,15 +113,9 @@ export type IdentityFoldState = IdentityHeads & {
 };
 
 /**
+ * state per user,
  * The identity pipeline's operational projection (ADR-101 §3): one Postgres
- * state per user, applied through `.withProjection()`'s direct
- * load/apply/store cycle under the queue's per-user lock. The store writes
- * `Identifier` rows plus the cursor — a pure event-truth head, whole-row
  * replay semantics, ADR-022/015 unamended.
- *
- * Every handler is the same move: validate the wire event and hand it to
- * `@langwatch/identity`'s reducer — live dispatch, the queue's fold and the
- * replay proof run the identical function.
  */
 export class IdentityStateFoldProjection
   extends AbstractFoldProjection<
@@ -216,11 +200,8 @@ export class IdentityStateFoldProjection
   }
 
   /**
-   * Folded like every other fact, and the reducer leaves the heads alone: a
-   * proposal states that no identifier was attached. It runs through the same
-   * path anyway so the projection's cursor advances past it — a fact the fold
-   * skipped would leave the read-your-writes wait watching for a cursor that
-   * never moves.
+   * Folded like every other fact, and the reducer leaves the heads alone: a proposal states that no
+   * identifier was attached.
    */
   handleIdentityLinkProposed(
     event: LinkProposedEvent,
@@ -232,17 +213,7 @@ export class IdentityStateFoldProjection
   /**
    * The ONE place an identity fact becomes a framework event: the guards
    * (`IdentityGuards`) decide what a command states, and this stamps the
-   * envelope from the command that produced it — the aggregate type the store
-   * validates (#7406), the user as aggregate and tenant, the command's
-   * business time, and the `commandId:index` idempotency key. Both the
-   * pipeline's command handlers (the staged re-run) and the app's ledger
-   * writer (the calling path) go through here, so the two legs cannot stamp a
-   * fact differently.
-   *
-   * Defined here, beside the fold and the schemas it stamps, rather than in
-   * the pipeline definition adapter: the intents that call this ARE inputs to
-   * that adapter's pipeline builder, so an import back the other way would be
-   * a cycle.
+   * envelope, so both the staged re-run and the calling path stamp identically.
    */
   static eventsFor({
     command,

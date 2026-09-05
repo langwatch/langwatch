@@ -1,29 +1,7 @@
 /**
+ * The previous version of this suite drove a storage-replacing adapter,
  * The `databaseHooks` seam against the real better-auth library (ADR-116).
- *
- * The previous version of this suite drove a storage-replacing adapter, and
- * is what proved that design impossible: better-auth satisfies its own
- * `join: { account: true }` with a second query issued *below* any wrapper,
  * so a wrapped adapter cannot intercept a model completely. ADR-116 stopped
- * intercepting. `Account` is now a projection of the event log written by
- * the fold, and better-auth reads it with the completely stock adapter.
- *
- * What this suite proves is therefore different, and stronger:
- *
- *  1. **better-auth is unimpeded.** Sign-up, sign-in, the account list and a
- *     password change all work with nothing in front of them — including the
- *     joined read that defeated the adapter.
- *  2. **The facts are stated anyway.** The hooks turn the row writes that
- *     mean something into identity commands, gated per user.
- *
- * Real `betterAuth()`, real handlers, real `IdentityCeremonies`, real
- * `IdentityService` and guards. The ledger folds in memory rather than
- * through ClickHouse and a queue, and better-auth's own `memoryAdapter`
- * stands in for Prisma — the fold's `Account` projection is app-layer, and
- * is covered by `identity-projection.prisma.repository.integration.test.ts`.
- *
- * Hermetic (no database, no network), so it stays in the unit bucket like
- * the app's `resetRecoversOauthUser.test.ts`.
  */
 import type { IdentityCommand } from "@langwatch/identity-contract";
 import type { BetterAuthOptions } from "better-auth";

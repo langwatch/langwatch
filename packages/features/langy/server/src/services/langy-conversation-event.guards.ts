@@ -18,12 +18,8 @@ import type {
 } from "./langy-conversation.events";
 
 /**
- * Which event a `LangyConversationProcessingEvent` actually is.
- *
- * Fourteen narrowings of one union, each a single comparison against the event
- * type constant. Collected on one class so the set is visible as a set: adding
- * an event to the union without a guard here is a gap, and a gap is only
- * obvious when the guards are not scattered across a file as loose exports.
+ * Which event a `LangyConversationProcessingEvent` actually is. Fourteen narrowings of one union,
+ * each a single comparison against the event type constant.
  */
 export class LangyEventGuards {
   static isLangyConversationStartedEvent(

@@ -1,10 +1,6 @@
 /**
+ * The child's own call to a connected agent over the relay route: session echoing per thread,
  * @vitest-environment node
- *
- * The child's own call to a connected agent over the relay route: session
- * echoing per thread, and how a refused call is named by the code the relay
- * wrote rather than by the status text beside it.
- *
  * @see specs/agents/connected-agents.feature
  */
 
@@ -118,7 +114,9 @@ describe("SerializedConnectedAgentAdapter", () => {
       ]);
       const adapter = adapterWith(relay);
 
-      const failure = await adapter.call(turn("thread_a", "hello")).catch((error: unknown) => error);
+      const failure = await adapter
+        .call(turn("thread_a", "hello"))
+        .catch((error: unknown) => error);
 
       expect(failure).toBeInstanceOf(ConnectedAgentCallError);
       const typed = failure as ConnectedAgentCallError;

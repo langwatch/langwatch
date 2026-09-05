@@ -8,15 +8,8 @@ import type { ExecuteRunIntent } from "@langwatch/scenario-server";
 import { resolveWorkerScenarioExecutionPrerequisites } from "../worker-scenario-execution.composition";
 
 /**
+ * THE CONVERSION, asserted where it can actually fail.
  * Spec: specs/scenarios/worker-simulation-pipeline-conversion.feature
- *
- * THE CONVERSION, asserted where it can actually fail. The definition used to
- * arrive from the application; nothing about re-registering it could tell a
- * graph that reaches its own collaborators from one that was handed in. So the
- * assertions below build the real definition and drive registered handlers,
- * observing the effect at the far end: a snapshot on the tenant's own channel,
- * a suite item recorded through Suite's own command, and the execute intent
- * refusing by name rather than dropping a queued run.
  */
 
 const RECORDED: {

@@ -1,14 +1,6 @@
 /**
+ * A turn reaches exactly ONE terminal:
  * @vitest-environment node
- *
- * A turn reaches exactly ONE terminal: `agent_responded` (the answer) or
- * `agent_response_failed` (the liveness sweep gave up). The two commands used
- * to occupy DIFFERENT idempotency slots (`turn-final:` vs `turn-failed:`), so
- * a stale failure racing a completed answer produced BOTH terminals and the
- * failure buried the answer. They now share a `turn-terminal:` slot — the
- * first terminal for a turnId wins, exactly like the tool-call commands'
- * shared `tool-done:` slot.
- *
  * @see specs/langy/langy-turn-recovery.feature
  */
 
@@ -71,12 +63,8 @@ describe("turn terminal commands", () => {
   });
 
   /**
-   * A user stop is the third way into that same slot. It is neither a
-   * completion nor a failure, but it carries an answer, so it rides
+   * A user stop is the third way into that same slot.
    * `agent_responded` with `outcome: "stopped"` (ADR-078) — which means it
-   * competes with the natural finish for the ONE terminal a turn is allowed,
-   * rather than burying it or being buried by it.
-   *
    * @see specs/langy/langy-stop-and-resume.feature
    */
   describe("given a user stop and the turn's natural completion race each other", () => {

@@ -1,22 +1,6 @@
 /**
- * LangyTurnRelay — the control-plane consumer of one worker→relay frame stream
- * the successor to `runTurn`'s streaming
- * role. One instance per pushed connection (one turn). For each authenticated
- * frame it fans out to two places:
- *
- *   • the LIVE edge — the Redis Stream token buffer the browser tails; and
- *   • the DURABLE log — event-sourcing commands for NAMED (tool-call) and
- *     TERMINAL (final / error) frames, so the audit + final answer survive.
- *
- * Ephemeral frames (delta / status / progress / heartbeat / card) only ever
- * touch the live buffer — tokens are never events.
- *
- * Security per frame (the relay owns replay defence; the crypto lives in
- * langyFrameAuth): verify the HMAC against the conversation's server-only
- * runToken, pin the frame to THIS connection's conversation+turn (cross-turn
- * replay dies here), and dedup the frameNonce (intra-turn replay dies here).
- * All state that must survive an instance restart is durable (runToken, the
- * turn, the dedup set); the relay instance itself is stateless beyond a cache.
+ * LangyTurnRelay — the control-plane consumer of one worker→relay frame stream the successor to
+ * `runTurn`'s streaming role. One instance per pushed connection (one turn).
  */
 import {
   type CliResultDigest,
@@ -83,12 +67,8 @@ function navigateResourceIdOf(invocation: LangwatchCommand | null): { resourceId
 }
 
 /**
- * IDs a precise platform link legitimately opens BEYOND its path's primary
- * resource, so `navigate open <id>` resolves for any of them. A scenario-run
- * link opens the run in a drawer (`…?drawer.open=scenarioRunDetail&
- * drawer.scenarioRunId={runId}`) whose digest primaryId is the parent batch,
- * not the run; the run id rides the `drawer.scenarioRunId` query. (The legacy
- * nested form carried it as `openRun` — read both so either resolves.)
+ * IDs a precise platform link legitimately opens BEYOND its path's primary resource, so `navigate
+ * open <id>` resolves for any of them.
  */
 function nestedResourceIds(platformUrl: string): string[] {
   const ids: string[] = [];
@@ -112,12 +92,8 @@ function nestedResourceIds(platformUrl: string): string[] {
 const ITEM_ID_KEYS = ["id", "scenarioRunId", "batchRunId", "runId"] as const;
 
 /**
- * Every `{id, href}` pair a payload's NESTED objects surface — a LIST returns
- * many resources in one call, each carrying its own `platformUrl`. Without
- * this, only the single-resource shape (digest primaryId + top-level link)
- * was remembered, so "list runs" → "open the latest one" resolved nothing and
- * the navigate silently dropped. Depth-capped defensive walk; only precise
- * per-resource links qualify, and only allowlisted id fields key them.
+ * Every `{id, href}` pair a payload's NESTED objects surface — a LIST returns many resources in one
+ * call, each carrying its own `platformUrl`.
  */
 function collectItemPlatformLinks(payload: unknown): Array<{ id: string; href: string }> {
   const links = new Map<string, string>();
@@ -255,19 +231,8 @@ export interface LangyTurnRelayDeps {
     frameNonce: string;
   }): Promise<boolean>;
   /**
-   * Read the runToken the worker was handed at dispatch, straight from the
-   * synchronous per-turn Redis handoff. This is the EXACT token the manager
-   * signs its frames with, written before dispatch — so a first frame that
-   * outruns the async `RunToken` projection is authenticated instead of dropped
-   * as `no-run-token`. Returns null when no handoff exists (aged out past its
-   * TTL, or a legacy conversation with no token).
-   *
-   * `projectId` is REQUIRED, not decorative: the handoff key is
-   * conversation+turn scoped, but conversation identity is project-scoped
-   * (`@@unique([projectId, ConversationId])`), so the implementation must refuse
-   * a handoff stashed under a different project rather than hand this stream
-   * another tenant's runToken. Optional dep so unit tests can exercise the
-   * projection fallback in isolation.
+   * Read the runToken the worker was handed at dispatch, straight from the synchronous per-turn
+   * Redis handoff.
    */
   readHandoffRunToken?(a: {
     projectId: string;
@@ -275,31 +240,19 @@ export interface LangyTurnRelayDeps {
     turnId: string;
   }): Promise<string | null>;
   /**
-   * Extend the turn's handoff by another full TTL.
-   *
-   * The handoff TTL is written once when the turn is dispatched, and the
-   * heartbeat below is the only ongoing proof that the worker is alive. Without
-   * this, a turn running longer than the handoff TTL lost the record it would
-   * be revived from while it was still working.
-   *
-   * No `projectId`, unlike `readHandoffRunToken`: that one runs BEFORE the MAC
-   * check and so cannot trust the conversation id it was handed, while this one
-   * runs after it, on a triple the signature has already proven. Optional dep so
-   * unit tests and non-relaying consumers stay thin.
+   * Extend the turn's handoff by another full TTL. The handoff TTL is written once when the turn is
+   * dispatched, and the heartbeat below is the only ongoing proof that the worker is alive.
    */
   refreshHandoffTtl?(a: { conversationId: string; turnId: string }): Promise<void>;
   /**
-   * Per-conversation memory of "which platform address did a lookup surface for
-   * resource X". A `navigate` instruction resolves its destination from here.
-   * Conversation-scoped (not this relay instance) so a resource looked up in one
-   * turn resolves a navigate in a LATER turn — the relay itself is per-turn.
+   * Per-conversation memory of "which platform address did a lookup surface for resource X". A
+   * `navigate` instruction resolves its destination from here.
    */
   resourceLinks: LangyResourceLinkStore;
   /**
-   * Verified server-side fallback when the link store misses: the platform
-   * looks the id up with the PROJECT's own access and computes the address
-   * itself (see langyNavigateFallback). Null = not resolvable here → the
-   * navigate drops. Optional so tests and non-navigating consumers stay thin.
+   * Verified server-side fallback when the link store misses: the platform looks the id up with the
+   * PROJECT's own access and computes the address itself (see langyNavigateFallback). Null = not
+   * resolvable here → the navigate drops. Optional so tests and non-navigating consumers stay thin.
    */
   resolveResourceUrl?: (a: { projectId: string; resourceId: string }) => Promise<string | null>;
   logger?: {
@@ -339,10 +292,9 @@ export class LangyTurnRelay {
   } | null = null;
 
   /**
-   * The project+conversation+turn this connection authenticated and pinned
-   * to, or null before the first verified frame. Read by the relay route for
-   * its end-of-stream summary — the ids here are MAC-verified, unlike the
-   * claimed ids on a rejection.
+   * The project+conversation+turn this connection authenticated and pinned to, or null before the
+   * first verified frame. Read by the relay route for its end-of-stream summary — the ids here are
+   * MAC-verified, unlike the claimed ids on a rejection.
    */
   get pinnedTurn(): {
     projectId: string;
@@ -352,10 +304,9 @@ export class LangyTurnRelay {
     return this.pinned;
   }
   /**
-   * Re-types a `bash("langwatch …")` tool frame as the capability it invoked —
-   * BEFORE anything is recorded, so the live buffer, the durable milestone
-   * events and every consumer downstream see `langwatch.<resource>.<verb>`
-   * with the reduced output and its digest, never "the agent ran bash".
+   * Re-types a `bash("langwatch …")` tool frame as the capability it invoked
+   * — BEFORE anything is recorded, so every consumer downstream sees
+   * `langwatch.<resource>.<verb>`, never "the agent ran bash".
    */
   private readonly cliEnvelope = LangyCliEnvelopeService.create();
 
@@ -541,12 +492,11 @@ export class LangyTurnRelay {
       };
       return true;
     }
-    // projectId is pinned too: the runToken is cached after frame 1 while
-    // apply() reads projectId off each envelope, so without this a caller
-    // holding a valid token could switch projectId on later frames and sign
-    // them with the token they already have — writing this conversation's
-    // frames under another tenant's id. Signing projectId only means
-    // something if every frame is held to the pinned value.
+    // projectId is pinned too: the runToken is cached after frame 1 while apply() reads projectId
+    // off each envelope, so without this a caller holding a valid token could switch projectId on
+    // later frames and sign them with the token they already have — writing this conversation's
+    // frames under another tenant's id. Signing projectId only means something if every frame is
+    // held to the pinned value.
     return (
       this.pinned.projectId === envelope.projectId &&
       this.pinned.conversationId === envelope.conversationId &&
@@ -648,13 +598,11 @@ export class LangyTurnRelay {
           return this.applyNavigateTool(projectId, at, frame, invocation);
         }
 
-        // The model sometimes CHAINS the navigate onto its lookup
-        // (`…get X --format json && langwatch navigate open X`). The chained
-        // call keeps its normal life — card, durable record; the other
-        // segments are real work — but each navigate segment still fires:
-        // the id comes from the command string and the address only ever
-        // from the link store, so compound stdout changes nothing here.
-        // (Remembering stays sole-invocation-gated — stdout provenance.)
+        // The model sometimes CHAINS the navigate onto its lookup (`…get X --format json &&
+        // langwatch navigate open X`). The chained call keeps its normal life — card, durable
+        // record; the other segments are real work — but each navigate segment still fires: the id
+        // comes from the command string and the address only ever from the link store, so compound
+        // stdout changes nothing here.
         if (frame.phase === "end" && !frame.isError) {
           for (const chained of this.chainedNavigateInvocationsOf(frame)) {
             await this.applyNavigateTool(projectId, at, frame, chained);
@@ -664,13 +612,11 @@ export class LangyTurnRelay {
       }
 
       case "final": {
-        // The one terminal that means the turn finished. Stop and handoff also
-        // end the stream, and neither may claim the turn wrote no reply.
-        //
-        // The durable message is built from the frame, the live stream from the
-        // deltas, so this is the one place that sees both. Whether the backstop
-        // fired decides both, or the fallback would show live and the turn
-        // would render blank again the moment history reloads.
+        // The one terminal that means the turn finished. Stop and handoff also end the stream, and
+        // neither may claim the turn wrote no reply. The durable message is built from the frame,
+        // the live stream from the deltas, so this is the one place that sees both. Whether the
+        // backstop fired decides both, or the fallback would show live and the turn would render
+        // blank again the moment history reloads.
         const { backstopped } = await this.deps.buffer.markEnd({
           ...at,
           backstopSilentTurn: (frame.text ?? "").trim() === "",
@@ -691,15 +637,10 @@ export class LangyTurnRelay {
       }
 
       case "error": {
-        // The LIVE edge must carry the SAME classified, serialized domain error
-        // the durable path records — not the raw frame message. The browser reads
-        // the error off the stream as a JSON domain error (readLangyStreamError);
-        // a raw string parses as null and collapses every named failure into the
-        // generic "Something went wrong". Classify by the typed herr envelope
-        // when the frame carries one (the full cause chain — e.g. the gateway's
-        // no_provider_configured riding as a reason — persists into LastError),
-        // falling back to the vetted `code` (never the prose), the same mapping
-        // ingestAgentTurnResult applies to the fold.
+        // The LIVE edge must carry the SAME classified, serialized domain error the durable path
+        // records — not the raw frame message. The browser reads the error off the stream as a JSON
+        // domain error (readLangyStreamError); a raw string parses as null and collapses every
+        // named failure into the generic "Something went wrong".
         const classified = LangyTurnErrors.fromErrorFrame({
           code: frame.code ?? frame.error,
           ...(frame.herr !== undefined ? { cause: frame.herr } : {}),
@@ -757,16 +698,8 @@ export class LangyTurnRelay {
       },
     });
 
-    // Remember this resource's platform link — the ONLY thing a later
-    // `navigate` instruction may resolve an address from. Only from a
-    // settled, successful call (so a resource the viewer's own access could
-    // not reach never lands here); only when the call was a SOLE plain
-    // `langwatch` invocation, so its stdout is provably the CLI's own output
-    // and not something the agent chained in (`langwatch trace get x; echo
-    // '{…forged…}'` must never seed a navigation target); and only when the
-    // link addresses this ONE resource rather than degrading to a surface's
-    // bare index (a scenario run whose set could not be resolved, say) — an
-    // index must never be cached as if it were the resource's own address.
+    // Remember this resource's platform link — the ONLY thing a later `navigate` instruction may
+    // resolve an address from.
     if (frame.phase === "end" && !call.isError) {
       const command = this.cliEnvelope.tryShellCommandOf({
         id: frame.id,
@@ -832,12 +765,7 @@ export class LangyTurnRelay {
   }
 
   /**
-   * Cache a settled call's platform link under the conversation, keyed by the
-   * resource it named. Also keys it by any nested resource the URL addresses —
-   * a scenario-run link is `…/{batch}?openRun={runId}` whose `digest.primaryId`
-   * is the BATCH, but the user opens the RUN; without the extra key
-   * `navigate open <runId>` would miss the link that is literally its own
-   * address. Every id the link legitimately opens is a valid navigate target.
+   * Cache a settled call's platform link under the conversation, keyed by the resource it named.
    */
   private async rememberResourceLink(
     at: { conversationId: string; turnId: string },
@@ -869,11 +797,8 @@ export class LangyTurnRelay {
   }
 
   /**
-   * Whether a tool frame is the dedicated `langwatch navigate open
-   * <resourceId>` call, and — if so — the resource id it named. Read straight
-   * off the parsed shell command, independent of whether the call itself
-   * settled successfully: the agent's ONLY input here is which resource, never
-   * an address, so there is nothing else to extract.
+   * Whether a tool frame is the dedicated `langwatch navigate open <resourceId>` call, and — if so
+   * — the resource id it named.
    */
   private shellCommandOfFrame(frame: Extract<LangyRelayFrame, { type: "tool" }>): string | null {
     return this.cliEnvelope.tryShellCommandOf({
@@ -913,12 +838,8 @@ export class LangyTurnRelay {
   }
 
   /**
-   * Resolve a navigate instruction and push it to the live edge — NEVER to the
-   * durable log (see `LangyStreamEntry`'s `navigate` variant). Invisible on
-   * both counts when it can't resolve: no tool card (the agent naming a
-   * resource to open is not a lookup worth its own card) and no navigation
-   * (an unknown/unresolvable/inaccessible destination silently drops — the
-   * turn is otherwise unaffected).
+   * Resolve a navigate instruction and push it to the live edge — NEVER to the durable log (see
+   * `LangyStreamEntry`'s `navigate` variant).
    */
   private async applyNavigateTool(
     projectId: string,

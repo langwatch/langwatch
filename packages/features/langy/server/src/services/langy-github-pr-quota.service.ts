@@ -1,23 +1,6 @@
 /**
- * Per-user daily cap on PRs Langy may open on the user's behalf. A safety net
- * against runaway loops or compromised sessions burning through a user's
- * GitHub goodwill (and triggering abuse detection). Cheap Redis counter,
- * fails open when Redis is absent so dev stays usable.
- *
- * Counting model: the manager doesn't currently parse worker tool calls, so
- * the natural place to bump the counter is the control-plane side AFTER a
- * chat reply that contains a github.com PR URL. See LangyMessageService.
- *
+ * Per-user daily cap on PRs Langy may open on the user's behalf.
  * Issue #4747. Spec: specs/langy/langy-github-prs.feature.
- */
-/**
- * The counter this quota is spent against.
- *
- * A port rather than the process's Redis handle, because every branch below
- * turns on whether the counter is REACHABLE: with no counter the cap fails
- * open, which is a decision this service makes and a composition root supplies
- * the means for. A deployment with no Redis passes `null` and gets exactly the
- * documented dev behaviour.
  */
 export abstract class LangyGithubPrCounterPort {
   abstract get(key: string): Promise<string | null>;
@@ -35,16 +18,8 @@ export type GithubPrLimitResult = {
   /** When the day-bucket rolls over (epoch ms). */
   resetAt: number;
   /**
-   * True only when a real `INCR` actually committed to Redis under this call.
-   * Read-only `getLangyGithubPrUsage` always returns `false` (no INCR ran).
-   * `reserveLangyGithubPrPermit` returns `true` only on the happy path; the
-   * Redis-down / Redis-blip / over-cap paths return `false` even when the
-   * function fails OPEN on `allowed`. Callers that release reservations
-   * (`releasePermitIfUnused`) MUST gate on `reserved`, not on `allowed`:
-   * gating on `allowed` would DECR a key that was never INCR'd, walking the
-   * shared daily counter into the negative space — the floor at 0 then
-   * refunds N free permits to whoever calls reserve next. Sergio caught
-   * this as the P2 erosion-via-blip path on 2026-06-30.
+   * True only when a real `INCR` actually committed to Redis under this call. Read-only
+   * `getLangyGithubPrUsage` always returns `false` (no INCR ran).
    */
   reserved: boolean;
 };
@@ -117,14 +92,9 @@ export class LangyGithubPrQuotaService {
   }
 
   /**
-   * Increment the counter for one PR. Returns the post-increment usage so the
-   * caller can decide whether to soft-warn the user when they're close to the
-   * cap.
-   *
-   * Bumped AFTER a PR is observed in the assistant reply (see
-   * LangyMessageService onAssistantReply). At-most-once is preferable to
-   * at-least-once here — undercounting briefly is better than blocking a
-   * legitimate user because we double-counted a retried message.
+   * Increment the counter for one PR. Returns the post-increment usage so the caller can decide
+   * whether to soft-warn the user when they're close to the cap. Bumped AFTER a PR is observed in
+   * the assistant reply (see LangyMessageService onAssistantReply).
    */
   async record({
     userId,
@@ -171,13 +141,8 @@ export class LangyGithubPrQuotaService {
   }
 
   /**
-   * Apply EXTRA increments (beyond the up-front reservation) when a single
-   * chat turn opens more PRs than the one permit we held. Lets the daily
-   * counter reflect what actually happened on the wire instead of "one bump
-   * per turn regardless of PR count" — the previous shape let an injected
-   * worker open hundreds of PRs against a single permit. Best-effort: a
-   * Redis blip means the counter is briefly under-counted, but the next call
-   * will re-tally on top of whatever made it through.
+   * Apply EXTRA increments (beyond the up-front reservation) when a single chat turn opens more PRs
+   * than the one permit we held.
    */
   async recordExtra({ userId, extra }: { userId: string; extra: number }): Promise<void> {
     const connection = this.counter;
@@ -199,20 +164,7 @@ export class LangyGithubPrQuotaService {
   }
 
   /**
-   * Atomically reserve a per-turn PR permit BEFORE handing the worker the
-   * GitHub token. Replaces the prompt-only cap: the previous behaviour added
-   * a system note asking the model not to use the token, which is not an
-   * authorisation boundary — the worker could ignore it, and N concurrent
-   * requests could all observe `allowed=true` and all exceed the cap. Here
-   * the permit is granted by INCR (atomic across replicas); a permit that
-   * pushes the post-count past `limit` is immediately revoked via DECR and
-   * `allowed: false` is returned, so the caller can strip the token from the
-   * worker's credentials entirely.
-   *
-   * A permit reserved here that never produces an actual PR (the turn was
-   * read-only, or the worker crashed pre-push) should be released via
-   * `releasePermit` once the chat ends so the user isn't
-   * silently penalised for asking questions.
+   * Atomically reserve a per-turn PR permit BEFORE handing the worker the GitHub token.
    */
   async reservePermit({
     userId,
@@ -236,15 +188,11 @@ export class LangyGithubPrQuotaService {
 
     const bucket = dayBucket();
     const key = `langy:gh:prs:${userId}:${bucket}`;
-    // Track each step's outcome explicitly so a Redis blip MID-flow doesn't
-    // collapse two different states into the same fail-open shape. The N1/N2
-    // adversarial findings (goated-review round 4): the previous catch-all
-    // could send back `allowed: true, reserved: false` even when the count
-    // had ALREADY gone over the limit (DECR throw on over-cap), letting a
-    // 21st request squeak past while the counter stayed inflated. Now the
-    // over-cap path is detected up front; if DECR fails best-effort, the
-    // result is still `allowed: false` because we honour what the kernel
-    // already told us about the count.
+    // Track each step's outcome explicitly so a Redis blip MID-flow doesn't collapse two different
+    // states into the same fail-open shape. The N1/N2 adversarial findings (goated-review round 4):
+    // the previous catch-all could send back `allowed: true, reserved: false` even when the count
+    // had ALREADY gone over the limit (DECR throw on over-cap), letting a 21st request squeak past
+    // while the counter stayed inflated.
     let count: number | null = null;
     try {
       count = await connection.incr(key);
@@ -308,10 +256,9 @@ export class LangyGithubPrQuotaService {
   }
 
   /**
-   * Release a previously-reserved permit (DECR) when the turn ended without
-   * opening any PR. Best-effort: on Redis blip we just drop the call. The
-   * reservation will expire with the bucket TTL anyway; releasing is a
-   * fairness optimisation, not a correctness boundary.
+   * Release a previously-reserved permit (DECR) when the turn ended without opening any PR. Best-
+   * effort: on Redis blip we just drop the call. The reservation will expire with the bucket TTL
+   * anyway; releasing is a fairness optimisation, not a correctness boundary.
    */
   async releasePermit({ userId }: { userId: string }): Promise<void> {
     const connection = this.counter;
@@ -322,12 +269,11 @@ export class LangyGithubPrQuotaService {
     const bucket = dayBucket();
     const key = `langy:gh:prs:${userId}:${bucket}`;
     try {
-      // Floor the decrement at 0. A naked DECR can underflow: if `release` is
-      // called twice for the same reservation (retry path, double-call from a
-      // crashed handler, or any reservation that never INCRed because Redis
-      // was up-then-down), the counter goes negative — and a negative count
-      // < limit means the next 20+ reservations all `allowed: true`. Lua keeps
-      // the check-and-decr atomic.
+      // Floor the decrement at 0. A naked DECR can underflow: if `release` is called twice for the
+      // same reservation (retry path, double-call from a crashed handler, or any reservation that
+      // never INCRed because Redis was up-then-down), the counter goes negative — and a negative
+      // count < limit means the next 20+ reservations all `allowed: true`. Lua keeps the check-and-
+      // decr atomic.
       const conn = connection as LangyGithubPrCounterPort & {
         eval?: (
           script: string,

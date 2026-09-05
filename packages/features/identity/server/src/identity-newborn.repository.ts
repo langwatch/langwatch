@@ -1,9 +1,7 @@
 /**
- * The row writes the born-finalized entrance performs, and the sweep that
+ * The row writes the born-finalized entrance performs, and the sweep that The entrance and the
+ * reconciliation sweep hold this;
  * cleans up after the ones that never happened (ADR-116 §3).
- *
- * The entrance and the reconciliation sweep hold this; the Prisma class in
- * `repositories/prisma` is what a composition root binds to it.
  */
 export interface IdentityNewbornRepository {
   /**

@@ -19,18 +19,8 @@ import type {
 export type PrismaSsoConnectionProjectionDatabase = Pick<PrismaClient, "ssoConnection">;
 
 /**
+ * `SsoConnection` head and its cursor, written under the queue's per-connection lock.
  * The connection pipeline's projection store (D04, ADR-117 §5): the Postgres
- * `SsoConnection` head and its cursor, written under the queue's
- * per-connection lock.
- *
- * One row per aggregate, so the cursor rides on the row itself rather than in
- * a sibling table — and the row is written last-field-wins in one upsert,
- * which makes the whole apply the commit marker. A crash before it leaves
- * nothing; a crash after it is a completed apply.
- *
- * Nothing outside the fold writes here. A hand-edited row is not a
- * configuration change, it is a value the next event or the next replay
- * overwrites — which is exactly why the backoffice goes through commands.
  */
 export class PrismaSsoConnectionProjectionRepository implements StateProjectionStore<SsoConnectionFoldState> {
   static create(

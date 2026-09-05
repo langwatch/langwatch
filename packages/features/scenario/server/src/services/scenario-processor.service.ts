@@ -224,10 +224,8 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
   }
 
   /**
-   * Releases whatever this run is holding.
-   *
-   * A child session deregisters itself as it aborts; without one, the pool is
-   * still holding a registration that nothing else will release.
+   * Releases whatever this run is holding. A child session deregisters itself as it aborts; without
+   * one, the pool is still holding a registration that nothing else will release.
    */
   private async releaseChild({
     childSession,

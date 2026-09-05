@@ -45,11 +45,9 @@ export interface ScenarioChildProcessConfig {
   nodeEnv: string;
   isSaas: boolean;
   /**
-   * The deployment's outbound fence, as the composing process resolved it.
-   *
-   * Required rather than optional: a child with no stated policy refuses the
-   * run, and a field that could be left out here is how that refusal would
-   * turn back into a silently permissive default.
+   * The deployment's outbound fence, as the composing process resolved it. Required rather than
+   * optional: a child with no stated policy refuses the run, and a field that could be left out
+   * here is how that refusal would turn back into a silently permissive default.
    */
   egress: ScenarioEgressPolicy;
   parentEnvironment: ScenarioChildParentEnvironment;

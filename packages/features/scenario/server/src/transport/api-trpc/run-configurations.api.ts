@@ -18,17 +18,9 @@ export function createRunConfigurationsRouter<
 
   return trpc.router({
     /**
-     * Every configuration this project's run plans already ran with, newest
-     * first, one entry per configuration.
-     *
-     * The Run name dropdown reads this and filters it by the scope the dialog
-     * currently holds. It replaces the plan-row read, which could only ever
-     * answer one entry per plan: a plan row holds the configuration of its LAST
-     * run, while two runs of one plan that used different parameters or a
-     * different repeat count are two configurations and both belong in the list.
-     *
-     * `startDate` widens the window past the default. An empty list is the
-     * ordinary state of a project whose plans never ran.
+     * Every configuration this project's run plans already ran with, newest first, one entry per
+     * configuration. The Run name dropdown reads this and filters it by the scope the dialog
+     * currently holds.
      */
     getRunConfigurations: policy("scenarios:view")(
       procedure.input(

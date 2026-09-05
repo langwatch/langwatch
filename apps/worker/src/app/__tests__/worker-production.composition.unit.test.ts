@@ -285,10 +285,7 @@ describe("WorkerProductionComposition", () => {
 
   describe("given the SaaS deployment leaf this process reads for itself", () => {
     /**
-     * The routing keys the checked-in job registry says the cross-pipeline pair
-     * carries. Read rather than restated: `job-registry.json` is the switch's
-     * checklist for what the packaged consumer must be able to route, and a
-     * literal here would only ever assert this file against itself.
+     * The routing keys the checked-in job registry says the cross-pipeline pair carries.
      */
     function expectedGlobalRoutingKeys(): string[] {
       const registry = JSON.parse(
@@ -607,11 +604,9 @@ describe("WorkerProductionComposition", () => {
   });
 
   /**
-   * The API-key sweep is the first feature composed here from its own package
-   * rather than handed over built, so these two say what "composed" means: the
-   * pipeline is registered by this graph, and the revoke behind its schedule
-   * reaches the client this root was given. A sweep wired to the wrong client —
-   * or to nothing — registers exactly the same routing keys and retires nothing.
+   * The API-key sweep is the first feature composed here from its own package rather than handed
+   * over built, so these two say what "composed" means: the pipeline is registered by this graph,
+   * and the revoke behind its schedule reaches the client this root was given.
    */
   describe("when the API-key sweep is composed", () => {
     function compositionWith(database: object, topicDatabase: object) {
@@ -682,14 +677,9 @@ describe("WorkerProductionComposition", () => {
   });
 
   /**
-   * The GitHub branch sweep, composed here rather than handed over built.
-   *
-   * It mounts whether or not this deployment is a GitHub App, because its
-   * retention half is a DELETE over rows this process wrote and needs no
-   * credentials at all. What credentials decide is whether the recheck half can
-   * ask GitHub anything — and a deployment that expected pull-request linkage
-   * to keep working has to be able to read that in its own logs at boot, not
-   * infer it from a sweep that quietly answers zero forever.
+   * The GitHub branch sweep, composed here rather than handed over built. It mounts whether or not
+   * this deployment is a GitHub App, because its retention half is a DELETE over rows this process
+   * wrote and needs no credentials at all.
    */
   describe("when the GitHub branch sweep is composed", () => {
     function compositionWith(input: {
@@ -788,14 +778,6 @@ describe("WorkerProductionComposition", () => {
 
   /**
    * The Langy session-key sweep, composed here rather than handed over built.
-   *
-   * The reaper was written, tested and routed for cron, and then never
-   * scheduled, because the chart ships no CronJobs — so for the whole time it
-   * existed the backstop for keys orphaned by a SIGKILLed manager had no caller
-   * at all. What these cases hold is that the pipeline is registered by THIS
-   * graph and that the revoke behind its schedule reaches the client this root
-   * was given. A sweep wired to the wrong client — or to nothing — registers
-   * exactly the same routing keys and retires nothing.
    */
   describe("when the Langy session-key sweep is composed", () => {
     function compositionWith(database: object, topicDatabase: object) {
@@ -876,15 +858,7 @@ describe("WorkerProductionComposition", () => {
 
   /**
    * Metric and Log, composed here rather than handed over built.
-   *
-   * Both pipelines were the App's to build: their repository carried an
-   * organization-keyed ClickHouse read (metric) and a trace read cap (log)
-   * that durable processing never touches, and this process can supply
-   * neither. What these cases hold is that the pipelines are composed by THIS
-   * graph, from the tenant-keyed client and retention its Eventing substrate
    * already resolved, and that the ADR-056 edge into Coding Agent is either
-   * mounted or declared missing by name. A pipeline wired to the wrong client
-   * registers exactly the same routing keys and stores nothing.
    */
   describe("when metric and log processing are composed", () => {
     function compositionWith(
@@ -1065,16 +1039,6 @@ describe("WorkerProductionComposition", () => {
 
   /**
    * Suite-run processing, composed here rather than handed over built.
-   *
-   * The pipeline itself was never the App's to own — it folds three commands
-   * into one ClickHouse table — but its fold store was assembled from three
-   * places at once (the projection store on the suite runtime, the version in
-   * the contract, the Redis cache on the registry), so no other process could
-   * put one together. What these cases hold is that THIS graph assembles it,
-   * from the tenant-keyed client, the retention and the Redis its own
-   * substrate already resolved, and that the cache lands in the keyspace the
-   * App reads. A pipeline wired to the wrong client or the wrong prefix
-   * registers exactly the same routing keys and is silently alone.
    */
   describe("when the identity ledgers are composed", () => {
     function identityDatabase() {
@@ -1589,12 +1553,9 @@ describe("WorkerProductionComposition", () => {
     }
 
     /**
-     * What `eventSourcing.register` hands back for this pipeline.
-     *
-     * The installer resolves its two deferred senders out of the returned
-     * commands and refuses a registration missing either, so a bare
-     * `{ commands: {} }` would fail these cases for a reason none of them is
-     * about.
+     * What `eventSourcing.register` hands back for this pipeline. The installer resolves its two
+     * deferred senders out of the returned commands and refuses a registration missing either, so a
+     * bare `{ commands: {} }` would fail these cases for a reason none of them is about.
      */
     function registeredSuitePipeline() {
       return {
@@ -1722,16 +1683,9 @@ describe("WorkerProductionComposition", () => {
   });
 
   /**
+   * It was the App's to build for one reason that turned out to be two misreadings: pricing a model
+   * call looked like it needed the provider stack,
    * The ADR-056 session pipeline, composed here rather than handed over built.
-   *
-   * It was the App's to build for one reason that turned out to be two
-   * misreadings: pricing a model call looked like it needed the provider
-   * stack, and stamping a project looked like it needed the project service.
-   * Neither is true — the first is a pure function over the platform catalog,
-   * the second one throttled UPDATE — so what these cases hold is that this
-   * graph composes the pipeline from its own ClickHouse client, its own Redis
-   * and its own Prisma client, and that the GitHub demand path the mapping
-   * subscriber needs is composed alongside it.
    */
   describe("when coding-agent session processing is composed", () => {
     function compositionWith(
@@ -1763,10 +1717,9 @@ describe("WorkerProductionComposition", () => {
     }
 
     /**
-     * What `eventSourcing.register` hands back for this pipeline. The installer
-     * resolves three deferred contribution senders out of the returned commands
-     * and refuses a registration missing any, so a bare `{ commands: {} }`
-     * would fail these cases for a reason none of them is about.
+     * What `eventSourcing.register` hands back for this pipeline. The installer resolves three
+     * deferred contribution senders out of the returned commands and refuses a registration missing
+     * any, so a bare `{ commands: {} }` would fail these cases for a reason none of them is about.
      */
     function registeredCodingAgentPipeline() {
       return {
@@ -1942,10 +1895,6 @@ describe("WorkerProductionComposition", () => {
 
     /**
      * What `eventSourcing.register` hands back for this pipeline.
-     *
-     * The installer resolves Trace's `computeExperimentRunMetrics` proxy out of
-     * the returned commands and refuses a registration missing it, so a bare
-     * `{ commands: {} }` would fail these cases for a reason neither is about.
      */
     function registeredExperimentPipeline() {
       return {
@@ -2082,20 +2031,9 @@ describe("WorkerProductionComposition", () => {
 });
 
 /**
- * The join-request ledger, and the mail capability that finally lets this
- * process build it.
- *
- * What kept this graph in the application was never persistence: the
- * `JoinRequest` head is Postgres like the other three ledgers'. It was the
- * lifecycle port — the day-7 reminder and the lapse notice are outbound mail,
- * and no process but the App had a gateway to send it through.
- *
- * The failure this block exists to catch is the quiet one. `join-requests`
- * names five commands, a state projection and the lifecycle subscriber in the
- * checked-in job registry, and the queue rejects an unroutable job for
- * redelivery rather than dropping it — so a consumer that mounted everything
- * else would stall exactly those seven forever with the pods up, the liveness
- * probe answering and the queue depth simply growing.
+ * The join-request ledger, and the mail capability that finally lets this process build it. What
+ * kept this graph in the application was never persistence: the `JoinRequest` head is Postgres like
+ * the other three ledgers'.
  */
 describe("given a worker that composes the join-request ledger", () => {
   /** The routing keys the checked-in job registry says this pipeline carries.
@@ -2268,12 +2206,9 @@ describe("given a worker that composes the join-request ledger", () => {
 });
 
 /**
- * THE TENANCY GRAPH IS THE PRECONDITION THE MODEL GATEWAY REFUSED WITHOUT, and
- * the wiring that carries it is one option on this root — so this is the level
- * the claim "production stops logging no-tenancy" has to be made at. The
- * gateway's own composition is proven in
- * `worker-tenancy.composition.unit.test.ts`; what is under test here is that
- * the root hands the graph over at all.
+ * THE TENANCY GRAPH IS THE PRECONDITION THE MODEL GATEWAY REFUSED WITHOUT, and the wiring that
+ * carries it is one option on this root — so this is the level the claim "production stops logging
+ * no-tenancy" has to be made at.
  */
 describe("the model gateway on the production graph", () => {
   function compositionWithConnection(input: {

@@ -275,10 +275,9 @@ export type WorkerTopicCompositionOptions = {
 };
 
 /**
- * Reports the composition decisions Trace's own storage would otherwise hide.
- *
- * A decision a deployment should read in its own logs at boot rather than
- * infer from work that quietly never completes.
+ * Reports the composition decisions Trace's own storage would otherwise hide. A decision a
+ * deployment should read in its own logs at boot rather than infer from work that quietly never
+ * completes.
  */
 export abstract class WorkerTraceAbsenceReportPort {
   /** No pub/sub bridge: the two broadcast subscribers register and stay inert. */
@@ -286,14 +285,8 @@ export abstract class WorkerTraceAbsenceReportPort {
 }
 
 /**
- * The one Prisma client this process opened.
- *
- * Optional only while the platform root still composes this graph. That root
- * hands its client over inside `topic` — `TopicClusteringDatabase` IS a
- * `PrismaClient` — and a process opens exactly one, so the fallback below names
- * the same object an explicit option would. Naming it here is what lets a
- * feature that is not Topic compose its own Postgres adapter without reading
- * another feature's option, and the fallback goes when the platform root does.
+ * The one Prisma client this process opened. Optional only while the platform root still composes
+ * this graph.
  */
 export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
   IngestionPullLifecycleDatabase &
@@ -319,30 +312,9 @@ export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
   WorkerTraceCapabilityDatabase;
 
 /**
+ * The other three — `identity`, `scim-sync` and `join-requests` — are composed below from
+ * `@langwatch/identity-server`'s Postgres seams,
  * The ONE identity ledger this graph still RECEIVES (ADR-101).
- *
- * The other three — `identity`, `scim-sync` and `join-requests` — are composed
- * below from `@langwatch/identity-server`'s Postgres seams, because every
- * dependency they take is either a Postgres binding or the mail gateway this
- * process now owns. The connection ledger is not: its teardown port revokes a
- * torn-down connection's directory tokens through the SCIM service, and no
- * directory service exists as something this process can compose, so its
- * definition still comes from the application that has one.
- *
- * Optional, like every group the legacy registry still owns. A graph without
- * it routes three of the four identity ledgers and must not claim
- * `event-sourcing/jobs`; that rule is the composition root's
- * (`createWorkerDurableComposition` asks for no consumers), and the parity
- * guard is what proves the packaged consumer routes all four.
- */
-/**
- * Reports the composition decision an absent GitHub App would otherwise hide.
- *
- * The sweep mounts either way: its retention half is a DELETE over rows this
- * process wrote and needs no App at all. What changes without credentials is
- * that the recheck half asks GitHub nothing, and a deployment should read that
- * in its own logs at boot rather than infer it from a sweep that quietly
- * answers zero forever.
  */
 export abstract class WorkerGithubAbsenceReportPort {
   abstract withoutAppCredentials(): void;
@@ -356,32 +328,19 @@ export type WorkerInfrastructureCompositionOptions = Omit<
 
 /**
  * Consumer ownership, stated alongside the Eventing ports it applies to.
- *
- * `EventingServerRuntimeOptions.consumersEnabled` is omitted from both arms
- * below in its favour, so the graph has one place that decides whether it
- * claims `event-sourcing/jobs` rather than two that could disagree.
  */
 type WorkerEventingConsumerCompositionOptions = {
   consumers?: WorkerEventingConsumerOptions;
   /**
-   * Every configured ClickHouse endpoint, shared and private alike.
-   *
-   * The tenant-keyed resolver beside it answers "the client for THIS tenant",
-   * which is the only question a fold or an append may ask. The settlement
-   * sweeper asks the other one — "every instance" — because one sweeper
-   * settles the whole install, and a graph handed a resolver as a PORT has no
-   * connection to enumerate. Optional for exactly that reason: the standalone
-   * worker opened the connection and supplies it; a graph composed over
-   * already-built persistence ports does not, and the sweep says so by name.
+   * Every configured ClickHouse endpoint, shared and private alike. The tenant-keyed resolver
+   * beside it answers "the client for THIS tenant", which is the only question a fold or an append
+   * may ask.
    */
   resolveClickHouseInstances?: WorkerGatewaySpendCompositionInput["resolveClickHouseInstances"];
   /**
-   * One ORGANIZATION's endpoint, with no directory lookup.
-   *
-   * The anonymous usage report counts an organization's projects together and
-   * already holds the organization, so routing through a project id would be a
-   * lookup to arrive back where it started. Absent leaves the ClickHouse half
-   * of that report at zero, which the collector answers rather than throws.
+   * One ORGANIZATION's endpoint, with no directory lookup. The anonymous usage report counts an
+   * organization's projects together and already holds the organization, so routing through a
+   * project id would be a lookup to arrive back where it started.
    */
   resolveClickHouseOrganizationClient?: (organizationId: string) => unknown;
 };
@@ -394,25 +353,12 @@ type WorkerProductionCompositionBaseOptions = {
   database: WorkerDatabaseCompositionOptions;
   /**
    * The SAME client, as the typed connection the tenancy graph needs.
-   *
-   * Two names for one object, and it is worth being exact about why rather
-   * than folding them: `database` above is the structural intersection every
-   * feature narrows for itself, which is what lets a composition test hand in
-   * the delegates it exercises and nothing else. `PostgresOrganizationAdapter`
-   * and `PostgresProjectAdapter` do not take a structural type — both declare
-   * `database: PrismaClient` — so the tenancy graph is the one thing here that
-   * needs the generated client itself, passed through with no cast.
-   *
-   * Optional because it can genuinely be absent: a graph composed without it
-   * composes no tenancy, no model gateway and no title model, and each says so
-   * by name. `WorkerStandaloneComposition` always supplies it.
    */
   connection?: PrismaConnection;
   /**
-   * Pipeline groups whose features have moved out of the legacy registry.
-   * Each stays optional until every group in Wave 4 has landed: the shared
-   * `event-sourcing/jobs` queue still belongs to the legacy worker, so an
-   * incomplete graph must be composable without pretending to be complete.
+   * Pipeline groups whose features have moved out of the legacy registry. Each stays optional until
+   * every group in Wave 4 has landed: the shared `event-sourcing/jobs` queue still belongs to the
+   * legacy worker, so an incomplete graph must be composable without pretending to be complete.
    */
   enterprise?: EnterpriseWorkerCompositionOptions;
   observability?: ProcessObservability;
@@ -436,15 +382,8 @@ export type WorkerProductionCompositionOptions =
     });
 
 /**
- * Fully composed background-worker graph for extractable worker surfaces.
- *
- * The shared Eventing consumer is off unless the caller asks for it. A
- * consumer must be able to route the complete Eventing job registry,
- * including Trace's `assignTopic` pipeline consumer, before it can safely
- * claim `event-sourcing/jobs`: the queue rejects an unroutable job for
- * redelivery rather than dropping it, so a graph missing one handler stalls
- * that handler's work while every health signal stays green. Only a caller
- * that has mounted the complete registry may pass `eventing.consumers`.
+ * Fully composed background-worker graph for extractable worker surfaces. The shared Eventing
+ * consumer is off unless the caller asks for it.
  */
 export class WorkerProductionComposition {
   static create(options: WorkerProductionCompositionOptions): WorkerProductionComposition {
@@ -455,13 +394,11 @@ export class WorkerProductionComposition {
         })
       : undefined;
     const eventingOptions = createEventingPersistence(options, infrastructure);
-    // The one Redis this process opened, named once.
-    //
-    // A worker that composed its own foundation has it there; one handed an
-    // already-built substrate reads the queue's. They are the same connection
-    // either way, and naming it once is what stops a feature reaching for a
-    // second: two connections would give one process two fold caches, two
-    // dedup keyspaces and two tenant broadcast channels.
+    // The one Redis this process opened, named once. A worker that composed its own foundation has
+    // it there; one handed an already-built substrate reads the queue's. They are the same
+    // connection either way, and naming it once is what stops a feature reaching for a second: two
+    // connections would give one process two fold caches, two dedup keyspaces and two tenant
+    // broadcast channels.
     const processRedis = infrastructure?.redis ?? eventingOptions.groupQueue.redis;
     // The experiment feature's connected cell dispatches through
     // `ConnectedAgentRuntimeAdapter.get()` too (ADR-128); without Redis installed
@@ -475,15 +412,11 @@ export class WorkerProductionComposition {
       ...(infrastructure ? { aws: infrastructure.aws } : {}),
       ...(options.resources ? { resources: options.resources } : {}),
     });
-    // One fenced outbound sender for the whole process: an automation's webhook
-    // alert and a webhook endpoint's delivery count against the same ceiling
-    // and answer to the same address policy.
-    //
-    // The counter is composed BESIDE the sender rather than inside it, because
-    // a third outbound hop does not pass through the sender at all: a webhook
-    // endpoint that delivers to a queue is put on that queue directly. Handing
-    // both the same object is what keeps the queue from being the one uncapped
-    // destination in the product.
+    // One fenced outbound sender for the whole process: an automation's webhook alert and a webhook
+    // endpoint's delivery count against the same ceiling and answer to the same address policy. The
+    // counter is composed BESIDE the sender rather than inside it, because a third outbound hop
+    // does not pass through the sender at all: a webhook endpoint that delivers to a queue is put
+    // on that queue directly.
     const webhookDispatchRateLimiter = createWorkerWebhookDispatchRateLimiter({
       config: options.config,
       redis: eventingOptions.groupQueue.redis,
@@ -499,29 +432,11 @@ export class WorkerProductionComposition {
       resources: options.resources,
     });
 
-    // The SaaS billable-events meter and the dispatch subscriber that follows
-    // it, built HERE rather than received. They are configured on the runtime
-    // itself rather than on a pipeline, because their `global:*` queues join
-    // the shared job registry the moment the first pipeline registers — so the
-    // pair has to exist before any feature mounts, and the sender its
-    // subscriber calls is produced by a pipeline this same composition
-    // registers afterwards. That circle is why the dispatch is resolved
-    // lazily, from the reporting installer named below.
-    //
-    // Gated on this process's own deployment leaf, read from the one variable
-    // the App reads: the pair's routing keys share `event-sourcing/jobs` with
-    // every pipeline's, so a consumer that has them where the producer does
-    // not meters a self-hosted install, and one that lacks them where the
-    // producer has them rejects every billable span, evaluation, experiment
-    // and simulation event for redelivery forever.
-    // A SaaS worker that metered without composing the pipeline its reports
-    // are sent through would count every billable event correctly and report
-    // none of them — revenue that is present in ClickHouse, absent from
-    // Stripe, and visible nowhere else. This graph composes that pipeline
-    // itself, unconditionally, so the pairing is structural rather than
-    // checked; what is left to get wrong is ORDER, and the guard below is what
-    // says so — the meter is configured on the runtime's construction, which
-    // is before any installer exists.
+    // The SaaS billable-events meter and the dispatch subscriber that follows it, built HERE rather
+    // than received. They are configured on the runtime itself rather than on a pipeline, because
+    // their `global:*` queues join the shared job registry the moment the first pipeline registers
+    // — so the pair has to exist before any feature mounts, and the sender its subscriber calls is
+    // produced by a pipeline this same composition registers afterwards.
     let billingReportingInstaller: BillingReportingWorkerFeatureInstaller | undefined;
     const saasMeter = options.config.deployment.saas
       ? saasBillableEventsMeter({
@@ -545,14 +460,8 @@ export class WorkerProductionComposition {
       ...(saasMeter ? { configureGlobalProjections: saasMeter } : {}),
       ...(options.eventing.consumers ? { consumers: options.eventing.consumers } : {}),
     });
-    // Unconditional, like every other substrate sweep below: both halves are
-    // composed from this package over objects this process already holds. The
-    // blob pass needs the queue's OWN Redis — the sweeper walks the keyspace
-    // the Group Queue offloads payloads into, so a second connection to a
-    // different Redis would report an empty sweep rather than fail — and the
-    // metrics adapter is Eventing's own, because this process has no
-    // prom-client registry to lend it and writes the same two series names
-    // over OTLP that the App writes through its registry.
+    // Unconditional, like every other substrate sweep below: both halves are composed from this
+    // package over objects this process already holds.
     const eventingMaintenance = EventingMaintenanceWorkerFeatureInstaller.create({
       eventing,
       blobSweep: WorkerGroupQueueBlobSweep.create(eventingOptions.groupQueue.redis),
@@ -584,12 +493,11 @@ export class WorkerProductionComposition {
     // One instance, because the coding-agent fold and the Log pipeline's
     // dispatch subscriber ask it the same questions.
     const traceCanonicalisation = TraceCanonicalisationService.create();
-    // Unconditional, on the same footing as the API-key sweep: the sweep is
-    // composed from this package and the feature's own service, so there is no
-    // graph in which it is present but unbuildable. Credentials are a different
-    // question from composition — without them the recheck half asks GitHub
-    // nothing and the retention half keeps working — so their absence is
-    // reported by name rather than silently mounting a half-sweep.
+    // Unconditional, on the same footing as the API-key sweep: the sweep is composed from this
+    // package and the feature's own service, so there is no graph in which it is present but
+    // unbuildable. Credentials are a different question from composition — without them the recheck
+    // half asks GitHub nothing and the retention half keeps working — so their absence is reported
+    // by name rather than silently mounting a half-sweep.
     const githubConfig = options.config.github;
     if (!githubConfig.appId || !githubConfig.privateKey) {
       WorkerProductionComposition.githubAbsence(options)?.withoutAppCredentials();
@@ -606,30 +514,10 @@ export class WorkerProductionComposition {
         ...(githubConfig.host ? { hostConfig: { host: githubConfig.host } } : {}),
       }).build(),
     });
-    // Unconditional, on the same footing as the sweeps above: every dependency
-    // is composed from a feature package over substrates this process already
-    // holds — the tenant-keyed ClickHouse client the event store resolves
-    // through, the queue's own Redis, and the one Prisma client this process
-    // opened. So there is no graph in which it is present but unbuildable.
-    //
-    // Two of its collaborators used to be why nothing outside the App could
-    // build it, and neither is a service graph after all. Session cost is
-    // priced from the platform's immutable model catalog — the identical pure
-    // function `ModelProviderService.estimateCost` calls, over the identical
-    // static rates, with per-tenant overrides still travelling on the span
-    // attributes — so the App's provider stack was never being asked anything.
-    // And the project write is one throttled `UPDATE` of one column, behind a
-    // one-method port, rather than the whole `ProjectService`.
-    //
-    // The pull-request mapping subscriber gets the GitHub demand half composed
-    // from this process's own database, on the same credentials the sweep
-    // above uses and with the same declared absence when there are none:
-    // without an App the mapping call resolves no installation and maps
-    // nothing, exactly as the recheck half asks GitHub nothing. It is passed
-    // unconditionally because it is what registers `reactor:pullRequestMapping`
-    // — a consumer that composed the pipeline without it would route one key
-    // fewer than the producer stages, and the queue rejects an unroutable job
-    // for redelivery rather than dropping it.
+    // Unconditional, on the same footing as the sweeps above: every dependency is composed from a
+    // feature package over substrates this process already holds — the tenant-keyed ClickHouse
+    // client the event store resolves through, the queue's own Redis, and the one Prisma client
+    // this process opened. So there is no graph in which it is present but unbuildable.
     const codingAgentActivity = PostgresCodingAgentActivityAdapter.create({
       database: options.database,
     }).build();
@@ -656,28 +544,11 @@ export class WorkerProductionComposition {
           : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
       }),
     });
-    // The Gateway spend spine and the Governance signal log, composed here
-    // rather than received, and composed as ONE pair.
-    //
-    // UNCONDITIONAL, on the same footing as every other pipeline this process
-    // now owns: ten of the shared registry's routing keys are theirs, and a
-    // consumer that claimed `event-sourcing/jobs` without them would leave
-    // every spend command, every budget debit and every webhook delivery
-    // redelivering forever while the pods stayed up.
-    //
-    // The governance installer is built FIRST, because the spend graph's debit
-    // process appends through its two commands and receives them as the
-    // installer's own late-bound proxies. Ordering is enforced again at install
-    // time by `orderedFeatureInstallers`.
-    // Which plan an organization is on, composed ONCE for the three questions
-    // this process asks of it: whether a webhook batch may leave, how many
-    // confirmed matches an automation may persist in a day, and how far back a
-    // trace's captured content stays unteased.
-    //
-    // One provider rather than three because all three are the same fleet fact.
-    // It resolves from the deployment's own subscription rows and the same
-    // baseline the interactive process starts from — see the composition, which
-    // also names the one line the two roots still write twice.
+    // The Gateway spend spine and the Governance signal log, composed here rather than received,
+    // and composed as ONE pair. UNCONDITIONAL, on the same footing as every other pipeline this
+    // process now owns: ten of the shared registry's routing keys are theirs, and a consumer that
+    // claimed `event-sourcing/jobs` without them would leave every spend command, every budget
+    // debit and every webhook delivery redelivering forever while the pods stayed up.
     const plans = options.connection
       ? createWorkerPlanProvider({
           isSaas: options.config.deployment.saas,
@@ -696,18 +567,10 @@ export class WorkerProductionComposition {
         })
       : undefined;
     const gatewayAbsence = WorkerProductionComposition.gatewayAbsence(options);
-    // The spend-spike evaluator rides this installer, unconditionally, because
-    // every collaborator it needs is one this process already holds: the Prisma
-    // client its rules and alerts live in, the tenant-keyed ClickHouse client
-    // the `governance_kpis` windows are read from, and the same address fence
-    // every other customer-supplied destination in this process leaves through.
-    //
-    // The platform started the loop with none of the third: its evaluator was
-    // built over `prisma` alone, so a fired alert recorded `log_only` and the
-    // admin who configured a webhook was paged by nothing. Composing the
-    // dispatcher here is what closes that, and it is a scheduler, so it claims
-    // no routing key — see the composition for why it has no installer of its
-    // own.
+    // The spend-spike evaluator rides this installer, unconditionally, because every collaborator
+    // it needs is one this process already holds: the Prisma client its rules and alerts live in,
+    // the tenant-keyed ClickHouse client the `governance_kpis` windows are read from, and the same
+    // address fence every other customer-supplied destination in this process leaves through.
     const governanceEventsInstaller = GovernanceEventsWorkerFeatureInstaller.create({
       installer: { buildProcessing: () => gatewaySpendGraph.governance.buildProcessing() },
       eventing,
@@ -760,16 +623,9 @@ export class WorkerProductionComposition {
     const gatewayRealtimeSession = realtimeSessionPoller
       ? GatewayRealtimeSessionWorkerFeatureInstaller.create({ poller: realtimeSessionPoller })
       : undefined;
-    // Unconditional, on the same footing as the sweeps above: both pipelines
-    // are composed from their own feature package over the tenant-keyed
-    // ClickHouse client this graph already resolves its event store through,
-    // so there is no graph in which they are present but unbuildable.
-    //
-    // `retention.defaultRetentionDays` is the number the event store already
-    // stamps rows with, read once here rather than configured a second time,
-    // and the two shard counts come from the same environment variables the
-    // App reads (worker.config `processing`) so producer and consumer clamp a
-    // lane count identically.
+    // Unconditional, on the same footing as the sweeps above: both pipelines are composed from
+    // their own feature package over the tenant-keyed ClickHouse client this graph already resolves
+    // its event store through, so there is no graph in which they are present but unbuildable.
     const metric = MetricWorkerFeatureInstaller.create({
       eventing,
       installer: ClickHouseMetricProcessingAdapter.create({
@@ -801,17 +657,9 @@ export class WorkerProductionComposition {
         }),
       ],
     });
-    // Unconditional, on the same footing as metric and log: the pipeline is
-    // composed from its own feature package over the tenant-keyed ClickHouse
-    // client this graph already resolves its event store through, so there is
-    // no graph in which it is present but unbuildable.
-    //
-    // The fold cache rides `eventingOptions.groupQueue.redis` — the one Redis
-    // this process's queue substrate runs on, rather than a second connection
-    // — because the cache is not optional here: it carries the applied-event
-    // ids a redelivered item is dropped on, and the run-state fold accumulates
-    // by addition. Its TTL comes from the same variable the App reads, so the
-    // two graphs cannot expire each other's entries early.
+    // Unconditional, on the same footing as metric and log: the pipeline is composed from its own
+    // feature package over the tenant-keyed ClickHouse client this graph already resolves its event
+    // store through, so there is no graph in which it is present but unbuildable.
     const suite = SuiteWorkerFeatureInstaller.create({
       eventing,
       installer: ClickHouseSuiteRunProcessingAdapter.create({
@@ -823,18 +671,9 @@ export class WorkerProductionComposition {
           : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
       }),
     });
-    // Unconditional, on the same footing as suite above: the pipeline is
-    // composed from its own feature package over the tenant-keyed ClickHouse
-    // client this graph already resolves its event store through, so there is
-    // no graph in which it is present but unbuildable.
-    //
-    // The fold cache rides `eventingOptions.groupQueue.redis` — the one Redis
-    // this process's queue substrate runs on, rather than a second connection
-    // — because the cache is not optional here either: it carries the
-    // applied-event ids a redelivered result is dropped on, and the run-state
-    // fold accumulates by addition across every target and evaluator result.
-    // Its TTL comes from the same variable the App reads, so the two graphs
-    // cannot expire each other's entries early.
+    // Unconditional, on the same footing as suite above: the pipeline is composed from its own
+    // feature package over the tenant-keyed ClickHouse client this graph already resolves its event
+    // store through, so there is no graph in which it is present but unbuildable.
     const experiment = ExperimentWorkerFeatureInstaller.create({
       eventing,
       installer: ClickHouseExperimentRunProcessingAdapter.create({
@@ -846,17 +685,11 @@ export class WorkerProductionComposition {
           : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
       }),
     });
-    // TRACE, COMPOSED HERE RATHER THAN RECEIVED. This is the conversion the
-    // step-(g) attempt halted on: the pipeline definition, `command:recordSpan`
-    // and all fifteen subscriber handlers are now built from substrates this
-    // process holds — the one Prisma client, the queue's Redis, the tenant-keyed
-    // ClickHouse client, this deployment's own variables and its object storage
-    // — plus the command proxies the sibling installers publish above.
-    //
-    // It is UNCONDITIONAL, and it has to be: `trace_processing` owns
-    // twenty-nine of the shared registry's routing keys, and a consumer that
-    // claimed `event-sourcing/jobs` without them would leave every kind of
-    // trace work redelivering forever while the pods stayed up.
+    // TRACE, COMPOSED HERE RATHER THAN RECEIVED. This is the conversion the step-(g) attempt halted
+    // on: the pipeline definition, `command:recordSpan` and all fifteen subscriber handlers are now
+    // built from substrates this process holds — the one Prisma client, the queue's Redis, the
+    // tenant-keyed ClickHouse client, this deployment's own variables and its object storage — plus
+    // the command proxies the sibling installers publish above.
     const traceDatabase = options.database;
     const traceAbsence = WorkerProductionComposition.traceAbsence(options);
     const objectStorage = createWorkerObjectStorage({
@@ -902,17 +735,10 @@ export class WorkerProductionComposition {
         : {}),
       ...(options.observability ? { logger: options.observability.logger } : {}),
     });
-    // The model gateway, composed once for every path in this process that
-    // resolves a customer's model: topic clustering's four questions and an
-    // online evaluation's `X_LITELLM_*` environment. Two gateways would be two
-    // decryptions of one stored credential and two answers to which model a
-    // project clusters with, so it is built here and handed down.
-    //
-    // The cipher is the SAME `resolveWorkerStoredSecretCipher` the three other
-    // stored-secret verticals read under — a provider credential is written by
-    // the control plane under `CREDENTIALS_SECRET` — and its absence is a gate
-    // rather than a degradation, because a gateway that could not decrypt would
-    // report every configured provider as unusable instead of failing honestly.
+    // The model gateway, composed once for every path in this process that resolves a customer's
+    // model: topic clustering's four questions and an online evaluation's `X_LITELLM_*`
+    // environment. Two gateways would be two decryptions of one stored credential and two answers
+    // to which model a project clusters with, so it is built here and handed down.
     const modelProviders = tryCreateWorkerModelProviders({
       config: options.config,
       database: options.database,
@@ -943,15 +769,10 @@ export class WorkerProductionComposition {
       projects: traceServices.projects,
       nlpServiceUrl: options.config.infrastructure.modelProvider.nlpServiceUrl,
     });
-    // Langy's conversation pipeline, composed here rather than received.
-    //
-    // UNCONDITIONAL, on the same footing as trace processing: the pipeline owns
-    // twenty-four of the shared registry's routing keys, its two operational
-    // folds are Postgres, and there is no deployment in which those keys are
-    // meaningless. What varies is whether this process can reach an agent
-    // manager, generate a title or mint a recovery session key, and each of
-    // those is reported by name rather than inferred from work that never
-    // completes.
+    // Langy's conversation pipeline, composed here rather than received. UNCONDITIONAL, on the same
+    // footing as trace processing: the pipeline owns twenty-four of the shared registry's routing
+    // keys, its two operational folds are Postgres, and there is no deployment in which those keys
+    // are meaningless.
     const langyConversation = LangyConversationWorkerFeatureInstaller.create({
       installer: createWorkerLangyConversation({
         config: options.config,
@@ -980,14 +801,11 @@ export class WorkerProductionComposition {
         ? {}
         : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
     });
-    // The simulation-run pipeline, composed here rather than received.
-    //
-    // It is built AFTER the trace projection stores because its metrics command
-    // reads the trace summary fold this process already composes — one store,
-    // one cache prefix, one applied-event-id set. Install ORDER is unchanged
-    // and still lives in `orderedFeatureInstallers`: Suite registers before
-    // Scenario because the simulation process reports item starts and
-    // completions into a suite run.
+    // The simulation-run pipeline, composed here rather than received. It is built AFTER the trace
+    // projection stores because its metrics command reads the trace summary fold this process
+    // already composes — one store, one cache prefix, one applied-event-id set. Install ORDER is
+    // unchanged and still lives in `orderedFeatureInstallers`: Suite registers before Scenario
+    // because the simulation process reports item starts and completions into a suite run.
     const scenarioAbsence = WorkerProductionComposition.scenarioAbsence(options);
     // Whether this pod can RUN a simulation, decided before the pipeline is
     // built so the pool and the boot report cannot disagree. The pool is the
@@ -1103,34 +921,15 @@ export class WorkerProductionComposition {
             ...(options.observability ? { logger: options.observability.logger } : {}),
           })
         : undefined;
-    // Automation's settlement half, composed here rather than received.
-    //
-    // UNCONDITIONAL, and it installs FIRST: `command:recordTriggerMatch` is the
-    // durable write every trigger match from trace, evaluation and governance
-    // lands in, and `subscriber:pm:triggerSettlement` is what turns those
-    // matches into one notification per window. A consumer that claimed
-    // `event-sourcing/jobs` without the pair would leave every match
-    // redelivering forever.
-    //
-    // Its other two process managers — the 30-second graph-alert sweep and the
-    // webhook delivery-log prune — register NO routing key, because a
-    // schedule-only definition declares no event types. They still wake here,
-    // so their collaborators are composed rather than refused.
-    // ONE trace reader for both halves of this process's Automation work.
-    // The settlement digest and Evaluation's alert subscriber ask it the same
-    // two questions — a trace's summary and whether a saved filter reads
-    // evaluations — and two readers would give one process two answers to the
-    // second, which is what decides whether an alert fires at all.
+    // Automation's settlement half, composed here rather than received. UNCONDITIONAL, and it
+    // installs FIRST: `command:recordTriggerMatch` is the durable write every trigger match from
+    // trace, evaluation and governance lands in, and `subscriber:pm:triggerSettlement` is what
+    // turns those matches into one notification per window. A consumer that claimed `event-
+    // sourcing/jobs` without the pair would leave every match redelivering forever.
     const automationAbsence = WorkerProductionComposition.automationAbsence(options);
-    // The full trace record, and the dataset append that consumes it.
-    //
-    // ONE gate for both, and it is the typed Prisma client: the packaged legacy
-    // read declares the generated client by type, and so does Dataset's
-    // Postgres adapter. They are composed as a PAIR rather than independently
-    // because `dispatchToDataset` reads the record BEFORE it maps — a writer
-    // without the read has nothing to write, and a read without the writer
-    // still serves the digest's fallback, which is why the read is the one that
-    // is passed on its own.
+    // The full trace record, and the dataset append that consumes it. ONE gate for both, and it is
+    // the typed Prisma client: the packaged legacy read declares the generated client by type, and
+    // so does Dataset's Postgres adapter.
     const traceRecords =
       options.connection && plans && tenancy
         ? WorkerTraceRecordReader.create({
@@ -1153,13 +952,11 @@ export class WorkerProductionComposition {
             storage: objectStorage,
           })
         : undefined;
-    // `ADD_TO_ANNOTATION_QUEUE`'s write, on the same typed client the dataset
-    // half stands on — but NOT on the record read, because a queue item is a
-    // trace id and a pointer rather than a copy of the content.
-    //
-    // Which of the ids sent address a trace this project holds is trace
-    // storage's answer, not Annotation's — the same split the application made,
-    // over this process's own ClickHouse.
+    // `ADD_TO_ANNOTATION_QUEUE`'s write, on the same typed client the dataset half stands on — but
+    // NOT on the record read, because a queue item is a trace id and a pointer rather than a copy
+    // of the content. Which of the ids sent address a trace this project holds is trace storage's
+    // answer, not Annotation's — the same split the application made, over this process's own
+    // ClickHouse.
     const traceExistence = ClickHouseTraceExistenceRepository.create({
       resolveClient: options.eventing.resolveClickHouseClient as unknown as Parameters<
         typeof ClickHouseTraceExistenceRepository.create
@@ -1191,13 +988,11 @@ export class WorkerProductionComposition {
       ...(automationAbsence ? { absence: automationAbsence } : {}),
     });
     const automationClock = new WorkerAutomationClock();
+    // Composed exactly when this process holds the typed client the calendar row lives in AND can
+    // send: a report that came due on a process with no mail would claim its slot, render its data
+    // and deliver nothing, which is strictly worse than a slot nobody claimed — the lease settles,
+    // the calendar advances, and the period it summarised is gone.
     // ADR-044 Phase 3c: the scheduled-report calendar.
-    //
-    // Composed exactly when this process holds the typed client the calendar
-    // row lives in AND can send: a report that came due on a process with no
-    // mail would claim its slot, render its data and deliver nothing, which is
-    // strictly worse than a slot nobody claimed — the lease settles, the
-    // calendar advances, and the period it summarised is gone.
     const reportSchedule =
       options.connection && mail && automationDelivery
         ? createWorkerReportSchedule({
@@ -1275,14 +1070,10 @@ export class WorkerProductionComposition {
       eventing,
       ...(reportSchedule ? { reportSchedule } : {}),
     });
-    // Evaluation's durable pipeline, composed here rather than received.
-    //
-    // It is built AFTER Automation and BEFORE the trace producer check because
-    // its two terminal subscribers dispatch through Automation's own recorder
-    // and re-evaluate through the graph vertical composed above, while Trace's
-    // evaluation trigger dispatches into the commands this installer produces.
-    // Installation order is the registry's and is unchanged: Evaluation still
-    // installs before Trace, Metric and Log.
+    // Evaluation's durable pipeline, composed here rather than received. It is built AFTER
+    // Automation and BEFORE the trace producer check because its two terminal subscribers dispatch
+    // through Automation's own recorder and re-evaluate through the graph vertical composed above,
+    // while Trace's evaluation trigger dispatches into the commands this installer produces.
     const evaluationTriggerCatalogue = PostgresAutomationTraceTriggerCatalogueAdapter.create({
       prisma: traceDatabase,
       clock: automationClock,
@@ -1421,17 +1212,11 @@ export class WorkerProductionComposition {
       eventing,
       traceAssignments: trace.traceAssignments,
     });
-    // UNCONDITIONAL, like the two pipelines around it. `pulled_usage_processing`
-    // and `ingestion_pull_processing` carry eight routing keys between them in
-    // the checked-in `job-registry.json`, and the queue rejects an unroutable
-    // job for redelivery rather than dropping it — so a graph that mounted the
-    // rest and left these out would stall every configured customer's usage
-    // pull forever with the pods up and the queue depth simply growing.
-    //
-    // Every collaborator is one this process already holds: its Prisma client,
-    // its tenant-keyed ClickHouse resolver, its AWS client runtime, its
-    // feature-flag store and the one cipher both halves of Automation already
-    // read the App's stored secrets with.
+    // UNCONDITIONAL, like the two pipelines around it. `pulled_usage_processing` and
+    // `ingestion_pull_processing` carry eight routing keys between them in the checked-in `job-
+    // registry.json`, and the queue rejects an unroutable job for redelivery rather than dropping
+    // it — so a graph that mounted the rest and left these out would stall every configured
+    // customer's usage pull forever with the pods up and the queue depth simply growing.
     const governanceIngestion = GovernanceIngestionWorkerFeatureInstaller.create({
       installer: createWorkerGovernanceIngestion({
         config: options.config,
@@ -1448,29 +1233,11 @@ export class WorkerProductionComposition {
       }),
       eventing,
     });
-    // Unconditional, exactly as the legacy registry registers it, and for the
-    // same reason the sweeps above are: every dependency is composed from this
-    // package over substrates this process already holds. The roll-up is a
-    // command-only pipeline — no projections, no subscribers — so on a
-    // self-hosted install nothing dispatches into it; registering it either
-    // way is what keeps producer and consumer routing one key set off the
-    // shared `event-sourcing/jobs` queue.
-    //
-    // The ClickHouse read is asked for by ORGANIZATION, which the tenant-keyed
-    // resolver answers because the routing directory treats an organization id
-    // as a tenant of itself — the same equivalence the meter rides. Asking for
-    // the project instead would still return a client and still count, off the
-    // shared instance, for a customer whose data is on their own cluster.
-    //
-    // The organization cache rides the queue's one Redis under the prefix and
-    // lifetime the App's own `TtlCache` uses, so neither graph expires the
-    // other's entries early or reads a cache the other never writes.
-    //
-    // The Stripe sender is the half that IS deployment-shaped, and it is built
-    // on the same leaf the App builds its own on: a SaaS process resolves one
-    // and refuses without a key — the refusal `AppStripeRuntime.create`
-    // already makes — while a self-hosted process composes none at all, which
-    // is what `usageReportingService` is on the App side of the same install.
+    // Unconditional, exactly as the legacy registry registers it, and for the same reason the
+    // sweeps above are: every dependency is composed from this package over substrates this process
+    // already holds. The roll-up is a command-only pipeline — no projections, no subscribers — so
+    // on a self-hosted install nothing dispatches into it; registering it either way is what keeps
+    // producer and consumer routing one key set off the shared `event-sourcing/jobs` queue.
     const billingReportingPersistence = PostgresBillingReportingAdapter.create({
       database: options.database,
     }).build();
@@ -1500,12 +1267,11 @@ export class WorkerProductionComposition {
       eventing,
     });
     billingReportingInstaller = billingReporting;
-    // Unconditional, on the same footing as the identity ledgers below: the
-    // grants ledger's CONSUMER half takes exactly two Postgres bindings — the
-    // read model's guarded writer and the insert-only audit trail — over the
-    // one Prisma client this process opened, so there is no graph in which it
-    // is present but unbuildable. Its producer half stays with the
-    // application, which is the process that writes grants.
+    // Unconditional, on the same footing as the identity ledgers below: the grants ledger's
+    // CONSUMER half takes exactly two Postgres bindings — the read model's guarded writer and the
+    // insert-only audit trail — over the one Prisma client this process opened, so there is no
+    // graph in which it is present but unbuildable. Its producer half stays with the application,
+    // which is the process that writes grants.
     const authz = AuthzWorkerFeatureInstaller.create({
       installer: {
         pipeline: PostgresAuthzPipelineAdapter.create({
@@ -1514,15 +1280,9 @@ export class WorkerProductionComposition {
       },
       eventing,
     });
-    // Unconditional, on the same footing as the sweeps and the two processing
-    // pipelines above: both ledgers are composed from their own feature
-    // package over the one Prisma client this process opened, so there is no
-    // graph in which they are present but unbuildable.
-    //
-    // The identity ledger carries two-step verification on the same aggregate
-    // (D06), which is why one option builds two folds: an enrollment belongs
-    // to exactly the person the identifiers belong to, and sharing the
-    // aggregate is what puts both in one per-person lane.
+    // Unconditional, on the same footing as the sweeps and the two processing pipelines above: both
+    // ledgers are composed from their own feature package over the one Prisma client this process
+    // opened, so there is no graph in which they are present but unbuildable.
     const identity = IdentityWorkerFeatureInstaller.create({
       installer: {
         pipeline: PostgresIdentityPipelineAdapter.create({
@@ -1542,18 +1302,11 @@ export class WorkerProductionComposition {
       },
       eventing,
     });
-    // UNCONDITIONAL now, like the three ledgers around it. `sso-connections`
-    // names fourteen commands, a state projection and the teardown grace
-    // subscriber in the checked-in `job-registry.json`, and this is the ONLY
-    // graph that can advance TEARDOWN_PENDING to TORN_DOWN — so a process that
-    // claimed the queue without it would leave every requested teardown
-    // pending forever with the pods up and the probe answering.
-    //
-    // What is absent is the DIRECTORY half, by name: a torn-down connection's
-    // SCIM tokens are not deleted here, because this process composes no
-    // directory capability. They stop verifying regardless — every SCIM
-    // request checks the connection this fold has just moved to TORN_DOWN —
-    // so what is lost is the row cleanup, not the security property.
+    // UNCONDITIONAL now, like the three ledgers around it. `sso-connections` names fourteen
+    // commands, a state projection and the teardown grace subscriber in the checked-in `job-
+    // registry.json`, and this is the ONLY graph that can advance TEARDOWN_PENDING to TORN_DOWN —
+    // so a process that claimed the queue without it would leave every requested teardown pending
+    // forever with the pods up and the probe answering.
     WorkerProductionComposition.identityAbsence(options)?.withoutDirectoryTokenRevocation();
     const ssoConnection = SsoConnectionWorkerFeatureInstaller.create({
       installer: {
@@ -1567,26 +1320,9 @@ export class WorkerProductionComposition {
       },
       eventing,
     });
-    // Composed here, on the mail capability this process now owns. Everything
-    // else the join ledger takes is Postgres: the `JoinRequest` head serving
-    // both the fold and its guards, and the audience its two notices are
-    // addressed to.
-    //
-    // UNCONDITIONAL, unlike the connection ledger above. `join-requests` names
-    // five commands, a state projection and the lifecycle subscriber in the
-    // checked-in `job-registry.json`, and the queue rejects an unroutable job
-    // for redelivery rather than dropping it — so a graph that mounted this
-    // only where mail happened to be configured would stall those seven
-    // forever while the pods stayed up and the queue depth simply grew.
-    // Expiry is also a FOLD this graph performs: a request lapses on time
-    // whether or not anybody can be told about it.
-    //
-    // Which leaves the mail itself as the thing that can be absent, and it is
-    // absent by NAME: `AbsentJoinRequestMail` throws on every send, the
-    // notification fan-out logs it, and the request stands — the behaviour a
-    // deployment with no email provider already has. A process that claims
-    // `event-sourcing/jobs` never reaches that state, because
-    // `requireMailForConsumers` above refuses to compose it.
+    // Composed here, on the mail capability this process now owns. Everything else the join ledger
+    // takes is Postgres: the `JoinRequest` head serving both the fold and its guards, and the
+    // audience its two notices are addressed to. UNCONDITIONAL, unlike the connection ledger above.
     const joinRequest = JoinRequestWorkerFeatureInstaller.create({
       installer: {
         pipeline: PostgresJoinRequestPipelineAdapter.create({
@@ -1647,32 +1383,9 @@ export class WorkerProductionComposition {
   }
 
   /**
-   * Refuses a consuming graph that cannot send mail.
-   *
-   * `join-requests` names five commands, a state projection and the lifecycle
-   * subscriber in the checked-in `job-registry.json`, and the queue rejects an
-   * unroutable job for redelivery rather than dropping it. So a consumer that
-   * mounted everything else would stall exactly those seven forever while the
-   * pods stayed up, the liveness probe answered and the queue depth simply
-   * grew — the failure shape every refusal in this file exists to convert into
-   * a boot error.
-   *
-   * Mounting the pipeline WITHOUT mail is not the alternative. Its two wakes
-   * are the only nudge an admin ever gets about a pending request and the only
-   * notice a requester gets that theirs lapsed; a graph that folded the
-   * expiry and told nobody would look identical to a working one from every
-   * angle the fleet watches.
-   *
-   * A producer-only graph is unaffected, deliberately: it claims nothing, so
-   * nothing goes unrouted, and every existing composition that never asked for
-   * consumers keeps composing without a mail gateway.
-   *
-   * So is a graph with no resource scope, and for a narrower reason: a mail
-   * gateway holds a transport, and a composition that owns no scope can close
-   * nothing — so it could not hold one even where the deployment is fully
-   * configured. Every root that runs as a process supplies a scope; a
-   * composition without one is a partially-composed graph, and refusing it
-   * would be refusing the fixture rather than the deployment.
+   * Refuses a consuming graph that cannot send mail. `join-requests` names five commands, a state
+   * projection and the lifecycle subscriber in the checked-in `job-registry.json`, and the queue
+   * rejects an unroutable job for redelivery rather than dropping it.
    */
   private static requireMailForConsumers(input: {
     mail: WorkerMailComposition | undefined;
@@ -1686,22 +1399,9 @@ export class WorkerProductionComposition {
   }
 
   /**
-   * The three producers Trace's own subscribers dispatch into.
-   *
-   * A GRAPH THAT CONSUMES MUST HAVE ALL THREE. `reactor:evaluationTrigger` and
-   * `reactor:customEvaluationSync` send into Evaluation,
-   * `reactor:simulationMetricsSync` into Scenario, and `reactor:triggerMatch`
-   * into Automation. A consumer that claimed `event-sourcing/jobs` without one
-   * of them would route the trace side of that work and then throw on every
-   * dispatch — an online evaluation that never runs, a simulation whose metrics
-   * never settle, an alert that never fires — with the queue redelivering each
-   * one forever.
-   *
-   * A graph that does NOT consume may omit them, and that is not a loophole:
-   * it composes the definition so the registry can be inspected and tested, and
-   * nothing ever calls a handler. The proxies it gets refuse BY NAME rather
-   * than resolving to a no-op, so a graph that started consuming without the
-   * producers fails on the first dispatch instead of silently dropping it.
+   * The three producers Trace's own subscribers dispatch into. A GRAPH THAT CONSUMES MUST HAVE ALL
+   * THREE. `reactor:evaluationTrigger` and `reactor:customEvaluationSync` send into Evaluation,
+   * `reactor:simulationMetricsSync` into Scenario, and `reactor:triggerMatch` into Automation.
    */
   private static requireTraceProducers(input: {
     automation: AutomationWorkerFeatureInstaller | undefined;
@@ -1824,10 +1524,9 @@ export class WorkerProductionComposition {
   }
 
   /**
-   * The deployment's operator list, as identity's port over it.
-   *
-   * `ADMIN_EMAILS` is parsed once, by the ops feature that owns the variable,
-   * so the connection guards and the back office answer from the same list.
+   * The deployment's operator list, as identity's port over it. `ADMIN_EMAILS` is parsed once, by
+   * the ops feature that owns the variable, so the connection guards and the back office answer
+   * from the same list.
    */
   private static platformOperators({
     adminEmails,
@@ -1992,11 +1691,9 @@ export class WorkerProductionComposition {
   /** Exactly the installers the application mounts, in mount order. */
   readonly featureInstallers: readonly WorkerFeatureInstallerPort[];
   /**
-   * The installers a host wires producers against.
-   *
-   * Each publishes callable command proxies that refuse until the installer
-   * has registered, so exposing them here is what lets a host hand a producer
-   * its dispatcher before the graph starts without risking a silent drop.
+   * The installers a host wires producers against. Each publishes callable command proxies that
+   * refuse until the installer has registered, so exposing them here is what lets a host hand a
+   * producer its dispatcher before the graph starts without risking a silent drop.
    */
   readonly automation: AutomationWorkerFeatureInstaller | undefined;
   readonly evaluation: EvaluationWorkerFeatureInstaller | undefined;
@@ -2050,65 +1747,7 @@ export class WorkerProductionComposition {
 
 /**
  * The one registration order, and the reason it is written down.
- *
- * It reproduces the live registry's order exactly, because the order is
- * load-bearing rather than incidental:
- *
- *   automation           first — every trigger match in the trace, evaluation
- *                        and governance graphs is written through its command
- *   eventing-maintenance the substrate's own blob and retention sweeps, which
- *                        belong to no feature and must not depend on one
- *   langy-maintenance    the session-key reaper, composed from its own feature
- *                        package and so unconditional, like the substrate
- *                        sweeps it is mounted with
- *   api-key              the agent-sandbox key sweep, the same kind of
- *                        unconditional reaper, and where the legacy registry
- *                        mounts it: after Langy's, before GitHub's
- *   github               fleet-wide branch recheck, before the domain graphs
- *   evaluation           before trace, whose evaluation trigger and custom
- *                        evaluation sync dispatch its two commands
- *   coding-agent         before metric, log and trace, whose dispatch
- *                        subscribers close over its contribution commands
- *   governance-events    the pair the live registry mounts under one guard:
- *   gateway-spend        spend's debit adapter delivers through governance's
- *                        commands, and governance's webhook delivery process
- *                        has no producer without spend
- *   gateway-realtime-session
- *                        after spend, whose `confirmSpend` a reconciled voice
- *                        call settles through
- *   metric, log          before trace, because their coding-agent dispatch
- *                        subscribers feed the same contribution commands
- *   trace                before topic: Topic dispatches assignments through
- *                        Trace's canonical assignment port
- *   suite                before scenario, whose simulation process manager
- *                        reports item starts and completions into it
- *   scenario
- *   scenario-execution   after scenario, because starting a run means finishing
- *                        one, and a terminal event has nowhere to land until
- *                        the pipeline above it is registered
- *   experiment           after trace, which reaches it through the
- *                        computeExperimentRunMetrics proxy rather than the
- *                        other way round
- *   langy-conversation   after experiment, before topic, which is where the
- *                        legacy registry mounts it
- *   topic
- *   governance-ingestion Enterprise pulled-usage and ingestion-pull
- *   billing-reporting
- *   ops                  the three timers: the enqueue-rate tick, the daily
- *                        usage report and the ClickHouse storage gauges. Last
- *                        of the non-ledger group because it claims no routing
- *                        key and nothing waits on it
- *   authz                the grants ledger, registered after every pipeline
- *                        that can emit a grant change
  *   identity             the four ADR-101 ledgers, after AuthZ exactly as the
- *   sso-connection       legacy registry mounts them. Their relative order is
- *   scim-sync            free — none subscribes to another's events — but the
- *   join-request         group's position is not: they are the last producers
- *                        to open a durable write path
- *
- * Gaps in the middle are pipeline groups still owned by the legacy registry.
- * A group landing later slots into its documented position; nothing here
- * reorders to accommodate it.
  */
 function orderedFeatureInstallers(
   options: Parameters<typeof WorkerProductionComposition.createFromPorts>[0],
@@ -2160,12 +1799,6 @@ class WorkerProductionLifecycle extends WorkerLifecyclePort {
 
 /**
  * The Group Queue's own blob keyspace pass.
- *
- * The sweeper is handed the queue's Redis rather than a connection of this
- * composition's own: the keys it walks are written by the queue when it
- * offloads a payload, so a sweeper pointed anywhere else reports a clean
- * empty sweep forever while the real keyspace grows. Reclaim destroys bytes,
- * which is why the connection has to be the same one that wrote them.
  */
 class WorkerGroupQueueBlobSweep extends WorkerBlobSweepPort {
   static create(
@@ -2184,12 +1817,9 @@ class WorkerGroupQueueBlobSweep extends WorkerBlobSweepPort {
 }
 
 /**
- * The one organization read the internal governance project mint makes.
- *
- * The oldest team is where an organization's internal project is created, and
- * `OrganizationService` answers it by exactly this query — a `findFirst`
- * ordered by creation. Composing the whole capability to reach it would name a
- * members graph, an invite flow and a billing profile this path never touches.
+ * The one organization read the internal governance project mint makes. The oldest team is where an
+ * organization's internal project is created, and `OrganizationService` answers it by exactly this
+ * query — a `findFirst` ordered by creation.
  */
 class PrismaGovernanceOldestTeamAdapter extends ProjectOldestTeamPort {
   static create(database: { team: { findFirst: (args: never) => Promise<unknown> } }) {
@@ -2230,26 +1860,9 @@ function createEventingPersistence(
 }
 
 /**
- * The SaaS cross-pipeline meter pair, composed from this process's own graph.
- *
- * Three substrates, and none of them is new to this composition: the tenant-
- * keyed ClickHouse client the event store already resolves through, the one
- * Prisma client this process opened, and the queue's one Redis.
- *
- * The ClickHouse client is asked for by ORGANIZATION here, which the tenant
- * resolver answers because the routing directory behind it treats an
- * organization id as a tenant of itself — the same lookup composed the other
- * way round, and the same physical endpoint. That equivalence is what removes
- * the recorded blocker: metering a private-instance customer needs their own
- * cluster, and this graph reaches it without opening a second connection pool
- * beside the one the process already holds. A directory that lost the
- * organization arm would route every private-instance organization to the
- * shared instance, so the pin below states it rather than leaving it inferred.
- *
- * Attribution rides the App's own Redis keyspace: both graphs answer "which
- * organization is this project billed to" from `ttlcache:org:resolve:`, and
- * the answer cannot go stale — a project belongs to a team and a team to an
- * organization, and neither link is reassignable.
+ * The SaaS cross-pipeline meter pair, composed from this process's own graph. Three substrates, and
+ * none of them is new to this composition: the tenant- keyed ClickHouse client the event store
+ * already resolves through, the one Prisma client this process opened, and the queue's one Redis.
  */
 export function saasBillableEventsMeter(options: {
   database: BillingTenantOrganizationDatabase;
@@ -2343,15 +1956,10 @@ export class LoggedWorkerScenarioAbsence extends WorkerScenarioAbsenceReportPort
   }
 }
 
-/** Names Langy's three conversation absences once, at boot, rather than leaving them inferred. */
 /**
- * Automation settlement's seven absences, said once at boot.
- *
- * They are one class rather than seven checks scattered through the graph
- * because they answer one question a reader has exactly once — what can this
- * process NOT do about a match it settles — and because a settlement half that
- * quietly did most of the job would look identical from outside to one that did
- * all of it.
+ * Automation settlement's seven absences, said once at boot: one class
+ * rather than seven checks scattered through the graph, because they answer
+ * one question a reader has exactly once.
  */
 export class LoggedWorkerAutomationSettlementAbsence extends WorkerAutomationSettlementAbsenceReportPort {
   static create(logger: Pick<Logger, "warn">): LoggedWorkerAutomationSettlementAbsence {
@@ -2410,6 +2018,7 @@ export class LoggedWorkerAutomationSettlementAbsence extends WorkerAutomationSet
   }
 }
 
+/** Names Langy's three conversation absences once, at boot, rather than leaving them inferred. */
 export class LoggedWorkerLangyAbsence extends WorkerLangyAbsenceReportPort {
   static create(logger: Pick<Logger, "warn">): LoggedWorkerLangyAbsence {
     return new LoggedWorkerLangyAbsence(logger);
@@ -2457,11 +2066,9 @@ export class LoggedWorkerGithubAbsence extends WorkerGithubAbsenceReportPort {
 }
 
 /**
- * Reports the composition decision an absent directory capability would
- * otherwise hide.
- *
- * The connection pipeline mounts either way, so all sixteen of its routing
- * keys are claimed and a requested teardown completes on time.
+ * Reports the composition decision an absent directory capability would otherwise hide. The
+ * connection pipeline mounts either way, so all sixteen of its routing keys are claimed and a
+ * requested teardown completes on time.
  */
 export abstract class WorkerIdentityAbsenceReportPort {
   abstract withoutDirectoryTokenRevocation(): void;
@@ -2504,13 +2111,8 @@ export class LoggedWorkerTopicAbsence extends WorkerTopicAbsenceReportPort {
 }
 
 /**
- * Names the model gateway's absences once, at boot, rather than leaving them
- * inferred from a clustering schedule that never advances.
- *
- * The first is the one that matters to an operator: it says WHY no model can be
- * resolved, and the two reasons need different actions — one is a variable
- * nobody exported, the other is a capability this process does not compose yet.
- */
+ * Names the model gateway's absences once, at boot, rather than leaving them inferred from a
+ * clustering schedule that never advances.
 /** Names the one half of the tenancy graph this tier does not serve. */
 export class LoggedWorkerTenancyAbsence extends WorkerTenancyAbsenceReportPort {
   static create(logger: Pick<Logger, "info">): LoggedWorkerTenancyAbsence {
@@ -2586,14 +2188,9 @@ export class LoggedWorkerEvaluationAbsence extends WorkerEvaluationAbsenceReport
 }
 
 /**
- * No graph vertical, so Evaluation's graph-alert subscriber has nothing to
- * re-evaluate against.
- *
- * Reached only where `BASE_HOST` is unset, which is the same condition that
- * already refuses every outbound delivery: a graph alert that fired here could
- * not be sent anywhere. Listing no triggers is the honest answer — the sweep
- * finds nothing to evaluate — and the evaluation itself refuses by name rather
- * than reporting a result nobody asked it to compute.
+ * No graph vertical, so Evaluation's graph-alert subscriber has nothing to re-evaluate against.
+ * Reached only where `BASE_HOST` is unset, which is the same condition that already refuses every
+ * outbound delivery: a graph alert that fired here could not be sent anywhere.
  */
 class AbsentEvaluationGraphActivity extends AutomationGraphActivityPort {
   async getActiveGraphTriggersForProject(): Promise<[]> {
@@ -2629,11 +2226,6 @@ export class LoggedWorkerTraceAbsence extends WorkerTraceAbsenceReportPort {
 
 /**
  * The trigger-match recorder a non-consuming graph gets.
- *
- * It refuses rather than swallowing, because the only way to reach it is a
- * graph that started consuming without Automation — and a trigger match that
- * silently vanished is a customer's alert that never arrives with nothing to
- * show for it.
  */
 class AbsentTraceTriggerMatches extends AutomationTriggerMatchRecorderPort {
   async send(): Promise<void> {

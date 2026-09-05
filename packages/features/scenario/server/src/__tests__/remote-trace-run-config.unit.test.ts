@@ -1,11 +1,6 @@
 /**
- * @vitest-environment node
- *
  * Unit tests for the remote-trace fragment of the SDK run configuration,
- * plus a structural pin on the child process entry point (it runs main() at
- * import, so its wiring is asserted on the source rather than by importing
- * it).
- *
+ * @vitest-environment node
  * @see specs/scenarios/remote-trace-judging.feature
  */
 
@@ -78,12 +73,12 @@ describe("buildRemoteTraceRunConfig", () => {
   describe("given a connected target", () => {
     /** @scenario "A connected target is judged from its remote traces" */
     it("fetches remote traces the way it does for an http target", () => {
-      expect(
-        buildRemoteTraceRunConfig({ ...base, targetType: "connected" }),
-      ).toEqual(buildRemoteTraceRunConfig({ ...base, targetType: "http" }));
-      expect(
-        buildRemoteTraceRunConfig({ ...base, targetType: "connected" }),
-      ).toMatchObject({ fetchRemoteTraces: true });
+      expect(buildRemoteTraceRunConfig({ ...base, targetType: "connected" })).toEqual(
+        buildRemoteTraceRunConfig({ ...base, targetType: "http" }),
+      );
+      expect(buildRemoteTraceRunConfig({ ...base, targetType: "connected" })).toMatchObject({
+        fetchRemoteTraces: true,
+      });
     });
   });
 

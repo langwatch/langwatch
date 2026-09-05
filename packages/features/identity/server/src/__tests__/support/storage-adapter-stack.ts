@@ -69,10 +69,9 @@ export interface IdentityStack {
   /** The per-user WRITE gate: cached, and the thing that fails closed. */
   gate: { open: (userId: string) => boolean };
   /**
-   * The migration-state row resolution joins into its own query, which the
+   * The migration-state row resolution joins into its own query, which the default; a suite that
+   * wants the two to disagree — a gate outage — sets this one first and then closes the gate.
    * gate's cache cannot make stale (ADR-116 §2). It follows the gate by
-   * default; a suite that wants the two to disagree — a gate outage — sets
-   * this one first and then closes the gate.
    */
   finalized: { is: (userId: string) => boolean };
   /** The migration-state rows the born-finalized entrance writes, by user
@@ -89,19 +88,9 @@ export interface IdentityStack {
 }
 
 /**
+ * memory engine underneath as the legacy branch. `databaseHooks` are OFF by default.
  * better-auth over the identity storage adapter (ADR-116 §1), with the same
- * memory engine underneath as the legacy branch.
- *
- * `databaseHooks` are OFF by default. The adapter has to state its own facts
  * — ADR-116 §5's move from a hook-level veto to a storage-level one — and a
- * suite that always wired the hooks could not tell which of the two did it.
- * `withDatabaseHooks` turns on the application's own composition, hooks and
- * adapter together, which is the one arrangement that can prove they do not
- * both state the fact.
- *
- * `inert` gives the ports nothing to answer with and makes every identity
- * WRITE throw, so a closed gate that nevertheless put a row into identity
- * storage fails the suite rather than passing quietly.
  */
 export function identityStack({
   inert = false,
@@ -181,13 +170,8 @@ export function identityStack({
   );
 
   /**
-   * The born-finalized entrance, in memory, in the legs ADR-116 §3 pins:
    * the waited append first, then the row writes, then the projection.
-   *
-   * The ids are the entrance's own — the user id derived from the address so
-   * a retry converges, the command id the one the BACKFILL would have used
-   * for `User.email`, so the entrance and a later adoption pass state the
-   * same command and the store dedupes rather than duplicating.
+   * The born-finalized entrance, in memory, in the legs ADR-116 §3 pins:
    */
   const birth: IdentityBirthPort = {
     async bear({ row, email, createdAtMs }) {
@@ -283,10 +267,9 @@ export function flaggedSignUp(auth: AuthUnderTest, email: string): Promise<strin
 }
 
 /**
- * The same sign-up, driven so that a failure THROWS rather than becoming a
- * response. `asResponse` turns better-auth's own error handling into a
- * status code, which is the wrong lens for asserting that a refusal kept its
- * handled code all the way out.
+ * The same sign-up, driven so that a failure THROWS rather than becoming a response. `asResponse`
+ * turns better-auth's own error handling into a status code, which is the wrong lens for asserting
+ * that a refusal kept its handled code all the way out.
  */
 export function flaggedSignUpOrThrow(auth: AuthUnderTest, email: string): Promise<unknown> {
   return runWithIdentityBirth(() =>

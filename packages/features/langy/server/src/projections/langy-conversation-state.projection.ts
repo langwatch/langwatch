@@ -64,17 +64,9 @@ const langyConversationEvents = [
 ] as const;
 
 /**
- * Type-safe fold projection for Langy conversation state.
- *
- * - `implements FoldEventHandlers` enforces a handler for every event schema.
- * - Handler names are derived from event type strings (e.g.
- *   `"lw.langy_conversation.message_recorded"` -> `handleLangyConversationMessageRecorded`).
- * - `CreatedAt` / `UpdatedAt` / `LastEventOccurredAt` are auto-managed by the base.
- *
- * The reduction itself lives in the Langy contract's
+ * Type-safe fold projection for Langy conversation state. - `implements FoldEventHandlers` enforces
+ * a handler for every event schema. - Handler names are derived from event type strings (e.g.
  * `foldLangyConversationState` (ADR-059) — the same reducer a browser spine
- * fold will run. This class is only the server rig: schema routing, the
- * store, versioning, and the bookkeeping stamps.
  */
 export class LangyConversationStateFoldProjection
   extends AbstractFoldProjection<

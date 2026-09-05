@@ -1,16 +1,7 @@
 /**
- * The directory-sync ledger writer.
- *
- * Two properties, and they pull against each other on purpose: a directory's
- * push must never fail because its HISTORY could not be written, AND the loss
- * must be impossible to mistake for weather. So the writer stages, swallows,
- * and says at `error` exactly which registration is missing.
- *
- * The second half is what a process that HAS the registration can never
- * exercise, and it is the half a reader of the log depends on: the API
- * registers `scim-sync` now, so the no-sender branch belongs to a deployment
- * that composed no queue. It is asserted here rather than there because the
- * swallow leaves nothing else to observe.
+ * The directory-sync ledger writer. Two properties, and they pull against each other on purpose: a
+ * directory's push must never fail because its HISTORY could not be written, AND the loss must be
+ * impossible to mistake for weather.
  */
 import {
   ISSUE_SCIM_TOKEN_COMMAND_TYPE,

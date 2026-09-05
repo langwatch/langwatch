@@ -1,15 +1,6 @@
 /**
- * @vitest-environment node
- *
  * The mapping from one folded row plus its plan row to one dropdown entry.
- *
- * The key is what the whole feature stands on: the dialog rebuilds the key of
- * what it currently holds to mark the matching entry, so a read that keys
- * differently marks nothing and offers the same configuration twice. The first
- * test here builds the SAME configuration both ways, once through the shared
- * recipe the dialog uses (`@langwatch/suite-contract`'s `configurationKey`)
- * and once through this read, and requires one string.
- *
+ * @vitest-environment node
  * @see specs/features/agent-testing/run-configuration-history.feature
  */
 

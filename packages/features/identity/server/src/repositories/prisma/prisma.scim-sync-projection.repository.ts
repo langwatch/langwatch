@@ -18,19 +18,8 @@ import type {
 } from "@langwatch/eventing";
 
 /**
- * The directory-sync pipeline's projection store (D08): the Postgres
- * `ScimSyncState` head and its cursor, written under the queue's per-sync
- * lock, plus the read the guards run against.
- *
- * One row per aggregate, so the cursor rides on the row itself rather than in
- * a sibling table — and the row is written last-field-wins in one upsert,
- * which makes the whole apply the commit marker. A crash before it leaves
- * nothing; a crash after it is a completed apply.
- *
- * Nothing outside the fold writes here. A hand-edited row is not a
- * configuration change, it is a value the next event or the next replay
- * overwrites — which matters most for `deadLetters`: clearing one by hand
- * would say a removal happened that did not.
+ * The directory-sync pipeline's projection store (D08): the Postgres `ScimSyncState` head and its
+ * cursor, written under the queue's per-sync lock, plus the read the guards run against.
  */
 export class PrismaScimSyncProjectionRepository
   implements StateProjectionStore<ScimSyncFoldState>, ScimSyncReadRepository
@@ -145,10 +134,7 @@ export class PrismaScimSyncProjectionRepository
 }
 
 /**
- * There is no view-model helper here on purpose. The projection already
- * carries only what a failure surface may publish — the connection, the
- * operation, a reason code, a count and the person it was about — so a
- * reader shapes what it needs from `lastFailure` and `deadLetters` directly.
- * A helper with no consumer would be a surface claiming to exist; the ops
- * page that reads these is not part of D08.
+ * There is no view-model helper here on purpose. The projection already carries only what a failure
+ * surface may publish — the connection, the operation, a reason code, a count and the person it was
+ * about — so a reader shapes what it needs from `lastFailure` and `deadLetters` directly.
  */

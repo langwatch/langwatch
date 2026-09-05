@@ -1,9 +1,6 @@
 /**
+ * rows are upserted whole, replay's writes win over stated linkage,
  * The identity fold's store against real Postgres (ADR-101 §3, ADR-116):
- * rows are upserted whole, replay's writes win over stated linkage, and the
- * fold never overwrites a secret column it cannot know about.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it.
  * Spec: specs/identity/identifier-model.feature.
  */
 import { nanoid } from "nanoid";

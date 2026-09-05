@@ -1,21 +1,6 @@
 /**
- * The three operational loops this process owns, and nothing else does.
- *
- *   anomaly detection   a per-tenant enqueue-rate tick, so a runaway tenant
- *                       shows on the Ops page within a minute instead of as a
- *                       queue nobody can drain
- *   usage telemetry     the anonymous daily report a self-hosted install sends
- *                       about itself; off on SaaS and off wherever an operator
- *                       said so
- *   storage stats       what ClickHouse is actually holding, which every size,
- *                       capacity and backup alert is built on
- *
- * None of the three is a pipeline: they react to the passage of time rather
- * than to an event, so no routing key could carry them and no queue could
- * redeliver them. That is exactly why they are easy to leave uninstalled and
- * impossible to notice — an alert with no series looks like an alert that is
- * not firing.
- *
+ * The three operational loops this process owns, and nothing else does. anomaly detection   a per-
+ * tenant enqueue-rate tick,
  * @see specs/ops/clickhouse-storage-metrics.feature
  */
 
@@ -44,19 +29,13 @@ const USAGE_STATS_RECEIVER = "https://app.langwatch.ai/api/track_usage";
 
 /**
  * The `CustomGraph.kind` a chart built in the chart builder carries.
- *
- * Stated by this root rather than read from the Dashboard package, because the
- * count exists to answer "how much is the chart BUILDER used": saved workbench
- * charts share the table and folding them in would read as growth in a feature
- * nobody adopted.
  */
 const BUILDER_CHART_KIND = "builder";
 
 /**
- * Reports the operational loops this process could not compose.
- *
- * Each absence is silent by construction: the anomaly page just never
- * surfaces a tenant, and the storage gauges just never appear.
+ * Reports the operational loops this process could not compose. Each absence is silent by
+ * construction: the anomaly page just never surfaces a tenant, and the storage gauges just never
+ * appear.
  */
 export abstract class WorkerOpsAbsenceReportPort {
   abstract withoutAnomalyDetection(): void;
@@ -73,11 +52,9 @@ export type WorkerOpsCompositionInput = Readonly<{
   /** The organization's own ClickHouse endpoint, for its usage counts. */
   resolveOrganizationClient: ((organizationId: string) => UsageStatsClickHouseClient) | undefined;
   /**
-   * Every configured endpoint, for the one read that is nobody's tenant.
-   *
-   * `system.parts` is a property of an INSTALL rather than of a tenant, and an
-   * install with private organization routes has more than one. Absent leaves
-   * the storage gauges with no producer, which is reported by name.
+   * Every configured endpoint, for the one read that is nobody's tenant. `system.parts` is a
+   * property of an INSTALL rather than of a tenant, and an install with private organization routes
+   * has more than one.
    */
   resolveClickHouseInstances: (() => Promise<readonly StorageStatsInstance[]>) | undefined;
   absence?: WorkerOpsAbsenceReportPort;
@@ -124,11 +101,9 @@ export function createWorkerOps(options: WorkerOpsCompositionInput): WorkerOpsCo
 }
 
 /**
- * The hard-tier hook, which logs and pages rather than pausing.
- *
- * Deliberately not an auto-pause: a tenant this loop is wrong about would be
- * cut off by a heuristic, so the detector surfaces the anomaly and an operator
- * decides. The log line is the page.
+ * The hard-tier hook, which logs and pages rather than pausing. Deliberately not an auto-pause: a
+ * tenant this loop is wrong about would be cut off by a heuristic, so the detector surfaces the
+ * anomaly and an operator decides. The log line is the page.
  */
 class LoggedHardTierAlert extends AnomalyHardTierAlertPort {
   static create(logger: Logger): LoggedHardTierAlert {
@@ -173,12 +148,9 @@ class WorkerUsageStatsClickHouse extends UsageStatsClickHouseClientResolver {
 }
 
 /**
- * The receiver, which is LangWatch's own hosted install.
- *
- * A plain fetch rather than the SSRF-fenced sender: the destination is a
- * constant in this file rather than anything a customer configured, so there is
- * no customer-supplied host to fence and nothing of the customer's own to leak
- * to one.
+ * The receiver, which is LangWatch's own hosted install. A plain fetch rather than the SSRF-fenced
+ * sender: the destination is a constant in this file rather than anything a customer configured, so
+ * there is no customer-supplied host to fence and nothing of the customer's own to leak to one.
  */
 class WorkerUsageStatsTelemetry extends UsageStatsTelemetryClient {
   static create(): WorkerUsageStatsTelemetry {

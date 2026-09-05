@@ -1,9 +1,6 @@
 /**
- * The UI-action dispatch/claim/complete protocol, against fakes
- * (specs/langy/langy-ui-actions.feature). The Redis fake models exactly the
- * primitives the service leans on — SET NX, BLPOP with a timeout, key
- * deletion — because the at-most-once and away-detection guarantees live in
- * how those primitives are sequenced.
+ * The UI-action dispatch/claim/complete protocol, against fakes (specs/langy/langy-ui-
+ * actions.feature).
  */
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -49,10 +46,9 @@ interface FakeStore {
 }
 
 /**
- * `blpopBehavior` scripts the blocking waits in order: each call takes the
- * next behavior. "wait-empty" models the timeout with nothing arriving;
- * a function models something landing mid-wait (it runs, then the list is
- * read).
+ * `blpopBehavior` scripts the blocking waits in order: each call takes the next behavior. "wait-
+ * empty" models the timeout with nothing arriving; a function models something landing mid-wait (it
+ * runs, then the list is read).
  */
 function makeRedis(blpopBehavior: Array<"wait-empty" | (() => void)> = []): {
   redis: UiActionRedis;

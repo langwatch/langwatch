@@ -41,14 +41,7 @@ import type { WorkerAutomationDeliveryComposition } from "./worker-automation-gr
 import type { AutomationProjectIdentityPort } from "@langwatch/automation-server";
 
 /**
- * What a scheduled report reads its traces through.
- *
- * Narrow on purpose. A trace-query report asks trace storage ONE question —
- * the top rows matching the author's saved query over the report's window —
- * and the reader that answers it is a ClickHouse repository plus the evaluation
- * summaries a row is labelled with. Naming the question rather than the whole
- * trace-list capability is what keeps this composition free of the topic
- * enrichment and facet machinery a report never renders.
+ * What a scheduled report reads its traces through. Narrow on purpose.
  */
 export abstract class WorkerReportTraceListPort {
   abstract listReportTraces(input: {
@@ -63,11 +56,6 @@ export abstract class WorkerReportTraceListPort {
 
 /**
  * The traces a report lists, over a trace-list reader this process composes.
- *
- * `ReportTraceRowService.toReportTraceRow` is the feature's own mapper rather than a second copy of
- * it here: the report's row shape (a snipped input, a numeric cost, a deep
- * link) is what the templates render, and two mappers would let a report and
- * the traces page disagree about the same trace.
  */
 export class ComposedWorkerReportTraceList extends WorkerReportTraceListPort {
   static create(input: {
@@ -136,17 +124,7 @@ export class ComposedWorkerReportTraceList extends WorkerReportTraceListPort {
 }
 
 /**
- * The trace reader a report lists through, composed over this process's own
- * ClickHouse.
- *
- * `TraceListService` is the one implementation of that read, so it is composed
- * rather than re-issued: the retention floor, the visibility teaser and the
- * evaluation labels a row carries are that service's correctness, and a second
- * query here is how a report starts disagreeing with the traces page it links
- * to. Its two other collaborators are answered honestly — evaluation summaries
- * from Evaluation's own ClickHouse repository, and a topic reader that refuses
- * by name because a list read never asks it anything (only facet enrichment
- * does, and a report renders no facets).
+ * The trace reader a report lists through, composed over this process's own ClickHouse.
  */
 export function createWorkerReportTraceList(options: {
   resolveClickHouseClient: Parameters<typeof TraceListClickHouseRepository.create>[0];
@@ -179,11 +157,6 @@ export function createWorkerReportTraceList(options: {
 
 /**
  * A stand-in whose every member refuses by name.
- *
- * A proxy rather than an object literal because these are collaborator
- * interfaces another package declared: writing out each member would be a
- * second declaration of somebody else's interface, and the copy is what goes
- * stale when the real one grows a method.
  */
 function refuseReportRead<T extends object>(capability: string): T {
   return new Proxy({} as T, {
@@ -237,34 +210,8 @@ export type WorkerReportSchedule = Readonly<{
 }>;
 
 /**
- * The scheduled-report calendar, composed from what this process already holds.
- *
- * WHAT WAS MISSING. `ReportDispatchService.dispatchScheduledReport` is Automation's own handler and
- * it had no caller anywhere in the tree: the loop that claims a due
- * `ScheduledJob` and the registration that maps `reportTrigger` onto the
- * handler both lived in the deleted application's composition root, so every
- * scenario in `specs/monitors/report-content.feature` described code nothing
- * could reach. A report could be authored, saved and shown a next-run time,
- * and never send.
- *
+ * The scheduled-report calendar, composed from what this process already holds. WHAT WAS MISSING.
  * WHAT IT IS. ADR-044 §4's in-process calendar: a worker-only loop that sleeps
- * until the soonest due row, atomically leases it, and fires it into the
- * handler registered for its `targetType`. Correctness is one Postgres
- * conditional update, so every worker runs the loop and races the lease rather
- * than one pod holding a leader lock.
- *
- * THE REGISTRY IS THIS COMPOSITION'S OWN, not the module singleton. A process
- * singleton throws on a second registration of the same `targetType`, so a
- * suite that composes the graph twice — or a deployment that ever composed two
- * — would fail on the second boot rather than on the mistake. One registry per
- * composed calendar keeps the throw meaningful.
- *
- * IT RECONCILES AT BOOT, and on this branch that is load-bearing rather than a
- * self-heal: the interactive process composes `PostgresAutomationAdapter` with
- * a `ScheduledJobStorePort` whose `upsertForTarget` refuses by name, so a
- * report saved there writes its `Trigger` row and no calendar row at all. The
- * reconcile sweep is create-if-missing and race-safe across the fleet, so it is
- * what gives an authored report a slot to be claimed.
  */
 export function createWorkerReportSchedule(
   options: WorkerReportScheduleCompositionOptions,
@@ -366,12 +313,9 @@ export function createWorkerReportSchedule(
 }
 
 /**
- * Automation's three-method calendar port, over Eventing's `ScheduledJob` store.
- *
- * The two packages describe the same table from opposite ends — Automation
- * writes a report's slot, Eventing claims and settles it — and this is the one
- * place they meet. It is a narrowing rather than a second store: a schedule
- * written through anything but the row the loop scans would come due nowhere.
+ * Automation's three-method calendar port, over Eventing's `ScheduledJob` store. The two packages
+ * describe the same table from opposite ends — Automation writes a report's slot, Eventing claims
+ * and settles it — and this is the one place they meet.
  */
 class WorkerReportScheduleJobs extends ScheduledJobStorePort {
   static create(store: ScheduledJobStore): WorkerReportScheduleJobs {
@@ -416,10 +360,9 @@ class WorkerReportScheduleJobs extends ScheduledJobStorePort {
 }
 
 /**
- * The cross-pod wake a newly written schedule publishes, best-effort.
- *
- * Postgres is the correctness layer: a dropped publish or an absent Redis costs
- * only the time to the next poll backstop, never a fire.
+ * The cross-pod wake a newly written schedule publishes, best-effort. Postgres is the correctness
+ * layer: a dropped publish or an absent Redis costs only the time to the next poll backstop, never
+ * a fire.
  */
 class WorkerSchedulerWake extends SchedulerWakePort {
   constructor(private readonly redis: RedisConnection | null) {

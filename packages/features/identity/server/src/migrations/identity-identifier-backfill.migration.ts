@@ -4,18 +4,8 @@ import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../identity-migrati
 
 /**
  * D01 — the identifier backfill as the runner sees it (ADR-101 §6): the
- * `SystemMigration` contract over `@langwatch/identity-server`'s
- * IdentityBackfillService, which owns the pass. The runner's shape stays the
- * app's, the way AuthzEngineMigration keeps it for the grants engine — the
- * domain package never couples to the runner package.
- *
- * Tenant = user. Finalization is the LATCH: the adapter's per-user write
- * gate (write-gate.ts) reads exactly this migration's record, so the moment
- * a user finalizes here, their domain-significant better-auth writes start
- * emitting identity events structurally.
- *
- * Spec: specs/identity/identifier-model.feature ("The backfill adopts
- * existing accounts and proves itself per user").
+ * `SystemMigration` contract over `IdentityBackfillService`.
+ * Spec: specs/identity/identifier-model.feature.
  */
 export class IdentityIdentifierBackfillMigration implements SystemMigration {
   // Never rename: the stable state-table key. The write gate reads exactly

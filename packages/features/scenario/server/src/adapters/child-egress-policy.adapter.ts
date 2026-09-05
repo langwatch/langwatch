@@ -1,18 +1,6 @@
 /**
- * The outbound fence a scenario child dials an HTTP target through, carried
- * from the parent rather than read again in the child.
- *
- * A child inherits an allowlisted handful of the operator's environment on
- * purpose, and it runs under `SKIP_ENV_VALIDATION`, so a policy it resolved
- * from `process.env` itself would be the library DEFAULT rather than the
- * deployment's: an install that blocks local addresses everywhere else would
- * silently stop blocking them the moment the call moved into a child. The
- * parent resolves it once, from the same configuration leaves every other
- * outbound call in that process reads, and states it here.
- *
- * TLS is deliberately absent. `resolveChildTlsEnv` already owns that decision
- * and expresses it as the child's `NODE_TLS_REJECT_UNAUTHORIZED`; a second
- * field here would be a second answer to one question.
+ * The outbound fence a scenario child dials an HTTP target through, carried from the parent rather
+ * than read again in the child.
  */
 
 import { z } from "zod";
@@ -40,12 +28,9 @@ export class ChildEgressPolicyAdapter {
   }
 
   /**
-   * The parent's policy, or a throw naming the variable.
-   *
-   * Never a default: a missing or malformed document means the parent and the
-   * child disagree about what this build forwards, and every guess available
-   * here opens the fence rather than closing it. Failing the run is the one
-   * outcome that cannot quietly widen egress.
+   * The parent's policy, or a throw naming the variable. Never a default: a missing or malformed
+   * document means the parent and the child disagree about what this build forwards, and every
+   * guess available here opens the fence rather than closing it.
    */
   static decode(raw: string | undefined): ScenarioEgressPolicy {
     if (!raw) {

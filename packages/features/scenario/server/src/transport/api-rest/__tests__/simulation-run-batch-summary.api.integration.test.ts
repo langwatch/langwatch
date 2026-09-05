@@ -1,7 +1,6 @@
 /**
- * GET /api/simulation-runs/batches/:batchRunId serves one batch as a resource
- * of its own, so a CI job polls the batch id it was handed at scheduling time.
- *
+ * GET /api/simulation-runs/batches/:batchRunId serves one batch as a resource of its own, so a CI
+ * job polls the batch id it was handed at scheduling time.
  * @see specs/features/simulation-runs-batch-completion.feature
  */
 import {

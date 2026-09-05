@@ -23,28 +23,16 @@ import type { JoinRequestService } from "../join-request.service";
 const logger = createLogger("langwatch:identity:join-request-adapters");
 
 /**
- * The KSUID resource an organization-scoped grant is born under. Spelled as a
- * literal, the way every other feature package spells its own: the prefix is a
- * PERSISTED format, and a second description of it writes bindings the
- * revocation queries never find.
+ * The KSUID resource an organization-scoped grant is born under. Spelled as a literal, the way
+ * every other feature package spells its own: the prefix is a PERSISTED format, and a second
+ * description of it writes bindings the revocation queries never find.
  */
 const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
 
 /**
  * How a join approval becomes a membership: the `OrganizationUser` row plus
- * the organization-scoped grant, in the SAME two-step shape an invitation
- * acceptance and the SSO auto-join already use (ADR-092 — the row is a table
- * write, the grant is a ledger command, and they cannot share a transaction).
- *
- * Two things make it safe to re-run, which is what a retried approval needs:
- * `skipDuplicates` on the row and `onDuplicate: "skip"` on the grant. So an
- * approval retried after a partial failure finishes the job rather than
- * attaching a second membership.
- *
- * The role is the literal default and there is no parameter for it. An
- * approval — by an admin or by the policy — grants MEMBER and nothing else;
- * least privilege by construction, and an admin who wants to hand over more
- * sends a formal invitation, which is the flow that owns roles and teams.
+ * the organization-scoped grant, the SAME two-step shape invitation
+ * acceptance and SSO auto-join already use (ADR-092).
  */
 export class PrismaJoinMembership implements JoinMembershipPort {
   constructor(
@@ -106,13 +94,9 @@ export class PrismaJoinMembership implements JoinMembershipPort {
 }
 
 /**
- * The organization's joining setting, as two plain columns.
- *
- * Not event-sourced, on purpose: it is configuration an administrator sets,
- * like every other organization setting, and the thing that needs a history
- * is the requests it produces rather than the switch itself. The change is
- * still audited — the setting write goes through the organization service's
- * own audited update path.
+ * The organization's joining setting, as two plain columns. Not event-sourced, on purpose: it is
+ * configuration an administrator sets, like every other organization setting, and the thing that
+ * needs a history is the requests it produces rather than the switch itself.
  */
 export class PrismaJoinSettings implements JoinSettingPort {
   constructor(private readonly prisma: PrismaClient) {}
@@ -150,12 +134,9 @@ export class PrismaJoinSettings implements JoinSettingPort {
 }
 
 /**
- * Who is told, and how.
- *
- * Every fan-out is `Promise.allSettled`, for the reason D11's re-request mail
- * gives: one bouncing admin address must not silence the rest. A mail that
- * cannot be sent is logged and the request stands — the durable fact is the
- * request, not the notification.
+ * Who is told, and how. Every fan-out is `Promise.allSettled`, for the reason D11's re-request mail
+ * gives: one bouncing admin address must not silence the rest. A mail that cannot be sent is logged
+ * and the request stands — the durable fact is the request, not the notification.
  */
 export class EmailJoinRequestNotifier implements JoinRequestNotifier {
   constructor(
@@ -369,17 +350,9 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
 }
 
 /**
- * What the two wakes actually do (D12): send the one reminder, and dispatch
- * the guarded `expireJoin` command.
- *
- * A command rather than a projection write, and that is the point — the
- * process manager decides WHEN, the guard still decides WHETHER. It re-reads
- * the folded deadline, so a wake that fires early expires nothing.
- *
- * The write surface arrives as a thunk rather than an instance: its ledger
- * resolves the pipeline handle when a command actually commits, so a
- * dispatcher constructed during composition still appends once the process
- * has finished wiring its eventing.
+ * What the two wakes actually do (D12): send the one reminder, and dispatch the guarded
+ * `expireJoin` command. A command rather than a projection write, and that is the point — the
+ * process manager decides WHEN, the guard still decides WHETHER.
  */
 export class JoinRequestLifecycleDispatcher implements JoinRequestLifecyclePort {
   constructor(

@@ -16,14 +16,9 @@ import {
 } from "./prisma.identifier.mapper";
 
 /**
+ * Secrets are absent deliberately, and the list is narrow on purpose: a replay that rewrote
+ * `access_token` would undo a token refresh that legitimately happened after the event.
  * The columns the fold owns on `Account` (ADR-116's bridge phase).
- *
- * Secrets are absent deliberately, and the list is narrow on purpose: a
- * replay that rewrote `access_token` would undo a token refresh that
- * legitimately happened after the event. `type` is absent too — a legacy
- * NextAuth column better-auth does not even map, left to its default.
- * Widening this list is how the payload rule stops being true, so the
- * integration suite pins it.
  */
 export const FOLD_OWNED_ACCOUNT_COLUMNS = [
   "id",
@@ -47,18 +42,9 @@ function linkedIdentifiers(state: IdentityFoldState): LinkedIdentifier[] {
 }
 
 /**
+ * Postgres `Identifier` head, the linkage columns of `Account`, and the cursor — all written under
+ * the queue's per-user lock.
  * The identity pipeline's projection store (ADR-101 §3, ADR-116): the
- * Postgres `Identifier` head, the linkage columns of `Account`, and the
- * cursor — all written under the queue's per-user lock.
- *
- * `Identifier` is a pure event-truth head: every column is fold-written and
- * rows are never deleted (DETACHED is a tombstone; erasure wipes value
- * columns and keeps the row).
- *
- * `Account` is the OTHER projection of the same log. better-auth reads and
- * writes it with the completely stock adapter, so this store owns only its
- * linkage columns and reconciles existence: a live identifier projects to a
- * row, a tombstoned one projects to none.
  */
 export class PrismaIdentityProjectionRepository implements StateProjectionStore<IdentityFoldState> {
   static create({
@@ -148,21 +134,9 @@ export class PrismaIdentityProjectionRepository implements StateProjectionStore<
   }
 
   /**
-   * One identifier row, upserted whole.
-   *
-   * No database constraint arbitrates an ADDRESS collision here, and none
-   * can: ONE user legitimately holds several proven identifiers carrying the
-   * same address — a credential sign-in and a Google sign-in are two rows
-   * with one email, both VERIFIED. "One USER per proven address" is not a
-   * row-level rule, so it lives in `IdentifierReservation`, claimed before
-   * any fact is stated.
-   *
-   * A provider SUBJECT is arbitrated, by the partial unique index on
-   * `(providerId, providerAccountId)` over the live states (migration
-   * 20260824120004). That collision should be unreachable — every subject
-   * comes from an `Account` row, and `Account` is unique on the same pair —
-   * so reaching it means an invariant broke upstream, and the fold's job is
-   * to say so without dying.
+   * One identifier row, upserted whole. No database constraint arbitrates an ADDRESS collision
+   * here, and none can: ONE user legitimately holds several proven identifiers carrying the same
+   * address — a credential sign-in and a Google sign-in are two rows with one email, both VERIFIED.
    */
   private async writeIdentifier(fact: IdentifierFact): Promise<void> {
     const { id, ...columns } = factToRow(fact);
@@ -178,49 +152,9 @@ export class PrismaIdentityProjectionRepository implements StateProjectionStore<
   }
 
   /**
-   * A subject already held by another live identifier: park this one and keep
-   * folding. True when that is what happened, so the caller rethrows anything
-   * else.
-   *
-   * The INCUMBENT keeps the subject and the newcomer is skipped, rather than
-   * either row being rewritten — a fold for one user must not reach across
-   * and demote another user's projection. The losing FACT is never lost: it
-   * stays in the log, and a replay onto a database where the subject is free
-   * projects it.
-   *
-   * What happens to the losing USER depends on where they are, and only one
-   * of the two cases is contained:
-   *
-   *   still being backfilled (no record, or `migrated`) — contained. The
-   *     next pass re-reads their legacy rows, `prove` diffs them against the
-   *     projection, the missing identifier shows up as a parity diff and the
-   *     user is HELD with a report. That is the system saying "not right
-   *     yet", and it is a far better outcome than a projection that stops
-   *     folding for everybody.
-   *
-   *   already `finalized` — NOT contained. `finalized` is terminal, so the
-   *     runner short-circuits on it (`isTerminalTenantStatus`) and no later
-   *     pass ever revisits them. A latched user linking a new enterprise
-   *     account whose subject collides therefore ends up with the identifier
-   *     permanently absent from the projection, the cursor committed, and
-   *     nothing scheduled that would notice. Their `Account` bridge row is
-   *     still written — `projectAccounts` reads the fold STATE, not the rows
-   *     this method wrote — so what actually covers them is the legacy
+   * A subject already held by another live identifier: park this one and keep folding. True when
+   * that is what happened, so the caller rethrows anything else.
    *     fallback ADR-116 exists to retire. This WARN is the only signal.
-   *
-   * (An unlatched user cannot reach here at all: their ceremonies state no
-   * facts, so nothing of theirs is ever folded.)
-   *
-   * Closing the second case properly means refusing the collision at COMMAND
-   * time rather than parking it at fold time — a subject lock mirroring
-   * `IdentifierReservation`'s address lock, so the attach is refused
-   * synchronously and the customer is told at link time. Tracked as
-   * follow-up; the unique index makes the collision unreachable from the
-   * data we have, which is why this is a net rather than a hole.
-   *
-   * Both identifier ids are named in the line, because the interesting fact
-   * is the PAIR — one of them is a duplicate or a takeover, and neither id
-   * alone says which.
    */
   private async parkedOnSubjectCollision({
     fact,
@@ -261,13 +195,9 @@ export class PrismaIdentityProjectionRepository implements StateProjectionStore<
   }
 
   /**
+   * The lock is row-truth taken before a fact is stated, so the fold never CREATES one — it only
+   * lets go.
    * The address locks this user no longer backs (ADR-116 §6).
-   *
-   * The lock is row-truth taken before a fact is stated, so the fold never
-   * CREATES one — it only lets go. A user's claim survives while a live
-   * identifier of theirs still carries the value; a detach, a dead end and an
-   * erasure (which nulls the value) all end that, and the address becomes
-   * somebody else's to take.
    */
   private async releaseAddressLocks({
     userId,
@@ -286,13 +216,8 @@ export class PrismaIdentityProjectionRepository implements StateProjectionStore<
   }
 
   /**
+   * Convergent rather than atomic.
    * `Account` as the identifiers imply it (ADR-116).
-   *
-   * Convergent rather than atomic. On the live path better-auth has already
-   * written this row, with the id the ceremony pinned, so the upsert
-   * re-asserts values that already agree — it costs a write and changes
-   * nothing. It earns its place on replay, and when a detach has to remove
-   * a row the stock adapter did not.
    */
   private async projectAccounts({
     userId,
@@ -311,14 +236,8 @@ export class PrismaIdentityProjectionRepository implements StateProjectionStore<
   }
 
   /**
-   * A `User` row that is not there is an ANOMALY, not a branch: the fold is
-   * projecting a user's linkage while nothing in `User` carries them.
-   *
-   * Surfaced, and the projection stays total — the rows are written anyway,
-   * because `Account` carries no database foreign key (the schema's
-   * `relationMode = "prisma"` makes the cascade the client's) and a fold that
-   * silently declined would leave the projection quietly incomplete with
-   * nothing to read about it.
+   * A `User` row that is not there is an ANOMALY, not a branch: the fold is projecting a user's
+   * linkage while nothing in `User` carries them.
    */
   private async reportWhenUserIsMissing({
     userId,
@@ -353,21 +272,7 @@ export class PrismaIdentityProjectionRepository implements StateProjectionStore<
 
   /**
    * One live identifier's `Account` row.
-   *
-   * The provider written here is better-auth's OWN id, never the folded
-   * vocabulary: the identifier's `provider` collapses auth0, okta and every
-   * custom OIDC connection into `oidc`, while `Account`'s uniqueness and the
-   * genericOAuth callback's lookup are both keyed by the unfolded name — so
-   * writing the folded one makes a held user's account unfindable by the
    * library that wrote it. A fact stated before ADR-116 carries neither a
-   * subject nor an unfolded id, and its row is left as better-auth's own.
-   *
-   * The issuer is written for the same reason, one step further out:
-   * better-auth 1.7 looks an account up by `(issuer, accountId)`, and for a
-   * real OIDC connection the issuer is the IdP's own URL — nothing the fold
-   * could derive from anything else the identifier holds. So it is stated on
-   * the fact, carried by the identifier and projected here, never computed.
-   * A fact stated before it carried one leaves the column as it found it.
    */
   private async upsertLiveAccount(fact: LinkedIdentifier): Promise<void> {
     if (!isLiveIdentifierState(fact.state)) return;

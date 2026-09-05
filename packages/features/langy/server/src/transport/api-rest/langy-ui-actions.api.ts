@@ -1,22 +1,6 @@
 /**
- * The agent-to-page UI-action dispatch surface — `langwatch ui call` /
- * `langwatch ui actions` land here, authenticated with the worker's own
- * per-conversation session key.
- *
- * Mounted under `/api/langy/ui`, beside the key-authed turn surface
- * (`langy-turns.api.ts`) and deliberately NOT under `/api/internal` (which the
- * Helm ingress blocks). Same refusal order as that family, same dark-404
- * stance: with `release_langy_ui_actions` off the surface answers Hono's own
- * `c.notFound()`, byte-identical to an unmounted path, so rollback looks like
- * the feature was never deployed.
- *
- * The dispatch enforces the ACTION's own permission as the API-key ceiling
- * (`experiments:update` for a workbench write, `evaluations:create` for a
- * run), so the browser path, which executes under the human's full session,
- * can never be used to exceed what the worker's key holds. The conversation id
- * in the body is a claim, not a credential: the service proves it belongs to
- * the key's owning user and project, and a foreign id dies as not-found
- * without confirming anything exists.
+ * The agent-to-page UI-action dispatch surface — `langwatch ui call` / `langwatch ui actions` land
+ * here, authenticated with the worker's own per-conversation session key.
  */
 
 import { handlerManagedAuth } from "@langwatch/api";
@@ -56,12 +40,6 @@ const uiActionAuth = handlerManagedAuth({
 
 /**
  * The catalogue this DOOR needs, which is one method wider than the service's.
- *
- * `GET /actions` publishes the whole catalogue — that is how a CLI discovers
- * what it may dispatch and with what payload — and the service, which only
- * ever resolves a kind somebody already named, has no reason to enumerate.
- * Extending the port here rather than widening the service's keeps a process
- * that composes only the panel from having to answer a question it never asks.
  */
 export abstract class LangyUiActionRestCatalogPort extends LangyUiActionCatalogPort {
   /** Every kind this process serves, in no particular order. */
@@ -85,10 +63,9 @@ export type LangyUiActionsRestPorts = LangyRestCredentialPorts &
     /** Which kinds exist, and what each one's payload must look like. */
     actions: () => LangyUiActionRestCatalogPort;
     /**
-     * Runs an action server-side when the page is away, where this process can.
-     *
-     * Absent means an away page is a refusal rather than a silent backend run —
-     * the honest answer for a process that holds no workbench execution stack.
+     * Runs an action server-side when the page is away, where this process can. Absent means an
+     * away page is a refusal rather than a silent backend run — the honest answer for a process
+     * that holds no workbench execution stack.
      */
     backendRunner?: UiActionBackendRunner | undefined;
   }>;

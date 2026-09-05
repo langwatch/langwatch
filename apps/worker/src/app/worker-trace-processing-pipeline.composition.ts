@@ -88,59 +88,8 @@ import { createWorkerTraceNarrowPorts } from "./worker-trace-narrow-ports.compos
 import type { WorkerTrackedEventComposition } from "./worker-tracked-event.composition";
 
 /**
- * The trace processing pipeline, composed and MOUNTED in this process out of
- * packages alone.
- *
- * ALL TWENTY-NINE ROUTING KEYS. The definition below registers every key
- * `trace_processing` declares in the byte-frozen `job-registry.json`, and the
- * two it does not register directly — `job:deferredOriginResolution` and
- * `job:datasetNormalize` — are the installer's own, registered as durable jobs
- * beside the pipeline. A definition short of one key is not a smaller
- * deployment: the queue rejects an unroutable job for redelivery rather than
- * dropping it, so that kind of work redelivers forever while the pods stay up,
- * the liveness probe answers and the queue depth grows.
- *
- * WHAT THIS FILE OWNS. It owns the DEFINITION — the names, the delays, the
- * dedup windows, the group keys and the `runIn` scopes — and, since the
- * conversion, the CONSTRUCTION of every handler behind those names.
- * `recordSpanCommand` and the fifteen subscriber handlers used to be
- * parameters, which was honest while the application still supplied them and
- * dishonest the moment this process became the one that routes the work: a
- * handler passed in is a handler this composition cannot promise exists.
- * Everything is now built here from substrates — a Prisma client, the queue's
- * Redis, a tenant-keyed ClickHouse client, this deployment's own variables,
- * object storage — and from the command proxies the sibling installers publish.
- *
- *     WorkerTraceProcessingPipeline
- *       |- EventingTracePipelineAdapter          the four projections
- *       |    |- TraceIoExtractionAdapter               (g1)
- *       |    |- TraceMediaReferenceAdapter             (g1)
- *       |    |- ModelCatalogTraceModelCostAdapter      (g1)
- *       |    |- TraceSpanNormalizationAdapter          (g1)
- *       |    |- TraceProjectionLeanService.leanForProjection                      (g1)
- *       |    `- RecordSpanCommand                      (g2)
- *       `- fifteen subscribers, each over a named collaborator
- *            |- originGate            the installer's deferred scheduler
- *            |- evaluationTrigger     monitors + flags + the evaluation queue
- *            |- customEvaluationSync  evaluation's reportEvaluation proxy
- *            |- trackedEventSync      the harvested span builder        (g4)
- *            |- traceUpdateBroadcast  the tenant pub/sub bridge
- *            |- projectMetadata       project write + product analytics +
- *            |                        topic's claimAndBootstrap proxy
- *            |- simulationMetricsSync scenario's computeRunMetrics proxy
- *            |- experimentMetricsSync experiment's proxy + its id lookup
- *            |- triggerMatch          the trace-alert subscriber         (g5)
- *            |- graphTriggerActivity  the graph vertical + analytics
- *            |- spanStorageBroadcast  the same pub/sub bridge
- *            |- governanceKpisSync    EE, supplied or declared absent    (g6)
- *            |- governanceOcsfEventsSync                                 (g6)
- *            `- codingAgentSpanFactsDispatch  normalization + the stored-span
- *                                             read                       (g3)
- *
- * THE STORES STAY PARAMETERS and that is not an inconsistency. A store is
- * where the projection COMMITS, and the same three stores are read back by the
- * trace read path; the composition root that opens the ClickHouse client owns
- * them so both readers and this writer hold one instance.
+ * The trace processing pipeline, composed and MOUNTED in this process out of packages alone. ALL
+ * TWENTY-NINE ROUTING KEYS.
  */
 
 /** A subscriber handler on the committed traceSummary fold state. */
@@ -150,14 +99,8 @@ export type WorkerTraceSummaryHandler = (
 ) => Promise<void>;
 
 /**
- * The three cross-pipeline payloads, taken from the subscriber that sends them
- * rather than from the owning feature's contract package.
- *
- * Deliberate: what this composition must agree with is the shape the SUBSCRIBER
- * dispatches, and taking it from there means a change to that shape is a
- * typecheck failure here instead of three packages that agree with each other
- * and not with the caller. It also keeps three contract packages off this
- * process's dependency list for three type aliases.
+ * The three cross-pipeline payloads, taken from the subscriber that sends them rather than from the
+ * owning feature's contract package.
  */
 type ComputeRunMetricsData = Parameters<
   Parameters<typeof createSimulationMetricsSyncHandler>[0]["computeRunMetrics"]
@@ -170,14 +113,9 @@ type ContributeSpanFactsData = Parameters<
 >[0];
 
 /**
- * The cross-feature command proxies this pipeline's subscribers dispatch
- * through.
- *
- * Every one of them is a LATE-BOUND proxy published by a sibling installer,
- * not a command: the pipelines register in a fixed order and each of these
- * belongs to a pipeline that registers after this one. A `Deferred` resolves
- * during installation, which completes before the consumer claims its first
- * job.
+ * The cross-feature command proxies this pipeline's subscribers dispatch through. Every one of them
+ * is a LATE-BOUND proxy published by a sibling installer, not a command: the pipelines register in
+ * a fixed order and each of these belongs to a pipeline that registers after this one.
  */
 export type WorkerTraceProcessingCommands = Readonly<{
   /** Evaluation's dispatch, for the online-evaluation trigger. */
@@ -322,11 +260,6 @@ export class WorkerTraceProcessingPipeline extends TraceProcessingPipelinePort {
 
 /**
  * Every collaborator behind the fifteen names, built from substrates.
- *
- * Read this as the answer to "what does one trace actually touch": four
- * capability services over Postgres, one ClickHouse client, one Redis, this
- * deployment's own variables, its object storage, and seven command proxies
- * belonging to six other features.
  */
 function composeWorkerTraceProcessingDeps(
   options: WorkerTraceProcessingCompositionOptions,
@@ -412,25 +345,15 @@ function composeWorkerTraceProcessingDeps(
 
 /**
  * The publisher a process with no Redis hands the two broadcast subscribers.
- *
- * They stay REGISTERED and become inert, which is the difference that matters:
- * `disabled` keeps the routing key claimed so a broadcast job staged by the
- * other graph is still routed and dropped here, rather than redelivered
- * forever by a consumer that does not know the name.
  */
 class WorkerInertTraceBroadcast extends TraceTenantBroadcastPort {
   async broadcastToTenant(): Promise<void> {}
 }
 
 /**
- * The projection half: the four projections and the record-span command, over
- * the four collaborators this process now builds for itself.
- *
- * Frozen twin of the application's `AppTraceProjectionsAdapter.compose()`. The
- * two are one function here because they were never two concerns — the
- * application split them so the runtime could also be handed to the
- * standalone span-storage and rollup projections, and this process composes
- * those through `TraceProjectionRuntimeService` directly.
+ * The projection half: the four projections and the record-span command, over the four
+ * collaborators this process now builds for itself. Frozen twin of the application's
+ * `AppTraceProjectionsAdapter.compose()`.
  */
 function composeTraceProjections(deps: WorkerTraceProcessingPipelineDeps) {
   return EventingTracePipelineAdapter.create({
@@ -452,12 +375,8 @@ function composeTraceProjections(deps: WorkerTraceProcessingPipelineDeps) {
 }
 
 /**
- * The whole `trace_processing` definition: the projections above plus the
- * fifteen subscriber registrations. Byte-for-byte the same registrations, in
- * the same order, with the same delays, dedup windows, group keys and
- * `runIn` scopes as the application's `createTraceProcessingPipeline` — the
- * queue routes on these names, and a name spelled differently here is work the
- * standalone graph would never pick up.
+ * The whole `trace_processing` definition: the projections above plus the fifteen subscriber
+ * registrations.
  */
 export function createWorkerTraceProcessingPipeline(deps: WorkerTraceProcessingPipelineDeps) {
   let builder = composeTraceProjections(deps)

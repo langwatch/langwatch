@@ -16,24 +16,6 @@ import type {
 
 /**
  * The agent-to-page action channel (specs/langy/langy-ui-actions.feature).
- *
- * One dispatch is one blocking HTTP call from the `langwatch ui call` CLI
- * command running inside the worker: the service validates the action, pins it
- * to the conversation's ACTIVE turn in Redis, publishes it on that turn's live
- * stream (the channel the panel is already tailing mid-turn, exactly like
- * `navigate`), and then waits on a Redis list for the page's result. The
- * browser claims the action (SET NX, so two tabs execute it at most once),
- * runs the page-registered handler, and reports back through the
- * `claimUiAction` / `completeUiAction` tRPC mutations, which land the result
- * on the list this dispatch is blocked on.
- *
- * Security pins, in order: the ROUTE authenticates the session key and
- * enforces the action's own permission ceiling before calling dispatch; the
- * conversation lookup here proves the conversation belongs to the key's
- * owning user and project (a foreign id dies as not-found, never confirming
- * existence); the pending record written here is what claim/complete verify
- * against, so a claim or completion can never attach to a different turn,
- * conversation, or project than the dispatch named.
  */
 
 /** How long the page has to CLAIM a published action before it counts as away. */
@@ -41,23 +23,8 @@ export const UI_ACTION_CLAIM_WINDOW_MS = 3_000;
 /** Execute budget when the action's manifest declares none. */
 export const UI_ACTION_DEFAULT_BUDGET_MS = 10_000;
 /**
- * Hard ceiling on any execute budget.
- *
- * The dispatch blocks a `langwatch ui call`, and that command runs inside an
- * agent worker whose harness stops any command at 30 seconds. A ceiling at 30
- * seconds was therefore a race the CLI always lost: the harness killed it at
- * the same instant the server gave up, so the caller never read the CLI's
- * "the action may still have applied" warning, which is written for exactly
- * that case.
- *
- * The ceiling is the WHOLE server wait, claim window included: the dispatch
- * waits the claim window first, then the rest of the budget, so a 15s ceiling
- * is 3s of claim plus at most 12s of execute.
- *
- * The order that has to hold is: this ceiling (15s) < the CLI's own request
- * deadline (20s, sdks/typescript/src/cli/commands/ui/call.ts) < the harness
- * stop (30s), so the failure is always reported by the layer that owns it.
- * This still clears the ingress idle timeout.
+ * Hard ceiling on any execute budget. The dispatch blocks a `langwatch ui call`, and that command
+ * runs inside an agent worker whose harness stops any command at 30 seconds.
  */
 export const UI_ACTION_MAX_BUDGET_MS = 15_000;
 /** Pending records outlive the longest possible dispatch, then self-clean. */
@@ -146,13 +113,9 @@ export type LangyUiActionServiceDependencies = {
   conversations: UiActionConversations;
   buffer: Pick<LangyTokenBuffer, "appendUiAction">;
   /**
-   * Which kinds exist and what each one's payload must look like.
-   *
-   * A port rather than an import: the only catalogue that exists is the
-   * experiments workbench's, and a Langy server package may not reach into
-   * another feature's. The process that holds both supplies it; a process
-   * that holds neither composes none, and `dispatch` refuses every kind by
-   * name — which is the right answer there, because no page on it can run one.
+   * Which kinds exist and what each one's payload must look like. A port rather than an import: the
+   * only catalogue that exists is the experiments workbench's, and a Langy server package may not
+   * reach into another feature's.
    */
   actions: LangyUiActionCatalogPort;
   backendRunner?: UiActionBackendRunner;
@@ -178,14 +141,9 @@ export class LangyUiActionService {
   }
 
   /**
-   * Dispatch one action to the page attached to `conversationId`'s active turn
-   * and block until its result arrives, the claim window lapses, or the
-   * execute budget runs out. Throws typed errors for every refusal; the caller
-   * (the route) has already enforced the action's permission ceiling.
-   *
-   * `notFound` is thrown by the caller-supplied factory so the route can reuse
-   * its own not-found error without this module importing the conversation
-   * error family.
+   * Dispatch one action to the page attached to `conversationId`'s active turn and block until its
+   * result arrives, the claim window lapses, or the execute budget runs out. Throws typed errors
+   * for every refusal; the caller (the route) has already enforced the action's permission ceiling.
    */
   async dispatch({
     projectId,
@@ -228,14 +186,10 @@ export class LangyUiActionService {
       throw new LangyUiPayloadInvalidError(kind, parsed.error.issues);
     }
 
-    // Always publish and let the claim window decide whether a page is
-    // attached. Presence looked like a cheaper answer, but its heartbeat is
-    // mounted per view (today only traces-v2), so on every other page
-    // "presence enabled, zero sessions" is the permanent state and a
-    // pre-check on it sent EVERY action to the backend with an open tab
-    // right there. The claim window costs three seconds only when nobody is
-    // home, which is the rare case for an agent driving a page the user
-    // asked it to drive.
+    // Always publish and let the claim window decide whether a page is attached. Presence looked
+    // like a cheaper answer, but its heartbeat is mounted per view (today only traces-v2), so on
+    // every other page "presence enabled, zero sessions" is the permanent state and a pre-check on
+    // it sent EVERY action to the backend with an open tab right there.
     const actionId = nanoid();
     const pending: PendingUiAction = {
       projectId,
@@ -287,12 +241,10 @@ export class LangyUiActionService {
       throw new LangyUiNoBrowserError(kind);
     }
 
-    // The backend answers under the same ceiling the page does. Without this
-    // the runner is awaited unbounded, so a slow action runs past the ceiling
-    // and the CLI's deadline reports the failure instead of this layer.
-    //
-    // The action is not cancelled, only stopped being waited on: it may still
-    // apply, which is exactly what the caller is told.
+    // The backend answers under the same ceiling the page does. Without this the runner is awaited
+    // unbounded, so a slow action runs past the ceiling and the CLI's deadline reports the failure
+    // instead of this layer. The action is not cancelled, only stopped being waited on: it may
+    // still apply, which is exactly what the caller is told.
     let timer: NodeJS.Timeout | undefined;
     const deadline = new Promise<never>((_, reject) => {
       timer = setTimeout(() => reject(new LangyUiTimeoutError(kind)), remainingMs);
@@ -319,13 +271,9 @@ export class LangyUiActionService {
   }
 
   /**
-   * Two-stage wait on the result list. Stage one covers the claim window: a
-   * result OR a claim must appear inside it, else the page counts as away and
-   * the dispatch takes the claim key for the backend, which is what makes the
-   * handover atomic (see the take below). Stage two waits out the action's own
-   * execute budget once something claimed it; a claimed but silent page is a
-   * timeout, never a re-dispatch, because the page may have half-applied the
-   * action.
+   * Two-stage wait on the result list. Stage one covers the claim window: a result OR a claim must
+   * appear inside it, else the page counts as away and the dispatch takes the claim key for the
+   * backend, which is what makes the handover atomic (see the take below).
    */
   private async awaitResult({
     actionId,
@@ -437,22 +385,9 @@ export class LangyUiActionService {
   }
 
   /**
-   * The page asking to execute `actionId`. First caller wins (SET NX); every
-   * other tab, every stream replay, and a tab racing the dispatch's own
-   * handover to the backend gets `isClaimed: false` and drops. The pending
-   * record is the authority on WHERE the action belongs: a claim naming a
-   * different conversation or project than the dispatch pinned is refused
-   * exactly like an unknown action, so this cannot be used to probe or hijack
-   * another dispatch. The claim value records the executing user for
-   * `complete`.
-   *
-   * WHICH TURN is deliberately not part of that test. The dispatch takes the
-   * turn from a projection the event log writes after the fact, while the page
-   * holds the id its own send returned; for as long as those disagree, a page
-   * open in front of the user could not claim anything and every action went to
-   * the backend instead, which is how a live-driven workbench turned into a
-   * page that only caught up at the end. The project, the conversation and the
-   * caller's session already answer every question a turn id would.
+   * The page asking to execute `actionId`. First caller wins (SET NX); every other tab, every
+   * stream replay, and a tab racing the dispatch's own handover to the backend gets `isClaimed:
+   * false` and drops.
    */
   async claim({
     projectId,
@@ -482,11 +417,7 @@ export class LangyUiActionService {
   }
 
   /**
-   * The page reporting the claimed action's outcome. Only the claiming user's
-   * session may complete, and only while the pending record still names the
-   * same project and conversation; anything else is dropped as
-   * `isAccepted: false` (the dispatch side has its own timeout, so a dropped
-   * completion cannot wedge it).
+   * The page reporting the claimed action's outcome.
    */
   async complete({
     projectId,

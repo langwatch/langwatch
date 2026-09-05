@@ -18,22 +18,6 @@ import {
 
 /**
  * The standalone worker graph: the ONE consumer of `event-sourcing/jobs`.
- *
- * Everything this process runs on it opens for itself — one guarded Prisma
- * client, one routed ClickHouse connection, one Redis, one AWS client runtime
- * and one stored-object runtime — and each is owned by the boot scope, so
- * shutdown releases them in the reverse of the order they were taken.
- *
- * IT CLAIMS THE CONSUMER, and it is the only composition in this package that
- * may. `event-sourcing/jobs` is one queue holding every pipeline's jobs, and
- * the queue rejects an unroutable job for redelivery rather than dropping it —
- * so a graph that claimed it while any pipeline were unmounted would stall
- * that pipeline's work indefinitely with the pods up, the liveness probe
- * answering and the queue depth simply growing. `WorkerProductionComposition`
- * now mounts the complete registry, which is what makes this claim legal.
- *
- * There is no application graph anywhere below this line: no `getApp()`, no
- * platform singleton, and no second Eventing runtime in the process.
  */
 export class WorkerStandaloneComposition extends WorkerExecutableCompositionPort {
   static create(): WorkerStandaloneComposition {
@@ -119,23 +103,18 @@ export class WorkerStandaloneComposition extends WorkerExecutableCompositionPort
 }
 
 /**
- * There is no application underneath this process to close.
- *
- * The port exists because the packaged executable used to run inside one; here
- * every client the graph opened is owned by the boot `ResourceScope`, which
- * `WorkerProcess` closes after the application has drained. A second closer
- * would release them while jobs were still finishing.
+ * There is no application underneath this process to close. The port exists because the packaged
+ * executable used to run inside one; here every client the graph opened is owned by the boot
+ * `ResourceScope`, which `WorkerProcess` closes after the application has drained.
  */
 class NoApplicationLifecycle extends WorkerLifecyclePort {
   async close(): Promise<void> {}
 }
 
 /**
- * The worker's one HTTP listener: the Prometheus metrics port, which also
- * answers the kubelet's unauthenticated `/healthz`.
- *
- * It is the TRANSPORT because it is the only thing this process listens on.
- * Everything else it does is driven by the queue.
+ * The worker's one HTTP listener: the Prometheus metrics port, which also answers the kubelet's
+ * unauthenticated `/healthz`. It is the TRANSPORT because it is the only thing this process listens
+ * on. Everything else it does is driven by the queue.
  */
 class WorkerMetricsTransport extends WorkerTransportPort {
   static create(options: {

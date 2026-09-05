@@ -404,14 +404,9 @@ export class ScenarioService extends ScenarioServiceContract {
   }
 
   /**
-   * Dispatches the cancel command for one run, with no status read of its own.
-   *
-   * `cancelJob` reads and guards before calling this because it is the
-   * single-run door and nothing has filtered for it. `cancelBatchRun` has
-   * already filtered the same batch it read, so re-reading per run bought
-   * nothing: `handleSimulationRunCancelRequested` only stamps
-   * `CancellationRequestedAt` and never changes a run's status, so a cancel
-   * that lands on a run which finished in the meantime is inert.
+   * Dispatches the cancel command for one run, with no status read of its own. `cancelJob` reads
+   * and guards before calling this because it is the single-run door and nothing has filtered for
+   * it.
    */
   private async requestCancellation(
     projectId: string,

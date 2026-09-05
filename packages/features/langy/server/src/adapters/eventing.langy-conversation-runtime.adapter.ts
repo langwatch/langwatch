@@ -65,16 +65,9 @@ export interface EventingLangyConversationAdapterOptions {
 }
 
 /**
- * Langy's conversation pipeline and the worker-facing capability that
- * composes it. Langy writes its low-latency operational projections directly
- * to Postgres.
- *
- * `connectCommands` is the loop this feature cannot close alone. Two of the
- * pipeline's own effects append back into it — a permanently rejected dispatch
- * fails the turn, and a generated title is saved as an event — so the senders
- * they need are produced by the very registration that mounts them. Binding
- * them once, straight after registration, is what turns a mis-registered graph
- * into a boot failure instead of a turn that hangs.
+ * Langy's conversation pipeline and the worker-facing capability that composes it. Langy writes its
+ * low-latency operational projections directly to Postgres. `connectCommands` is the loop this
+ * feature cannot close alone.
  */
 export class EventingLangyConversationAdapter {
   static create(

@@ -41,15 +41,9 @@ const langyConversationTurnEvents = [
 ] as const;
 
 /**
- * Per-turn fold projection. `key` partitions the conversation's stream by turn,
- * so each turn accretes into its own document. Handler names derive from the
- * event type strings, exactly like the conversation-state fold.
- *
- * The reduction itself — the whole `(state, event) → state` body — lives in
+ * Per-turn fold projection. `key` partitions the conversation's stream by turn, so each turn
+ * accretes into its own document.
  * contract's `foldLangyConversationTurn` (ADR-059): the SAME reducer
- * the browser folds its local tail with, so a turn renders identically on both
- * sides. This class is only the server rig — schema routing, the store,
- * versioning, and the bookkeeping stamps.
  */
 export class LangyConversationTurnFoldProjection
   extends AbstractFoldProjection<

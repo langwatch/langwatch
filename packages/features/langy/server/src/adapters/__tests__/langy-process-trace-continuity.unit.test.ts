@@ -1,11 +1,7 @@
 /**
+ * Proves OTel carrier continuity through the SUBSCRIBER → process-service path with a REAL
+ * TracerProvider:
  * @vitest-environment node
- *
- * Proves OTel carrier continuity through the SUBSCRIBER → process-service
- * path with a REAL TracerProvider: the ambient trace active while the
- * subscriber handles a queued event is captured onto the persisted intent,
- * and dispatching through the typed Langy intent
- * handlers — in a fresh context — continues that same trace.
  */
 
 import type { EventSubscriberContext } from "@langwatch/eventing";
@@ -34,11 +30,8 @@ import {
 
 /**
  * The EXACT definition the runtime mounts — built through the pipeline's own
- * `langyConversationProcess` applier and the runtime's
- * `buildProcessDefinition`, so these tests cover the generated evolve
- * (intent-key prefixing, undeclared-event guard, schema-validated intent
- * payloads) rather than a re-implementation. The effect ports are stubs:
- * evolve never dispatches.
+ * `langyConversationProcess` applier and `buildProcessDefinition`, so these
+ * tests cover the generated evolve, not a re-implementation.
  */
 function buildLangyManager(ports = createStubLangyEffectPorts().ports) {
   return buildProcessManager<LangyConversationProcessingEvent>({
@@ -89,10 +82,9 @@ describe("Langy process trace continuity", () => {
   });
 
   /**
-   * The `pm:langyConversation` subscriber ProcessRuntime generates for the
-   * pipeline — the real production path now that Langy no longer hand-rolls
-   * one. It builds the envelope (including the content boundary) and drives
-   * the process itself.
+   * The `pm:langyConversation` subscriber ProcessRuntime generates for the pipeline — the real
+   * production path now that Langy no longer hand-rolls one. It builds the envelope (including the
+   * content boundary) and drives the process itself.
    */
   function generatedSubscriber(ports = createStubLangyEffectPorts().ports) {
     const runtime = new ProcessRuntime({ store, consumersEnabled: false });

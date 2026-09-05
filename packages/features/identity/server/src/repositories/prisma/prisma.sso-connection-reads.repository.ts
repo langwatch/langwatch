@@ -37,12 +37,6 @@ export class PrismaSsoConnectionReadRepository implements SsoConnectionReadRepos
 
   /**
    * First verifier owns, and this is where the scope of "owns" is decided.
-   *
-   * The query is deliberately unscoped by organization: on cloud that IS the
-   * global rule, and on a self-hosted installation this table only ever holds
-   * that installation's own connections, so the same statement means
-   * "per-instance" there without a branch. Scoping it by deployment mode
-   * would be a branch that is a no-op on one side and a hole on the other.
    */
   async findDomainOwner({
     domain,
@@ -58,13 +52,9 @@ export class PrismaSsoConnectionReadRepository implements SsoConnectionReadRepos
 }
 
 /**
+ * D01's `Identifier` projection — because that is where "how can this person get in" is answered,
+ * and teardown must not invent a second answer.
  * Who a teardown would strand (ADR-117 §5). Read over the identity heads —
- * D01's `Identifier` projection — because that is where "how can this person
- * get in" is answered, and teardown must not invent a second answer.
- *
- * A user is stranded when every live identifier they hold belongs to this
- * connection. Holding one elsewhere, of any live state, is a way in that
- * survives the teardown.
  */
 export class PrismaSsoConnectionStrandingRepository implements SsoConnectionStrandingRepository {
   static create(

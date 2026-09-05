@@ -1,20 +1,6 @@
 /**
- * CSV serialization for scenario run export.
- *
- * Two row axes over the same run record — see ScenarioRunExportMode. Both
- * modes share the same column groups, so a column means the same thing
- * whichever file you opened.
- *
- * Column order is deliberate: spreadsheets show the leftmost columns first, so
- * the file opens on the ones a person reads and the identifiers sit past them.
- * Nothing is dropped for being unreadable — it is only moved.
- *
- *   CORE    what ran, what happened, why      ← visible on open
- *   payload the mode's reason to exist        ← criteria / messages
- *   TAIL    ids, target, trace links          ← scroll or hide
- *
- * Uses PapaParse for RFC 4180-compliant output.
- *
+ * CSV serialization for scenario run export. Two row axes over the same run record — see
+ * ScenarioRunExportMode.
  * @see specs/scenarios/scenario-run-export.feature
  */
 
@@ -24,18 +10,8 @@ import { categorizeRunStatus } from "@langwatch/scenario-contract";
 import { neutralizeFormula } from "@langwatch/csv";
 
 /**
- * The columns a person reads, shortest and highest-signal first so the useful
- * ones fit on screen before the long prose pushes everything sideways.
- *
- * `status` is the resolved status (the same value the run history shows;
- * STALLED appears only on legacy stored rows) and `status_category` is its
- * outcome bucket. Both
- * are emitted: the category is what you pivot on, the status is what you need
- * when a single run looks wrong.
- *
- * There is deliberately no pass_rate or any other aggregate — that formula
- * already lives in run-history-transforms.ts and the sidebar ClickHouse query,
- * and a third copy here would drift from the number shown on screen.
+ * The columns a person reads, shortest and highest-signal first so the useful ones fit on screen
+ * before the long prose pushes everything sideways.
  */
 const CORE_COLUMNS = [
   "scenario_name",
@@ -72,16 +48,9 @@ const TAIL_COLUMNS = [
 ] as const;
 
 /**
- * The judged criteria, as JSON lists.
- *
- * Carried by full mode, which is where someone reads a failing transcript.
- * "Why did this fail" is only half-answered by the judge's prose `reasoning`
- * — the other half is which specific criteria went unmet, and counts alone
- * cannot say which.
- *
- * Criteria mode omits them: it already explodes the same data into one row
- * per criterion, so repeating both full lists on every one of those rows
- * would bloat the file to say nothing new.
+ * The judged criteria, as JSON lists. Carried by full mode, which is where someone reads a failing
+ * transcript. "Why did this fail" is only half-answered by the judge's prose `reasoning` — the
+ * other half is which specific criteria went unmet, and counts alone cannot say which.
  */
 const CRITERIA_LIST_COLUMNS = ["met_criteria", "unmet_criteria"] as const;
 
@@ -208,14 +177,9 @@ function buildCriteriaListValues(run: SimulationExportRun): string[] {
 }
 
 /**
- * Identifiers go through `text()` like any prose field.
- *
- * They read as machine-generated and safe, but only some of them are: a set
- * id, scenario id, batch id and target reference all arrive from the SDK as
- * arbitrary strings, so `=cmd|…` is a value a caller can choose. A formula
- * evaluates the same whichever column it lands in, and neutralising a cell
- * that never needed it costs a leading apostrophe on an id no spreadsheet
- * would have parsed as a number anyway.
+ * Identifiers go through `text()` like any prose field. They read as machine-generated and safe,
+ * but only some of them are: a set id, scenario id, batch id and target reference all arrive from
+ * the SDK as arbitrary strings, so `=cmd|…` is a value a caller can choose.
  */
 function buildTailValues(run: SimulationExportRun): string[] {
   const target = extractTarget(run.metadata);
@@ -234,11 +198,6 @@ function buildTailValues(run: SimulationExportRun): string[] {
 
 /**
  * The parameter values the run resolved, as one JSON object.
- *
- * One column rather than one per name: which parameters exist is a property of
- * the scenario, not of the export, so a per-name column would make the header
- * depend on which runs happened to be in the file and stop two exports lining
- * up. A run that resolved none leaves the cell empty.
  */
 function extractParameters(metadata: Record<string, unknown> | null | undefined): string {
   const parameters = metadata?.parameters;
@@ -272,11 +231,6 @@ function extractTarget(metadata: Record<string, unknown> | null | undefined): {
 
 /**
  * Union of the run-level TraceIds column and the per-message trace ids.
- *
- * The per-message ids were the strict superset on a 228-run sample, so the
- * union currently adds nothing; it exists because the two columns are written
- * by independent code paths and a run can record traces without ever emitting
- * a message snapshot. Cheap enough to keep rather than rely on that holding.
  */
 function collectTraceIds(run: SimulationExportRun): string[] {
   const ids = new Set<string>();
@@ -295,11 +249,9 @@ function collectTraceIds(run: SimulationExportRun): string[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Criteria and trace ids are JSON arrays, not comma-joined.
- *
- * Criteria are free-text sentences that routinely contain commas, so joining
- * on ", " produces a cell that cannot be split back apart. The *_count columns
- * sit alongside so the common question needs no JSON parsing at all.
+ * Criteria and trace ids are JSON arrays, not comma-joined. Criteria are free-text sentences that
+ * routinely contain commas, so joining on ", " produces a cell that cannot be split back apart. The
+ * *_count columns sit alongside so the common question needs no JSON parsing at all.
  */
 function jsonArray(values: string[] | undefined): string {
   if (!values || values.length === 0) return "";
@@ -325,19 +277,9 @@ function stringOrEmpty(value: unknown): string {
 }
 
 /**
- * Neutralize a free-text cell against spreadsheet formula injection.
- *
- * Scenario names, judge reasoning, criteria and message content are all user-
- * or model-controlled, and the entire point of this file is to be opened in a
- * spreadsheet, so every free-text cell goes through the guard.
- *
- * The rule itself lives in `@langwatch/csv`; this file used to carry
- * its own copy, written independently of the browser-side one. Delegating also
- * picks up the guard's number exemption, so a text cell that happens to read
- * `-5` stays a number to the reader rather than becoming quoted text.
- *
- * Still applied only to text: numbers and timestamps are generated here and
- * never need it.
+ * Neutralize a free-text cell against spreadsheet formula injection. Scenario names, judge
+ * reasoning, criteria and message content are all user- or model-controlled, and the entire point
+ * of this file is to be opened in a spreadsheet, so every free-text cell goes through the guard.
  */
 function text(value: string): string {
   return neutralizeFormula(value);
@@ -355,15 +297,8 @@ function messageContent(content: unknown): string {
 }
 
 /**
- * RFC 4180 line ending, stated explicitly rather than relying on PapaParse's
- * default.
- *
- * Every chunk must both use this internally AND end with it. A streamed export
- * concatenates chunks directly into one file, so a chunk with no trailing
- * newline glues its last row onto the next chunk's first row, and a chunk that
- * terminates rows with a different sequence than the one PapaParse wrote
- * inside it makes the whole remainder of the file parse as a single row.
- * Neither shows up until an export is large enough to need a second batch.
+ * RFC 4180 line ending, stated explicitly rather than relying on PapaParse's default. Every chunk
+ * must both use this internally AND end with it.
  */
 const NEWLINE = "\r\n";
 

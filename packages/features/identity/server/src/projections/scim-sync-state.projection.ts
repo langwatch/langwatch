@@ -33,12 +33,8 @@ import {
 import { z } from "zod";
 
 /**
- * The directory-sync pipeline's wire schemas: the framework envelope (id,
- * aggregate, tenant, cursor time) over the payloads `@langwatch/identity-contract`
- * declares. Defined here, beside the fold that is their one collector, for
- * the reason every other identity pipeline's events live beside its own
- * fold: the pipeline definition adapter builds itself FROM this projection,
- * so an import back the other way would be a cycle.
+ * The directory-sync pipeline's wire schemas: the framework envelope (id, aggregate, tenant, cursor
+ * time) over the payloads `@langwatch/identity-contract` declares.
  */
 
 export const scimTokenIssuedEventSchema = EventSchema.extend({
@@ -117,21 +113,9 @@ export type ScimSyncFoldState = ScimSyncState & {
 };
 
 /**
- * The directory-sync pipeline's operational projection (D08): one Postgres
- * `ScimSyncState` row per connection's sync, applied through
- * `.withProjection()`'s direct load/apply/store cycle under the queue's
- * per-sync lock.
- *
- * A pure event-truth head with whole-row replay semantics, like the
- * connection projection beside it: every column is fold-written and rows are
- * never deleted — REVOKED is a tombstone the failure surface still shows, not
- * an absence. That matters here more than anywhere: a dead letter that
- * disappeared when a connection was torn down would be a removal nobody could
- * check afterwards.
- *
- * Every handler is the same move: validate the wire event and hand it to
- * `@langwatch/identity`'s reducer — live dispatch, the queue's fold and the
- * replay proof run the identical function.
+ * The directory-sync pipeline's operational projection (D08): one Postgres `ScimSyncState` row per
+ * connection's sync, applied through `.withProjection()`'s direct load/apply/store cycle under the
+ * queue's per-sync lock.
  */
 export class ScimSyncStateFoldProjection
   extends AbstractFoldProjection<
@@ -231,18 +215,7 @@ export class ScimSyncStateFoldProjection
   /**
    * The ONE place a directory-sync fact becomes a framework event: the guards
    * (`ScimSyncGuards`) decide what a command states, and this stamps the
-   * envelope from the command that produced it — the aggregate type the store
-   * validates (#7406), the sync as aggregate, the organization as tenant, the
-   * command's business time, and the `commandId:index` idempotency key.
-   *
-   * Both the pipeline's command handlers (the staged re-run) and the app's
-   * ledger writer (the calling path) go through here, so the two legs cannot
-   * stamp a fact differently.
-   *
-   * Defined here, beside the fold and the schemas it stamps, rather than in
-   * the pipeline definition adapter: the intents that call this ARE inputs to
-   * that adapter's pipeline builder, so an import back the other way would be
-   * a cycle.
+   * envelope, so every producer stamps a fact identically.
    */
   static eventsFor({
     command,

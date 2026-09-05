@@ -2,13 +2,8 @@ import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { LangyAccessService } from "./langy-access.service";
 
 /**
- * The two fields this gate reads off a resolved credential.
- *
- * Structural rather than `ResolvedApiKeyToken` itself, so the gate names what
- * it uses and nothing more. The project half tracks `ProjectIdentity`: since
- * a credential carries the identity instead of the project row with its team
- * (`@langwatch/project-contract`), the organization is a field on the project
- * and not a nested team.
+ * The two fields this gate reads off a resolved credential. Structural rather than
+ * `ResolvedApiKeyToken` itself, so the gate names what it uses and nothing more.
  */
 export type LangyIdentityToken =
   | {

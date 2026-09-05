@@ -1,17 +1,7 @@
 /**
- * Combinatorial test for simulation run fold ordering.
- *
- * Proves that the fold produces correct final state regardless of
- * event processing order. Simulates the incremental fold pattern:
- * store.get() → apply(event) → store.store() for each event.
- *
- * The in-memory store mimics ClickHouse ReplacingMergeTree behavior:
- * multiple rows coexist, get() returns the one with highest UpdatedAt.
- *
- * Production constraint (verified from prod data):
- * - started is ALWAYS the first event (lowest createdAt)
- * - finished is ALWAYS after message_snapshot
- * - metrics_computed can arrive at any point after started
+ * Combinatorial test for simulation run fold ordering. Proves that the fold produces correct final
+ * state regardless of event processing order. Simulates the incremental fold pattern: store.get() →
+ * apply(event) → store.store() for each event.
  */
 
 import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";

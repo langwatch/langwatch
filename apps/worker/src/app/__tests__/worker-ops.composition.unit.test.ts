@@ -1,11 +1,7 @@
 /**
+ * All three loops were built and none was started, which is invisible: a loop that never runs and a
+ * loop that finds nothing produce the same silence.
  * Spec: specs/ops/worker-operational-loops.feature
- *
- * All three loops were built and none was started, which is invisible: a loop
- * that never runs and a loop that finds nothing produce the same silence. So
- * what is asserted is the START and the STOP — that the installer runs them,
- * that a deployment's own opt-outs are honoured, and that nothing it started
- * outlives the process.
  */
 import { describe, expect, it } from "vitest";
 

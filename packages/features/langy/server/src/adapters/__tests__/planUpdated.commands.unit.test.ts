@@ -1,13 +1,6 @@
 /**
+ * The plan is snapshot-typed and last-write-wins: `todowrite` rewrites the whole list each call,
  * @vitest-environment node
- *
- * The plan is snapshot-typed and last-write-wins: `todowrite` rewrites the whole
- * list each call, so a turn emits MANY plan_updated events and the fold keeps the
- * latest. The idempotency key is therefore turn-scoped AND per-dispatch
- * (occurredAt), mirroring UpdateConversationMetadata — distinct snapshots are
- * distinct events (they must not collapse), while a redelivered frame is already
- * dropped upstream by the relay's frameNonce dedup.
- *
  * @see specs/langy/langy-plan-progress.feature
  */
 

@@ -28,11 +28,8 @@ import {
 
 /**
  * The EXACT definition the runtime mounts — built through the pipeline's own
- * `langyConversationProcess` applier and the runtime's
- * `buildProcessDefinition`, so these tests cover the generated evolve
- * (intent-key prefixing, undeclared-event guard, schema-validated intent
- * payloads) rather than a re-implementation. The effect ports are stubs:
- * evolve never dispatches.
+ * `langyConversationProcess` applier and `buildProcessDefinition`, so these
+ * tests cover the generated evolve, not a re-implementation.
  */
 const langyConversationProcessDefinition = buildProcessDefinition(
   buildProcessManager<LangyConversationProcessingEvent>({
@@ -48,14 +45,8 @@ const ref = {
 };
 
 /**
- * The Langy outbox delivers a worker dispatch by calling the manager over HTTP
- * with a budget of {@link AGENT_DISPATCH_TIMEOUT_MS}. If the exclusive lease is
- * shorter than that budget, a healthy long-running dispatch loses its lease
- * MID-FLIGHT: a second dispatcher instance re-leases the row and re-delivers
- * the same intent concurrently, and the original handler's markDispatched is
- * then fenced out by the superseding token — so a persistently slow-but-live
- * effect never retires and redelivers forever. These tests pin the fix: the
- * lease outlives the dispatch budget.
+ * The Langy outbox delivers a worker dispatch by calling the manager over HTTP with a budget of
+ * {@link AGENT_DISPATCH_TIMEOUT_MS}.
  */
 describe("Langy process outbox lease fencing", () => {
   let store: InMemoryProcessStore;

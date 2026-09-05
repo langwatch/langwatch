@@ -1,13 +1,7 @@
 /**
  * Full durable event schemas for the `langy_conversation` aggregate: the
- * server's branded event envelope (`EventSchema` — TenantId, AggregateType,
- * ids, timestamps) closed over each event's `type`/`version` literal and its
- * PAYLOAD schema.
- *
- * The payload schemas — the `data` half, and everything a browser fold needs —
- * live in `@langwatch/langy-contract` (ADR-059). This module is the server-only half:
- * the envelope carries domain branding that has no business in a client
- * bundle, so the composition happens here and only here.
+ * server's branded envelope closed over each event's payload schema, which
+ * lives in `@langwatch/langy-contract` (ADR-059).
  */
 
 import { EventSchema } from "@langwatch/eventing";

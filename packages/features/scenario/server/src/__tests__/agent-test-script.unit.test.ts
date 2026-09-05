@@ -1,10 +1,6 @@
 /**
+ * The scripted conversation of an agent test as the child plays it: who is on the cast,
  * @vitest-environment node
- *
- * The scripted conversation of an agent test as the child plays it: who is
- * on the cast, what each step asks the runner to do, and how an agent that
- * cannot answer fails it.
- *
  * @see specs/agents/agent-test-run.feature
  */
 

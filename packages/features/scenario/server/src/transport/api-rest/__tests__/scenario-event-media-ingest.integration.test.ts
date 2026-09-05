@@ -1,11 +1,6 @@
 /**
+ * The ingest leg of `POST /api/scenario-events` that stored objects depend on:
  * @vitest-environment node
- *
- * The ingest leg of `POST /api/scenario-events` that stored objects depend
- * on: the body cap that runs before anything is decoded, the refusal that
- * follows a failed byte write, and the log line an operator correlates an
- * event to the rows it created.
- *
  * Spec: specs/features/scenarios/externalize-event-byte-content.feature
  */
 import { bodyLimit } from "@langwatch/api/rest";

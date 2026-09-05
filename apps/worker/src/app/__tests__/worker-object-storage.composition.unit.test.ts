@@ -4,11 +4,9 @@ import { createWorkerAzureBlobDriver } from "../worker-object-storage.compositio
 import type { WorkerStorageConfig } from "../../platform/config/worker.config";
 
 /**
+ * Dataset normalization reuses this factory rather than the general registry's Azure driver, so
+ * pinning it here is what keeps both paths agreeing about which account a byte lands in.
  * Spec: specs/datasets/dataset-normalization-azure-storage.feature
- *
- * Dataset normalization reuses this factory rather than the general
- * registry's Azure driver, so pinning it here is what keeps both paths
- * agreeing about which account a byte lands in.
  */
 
 const unconfiguredAzure: WorkerStorageConfig["azure"] = {

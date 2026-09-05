@@ -13,34 +13,15 @@ export type StalledRunFinder = {
 const logger = createLogger("langwatch:tasks:backfillStalledSimulationRuns");
 
 /**
- * One-shot backfill closing historical simulation runs that never received a
- * terminal event.
- *
+ * One-shot backfill closing historical simulation runs that never received a terminal event. covers
+ * every run queued after it shipped,
  * The simulation_run_execution process manager's stall watchdog (ADR-094)
- * covers every run queued after it shipped, but runs abandoned before it —
- * including runs that fell outside the deleted boot sweeps' lookback windows
- * (30 days for IN_PROGRESS in #3195, 7 days for QUEUED in #3365) — have no
- * process instance, so nothing can ever finish them. With read-time stall
- * derivation deleted, those rows would render as in-progress forever. This
- * task finishes each one with a real terminal ERROR ("stalled") through the
- * same idempotent path in-process failures use, so the truth is recorded
- * rather than repainted.
- *
- * Idempotent: finishRun dedups on the run id, and closed runs leave the
- * population, so re-running converges to zero.
- *
- * Registered in `apps/tasks`' catalogue
- * (`apps/tasks/src/platform/stalled-runs-backfill.composition.ts`), whose
- * `execution` dispatches `finishRun` through a producer-only Eventing
- * registration of the SAME `simulation_processing` pipeline the worker
- * consumes (`SimulationProcessingProducerAdapter`).
  */
 
 /**
- * Closes every stalled run the finder surfaces. Each run is handled
- * independently — one failing emit does not abort the rest. With `dryRun`
- * the population is only counted and sampled, nothing is written; that mode
- * doubles as the measurement answering "how many rows are actually at risk".
+ * Closes every stalled run the finder surfaces. Each run is handled independently — one failing
+ * emit does not abort the rest. With `dryRun` the population is only counted and sampled, nothing
+ * is written; that mode doubles as the measurement answering "how many rows are actually at risk".
  */
 export async function backfillStalledRuns({
   finder,
@@ -95,14 +76,9 @@ export async function backfillStalledRuns({
 }
 
 /**
- * The task-launcher entry — `pnpm --filter @langwatch/tasks task
- * stalled-runs-backfill`. `DRY_RUN` is read here, at the process boundary;
- * {@link backfillStalledRuns} above takes it as a parsed value so it stays
- * testable without an environment.
- *
- * Both collaborators are factories (the `TopicClusteringRunTask` shape):
- * building the real `execution` registers an Eventing pipeline, which needs
- * Redis, and a value here would force that at catalogue-construction time.
+ * The task-launcher entry — `pnpm --filter @langwatch/tasks task stalled-runs-backfill`. `DRY_RUN`
+ * is read here, at the process boundary; {@link backfillStalledRuns} above takes it as a parsed
+ * value so it stays testable without an environment.
  */
 export class StalledRunsBackfillTask extends Task {
   readonly name = "stalled-runs-backfill";

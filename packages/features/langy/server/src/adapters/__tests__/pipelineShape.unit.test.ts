@@ -20,11 +20,9 @@ import type { LangyAnalyticsEventProjectionRecord } from "../../projections/lang
 import type { LangyConversationProcessingEvent } from "../../services/langy-conversation.events";
 
 /**
- * Proves the FINAL Langy pipeline shape from the public static definition
+ * Proves the FINAL Langy pipeline shape from the public static definition (conversation + turn)
+ * plus a Postgres message map; analytics is a SEPARATE pure map; live subscribers are independent;
  * (ADR-046): the operational read models are two `withProjection` state folds
- * (conversation + turn) plus a Postgres message map; analytics is a SEPARATE
- * pure map; live subscribers are independent; and no Langy operational
- * projection carries a subscriber/outbox contract.
  */
 
 /** Append-only store — deliberately no load/read/get, matching the map contract. */

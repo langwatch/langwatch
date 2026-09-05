@@ -1,45 +1,7 @@
 /**
- * The identity ledger writer: the app's implementation of
- * `@langwatch/identity-server`'s IdentityLedger port, in the shape the
- * grants ledger already has (`app-layer/authz/ledger.ts`, ADR-110):
- *
- *   1. the command staged onto the per-user GroupQueue — the queued run is
- *      what APPENDS, re-running the same guard the calling path ran;
- *   2. a bounded read-your-writes wait, watching the projection's cursor
- *      reach the events the guard decided.
- *
- * The staged command is the SOLE appender, and that is the correction ADR-110
- * already made for grants. Appending here as well and staging the command
- * afterwards writes every fact twice: the queued run re-executes the handler
- * against heads the fold has not advanced yet, so it restates and appends a
- * second row. The projection converges either way — the store dedupes
- * `commandId:index` on read — but the log would carry two rows per ceremony,
- * and "a re-run costs no row" would not be true.
- *
- * `commit` runs both legs back to back, which is what every ceremony wants.
- * The born-finalized entrance (ADR-116 §3) is the one caller that has to
- * interleave: its Postgres row writes belong between handing the facts to the
- * engine and observing the fold, so it reaches `stage` and `awaitFold`
- * directly rather than reimplementing either. Staging FIRST is what keeps its
- * loud failure honest — an engine that cannot take the command fails the
- * sign-up before any row exists on either branch.
- *
- * The wait is an OBSERVATION, not inline processing. A fold that cannot run
- * makes it time out; the command is still queued, the caller still succeeds,
- * and the rows appear when the queue drains. That is why the guards read the
- * heads and state only what the heads do not carry (#7429): a pass that runs
- * against a lagging projection restates, and restating is the repair.
- *
- * Identity used to fold on the calling path here, to keep ceremonies working
- * through a Redis outage (the D02 deliverable). That requirement was dropped
- * — the complexity was not worth it at ceremony volume — so identity no
- * longer diverges from ADR-110's queue-only rule and this writer has no
- * second apply path to keep in agreement with the fold.
- *
- * Like the grants ledger, the pipeline handle is resolved lazily off the
- * App: better-auth constructs its adapter at module load, before any App
- * exists, and a bare script that never composes one must still be able to
- * import the runtime.
+ * The identity ledger writer: stages the command, then waits for the
+ * projection to reach it — the grants ledger's shape (ADR-110). The staged
+ * command is the SOLE appender; ADR-116 §3's caller stages first, then awaits.
  */
 import {
   ATTACH_IDENTIFIER_COMMAND_TYPE,
@@ -88,10 +50,8 @@ const SENDER_NAME_BY_COMMAND: Record<IdentityCommandType, string> = {
 export interface IdentityLedgerWriterDeps {
   projectionStore: StateProjectionStore<IdentityFoldState>;
   /**
-   * The event stack this ledger stages through.
-   *
-   * Required, and asked per command rather than held: the pipeline handle is
-   * resolved when a ceremony actually commits, which is what lets a ceremony
+   * The event stack this ledger stages through. Required, and asked per command rather than held:
+   * the pipeline handle is resolved when a ceremony actually commits, which is what lets a ceremony
    * composed before the process finished wiring its eventing still append.
    */
   eventing: IdentityEventingPort;
@@ -141,11 +101,9 @@ export class IdentityLedgerWriterAdapter implements IdentityLedger {
   }
 
   /**
-   * Both legs: staging — the queued run appends and folds, so this is how the
-   * log and the projection ever learn, and a failure here is a real failure
-   * because nothing else would state these events — followed by the bounded
-   * read-your-writes wait. The backfill's own pass depends on that wait: it
-   * verifies an identifier the same pass just attached.
+   * Both legs: staging — the queued run appends and folds, so this is how the log and the
+   * projection ever learn, and a failure here is a real failure because nothing else would state
+   * these events — followed by the bounded read-your-writes wait.
    */
   async stageAndAwait({
     command,
@@ -160,14 +118,8 @@ export class IdentityLedgerWriterAdapter implements IdentityLedger {
   }
 
   /**
-   * Leg one on its own: the command handed to the queue, which is where the
-   * append happens.
-   *
+   * Leg one on its own: the command handed to the queue, which is where the append happens.
    * Public because ADR-116 §3's born-finalized entrance has to put its
-   * Postgres row writes BETWEEN the two legs — the engine must have taken the
-   * facts before any row exists, and the `Identifier` row must be there when
-   * sign-up returns. The entrance sequences the same two legs these methods
-   * implement, rather than a second copy of them.
    */
   async stage({ command }: { command: IdentityCommand }): Promise<void> {
     const senderName = SENDER_NAME_BY_COMMAND[command.type];
@@ -183,10 +135,7 @@ export class IdentityLedgerWriterAdapter implements IdentityLedger {
   }
 
   /**
-   * Leg two: wait for the projection's cursor to reach the last event the
-   * guard decided. The same comparison the fold uses to decide an event is
-   * already applied, read here instead of written — which is what makes this
-   * an observation of the queue's work rather than a second writer racing it.
+   * Leg two: wait for the projection's cursor to reach the last event the guard decided.
    */
   async awaitFold({
     userId,

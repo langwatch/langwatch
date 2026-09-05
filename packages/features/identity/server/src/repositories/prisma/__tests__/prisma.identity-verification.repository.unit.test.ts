@@ -3,12 +3,9 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PrismaIdentityVerificationRepository } from "../prisma.identity-verification.repository";
 
 /**
- * `consume` reaps every generation it reads, not just the pair it was
- * offered (D01) — `identifier` carries no unique constraint on the legacy
- * `VerificationToken` table, so two mints racing each other both insert
- * rather than one replacing the other. Single-use enforcement lives in that
- * reap, and this pins it directly: the older record must never complete,
- * before OR after the newer one does.
+ * `consume` reaps every generation it reads, not just the pair it was offered (D01) — `identifier`
+ * carries no unique constraint on the legacy `VerificationToken` table, so two mints racing each
+ * other both insert rather than one replacing the other.
  */
 
 interface Row {
