@@ -359,6 +359,14 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       And the command asks
 
     @unit
+    Scenario: A listing form of a git subcommand that also writes runs
+      Given a connected folder
+      When Langy lists the branches of a prefix or the tags of the repository
+      Then the command runs at once
+      And the pattern it lists is read as a reference, not as a file name
+      And the same subcommand with a name to write still asks
+
+    @unit
     Scenario: A shell command that reads a file which may hold secrets asks
       Given a connected folder
       When Langy reads a file that may hold secrets through a shell command

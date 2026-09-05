@@ -907,3 +907,139 @@ describe("when a shell command reads a file that may hold secrets", () => {
     }
   });
 });
+
+describe("when Langy lists the branches or the tags of the repository", () => {
+  /**
+   * The listing forms of the subcommands that also write. The skill asks
+   * Langy to list the branches of a prefix before it makes one, so these run
+   * with no card, and their operands are references rather than file names.
+   */
+  const listings: Array<[string, PolicyDecision["kind"]]> = [
+    ["git branch --list 'langy/*'", "run"],
+    ["git branch -l 'langy/*'", "run"],
+    ["git branch --show-current", "run"],
+    ["git branch --contains HEAD", "run"],
+    ["git branch --merged main", "run"],
+    ["git branch --no-merged main", "run"],
+    ["git branch --points-at HEAD", "run"],
+    ["git branch --sort=-committerdate", "run"],
+    ["git tag -l 'v*'", "run"],
+    ["git tag --list 'v*'", "run"],
+    ["git branch langy/add-tracing", "ask"],
+    ["git tag v1.2.0", "ask"],
+    ["git branch -d langy/old", "ask"],
+  ];
+
+  /** @scenario "A listing form of a git subcommand that also writes runs" */
+  it("runs the listing forms and asks for the ones that write", () => {
+    for (const [command, kind] of listings) {
+      expect(bash(command).kind, command).toBe(kind);
+    }
+  });
+
+  /** @scenario "A listing form of a git subcommand that also writes runs" */
+  it("reads a reference pattern as a reference, not as a wildcard over the folder", () => {
+    // The glob rule holds for every other command, and a git or GitHub word
+    // is judged by its exact name only.
+    expect(bash("git branch --list 'langy/*'").kind).toBe("run");
+    expect(bash("gh pr list --search 'secret*'").kind).toBe("ask");
+    expect(bash("cat *.pem").kind).toBe("ask");
+  });
+});
+
+describe("when a write option is attached to its value or to another flag", () => {
+  /** @scenario "An allowed command with an operand that writes asks" */
+  it("reads the option whichever way it is written", () => {
+    const spellings: Array<[string, PolicyDecision["kind"]]> = [
+      ["sort -o out.txt package.json", "ask"],
+      ["sort -oout.txt package.json", "ask"],
+      ["sort -ro out.txt package.json", "ask"],
+      ["sort --output=out.txt package.json", "ask"],
+      ["sort --output out.txt package.json", "ask"],
+      ["sort -r package.json", "run"],
+      ["sort -u package.json", "run"],
+      ["tree -o listing.txt", "ask"],
+      ["tree -L 2", "run"],
+      ["date -s 12:00", "ask"],
+      ["date -u", "run"],
+    ];
+    for (const [command, kind] of spellings) {
+      expect(bash(command).kind, command).toBe(kind);
+    }
+  });
+});
+
+describe("when a file may hold secrets", () => {
+  /**
+   * The names and the paths that ask. Every one of them was read with no
+   * card before, through the file tool or through a shell command.
+   */
+  const secrets: readonly string[] = [
+    ".env",
+    ".env.local",
+    ".envrc",
+    ".git-credentials",
+    ".pgpass",
+    ".my.cnf",
+    ".htpasswd",
+    ".netrc",
+    ".npmrc",
+    "credentials.json",
+    "keystore.p12",
+    "signing.pfx",
+    "release.jks",
+    "app.keystore",
+    "github.token",
+    "token",
+    "tokens",
+    ".secrets",
+    "secrets.yml",
+    "config/secrets.yml",
+    "secret.json",
+    "SECRETS.md",
+    ".git/config",
+    ".docker/config.json",
+    ".ssh/known_hosts",
+    ".aws/config",
+    "id_rsa",
+    "server.key",
+    "key.pem",
+  ];
+
+  /** @scenario "A shell command that reads a file which may hold secrets asks" */
+  it("reads what a printing command is given as text rather than as a file", () => {
+    expect(bash("echo secret-output")).toEqual({ kind: "run" });
+    expect(bash("printf 'the secret is %s' x")).toEqual({ kind: "run" });
+    expect(bash("echo x > .env").kind).toBe("ask");
+  });
+
+  const ordinary: readonly string[] = [
+    ".env.example",
+    ".env.sample",
+    "package.json",
+    "app/main.py",
+    "README.md",
+    ".github/workflows/ci.yml",
+    "config/database.yml",
+  ];
+
+  /** @scenario "A shell command that reads a file which may hold secrets asks" */
+  it("asks for the same file through the file tool and through the shell", () => {
+    for (const target of secrets) {
+      expect(at({ tool: "local_read", params: { path: target } }).kind, target).toBe(
+        "ask",
+      );
+      expect(bash(`cat ${target}`).kind, `cat ${target}`).toBe("ask");
+    }
+  });
+
+  /** @scenario "A shell command that reads a file which may hold secrets asks" */
+  it("runs the files that carry placeholders or code", () => {
+    for (const target of ordinary) {
+      expect(at({ tool: "local_read", params: { path: target } }).kind, target).toBe(
+        "run",
+      );
+      expect(bash(`cat ${target}`).kind, `cat ${target}`).toBe("run");
+    }
+  });
+});

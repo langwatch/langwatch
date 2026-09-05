@@ -118,12 +118,33 @@ export const READ_ONLY_GIT_SUBCOMMANDS: ReadonlySet<string> = new Set([
  */
 const GIT_OPERAND_RULES: ReadonlyMap<
   string,
-  { bare: boolean; verbs: ReadonlySet<string> }
+  { bare: boolean; verbs: ReadonlySet<string>; lists?: boolean }
 > = new Map([
-  ["branch", { bare: true, verbs: new Set<string>() }],
-  ["tag", { bare: true, verbs: new Set<string>() }],
+  ["branch", { bare: true, verbs: new Set<string>(), lists: true }],
+  ["tag", { bare: true, verbs: new Set<string>(), lists: true }],
   ["remote", { bare: true, verbs: new Set(["get-url"]) }],
   ["worktree", { bare: false, verbs: new Set(["list"]) }],
+]);
+
+/**
+ * The options that make `git branch` and `git tag` list.
+ *
+ * With one of these the operands are patterns and references rather than the
+ * name of something to write: `git branch --list "langy/*"` prints the
+ * branches of a prefix, which is the first thing the skill asks Langy to do,
+ * and it must not spend a card.
+ */
+const GIT_LIST_OPTIONS: ReadonlySet<string> = new Set([
+  "--list",
+  "-l",
+  "--show-current",
+  "--contains",
+  "--no-contains",
+  "--merged",
+  "--no-merged",
+  "--points-at",
+  "--sort",
+  "--format",
 ]);
 
 /**
@@ -248,20 +269,70 @@ const EXAMPLE_ENV_FILE = /^\.env\.(example|sample|template|dist)$/i;
 const SECRET_FILE_PATTERNS: readonly RegExp[] = [
   /^\.env$/,
   /^\.env\..+$/,
+  /^\.envrc$/,
   /\.pem$/,
   /\.key$/,
+  /\.p12$/,
+  /\.pfx$/,
+  /\.jks$/,
+  /\.keystore$/,
+  /\.token$/,
   /^id_rsa/,
   /^id_ed25519/,
   /^\.netrc$/,
   /^\.npmrc$/,
   /^\.pypirc$/,
+  /^\.pgpass$/,
+  /^\.my\.cnf$/,
+  /^\.htpasswd$/,
+  /^\.git-credentials$/,
   /^credentials/,
+  /^tokens?$/i,
+  /secret/i,
+];
+
+/**
+ * Directories whose files are credentials whatever they are called, and the
+ * files that carry one inside a folder that is otherwise ordinary.
+ *
+ * `.git/config` holds the remote urls, and a token written into one is read
+ * by anything that prints that file.
+ */
+const SECRET_DIRECTORIES: readonly string[] = [".ssh", ".aws"];
+
+const SECRET_RELATIVE_PATHS: readonly string[] = [
+  ".git/config",
+  ".docker/config.json",
 ];
 
 /** True when the file name is one a secret usually lives in. */
 export function isSecretFileName(name: string): boolean {
   if (EXAMPLE_ENV_FILE.test(name)) return false;
   return SECRET_FILE_PATTERNS.some((pattern) => pattern.test(name));
+}
+
+/**
+ * True when a path names a file that may hold secrets: by its own name, by
+ * the directory it sits in, or because it is one of the files a project
+ * keeps credentials in under an ordinary name.
+ */
+export function isSecretPath(target: string): boolean {
+  const parts = target
+    .split(/[/\\]/)
+    .filter((part) => part !== "" && part !== ".");
+  const name = parts[parts.length - 1] ?? "";
+  if (isSecretFileName(name)) return true;
+  const written = parts.join("/");
+  if (
+    SECRET_RELATIVE_PATHS.some(
+      (secret) => written === secret || written.endsWith(`/${secret}`),
+    )
+  ) {
+    return true;
+  }
+  return parts
+    .slice(0, -1)
+    .some((segment) => SECRET_DIRECTORIES.includes(segment));
 }
 
 // ---------------------------------------------------------------------------
@@ -558,9 +629,8 @@ function isReadOnlyPart(part: CommandPart): boolean {
   const rule = READ_ONLY_COMMAND_RULES.get(name);
   if (rule !== undefined) {
     if (
-      args.some(
-        (argument) => rule.writeOptions?.has(argument.split("=")[0]!) === true,
-      )
+      rule.writeOptions !== undefined &&
+      args.some((argument) => carriesOption(argument, rule.writeOptions!))
     ) {
       return false;
     }
@@ -571,6 +641,30 @@ function isReadOnlyPart(part: CommandPart): boolean {
   }
 
   return true;
+}
+
+/**
+ * True when an argument carries one of these options, however it is written.
+ *
+ * A shell takes the value of a short option attached to it and lets short
+ * options be written as one word, so `sort -o out`, `sort -oout`, `sort -ro`
+ * and `sort --output=out` all write a file. Reading only the whole word left
+ * the first spelling asking and the other three running.
+ */
+export function carriesOption(
+  argument: string,
+  options: ReadonlySet<string>,
+): boolean {
+  if (!argument.startsWith("-") || argument === "-" || argument === "--") {
+    return false;
+  }
+  if (argument.startsWith("--")) return options.has(argument.split("=")[0]!);
+  const letters = argument.slice(1);
+  for (const option of options) {
+    if (option.startsWith("--") || option.length !== 2) continue;
+    if (letters.includes(option.slice(1))) return true;
+  }
+  return false;
 }
 
 /**
@@ -586,6 +680,12 @@ export function isReadOnlyGit(args: string[]): boolean {
   if (subcommand === undefined) return VERSION_ARGUMENTS.has(args[0] ?? "");
   const rule = GIT_OPERAND_RULES.get(subcommand);
   if (rule !== undefined) {
+    if (
+      rule.lists === true &&
+      args.some((argument) => GIT_LIST_OPTIONS.has(argument.split("=")[0]!))
+    ) {
+      return true;
+    }
     if (operands.length === 0) return rule.bare;
     return operands.length <= 2 && rule.verbs.has(operands[0]!);
   }
@@ -1021,7 +1121,9 @@ function decideFileTool({
       );
     }
     const name = path.basename(check.resolved);
-    if (isSecretFileName(name)) {
+    // Both spellings are read: the path as it was written, and the path it
+    // really points at, so a link into `.ssh` is judged as `.ssh`.
+    if (isSecretPath(target) || isSecretPath(check.resolved)) {
       const verb = TOOL_VERBS[call.tool];
       return {
         kind: "ask",
@@ -1194,14 +1296,20 @@ export function pathTokensOf(part: CommandPart): string[] {
 const SECRET_FILE_SAMPLES: readonly string[] = [
   ".env",
   ".env.local",
+  ".envrc",
   "id_rsa",
   "id_ed25519",
   ".netrc",
   ".npmrc",
   ".pypirc",
+  ".pgpass",
+  ".git-credentials",
   "credentials",
+  "secrets.yml",
+  "token",
   "server.key",
   "key.pem",
+  "keys.p12",
 ];
 
 /**
@@ -1234,9 +1342,21 @@ function globCouldMatchSecret(name: string): boolean {
  * because what it stands for is known to the shell and not here.
  */
 export function secretFileRead(part: CommandPart): string | null {
-  for (const token of pathTokensOf(part)) {
-    const name = path.basename(token);
-    if (isSecretFileName(name) || globCouldMatchSecret(name)) return name;
+  // A bare word of a command with its own vocabulary is a reference or a
+  // pattern rather than a file name, so `git branch --list "langy/*"` is read
+  // as the prefix of a branch and not as a wildcard over the folder.
+  const name = part.tokens[0] ?? "";
+  const ownVocabulary = VOCABULARY_COMMANDS.has(name);
+  // What `echo` and `printf` are given is text they print, so the only file
+  // they touch is the one a redirect sends the text to.
+  const candidates = TEXT_PRINTING_COMMANDS.has(name)
+    ? part.tokens.filter((_, index) => part.redirectTarget[index] === true)
+    : pathTokensOf(part);
+  for (const token of candidates) {
+    if (isSecretPath(token)) return path.basename(token);
+    if (!ownVocabulary && globCouldMatchSecret(path.basename(token))) {
+      return path.basename(token);
+    }
   }
   return null;
 }
