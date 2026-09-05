@@ -4,7 +4,7 @@ import {
   extractMessageContentText,
   extractSystemInstructionFromMessages,
   stripSystemMessages,
-} from "../canonical-message.rules";
+} from "../../rules/canonical-message.rules";
 
 describe("extractMessageContentText", () => {
   describe("when content is a string", () => {

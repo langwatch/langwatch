@@ -1,6 +1,6 @@
 import type { EventHandler, IntentExecutor, ProcessManagerApplier } from "@langwatch/eventing";
 import { LANGY_CONVERSATION_EVENT_TYPES, LANGY_TITLE_SOURCE } from "@langwatch/langy-contract";
-import type { LangyConversationProcessingEvent } from "../services/langy-conversation.events";
+import type { LangyConversationProcessingEvent } from "../adapters/eventing.langy-conversation-events.adapter";
 import {
   LANGY_PROCESS_INTENT_TYPES,
   type LangyConversationProcessState,

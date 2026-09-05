@@ -230,12 +230,12 @@ describe("trace dedup OOM safety", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // aggregation-builder.ts: dedupedTraceSummaries (@regression #3158)
+  // clickhouse.aggregation-builder.mapper.ts: dedupedTraceSummaries (@regression #3158)
   // ---------------------------------------------------------------------------
   describe("dedupedTraceSummaries() (analytics)", () => {
     const aggregationBuilderPath = path.join(
       repoRoot(),
-      "packages/features/analytics/server/src/clickhouse/aggregation-builder.ts",
+      "packages/features/analytics/server/src/repositories/clickhouse/clickhouse.aggregation-builder.mapper.ts",
     );
     const aggregationBuilderSource = fs.readFileSync(aggregationBuilderPath, "utf-8");
     const body = extractFunctionBody(aggregationBuilderSource, "dedupedTraceSummaries");

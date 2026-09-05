@@ -22,7 +22,7 @@ import {
   type DatasetStorage,
 } from "@langwatch/dataset-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { StoredObjectStorageRuntime } from "@langwatch/stored-object-server/storage";
+import type { StoredObjectStorageRuntime } from "@langwatch/stored-object-server";
 import { createWorkerAzureBlobDriver } from "./worker-object-storage.composition";
 import type { WorkerStorageConfig } from "../platform/config/worker.config";
 import type {

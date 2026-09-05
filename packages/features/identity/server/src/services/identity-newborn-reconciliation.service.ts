@@ -1,8 +1,8 @@
-import type { IdentityReservationRepository } from "../identity-reservations.repository";
-import type { IdentityCeremonyWrites } from "../identity-writes";
-import { newIdentityCommandId } from "../identity-command-id";
+import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository";
+import type { IdentityCeremonyWrites } from "../rules/identity-writes.rules";
+import { newIdentityCommandId } from "../rules/identity-command-id.rules";
 import { createLogger } from "@langwatch/observability";
-import type { IdentityNewbornRepository } from "../identity-newborn.repository";
+import type { IdentityNewbornRepository } from "../repositories/identity-newborn.repository";
 
 const logger = createLogger("langwatch:identity:newborn-reconciliation");
 

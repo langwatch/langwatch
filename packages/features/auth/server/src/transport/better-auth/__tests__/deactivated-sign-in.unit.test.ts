@@ -3,7 +3,7 @@
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
-import { beforeSessionCreate } from "../better-auth-hooks";
+import { beforeSessionCreate } from "../better-auth-hooks.api";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),

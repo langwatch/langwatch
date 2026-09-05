@@ -4,7 +4,7 @@ const TRACK_EVENT_SPAN_NAME = "langwatch.track_event";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contract";
 import { SpanTimingService } from "../span-timing.service";
-import { isValidTimestamp } from "../span-timing.rules";
+import { isValidTimestamp } from "../../rules/span-timing.rules";
 
 function makeSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {
   return {

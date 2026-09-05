@@ -36,7 +36,7 @@ import {
   parseJsonl,
   toJsonlChunks,
   toSingleJsonl,
-} from "../services/dataset-chunking";
+} from "../services/dataset-chunking.service";
 import type { DatasetStorage, PresignedUpload } from "../ports/dataset-storage.port";
 import {
   ChunkTooLargeError,
@@ -44,8 +44,8 @@ import {
   StagedUploadNotFoundError,
   StorageNotWritableError,
   UploadTooLargeError,
-} from "../services/errors";
-import { localStagingUploadPath, stagingUploadKey } from "../services/presigned-upload";
+} from "../services/dataset-errors.service";
+import { localStagingUploadPath, stagingUploadKey } from "../services/presigned-upload.service";
 
 const logger = createLogger("langwatch:datasets:local-storage");
 

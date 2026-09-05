@@ -16,8 +16,8 @@ import type { LangyAnalyticsEventProjectionRecord } from "../projections/langy-a
 import type { LangyTitleGenerator } from "../ports/langy-effect.port";
 import type { LangyWorkerPort } from "../ports/langy-turn-runtime.port";
 import type { LangySessionKeyService } from "../services/langy-session-key.service";
-import type { LangyTokenBuffer } from "../streaming/langy-token-buffer";
-import type { LangyTurnHandoffStore } from "../streaming/langy-turn-handoff";
+import type { LangyTokenBuffer } from "./redis.langy-token-buffer.adapter";
+import type { LangyTurnHandoffStore } from "./redis.langy-turn-handoff.adapter";
 import {
   createAgentTurnLivenessSubscriber,
   createLangyConversationUpdateBroadcastSubscriber,

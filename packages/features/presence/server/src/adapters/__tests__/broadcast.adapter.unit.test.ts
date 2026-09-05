@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BroadcasterNotActiveError } from "../broadcast.errors";
+import { BroadcasterNotActiveError } from "@langwatch/presence-contract";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({

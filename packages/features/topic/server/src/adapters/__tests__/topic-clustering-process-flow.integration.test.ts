@@ -7,7 +7,7 @@ import {
   ProcessManagerService,
 } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import type { TopicClusteringProcessingEvent } from "../eventing.topic.events";
+import type { TopicClusteringProcessingEvent } from "../eventing.topic-events.adapter";
 import type {
   TopicClusteringDispatchDeps,
   TopicClusteringOutcomeCommands,

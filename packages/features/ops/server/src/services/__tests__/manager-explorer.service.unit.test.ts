@@ -2,8 +2,8 @@ import type { ProcessStore } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ManagerExplorerService } from "../manager-explorer.service";
-import { NullProcessAuditSink } from "../../ports/process-audit.sink";
-import { NullProcessOpsRepository } from "../../ports/process-ops.repository";
+import { NullProcessAuditSink } from "../../ports/process-audit-sink.port";
+import { NullProcessOpsRepository } from "../../adapters/null.process-ops.adapter";
 import {
   OpsEventingIntrospectionPort,
   type OpsProcessManagerMetadata,

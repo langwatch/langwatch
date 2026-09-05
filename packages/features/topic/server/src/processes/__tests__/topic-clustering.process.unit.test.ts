@@ -1,7 +1,7 @@
 import type { ProcessDefinition } from "@langwatch/eventing";
 import { buildProcessDefinition, buildProcessManager } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import type { TopicClusteringProcessingEvent } from "../../adapters/eventing.topic.events";
+import type { TopicClusteringProcessingEvent } from "../../adapters/eventing.topic-events.adapter";
 import {
   TOPIC_CLUSTERING_PROCESS_NAME,
   TopicClusteringProcess,

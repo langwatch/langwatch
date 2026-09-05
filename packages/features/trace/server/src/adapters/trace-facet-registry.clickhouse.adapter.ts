@@ -11,8 +11,8 @@ import {
   TRACE_METADATA_FACET,
 } from "./trace-facet-metadata-keys.clickhouse.adapter";
 import { SPAN_ATTRIBUTE_KEYS_FACET } from "./trace-facet-span-attribute-keys.clickhouse.adapter";
-import type { CategoricalRead, RangeRead } from "./trace-query-evaluation.types";
-import { UNSUPPORTED } from "./trace-query-evaluation.types";
+import type { CategoricalRead, RangeRead } from "@langwatch/trace-contract";
+import { UNSUPPORTED } from "@langwatch/trace-contract";
 
 export type FacetTable = "trace_summaries" | "evaluation_runs" | "stored_spans";
 export type FacetGroup = "trace" | "evaluation" | "span" | "metadata" | "prompt";

@@ -1,6 +1,6 @@
 import { emptyIdentityHeads } from "@langwatch/identity-contract";
-import { IdentityGuards } from "../../guards";
-import type { IdentityHeadsRepository } from "../../identity-heads.repository";
+import { IdentityGuards } from "../../services/identity-guards.service";
+import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository";
 import { describe, expect, it } from "vitest";
 import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing";
 import {

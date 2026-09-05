@@ -8,7 +8,7 @@ import {
   type RestApiServicePorts,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import { UploadValidationError } from "../../services/errors";
+import { UploadValidationError } from "../../services/dataset-errors.service";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import type { DatasetApp } from "../dataset.app";

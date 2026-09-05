@@ -1,4 +1,4 @@
-import type { SsoConnectionGuards } from "../sso-connection-guards";
+import type { SsoConnectionGuards } from "../services/sso-connection-guards.service";
 import {
   defineAggregate,
   defineEvents,

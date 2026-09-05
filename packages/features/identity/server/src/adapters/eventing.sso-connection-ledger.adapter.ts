@@ -23,7 +23,7 @@ import {
   SUSPEND_CONNECTION_COMMAND_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
 } from "@langwatch/identity-contract";
-import type { SsoConnectionLedger } from "../sso-connection-ledger";
+import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules";
 import { createLogger } from "@langwatch/observability";
 import {
   type AggregateType,

@@ -27,7 +27,7 @@ import {
 import { LangyMessageService, type LangyTrustedMessageReader } from "./langy-message.service";
 import { LangyTurnService } from "./langy-turn.service";
 import { LangyCredentialService } from "./langy-credential.service";
-import { LangyTurnRelay, type LangyRelayRedis } from "../streaming/langy-turn-relay";
+import { LangyTurnRelay, type LangyRelayRedis } from "../adapters/langy-turn-relay.adapter";
 import { LangyFeedbackPromptPolicy } from "../ports/langy-feedback-prompt.port";
 
 export type LangyRelayCompositionOptions = {

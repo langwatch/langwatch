@@ -3,7 +3,7 @@ import { AzureDatasetStorageAdapter, LocalDatasetStorageAdapter } from "@langwat
 import {
   StoredObjectProjectDestinationResolverPort,
   StoredObjectStorageRuntime,
-} from "@langwatch/stored-object-server/storage";
+} from "@langwatch/stored-object-server";
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
 import {

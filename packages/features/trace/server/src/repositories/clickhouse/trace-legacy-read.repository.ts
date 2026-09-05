@@ -1,3 +1,4 @@
+import type { Protections } from "@langwatch/trace-contract";
 import { TraceWindowedReadService } from "../../services/trace-windowed-read.service";
 import { TraceEvaluationMappingService } from "../../services/trace-evaluation-mapping.service";
 import { TraceEventAttributeMappingService } from "../../services/trace-event-attribute-mapping.service";
@@ -28,13 +29,13 @@ import type {
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
 import type { Event, Span, Trace } from "@langwatch/trace-contract";
-import type { Protections } from "@langwatch/trace-server";
+
 import { findPromptReferenceInAncestors } from "@langwatch/trace-contract";
 import { TraceReadRedactionService } from "../../services/trace-read-redaction.service";
 import { TraceLegacySpanMappingService } from "../../services/trace-legacy-span-mapping.service";
 import { TraceLegacySummaryMappingService } from "../../services/trace-legacy-summary-mapping.service";
 import { type EventSpanRow } from "../../services/trace-event-attribute-mapping.service";
-import type { ProjectableTrace, ProjectedAnnotation } from "../../services/trace-projection.types";
+import type { ProjectableTrace, ProjectedAnnotation } from "@langwatch/trace-contract";
 import type { ResolvedTraceSpans } from "../../services/trace-offload-resolution.service";
 import type {
   CustomersAndLabelsResult,
@@ -49,7 +50,7 @@ import type {
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
   TraceDateField,
-} from "../../services/trace-legacy-read.types";
+} from "@langwatch/trace-contract";
 
 /**
  * Callback injected from TraceService that resolves offloaded blob refs for

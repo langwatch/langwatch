@@ -1,3 +1,4 @@
+import type { Protections } from "@langwatch/trace-contract";
 /**
  * The single public surface for anonymous shared-trace reads.
  *
@@ -32,7 +33,7 @@ import {
 } from "@langwatch/trace-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import type { Protections } from "../../services/trace-viewer-protections.service";
+
 import {
   deriveTraceDropPrivacy,
   mapLegacySpanSummaryToTreeNode,

@@ -14,7 +14,7 @@ export { SpanNormalizationPipelineService } from "./services/span-normalization.
 export {
   mapChRowToNormalized,
   serializeAttributes,
-} from "./repositories/clickhouse/stored-span-row.codec";
+} from "./repositories/clickhouse/stored-span-row.mapper";
 export { TraceSpanCostMatchingService } from "./services/trace-span-cost-matching.service";
 export { ClickHouseTraceQuerySubqueryAdapter } from "./adapters/trace-query-subquery.clickhouse.adapter";
 

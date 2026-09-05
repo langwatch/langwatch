@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TraceRequestUtils } from "../otlp-trace-request.rules";
+import { TraceRequestUtils } from "../otlp-trace-request.service";
 
 const { reconstructFlattenedArrays } = TraceRequestUtils;
 

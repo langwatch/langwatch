@@ -8,11 +8,11 @@ import type { BetterAuthOptions } from "better-auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { beforeEach, describe, expect, it } from "vitest";
-import { IdentityCeremonies } from "../better-auth/identity-ceremonies";
-import { IdentityGuards } from "../guards";
-import { newIdentityCommandId } from "../identity-command-id";
-import type { IdentityUsersRepository } from "../identity-users.repository";
-import { IdentityService } from "../identity.service";
+import { IdentityCeremonies } from "../adapters/better-auth.identity-ceremonies.adapter";
+import { IdentityGuards } from "../services/identity-guards.service";
+import { newIdentityCommandId } from "../rules/identity-command-id.rules";
+import type { IdentityUsersRepository } from "../repositories/identity-users.repository";
+import { IdentityService } from "../services/identity.service";
 import {
   InMemoryIdentityEventStore,
   inMemoryIdentityLedger,

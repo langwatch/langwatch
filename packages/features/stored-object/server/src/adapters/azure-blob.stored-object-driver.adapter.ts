@@ -9,10 +9,10 @@ import {
   redactStoredObjectStorageErrorText,
   redactStoredObjectStorageUri,
 } from "@langwatch/stored-object-contract";
-import type { AzureCredentials } from "./azure-blob-credentials";
-import { getAzureBlobToken, invalidateAzureBlobToken } from "./azure-blob-token-provider";
-import { ObjectNotFoundError } from "../errors";
-import type { StoredObjectStorageDriver } from "./stored-object-storage.registry";
+import type { AzureCredentials } from "./azure-blob-credentials.adapter";
+import { getAzureBlobToken, invalidateAzureBlobToken } from "./azure-blob-token-provider.adapter";
+import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
+import type { StoredObjectStorageDriver } from "./stored-object-storage-registry.adapter";
 
 interface ParsedAzureBlobUri {
   accountName: string;

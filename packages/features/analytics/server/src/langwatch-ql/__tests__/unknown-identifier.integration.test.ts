@@ -28,7 +28,7 @@ import {
   createLangWatchQLExecutor,
   DEFAULT_LWQL_RESULT_LIMITS,
   type LangWatchQLExecutor,
-} from "../executor";
+} from "../../services/langwatch-ql-executor.service";
 import {
   type LangWatchQLClickHouseHarness,
   startLangWatchQLClickHouse,

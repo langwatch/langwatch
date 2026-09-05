@@ -1,8 +1,8 @@
 import type {
   AccountSecretPair,
   IdentitySecretCarryRepository,
-} from "../../identity-secret-carry.service";
-import type { IdentityAccountSecrets } from "../../better-auth/storage-ports";
+} from "../../services/identity-secret-carry.service";
+import type { IdentityAccountSecrets } from "../../rules/identity-storage-ports.rules";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**

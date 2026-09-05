@@ -26,7 +26,7 @@ import { PrismaLangyConversationRepository } from "../repositories/prisma/prisma
 import { PrismaLangyMessageRepository } from "../repositories/prisma/prisma.langy-message.repository";
 import { PrismaLangyCredentialRepository } from "../repositories/prisma/prisma.langy-credential.repository";
 import { PrismaLangyTurnAdmissionRepository } from "../repositories/prisma/prisma.langy-turn-admission.repository";
-import type { LangyDatabase } from "../repositories/prisma/langy-database.port";
+import type { LangyDatabase } from "../repositories/prisma/prisma.langy-database.repository";
 import { PrismaLangyConversationProjectionRepository } from "../repositories/prisma/prisma.langy-conversation-projection.repository";
 import { PrismaLangyConversationTurnProjectionRepository } from "../repositories/prisma/prisma.langy-conversation-turn-projection.repository";
 import { PrismaLangyMessageProjectionRepository } from "../repositories/prisma/prisma.langy-message-projection.repository";

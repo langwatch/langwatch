@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { SetupSkillsService } from "../setup-skills.service";
-import { SETUP_SKILL_BODIES } from "../setup-skill-bodies.generated";
+import { SETUP_SKILL_BODIES } from "../../rules/setup-skill-bodies.rules";
 
 describe("SetupSkillsService", () => {
   const skills = SetupSkillsService.create();

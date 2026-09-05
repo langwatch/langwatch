@@ -15,16 +15,9 @@ import {
 import type { WorkerModelProviders } from "./worker-model-provider.composition";
 
 /**
- * The evaluator environment, over the gateway this process composed.
- *
- * It takes the whole `WorkerModelProviders` bundle rather than the two
- * services separately, which is what makes the sharing structural: the model
- * gateway and the managed-provider service that decides whether LangWatch
- * supplies an organization's credentials come out of ONE composition, and the
- * topic clustering path takes the same instance. A caller cannot hand this the
- * gateway from one graph and the managed service from another, which is how a
- * managed-Bedrock organization would get its own key on one path and the proxy
- * credentials on the other.
+ * The evaluator environment, over the composed gateway. Takes the whole
+ * `WorkerModelProviders` bundle, not two services, so a caller can never mix
+ * a gateway from one graph with a managed-provider service from another.
  */
 export function createWorkerEvaluationModelEnv(input: {
   models: WorkerModelProviders;
@@ -41,19 +34,9 @@ export function createWorkerEvaluationModelEnv(input: {
 }
 
 /**
- * The environment an evaluator executes with, resolved from the project's own
- * model providers.
- *
- * Composed HERE rather than inside `@langwatch/evaluation-server` because it
- * is the bridge between two features' server packages — Evaluation asks the
- * question, Model Provider answers it — and a feature server package may not
- * depend on another's. This is the same call the API process already made for
- * the LiteLLM parameter resolution and the Azure credential read.
- *
- * The Azure Content Safety branch never reads `process.env`: those evaluators
- * require a per-project `azure_safety` provider, and the same port the
- * execution preparation checks before it runs is what answers here, so the two
- * cannot disagree about whether a project has credentials.
+ * The environment an evaluator executes with, resolved from the project's
+ * model providers. Composed HERE since it bridges two features' server
+ * packages. The Azure Content Safety branch never reads `process.env`.
  */
 export class WorkerEvaluationModelEnv extends EvaluationModelEnvPort {
   static create(input: {
@@ -140,13 +123,9 @@ export class WorkerEvaluationModelEnv extends EvaluationModelEnvPort {
 }
 
 /**
- * Builds the X_LITELLM_* env block for an evaluator that needs to call a
- * specific model. Validates the provider is configured + enabled, projects
- * litellm params, and overlays whitelisted generation params (temperature,
- * max_tokens, etc.) from the evaluator settings.
- *
- * Throws `EvaluatorConfigError` for misconfigured providers — callers who
- * need a per-worker error class should catch and rewrap.
+ * Builds the X_LITELLM_* env block for an evaluator calling a specific model:
+ * validates the provider, projects litellm params, and overlays whitelisted
+ * generation params. Throws `EvaluatorConfigError` for misconfigured providers.
  */
 export async function setupModelEnv(
   modelProvidersService: ModelProviderService,
@@ -176,13 +155,10 @@ export async function setupModelEnv(
   const isCustomModel = customModelList?.some((m) => m.modelId === modelName);
 
   if (modelList && modelList.length > 0 && !modelList.includes(modelName) && !isCustomModel) {
-    // The collapse winner for the provider key is not necessarily the row
-    // that serves this model: with multi-instance providers the model may
-    // come from a wider-scope row's custom catalog, and
-    // prepareLitellmParams below swaps to that row. Only reject when no
-    // accessible enabled row serves the model at all. The lookup is a
-    // rescue attempt — if it fails, reject with the config error rather
-    // than masking it behind an infrastructure error.
+    // The collapse winner isn't necessarily the row that serves this model —
+    // `prepareLitellmParams` below may swap to a wider-scope row. Only reject
+    // when no accessible enabled row serves the model at all; a lookup
+    // failure falls through to the config error rather than an infra one.
     let servingRow = null;
     try {
       servingRow = await modelProvidersService.tryFindRowServingModel({

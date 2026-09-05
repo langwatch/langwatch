@@ -16,16 +16,16 @@
 
 import { describe, expect, it } from "vitest";
 
-import { LWQL_VIEW_CATALOG } from "../catalog/lwql-views";
-import { lwqlAllowedTables } from "../catalog/types";
+import { LWQL_VIEW_CATALOG } from "../../repositories/clickhouse/clickhouse.lwql-view-catalog.mapper";
+import { lwqlAllowedTables } from "../../adapters/clickhouse.lwql-catalog-shapes.adapter";
 import {
   type LangWatchQLDiagnostic,
   LWQL_CLEAN_DIAGNOSTICS_MEANING,
   LWQL_DIAGNOSTIC_CODES,
   lwqlDiagnostics,
-} from "../diagnostics";
-import type { LangWatchQLColumn } from "../executor";
-import { DEFAULT_LWQL_RESULT_LIMITS } from "../executor";
+} from "../../adapters/clickhouse.lwql-diagnostics.adapter";
+import type { LangWatchQLColumn } from "../../services/langwatch-ql-executor.service";
+import { DEFAULT_LWQL_RESULT_LIMITS } from "../../services/langwatch-ql-executor.service";
 import { validateLangWatchQL } from "../validation/validate";
 
 const DATABASE = "analytics";

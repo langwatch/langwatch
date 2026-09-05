@@ -10,7 +10,7 @@ import {
   type Unsupported,
   type FieldHandler,
   type TranslationContext,
-} from "./trace-query-evaluation.types";
+} from "@langwatch/trace-contract";
 import { TraceQueryValuesAdapter } from "./trace-query-values.clickhouse.adapter";
 
 // ---------------------------------------------------------------------------

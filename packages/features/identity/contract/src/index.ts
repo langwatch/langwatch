@@ -162,7 +162,7 @@ export {
   SsoConnectionStringEditRetiredError,
   SsoConnectionTeardownStrandsUsersError,
   SsoSamlNotSelfServeError,
-} from "./errors";
+} from "./identity.errors";
 export { IdentityEmailService } from "./identity-email.service";
 export {
   coarseColleagueCount,

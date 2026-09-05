@@ -4,10 +4,9 @@ import type * as React from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 
 /**
- * Private to `StudioDrawer`/`StudioDialog`. Mirrors the code-presence check
- * `explainAnyError` in workflow's (still feature-owned) studio-host error
- * shims does for a render-time crash: it reads a code if there is one, never
- * the presentation registry, which is the composing application's.
+ * Private to `StudioDrawer`/`StudioDialog`. Reads a code if there is one for
+ * a render-time crash, never the presentation registry, which is the
+ * composing application's.
  */
 function codeOfStudioError(error: unknown): string | undefined {
   const data = (error as { data?: { error?: { code?: unknown } } } | null)?.data?.error;

@@ -1,21 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Login completion for an organization whose admin accounts are gone, against
- * real Postgres.
- *
- * `OrganizationUser.user` is backed by no database foreign key (the schema
- * runs `relationMode = "prisma"`), so a membership row outlives the account it
- * points at. Asking for that required relation made ONE dangling ADMIN row
- * reject the whole read with "Inconsistent query result: Field user is
- * required to return data, got null instead", which surfaced as a 500 on the
- * bootstrap route. The CLI then cached nothing, so the wrapper had no tool
- * policies left to enforce — hence the policy-map assertions here beside the
- * admin address itself.
- *
- * Only the contact leg touches the database; the catalog and budget
- * collaborators are substituted, because neither is what the orphan broke.
- *
+ * Login completion for an org whose admin accounts are gone (a dangling row 500'd it).
  * Spec: specs/ai-gateway/governance/cli-login.feature
  */
 import {

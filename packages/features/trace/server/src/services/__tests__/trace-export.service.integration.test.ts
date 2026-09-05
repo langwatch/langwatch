@@ -1,3 +1,4 @@
+import type { Protections } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  *
@@ -8,11 +9,11 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { Evaluation, LLMSpan, Trace } from "@langwatch/trace-contract";
-import type { Protections } from "../trace-viewer-protections.service";
+
 import type { TraceService } from "../trace-legacy-read.service";
 import type { TracesForProjectResult } from "@langwatch/trace-contract";
 import { TraceExportService } from "../trace-export.service";
-import type { ExportRequest } from "../trace-export.vocabulary";
+import type { ExportRequest } from "@langwatch/trace-contract";
 
 const fullProtections: Protections = {
   canSeeCosts: true,

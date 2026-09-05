@@ -1,6 +1,6 @@
 import { emptyMfaEnrollment, type MfaEnrollmentState } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { MfaEnrollmentRepository } from "../../mfa-enrollment.repository";
+import type { MfaEnrollmentRepository } from "../mfa-enrollment.repository";
 import { mfaEnrollmentRowToState } from "./prisma.mfa-enrollment.mapper";
 
 /** The enrollment head, and the person the membership question is asked through. */

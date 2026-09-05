@@ -7,7 +7,7 @@ import type { SuiteRunResult } from "@langwatch/suite-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import { SuiteTrpcApi } from "../suite.api";
-import type { SuiteTrpcContext } from "../suite.trpc-context";
+import type { SuiteTrpcContext } from "../../../rules/suite-trpc-context.rules";
 
 const runResult: SuiteRunResult = {
   batchRunId: "batch_1",

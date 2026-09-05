@@ -1,3 +1,4 @@
+import type { Protections } from "@langwatch/trace-contract";
 import { VisibilityWindowService } from "./trace-visibility-window.service";
 import { PRIVACY_DROPPED_MARKER_ATTR } from "@langwatch/data-privacy-contract";
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
@@ -10,7 +11,7 @@ import type {
   TraceInput,
   TraceOutput,
 } from "@langwatch/trace-contract";
-import { TraceAttributeRedactionService, type Protections } from "@langwatch/trace-server";
+import { TraceAttributeRedactionService } from "@langwatch/trace-server";
 import { parsePythonInsideJson } from "@langwatch/trace-contract";
 
 // Stable display order for the content categories a drop policy can strip, so

@@ -40,7 +40,7 @@ import {
 import { LangyConversationStateFoldProjection } from "../projections/langy-conversation-state.projection";
 import { LangyConversationTurnFoldProjection } from "../projections/langy-conversation-turn.projection";
 import { LangyMessageOperationalMapProjection } from "../projections/langy-message-operational.projection";
-import type { LangyConversationProcessingEvent } from "../services/langy-conversation.events";
+import type { LangyConversationProcessingEvent } from "./eventing.langy-conversation-events.adapter";
 
 export interface LangyConversationProcessingPipelineDeps {
   langyConversationProjectionStore: StateProjectionStore<LangyConversationStateData>;

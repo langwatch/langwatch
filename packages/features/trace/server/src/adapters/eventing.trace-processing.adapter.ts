@@ -17,7 +17,7 @@ import {
 } from "@langwatch/trace-contract";
 import { recordLogContributionCommand } from "./eventing.trace-log-contribution.adapter";
 import { recordMetricCorrelationCommand } from "./eventing.trace-metric-correlation.adapter";
-import { changeTraceNameCommand } from "./eventing.change-trace-name.command";
+import { changeTraceNameCommand } from "./eventing.change-trace-name.adapter";
 
 const addAnnotationCommand = defineCommand({
   commandType: ADD_ANNOTATION_COMMAND_TYPE,

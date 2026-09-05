@@ -5,7 +5,7 @@ import { ModelProviderLegacyMigrationService } from "#services/model-provider-le
 import type {
   ModelProviderMigrationDatabase,
   ModelProviderMigrationOutcome,
-} from "./model-provider-migration.shared";
+} from "../rules/model-provider-migration.rules";
 
 const logger = createLogger("langwatch:task:model-provider-migrate-custom-models");
 

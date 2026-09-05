@@ -13,3 +13,7 @@ export * from "./series-points";
 export * from "./analytics.timeseries";
 export * from "./analytics.evaluation";
 export { BUILDER_CHART_KIND, WORKBENCH_SQL_CHART_KIND } from "./analytics.chart-kind";
+export * from "./analytics.query-shapes";
+export * from "./analytics-query.errors";
+export * from "./langwatch-ql.errors";
+export * from "./analytics.input-schemas";

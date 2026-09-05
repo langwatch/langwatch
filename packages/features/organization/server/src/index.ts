@@ -29,8 +29,8 @@ export {
   NoAdminConfiguredError,
   OrganizationNotFoundForTeamError,
   OrganizationSlugTakenError,
-} from "./services/organization-membership.errors";
-export { isCustomRole } from "./services/custom-role-naming";
+} from "./services/organization-membership-errors.service";
+export { isCustomRole } from "./rules/custom-role-naming.rules";
 export {
   getAutoCorrectedTeamRoleForOrganizationRole,
   getDefaultTeamRoleForOrganizationRole,
@@ -39,8 +39,11 @@ export {
   isTeamRoleAllowedForOrganizationRole,
   ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
-} from "./services/member-role-constraints";
-export { assertNoPersonalTeamScope, findSharedTeamIds } from "./services/personal-team-scope";
+} from "./services/member-role-constraints.service";
+export {
+  assertNoPersonalTeamScope,
+  findSharedTeamIds,
+} from "./services/personal-team-scope.service";
 export type {
   AuditLogFilters,
   CreateAndAssignInput,
@@ -118,10 +121,13 @@ export {
   type OrganizationProvisioningSummary,
   verifyInstanceAdminKey,
 } from "./transport/api-rest/organization-provisioning.api";
-export { ORGANIZATIONS_SPEC_OPTIONS } from "./transport/api-rest/organization-provisioning.openapi";
+export { ORGANIZATIONS_SPEC_OPTIONS } from "./rules/organization-provisioning-openapi.rules";
 export { createTeamsRestApp } from "./transport/api-rest/team.api";
-export { buildInviteAcceptUrl, buildMembersSettingsUrl } from "./services/invite-link";
-export { resolveInviteDisplayStatus, type InviteDisplayStatus } from "./services/invite-rules";
+export { buildInviteAcceptUrl, buildMembersSettingsUrl } from "./rules/invite-link.rules";
+export {
+  resolveInviteDisplayStatus,
+  type InviteDisplayStatus,
+} from "./rules/invite-display-status.rules";
 export {
   AlreadyOrganizationMemberError,
   DuplicateInviteError,
@@ -134,7 +140,7 @@ export {
   InviteWrongAccountError,
   OrganizationNotFoundError,
   TeamNotInOrganizationError,
-} from "./services/invite.errors";
+} from "./services/invite-errors.service";
 export {
   LITE_MEMBER_VIEWER_ONLY_ERROR,
   computeEffectiveTeamRoleUpdates,
@@ -142,7 +148,7 @@ export {
   type EffectiveTeamRoleUpdate,
   type TeamRoleUpdate,
   type TeamRoleUpdateOrigin,
-} from "./services/compute-effective-team-role-updates";
+} from "./services/compute-effective-team-role-updates.service";
 export {
   INVITE_EXPIRATION_MS,
   InviteService,

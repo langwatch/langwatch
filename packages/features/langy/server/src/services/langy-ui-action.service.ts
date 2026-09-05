@@ -8,7 +8,7 @@ import {
   LangyUiTimeoutError,
   LangyUiTurnInactiveError,
 } from "@langwatch/langy-contract";
-import type { LangyTokenBuffer } from "../streaming/langy-token-buffer";
+import type { LangyTokenBuffer } from "../adapters/redis.langy-token-buffer.adapter";
 import type {
   LangyUiActionCatalogPort,
   LangyUiActionDefinition,

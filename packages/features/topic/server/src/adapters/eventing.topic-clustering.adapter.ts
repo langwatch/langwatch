@@ -14,7 +14,7 @@ import {
   recordTopicsDedupeId,
   type TopicClusteringDispatchDeps,
 } from "../intents/topic-clustering.intent";
-import type { TopicClusteringProcessingEvent } from "./eventing.topic.events";
+import type { TopicClusteringProcessingEvent } from "./eventing.topic-events.adapter";
 import {
   TOPIC_CLUSTERING_PROCESS_NAME,
   TopicClusteringProcess,

@@ -1,5 +1,5 @@
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
-import type { IdentityUsersRepository } from "../../identity-users.repository";
+import type { IdentityUsersRepository } from "../../repositories/identity-users.repository";
 
 /**
  * The `User` table as identity reads it, in memory: `email` per user and the

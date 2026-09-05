@@ -28,7 +28,7 @@ import {
   LIST_API_KEYS,
   REVOKE_API_KEY,
   UPDATE_API_KEY,
-} from "./api-key.openapi";
+} from "../../rules/api-key-openapi.rules";
 
 const bindingSchema = z.object({
   role: z

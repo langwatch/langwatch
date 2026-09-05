@@ -34,7 +34,7 @@ import {
   StoredObjectDestinationPolicy,
   StoredObjectProjectS3ConfigPort,
   StoredObjectStorageRuntime,
-} from "@langwatch/stored-object-server/storage";
+} from "@langwatch/stored-object-server";
 
 class NoProxy extends OutboundProxyResolverPort {
   tryResolveForHost(): string | undefined {

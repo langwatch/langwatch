@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type DataPrivacyPolicy, type DataPrivacyScope } from "@langwatch/data-privacy-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import { DataPrivacyPolicyRepository } from "../data-privacy.repository";
+import { DataPrivacyPolicyRepository } from "../../repositories/data-privacy.repository";
 import { DataPrivacyService } from "../../services/data-privacy.service";
 
 class MemoryDataPrivacyRepository extends DataPrivacyPolicyRepository {

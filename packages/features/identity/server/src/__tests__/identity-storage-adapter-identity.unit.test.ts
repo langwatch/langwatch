@@ -20,7 +20,7 @@
 import { IDENTIFIER_ATTACHED_EVENT_TYPE } from "@langwatch/identity-contract";
 import { handleOAuthUserInfo } from "better-auth/oauth2";
 import { beforeEach, describe, expect, it } from "vitest";
-import { IdentityUnsupportedStorageQueryError } from "../better-auth/account-queries";
+import { IdentityUnsupportedStorageQueryError } from "../adapters/better-auth.account-queries.adapter";
 import type { IdentityStack } from "./support/storage-adapter-stack";
 import { identityStack, NEW_PASSWORD, PASSWORD, signUp } from "./support/storage-adapter-stack";
 

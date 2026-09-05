@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import { pinTimezone } from "./pinTimezone";
 
-import { resolveLangWatchQLTimeWindow } from "../resolve-time-window";
+import { resolveLangWatchQLTimeWindow } from "../../services/langwatch-ql-time-window.service";
 import {
   formatLangWatchQLDateTimeParameter,
   isLangWatchQLDateTimeParameterType,

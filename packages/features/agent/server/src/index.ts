@@ -33,7 +33,7 @@ export {
   sanitizeHeadersForTrace,
   type AgentTestTrace,
   type TraceTestContext,
-} from "./transport/api-trpc/agent-test-tracing";
+} from "./rules/agent-test-tracing.rules";
 
 /**
  * The deprecated `/api/agents` REST family this feature owns. The process
@@ -94,7 +94,7 @@ export {
   type StoredCall,
   type StoredResult,
   type StoredResultError,
-} from "./rules/connected-agent-envelope.rules";
+} from "./services/connected-agent-envelope.service";
 export {
   ConnectedAgentParameterSpecService,
   type NormalizedParameters,

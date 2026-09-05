@@ -28,7 +28,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run",
-    "generate:langy-skills": "tsx scripts/generate-langy-skills.ts"
+    "generate:langy-skills": "tsx scripts/generate-langy-skills.ts",
+    "generate:feature-map": "tsx scripts/generate-feature-map.ts"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.219",
@@ -63,6 +64,7 @@
     "zustand": "^4.5.7"
   },
   "devDependencies": {
+    "@langwatch/skills": "workspace:*",
     "@tanstack/react-query": "5.101.4",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",

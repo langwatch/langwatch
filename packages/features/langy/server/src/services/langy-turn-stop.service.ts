@@ -2,7 +2,10 @@ import {
   LangyConversationNotOwnedError,
   LangyTurnNotStoppableError,
 } from "@langwatch/langy-contract";
-import { reconstructPartialAnswer, type LangyTurnServiceDependencies } from "./langy-turn.shared";
+import {
+  reconstructPartialAnswer,
+  type LangyTurnServiceDependencies,
+} from "./langy-turn-shared.service";
 
 /** Private control collaborator for the durable Stop workflow. */
 export class LangyTurnStopService {

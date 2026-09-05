@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
-import type { TeamRoleValue } from "../member-role-constraints";
+import type { TeamRoleValue } from "../member-role-constraints.service";
 import {
   getAutoCorrectedTeamRoleForOrganizationRole,
   getDefaultTeamRoleForOrganizationRole,
   getOrganizationRoleLabel,
   isBindingRoleAllowedForOrganizationRole,
   isTeamRoleAllowedForOrganizationRole,
-} from "../member-role-constraints";
+} from "../member-role-constraints.service";
 
 describe("memberRoleConstraints", () => {
   describe("getOrganizationRoleLabel()", () => {

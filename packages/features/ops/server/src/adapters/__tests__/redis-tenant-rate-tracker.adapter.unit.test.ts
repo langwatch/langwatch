@@ -2,7 +2,7 @@ import Redis from "ioredis";
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RedisTenantRateTrackerAdapter } from "../redis.tenant-rate-tracker.adapter";
-import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../services/anomaly.constants";
+import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../rules/anomaly-constants.rules";
 
 function redisFake() {
   const redis = new Redis({ lazyConnect: true, enableOfflineQueue: false });

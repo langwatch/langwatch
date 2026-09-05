@@ -5,8 +5,8 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { StoredObjectsClickHousePort } from "../../ports/stored-objects-clickhouse.port";
 import { StoredObjectsRepository } from "../stored-objects.repository";
-import type { StoredObject } from "../stored-objects.row";
-import { storedObjectSchema } from "../stored-objects.row";
+import type { StoredObject } from "../../rules/stored-object-row.rules";
+import { storedObjectSchema } from "../../rules/stored-object-row.rules";
 
 const TABLE_NAME = "stored_objects" as const;
 

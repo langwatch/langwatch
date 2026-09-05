@@ -1,16 +1,7 @@
 /**
  * The HTTP side of connected agents, for a process whose network blocks
- * WebSockets (ADR-128, "Transport"): the same frames, carried by three
- * requests. `register` answers with the registered frame and an instance
- * token; `poll` waits for the next call and cancel frames of that instance
- * and refreshes its presence; `frames` takes ack, result and deregister.
- *
- * A session lives in the state store under its token, so a poll may land on
- * any pod. A pod that served an instance keeps a subscription on its channel
- * until the presence TTL passes with no poll, which is what wakes a waiting
- * poll and what tells the dispatcher an instance still exists between two
- * polls. Delivery is once only: a call is claimed under its own key before
- * it is handed out, so two polls never carry the same call.
+ * WebSockets (ADR-128): the same frames over `register`/`poll`/`frames`.
+ * Delivery is once only — a call is claimed under its own key before handout.
  */
 
 import {
@@ -32,7 +23,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { type InstanceNudge, instanceNudgeSchema } from "../rules/connected-agent-envelope.rules";
+import { type InstanceNudge, instanceNudgeSchema } from "./connected-agent-envelope.service";
 import {
   callDeliveredKey,
   callKey,
@@ -228,9 +219,7 @@ export class LongPollTransportService {
   }
 
   /**
-   * Waits up to the poll wait for the next frames of an instance, and
-   * refreshes its presence on the way in and on the way out.
-   *
+   * Waits up to the poll wait for the next frames, refreshing presence in and out.
    * @throws {AgentRegisterRefusedError} the credential is refused
    * @throws {AgentSessionUnknownError} the token names no live session
    */
@@ -303,7 +292,6 @@ export class LongPollTransportService {
 
   /**
    * Takes the frames a process posts: ack, result and deregister.
-   *
    * @throws {AgentRegisterRefusedError} the credential is refused
    * @throws {AgentSessionUnknownError} the token names no live session
    */

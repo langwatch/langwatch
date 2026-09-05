@@ -7,9 +7,8 @@ import { StudioIsolatedErrorBoundary } from "./studio-error-boundary";
 
 /**
  * Context to provide a margin-top offset to all Drawer.Content descendants.
- * Used by CurrentDrawer in the studio to push drawers below the header bar.
- * Works with portaled content because React context follows the React tree,
- * not the DOM tree.
+ * Used by CurrentDrawer to push drawers below the header bar; works with
+ * portaled content since React context follows the React tree.
  */
 const DrawerOffsetContext = React.createContext<{ marginTop?: number }>({});
 export const DrawerOffsetProvider = DrawerOffsetContext.Provider;
@@ -19,10 +18,8 @@ interface DrawerContentProps extends ChakraDrawer.ContentProps {
   portalRef?: React.RefObject<HTMLElement>;
   offset?: ChakraDrawer.ContentProps["padding"];
   /**
-   * Set to `false` to disable the inline error boundary that wraps
-   * children. By default, a render-time crash inside a drawer body shows
-   * an inline error panel — it does NOT close the drawer or take down the
-   * page. Opt out only if you have a more specific outer boundary already.
+   * Set to `false` to disable the inline error boundary wrapping children. By
+   * default a render-time crash shows an inline panel, not a closed drawer.
    */
   withErrorBoundary?: boolean;
   /** Optional scope label shown by the error fallback. */
@@ -52,15 +49,10 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
     const marginTopProp =
       rest.marginTop ?? (contextMarginTop ? `${contextMarginTop}px` : undefined);
 
-    // THE LANGY CHOREOGRAPHY DID NOT TRAVEL, and it is the seventh family to
-    // refuse `@langwatch/langy-web` for the same reason: it is ungoverned, so
-    // every consumer compiles its source, which needs an `es2023` library and a
-    // stylesheet declaration this package would have had to adopt globally.
-    //
-    // What was in these lines: a docked Langy sidebar held the right edge and
-    // the drawer yielded a panel's width to it, and a floating Langy dodged
-    // first so the two did not move in lockstep. Without them a drawer opened in
-    // the studio slides to the edge under a docked panel rather than beside it.
+    // THE LANGY CHOREOGRAPHY DID NOT TRAVEL: `@langwatch/langy-web` is
+    // ungoverned and needs a stylesheet this package won't adopt globally.
+    // Without it a drawer opened in the studio slides under a docked panel
+    // rather than beside it.
     // Spec: specs/langy/langy-panel-layout.feature.
     const langyYieldMarginEnd = undefined;
     const langyStaggerEnter = undefined;
@@ -112,20 +104,9 @@ export const DrawerCloseTrigger = React.forwardRef<
 });
 
 /**
- * Wrapper around Chakra's Drawer.Root with safe defaults for nested drawers.
- *
- * - `modal={false}`: Prevents focus trap from stealing input in child drawers.
- * - `closeOnInteractOutside={false}`: Prevents parent from closing when
- *   interacting with a child drawer.
- * - `preventScroll={false}`: Default to allowing background scrolling.
- *
- * All defaults can be overridden by passing props explicitly.
- *
- * `size` is widened the way `@langwatch/design-system`'s plain drawer widens
- * it: Chakra types `size` from its OWN recipe, so a width step the product
- * adds in `system/drawer.recipe.ts` is unknown to it. The wrapper carries the
- * product's list and hands the name down, which is why a drawer sets a width
- * by name and never with a maxWidth of its own.
+ * Wrapper around Chakra's Drawer.Root with safe, overridable defaults for
+ * nested drawers. `size` is widened like the plain drawer's, since Chakra's
+ * own recipe doesn't know the product's extra width step.
  */
 export type AppDrawerSize = NonNullable<ChakraDrawer.RootProps["size"]> | "2xl";
 

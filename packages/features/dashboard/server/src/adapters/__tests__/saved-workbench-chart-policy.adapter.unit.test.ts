@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-contract/visualization/validation";
 import { SavedWorkbenchChartAlreadyExistsError } from "@langwatch/dashboard-contract";
 import { AnalyticsSavedWorkbenchChartPolicyAdapter } from "../saved-workbench-chart-policy.adapter";
-import { mapDashboardSavedWorkbenchChartError } from "../../transport/api-trpc/saved-workbench-chart.transport-errors";
+import { mapDashboardSavedWorkbenchChartError } from "../saved-workbench-chart-errors.adapter";
 import { LangWatchQLService } from "@langwatch/analytics-server/testing";
 
 const PROJECT_ID = "project_1";

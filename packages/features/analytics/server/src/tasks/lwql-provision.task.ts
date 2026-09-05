@@ -9,7 +9,7 @@ import { createLogger } from "@langwatch/observability";
 
 import { parseConnectionUrl } from "@langwatch/clickhouse-client";
 import { Task } from "@langwatch/task";
-import { lwqlConnectionFromEnvironment } from "../langwatch-ql/executor";
+import { lwqlConnectionFromEnvironment } from "../services/langwatch-ql-executor.service";
 import {
   type LwqlKeyMapBackfillPlan,
   lwqlKeyMapTableQualifiedName,
@@ -20,8 +20,11 @@ import {
   productionPostgresApprovedViewStatements,
   productionPostgresReaderGrantStatements,
   withTenancyOptOut,
-} from "../langwatch-ql/production-provisioning";
-import { KEY_MAP_COLUMNS, type LangWatchQLNames } from "../langwatch-ql/provisioning";
+} from "../services/langwatch-ql-production-provisioning.service";
+import {
+  KEY_MAP_COLUMNS,
+  type LangWatchQLNames,
+} from "../adapters/clickhouse.lwql-provisioning.adapter";
 import { LWQL_KEY_MAP_INSERT_SETTINGS } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository";
 
 const logger = createLogger("langwatch:task:lwql-provision");

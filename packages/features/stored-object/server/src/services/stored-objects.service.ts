@@ -9,9 +9,9 @@ import { redactStoredObjectStorageUri } from "@langwatch/stored-object-contract"
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { StoredObjectStoragePort } from "../ports/stored-object-storage.port";
-import { ObjectNotFoundError } from "../errors";
+import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import type { StoredObjectsTelemetryPort } from "../ports/stored-objects-telemetry.port";
-import type { StoredObject } from "../repositories/stored-objects.row";
+import type { StoredObject } from "../rules/stored-object-row.rules";
 import type { StoredObjectsRepository } from "../repositories/stored-objects.repository";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.service");

@@ -5,9 +5,9 @@ import {
   VERIFY_IDENTIFIER_COMMAND_TYPE,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
-import { IdentityGuards } from "../guards";
-import type { IdentityLedger } from "../identity-ledger";
-import { IdentityService } from "../identity.service";
+import { IdentityGuards } from "../services/identity-guards.service";
+import type { IdentityLedger } from "../rules/identity-ledger.rules";
+import { IdentityService } from "../services/identity.service";
 import { ACTOR, attachData, InMemoryHeads, T0, USER } from "./support/in-memory-heads";
 import { InMemoryUsers } from "./support/in-memory-users";
 import { InMemoryReservations } from "./support/in-memory-reservations";

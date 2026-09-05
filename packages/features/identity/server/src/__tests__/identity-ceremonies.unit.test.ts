@@ -1,7 +1,7 @@
 import { IdentityPrimaryMustDemoteFirstError } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
-import { IdentityCeremonies } from "../better-auth/identity-ceremonies";
-import type { IdentityUsersRepository } from "../identity-users.repository";
+import { IdentityCeremonies } from "../adapters/better-auth.identity-ceremonies.adapter";
+import type { IdentityUsersRepository } from "../repositories/identity-users.repository";
 import { fact, InMemoryHeads, T0, USER } from "./support/in-memory-heads";
 
 function harness(options?: {

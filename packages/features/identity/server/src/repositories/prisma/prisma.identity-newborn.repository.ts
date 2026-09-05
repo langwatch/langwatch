@@ -1,10 +1,7 @@
 import { IdentityEmailInUseError } from "@langwatch/identity-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../identity-migration-names";
-import type {
-  AbandonedNewborn,
-  IdentityNewbornRepository,
-} from "../../identity-newborn.repository";
+import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules";
+import type { AbandonedNewborn, IdentityNewbornRepository } from "../identity-newborn.repository";
 
 /** Prisma's unique-constraint code, as the pinned-id race arrives. */
 function isUniqueViolation(error: unknown): boolean {

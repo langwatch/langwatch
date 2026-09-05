@@ -3,7 +3,7 @@
  */
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
-import type { AgentTestTrace } from "../agent-test-tracing";
+import type { AgentTestTrace } from "../../../rules/agent-test-tracing.rules";
 import { HttpProxyTrpcApi } from "../http-proxy.api";
 
 type Recorded = { projectId: string; trace: AgentTestTrace };

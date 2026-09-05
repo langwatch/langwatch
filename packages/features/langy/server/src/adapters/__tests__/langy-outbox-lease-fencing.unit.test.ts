@@ -9,7 +9,7 @@ import {
 } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AGENT_DISPATCH_TIMEOUT_MS } from "@langwatch/langy-server";
-import type { LangyConversationProcessingEvent } from "../../services/langy-conversation.events";
+import type { LangyConversationProcessingEvent } from "../eventing.langy-conversation-events.adapter";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   LANGY_PROCESS_INTENT_TYPES,

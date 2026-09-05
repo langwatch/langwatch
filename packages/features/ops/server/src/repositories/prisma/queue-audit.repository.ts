@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
-import { QueueAuditSink, type QueueControlAction } from "../../ports/queue-audit.sink";
+import { QueueAuditSinkPort, type QueueControlAction } from "../../ports/queue-audit-sink.port";
 
 const auditMetadataSchema = z.record(z.string(), z.json());
 
@@ -19,7 +19,7 @@ const TARGET_KIND_BY_ACTION: Record<QueueControlAction, string> = {
 };
 
 /** Writes queue dead-letter operator actions to the shared audit log. */
-export class QueueAuditRepository extends QueueAuditSink {
+export class QueueAuditRepository extends QueueAuditSinkPort {
   static create({ prisma }: { prisma: PrismaClient }): QueueAuditRepository {
     return new QueueAuditRepository(prisma);
   }

@@ -7,7 +7,10 @@ import { TraceExportService } from "../trace-export.service";
 import Parse from "papaparse";
 import { describe, expect, it } from "vitest";
 import type { Evaluation, LLMSpan, RAGSpan, Span, Trace } from "@langwatch/trace-contract";
-import { serializeTracesToFullCsv, serializeTracesToSummaryCsv } from "../trace-export-csv.rules";
+import {
+  serializeTracesToFullCsv,
+  serializeTracesToSummaryCsv,
+} from "../../rules/trace-export-csv.rules";
 
 // ---------------------------------------------------------------------------
 // Test data builders

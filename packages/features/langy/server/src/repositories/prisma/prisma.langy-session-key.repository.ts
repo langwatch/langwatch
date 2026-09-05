@@ -1,4 +1,4 @@
-import type { LangyDatabase } from "./langy-database.port";
+import type { LangyDatabase } from "./prisma.langy-database.repository";
 import { PrismaLangySessionKeyReapRepository } from "./prisma.langy-session-key-reap.repository";
 import {
   LangySessionKeyRepository,

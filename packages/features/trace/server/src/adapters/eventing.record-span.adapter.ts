@@ -26,7 +26,7 @@ import type {
   TraceSpanTokenEstimationPort,
 } from "../ports/trace-span-preparation.port";
 import type { TraceSpanSpoolPort } from "../ports/trace-span-spool.port";
-import { TraceAttributeCap } from "../services/trace-attribute-cap.rules";
+import { TraceAttributeCap } from "../services/trace-attribute-cap.service";
 
 const spooledRecordSpanSchema = z.object({
   span: spanSchema,

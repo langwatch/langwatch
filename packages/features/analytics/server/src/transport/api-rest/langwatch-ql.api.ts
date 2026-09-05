@@ -24,9 +24,9 @@
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 
 import { registerSavedWorkbenchChartRoutes } from "./saved-workbench-chart.api";
-import type { LangWatchQLRestPorts } from "./langwatch-ql-route-guards";
+import type { LangWatchQLRestPorts } from "../../services/langwatch-ql-route-guards.service";
 
-export type { LangWatchQLRestPorts } from "./langwatch-ql-route-guards";
+export type { LangWatchQLRestPorts } from "../../services/langwatch-ql-route-guards.service";
 
 /** `/api/v1/projects/:projectId/analytics/charts/*`, bound to one process's graph. */
 export function createLangWatchQLRestApp(options: {

@@ -1,4 +1,4 @@
-import type { SsoBreakGlassBindingRepository } from "../sso-connection.repository";
+import type { SsoBreakGlassBindingRepository } from "../repositories/sso-connection.repository";
 import { LOCAL_METHOD_SET } from "../services/signin-method-policy.service";
 
 /**

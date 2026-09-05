@@ -12,7 +12,7 @@ import {
   executeScenarioChild,
   flushScenarioOtelTraces,
   formatScenarioChildError,
-  nlpFetchTimeoutsFromEnvironment,
+  NlpFetchAdapter,
   SCENARIO_EGRESS_POLICY_ENV,
   ScenarioHttpPort,
   type ScenarioHttpResponse,
@@ -81,7 +81,7 @@ async function main(): Promise<void> {
       verbose: process.env.SCENARIO_VERBOSE === "true",
       httpPort: new WorkerScenarioChildHttp(),
       logger,
-      nlpTimeouts: nlpFetchTimeoutsFromEnvironment(process.env),
+      nlpTimeouts: NlpFetchAdapter.timeoutsFromEnvironment(process.env),
     },
   });
 

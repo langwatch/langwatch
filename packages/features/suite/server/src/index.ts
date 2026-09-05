@@ -48,10 +48,7 @@ export {
   type StartSuiteRunCommandData,
 } from "@langwatch/suite-contract";
 export { SuiteTrpcApi } from "./transport/api-trpc/suite.api";
-export type {
-  SuiteTrpcContext,
-  SuiteTrpcProcedures,
-} from "./transport/api-trpc/suite.trpc-context";
+export type { SuiteTrpcContext, SuiteTrpcProcedures } from "./rules/suite-trpc-context.rules";
 
 /**
  * The feature's application: the one object both of its doors call, and the

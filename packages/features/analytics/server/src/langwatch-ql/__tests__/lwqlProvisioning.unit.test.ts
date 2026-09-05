@@ -21,7 +21,7 @@ import {
   lwqlKeyMapTableStatement,
   lwqlRowPolicyStatement,
   lwqlSettingsProfileStatement,
-} from "../provisioning";
+} from "../../adapters/clickhouse.lwql-provisioning.adapter";
 
 const NAMES: LangWatchQLNames = {
   database: "lwql_unit",

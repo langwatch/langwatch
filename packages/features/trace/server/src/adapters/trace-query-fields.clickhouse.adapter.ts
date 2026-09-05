@@ -4,13 +4,8 @@ import {
   type ExpressionCategoricalDef,
   type RangeFacetDef,
 } from "./trace-facet-registry.clickhouse.adapter";
-import type {
-  CategoricalRead,
-  FieldDef,
-  FieldNeeds,
-  RangeRead,
-} from "./trace-query-evaluation.types";
-import { UNSUPPORTED } from "./trace-query-evaluation.types";
+import type { CategoricalRead, FieldDef, FieldNeeds, RangeRead } from "@langwatch/trace-contract";
+import { UNSUPPORTED } from "@langwatch/trace-contract";
 import { TraceQueryTranslatorsAdapter } from "./trace-query-translators.clickhouse.adapter";
 import { META_FIELD_DEFS } from "./trace-query-meta-fields.clickhouse.adapter";
 

@@ -24,6 +24,7 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { HostedMcpRedis } from "../../ports/hosted-mcp.port";
 import type { HostedMcpDependencies } from "../../ports/hosted-mcp.port";
 import { RedisOAuthClientRepository } from "../../repositories/redis/redis.oauth-client.repository";
+import { McpRateLimitService } from "../../services/mcp-rate-limit.service";
 
 const logger = createLogger("langwatch:mcp");
 
@@ -74,52 +75,6 @@ const MAX_SESSIONS_PER_KEY = 20;
  */
 function hashApiKey(apiKey: string): string {
   return createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
-}
-
-// ---------------------------------------------------------------------------
-// Rate limiter — sliding window per IP
-// ---------------------------------------------------------------------------
-
-interface RateLimitEntry {
-  count: number;
-  windowStart: number;
-}
-
-function createRateLimiter({ windowMs, maxRequests }: { windowMs: number; maxRequests: number }) {
-  const entries = new Map<string, RateLimitEntry>();
-
-  return {
-    /** Check if the IP is within the rate limit (does NOT increment). */
-    isBlocked(ip: string): boolean {
-      const now = Date.now();
-      const entry = entries.get(ip);
-      if (!entry || now - entry.windowStart > windowMs) return false;
-      return entry.count >= maxRequests;
-    },
-    /** Record a request for this IP (increments the counter). */
-    track(ip: string): void {
-      const now = Date.now();
-      const entry = entries.get(ip);
-      if (!entry || now - entry.windowStart > windowMs) {
-        entries.set(ip, { count: 1, windowStart: now });
-      } else {
-        entry.count++;
-      }
-    },
-    /** Remove expired entries (call from reaper). */
-    sweep() {
-      const now = Date.now();
-      for (const [ip, entry] of entries) {
-        if (now - entry.windowStart > windowMs) {
-          entries.delete(ip);
-        }
-      }
-    },
-    /** Drop every tracked entry (for testing). */
-    clear() {
-      entries.clear();
-    },
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -334,15 +289,15 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   // Rate limiters. Registration and token exchange get a budget each: a
   // client that just registered immediately exchanges a code, so one shared
   // bucket makes the second call pay for the first.
-  const registerRateLimiter = createRateLimiter({
+  const registerRateLimiter = new McpRateLimitService({
     windowMs: 60_000,
     maxRequests: 30,
   });
-  const tokenRateLimiter = createRateLimiter({
+  const tokenRateLimiter = new McpRateLimitService({
     windowMs: 60_000,
     maxRequests: 30,
   });
-  const authFailRateLimiter = createRateLimiter({
+  const authFailRateLimiter = new McpRateLimitService({
     windowMs: 60_000,
     maxRequests: 20,
   });

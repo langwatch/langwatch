@@ -21,13 +21,13 @@ import {
 import type {
   JoinCandidateRepository,
   JoinRequestListReadRepository,
-} from "../join-request.repository";
-import type { JoinRequestService } from "../join-request.service";
+} from "../repositories/join-request.repository";
+import type { JoinRequestService } from "./join-request.service";
 import {
   approveJoinCommandId,
   newJoinRequestCommandId,
   newJoinRequestId,
-} from "../join-request-id";
+} from "../rules/join-request-id.rules";
 import { createLogger } from "@langwatch/observability";
 import { JOIN_REQUEST_EXPIRY_MS } from "../processes/join-request-lifecycle.process";
 

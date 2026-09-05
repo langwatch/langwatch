@@ -7,7 +7,10 @@
 
 import { describe, expect, it } from "vitest";
 import type { Evaluation, LLMSpan, RAGSpan, Trace } from "@langwatch/trace-contract";
-import { serializeTraceToFullJson, serializeTraceToSummaryJson } from "../trace-export-json.rules";
+import {
+  serializeTraceToFullJson,
+  serializeTraceToSummaryJson,
+} from "../../rules/trace-export-json.rules";
 
 // ---------------------------------------------------------------------------
 // Test data builders

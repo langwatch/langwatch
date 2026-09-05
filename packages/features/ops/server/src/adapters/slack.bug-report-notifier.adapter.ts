@@ -1,5 +1,5 @@
 import type { BugReport } from "@langwatch/prisma-client/generated";
-import { BugReportNotifierPort } from "../ports/bug-report-intake.ports";
+import { BugReportNotifierPort } from "../ports/bug-report-notifier.port";
 
 /**
  * Posts one Block Kit message. The deployment binds its own Slack Web API

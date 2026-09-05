@@ -15,7 +15,7 @@ import {
   NlpFetchAdapter,
   type NlpFetchTimeouts,
 } from "./nlp-fetch.adapter";
-import { SerializedAgentAdapter } from "./serialized-agent.base";
+import { SerializedAgentAdapter } from "./serialized-agent.adapter";
 
 /**
  * How long to wait on the NLP service for one turn.

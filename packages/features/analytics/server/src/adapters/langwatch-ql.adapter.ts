@@ -8,7 +8,10 @@
  * `available` answers false — which is what the workbench's navigation gate
  * reads, so an unprovisioned deployment never offers a surface it would refuse.
  */
-import { createLangWatchQLExecutor, type LangWatchQLConnection } from "../langwatch-ql/executor";
+import {
+  createLangWatchQLExecutor,
+  type LangWatchQLConnection,
+} from "../services/langwatch-ql-executor.service";
 import {
   DEFAULT_LWQL_DATABASE,
   LangWatchQLService,

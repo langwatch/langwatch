@@ -6,7 +6,7 @@ import {
   type TranslationContext,
   UNSUPPORTED,
   type Unsupported,
-} from "./trace-query-evaluation.types";
+} from "@langwatch/trace-contract";
 import {
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
   TraceQueryValuesAdapter,

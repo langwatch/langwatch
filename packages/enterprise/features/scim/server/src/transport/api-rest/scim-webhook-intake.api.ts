@@ -18,7 +18,7 @@
 import { internalSecret } from "@langwatch/api";
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 
-import { ScimWebhookApi } from "../../api/scim-webhook/scim-webhook.api";
+import { ScimWebhookApi } from "./scim-webhook.api";
 import {
   SCIM_WEBHOOK_SIGNATURE_HEADER,
   SCIM_WEBHOOK_TOLERANCE_SECONDS,

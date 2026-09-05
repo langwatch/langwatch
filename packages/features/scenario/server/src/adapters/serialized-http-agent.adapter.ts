@@ -20,7 +20,7 @@ import { applyAuthentication } from "./http-auth.adapter";
 import type { HttpAgentData, RunParameterValues } from "@langwatch/scenario-contract";
 import { ScenarioSecretReferenceAdapter } from "./scenario-secret-reference.adapter";
 import type { ScenarioHttpPort } from "../ports/scenario-http.port";
-import { SerializedAgentAdapter } from "./serialized-agent.base";
+import { SerializedAgentAdapter } from "./serialized-agent.adapter";
 
 /**
  * Truncate a response body for log inclusion. Long bodies are useless in

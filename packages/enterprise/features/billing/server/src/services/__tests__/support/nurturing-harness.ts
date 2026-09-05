@@ -4,7 +4,7 @@
 import { vi } from "vitest";
 import { BillingErrorReporter } from "../../../ports/error-reporter.port";
 import { NurturingService } from "../../nurturing.service";
-import { setNurturingSink } from "../../nurturing-sink";
+import { setNurturingSink } from "../../../adapters/nurturing-sink.adapter";
 
 export class RecordingErrorReporter extends BillingErrorReporter {
   readonly capture = vi.fn();

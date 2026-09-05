@@ -17,13 +17,9 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./storage": {
-      "types": "./src/storage.ts",
-      "default": "./src/storage.ts"
-    },
     "./public-api": {
-      "types": "./src/api/public/stored-object.api.ts",
-      "default": "./src/api/public/stored-object.api.ts"
+      "types": "./src/transport/public-rest/stored-object.api.ts",
+      "default": "./src/transport/public-rest/stored-object.api.ts"
     },
     "./testing": {
       "types": "./src/testing.ts",

@@ -14,9 +14,8 @@ export { PresenceStreamService } from "./services/presence-stream.service";
  * The tenant broadcast fabric the presence emitter and the export relay both subscribe on.
  */
 export { BroadcastAdapter, type BroadcastEventType } from "./adapters/broadcast.adapter";
-export { BroadcasterNotActiveError } from "./adapters/broadcast.errors";
 export {
   TenantRateLimiter,
   type BucketConfig,
   type TierConfig,
-} from "./adapters/broadcast-tenant-rate-limiter";
+} from "./adapters/broadcast-tenant-rate-limiter.adapter";

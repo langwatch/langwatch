@@ -2,7 +2,7 @@ import { LIVE_IDENTIFIER_STATES, type SsoConnectionState } from "@langwatch/iden
 import type {
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
-} from "../../sso-connection.repository";
+} from "../sso-connection.repository";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository";
 

@@ -1,6 +1,6 @@
 import type { TraceDerivationSpanReaderPort } from "../ports/trace-derivation-span-reader.port";
-import { deriveScenarioRoleMetricsFromSpans } from "./scenario-role-metrics.rules";
-import type { ScenarioRoleMetrics } from "./scenario-role-metrics.rules";
+import { deriveScenarioRoleMetricsFromSpans } from "../rules/scenario-role-metrics.rules";
+import type { ScenarioRoleMetrics } from "../rules/scenario-role-metrics.rules";
 import { SpanCostService } from "./span-cost.service";
 
 /**

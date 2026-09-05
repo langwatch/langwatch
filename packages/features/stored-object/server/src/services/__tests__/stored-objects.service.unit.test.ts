@@ -42,9 +42,9 @@ vi.mock("@langwatch/observability", () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { ObjectNotFoundError } from "../../errors";
+import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import type { StoredObjectStoragePort } from "../../ports/stored-object-storage.port";
-import type { StoredObject } from "../../repositories/stored-objects.row";
+import type { StoredObject } from "../../rules/stored-object-row.rules";
 import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository";
 import type { StoredObjectsTelemetryPort } from "../../ports/stored-objects-telemetry.port";
 import type { MintStorageUri } from "../stored-objects.service";

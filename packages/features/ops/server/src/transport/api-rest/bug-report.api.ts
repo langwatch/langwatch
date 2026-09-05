@@ -9,11 +9,9 @@ import { HandledError } from "@langwatch/handled-error";
 import type { Context } from "hono";
 import { z } from "zod";
 
-import type {
-  BugReportNotifierPort,
-  BugReportRateLimiterPort,
-} from "../../ports/bug-report-intake.ports";
-import type { BugReportRepository } from "../../ports/bug-report.repository";
+import type { BugReportNotifierPort } from "../../ports/bug-report-notifier.port";
+import type { BugReportRateLimiterPort } from "../../ports/bug-report-rate-limiter.port";
+import type { BugReportRepositoryPort } from "../../ports/bug-report.port";
 import { BugReportIntakeService } from "../../services/bug-report-intake.service";
 
 // Headroom over the 9M-char sessionData cap: JSON escaping can inflate the
@@ -31,7 +29,7 @@ export type BugReportRestCredentialReader = (
 /** Everything the intake reaches that the report itself does not own. */
 export type BugReportRestPorts = Readonly<{
   /** Where a filed report is written. */
-  reports: () => BugReportRepository;
+  reports: () => BugReportRepositoryPort;
   /** The deployment's fixed-window counter, keyed on the nearest-hop IP. */
   rateLimiter: BugReportRateLimiterPort;
   /** Where the team is alerted. Best-effort; intake already succeeded. */

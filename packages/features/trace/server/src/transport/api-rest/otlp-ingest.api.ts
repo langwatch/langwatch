@@ -35,7 +35,7 @@ import {
   stampIngestKeyProvenanceOnLogRequest,
   stampIngestKeyProvenanceOnMetricRequest,
   stampIngestKeyProvenanceOnTraceRequest,
-} from "../../services/ingest-key-provenance.rules";
+} from "../../rules/ingest-key-provenance.rules";
 import type { TraceRequestCollectionResult } from "../../services/trace-ingestion.service";
 
 /**

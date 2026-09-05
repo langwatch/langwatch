@@ -45,7 +45,10 @@ import type { ProjectIdentity } from "@langwatch/project-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 
-import { type LangWatchQLRestPorts, lwqlProject } from "./langwatch-ql-route-guards";
+import {
+  type LangWatchQLRestPorts,
+  lwqlProject,
+} from "../../services/langwatch-ql-route-guards.service";
 
 /** The app every route in this family is registered on. */
 type LangWatchQLApp = SecuredApp<{ Variables: AppRestProjectVariables }>;

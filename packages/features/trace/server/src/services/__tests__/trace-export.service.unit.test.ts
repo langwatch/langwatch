@@ -1,3 +1,4 @@
+import type { Protections } from "@langwatch/trace-contract";
 /**
  * #4991 ("2 of 2" of #4888) — AC1 call-site wiring for TraceExportService.
  *
@@ -9,12 +10,12 @@
  * BDD structure: given/when nested describes, action-based it() names.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { Protections } from "../trace-viewer-protections.service";
+
 import type { TraceService } from "../trace-legacy-read.service";
 import type { TracesForProjectResult } from "@langwatch/trace-contract";
-import type { GetAllTracesForProjectOptions } from "../trace-legacy-read.types";
+import type { GetAllTracesForProjectOptions } from "@langwatch/trace-contract";
 import { TraceExportService } from "../trace-export.service";
-import type { ExportRequest } from "../trace-export.vocabulary";
+import type { ExportRequest } from "@langwatch/trace-contract";
 
 const protections: Protections = {
   canSeeCapturedInput: true,

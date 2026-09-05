@@ -10,7 +10,7 @@ import {
 } from "@langwatch/agent-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { StoredCall } from "../rules/connected-agent-envelope.rules";
+import type { StoredCall } from "../services/connected-agent-envelope.service";
 import type { AgentRepository } from "../repositories/agent.repository";
 import type { ConnectCredentialPort } from "../ports/connect-credential.port";
 import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter";

@@ -26,10 +26,13 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import { AGENT_CHAT_TIMEOUT_MS } from "../../services/langy-turn-errors.errors";
+import { AGENT_CHAT_TIMEOUT_MS } from "../../services/langy-turn-errors.service";
 import { ADOPTABLE_CONVERSATION_ID } from "../../services/langy-conversation.service";
-import type { LangyChatMessageInput } from "../../services/langy-turn.shared";
-import type { LangyStreamEntry, LangyTokenBuffer } from "../../streaming/langy-token-buffer";
+import type { LangyChatMessageInput } from "../../services/langy-turn-shared.service";
+import type {
+  LangyStreamEntry,
+  LangyTokenBuffer,
+} from "../../adapters/redis.langy-token-buffer.adapter";
 import { LangySessionRequiredError, type LangyApp } from "#app/langy.app";
 
 const logger = createLogger("langwatch:langy:router");

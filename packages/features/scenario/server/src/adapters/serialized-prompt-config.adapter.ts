@@ -17,7 +17,7 @@ import type {
 } from "@langwatch/scenario-contract";
 import { createModelFromParams } from "./litellm-model.adapter";
 import { PromptTemplateAdapter } from "./prompt-template.adapter";
-import { SerializedAgentAdapter } from "./serialized-agent.base";
+import { SerializedAgentAdapter } from "./serialized-agent.adapter";
 
 // Shared Liquid engine for template interpolation. Sandboxed: a customer
 // prompt template must not be able to inline a file from the worker's working

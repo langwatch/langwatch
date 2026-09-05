@@ -31,27 +31,9 @@ import {
 } from "../blocks/sign-in-method-picker";
 
 /**
- * The identifier-first log-in screen (D13, ADR-117 §6).
- *
- * The order is the whole design: ask for the address, ask the server where it
- * signs in, render the answer. There is no branch in this file that decides
- * where anybody goes — a redirect happens because the decision said
- * `redirect_to_connection`, and a picker appears because it said
- * `method_picker`, with exactly the methods it named. On a domain that routes
- * to an identity provider a password field is never shown at all: the redirect
- * comes first, so there is nothing to type into wrongly.
- *
- * Nothing here dead-ends. A password typed for an address nobody holds an
- * account for is not a refusal, it is a sign-up that arrived at the log-in
- * form: the credential is held, a confirmation link goes out, and the person
- * sees the same "check your email" they would have seen on the other page. A
- * password that is wrong for an account that does exist still says so, in the
- * same words it always has.
- *
- * Two entrances skip the address step, and both are the decision's doing
- * rather than this screen's: a self-hosted deployment with one connection
- * routes with no address at all, and `?local=1` asks for the local method set
- * whatever else would have routed.
+ * The identifier-first log-in screen (D13, ADR-117 §6): ask for the address,
+ * ask the server where it signs in, render the answer. A password typed for
+ * an unheld address is a sign-up, not a refusal.
  */
 export function IdentifierFirstSignIn() {
   const query = useSearchParams();
@@ -256,22 +238,15 @@ function signInDepth({
 }
 
 /**
- * How long a hand-off is allowed to take before the screen admits to it.
- *
- * A redirect that lands inside this window paints nothing at all, which is the
- * whole point: a message that flashes for 80 milliseconds is not information,
- * it is a flicker. Past it the wait is real, and a blank page would be the
- * worse answer.
+ * How long a hand-off is allowed to take before the screen admits to it. A
+ * redirect inside this window paints nothing — an 80ms flash isn't information.
  */
 const HANDOFF_QUIET_MS = 400;
 
 /**
- * The decision routed this address to an identity provider, so the browser is
- * on its way there.
- *
- * Nothing is drawn while that is happening. If the hand-off turns out to be
- * slow, or the browser refused to follow it, the card appears and says where
- * they are going, with a button for the second case.
+ * The decision routed this address to an identity provider; nothing is drawn
+ * while the browser is on its way there. A slow or refused hand-off shows a
+ * card saying where it's going, with a button for the refused case.
  */
 function RoutedToConnection({
   decision,

@@ -4,7 +4,7 @@ import {
   type LangyCredentialSession,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import type { LangyTurnServiceDeps } from "./langy-turn.shared";
+import type { LangyTurnServiceDeps } from "./langy-turn-shared.service";
 
 const logger = createLogger("langwatch:langy:turn-dependencies");
 

@@ -1,8 +1,6 @@
 /**
  * The gateway's own guards, with no datastore: the payload caps on a result,
- * and the refusal of a connection when Redis is absent on a deployment with
- * several replicas.
- *
+ * and the connection refusal with no Redis on a multi-replica deployment.
  * @see specs/agents/connected-agents.feature
  */
 import { createServer, type Server } from "node:http";
@@ -17,7 +15,7 @@ import {
 } from "@langwatch/agent-contract";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import WebSocket from "ws";
-import { resultCapViolation } from "../../../rules/connected-agent-envelope.rules";
+import { resultCapViolation } from "../../../services/connected-agent-envelope.service";
 import { ConnectedAgentRuntimeAdapter } from "../../../adapters/connected-agent-runtime.adapter";
 import { ConnectedAgentStateAdapter } from "../../../adapters/connected-agent-state.adapter";
 import { AgentSessionService } from "../../../services/connected-agent-session.service";

@@ -17,7 +17,7 @@ import {
   SsoConnectionStringEditRetiredError,
   SsoConnectionTeardownStrandsUsersError,
   SsoSamlNotSelfServeError,
-} from "../errors";
+} from "../identity.errors";
 
 /** Every refusal reachable from the onboarding surfaces, constructed the way
  *  the guards construct them. Listed rather than derived so that adding a

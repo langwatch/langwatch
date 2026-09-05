@@ -31,7 +31,7 @@ import {
   type StoredCall,
   type StoredResultError,
   storedResultSchema,
-} from "../rules/connected-agent-envelope.rules";
+} from "../services/connected-agent-envelope.service";
 import {
   callKey,
   INSTANCE_GONE_CHANNEL,

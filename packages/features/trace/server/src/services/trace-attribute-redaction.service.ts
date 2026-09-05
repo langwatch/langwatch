@@ -1,8 +1,8 @@
+import type { Protections } from "@langwatch/trace-contract";
 import {
   type CompiledAttributeMatcher,
   compileAttributePatterns,
 } from "@langwatch/data-privacy-contract";
-import type { Protections } from "./trace-viewer-protections.service";
 
 interface HiddenMatcher extends CompiledAttributeMatcher {
   visibleTo: string;

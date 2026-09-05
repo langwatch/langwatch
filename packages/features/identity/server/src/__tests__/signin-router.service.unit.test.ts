@@ -4,7 +4,7 @@ import type {
   SignInMethodPolicy,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
-import { type SignInRoutingRecord, SignInRouterService } from "../signin-router.service";
+import { type SignInRoutingRecord, SignInRouterService } from "../services/signin-router.service";
 
 const PASSWORD: SignInMethod = {
   id: "password",

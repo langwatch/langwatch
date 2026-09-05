@@ -4,8 +4,8 @@ import type { Anomaly } from "@langwatch/ops-contract";
 import type { AnomalyHardTierAlertPort } from "../ports/anomaly-hard-tier-alert.port";
 import type { AnomalyRateTrackerPort } from "../ports/anomaly-rate-tracker.port";
 import type { AnomalyStatePort } from "../ports/anomaly-state.port";
-import { percentile } from "../ops.anomaly-percentile";
-import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "./anomaly.constants";
+import { percentile } from "../rules/ops-anomaly-percentile.rules";
+import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../rules/anomaly-constants.rules";
 
 const logger = createLogger("langwatch:observability:anomalyDetector");
 

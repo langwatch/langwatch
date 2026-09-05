@@ -61,7 +61,7 @@ import {
   TestFireRateLimitedError,
   type AutomationApp,
 } from "#app/automation.app";
-import { buildRetryAfterMessage } from "./retry-after-message";
+import { buildRetryAfterMessage } from "../../rules/retry-after-message.rules";
 
 /**
  * The app's KSUID resource for a trigger row (`KSUID_RESOURCES.TRIGGER`). The

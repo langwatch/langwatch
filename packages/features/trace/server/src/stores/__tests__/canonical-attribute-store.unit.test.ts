@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { CanonicalAttributes } from "@langwatch/trace-contract";
-import { AttributeBag } from "../canonical-attribute.bag";
+import { AttributeBag } from "../canonical-attribute.store";
 
 describe("AttributeBag", () => {
   describe("when takeByPrefix is called", () => {

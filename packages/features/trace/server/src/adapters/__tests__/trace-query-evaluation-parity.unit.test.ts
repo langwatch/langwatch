@@ -15,7 +15,7 @@ import {
   type InMemoryTrace,
   type TraceQueryEvaluationRun,
   UNSUPPORTED,
-} from "../trace-query-evaluation.types";
+} from "@langwatch/trace-contract";
 
 // ---------------------------------------------------------------------------
 // Fixtures

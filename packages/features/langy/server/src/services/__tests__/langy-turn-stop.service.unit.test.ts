@@ -13,7 +13,7 @@ import {
 } from "@langwatch/langy-contract";
 import { LangyTurnStopService } from "../langy-turn-stop.service";
 import { LangyFinalPartsService } from "../langy-final-parts.service";
-import type { LangyTurnServiceDependencies } from "../langy-turn.shared";
+import type { LangyTurnServiceDependencies } from "../langy-turn-shared.service";
 
 function makeStopDeps(
   over: {

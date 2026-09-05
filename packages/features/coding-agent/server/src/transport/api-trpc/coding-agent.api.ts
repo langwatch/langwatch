@@ -19,7 +19,7 @@ import {
   gatePullRequestSessionTitles,
   gateSessionListCost,
   gateSessionListTitles,
-} from "./coding-agent.gates";
+} from "../../rules/coding-agent-gates.rules";
 
 /** Default look-back for the personal usage card: the trailing 30 days. */
 const DEFAULT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;

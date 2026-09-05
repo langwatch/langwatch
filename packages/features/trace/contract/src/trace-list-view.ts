@@ -8,7 +8,7 @@ import type {
   EventMetricValues,
   FacetValueAggregates,
   TraceListCursor,
-} from "./trace-list.repository";
+} from "./trace-list.queries";
 import type { TraceMediaRef } from "./trace-media-ref";
 
 export interface TraceListItem {

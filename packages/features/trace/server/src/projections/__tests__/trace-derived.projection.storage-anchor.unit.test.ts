@@ -5,7 +5,7 @@ import {
 } from "@langwatch/trace-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
-import { anchorStorageTime } from "../../services/trace-storage-anchor.rules";
+import { anchorStorageTime } from "../../rules/trace-storage-anchor.rules";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TraceAnalyticsFoldProjection,

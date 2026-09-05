@@ -1,20 +1,7 @@
 /**
  * ADR-032 rung 6b — the write side of a dataset stored as `contentLayout='s3_jsonl'`.
- *
- * Every operation mutates S3 chunk objects AND the Postgres-authoritative
- * counters (`rowCount`/`sizeBytes`/`chunkCount`/`chunkOffsets`), so each runs
- * inside the per-dataset advisory lock (Decision 9 / I-COUNT): the chunk write
- * and the counter update commit as one serialized unit. Mutations are gated on
- * `status='ready'` (Decision 6) — a half-prepared dataset is never mutated.
- *
- * Decision 3:
- *   - append → new chunk(s) written from `chunkCount`, never rewriting existing;
- *   - edit/delete → rewrite only the affected chunk(s), located via the row
- *     offset index.
- *
- * This is the single home for that logic; both the REST path and the tRPC
- * editor path reach it through `DatasetContentAdapter`, so the lock and the
- * counter maths live in exactly one place.
+ * Every operation mutates S3 chunks AND Postgres counters under the per-dataset
+ * advisory lock (Decision 9 / I-COUNT). Single home for this logic.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -26,15 +13,15 @@ import {
   chunkedMeta,
   chunkMetaOf,
   toSingleJsonl,
-} from "./dataset-chunking";
+} from "./dataset-chunking.service";
 import { type DatasetStorage } from "../ports/dataset-storage.port";
 import {
   DatasetConflictError,
   DatasetNotReadyError,
   DatasetTooLargeToEditColumnsError,
   DuplicateRecordIdError,
-} from "./errors";
-import { stripNullBytes } from "./sanitize";
+} from "./dataset-errors.service";
+import { stripNullBytes } from "../rules/dataset-sanitize.rules";
 import {
   convertRowsToColumnTypes,
   type DatasetColumns,
@@ -94,10 +81,9 @@ export type DatasetMutationRecord = {
 };
 
 /**
- * Byte ceiling for the in-memory column-type rewrite (ADR-032 v19). Above this
- * we refuse rather than buffer the whole dataset (+ converted copies) in heap
- * while holding the advisory lock. Set above the largest expected hand-edited
- * dataset; the deferred streaming rewrite lifts the cap entirely.
+ * Byte ceiling for the in-memory column-type rewrite (ADR-032 v19): above this
+ * we refuse rather than buffer the whole dataset in heap under the advisory lock.
+ * Set above the largest expected hand-edited dataset.
  */
 export const MAX_INMEMORY_COLUMN_EDIT_BYTES = 512 * 1024 * 1024;
 
@@ -114,13 +100,8 @@ type ChunkLine = { id: string; entry: unknown };
 
 /**
  * Wrap raw row entries as `{ id, entry }` chunk lines: mint a stable per-row id
- * (`record_<nanoid>`) the later edit/delete can target, and scrub U+0000 from
- * the entry (I-NULL — Postgres-parity). `forcedIds` pins each new row's id —
- * per-row and optional: a defined entry honors the caller's id, an `undefined`
- * one (or a short/absent array) mints a fresh id. The single home for the batch
- * `{id,entry}`+null-scrub wrap shared by the append and born-on-storage paths
- * (the streaming normalize writer mints ids per row as it goes, so it stays
- * separate).
+ * (`record_<nanoid>`), and scrub U+0000 from the entry (I-NULL). `forcedIds`
+ * pins each new row's id. Shared by the append and born-on-storage paths.
  */
 const toChunkLines = (
   entries: unknown[],
@@ -130,14 +111,11 @@ const toChunkLines = (
     id: forcedIds?.[i] ?? `record_${nanoid()}`,
     entry: stripNullBytes(entry),
   }));
-  // I-PG: row ids are unique within a dataset (the legacy PG PK). Minted ids
-  // can't collide, but caller-supplied `forcedIds` can — a double-submit or
-  // buggy SDK that repeats an id would persist two rows that edit/delete then
-  // can't disambiguate. Reject the duplicate at the id-assignment chokepoint
-  // rather than silently creating a ghost row. (Within-batch only: a cross-batch
-  // collision against an already-stored id would need an O(rowCount) id scan on
-  // every write — disproportionate; the edit create-on-miss path guards the
-  // common upsert case.)
+  // I-PG: row ids are unique within a dataset (the legacy PG PK). Minted ids can't
+  // collide, but caller-supplied `forcedIds` can — reject the duplicate at the
+  // id-assignment chokepoint rather than silently creating a ghost row.
+  // Within-batch only: a cross-batch collision needs an O(rowCount) scan the edit
+  // create-on-miss path already guards.
   const seen = new Set<string>();
   for (const { id } of lines) {
     if (seen.has(id)) {
@@ -172,8 +150,7 @@ const assertReady = (dataset: DatasetMutationRecord): void => {
 /**
  * Re-derive global per-chunk row offsets from a per-chunk (rowCount, byteSize)
  * list — every chunk's `startRow` is the running sum of prior chunks' rows. Used
- * after a delete (rows + bytes change) so the offset index stays authoritative
- * (I-COUNT). Also returns the totals.
+ * after a delete so the offset index stays authoritative (I-COUNT).
  */
 const recomputeOffsets = (
   chunks: Array<{ rowCount: number; byteSize: number }>,
@@ -192,17 +169,9 @@ const recomputeOffsets = (
 };
 
 /**
- * Every write to a dataset stored as s3_jsonl chunks.
- *
- * Three collaborators used to arrive on every call: `prisma`, `storage`, and an
- * optional `repository` that three of twelve call sites passed. The repository
- * is process-scoped, so it is a field. Storage is resolved per project and
- * costs a query to resolve, so it stays an argument — the caller already holds
- * one, and taking a resolver here would resolve it a second time per request.
- *
- * The lock and its transaction belong to the repository
- * (`DatasetContentRepository.withDatasetLock`), which hands each method a
- * repository bound to that transaction. Nothing here holds a database client.
+ * Every write to a dataset stored as s3_jsonl chunks. `repository` is
+ * process-scoped (a field); `storage` is resolved per project (an argument).
+ * The lock and its transaction belong to the repository.
  */
 export class DatasetChunkService {
   private constructor(private readonly datasets: DatasetContentRepository) {}
@@ -212,27 +181,9 @@ export class DatasetChunkService {
   }
 
   /**
-   * Born-on-storage (ADR-032 cutover step 1): write a brand-new dataset's records
-   * directly to chunk objects from index 0 and return the PG-authoritative
-   * `ChunkedDatasetMeta` (rowCount / sizeBytes / chunkCount / chunkOffsets) the
-   * caller stamps onto the `Dataset` row.
-   *
-   * No advisory lock and no transaction: the row does not exist yet (this runs
-   * BEFORE `repository.create`, not inside `withDatasetLock`), so there is nothing
-   * to serialize against. Writing the chunks first means a write failure throws
-   * and leaves no orphan row — the atomicity the create path relies on. Owns its
-   * own storage resolution (`getDatasetStorage`) when not passed, mirroring the
-   * sibling append/edit/delete mutations.
-   *
-   * Self-cleaning on a partial write: both storage backends write chunks
-   * sequentially, so a multi-chunk write can persist chunk 0 and then fail on
-   * chunk 1 — leaving rowless orphan objects (customer content with no row to
-   * govern retention/deletion). On any write failure we best-effort reap the whole
-   * `0..k` prefix (`deleteChunksFrom(fromIndex: 0)`) before rethrowing, so the
-   * function never leaks objects regardless of which caller invokes it.
-   *
-   * `forcedIds` honors caller-supplied per-row ids (parity with the append path);
-   * a fresh `record_<nanoid>` is minted wherever an id is absent.
+   * Born-on-storage (ADR-032 cutover step 1): write a new dataset's records to
+   * chunk objects from index 0. No lock — the row doesn't exist yet;
+   * self-cleaning on a partial write.
    */
   async writeInitialChunks({
     projectId,
@@ -278,12 +229,9 @@ export class DatasetChunkService {
   }
 
   /**
-   * Best-effort delete of ALL chunk objects of a dataset (from index 0). The
-   * born-on-storage create (`writeInitialS3JsonlChunks`) writes chunks BEFORE
-   * inserting the row; if the row insert then fails (slug race → unique violation,
-   * DB outage) this reaps the orphaned objects so customer content isn't left in
-   * storage with no row to govern its retention/deletion. No lock, no counters —
-   * there is no row to serialize against or update.
+   * Best-effort delete of ALL chunk objects of a dataset (from index 0). Reaps
+   * orphans `writeInitialS3JsonlChunks` left when the row insert after it fails.
+   * No lock, no counters — there is no row to serialize against.
    */
   async deleteAllChunks({
     projectId,
@@ -299,15 +247,9 @@ export class DatasetChunkService {
   }
 
   /**
-   * Append rows to an s3_jsonl dataset under the advisory lock. Each row is
-   * wrapped `{ id, entry }` so a later edit/delete can target it. Re-reads the
-   * dataset inside the lock: the counters are authoritative and another serialized
-   * mutation may have advanced them since the caller loaded the row.
-   *
-   * `forcedIds` honors caller-supplied per-row ids (index-aligned, optional) so a
-   * batch-create that mints + RETURNS ids persists those exact ids — otherwise the
-   * returned ids wouldn't exist in storage and a follow-up edit/delete by id would
-   * miss. A fresh `record_<nanoid>` is minted wherever an id is absent.
+   * Append rows to an s3_jsonl dataset under the advisory lock, wrapped
+   * `{ id, entry }`. Re-reads the dataset inside the lock since another
+   * mutation may have advanced the counters. `forcedIds` honors caller ids.
    */
   async append({
     dataset,
@@ -340,16 +282,9 @@ export class DatasetChunkService {
   }
 
   /**
-   * Locate a row by id and replace its `entry` in place, rewriting only that one
-   * chunk and patching its offset/byteSize (rowCount unchanged). If the id is not
-   * found in any chunk it is treated as a new row → appended (upsert-of-new).
-   * Returns whether an existing row was updated.
-   *
-   * scan-before-lock: the O(chunkCount) locate runs OFF the advisory lock
-   * (`locateIdsBeforeLock`); under the lock the fast path re-reads only the one
-   * hinted chunk. If the row isn't there under the lock (a concurrent mutation
-   * moved/removed it since the scan) the fast path falls through to the proven
-   * full in-lock scan, so correctness never depends on the hint.
+   * Locate a row by id and replace its `entry` in place, rewriting only that
+   * chunk. Not found → appended as new (upsert-of-new). scan-before-lock: the
+   * locate runs OFF the lock, falling to a full in-lock scan if it drifted.
    */
   async editRecord({
     dataset,
@@ -476,25 +411,9 @@ export class DatasetChunkService {
   }
 
   /**
-   * Delete rows by id from an s3_jsonl dataset under the advisory lock: rewrite
-   * each affected chunk without its removed rows, then recompute the offset index
-   * for every chunk (their startRow/endRow shift down once an earlier chunk
-   * shrinks) and decrement rowCount/sizeBytes. An affected chunk that becomes
-   * empty is LEFT in place as an empty chunk (no compaction): `chunkCount` stays
-   * authoritative and `readChunks` tolerates an empty chunk (parses to []), so
-   * this is the simplest correct approach for the rung. Returns rows removed.
-   *
-   * scan-before-lock: the O(chunkCount) locate runs OFF the advisory lock
-   * (`locateIdsBeforeLock`); under the lock the fast path re-reads ONLY the
-   * affected chunks and takes every unaffected chunk's `(rowCount, byteSize)` from
-   * the authoritative offset index (no read), shrinking lock-held S3 reads from
-   * O(chunkCount) to O(affected). The fast path only commits when the pre-scan
-   * located every target id and the offset index covers every chunk, and it bails
-   * to the proven full in-lock scan if any located id isn't where the hint said
-   * (a concurrent move/delete since the scan) — so correctness never depends on
-   * the hint. (Trusting the offset index for unaffected chunks means a delete no
-   * longer incidentally self-heals counter drift on those chunks;
-   * `recomputeDatasetCounts` remains the explicit I-COUNT repair.)
+   * Delete rows by id under the advisory lock: rewrite each affected chunk
+   * without its removed rows. An emptied chunk is LEFT in place (no
+   * compaction). scan-before-lock: bails to a full scan on any discrepancy.
    */
   async deleteRecords({
     dataset,
@@ -547,11 +466,8 @@ export class DatasetChunkService {
           const newRowCount = new Map<number, number>();
           const newByteSize = new Map<number, number>();
           // Buffer the rewrites; do NOT issue any S3 PUT until the hint is
-          // re-validated. Otherwise a partial rewrite-then-bail would leave a
-          // chunk mutated while control falls through to the full in-lock scan,
-          // which then re-reads the already-mutated chunk and under-reports
-          // `deleted` (and redundantly re-PUTs it). On bail we must leave S3
-          // untouched so the full scan owns every write and the count.
+          // re-validated, or a partial rewrite-then-bail would leave S3 mutated
+          // while control falls through to the full in-lock scan.
           const pendingRewrites: Array<{ index: number; kept: unknown[] }> = [];
           let deleted = 0;
           for (const index of hint.affectedIndices) {
@@ -681,20 +597,9 @@ export class DatasetChunkService {
   }
 
   /**
-   * I-COUNT repair: re-derive the PG-authoritative counters from S3 truth. Reads
-   * every chunk's actual bytes (`readChunk` per index, driven by `chunkCount`) and
-   * recomputes `rowCount`/`sizeBytes`/`chunkOffsets` from what's really on disk,
-   * then writes them back onto the Dataset row under the advisory lock.
-   *
-   * Runnable on a detected mismatch — the residual repair for the rare
-   * PG-commit-after-S3-write failure on edit/delete, where the chunk is mutated
-   * but the counters rolled back (Consequences → Negative: I-COUNT is eventually
-   * consistent / repairable, not unconditionally atomic). `chunkCount` is trusted
-   * as the chunk-set boundary: every chunk in `0..chunkCount` MUST exist — a
-   * missing one is corruption, not emptiness, so `readChunk` throws
-   * `MissingChunkError` and we propagate it rather than silently dropping the tail
-   * (which would re-derive a smaller `chunkCount` and mask data loss when a middle
-   * chunk is gone but later chunks survive). Returns the recomputed counts.
+   * I-COUNT repair: re-derive the counters from S3 truth, then write them back
+   * under the lock. `chunkCount` is trusted as the boundary: a missing chunk
+   * throws `MissingChunkError` rather than silently masking data loss.
    */
   async recomputeCounts({
     datasetId,
@@ -731,11 +636,8 @@ export class DatasetChunkService {
       const { offsets, rowCount, sizeBytes } = recomputeOffsets(perChunk);
 
       // Trim trailing empty chunks down to the highest non-empty index + 1, the
-      // same LOGICAL compaction `deleteS3JsonlRecords` does — so repair is fully
-      // idempotent and `chunkCount` doesn't keep over-counting trailing empties
-      // across repeated repair runs. The trailing objects are left as benign 0-byte
-      // orphans (no in-tx delete: reads are lock-free, the next append overwrites
-      // them by key) — identical reasoning to the delete path's trim.
+      // same LOGICAL compaction `deleteS3JsonlRecords` does, so repair stays
+      // idempotent. Trailing objects are left as benign 0-byte orphans.
       let keptChunkCount = perChunk.length;
       while (keptChunkCount > 0 && perChunk[keptChunkCount - 1]!.rowCount === 0) {
         keptChunkCount -= 1;
@@ -764,26 +666,9 @@ export class DatasetChunkService {
   }
 
   /**
-   * Change an s3_jsonl dataset's column schema (rename / retype / add / remove)
-   * under the advisory lock (ADR-032 v19). The legacy PG path migrates records via
-   * `migrateDatasetRecordColumns`; the s3 equivalent is a full chunk rewrite:
-   *   1. read every row (id + entry) across all chunks,
-   *   2. remap keys old→new (exact-name then by-position, the SAME
-   *      `tryToMapPreviousColumnsToNewColumns` the PG path uses — so renames keep
-   *      data, removed columns drop, added columns are absent),
-   *   3. convert each value to its new column type (`convertRowsToColumnTypes` —
-   *      text→number/json/date/etc.; `image` is a URL string, so a text→image
-   *      change keeps the value verbatim and only the column's declared type
-   *      changes),
-   *   4. rewrite chunks from index 0 (row ids preserved via `forcedIds`), reap any
-   *      orphan chunks past the new count (converted rows may pack into fewer),
-   *   5. update counters + `columnTypes` + name/slug in the lock's tx.
-   *
-   * Memory: step 1 buffers all rows (bounded by dataset size) — the same shape as
-   * the PG record migrator this replaces, and the operation is a deliberate,
-   * user-driven edit, not the unbounded upload path (so it is NOT held to the
-   * normalize job's streaming I-MEM contract). A streaming chunk-by-chunk rewrite
-   * is a future optimization if multi-GB column edits become common.
+   * Change an s3_jsonl dataset's column schema under the lock (ADR-032 v19):
+   * remap keys, convert values, rewrite chunks from index 0, update counters.
+   * Buffers all rows — a deliberate edit, not the streaming upload path.
    */
   async migrateColumns({
     dataset,
@@ -861,12 +746,9 @@ export class DatasetChunkService {
 
       // Rewrite the chunks from index 0, preserving each row's id. Deliberately NOT
       // `writeInitialS3JsonlChunks`: that helper reaps chunks-from-0 on a write
-      // FAILURE (safe only for a rowless CREATE) — on this LIVE dataset that would
-      // delete existing content on a transient error. We write directly and do NOT
-      // delete on failure: a retype is row-count-stable, so a partial overwrite
-      // keeps every row addressable, the lock's tx rolls PG back, and
-      // `recomputeDatasetCounts` can repair byte drift. Orphan chunks past the new
-      // (possibly smaller) count are reaped only AFTER a clean write.
+      // FAILURE, which would delete existing content on this LIVE dataset. We
+      // write directly and never delete on failure; orphan chunks past the new
+      // count are reaped only AFTER a clean write.
       const lines = toChunkLines(converted, { forcedIds: ids });
       const written = await datasetStorage.writeChunks({
         projectId,
@@ -899,10 +781,8 @@ export class DatasetChunkService {
 
   /**
    * Append lines within an already-locked transaction: write new chunk(s) from the
-   * current `chunkCount` (never touching existing chunks) and extend the counters.
-   * Shared by the public append and edit's create-on-miss branch so the lock +
-   * counter math lives once. `forcedIds` pins the new rows' ids (upsert
-   * semantics); otherwise a fresh id is minted per row.
+   * current `chunkCount` and extend the counters. Shared by the public append and
+   * edit's create-on-miss branch so the lock + counter math lives once.
    */
   private async appendLines({
     tx,
@@ -954,19 +834,9 @@ export class DatasetChunkService {
   }
 
   /**
-   * Pre-lock locate scan (NO advisory lock held) for the scan-before-lock
-   * optimization. Reads chunks in order — OFF the lock — to find which chunk
-   * currently holds each of `ids`, stopping as soon as every id is located. The
-   * edit/delete paths use this to shrink the lock-held work from O(chunkCount) S3
-   * reads to O(affected chunks): the expensive locate runs here, off the lock, and
-   * only the affected chunks are re-read + rewritten under the lock.
-   *
-   * The result is a HINT, never authoritative. A concurrent mutation between this
-   * scan and lock acquisition can move or remove a row, so the caller re-validates
-   * under the lock and bails to a full in-lock scan on any discrepancy — this scan
-   * never decides correctness on its own. Returns `null` (→ caller takes the
-   * proven full in-lock scan) when a chunk can't be cleanly read off the lock
-   * (e.g. racing a concurrent rewrite), rather than acting on a partial locate.
+   * Pre-lock locate scan (no lock held): finds which chunk holds each of `ids`.
+   * A HINT, never authoritative — the caller re-validates under the lock and
+   * bails to a full scan on any discrepancy.
    */
   private async locateIds({
     storage,
@@ -1013,12 +883,8 @@ export class DatasetChunkService {
   }
 
   /**
-   * Write the recomputed counters for a delete under the lock: a full offset
-   * recompute from the final per-chunk `(rowCount, byteSize)` plus the trailing-
-   * empty LOGICAL compaction (drop trailing 0-row chunks from `chunkCount` + the
-   * offset index; objects are left as benign orphans — see `deleteS3JsonlRecords`).
-   * Shared by the fast (affected-only) and full-scan delete paths so the
-   * compaction/offset math lives in exactly one place.
+   * Write the recomputed counters for a delete: a full offset recompute plus
+   * trailing-empty compaction. Shared by the fast and full-scan delete paths.
    */
   private async commitDeleteCounts({
     tx,

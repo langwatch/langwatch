@@ -25,7 +25,7 @@ import {
 } from "@langwatch/analytics-contract";
 import { AnalyticsRepository } from "../repositories/analytics.repository";
 import { AnalyticsEvaluationRepository } from "../repositories/analytics-persistence.repository";
-import { pickAnalyticsTable } from "../routing/route-table";
+import { pickAnalyticsTable } from "../repositories/clickhouse/clickhouse.analytics-route-table.mapper";
 
 const MINUTES_PER_DAY = 24 * 60;
 const MAX_TIMESERIES_BUCKETS = 1000;

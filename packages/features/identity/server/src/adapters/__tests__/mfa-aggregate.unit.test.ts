@@ -6,8 +6,8 @@ import {
   type MfaFact,
   reduceMfaEnrollment,
 } from "@langwatch/identity-contract";
-import type { MfaEnrollmentRepository } from "../../mfa-enrollment.repository";
-import { MfaGuards } from "../../mfa-guards";
+import type { MfaEnrollmentRepository } from "../../repositories/mfa-enrollment.repository";
+import { MfaGuards } from "../../services/mfa-guards.service";
 import { describe, expect, it } from "vitest";
 import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
 import {

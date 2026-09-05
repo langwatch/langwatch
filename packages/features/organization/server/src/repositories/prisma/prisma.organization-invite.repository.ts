@@ -7,7 +7,7 @@ import type {
   PrismaClient,
   RoleBindingScopeType,
 } from "@langwatch/prisma-client/generated";
-import { findPersonalTeamInScopes } from "../../services/personal-team-scope";
+import { findPersonalTeamInScopes } from "../../services/personal-team-scope.service";
 import {
   OrganizationInviteRepository,
   type InviteWithOrganization,

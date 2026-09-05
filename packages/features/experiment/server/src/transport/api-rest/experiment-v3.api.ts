@@ -62,8 +62,8 @@ import {
   startRunResponseSchema,
   workbenchStateResponseSchema,
   workbenchVersionProbeResponseSchema,
-} from "./experiment.schemas";
-import { workbenchActorFrom } from "./experiment.workbench-actor";
+} from "../../rules/experiment-schemas.rules";
+import { workbenchActorFrom } from "../../rules/experiment-workbench-actor.rules";
 
 const logger = createLogger("langwatch:experiments-v3");
 

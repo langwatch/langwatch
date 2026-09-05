@@ -7,8 +7,8 @@ import {
 } from "@langwatch/dataset-contract";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
 import { DatasetContentRepository } from "../repositories/dataset-content.repository";
-import { createDatasetNormalizeHandler } from "../jobs/dataset-normalize.job";
-import { UploadNotPendingError } from "./errors";
+import { createDatasetNormalizeHandler } from "../adapters/dataset-normalize.adapter";
+import { UploadNotPendingError } from "./dataset-errors.service";
 
 /**
  * Process-owned Dataset normalization capability.

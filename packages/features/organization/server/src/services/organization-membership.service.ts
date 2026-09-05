@@ -15,15 +15,15 @@ import type { AuthzBindingForSynthesis } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { PersonalWorkspaceNotManagedHereError } from "@langwatch/organization-contract";
 import slugify from "slugify";
-import { computeEffectiveTeamRoleUpdates } from "./compute-effective-team-role-updates";
-import { isCustomRole } from "./custom-role-naming";
-import type { TeamRoleValue } from "./member-role-constraints";
+import { computeEffectiveTeamRoleUpdates } from "./compute-effective-team-role-updates.service";
+import { isCustomRole } from "../rules/custom-role-naming.rules";
+import type { TeamRoleValue } from "./member-role-constraints.service";
 import {
   CannotDisableSelfError,
   CannotRemoveSelfError,
   MemberNotFoundError,
   MemberSeatLimitReachedError,
-} from "./organization-membership.errors";
+} from "./organization-membership-errors.service";
 
 import {
   OrganizationGrantCachePort,

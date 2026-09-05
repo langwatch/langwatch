@@ -1,3 +1,4 @@
+import type { Protections } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  * Cutting a correction down to what a viewer may read, and putting back what was cut when that viewer saves. Runs before the correction reaches the drawer and before it applies to a trace on the dataset path — the one place deciding whether corrected content reaches a reader, and the one place stopping a reader from deleting what it hid from them.
@@ -7,7 +8,6 @@ import { TraceEditOverlayRedactionService } from "../trace-edit-overlay-redactio
 import { describe, expect, it } from "vitest";
 import type { Span, Trace, TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { applyOverlayToTrace } from "@langwatch/trace-contract";
-import type { Protections } from "../trace-viewer-protections.service";
 
 const openProtections: Protections = {
   canSeeCosts: true,

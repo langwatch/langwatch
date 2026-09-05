@@ -9,4 +9,4 @@ export { LangWatchQLService } from "./services/langwatch-ql.service";
 export {
   recordingExecutor,
   type RecordingLangWatchQLExecutor,
-} from "./langwatch-ql/executor.test-fakes";
+} from "./fixtures/langwatch-ql-executor.fixture";

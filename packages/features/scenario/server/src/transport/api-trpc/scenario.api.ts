@@ -14,7 +14,7 @@ import type {
   ScenarioTrpcContext,
   ScenarioTrpcPorts,
   ScenarioTrpcProcedures,
-} from "./scenario.trpc-context";
+} from "../../rules/scenario-trpc-context.rules";
 import { createSimulationRunnerRouter } from "./simulation-runner.api";
 
 /** Installs the complete `scenarios.*` tRPC surface on a process-owned root. */

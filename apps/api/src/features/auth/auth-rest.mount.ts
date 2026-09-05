@@ -5,7 +5,7 @@ import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { AuthService } from "@langwatch/auth-contract";
 import type { AuthRestPorts } from "@langwatch/auth-server";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
-import { runWithIdentityBirth } from "@langwatch/identity-server/better-auth";
+import { runWithIdentityBirth } from "@langwatch/identity-server/adapters/better-auth-identity-birth";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {

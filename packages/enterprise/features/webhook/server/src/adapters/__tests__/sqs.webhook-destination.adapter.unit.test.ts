@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AwsClientConfig, AwsClientConfigInput } from "@langwatch/aws-client";
 import { WEBHOOK_SIGNATURE_HEADER, type WebhookDispatchRateLimiterPort } from "@langwatch/egress";
-import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../services/sqs-queue-url.rules";
+import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules";
 import {
   SQS_MAX_MESSAGE_BYTES,
   type SqsDestinationConfig,

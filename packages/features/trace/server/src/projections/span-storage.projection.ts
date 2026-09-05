@@ -7,7 +7,7 @@ import { SpanCostService } from "../services/span-cost.service";
 import {
   spanStorageMapGroupKey,
   TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
-} from "../services/trace-span-storage-group.rules";
+} from "../rules/trace-span-storage-group.rules";
 
 const spanEvents = [spanReceivedEventSchema] as const;
 

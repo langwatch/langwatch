@@ -2,10 +2,10 @@
  * What writing a prompt tells Customer.io, and once only for the first one.
  * @see specs/features/customer-io-nurturing-integration.feature
  */
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { NurturingPromptCountRepository } from "../../repositories/nurturing-prompt-count.repository";
 import { NurturingPromptCreationService } from "../nurturing-prompt-creation.service";
-import { setNurturingOrganizationAdminResolver } from "../nurturing-sink";
+import { setNurturingOrganizationAdminResolver } from "../../adapters/nurturing-sink.adapter";
 import {
   registerNoNurturingSink,
   registerNurturingSink,
@@ -17,11 +17,11 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 /** The two reads `NurturingPromptCreationService.afterPromptCreated` makes on its own, and nothing else. */
-function prismaCounting(orgPromptCount: number) {
+function repositoryCounting(orgPromptCount: number): NurturingPromptCountRepository {
   return {
-    project: { findUnique: vi.fn(async () => ({ team: { organizationId: "org-1" } })) },
-    llmPromptConfig: { count: vi.fn(async () => orgPromptCount) },
-  } as unknown as PrismaClient;
+    tryFindOrganizationId: vi.fn(async () => "org-1"),
+    countOrganizationPrompts: vi.fn(async () => orgPromptCount),
+  };
 }
 
 beforeEach(() => vi.clearAllMocks());
@@ -103,7 +103,7 @@ describe("NurturingPromptCreationService.afterPromptCreated", () => {
         }));
 
         NurturingPromptCreationService.afterPromptCreated({
-          prisma: prismaCounting(1),
+          repository: repositoryCounting(1),
           projectId: "project-1",
         });
         await settle();
@@ -125,7 +125,7 @@ describe("NurturingPromptCreationService.afterPromptCreated", () => {
 
         expect(() =>
           NurturingPromptCreationService.afterPromptCreated({
-            prisma: prismaCounting(1),
+            repository: repositoryCounting(1),
             projectId: "project-1",
             userId: "user-1",
           }),

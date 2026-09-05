@@ -8,7 +8,7 @@ import {
   LangyMessageImportedEventSchema,
   type LangyMessageRecordedEvent,
   LangyMessageRecordedEventSchema,
-} from "../services/langy-conversation.events";
+} from "../adapters/eventing.langy-conversation-events.adapter";
 
 const messageEvents = [
   LangyMessageRecordedEventSchema,

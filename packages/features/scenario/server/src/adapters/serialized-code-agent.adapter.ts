@@ -20,7 +20,7 @@ import {
   NlpFetchAdapter,
   type NlpFetchTimeouts,
 } from "./nlp-fetch.adapter";
-import { SerializedAgentAdapter } from "./serialized-agent.base";
+import { SerializedAgentAdapter } from "./serialized-agent.adapter";
 
 /** Categories for adapter failures, surfaced as the `error.kind` span attribute. */
 type AdapterErrorKind = "timeout" | "fetch" | "http" | "nlp_error";

@@ -13,7 +13,7 @@ import {
   type ScimSyncCommandType,
   type ScimSyncFactInput,
 } from "@langwatch/identity-contract";
-import type { ScimSyncLedger } from "../scim-sync-ledger";
+import type { ScimSyncLedger } from "../rules/scim-sync-ledger.rules";
 import type { IdentityEventingPort } from "../ports/identity-eventing.port";
 import { createLogger } from "@langwatch/observability";
 import { SCIM_SYNC_PIPELINE_NAME } from "@langwatch/identity-contract";

@@ -43,7 +43,7 @@ import {
   createExperimentBodySchema,
   createExperimentResponseSchema,
   handledErrorEnvelopeSchema,
-} from "./experiment.schemas";
+} from "../../rules/experiment-schemas.rules";
 
 const logger = createLogger("langwatch:api:experiments");
 

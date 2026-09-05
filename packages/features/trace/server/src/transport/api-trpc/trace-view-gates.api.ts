@@ -1,8 +1,8 @@
+import type { Protections } from "@langwatch/trace-contract";
 import { TraceViewerProtectionsService } from "../../services/trace-viewer-protections.service";
 import type { Evaluation } from "@langwatch/trace-contract";
 import { NON_BILLABLE_ATTR } from "@langwatch/trace-contract";
 import { TraceAttributeRedactionService } from "../../services/trace-attribute-redaction.service";
-import { type Protections } from "../../services/trace-viewer-protections.service";
 
 import type { SpanTreeNode, TraceHeader, TraceResourceInfoDto } from "@langwatch/trace-contract";
 

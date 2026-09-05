@@ -15,7 +15,7 @@ import {
   enforceApiKeyIdOnTraceRequest,
   PROVENANCE_ATTR_API_KEY_ID,
   stampIngestKeyProvenanceOnTraceRequest,
-} from "../../services/ingest-key-provenance.rules";
+} from "../../rules/ingest-key-provenance.rules";
 import {
   TraceSpanContentDropPort,
   TraceSpanCostEnrichmentPort,

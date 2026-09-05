@@ -1,15 +1,7 @@
 /**
- * The in-process cooldown that stops one organization being alerted twice.
- *
- * A burst of traces from one organization reaches the limit middleware many
- * times at once, and every one of those calls would otherwise send its own
- * alert. These keep the second and later ones quiet.
- *
- * They are deliberately per-process. The cooldown does not survive a restart
- * and does not coordinate across replicas, so the worst case is a duplicate
- * alert after a deploy — cheap next to the machinery a shared store would
- * need. The authoritative window is the 30-day one in the database; this is
- * only the near-term damper in front of it.
+ * The in-process cooldown stopping one organization being alerted twice
+ * during a burst. Deliberately per-process. The database's 30-day window is
+ * authoritative; this is only the near-term damper.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -70,10 +62,9 @@ export class BillingAlertCooldownService implements BillingCooldownCache {
 export const resourceLimitCooldown = BillingAlertCooldownService.create({ ttlMs: DAY_MS });
 
 /**
- * The plan-limit alert is guarded in two layers, because the two races are
- * different. `planLimitInFlight` is synchronous, and is what stops callers
- * interleaving within one tick before any await has resolved;
- * `planLimitCooldown` is what stops the ticks that follow.
+ * The plan-limit alert is guarded in two layers: `planLimitInFlight` is
+ * synchronous and stops callers interleaving within one tick;
+ * `planLimitCooldown` stops the ticks that follow.
  */
 export const planLimitInFlight = new Set<string>();
 export const planLimitCooldown = BillingAlertCooldownService.create({

@@ -15,12 +15,9 @@ export type UpdateDatasetInput = {
 };
 
 /**
- * The fields a chunk mutation writes back, in the feature's own vocabulary.
- *
- * The chunk service used to build `Prisma.DatasetUpdateInput` itself, which
- * meant seven `as unknown as Prisma.InputJsonValue` casts in a service — the
- * JSON columns are the only reason those existed. Naming the shape here keeps
- * the storage vocabulary on the storage side.
+ * The fields a chunk mutation writes back, in the feature's own vocabulary —
+ * naming the shape here keeps storage vocabulary (and its JSON casts) off
+ * the service, which used to build `Prisma.DatasetUpdateInput` itself.
  */
 export type DatasetContentUpdate = {
   rowCount?: number;
@@ -39,11 +36,9 @@ export type DatasetContentUpdate = {
  */
 export abstract class DatasetContentRepository {
   /**
-   * ADR-032 Decision 9: runs `mutate` under this dataset's advisory lock, inside
-   * one transaction, so a chunk write and the counter update it implies commit
-   * or roll back together (I-COUNT). `mutate` receives a REPOSITORY bound to the
-   * transaction, not a database client: the caller is a service, and a service
-   * does not hold one.
+   * ADR-032 Decision 9: runs `mutate` under this dataset's advisory lock
+   * inside one transaction (I-COUNT). Receives a REPOSITORY bound to the
+   * transaction, not a database client, since the caller is a service.
    */
   abstract withDatasetLock<T>(
     datasetId: string,

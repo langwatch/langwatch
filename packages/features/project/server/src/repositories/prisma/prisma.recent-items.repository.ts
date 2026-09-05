@@ -1,6 +1,6 @@
 import type { AuditLog, PrismaClient } from "@langwatch/prisma-client/generated";
-import type { GetRecentItemsParams } from "../../services/recent-items.types";
-import { ACTION_TO_TYPE_MAP } from "../../services/recent-items.types";
+import type { GetRecentItemsParams } from "../../rules/recent-items.rules";
+import { ACTION_TO_TYPE_MAP } from "../../rules/recent-items.rules";
 import {
   RecentItemsRepository,
   type RecentArchivableRow,

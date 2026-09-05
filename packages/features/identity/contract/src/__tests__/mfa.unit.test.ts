@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { IdentityMfaCodeInvalidError, IdentityMfaEnrollmentExpiredError } from "../errors";
+import { IdentityMfaCodeInvalidError, IdentityMfaEnrollmentExpiredError } from "../identity.errors";
 import {
   BACKUP_CODE_CONSUMED_EVENT_TYPE,
   BACKUP_CODES_REGENERATED_EVENT_TYPE,

@@ -6,7 +6,7 @@ import {
   PASSKEY_SIGNUP_EMAIL_TAKEN,
   passkeySignUpRegistration,
   type SignUpVerificationPort,
-} from "../passkey-sign-up";
+} from "../passkey-sign-up.api";
 
 const requestVerification = vi.fn();
 const createPasskeyUser = vi.fn();

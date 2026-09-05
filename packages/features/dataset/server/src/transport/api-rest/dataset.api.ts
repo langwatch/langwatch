@@ -40,13 +40,16 @@ import {
 // throws this one, and `instanceof` against the contract's is always false —
 // which sent every column-mismatch and over-size upload to the customer as a
 // 500 instead of the 400 the branches below build.
-import { type DatasetNotReadyError, UploadValidationError } from "../../services/errors";
+import {
+  type DatasetNotReadyError,
+  UploadValidationError,
+} from "../../services/dataset-errors.service";
 import type { Context } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import type { DatasetApp } from "#app/dataset.app";
-import { createDatasetErrorHandler } from "./dataset.error-handler";
-import { datasetOutputSchema } from "./dataset.schemas";
+import { createDatasetErrorHandler } from "./dataset-error-handler.api";
+import { datasetOutputSchema } from "../../rules/dataset-schemas.rules";
 
 /**
  * The read ceiling for `GET /api/dataset/:slugOrId`, which answers with the

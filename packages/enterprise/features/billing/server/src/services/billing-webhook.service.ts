@@ -66,19 +66,9 @@ const waitForStripeConsistency = () =>
 
 export type WebhookService = {
   /**
-   * Dispatches a verified Stripe event to the right handler.
-   *
-   * Signature verification happens at the transport layer (the Hono route);
-   * this method is transport-agnostic so it can be reused from workers,
-   * replays, and tests.
-   *
-   * Retry policy:
-   * - Returns `{ status: "ok" }` for no-op events (unknown types, events we
-   *   do not care about). Stripe will mark delivery successful — no retry.
-   * - Returns `{ status: "error", httpStatus: 500 }` on unexpected throws.
-   *   Stripe retries with backoff — correct for transient infra failures
-   *   and for bugs that will succeed after a deploy.
-   * - Every non-action branch logs at INFO/ERROR — nothing returns silently.
+   * Dispatches a verified Stripe event to the right handler. Transport-agnostic
+   * so it's reusable from workers, replays, and tests. Unexpected throws
+   * return a 500 so Stripe retries with backoff.
    */
   handleEvent(event: Stripe.Event): Promise<HandleEventResult>;
 
@@ -520,20 +510,9 @@ export class EEWebhookService implements WebhookService {
   }
 
   /**
-   * Annual subscriptions accrue metered events for a full year; the billing
-   * threshold makes Stripe collect that overage in slices as it accrues
-   * instead of one oversized renewal invoice. Checkout cannot set the field,
-   * so it is applied right after the subscription exists. Best-effort: a
-   * failure leaves the subscription behaving as before (single renewal
-   * invoice) and must never fail checkout completion.
-   *
-   * Because we answer Stripe 200 regardless — a non-2xx would make Stripe
-   * redeliver the whole checkout webhook, which must not happen — Stripe's own
-   * retry never covers this failure. A log line alone would leave the
-   * subscription quietly exposed to the single-large-invoice risk this exists
-   * to remove, so the failure also raises a Slack alert for manual follow-up.
-   * The alert is itself best-effort and separately guarded: a broken Slack
-   * webhook must never be what fails a checkout that otherwise succeeded.
+   * The billing threshold makes Stripe collect annual overage in slices, not
+   * one oversized invoice. Best-effort — we answer Stripe 200 regardless, so
+   * a failure raises a (also best-effort) Slack alert instead.
    */
   private async trySetAnnualEventsBillingThreshold(subscriptionId: string): Promise<void> {
     try {
@@ -880,36 +859,15 @@ export class EEWebhookService implements WebhookService {
   }
 
   /**
-   * A paid Growth-Seat subscription entitles the organization to explicit
-   * organization-scoped retention policies — one per category (traces,
-   * scenarios, experiments; evaluation runs live under traces, simulation runs
-   * under scenarios) — at the platform default window (49 days / 7 weeks). We
-   * stamp them on first activation so the entitlement is recorded rather than
-   * implied: an org with no override silently follows the platform default and
-   * would drift down if that default were ever lowered, whereas explicit
-   * overrides hold the window. Today the value equals the platform default, so
-   * this has no observable effect yet — it is the mechanism the paid retention
-   * tier hangs off once the default diverges. The 49-day window is deliberate:
-   * pricing tiers are visibility (blur) thresholds on top of it, not shorter
-   * deletion windows — free-tier content blurs after 14d but stays recoverable
-   * until the 49d policy deletes it. TODO(#4745): the blur layer.
-   *
-   * Create-if-absent, per category: an org that already has a category's
-   * org-level policy keeps it (never clobbered back to the default — that would
-   * shorten a grandfathered window and delete data). Only missing categories
-   * are provisioned. Best-effort throughout: a retention failure must never fail
-   * the Stripe webhook — that would leave the subscription stuck PENDING and
-   * trigger Stripe retries — so if the current rules can't be read we skip
-   * provisioning entirely, and a per-category write failure is logged and
-   * skipped, mirroring the surrounding notification side effects.
+   * A paid Growth-Seat subscription entitles the org to explicit per-category
+   * retention policies at the platform default (49 days), stamped on first
+   * activation. Create-if-absent; best-effort — never fails the Stripe webhook.
    */
   private async applySeatRetentionPolicy(organizationId: string): Promise<void> {
     // Create-if-absent, NOT upsert: a seat/subscription event must never
-    // overwrite an existing org-level override. Unconditionally writing the
-    // platform default here would clobber a grandfathered high policy (e.g.
-    // ORG-traces = 1827d) down to 49d on any billing event — silently
-    // shortening the retention window and DELETING data the customer never
-    // opted to lose. Mirrors licenseHandler.provisionMissingRetentionPolicies.
+    // overwrite an existing org-level override, which could clobber a
+    // grandfathered high policy down to 49d and DELETE data. Mirrors
+    // licenseHandler.provisionMissingRetentionPolicies.
     let covered: Set<string>;
     try {
       const existing = await this.host.listOrganizationRetentionRules({

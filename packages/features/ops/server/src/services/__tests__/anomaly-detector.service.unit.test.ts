@@ -11,8 +11,8 @@ import {
   INSUFFICIENT_DATA_RECHECK_SECONDS,
   SURFACE_TIER_SUSTAIN_MINUTES,
 } from "../anomaly-detector.service";
-import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../anomaly.constants";
-import { percentile } from "../../ops.anomaly-percentile";
+import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../rules/anomaly-constants.rules";
+import { percentile } from "../../rules/ops-anomaly-percentile.rules";
 
 /** The tenant a kill-switch resolution was asked about, or none. */
 function projectIdOf(target: FeatureFlagTarget): string | undefined {

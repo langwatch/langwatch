@@ -6,8 +6,8 @@ import {
   type FullSpanRow,
   mapChRowToNormalized,
   serializeAttributes,
-} from "./stored-span-row.codec";
-import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "./windowed-read";
+} from "./stored-span-row.mapper";
+import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "./windowed-read.mapper";
 
 const logger = createLogger("langwatch:trace:span-storage-repository");
 

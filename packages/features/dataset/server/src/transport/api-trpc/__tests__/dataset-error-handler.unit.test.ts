@@ -8,7 +8,7 @@ import {
   DatasetConflictError,
   DatasetNotFoundError,
   DatasetNotReadyError,
-} from "../../../services/errors";
+} from "../../../services/dataset-errors.service";
 import { datasetErrorHandler } from "../dataset.api";
 
 /**

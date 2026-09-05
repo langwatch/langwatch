@@ -1,8 +1,6 @@
 /**
  * The HTTP long-poll transport with no datastore: the empty answer after
- * the poll wait, delivery once, and the refusal of a register when Redis is
- * absent on a deployment with several replicas.
- *
+ * the poll wait, delivery once, and the register refusal with no Redis.
  * @see specs/agents/connected-agents.feature
  */
 import {
@@ -18,7 +16,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter";
 import type { AgentStateStorePort } from "../ports/agent-state-store.port";
 import { callKey, httpSessionKey, pendingKey } from "../rules/connected-agent-keys.rules";
-import type { StoredCall } from "../rules/connected-agent-envelope.rules";
+import type { StoredCall } from "../services/connected-agent-envelope.service";
 import type { AgentRepository } from "../repositories/agent.repository";
 import type { ConnectCredentialPort } from "../ports/connect-credential.port";
 import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter";

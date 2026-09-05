@@ -1,7 +1,7 @@
 /**
  * How often one invitation may put mail in somebody's inbox (D11).
  */
-import { InviteThrottledError } from "./invite.errors";
+import { InviteThrottledError } from "./invite-errors.service";
 import type { OrganizationInviteRateLimitPort } from "../ports/invite.port";
 
 export const INVITE_SEND_WINDOW_SECONDS = 60 * 60;

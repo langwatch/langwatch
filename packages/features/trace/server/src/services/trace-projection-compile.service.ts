@@ -1,9 +1,10 @@
+import type { Protections } from "@langwatch/trace-contract";
 /**
  * The schema compiler. Turns a validated `from` + `select` request into a resolved `schema` (response envelope), a `plan` the ENGINE executes (which child collections to JOIN, whether to fetch heavy io columns), and a per-trace `project` function that shapes each trace to the selection. Pure and synchronous — no DB access — so it is unit-tested in isolation; the ClickHouse/Postgres execution that consumes `plan` lives in the trace service.
  */
 
 import { TraceProjectionCatalogService } from "./trace-projection-catalog.service";
-import type { Protections } from "./trace-viewer-protections.service";
+
 import { type ProjectionSource, type ResolvedField } from "./trace-projection-catalog.service";
 import {
   type CompiledProjection,
@@ -15,7 +16,7 @@ import {
   type ProjectionPlan,
   ProjectionValidationError,
   type ResolvedSchema,
-} from "./trace-projection.types";
+} from "@langwatch/trace-contract";
 
 const COLLECTIONS: ProjectionCollection[] = ["events", "annotations", "evaluations"];
 

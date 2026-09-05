@@ -11,10 +11,10 @@ import {
   OpsWorkerAdapter,
   OtelStorageStatsMetricsAdapter,
   StorageStatsCollectionService,
-  UsageStatsClickHouseClient,
-  UsageStatsClickHouseClientResolver,
-  UsageStatsErrorReporter,
-  UsageStatsTelemetryClient,
+  UsageStatsClickHouseClientPort,
+  UsageStatsClickHouseClientResolverPort,
+  UsageStatsErrorReporterPort,
+  UsageStatsTelemetryClientPort,
   type OpsWorkerPort,
   type StorageStatsInstance,
   type UsageStatsWorkerDatabase,
@@ -50,7 +50,7 @@ export type WorkerOpsCompositionInput = Readonly<{
   redis: RedisConnection | null | undefined;
   featureFlags: FeatureFlagService;
   /** The organization's own ClickHouse endpoint, for its usage counts. */
-  resolveOrganizationClient: ((organizationId: string) => UsageStatsClickHouseClient) | undefined;
+  resolveOrganizationClient: ((organizationId: string) => UsageStatsClickHouseClientPort) | undefined;
   /**
    * Every configured endpoint, for the one read that is nobody's tenant. `system.parts` is a
    * property of an INSTALL rather than of a tenant, and an install with private organization routes
@@ -129,20 +129,20 @@ class LoggedHardTierAlert extends AnomalyHardTierAlertPort {
 }
 
 /** An organization's own endpoint, or nothing where this process routes none. */
-class WorkerUsageStatsClickHouse extends UsageStatsClickHouseClientResolver {
+class WorkerUsageStatsClickHouse extends UsageStatsClickHouseClientResolverPort {
   static create(
-    resolve: ((organizationId: string) => UsageStatsClickHouseClient) | undefined,
+    resolve: ((organizationId: string) => UsageStatsClickHouseClientPort) | undefined,
   ): WorkerUsageStatsClickHouse {
     return new WorkerUsageStatsClickHouse(resolve);
   }
 
   private constructor(
-    private readonly resolve: ((organizationId: string) => UsageStatsClickHouseClient) | undefined,
+    private readonly resolve: ((organizationId: string) => UsageStatsClickHouseClientPort) | undefined,
   ) {
     super();
   }
 
-  tryResolve(organizationId: string): Promise<UsageStatsClickHouseClient | null> {
+  tryResolve(organizationId: string): Promise<UsageStatsClickHouseClientPort | null> {
     return Promise.resolve(this.resolve ? this.resolve(organizationId) : null);
   }
 }
@@ -152,7 +152,7 @@ class WorkerUsageStatsClickHouse extends UsageStatsClickHouseClientResolver {
  * sender: the destination is a constant in this file rather than anything a customer configured, so
  * there is no customer-supplied host to fence and nothing of the customer's own to leak to one.
  */
-class WorkerUsageStatsTelemetry extends UsageStatsTelemetryClient {
+class WorkerUsageStatsTelemetry extends UsageStatsTelemetryClientPort {
   static create(): WorkerUsageStatsTelemetry {
     return new WorkerUsageStatsTelemetry();
   }
@@ -171,7 +171,7 @@ class WorkerUsageStatsTelemetry extends UsageStatsTelemetryClient {
 }
 
 /** A failed report is logged and the loop continues to the next organization. */
-class LoggedUsageStatsErrors extends UsageStatsErrorReporter {
+class LoggedUsageStatsErrors extends UsageStatsErrorReporterPort {
   static create(logger: Logger): LoggedUsageStatsErrors {
     return new LoggedUsageStatsErrors(logger);
   }

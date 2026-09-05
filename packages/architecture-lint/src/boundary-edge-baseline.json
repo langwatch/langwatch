@@ -880,7 +880,7 @@
     {
       "kind": "private-runtime-export",
       "from": "packages/features/trace/server/src/index.ts",
-      "to": "./repositories/clickhouse/stored-span-row.codec",
+      "to": "./repositories/clickhouse/stored-span-row.mapper",
       "expires": "2026-10-01"
     },
     {

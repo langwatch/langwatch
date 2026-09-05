@@ -5,13 +5,13 @@
  */
 
 import { HandledError } from "@langwatch/handled-error";
-import type {
-  EvaluationV3Event,
-  EvaluatorConfig,
-  ExecutionCell,
+import {
+  type EvaluationV3Event,
+  type EvaluatorConfig,
+  EvaluatorNoInputsResolvedError,
+  type ExecutionCell,
 } from "@langwatch/experiment-contract";
 import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
-import { EvaluatorNoInputsResolvedError } from "../experiment-execution.errors";
 
 /** The `error_type` a row carries when an evaluator resolved no input at all. */
 export const NO_INPUTS_RESOLVED = "NoInputsResolved";

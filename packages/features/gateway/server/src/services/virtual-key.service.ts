@@ -1,14 +1,7 @@
 /**
  * Business logic for virtual keys. Framework-agnostic (no tRPC / Hono imports).
- *
- * Every mutation runs inside a Prisma transaction that also appends a
- * GatewayChangeEvent (for the gateway's long-poll feed) and an AuditLog
- * row in gateway shape (for humans).
- *
- * VirtualKey is organization-scoped. Visibility is computed at read time
- * from `VirtualKeyScope` rows. Provider eligibility is computed from
- * those scope rows + an optional RoutingPolicy reference (see
- * `scopeResolver.ts`); the service does not own a per-VK provider chain.
+ * Every mutation appends a GatewayChangeEvent and an AuditLog row inside one
+ * Prisma transaction. VirtualKey is organization-scoped.
  */
 
 import { TRPCError } from "@trpc/server";
@@ -61,33 +54,17 @@ const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Keys the product provisions and owns rather than the customer — today only
- * the Langy VK (`purpose: LANGY`). They remain addressable internally (the
- * gateway authenticates against them by hashed secret; Langy re-reads its own
- * config by column) but are absent from every customer-facing read and refuse
- * every customer-facing mutation.
- *
- * Refusing the mutations is the load-bearing part. `rotate` on a Langy VK
- * would hand the caller a fresh plaintext secret AND break Langy, because the
- * gateway keeps authenticating against the secret Langy still holds; `revoke`
- * and `update` are the same class of foot-gun. The settings UI already badges
- * and locks these rows, but that is presentation — this is the boundary.
+ * the Langy VK. Absent from customer-facing reads; refuses customer-facing
+ * mutations (`rotate` would break Langy's own auth against the secret).
  */
 function isProductManaged(vk: Pick<VirtualKey, "purpose">): boolean {
   return vk.purpose !== "USER";
 }
 
 /**
- * The budget a key carries on itself, managed from the key's own drawer.
- * A key-targeted `GatewayBudget` is created in the same transaction as the
- * key, so a key can never exist for a moment with the cap its creator
- * asked for missing. `null` on update removes the cap (by archiving, never
- * deleting: the ledger behind it is spend history).
- *
- * The zod schema is the single validation source for this shape: the tRPC
- * mutations and the public REST API both parse through it, so the two
- * doors cannot accept different caps. Only the calendar windows a person
- * reasons about in a drawer: a per-minute cap on one key is an ops knob,
- * not a spending decision, and belongs on the budgets page.
+ * The budget a key carries on itself, created in the same transaction as the
+ * key. `null` on update removes the cap by archiving. The zod schema is the
+ * single validation source, shared by tRPC and REST.
  */
 export const virtualKeyBudgetInputSchema = z.object({
   // A decimal number of dollars, strictly positive. String rather
@@ -128,10 +105,9 @@ export type CreateVirtualKeyInput = {
   /** Customer-owned bookkeeping. Never read by the gateway. */
   metadata?: ResourceMetadata;
   /**
-   * Where this key's traces and costs should land. NOT a scope: it grants
-   * no visibility and no operate rights on the key. Omit it and the
-   * destination is decided from what the key is scoped to; either way the
-   * answer is stored on the key.
+   * Where this key's traces and costs should land. NOT a scope: it grants no
+   * visibility or operate rights. Omit it and the destination is decided from
+   * what the key is scoped to; either way the answer is stored on the key.
    */
   traceProjectId?: string | null;
   /**
@@ -141,18 +117,16 @@ export type CreateVirtualKeyInput = {
    */
   routingPolicyId?: string | null;
   /**
-   * When the key stops serving. Absent or null means it never expires. A
-   * date that has already passed is refused rather than stored: the key
-   * would be dead on arrival and nothing about its first refusal would
-   * point back at this field.
+   * When the key stops serving. Absent or null means it never expires. A date
+   * that has already passed is refused rather than stored: the key would be
+   * dead on arrival.
    */
   expiresAt?: Date | null;
   config?: Partial<VirtualKeyConfig>;
   /**
-   * USER (default) for keys created via the gateway UI / API; LANGY when
-   * auto-provisioned by the Langy services. Anything other than USER marks the
-   * key product-managed, which hides it from customer-facing reads and makes
-   * it refuse customer-facing mutations (see `isProductManaged`).
+   * USER (default) for keys created via the gateway UI/API; LANGY when
+   * auto-provisioned by Langy. Anything other than USER marks the key
+   * product-managed (see `isProductManaged`).
    */
   purpose?: "USER" | "LANGY";
 };
@@ -177,10 +151,8 @@ export type UpdateVirtualKeyInput = {
   routingPolicyId?: string | null;
   routingMode?: VirtualKeyRoutingMode;
   /**
-   * Undefined leaves the expiration where it is; null clears it, so the key
-   * never expires; a date moves it. Extending an expired key is the whole
-   * reason expiry is a date rather than a status, so a key whose date has
-   * already passed accepts this edit like any other.
+   * Undefined leaves the expiration where it is; null clears it; a date moves
+   * it. Extending an expired key is why expiry is a date, not a status.
    */
   expiresAt?: Date | null;
   config?: Partial<VirtualKeyConfig>;
@@ -210,13 +182,9 @@ export type CreatedVirtualKey = {
 };
 
 /**
- * `VirtualKeyService` owns the write-path invariants:
- *
- * - Secret minting + hashing, display-prefix extraction.
- * - Atomic revision bump + GatewayChangeEvent append so the Go gateway
- *   eventually sees every mutation via its long-poll.
- * - Audit log entry on every mutation.
- * - RBAC is enforced by tRPC / Hono layers before reaching the service.
+ * `VirtualKeyService` owns the write-path invariants: secret minting/hashing,
+ * atomic revision bump + GatewayChangeEvent append, and an audit log entry.
+ * RBAC is enforced by tRPC/Hono layers before reaching the service.
  */
 export class VirtualKeyService {
   private constructor(
@@ -233,9 +201,7 @@ export class VirtualKeyService {
     private readonly crypto: GatewayVirtualKeyCryptoPort,
     /**
      * The Enterprise governance ledger, when the deployment composes one.
-     * Absent means the five lifecycle emissions below are not recorded —
-     * exactly what the retired application did, which always constructed the
-     * Enterprise service in its disabled form.
+     * Absent means the lifecycle emissions below are not recorded.
      */
     private readonly governanceSignals?: GatewayGovernanceSignalsPort,
   ) {}
@@ -292,19 +258,9 @@ export class VirtualKeyService {
   }
 
   /**
-   * Display names for the keys a page of spend rows names.
-   *
-   * The spend surfaces read ids out of the ClickHouse ledger and need a label
-   * per id. It goes through this service — and therefore through
-   * `findMetaByIds`, which selects three columns — because the alternative was
-   * what the API process actually did: a `prisma.virtualKey.findMany` written
-   * in its own gateway composition, on the table that carries every key's
-   * hashed secret, its previous secret and the window that one stays valid in.
-   *
-   * Fenced by the owning organization even though the ids alone would find the
-   * rows: a read that can only answer within one tenant cannot be made to leak
-   * by a caller that assembled its id list somewhere unexpected. An empty id
-   * list asks nothing and answers nothing.
+   * Display names for the keys a page of spend rows names, via
+   * `findMetaByIds` (three columns) rather than a raw `findMany`. Fenced by
+   * the owning organization so an id list can't leak across tenants.
    */
   async resolveNames(input: {
     organizationId: string;
@@ -738,11 +694,9 @@ export class VirtualKeyService {
   }
 
   /**
-   * Reversible stop. Unlike revoke: budgets stay active, rotation-grace
-   * state stays intact, and the key material never changes, so enable
-   * restores service exactly as it was. The distinct DISABLED status (and
-   * its distinct auth error) is the whole point: a platform's kill switch
-   * must be un-throwable and must never masquerade as a bad key.
+   * Reversible stop. Unlike revoke: budgets and rotation-grace state stay
+   * intact and key material never changes, so enable restores service exactly
+   * as it was. The distinct DISABLED status must never masquerade as a bad key.
    */
   async disable(input: {
     id: string;
@@ -898,10 +852,8 @@ export class VirtualKeyService {
   }
 
   /**
-   * Create or update the budget targeted at this key. Runs inside the
-   * caller's transaction so a key and the cap its creator asked for land
-   * together or not at all: a key that exists for even a moment without
-   * its cap is a key that can spend without one.
+   * Create or update the budget targeted at this key. Runs inside the caller's
+   * transaction so a key and its cap land together or not at all.
    */
   private async upsertKeyBudget(
     args: {
@@ -983,26 +935,9 @@ export class VirtualKeyService {
   }
 
   /**
-   * Archive the budgets a key's lifecycle carries, which is a different set
-   * depending on what just happened to the key.
-   *
-   * `drawerManaged` is the key still being alive: the drawer's budget field
-   * was cleared, so that one row goes and nothing else does. Budgets created
-   * independently on the Budgets page also target the key, but their
-   * lifecycle carries its own permission (gatewayBudgets:delete); archiving
-   * them from a key update would let virtualKeys:update silently remove an
-   * admin's enforcement control.
-   *
-   * `scopedToKey` is the key being dead. REVOKED is terminal, so a budget
-   * whose scope is this key and nothing else can never count spend or refuse
-   * a request again, whoever created it. Leaving it active does not preserve
-   * an enforcement control, because there is nothing left to enforce against;
-   * it just leaves a row that reads as a live cap and shows up on the budgets
-   * list warning that no key sends traffic to it. The permission argument
-   * above does not carry over, because nothing is being taken away.
-   *
-   * Both cases archive rather than delete, so the ledger rows stay readable
-   * against the cap they accrued under.
+   * Archive the budgets a key's lifecycle carries: `drawerManaged` archives
+   * only the drawer's own row; `scopedToKey` (REVOKED) archives every budget
+   * scoped only to it. Archive, not delete, so ledger rows stay readable.
    */
   private async archiveKeyBudgets({
     vk,
@@ -1047,26 +982,8 @@ export class VirtualKeyService {
   }
 
   /**
-   * Every key must SAY where its traces land, rather than have it guessed,
-   * and the answer is written down rather than worked out again on each read.
-   *
-   * Per-key spend is read off the trace path, so the project a key traces
-   * into is the project its spend is attributed to. The four cases live in
-   * `ProjectService.resolveTraceDestination`; what belongs here is what each refusal means
-   * to the person who asked for the key:
-   *
-   *   - `gateway_trace_project_unknown`: the destination named is not a live
-   *     project of this organization. Deleted, or somebody else's.
-   *   - `gateway_trace_project_ambiguous`: nothing was named while the
-   *     organization has projects to choose from. The governance inbox would
-   *     take the traffic and every project budget the creator had in mind
-   *     would count none of it.
-   *   - `trace_project_required`: nothing was named and there is no
-   *     governance project either, so there is no destination to give.
-   *
-   * Revocation is intentionally not guarded: killing a key must always be
-   * possible.
-   *
+   * Every key must SAY where its traces land (cases:
+   * `ProjectService.resolveTraceDestination`). Revocation is not guarded.
    * Spec: specs/ai-gateway/virtual-key-creation.feature
    */
   private async resolveStoredTraceDestination(
@@ -1094,23 +1011,9 @@ export class VirtualKeyService {
   }
 
   /**
-   * What an update leaves in the destination column.
-   *
-   * An untouched destination stays exactly where it is, including when the
-   * edit moves the key's scopes around. Re-deriving it from the scopes is
-   * what used to let an access change silently move where a key's money was
-   * counted: two decisions, made on two screens, one of which never
-   * mentioned the other.
-   *
-   * A destination that IS named on the update is validated the way create
-   * validates it, so an edit can never point a key somewhere a create could
-   * not. Clearing it (an explicit null) re-runs the whole decision, which is
-   * the only way to say "work it out from what the key is now".
-   *
-   * The remaining case is a key that has no stored destination at all: one
-   * written before the column was filled, in an organization that had no
-   * governance project to fall back to. Those resolve like a create, so the
-   * next touch either gives the key's traces a home or does not go through.
+   * What an update leaves in the destination column. Untouched stays exactly
+   * where it is, even when scopes move. Named validates like create; explicit
+   * null re-runs the whole decision.
    */
   private async nextStoredTraceDestination(args: {
     existing: VirtualKeyWithScopes;
@@ -1130,12 +1033,8 @@ export class VirtualKeyService {
 
   /**
    * An explicit provider allowlist may only name providers the key can reach
-   * through its SCOPE graph. It is validated against the scope-reachable set,
-   * not the routing-policy-narrowed dispatch set: a provider the scope reaches
-   * but the key's routing policy omits is still a valid allowlist entry,
-   * because the policy blocks it at dispatch, not at save. Blocking the save
-   * too would be over-strict. A provider the scope does not reach at all still
-   * fails here, so a key can never point at another team's provider row.
+   * through its SCOPE graph, not the routing-policy-narrowed dispatch set (the
+   * policy blocks at dispatch, not at save).
    */
   private async assertProvidersAllowedReachable(
     vk: VirtualKeyWithScopes,
@@ -1183,11 +1082,9 @@ export class VirtualKeyService {
 }
 
 /**
- * Reconcile the requested routing mode with the policy reference. The two
- * are one decision expressed in two columns, so the pairing is enforced
- * here rather than trusted from every caller: POLICY without a policy id
- * would silently route as if no policy existed, and NONE with a policy id
- * would leave a dangling reference that a later edit could resurrect.
+ * Reconcile the requested routing mode with the policy reference: one
+ * decision expressed in two columns, enforced here rather than trusted
+ * from every caller.
  */
 function resolveRoutingMode(
   requested: VirtualKeyRoutingMode | undefined,
@@ -1230,12 +1127,9 @@ function assertProvidersAllowedShape(providersAllowed: string[] | null | undefin
 }
 
 /**
- * A key is never written already expired.
- *
- * Absence leaves the stored date alone and null clears it, so only a real
- * date is checked. The comparison is against the moment of the write, which
- * makes "now" itself a refusal: a key that expires at the instant it is
- * saved serves nothing and reads as a bug in whatever wrote it.
+ * A key is never written already expired. Absence leaves the stored date
+ * alone and null clears it, so only a real date is checked, against the
+ * moment of the write — "now" itself is a refusal.
  */
 function assertExpiryInFuture({ expiresAt }: { expiresAt: Date | null | undefined }): void {
   if (!expiresAt) {

@@ -4,9 +4,9 @@
  * engine gate (ADR-110: finishing the migration IS the switch). `migrated`
  */
 import { createLogger } from "@langwatch/observability";
-import { perSubjectCachedFlag } from "../per-subject-cached-gate";
-import { identityWriteGateReadFailuresTotal } from "../identity-ledger.metrics";
-import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../identity-migration-names";
+import { perSubjectCachedFlag } from "./per-subject-cached-gate.service";
+import { identityWriteGateReadFailuresTotal } from "../adapters/metrics.identity-ledger.adapter";
+import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../rules/identity-migration-names.rules";
 import type { IdentityWriteGateStatePort } from "../ports/identity-write-gate-state.port";
 
 const logger = createLogger("langwatch:identity:write-gate");

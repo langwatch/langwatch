@@ -18,15 +18,15 @@ import {
 // responses.
 const getAzureBlobTokenMock = vi.fn();
 const invalidateAzureBlobTokenMock = vi.fn();
-vi.mock("../azure-blob-token-provider", () => ({
+vi.mock("../azure-blob-token-provider.adapter", () => ({
   getAzureBlobToken: (...args: unknown[]) => getAzureBlobTokenMock(...args),
   invalidateAzureBlobToken: (...args: unknown[]) => invalidateAzureBlobTokenMock(...args),
 }));
 
 import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter";
-import { StoredObjectStorageRegistry } from "../stored-object-storage.registry";
-import type { StoredObjectStorageDriver } from "../stored-object-storage.registry";
-import { ObjectNotFoundError } from "../../errors";
+import { StoredObjectStorageRegistry } from "../stored-object-storage-registry.adapter";
+import type { StoredObjectStorageDriver } from "../stored-object-storage-registry.adapter";
+import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 
 const ACCOUNT_NAME = "lwtestacct";
 // Base64-encoded 256-bit key — arbitrary fixed value for deterministic signature tests.

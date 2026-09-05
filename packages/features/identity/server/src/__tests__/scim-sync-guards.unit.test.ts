@@ -9,7 +9,7 @@ import {
   type ScimSyncState,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
-import { SCIM_APPLY_MAX_ATTEMPTS, ScimSyncGuards } from "../scim-sync-guards";
+import { SCIM_APPLY_MAX_ATTEMPTS, ScimSyncGuards } from "../services/scim-sync-guards.service";
 
 const CONNECTION = "conn_okta_primary";
 const ORGANIZATION = "org_acme";

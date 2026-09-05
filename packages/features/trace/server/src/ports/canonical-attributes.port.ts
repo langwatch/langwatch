@@ -1,6 +1,6 @@
 import type { CanonicalAttributes, CanonicalSpanContext } from "@langwatch/trace-contract";
-import type { LogRecordDataBag } from "../stores/canonical-log-record.bag";
-import type { SpanDataBag } from "../stores/canonical-span.bag";
+import type { LogRecordDataBag } from "../stores/canonical-log-record.store";
+import type { SpanDataBag } from "../stores/canonical-span.store";
 
 /** Span input and output shared by canonicalisation extractors. */
 export type ExtractorContext = {

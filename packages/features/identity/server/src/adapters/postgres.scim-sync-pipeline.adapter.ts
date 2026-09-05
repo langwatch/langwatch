@@ -1,4 +1,4 @@
-import { ScimSyncGuards } from "../scim-sync-guards";
+import { ScimSyncGuards } from "../services/scim-sync-guards.service";
 import {
   ScimSyncPipelineDefinitionAdapter,
   type ScimSyncPipeline,

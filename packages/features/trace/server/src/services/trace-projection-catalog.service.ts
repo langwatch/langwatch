@@ -2,7 +2,7 @@
  * Field catalog — the allowlist of selectable dotted-paths for the projection DSL. Public contract: every path a caller may put in `select` resolves here, anything else is rejected at compile time (HTTP 400); mirrors the filter compiler's allowlist discipline, identifiers reaching the query never come from raw caller input. Each path resolves to a {@link ResolvedField}: where it lands in output (`outPath`), how to read it off the source (`read` — the trace for scalar/grouped fields, or a child element for collection fields), its advertised `type` and, for io/cost, the gating `protection`.
  */
 
-import type { ProjectionCollection, ProjectionValueType } from "./trace-projection.types";
+import type { ProjectionCollection, ProjectionValueType } from "@langwatch/trace-contract";
 
 /** Visibility gate a field is subject to, mirroring {@link Protections}. */
 export type FieldProtection = "input" | "output" | "costs";

@@ -4,7 +4,7 @@ import type {
   ScimSyncLifecycleState,
   ScimSyncState,
 } from "@langwatch/identity-contract";
-import type { ScimSyncReadRepository } from "../../scim-sync.repository";
+import type { ScimSyncReadRepository } from "../scim-sync.repository";
 import type {
   Prisma,
   PrismaClient,

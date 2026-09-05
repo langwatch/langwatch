@@ -41,13 +41,9 @@ export type EvaluatorMappingsSectionProps = {
 };
 
 /**
- * Sub-component for evaluator input mappings.
- * Manages local state for immediate UI feedback, persists via onMappingChange.
- * Computes missingMappingIds reactively from local state.
- *
- * Supports two modes:
- * 1. Level-based: fetches span names/metadata keys internally (avoids race conditions)
- * 2. Provided sources: uses the sources passed directly (for dataset evaluations)
+ * Sub-component for evaluator input mappings. Manages local state for
+ * immediate UI feedback, persists via onMappingChange. Supports level-based
+ * (fetches span names/keys internally) and provided-sources modes.
  */
 export function EvaluatorMappingsSection({
   evaluatorDef,

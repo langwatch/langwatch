@@ -1,4 +1,4 @@
-import { reportNurturingFailure, tryNurturingSink } from "./nurturing-sink";
+import { reportNurturingFailure, tryNurturingSink } from "../adapters/nurturing-sink.adapter";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 

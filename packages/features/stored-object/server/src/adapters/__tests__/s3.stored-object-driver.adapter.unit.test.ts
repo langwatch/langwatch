@@ -5,7 +5,10 @@
  */
 import { Readable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ObjectNotFoundError, UnsupportedStorageSchemeError } from "../../errors";
+import {
+  ObjectNotFoundError,
+  UnsupportedStorageSchemeError,
+} from "@langwatch/stored-object-contract";
 import { StoredObjectS3TargetPort } from "../../ports/stored-object-s3-target.port";
 import { S3StoredObjectDriverAdapter } from "../s3.stored-object-driver.adapter";
 

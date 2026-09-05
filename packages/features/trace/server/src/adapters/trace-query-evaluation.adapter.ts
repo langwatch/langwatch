@@ -12,7 +12,7 @@ import {
   type InMemoryTrace,
   UNSUPPORTED,
   type Unsupported,
-} from "./trace-query-evaluation.types";
+} from "@langwatch/trace-contract";
 import { MAX_NODE_COUNT, TraceQueryClickHouseAdapter } from "./trace-query.clickhouse.adapter";
 import { FIELD_DEF_BY_NAME } from "./trace-query-fields.clickhouse.adapter";
 import { TraceQueryMetaFieldsAdapter } from "./trace-query-meta-fields.clickhouse.adapter";

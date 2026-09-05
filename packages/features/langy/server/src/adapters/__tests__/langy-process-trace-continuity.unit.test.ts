@@ -17,7 +17,7 @@ import { context, propagation, SpanKind, trace } from "@opentelemetry/api";
 import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { LangyConversationProcessingEvent } from "../../services/langy-conversation.events";
+import type { LangyConversationProcessingEvent } from "../eventing.langy-conversation-events.adapter";
 import { LANGY_CONVERSATION_PROCESS_NAME } from "../../ports/langy-conversation-process.port";
 import { langyConversationProcess } from "../../processes/langy-conversation.process";
 import { createStubLangyEffectPorts } from "@langwatch/langy-server/testing";

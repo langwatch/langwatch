@@ -22,7 +22,7 @@ import {
   pullRequestUsageParameters,
   pullRequestUsageQuerySchema,
   pullRequestUsageResponseSchema,
-} from "./pull-request-usage.wire";
+} from "../../rules/pull-request-usage-wire.rules";
 
 /** Records who read an answer that names people. */
 export interface CodingAgentRestAuditPort {

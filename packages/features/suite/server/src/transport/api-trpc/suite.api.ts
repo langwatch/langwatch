@@ -25,8 +25,8 @@ import {
   runPlanSchema,
   suiteTargetSchema,
   updateSuiteSchema,
-} from "./suite.schemas";
-import type { SuiteTrpcContext, SuiteTrpcProcedures } from "./suite.trpc-context";
+} from "../../rules/suite-schemas.rules";
+import type { SuiteTrpcContext, SuiteTrpcProcedures } from "../../rules/suite-trpc-context.rules";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 

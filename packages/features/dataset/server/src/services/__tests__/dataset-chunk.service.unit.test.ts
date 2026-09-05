@@ -1,16 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The s3_jsonl chunk mutations, which had no test of any kind while carrying
- * the most dangerous invariant in the feature: the Postgres counters
- * (`rowCount`/`sizeBytes`/`chunkCount`/`chunkOffsets`) must agree with the S3
- * chunk set, and they only can because every mutation runs inside one
- * per-dataset advisory lock (ADR-032 Decision 9, I-COUNT).
- *
- * What each case is really asserting is that the counter write lands on the
- * TRANSACTIONAL repository. A write that reached the root repository would
- * commit outside the lock's transaction, so a rolled-back chunk write would
- * leave the counters claiming rows that are not there.
+ * The s3_jsonl chunk mutations: each case asserts the counter write lands on
+ * the TRANSACTIONAL repository (ADR-032 Decision 9, I-COUNT), not the root one.
  */
 import { describe, expect, it } from "vitest";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
@@ -22,9 +13,7 @@ type Update = { id: string; content: Record<string, unknown>; transactional: boo
 
 /**
  * A repository whose `withDatasetLock` hands the callback a DIFFERENT instance,
- * exactly as the Prisma one hands back a transaction-bound repository. Every
- * write records which of the two it arrived on, so a mutation that wrote
- * outside the lock is visible rather than merely untested.
+ * as Prisma does. Every write records which of the two it arrived on.
  */
 function fakeRepository(record: DatasetMutationRecord) {
   const updates: Update[] = [];

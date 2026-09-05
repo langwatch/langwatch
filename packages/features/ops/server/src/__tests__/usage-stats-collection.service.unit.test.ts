@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  UsageStatsClickHouseClient,
-  UsageStatsClickHouseClientResolver,
+  UsageStatsClickHouseClientPort,
+  UsageStatsClickHouseClientResolverPort,
   type UsageStatsClickHouseQuery,
 } from "../index";
 import {
-  UsageStatsClickHouseRepository,
-  UsageStatsProjectRepository,
+  UsageStatsClickHouseRepositoryPort,
+  UsageStatsProjectRepositoryPort,
   type UsageStatsProjectDatabase,
   type UsageStatsProjectCounts,
-} from "../ports/usage-stats-worker.ports";
+} from "../ports/usage-stats-worker.port";
 import { ClickHouseUsageStatsRepository } from "../repositories/clickhouse/clickhouse.usage-stats.repository";
 import { PrismaUsageStatsProjectRepository } from "../repositories/prisma/prisma.usage-stats-project.repository";
 import { UsageStatsCollectionService } from "../services/usage-stats-collection.service";
@@ -29,7 +29,7 @@ const projectCounts: UsageStatsProjectCounts = {
   workflows: 11,
 };
 
-class ProjectsFake extends UsageStatsProjectRepository {
+class ProjectsFake extends UsageStatsProjectRepositoryPort {
   readonly collectProjectCounts = vi.fn<
     (input: {
       organizationId: string;
@@ -38,18 +38,18 @@ class ProjectsFake extends UsageStatsProjectRepository {
   >(async () => projectCounts);
 }
 
-class CountsFake extends UsageStatsClickHouseRepository {
+class CountsFake extends UsageStatsClickHouseRepositoryPort {
   readonly findTraceCount = vi.fn(async () => 200);
   readonly findScenarioRunCount = vi.fn(async () => 75);
 }
 
-class ClickHouseClientFake extends UsageStatsClickHouseClient {
+class ClickHouseClientFake extends UsageStatsClickHouseClientPort {
   readonly query = vi.fn<(input: UsageStatsClickHouseQuery) => ReturnType<typeof queryResult>>();
 }
 
-class ClickHouseClientsFake extends UsageStatsClickHouseClientResolver {
+class ClickHouseClientsFake extends UsageStatsClickHouseClientResolverPort {
   readonly tryResolve =
-    vi.fn<(organizationId: string) => Promise<UsageStatsClickHouseClient | null>>();
+    vi.fn<(organizationId: string) => Promise<UsageStatsClickHouseClientPort | null>>();
 }
 
 function queryResult(total: string) {

@@ -4,7 +4,7 @@ import type { ReplayProgress } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
 import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
-import type { ReplayRepository } from "../ports/replay.repository";
+import type { ReplayRepository } from "../repositories/replay.repository";
 import type { OpsReplayRuntimePort } from "../ports/replay-runtime.port";
 
 const logger = createLogger("langwatch:ops:replay-service");

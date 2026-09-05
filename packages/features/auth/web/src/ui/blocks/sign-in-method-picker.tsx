@@ -12,12 +12,9 @@ import { PasskeySignInButton } from "../elements/passkey-sign-in-button";
 import { SignInMethodIcon } from "../elements/sign-in-method-icon";
 
 /**
- * A development stack rarely has social credentials mounted, so its routing
- * decision offers none of them — which would hide the whole social rail from
- * exactly the people iterating on it. In dev the rail shows the cloud's full
- * social set, wired to the real sign-in call; everywhere else the rail is
- * exactly what the decision offered. The deployment is the host's to say, and
- * a fragment rendered with no host above it reads production.
+ * A dev stack rarely has social credentials mounted, hiding the social rail
+ * from the people iterating on it. In dev the rail shows the cloud's full
+ * social set; everywhere else it shows exactly what the decision offered.
  */
 export function useShowsAllSocialMethods(): boolean {
   return useOptionalAuthHost()?.publicEnvironment().NODE_ENV === "development";
@@ -32,20 +29,9 @@ const SOCIAL_METHODS: readonly SignInMethod[] = [
 ];
 
 /**
- * The method picker: exactly the methods the routing decision named, in the
- * order it named them, with the words its reason code is worth (ADR-117 §2,
- * §6).
- *
- * It holds no routing logic and reads nothing about the person. Two visitors
- * whose addresses produce the same decision see the same picker, because the
- * decision is all this component is given — there is nothing else here for
- * them to differ by. The one thing that varies is the "Last used" badge, which
- * is this BROWSER's memory of a method id and knows nothing about accounts.
- *
- * Sign-in and sign-up both render this component. What a LOCAL method means
- * differs between them (a password to type, a password to choose), so each
- * supplies that part; everything else, including which methods exist at all,
- * is the decision's answer rather than the screen's.
+ * The method picker: exactly the methods the decision named, in that order
+ * (ADR-117 §2, §6). Holds no routing logic; the "Last used" badge is this
+ * BROWSER's own memory. Sign-in and sign-up both render it.
  */
 export function SignInMethodPicker({
   methodSet,
@@ -102,10 +88,8 @@ export function SignInMethodPicker({
 }
 
 /**
- * Whether the address step has anything to offer under its "or" at all. The
- * divider is the caller's to draw, and a divider over nothing was the old
- * layout's orphan "OR": ask this before passing `alternatives`, and pass
- * nothing when the answer is no.
+ * Whether the address step has anything to offer under its "or" at all. Ask
+ * this before passing `alternatives`; pass nothing when the answer is no.
  */
 export function hasAlternativeMethods({
   methodSet,
@@ -121,11 +105,9 @@ export function hasAlternativeMethods({
 }
 
 /**
- * The methods a person can take instead of typing an address: the instance's
- * federated methods, in the order the decision named them. Rendered under the
- * address step's divider on both doors, so the two screens offer the same
- * alternatives in the same order. Every button is live — a method appears
- * here because it can be dialed, or not at all.
+ * The methods a person can take instead of typing an address, in the order
+ * the decision named them. Every button is live — a method appears here
+ * because it can be dialed, or not at all.
  */
 export function AlternativeMethods({
   methodSet,

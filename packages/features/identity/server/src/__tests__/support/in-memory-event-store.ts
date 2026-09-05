@@ -3,7 +3,7 @@ import type {
   IdentityFact,
   IdentityFactInput,
 } from "@langwatch/identity-contract";
-import type { IdentityLedger } from "../../identity-ledger";
+import type { IdentityLedger } from "../../rules/identity-ledger.rules";
 import { type InMemoryHeads, T0 } from "./in-memory-heads";
 
 /**

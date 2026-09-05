@@ -6,7 +6,7 @@ import type {
 } from "@langwatch/langy-server";
 import { LangyApp, PostgresLangyAdapter } from "@langwatch/langy-server";
 import { LangyService } from "@langwatch/langy-contract";
-import type { LangyDatabase } from "../repositories/prisma/langy-database.port";
+import type { LangyDatabase } from "../repositories/prisma/prisma.langy-database.repository";
 import { describe, expect, it, vi } from "vitest";
 
 const COMMAND_NAMES = [

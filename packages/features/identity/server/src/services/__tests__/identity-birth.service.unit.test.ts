@@ -3,13 +3,13 @@
  * @vitest-environment node
  * The born-finalized entrance's SEQUENCE (ADR-116 §3).
  */
-import { IdentityGuards } from "../../guards";
-import { IdentityEngineUnavailableError } from "../../better-auth/identity-birth";
+import { IdentityGuards } from "../identity-guards.service";
+import { IdentityEngineUnavailableError } from "../../adapters/better-auth.identity-birth.adapter";
 import { describe, expect, it, vi } from "vitest";
 import type { IdentityEvent } from "../../projections/identity-state.projection";
 import { IdentityBirthService } from "../identity-birth.service";
 import type { IdentityBirthLedgerPort } from "../../ports/identity-birth-ledger.port";
-import type { IdentityNewbornRepository } from "../../identity-newborn.repository";
+import type { IdentityNewbornRepository } from "../../repositories/identity-newborn.repository";
 import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing";
 
 const EMAIL = "newborn@acme.com";

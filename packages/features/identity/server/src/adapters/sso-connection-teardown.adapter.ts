@@ -10,8 +10,8 @@ export interface ConnectionDirectoryRevocation {
   }): Promise<{ revoked: number }>;
 }
 import type { ConnectionTeardownPort } from "../processes/connection-teardown.process";
-import { newSsoConnectionCommandId } from "../sso-connection-id";
-import type { SsoConnectionService } from "../sso-connection.service";
+import { newSsoConnectionCommandId } from "../rules/sso-connection-id.rules";
+import type { SsoConnectionService } from "../services/sso-connection.service";
 import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:identity:sso-connection-teardown");

@@ -1,6 +1,6 @@
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import type { Logger } from "@langwatch/observability";
-import type { StoredObjectStorageRuntime } from "@langwatch/stored-object-server/storage";
+import type { StoredObjectStorageRuntime } from "@langwatch/stored-object-server";
 import {
   ClickHouseTracePayloadReaderAdapter,
   TraceSpanSpoolAdapter,

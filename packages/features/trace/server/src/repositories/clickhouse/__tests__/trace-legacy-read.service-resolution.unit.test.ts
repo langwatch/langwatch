@@ -1,3 +1,4 @@
+import type { Protections } from "@langwatch/trace-contract";
 /**
  * @see ADR-022
  * Unit tests for the TraceLegacyReadClickHouseRepository -> blob-resolution seam. Mocks only the lowest-level CH driver (getClickHouseClientForTenant), wires a real TraceBlobStoreService (via getFromEventLog stub) + real TraceIOExtractionService so full resolution + recomputed-IO fires end-to-end.
@@ -11,7 +12,6 @@ import type { TraceBlobStoreService } from "../../../services/trace-blob-store.s
 import { BlobNotFoundError } from "../../../services/trace-blob-store.service";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import { TraceIOExtractionService } from "../../../services/trace-io-extraction.service";
-import type { Protections } from "@langwatch/trace-server";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — mock only the CH SQL boundary

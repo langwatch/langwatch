@@ -38,7 +38,7 @@ import {
   type StoredCall,
   type StoredResult,
   storedCallSchema,
-} from "../rules/connected-agent-envelope.rules";
+} from "./connected-agent-envelope.service";
 import {
   callAckKey,
   callKey,

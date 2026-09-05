@@ -51,7 +51,10 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import type { DatasetApp } from "#app/dataset.app";
-import { DatasetNameTakenError, DatasetStaleColumnsError } from "../../services/errors";
+import {
+  DatasetNameTakenError,
+  DatasetStaleColumnsError,
+} from "../../services/dataset-errors.service";
 
 /**
  * The host supplies authentication; authorization arrives as `policy`.

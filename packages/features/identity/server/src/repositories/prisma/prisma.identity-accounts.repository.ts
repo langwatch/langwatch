@@ -3,7 +3,7 @@ import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
   IdentityAccountsPort,
-} from "../../better-auth/storage-ports";
+} from "../../rules/identity-storage-ports.rules";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /** The `Identifier` columns an assembled account row is built from. */

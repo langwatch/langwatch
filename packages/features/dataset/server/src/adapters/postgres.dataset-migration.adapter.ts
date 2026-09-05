@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
-import { StreamingChunkWriter } from "../services/dataset-chunk-writer";
+import { StreamingChunkWriter } from "../services/dataset-chunk-writer.service";
 import {
   DATASET_MUTATION_TXN_MAX_WAIT_MS,
   DATASET_MUTATION_TXN_TIMEOUT_MS,

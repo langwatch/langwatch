@@ -22,9 +22,12 @@ import {
   type UiActionBackendRunner,
   type UiActionRedis,
 } from "#services/langy-ui-action.service";
-import { LangyTokenBuffer } from "#streaming/langy-token-buffer";
+import { LangyTokenBuffer } from "#adapters/redis.langy-token-buffer.adapter";
 import { LANGY_UI_ACTIONS_FLAG } from "#ports/langy-turn-runtime.port";
-import { resolveLangyRestCaller, type LangyRestCredentialPorts } from "./langy-rest.credentials";
+import {
+  resolveLangyRestCaller,
+  type LangyRestCredentialPorts,
+} from "./langy-rest-credentials.api";
 
 const AUTH_REASON =
   "session key resolved in-handler by the API-key service + the process's ceiling port on the dispatched action's own permission, then bridged to the owning user by resolveLangyKeyIdentity";

@@ -7,29 +7,29 @@ export {
   computeIdentifierHash,
   deriveIdentifierId,
   deriveNewbornUserId,
-} from "./crypto/identifier-identity";
-export { s256Challenge } from "./crypto/pkce";
-export { mintUserHashKey } from "./crypto/user-hash-key";
-export { IdentityGuards } from "./guards";
-export {
-  type BackfillAccountRow,
-  type BackfillUserRow,
-  type IdentityBackfillRepository,
-} from "./identity-backfill.repository";
-export { type PlannedIdentifier, planIdentifiers } from "./identity-backfill-plan";
+} from "./adapters/crypto.identifier-identity.adapter";
+export { s256Challenge } from "./adapters/crypto.pkce.adapter";
+export { mintUserHashKey } from "./rules/user-hash-key.rules";
+export { IdentityGuards } from "./services/identity-guards.service";
+export type {
+  BackfillAccountRow,
+  BackfillUserRow,
+  IdentityBackfillRepository,
+} from "./repositories/identity-backfill.repository";
+export { type PlannedIdentifier, planIdentifiers } from "./services/identity-backfill-plan.service";
 export {
   IDENTITY_BACKFILL_ACTOR,
   type IdentityBackfillOutcome,
   IdentityBackfillService,
   type IdentityBackfillServiceDeps,
-} from "./identity-backfill.service";
-export { IdentityEmailService } from "./identity-email.service";
+} from "./services/identity-backfill.service";
+export { IdentityEmailService } from "./services/identity-email.service";
 /**
  * The synthetic issuer better-auth 1.7 expects on an account row. Exported
  * from the root, not just `./better-auth`, because it is a PERSISTED format
  * every writer of a credential account row must reach and reuse.
  */
-export { issuerForProviderId } from "./better-auth/account-queries";
+export { issuerForProviderId } from "./adapters/better-auth.account-queries.adapter";
 /**
  * The row mappings the fold writes through and every guard reads back through.
  * The identity platform's event-sourcing layer (ADR-101, ADR-115, ADR-116,
@@ -79,29 +79,32 @@ export {
   IdentitySecretCarryService,
   type IdentitySecretCarryOutcome,
   type IdentitySecretCarryRepository,
-} from "./identity-secret-carry.service";
+} from "./services/identity-secret-carry.service";
 export {
   adoptAccountCommandId,
   adoptUserEmailCommandId,
   detachOrphanCommandId,
   establishUserEmailCommandId,
   newIdentityCommandId,
-} from "./identity-command-id";
-export type { IdentityHeadsReader, IdentityHeadsRepository } from "./identity-heads.repository";
+} from "./rules/identity-command-id.rules";
+export type {
+  IdentityHeadsReader,
+  IdentityHeadsRepository,
+} from "./repositories/identity-heads.repository";
 export type {
   IdentifierReservationHolder,
   IdentityReservationRepository,
-} from "./identity-reservations.repository";
-export type { IdentityLedger } from "./identity-ledger";
-export type { IdentityUserGate } from "./identity-user-gate";
-export type { IdentityUsersRepository } from "./identity-users.repository";
+} from "./repositories/identity-reservations.repository";
+export type { IdentityLedger } from "./rules/identity-ledger.rules";
+export type { IdentityUserGate } from "./rules/identity-user-gate.rules";
+export type { IdentityUsersRepository } from "./repositories/identity-users.repository";
 export type {
   IdentityVerificationRecord,
   IdentityVerificationRepository,
-} from "./identity-verification.repository";
-export { IdentityService } from "./identity.service";
-export type { MfaEnrollmentRepository } from "./mfa-enrollment.repository";
-export { MfaGuards } from "./mfa-guards";
+} from "./repositories/identity-verification.repository";
+export { IdentityService } from "./services/identity.service";
+export type { MfaEnrollmentRepository } from "./repositories/mfa-enrollment.repository";
+export { MfaGuards } from "./services/mfa-guards.service";
 export {
   type SignInBreakGlassLimiter,
   type SignInDomainRoutingPort,
@@ -111,14 +114,17 @@ export {
   type SignInRouterDeps,
   type SignInRoutingRecord,
   type SignInRoutingRecorder,
-} from "./signin-router.service";
+} from "./services/signin-router.service";
 export type {
   IdentityAdoptionWrites,
   IdentityCeremonyWrites,
   IdentityLinkProposalWrites,
   IdentityVerificationWrites,
-} from "./identity-writes";
-export { IdentityJitDisabledError, IdentityLinkProposedError } from "./signin-callback-errors";
+} from "./rules/identity-writes.rules";
+export {
+  IdentityJitDisabledError,
+  IdentityLinkProposedError,
+} from "./services/signin-callback-errors.service";
 export {
   type CallbackAssertion,
   type CallbackAuditRecord,
@@ -128,13 +134,16 @@ export {
   type SignInCallbackDirectoryPort,
   SignInCallbackLinkingService,
   type SignInCallbackLinkingDeps,
-} from "./signin-callback-linking.service";
+} from "./services/signin-callback-linking.service";
 export {
   PostgresJoinRequestNotificationAdapter,
   type JoinRequestNotificationDatabase,
   type PostgresJoinRequestNotificationOptions,
 } from "./adapters/postgres.join-request-notification.adapter";
-export { JoinRequestGuards, type JoinRequestGuardsDeps } from "./join-request-guards";
+export {
+  JoinRequestGuards,
+  type JoinRequestGuardsDeps,
+} from "./services/join-request-guards.service";
 export { JoinRequestAudiencePort } from "./ports/join-request-audience.port";
 export { JoinRequestMailPort } from "./ports/join-request-mail.port";
 export { JoinRequestNotificationService } from "./services/join-request-notification.service";
@@ -143,47 +152,51 @@ export {
   expireJoinCommandId,
   newJoinRequestCommandId,
   newJoinRequestId,
-} from "./join-request-id";
-export type { JoinRequestLedger } from "./join-request-ledger";
-export type { JoinCandidateRepository, JoinRequestReadRepository } from "./join-request.repository";
-export { JoinRequestService } from "./join-request.service";
-export { SCIM_APPLY_MAX_ATTEMPTS, ScimSyncGuards } from "./scim-sync-guards";
-export { newScimSyncCommandId } from "./scim-sync-id";
-export type { ScimSyncLedger } from "./scim-sync-ledger";
-export type { ScimSyncReadRepository } from "./scim-sync.repository";
+} from "./rules/join-request-id.rules";
+export type { JoinRequestLedger } from "./rules/join-request-ledger.rules";
+export type {
+  JoinCandidateRepository,
+  JoinRequestReadRepository,
+} from "./repositories/join-request.repository";
+export { JoinRequestService } from "./services/join-request.service";
+export { SCIM_APPLY_MAX_ATTEMPTS, ScimSyncGuards } from "./services/scim-sync-guards.service";
+export { newScimSyncCommandId } from "./rules/scim-sync-id.rules";
+export type { ScimSyncLedger } from "./rules/scim-sync-ledger.rules";
+export type { ScimSyncReadRepository } from "./repositories/scim-sync.repository";
 export {
   type LegacySsoOrganizationRepository,
   type SsoConnectionGrandfatherDeps,
   type SsoConnectionGrandfatherOutcome,
   SsoConnectionGrandfatherService,
-} from "./sso-connection-grandfather.service";
-export { SsoConnectionGuards, type SsoConnectionGuardsDeps } from "./sso-connection-guards";
+} from "./services/sso-connection-grandfather.service";
+export { SsoConnectionGuards } from "./services/sso-connection-guards.service";
+export type { SsoConnectionGuardsDeps } from "./services/sso-connection-guard-checks.service";
 export {
   grandfatherCommandId,
   grandfatheredSsoConnectionId,
   newSsoConnectionCommandId,
   newSsoConnectionId,
-} from "./sso-connection-id";
-export type { SsoConnectionLedger } from "./sso-connection-ledger";
+} from "./rules/sso-connection-id.rules";
+export type { SsoConnectionLedger } from "./rules/sso-connection-ledger.rules";
 export {
   ShadowComparingDomainRoutingRepository,
   type SsoConnectionRoutingShadowDeps,
   type SsoConnectionRoutingShadowRecord,
   type SsoConnectionRoutingShadowRecorder,
-} from "./sso-connection-routing-shadow";
+} from "./adapters/sso-connection-routing-shadow.adapter";
 export type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
   SsoPlatformOperatorRepository,
-} from "./sso-connection.repository";
-export { SsoConnectionService } from "./sso-connection.service";
+} from "./repositories/sso-connection.repository";
+export { SsoConnectionService } from "./services/sso-connection.service";
 export {
   IDENTITY_VERIFICATION_TTL_MS,
   type MintedEmailVerification,
   VerificationCeremonyService,
   type VerificationCeremonyDeps,
-} from "./verification-ceremony.service";
+} from "./services/verification-ceremony.service";
 
 // --------------------------------------------------------------------------- The composition half
 // the platform application used to own Every module below was `platform/app/src/server/app-
@@ -211,7 +224,7 @@ export {
   JoinRequestLifecycleDispatcher,
   PrismaJoinMembership,
   PrismaJoinSettings,
-} from "./adapters/join-request.adapters";
+} from "./adapters/join-request.adapter";
 export { JoinRequestNotificationMailPort } from "./ports/join-request-notification-mail.port";
 export { InProcessBreakGlassLimiterAdapter } from "./adapters/in-process-break-glass-limiter.adapter";
 export { LocalDoorBreakGlassBindingAdapter } from "./adapters/local-door-break-glass-binding.adapter";
@@ -224,7 +237,7 @@ export {
 export type {
   SsoConnectionBackofficePage,
   SsoConnectionBackofficeRepository,
-} from "./sso-connection-backoffice.repository";
+} from "./repositories/sso-connection-backoffice.repository";
 export {
   PrismaJoinCandidateRepository,
   PrismaJoinRequestReadRepository,
@@ -282,17 +295,17 @@ export {
   MAX_CACHE_ENTRIES,
   perSubjectCachedFlag,
   type PerSubjectCachedFlag,
-} from "./per-subject-cached-gate";
+} from "./services/per-subject-cached-gate.service";
 export {
   IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME,
   IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
-} from "./identity-migration-names";
-export { IdentitySsoConnectionGrandfatherMigration } from "./migrations/identity-connection-grandfather.migration";
-export { IdentityIdentifierBackfillMigration } from "./migrations/identity-identifier-backfill.migration";
+} from "./rules/identity-migration-names.rules";
+export { IdentitySsoConnectionGrandfatherMigration } from "./adapters/system-migration.identity-connection-grandfather.adapter";
+export { IdentityIdentifierBackfillMigration } from "./adapters/system-migration.identity-identifier-backfill.adapter";
 export {
   IDENTITY_SECRET_HEAL_MIGRATION_NAME,
   IdentitySecretHealMigration,
-} from "./migrations/identity-secret-heal.migration";
+} from "./adapters/system-migration.identity-secret-heal.adapter";
 export {
   ScimSyncLedgerWriterAdapter,
   type ScimSyncLedgerWriterDeps,

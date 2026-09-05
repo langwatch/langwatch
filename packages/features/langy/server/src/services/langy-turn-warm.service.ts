@@ -1,7 +1,10 @@
 import { stripGithubCredentials } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { LangyTurnBaseDependenciesService } from "./langy-turn-base-dependencies.service";
-import { buildWorkerProbeArgs, type LangyTurnServiceDependencies } from "./langy-turn.shared";
+import {
+  buildWorkerProbeArgs,
+  type LangyTurnServiceDependencies,
+} from "./langy-turn-shared.service";
 import { LangySessionKeyScopeError } from "../ports/langy-turn-runtime.port";
 
 const logger = createLogger("langwatch:langy:turn-warm");

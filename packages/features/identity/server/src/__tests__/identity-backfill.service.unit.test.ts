@@ -10,10 +10,13 @@ import {
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
-import { deriveIdentifierId } from "../crypto/identifier-identity";
-import type { BackfillAccountRow, BackfillUserRow } from "../identity-backfill.repository";
-import { IdentityBackfillService } from "../identity-backfill.service";
-import { IdentitySecretCarryService } from "../identity-secret-carry.service";
+import { deriveIdentifierId } from "../adapters/crypto.identifier-identity.adapter";
+import type {
+  BackfillAccountRow,
+  BackfillUserRow,
+} from "../repositories/identity-backfill.repository";
+import { IdentityBackfillService } from "../services/identity-backfill.service";
+import { IdentitySecretCarryService } from "../services/identity-secret-carry.service";
 
 const USER = "user_sam";
 const USER_CREATED_AT = Date.UTC(2023, 2, 14, 9, 30);

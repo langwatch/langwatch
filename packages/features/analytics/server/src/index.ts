@@ -6,7 +6,7 @@ export {
   type AnalyticsFilterOptionsLookup,
   type AnalyticsFilterOptionsRequest,
 } from "./app/analytics.app";
-export { LoggingAnalyticsTripwire } from "./services/analytics.tripwire";
+export { LoggingAnalyticsTripwire } from "./services/analytics-tripwire.service";
 
 /**
  * Filter matching without a query engine.
@@ -19,7 +19,7 @@ export { LoggingAnalyticsTripwire } from "./services/analytics.tripwire";
  */
 export { LegacyFilterMatchingService } from "./services/legacy-filter-matching.service";
 export { PreconditionTraceDataService } from "./services/precondition-trace-data.service";
-export { ANALYTICS_CLICKHOUSE_SETTINGS } from "./clickhouse/settings";
+export { ANALYTICS_CLICKHOUSE_SETTINGS } from "./rules/clickhouse-settings.rules";
 export {
   AnalyticsTrpcApi,
   type AnalyticsTrpcContext,
@@ -50,13 +50,13 @@ export {
   LangWatchQLService,
   type LangWatchQLServiceDependencies,
 } from "./services/langwatch-ql.service";
-export { lwqlEnabled, LWQL_FLAG } from "./langwatch-ql/access";
-export { lwqlTenantCapability } from "./langwatch-ql/capability";
+export { lwqlEnabled, LWQL_FLAG } from "./rules/lwql-access.rules";
+export { lwqlTenantCapability } from "./services/langwatch-ql-capability.service";
 export {
   LangWatchQLNotEnabledError,
   LangWatchQLParameterMissingError,
   LangWatchQLUnavailableError,
-} from "./langwatch-ql/errors";
+} from "@langwatch/analytics-contract";
 export {
   createLangWatchQLExecutor,
   DEFAULT_LWQL_RESULT_LIMITS,
@@ -64,9 +64,12 @@ export {
   type LangWatchQLConnection,
   type LangWatchQLExecutor,
   type LangWatchQLResultLimits,
-} from "./langwatch-ql/executor";
-export { MAX_LWQL_LENGTH } from "./langwatch-ql/sql-text";
-export { lwqlGranularityStepSchema, lwqlTimeWindowSchema } from "./langwatch-ql/time-window-schema";
+} from "./services/langwatch-ql-executor.service";
+export { MAX_LWQL_LENGTH } from "./services/langwatch-ql-sql-text.service";
+export {
+  lwqlGranularityStepSchema,
+  lwqlTimeWindowSchema,
+} from "./services/langwatch-ql-time-window.service";
 
 /**
  * The filter picker: the values one field can offer, and the two facts a door
@@ -79,7 +82,7 @@ export type { FilterOption } from "./ports/filter-options.port";
 export {
   filterFieldRequiresKey,
   filterFieldRequiresSubkey,
-} from "./model/analytics-filter-catalogue";
+} from "./rules/analytics-filter-catalogue.rules";
 
 /** The shared analytics read input every charted door and the REST body parse. */
 export {
@@ -91,8 +94,8 @@ export {
   type SharedFiltersInput,
   type TimeseriesInput,
   type TracesPivotFilters,
-} from "./model/analytics-input";
-export { currentVsPreviousDates } from "./model/current-vs-previous-dates";
+} from "@langwatch/analytics-contract";
+export { currentVsPreviousDates } from "./services/analytics-comparison-window.service";
 
 /** The four ClickHouse query refusals a caller can act on. */
 export {
@@ -100,8 +103,8 @@ export {
   QueryMemoryExceededError,
   QueryScanLimitExceededError,
   QueryTimeoutError,
-} from "./clickhouse/query-errors";
-export { generateClickHouseFilterConditions } from "./filters/clickhouse/filter-conditions";
+} from "@langwatch/analytics-contract";
+export { generateClickHouseFilterConditions } from "./adapters/clickhouse.filter-conditions.adapter";
 
 /** The saved-chart REST family. */
 export {
@@ -110,7 +113,7 @@ export {
 } from "./transport/api-rest/langwatch-ql.api";
 /** The one door for raw LangWatchQL: `/api/v1/query`. */
 export { createQueryRestApp, registerQueryRoutes } from "./transport/api-rest/query.api";
-export type { SavedWorkbenchChartRestService } from "./transport/api-rest/langwatch-ql-route-guards";
+export type { SavedWorkbenchChartRestService } from "./services/langwatch-ql-route-guards.service";
 
 // The LangWatchQL key map: the row a project's access is granted by, written at
 // project creation and repaired by the deploy backfill.
@@ -122,7 +125,10 @@ export {
 // The production provisioning statements and names the deploy task runs. Kept
 // beside the runtime reader deliberately: the views a query reads and the
 // statements that create them are one description of the same objects.
-export { KEY_MAP_COLUMNS, type LangWatchQLNames } from "./langwatch-ql/provisioning";
+export {
+  KEY_MAP_COLUMNS,
+  type LangWatchQLNames,
+} from "./adapters/clickhouse.lwql-provisioning.adapter";
 export {
   type LwqlKeyMapBackfillPlan,
   type LwqlKeyMapRow,
@@ -134,6 +140,6 @@ export {
   productionPostgresApprovedViewStatements,
   productionPostgresReaderGrantStatements,
   withTenancyOptOut,
-} from "./langwatch-ql/production-provisioning";
+} from "./services/langwatch-ql-production-provisioning.service";
 
 export { LwqlProvisionTask } from "./tasks/lwql-provision.task";

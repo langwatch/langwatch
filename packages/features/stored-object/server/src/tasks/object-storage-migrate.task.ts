@@ -8,8 +8,8 @@ import {
   assertTokenModeTransportSafety,
   type AzureCredentials,
   type AzureInjectedIdentity,
-} from "#adapters/azure-blob-credentials";
-import type { StoredObjectStorageDriver } from "#adapters/stored-object-storage.registry";
+} from "#adapters/azure-blob-credentials.adapter";
+import type { StoredObjectStorageDriver } from "#adapters/stored-object-storage-registry.adapter";
 import { z } from "zod";
 import {
   type MigrationInventory,

@@ -1,9 +1,9 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { FilterField } from "@langwatch/analytics-contract";
 import { createLogger } from "@langwatch/observability";
-import { clickHouseFilters } from "../../filters/clickhouse/filter-definitions";
-import { buildScopeConditions } from "../../filters/clickhouse/query-helpers";
-import type { SupportedClickHouseFilterDefinition } from "../../filters/clickhouse/types";
+import { clickHouseFilters } from "./clickhouse.filter-definitions.mapper";
+import { buildScopeConditions } from "./clickhouse.filter-query-helpers.mapper";
+import type { SupportedClickHouseFilterDefinition } from "./clickhouse.filter-shapes.mapper";
 import {
   FilterOptionsPort,
   type FilterOption,

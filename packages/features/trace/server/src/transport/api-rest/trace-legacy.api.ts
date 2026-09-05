@@ -16,7 +16,7 @@ import type { Env } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z } from "zod";
 
-import { enrichTracesWithEvaluations } from "#services/trace-evaluation-enrichment.rules";
+import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
 
 const AUTH_REASON = "project API key / public share resolved in-handler";
 

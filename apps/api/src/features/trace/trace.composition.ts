@@ -1,3 +1,4 @@
+import type { Protections } from "@langwatch/trace-contract";
 /**
  * A project's captured traffic, composed as its own feature.
  * ADR-057 allows. Composing them apart would mean five redaction passes over
@@ -12,16 +13,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ShareService } from "@langwatch/share-contract";
 import type { TopicService } from "@langwatch/topic-contract";
-import {
-  TraceApp,
-  type Protections,
-  type SharedTraceTrpcPorts,
-  type SpansTrpcPorts,
-  type TraceAppDependencies,
-  type TraceEditOverlayTrpcPorts,
-  type TracesTrpcPorts,
-  type TracesV2TrpcPorts,
-} from "@langwatch/trace-server";
+import { TraceApp, type SharedTraceTrpcPorts, type SpansTrpcPorts, type TraceAppDependencies, type TraceEditOverlayTrpcPorts, type TracesTrpcPorts, type TracesV2TrpcPorts } from "@langwatch/trace-server";
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import type { TrpcRequestLike } from "@langwatch/api/trpc";
 import { trpcClientAddress } from "../../app/api-client-address";

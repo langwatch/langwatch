@@ -16,7 +16,7 @@ import {
   type WithdrawJoinCommandData,
   withdrawJoinCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { JoinRequestGuards } from "../join-request-guards";
+import type { JoinRequestGuards } from "../services/join-request-guards.service";
 import type { ZodTypeAny, z } from "zod";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import { JoinRequestStateFoldProjection } from "../projections/join-request-state.projection";

@@ -14,10 +14,10 @@ import type {
   RedisInfo,
   ThroughputPoint,
 } from "@langwatch/ops-contract";
-import { normalizeErrorMessage } from "../ops.error-normalizer";
-import { computeEngineCpuPercent, type RedisCpuSample } from "../ops.redis-engine-cpu";
+import { normalizeErrorMessage } from "../rules/ops-error-normalizer.rules";
+import { computeEngineCpuPercent, type RedisCpuSample } from "../rules/ops-redis-engine-cpu.rules";
 import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository";
-import { totalInFlight as computeTotalInFlight } from "../ops.in-flight";
+import { totalInFlight as computeTotalInFlight } from "../rules/ops-in-flight.rules";
 
 const logger = createLogger("langwatch:ops:metrics-collector");
 

@@ -165,7 +165,7 @@ export {
   tryNurturingOrganizationAdminResolver,
   tryNurturingSink,
   type OrganizationAdminResolver,
-} from "./services/nurturing-sink";
+} from "./adapters/nurturing-sink.adapter";
 export { NurturingActivityTrackingService } from "./services/nurturing-activity-tracking.service";
 export { NurturingFeatureAdoptionService } from "./services/nurturing-feature-adoption.service";
 export {

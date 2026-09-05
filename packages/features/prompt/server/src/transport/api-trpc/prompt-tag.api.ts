@@ -5,7 +5,10 @@ import { PermissionDeniedError } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import type { PromptTrpcContext, PromptTrpcProcedures } from "./prompt.trpc-context";
+import type {
+  PromptTrpcContext,
+  PromptTrpcProcedures,
+} from "../../rules/prompt-trpc-context.rules";
 
 /**
  * A tag definition is one organization row and its assignments cascade to every project in

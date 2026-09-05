@@ -13,7 +13,10 @@ import {
   type LangyWorkerProbeInput,
   type LangyWorkerWarmInput,
 } from "../../ports/langy-turn-runtime.port";
-import type { LangyTurnServiceDependencies, LangyTurnServiceDeps } from "../langy-turn.shared";
+import type {
+  LangyTurnServiceDependencies,
+  LangyTurnServiceDeps,
+} from "../langy-turn-shared.service";
 import { LangyTurnWarmService } from "../langy-turn-warm.service";
 
 const SESSION = { user: { id: "user-1" } };

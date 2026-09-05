@@ -23,7 +23,7 @@ import {
   LANGY_USER_MESSAGE_LABEL,
   type LangyTurnServiceDependencies,
   type StartConversationTurnInput,
-} from "./langy-turn.shared";
+} from "./langy-turn-shared.service";
 import { mintRunToken } from "../ports/langy-frame-auth.port";
 
 const logger = createLogger("langwatch:langy:turn-start");

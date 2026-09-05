@@ -3,7 +3,7 @@
 import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import type { ProjectService } from "@langwatch/project-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { LWQL_FLAG, lwqlEnabled } from "../access";
+import { LWQL_FLAG, lwqlEnabled } from "../../rules/lwql-access.rules";
 
 /**
  * `lwqlEnabled` takes the project service as a parameter, so the gate can be asked in isolation. It used to be asked through

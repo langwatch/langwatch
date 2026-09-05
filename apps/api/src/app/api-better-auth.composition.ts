@@ -403,7 +403,7 @@ export function announceApiBetterAuthAbsences(logger: Logger): void {
         "identity-storage-routing",
         "identity-ceremonies",
         "pending-invitations",
-        "sign-in-router-shadow",
+        "sign-in-router-shadow.api",
         "sso-providers",
       ],
     },

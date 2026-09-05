@@ -4,7 +4,10 @@
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import { MAX_RUN_CONFIGURATIONS } from "../../ports/run-configurations-read.port";
-import type { ScenarioTrpcContext, ScenarioTrpcProcedures } from "./scenario.trpc-context";
+import type {
+  ScenarioTrpcContext,
+  ScenarioTrpcProcedures,
+} from "../../rules/scenario-trpc-context.rules";
 
 export function createRunConfigurationsRouter<
   TContext extends ScenarioTrpcContext,

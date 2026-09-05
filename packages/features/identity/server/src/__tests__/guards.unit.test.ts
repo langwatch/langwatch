@@ -6,7 +6,7 @@ import {
   IdentityCommandRefusedError,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
-import { IdentityGuards } from "../guards";
+import { IdentityGuards } from "../services/identity-guards.service";
 import {
   ACTOR,
   attachData,

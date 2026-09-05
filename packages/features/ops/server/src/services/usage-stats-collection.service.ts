@@ -1,12 +1,12 @@
 import type {
-  UsageStatsClickHouseRepository,
-  UsageStatsProjectRepository,
+  UsageStatsClickHouseRepositoryPort,
+  UsageStatsProjectRepositoryPort,
   UsageStatsReport,
-} from "../ports/usage-stats-worker.ports";
+} from "../ports/usage-stats-worker.port";
 
 export interface UsageStatsCollectionServiceOptions {
-  projects: UsageStatsProjectRepository;
-  clickhouse: UsageStatsClickHouseRepository;
+  projects: UsageStatsProjectRepositoryPort;
+  clickhouse: UsageStatsClickHouseRepositoryPort;
   builderChartKind: string;
   now: () => Date;
 }

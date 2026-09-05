@@ -1,4 +1,4 @@
-import type { ScimSyncGuards } from "../scim-sync-guards";
+import type { ScimSyncGuards } from "../services/scim-sync-guards.service";
 import {
   defineAggregate,
   defineEvents,

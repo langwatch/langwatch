@@ -9,7 +9,7 @@ import {
 import type {
   JoinCandidateRepository,
   JoinRequestListReadRepository,
-} from "../../join-request.repository";
+} from "../join-request.repository";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PrismaJoinRequestProjectionRepository } from "./prisma.join-request-projection.repository";
 

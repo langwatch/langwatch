@@ -1,19 +1,7 @@
 /**
- * Opening a traced LLM call as a prompt tab.
- *
- * A NARROWED family-local copy of
- * `platform/app/src/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground.ts`.
- * The platform module also exports `useGoToSpanInPlaygroundTabUrlBuilder`, which
- * the trace explorer, the span details panel and the trace drawer's prompt
- * panels all call to BUILD this address — eight importers this move may not
- * repoint — so that half stays there and only the READING half travels.
- *
- * The two addresses are the same contract, stated in two places until the trace
- * family moves: `?promptPlaygroundSpanId=<span>&action=<open-existing|create-new>`.
- *
- * The address is read from the host and cleared through it. `platform/app`
- * spread `router.query` and replaced the whole thing; `setQuery` merges, so the
- * two keys are cleared by name.
+ * Opening a traced LLM call as a prompt tab. A NARROWED copy of
+ * `useLoadSpanIntoPromptPlayground.ts` — only the READING half travels here;
+ * the URL-building half stays in `platform/app`.
  */
 
 import { useEffect, useRef } from "react";
@@ -64,13 +52,9 @@ function useSpanIdFromUrl() {
 }
 
 /**
- * Safely coerces a value to a number, returning undefined for anything that
- * cannot be cleanly converted. Trace data may store numeric LLM params as
- * strings (e.g. "0.7"), booleans, or objects -- this function handles all
- * of those without throwing.
- *
- * @param value - The value to coerce (number, string, null, or unknown)
- * @returns The numeric value, or undefined if coercion is not possible
+ * Safely coerces a value to a number (trace data may store it as a string).
+ * @param value - The value to coerce
+ * @returns The numeric value, or undefined if not coercible
  */
 export function coerceToNumber(value: unknown): number | undefined {
   if (value == null) return undefined;
@@ -85,12 +69,9 @@ export function coerceToNumber(value: unknown): number | undefined {
 }
 
 /**
- * Safely coerces a value to a string, returning undefined for anything that
- * cannot be meaningfully converted. Nulls, undefined, objects, and arrays
- * are rejected.  Numbers and booleans are converted via String().
- *
+ * Safely coerces a value to a string; nulls/objects/arrays are rejected.
  * @param value - The value to coerce
- * @returns The string value, or undefined if coercion is not possible
+ * @returns The string value, or undefined if not coercible
  */
 export function coerceToString(value: unknown): string | undefined {
   if (value == null) return undefined;
@@ -101,14 +82,7 @@ export function coerceToString(value: unknown): string | undefined {
 }
 
 /**
- * Creates default form values for a new prompt config.
- * Single Responsibility: Generate initial prompt configuration structure from span data.
- *
- * Applies lenient coercion to numeric fields because trace data from customer
- * LLM calls may store parameters as strings instead of numbers.  Values that
- * cannot be coerced are silently dropped (set to undefined) so that the
- * "Open in Prompts" flow never fails due to unexpected trace data shapes.
- *
+ * Creates default form values for a new prompt config from span data.
  * @param spanData - The span data containing LLM configuration
  * @returns Initial form values for a new prompt
  */
@@ -138,15 +112,10 @@ export function createDefaultPromptFormValues(
     handle: null,
     scope: "PROJECT",
     version: {
-      // A LIVE DEFECT THIS MOVE FOUND, fixed here because the fix is one line
-      // in a package the deletes-only ruling allows repointing — the datasets
-      // family's call, second use. `formSchema`'s `version.parameters` had its
-      // schema default REMOVED ("the form always provides this field"), and
-      // this builder never did, so `formSchema.parse` threw on every span
-      // hand-off that did not resolve to a managed prompt: "Open in Prompts"
-      // from a trace has been failing outright. Both of the suites that cover
-      // this function were red in `platform/app` — one of them was in no test
-      // lane at all and never ran — which is why nothing caught it.
+      // A LIVE DEFECT THIS MOVE FOUND: `formSchema`'s `version.parameters` had
+      // its schema default REMOVED, and this builder never supplied one, so
+      // `formSchema.parse` threw on every unmanaged-prompt hand-off. Both
+      // covering suites were red in `platform/app`, one in no test lane at all.
       parameters: {},
       configData: {
         prompt: systemPrompt,
@@ -161,10 +130,8 @@ export function createDefaultPromptFormValues(
 
 /**
  * Adds a unique ID to each message.
- * Single Responsibility: Transforms message array by adding trace ID to each message.
  * @param messages - Array of chat messages without IDs
  * @param traceId - The trace ID to assign to messages
- * @returns Array of messages with ID field added
  */
 function addIdToMessages(
   messages: Array<ChatMessage>,
@@ -178,9 +145,8 @@ function addIdToMessages(
 
 /**
  * Opens a tab for an existing LangWatch-managed prompt at a specific version.
- * Falls back to creating a new tab from trace data if the prompt is not found.
- *
- * @returns The tab data to add, or null to fall back to new-tab-from-trace behavior
+ * Falls back to creating a new tab from trace data if not found.
+ * @returns The tab data to add, or null to fall back to new-tab-from-trace
  */
 async function tryOpenExistingPromptTab({
   promptHandle,
@@ -248,13 +214,9 @@ async function tryOpenExistingPromptTab({
 }
 
 /**
- * Merges traced variables into an existing prompt's inputs.
- * For variables that exist in the prompt's input schema, fills them.
- * For variables NOT in the prompt's input schema, adds them as new inputs.
- *
+ * Merges traced variables into a prompt's inputs, filling known ones and
+ * adding the rest as new inputs.
  * @param formValues - The existing prompt form values
- * @param promptVariables - The traced variable values
- * @returns Updated form values with merged inputs
  */
 function mergeTracedVariablesIntoInputs(
   formValues: PromptConfigFormValues,
@@ -284,15 +246,9 @@ function mergeTracedVariablesIntoInputs(
 }
 
 /**
- * Hook to load span data from a trace into the prompt studio.
- * When the span references a LangWatch-managed prompt (via promptHandle),
- * opens the existing prompt at the recorded version. Otherwise, creates
- * a new tab from the trace data.
- *
- * Supports an `action` URL parameter:
- * - "open-existing": open the referenced prompt at the traced version
- * - "create-new": always create a new tab from trace data
- * - absent: auto-detect based on whether promptHandle is present
+ * Hook to load span data from a trace into the prompt studio: opens the
+ * managed prompt at its recorded version (via promptHandle) or creates a new
+ * tab from trace data. The `action` URL parameter can force either behavior.
  */
 export function useLoadSpanIntoPromptPlayground() {
   const loadedRef = useRef(false);

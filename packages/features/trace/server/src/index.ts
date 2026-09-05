@@ -11,7 +11,7 @@ export {
   type EventingTracePipelineAdapterOptions,
 } from "./adapters/eventing.trace-pipeline.adapter";
 
-export { TraceProcessingServerInstaller } from "./adapters/eventing.trace-processing.installer";
+export { TraceProcessingServerInstaller } from "./adapters/eventing.trace-processing-installer.adapter";
 export { TraceProcessingInstallerPort } from "./ports/trace-processing-installer.port";
 export {
   DEFERRED_ORIGIN_CHECK_DELAY_MS,
@@ -60,8 +60,8 @@ export {
   TRACKED_EVENT_SYNC_DELAY_MS,
   TrackedEventSync,
 } from "./subscribers/tracked-event-sync.subscriber";
-export { parseJsonStringValues } from "./services/otlp-trace-request.rules";
-export { SpanRecordIdentity } from "./services/span-record-identity.rules";
+export { parseJsonStringValues } from "./services/otlp-attribute-flattening.service";
+export { SpanRecordIdentity } from "./services/span-record-identity.service";
 export { TraceListClickHouseRepository } from "./repositories/clickhouse/trace-list.repository";
 export { TraceSummaryClickHouseRepository } from "./repositories/clickhouse/trace-summary.repository";
 export {
@@ -98,7 +98,7 @@ export {
 } from "./adapters/trace-facet-registry.clickhouse.adapter";
 export { ClickHouseSpanAttributeKeysFacetAdapter } from "./adapters/trace-facet-span-attribute-keys.clickhouse.adapter";
 export { TraceQueryEvaluationAdapter } from "./adapters/trace-query-evaluation.adapter";
-export type { FieldDef } from "./adapters/trace-query-evaluation.types";
+export type { FieldDef } from "@langwatch/trace-contract";
 export { TraceSummaryReaderPort } from "./ports/trace-summary-reader.port";
 export {
   TraceSummaryProjectionPort,
@@ -173,24 +173,24 @@ export {
   TraceSpanDedupPort,
   type SpanDedupRef,
 } from "./services/trace-ingestion.service";
+export { TraceAttributeCap } from "./services/trace-attribute-cap.service";
 export {
+  capPayloadString,
   DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
-  TraceAttributeCap,
-} from "./services/trace-attribute-cap.rules";
-export { capPayloadString } from "./services/trace-payload-cap.rules";
+} from "./rules/trace-payload-cap.rules";
 export {
   MAX_SPAN_SHARD_COUNT,
   resolveSpanCommandShardCount,
   spanCommandGroupKey,
-} from "./services/trace-span-command-shard.rules";
-export { firstUsableAnchor } from "./services/trace-storage-anchor.rules";
-export { anchorStorageTime } from "./services/trace-storage-anchor.rules";
+} from "./rules/trace-span-command-shard.rules";
+export { firstUsableAnchor } from "./rules/trace-storage-anchor.rules";
+export { anchorStorageTime } from "./rules/trace-storage-anchor.rules";
 export {
   SPAN_STORAGE_MAP_SHARD_COUNT,
   spanStorageMapGroupKey,
   TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
-} from "./services/trace-span-storage-group.rules";
-export { trimAttributesForAnalytics } from "./services/analytics-attribute-trim.rules";
+} from "./rules/trace-span-storage-group.rules";
+export { trimAttributesForAnalytics } from "./rules/analytics-attribute-trim.rules";
 export { TraceAttributeAccumulationService } from "./services/trace-attribute-accumulation.service";
 export { TraceAttributeExtractionService } from "./services/trace-attribute-extraction.service";
 export { TraceOriginService } from "./services/trace-origin.service";
@@ -215,7 +215,7 @@ export {
   deriveScenarioRoleMetricsFromSpans,
   type ScenarioRoleMetrics,
   type ScenarioRoleSpanInput,
-} from "./services/scenario-role-metrics.rules";
+} from "./rules/scenario-role-metrics.rules";
 
 export {
   TraceApp,
@@ -241,11 +241,7 @@ export {
   type TracesTrpcContext,
   type TracesTrpcPorts,
 } from "./transport/api-trpc/traces.api";
-export {
-  type CategoryVisibility,
-  type Protections,
-  TraceViewerProtectionsService,
-} from "./services/trace-viewer-protections.service";
+export { TraceViewerProtectionsService } from "./services/trace-viewer-protections.service";
 export { TraceAttributeRedactionService } from "./services/trace-attribute-redaction.service";
 export {
   buildContentPrivacy,
@@ -294,7 +290,7 @@ export {
   type FullSpanRow,
   mapChRowToNormalized,
   serializeAttributes,
-} from "./repositories/clickhouse/stored-span-row.codec";
+} from "./repositories/clickhouse/stored-span-row.mapper";
 export { SpanNormalizationPipelineService } from "./services/span-normalization.service";
 export {
   TraceSpoolLegacyObjectPort,
@@ -383,7 +379,7 @@ export type {
   GetAllTracesForProjectOptions,
   TraceDateField,
   TraceSharedFiltersInput,
-} from "./services/trace-legacy-read.types";
+} from "@langwatch/trace-contract";
 export { TraceListService } from "./services/trace-list-read.service";
 export { SessionGroupsService } from "./services/trace-session-groups.service";
 export { SpanStorageService } from "./services/trace-span-storage-read.service";
@@ -413,7 +409,7 @@ export {
 export { TraceIOExtractionService } from "./services/trace-io-extraction.service";
 export { TraceReadableSpanService } from "./services/trace-readable-span.service";
 export { VisibilityWindowService } from "./services/trace-visibility-window.service";
-export { TraceNotFoundError } from "./services/trace-read.errors";
+export { TraceNotFoundError } from "./services/trace-read-errors.service";
 export { TraceWindowedReadService } from "./services/trace-windowed-read.service";
 export { TraceTtlCacheService, type TraceCacheRedis } from "./services/trace-ttl-cache.service";
 export { TraceSpanIngestPort } from "./ports/trace-span-ingest.port";
@@ -480,7 +476,7 @@ export {
   stampIngestKeyProvenanceOnMetricRequest,
   stampIngestKeyProvenanceOnTraceRequest,
   type IngestKeyProvenance,
-} from "./services/ingest-key-provenance.rules";
+} from "./rules/ingest-key-provenance.rules";
 export type { TraceRequestCollectionResult } from "./services/trace-ingestion.service";
 
 // The download half of the trace read: streaming CSV/JSONL export — the
@@ -497,19 +493,19 @@ export {
   type ExportMode,
   type ExportProgress,
   type ExportRequest,
-} from "./services/trace-export.vocabulary";
-export { ExportFailedError, ExportUnauthenticatedError } from "./services/trace-export.errors";
+} from "@langwatch/trace-contract";
+export { ExportFailedError, ExportUnauthenticatedError } from "@langwatch/trace-contract";
 export {
   CSV_NEWLINE,
   serializeTracesToFullCsv,
   serializeTracesToSummaryCsv,
-} from "./services/trace-export-csv.rules";
+} from "./rules/trace-export-csv.rules";
 export {
   serializeTraceToFullJson,
   serializeTraceToSummaryJson,
-} from "./services/trace-export-json.rules";
-export { RESERVED_METADATA_KEYS } from "./services/trace-export-columns.rules";
-export { enrichTracesWithEvaluations } from "./services/trace-evaluation-enrichment.rules";
+} from "./rules/trace-export-json.rules";
+export { RESERVED_METADATA_KEYS } from "./rules/trace-export-columns.rules";
+export { enrichTracesWithEvaluations } from "./rules/trace-evaluation-enrichment.rules";
 
 /**
  * The EDGE media path: what a span carries inline, lifted into the object store before the span folds. Was platform/app's edge-media-extraction.ts + four content-part extractors under server/stored-objects/ — they walk TRACE content parts and media markers, so they belong to this vertical, not Stored Objects.
@@ -585,7 +581,7 @@ export {
   type CompiledProjection,
   type CompileProjectionArgs,
   type ProjectionRequest,
-} from "./services/trace-projection.types";
+} from "@langwatch/trace-contract";
 export {
   OtelTraceEdgeMediaTelemetryAdapter,
   TRACE_EDGE_MEDIA_FAIL_OPEN_METRIC_NAME,

@@ -1,5 +1,5 @@
 import type { SchedulerAuditEntryView, SchedulerControlAction } from "@langwatch/ops-contract";
-import { SchedulerAuditSink } from "../../ports/scheduler-audit.sink";
+import { SchedulerAuditSinkPort } from "../../ports/scheduler-audit-sink.port";
 
 /** Writes scheduler controls to the shared audit log. */
 export type SchedulerAuditDatabase = {
@@ -46,7 +46,7 @@ export type SchedulerAuditDatabase = {
   };
 };
 
-export class PrismaSchedulerAuditRepository extends SchedulerAuditSink {
+export class PrismaSchedulerAuditRepository extends SchedulerAuditSinkPort {
   private constructor(private readonly database: SchedulerAuditDatabase) {
     super();
   }

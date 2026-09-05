@@ -9,6 +9,7 @@ export * from "./experiment-workbench-version";
 export * from "./experiment-run";
 export * from "./experiment-run-eventing.commands";
 export * from "./experiment-run-eventing.events";
+export * from "./experiment-execution.errors";
 export * from "./experiment.errors";
 export * from "./experiment.service";
 export * from "./human-readable-id";

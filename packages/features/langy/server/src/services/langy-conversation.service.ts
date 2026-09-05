@@ -32,9 +32,9 @@ import {
   langyJsonValueSchema,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import { LangyTurnErrors } from "./langy-turn-errors.errors";
+import { LangyTurnErrors } from "./langy-turn-errors.service";
 import { mintRunToken } from "../ports/langy-frame-auth.port";
-import type { LangyConversationProcessingEvent } from "./langy-conversation.events";
+import type { LangyConversationProcessingEvent } from "../adapters/eventing.langy-conversation-events.adapter";
 import { LANGY_ID_RESOURCES } from "../ports/langy-ids.port";
 import {
   LangyConversationIdUnadoptableError,
@@ -52,7 +52,7 @@ import {
   type LangyMessageRow,
   NullLangyMessageRepository,
 } from "../repositories/langy-message.repository";
-import type { LangyTurnOrderReader, LangyTurnSegment } from "../streaming/langy-turn-order";
+import type { LangyTurnOrderReader, LangyTurnSegment } from "./langy-turn-order.service";
 
 export type { LangyConversationRepository as LangyConversationReadRepository } from "../repositories/langy-conversation-projection.repository";
 

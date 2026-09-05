@@ -30,8 +30,8 @@ import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE } from "@langwatch/trace-contract";
 import { OUTPUT_SOURCE } from "../services/trace-io-accumulation.service";
 import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service";
-import { trimAttributesForAnalytics } from "../services/analytics-attribute-trim.rules";
-import { anchorStorageTime, firstUsableAnchor } from "../services/trace-storage-anchor.rules";
+import { trimAttributesForAnalytics } from "../rules/analytics-attribute-trim.rules";
+import { anchorStorageTime, firstUsableAnchor } from "../rules/trace-storage-anchor.rules";
 import {
   MAX_PROCESSED_SPANS,
   RESERVED_CACHE_CREATION_TOKENS,

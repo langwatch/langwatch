@@ -1,3 +1,4 @@
+import type { Protections } from "@langwatch/trace-contract";
 import {
   AutomationHeartbeatPort,
   AutomationSettlementEvaluationReaderPort,
@@ -32,15 +33,7 @@ import {
   type TraceRecord,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
-import {
-  ClickHouseTraceDerivationSpanReaderAdapter,
-  TraceLegacyReadClickHouseRepository,
-  TraceEventDerivationService,
-  TraceQueryClassificationAdapter,
-  VisibilityWindowService,
-  type Protections,
-  type TraceClickHouseWriteResolver,
-} from "@langwatch/trace-server";
+import { ClickHouseTraceDerivationSpanReaderAdapter, TraceLegacyReadClickHouseRepository, TraceEventDerivationService, TraceQueryClassificationAdapter, VisibilityWindowService, type TraceClickHouseWriteResolver } from "@langwatch/trace-server";
 import type { WorkerAutomationSettlementAbsenceReportPort } from "./worker-automation-settlement.composition";
 
 /**

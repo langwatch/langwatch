@@ -11,13 +11,13 @@ import {
   S3Client,
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
-import { ObjectNotFoundError } from "../errors";
-import { parseS3Uri } from "../rules/s3-uri.rules";
+import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
+import { parseS3Uri } from "./s3-uri.adapter";
 import type {
   StoredObjectS3Target,
   StoredObjectS3TargetPort,
 } from "../ports/stored-object-s3-target.port";
-import type { StoredObjectStorageDriver } from "./stored-object-storage.registry";
+import type { StoredObjectStorageDriver } from "./stored-object-storage-registry.adapter";
 
 /**
  * The process's shared AWS transport policy, as this driver asks for it.

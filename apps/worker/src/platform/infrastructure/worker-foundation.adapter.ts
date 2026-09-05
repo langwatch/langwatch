@@ -11,7 +11,7 @@ import {
   type RedisConfigResolution,
   type RedisLogger,
 } from "@langwatch/redis-client";
-import { StoredObjectStorageRuntime } from "@langwatch/stored-object-server/storage";
+import { StoredObjectStorageRuntime } from "@langwatch/stored-object-server";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { WorkerStoredObjectStorageRuntimeFactory } from "./worker-stored-object-storage.adapter";
 

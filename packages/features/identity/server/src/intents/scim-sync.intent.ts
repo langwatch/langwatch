@@ -11,7 +11,7 @@ import {
   revokeScimSyncCommandDataSchema,
   type ScimSyncCommand,
 } from "@langwatch/identity-contract";
-import type { ScimSyncGuards } from "../scim-sync-guards";
+import type { ScimSyncGuards } from "../services/scim-sync-guards.service";
 import type { ZodTypeAny, z } from "zod";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import { ScimSyncStateFoldProjection } from "../projections/scim-sync-state.projection";

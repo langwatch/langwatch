@@ -7,7 +7,7 @@ import {
   type DataPrivacyConfig,
 } from "@langwatch/data-privacy-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { DataPrivacyPolicyRepository } from "../../ports/data-privacy.repository";
+import { DataPrivacyPolicyRepository } from "../data-privacy.repository";
 
 /**
  * Only what this repository touches, so composition names the slice it needs

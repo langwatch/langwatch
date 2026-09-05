@@ -1,6 +1,6 @@
 import type { JoinRequestFact } from "@langwatch/identity-contract";
 import type { JoinRequestNotificationService } from "../../services/join-request-notification.service";
-import type { JoinRequestService } from "../../join-request.service";
+import type { JoinRequestService } from "../../services/join-request.service";
 import { describe, expect, it, vi } from "vitest";
 import { EventingJoinRequestLifecycleAdapter } from "../eventing.join-request-lifecycle.adapter";
 

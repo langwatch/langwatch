@@ -15,7 +15,7 @@ import {
   toJsonlChunks,
   type ChunkOffset,
   type DatasetChunk,
-} from "../../services/dataset-chunking";
+} from "../../services/dataset-chunking.service";
 
 type DatasetLayout = { contentLayout: string; useS3: boolean };
 type Fingerprint = { count: number; maxUpdatedAt: Date | null };

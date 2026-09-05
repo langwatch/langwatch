@@ -23,8 +23,8 @@ export {
   createScimWebhookRestApp,
   type ScimWebhookRestPorts,
 } from "./transport/api-rest/scim-webhook-intake.api";
-export * from "./api/scim/scim.api";
-export { ScimWebhookApi } from "./api/scim-webhook/scim-webhook.api";
+export * from "./transport/api-rest/scim-openapi.api";
+export { ScimWebhookApi } from "./transport/api-rest/scim-webhook.api";
 export { PostgresScimAdapter, type PostgresScimAdapterOptions } from "./adapters/scim.adapter";
 export {
   ScimSyncLifecyclePort,

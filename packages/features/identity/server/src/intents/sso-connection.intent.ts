@@ -43,7 +43,7 @@ import {
   type VerifyDomainCommandData,
   verifyDomainCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { SsoConnectionGuards } from "../sso-connection-guards";
+import type { SsoConnectionGuards } from "../services/sso-connection-guards.service";
 import type { ZodTypeAny, z } from "zod";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import { SsoConnectionStateFoldProjection } from "../projections/sso-connection-state.projection";

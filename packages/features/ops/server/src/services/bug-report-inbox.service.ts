@@ -2,7 +2,7 @@
  * The two reads the operator back office makes of the support inbox.
  */
 import type { BugReport } from "@langwatch/prisma-client/generated";
-import type { BugReportRepository } from "../ports/bug-report.repository";
+import type { BugReportRepositoryPort } from "../ports/bug-report.port";
 
 /** One page of the inbox, with the count the pager renders. */
 export type BugReportListing = Readonly<{
@@ -11,11 +11,11 @@ export type BugReportListing = Readonly<{
 }>;
 
 export class BugReportInboxService {
-  static create(options: { reports: BugReportRepository }): BugReportInboxService {
+  static create(options: { reports: BugReportRepositoryPort }): BugReportInboxService {
     return new BugReportInboxService(options.reports);
   }
 
-  private constructor(private readonly reports: BugReportRepository) {}
+  private constructor(private readonly reports: BugReportRepositoryPort) {}
 
   async getAll(input: {
     page: number;

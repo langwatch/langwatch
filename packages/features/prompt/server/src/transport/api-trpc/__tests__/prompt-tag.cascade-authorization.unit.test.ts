@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { PromptApp } from "#app/prompt.app";
 import { PromptTagTrpcApi } from "../prompt-tag.api";
-import type { PromptTrpcContext } from "../prompt.trpc-context";
+import type { PromptTrpcContext } from "../../../rules/prompt-trpc-context.rules";
 
 const ORGANIZATION_PROJECTS = ["project_a", "project_b"];
 

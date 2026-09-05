@@ -1,7 +1,7 @@
 import type { DataPrivacyPolicy, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
 import type { DataPrivacyProjectPort } from "../ports/data-privacy.port";
-import type { DataPrivacyPolicyRepository } from "../ports/data-privacy.repository";
-import { DataPrivacyPolicyCache } from "./data-privacy.cache";
+import type { DataPrivacyPolicyRepository } from "../repositories/data-privacy.repository";
+import { DataPrivacyPolicyCache } from "./data-privacy-cache.service";
 
 /**
  * The policy a scope resolves to, and the two reads that support it. Three operations that

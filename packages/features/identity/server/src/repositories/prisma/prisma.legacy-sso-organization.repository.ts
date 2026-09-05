@@ -1,4 +1,4 @@
-import type { LegacySsoOrganizationRepository } from "../../sso-connection-grandfather.service";
+import type { LegacySsoOrganizationRepository } from "../../services/sso-connection-grandfather.service";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**

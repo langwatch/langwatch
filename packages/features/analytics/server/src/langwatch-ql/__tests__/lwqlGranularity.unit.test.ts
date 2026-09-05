@@ -16,11 +16,11 @@ import { describe, expect, it } from "vitest";
 import {
   LangWatchQLGranularityTooFineError,
   LangWatchQLReservedGranularityTypeError,
-} from "../errors";
+} from "@langwatch/analytics-contract";
 import {
   LWQL_GRANULARITY_MAX_BUCKETS,
   resolveLangWatchQLGranularity,
-} from "../resolve-time-window";
+} from "../../services/langwatch-ql-time-window.service";
 import { LWQL_GRANULARITY_STEPS } from "@langwatch/analytics-contract";
 import type { LangWatchQLParameter } from "../validation/validate";
 

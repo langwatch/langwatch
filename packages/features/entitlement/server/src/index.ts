@@ -44,12 +44,10 @@ export {
   UsageLimitMessageService,
   type UsageDeployment,
 } from "./services/usage-limit-message.service";
+export { NoUsageCache, UsageCachePort } from "./ports/usage-cache.port";
+export { UsageOrganizationPort, type UsageMeterReading } from "./ports/usage-organization.port";
 export {
-  NoUsageCache,
-  UsageCachePort,
-  UsageOrganizationPort,
   UsageVolumeCounterPort,
   type ProjectUsageCount,
   type ProjectUsageCounts,
-  type UsageMeterReading,
-} from "./ports/usage-enforcement.ports";
+} from "./ports/usage-volume-counter.port";

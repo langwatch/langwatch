@@ -5,7 +5,7 @@ import {
   LANGY_CONVERSATION_EVENT_VERSIONS,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { LangyConversationProcessingEvent } from "../../services/langy-conversation.events";
+import type { LangyConversationProcessingEvent } from "../eventing.langy-conversation-events.adapter";
 
 import { createLangyConversationUpdateBroadcastSubscriber } from "@langwatch/langy-server";
 

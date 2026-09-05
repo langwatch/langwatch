@@ -20,13 +20,13 @@ import type { Context } from "hono";
 import { z } from "zod";
 
 import type { LangyApp } from "#app/langy.app";
-import { LANGY_API_KEY_TURNS_FLAG } from "./langy-rest.flags";
+import { LANGY_API_KEY_TURNS_FLAG } from "../../rules/langy-rest-flags.rules";
 import {
   resolveLangyRestActor,
   resolveLangyRestCaller,
   type LangyRestCredentialPorts,
-} from "./langy-rest.credentials";
-import { awaitTurnSettlement } from "#streaming/langy-turn-settlement-waiter";
+} from "./langy-rest-credentials.api";
+import { awaitTurnSettlement } from "#services/langy-turn-settlement-waiter.service";
 
 const AUTH_REASON =
   "project API key resolved by the process's credential port and checked against the API-key ceiling, then bridged to an owning user by resolveLangyKeyIdentity";

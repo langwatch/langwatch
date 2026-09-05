@@ -1,7 +1,7 @@
+import type { Protections } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { TraceAttributeRedactionService } from "../trace-attribute-redaction.service";
-import type { Protections } from "../trace-viewer-protections.service";
 
 /** The one-shot spelling, which is what most call sites want. */
 const redactHiddenAttributes = <T extends Record<string, unknown> | null | undefined>(

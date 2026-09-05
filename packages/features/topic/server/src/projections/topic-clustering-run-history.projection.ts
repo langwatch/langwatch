@@ -12,12 +12,12 @@ import type {
   TopicClusteringRunCompletedEvent,
   TopicClusteringRunFailedEvent,
   TopicClusteringRunStartedEvent,
-} from "../adapters/eventing.topic.events";
+} from "../adapters/eventing.topic-events.adapter";
 import {
   TopicClusteringRunCompletedEventSchema,
   TopicClusteringRunFailedEventSchema,
   TopicClusteringRunStartedEventSchema,
-} from "../adapters/eventing.topic.events";
+} from "../adapters/eventing.topic-events.adapter";
 
 /**
  * One run in the project's history, accumulated across the run's pages. The raw error text is

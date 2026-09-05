@@ -23,7 +23,7 @@ export {
   type DatasetDirectUploadAuthorization,
   type DatasetDirectUploadAuthorizer,
 } from "./transport/api-rest/dataset.api";
-export { createDatasetErrorHandler } from "./transport/api-rest/dataset.error-handler";
+export { createDatasetErrorHandler } from "./transport/api-rest/dataset-error-handler.api";
 export {
   PostgresDatasetAdapter,
   type PostgresDatasetAdapterOptions,
@@ -66,23 +66,23 @@ export {
   type DatasetMigrationRunResult,
   type DatasetMigrationSummary,
 } from "./adapters/postgres.dataset-migration.adapter";
-export { createDatasetNormalizeHandler } from "./jobs/dataset-normalize.job";
+export { createDatasetNormalizeHandler } from "./adapters/dataset-normalize.adapter";
 export { DatasetNormalizationService } from "./services/dataset-normalization.service";
 export { DatasetContentRepository } from "./repositories/dataset-content.repository";
 export {
   PrismaDatasetContentRepository,
   type DatasetContentDatabase,
 } from "./repositories/prisma/prisma.dataset-content.repository";
-export * from "./services/dataset-chunking";
+export * from "./services/dataset-chunking.service";
 export { DatasetChunkService } from "./services/dataset-chunk.service";
 export type {
   DatasetMutationRecord,
   RecomputedDatasetCounts,
 } from "./services/dataset-chunk.service";
 export { MAX_INMEMORY_COLUMN_EDIT_BYTES } from "./services/dataset-chunk.service";
-export * from "./services/presigned-upload";
-export * from "./services/sanitize";
-export * from "./services/errors";
+export * from "./services/presigned-upload.service";
+export * from "./rules/dataset-sanitize.rules";
+export * from "./services/dataset-errors.service";
 export {
   DATASET_GENERATE_FEATURE_KEY,
   createDatasetGenerateRestApp,

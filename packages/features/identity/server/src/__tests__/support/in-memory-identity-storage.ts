@@ -5,7 +5,7 @@ import type {
   IdentityAccountsPort,
   IdentityResolution,
   IdentityResolutionPort,
-} from "../../better-auth/storage-ports";
+} from "../../rules/identity-storage-ports.rules";
 import type { InMemoryHeads } from "./in-memory-heads";
 
 interface StoredCredential {

@@ -1,3 +1,4 @@
+import type { CategoryVisibility } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 import type { TraceLogRecordDto } from "@langwatch/trace-contract";
 import type { ContentCategory } from "@langwatch/data-privacy-contract";
@@ -10,7 +11,7 @@ import {
   type TraceContentPrivacyPort,
   type V2Protections,
 } from "../trace-read-mappers.api";
-import type { CategoryVisibility } from "../../../services/trace-viewer-protections.service";
+
 import {
   CONTENT_KEY_CATALOG,
   PRIVACY_DROPPED_MARKER_ATTR,

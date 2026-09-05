@@ -8,7 +8,10 @@ import { createLogger } from "@langwatch/observability";
 import { generateObject, type LanguageModel } from "ai";
 import { z } from "zod";
 
-import { isAbortLikeError, nlpgoHandledErrorFrom } from "./scenario-generate.nlpgo-error";
+import {
+  isAbortLikeError,
+  nlpgoHandledErrorFrom,
+} from "../../rules/scenario-generate-nlpgo-error.rules";
 
 const logger = createLogger("langwatch:api:scenario:generate");
 

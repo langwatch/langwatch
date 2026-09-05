@@ -7,7 +7,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service";
-import type { GetAllTracesForProjectInput } from "../../../services/trace-legacy-read.types";
+import type { GetAllTracesForProjectInput } from "@langwatch/trace-contract";
 import type { TracesForProjectResult } from "@langwatch/trace-contract";
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository";
 import {

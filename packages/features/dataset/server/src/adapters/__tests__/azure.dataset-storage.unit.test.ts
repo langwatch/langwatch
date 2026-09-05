@@ -1,12 +1,12 @@
 import { Readable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AzureDatasetStorageAdapter } from "../azure.dataset-storage.adapter";
-import { CHUNK_MAX_BYTES } from "../../services/dataset-chunking";
+import { CHUNK_MAX_BYTES } from "../../services/dataset-chunking.service";
 import {
   ChunkTooLargeError,
   MissingChunkError,
   StagedUploadNotFoundError,
-} from "../../services/errors";
+} from "../../services/dataset-errors.service";
 import {
   DatasetAzureConfigResolver,
   type DatasetBlobDriver,

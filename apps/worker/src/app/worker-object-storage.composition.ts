@@ -8,7 +8,7 @@ import {
 import type {
   StoredObjectStorageDriver,
   StoredObjectStorageRuntime,
-} from "@langwatch/stored-object-server/storage";
+} from "@langwatch/stored-object-server";
 import {
   WorkerAzureStorageFactoryPort,
   WorkerProjectS3SourcePort,

@@ -10,7 +10,7 @@ import {
   buildCallEnvelope,
   type StoredResult,
   storedCallSchema,
-} from "../rules/connected-agent-envelope.rules";
+} from "../services/connected-agent-envelope.service";
 import type { InstanceMeta } from "../ports/connected-agent-runtime.port";
 import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter";
 import {

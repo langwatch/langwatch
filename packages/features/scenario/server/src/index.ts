@@ -56,11 +56,7 @@ export * from "./adapters/child-process-spawn.adapter";
 export * from "./adapters/child-tls-env.adapter";
 export * from "./adapters/http-auth.adapter";
 export * from "./adapters/litellm-model.adapter";
-export {
-  NlpFetchAdapter,
-  nlpFetchTimeoutsFromEnvironment,
-  type NlpFetchTimeouts,
-} from "./adapters/nlp-fetch.adapter";
+export { NlpFetchAdapter, type NlpFetchTimeouts } from "./adapters/nlp-fetch.adapter";
 export * from "./adapters/node-scenario-child-process.adapter";
 export { OtelScenarioProcessorMetricsAdapter } from "./adapters/otel.scenario-processor-metrics.adapter";
 export * from "./adapters/prompt-template.adapter";
@@ -150,7 +146,7 @@ export type {
   ScenarioTrpcContext,
   ScenarioTrpcPorts,
   ScenarioTrpcProcedures,
-} from "./transport/api-trpc/scenario.trpc-context";
+} from "./rules/scenario-trpc-context.rules";
 export {
   archiveScenarioSetRuns,
   createScenarioEventsRestApp,
@@ -177,11 +173,11 @@ export { ScenarioRunExportService } from "./services/scenario-run-export.service
 export {
   serializeRunsToCriteriaCsv,
   serializeRunsToFullCsv,
-} from "./services/scenario-run-export-csv.rules";
+} from "./services/scenario-run-export-csv.service";
 export {
   ScenarioRunExportForbiddenError,
   ScenarioRunExportUnauthenticatedError,
-} from "./services/scenario-run-export.errors";
+} from "./services/scenario-run-export-errors.service";
 export {
   SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS,
   SCENARIO_GENERATE_FEATURE_KEY,
@@ -192,4 +188,4 @@ export {
 export {
   isAbortLikeError,
   nlpgoHandledErrorFrom,
-} from "./transport/api-rest/scenario-generate.nlpgo-error";
+} from "./rules/scenario-generate-nlpgo-error.rules";

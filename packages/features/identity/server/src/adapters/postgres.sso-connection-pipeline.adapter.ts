@@ -4,8 +4,8 @@ import {
 } from "../repositories/prisma/prisma.sso-platform-operators.repository";
 import type { PlatformOperatorPort } from "../ports/platform-operator.port";
 import { LocalDoorBreakGlassBindingAdapter } from "./local-door-break-glass-binding.adapter";
-import { SsoConnectionGuards } from "../sso-connection-guards";
-import { SsoConnectionService } from "../sso-connection.service";
+import { SsoConnectionGuards } from "../services/sso-connection-guards.service";
+import { SsoConnectionService } from "../services/sso-connection.service";
 import type { EventSourcing } from "@langwatch/eventing";
 import { SsoConnectionPipelineDefinitionAdapter } from "./sso-connection-pipeline-definition.adapter";
 import { SSO_CONNECTION_PIPELINE_NAME } from "@langwatch/identity-contract";

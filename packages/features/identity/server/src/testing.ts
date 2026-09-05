@@ -1,8 +1,8 @@
 import type {
   IdentifierReservationHolder,
   IdentityReservationRepository,
-} from "./identity-reservations.repository";
-import type { IdentityUsersRepository } from "./identity-users.repository";
+} from "./repositories/identity-reservations.repository";
+import type { IdentityUsersRepository } from "./repositories/identity-users.repository";
 
 /**
  * The `User` reads the identity guards take, in memory.

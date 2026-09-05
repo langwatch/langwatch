@@ -10,7 +10,7 @@ import {
   LWQL_QUERY_RESULT_DATASET,
   validateVegaLiteSpecStructure,
 } from "@langwatch/analytics-contract/visualization/validation";
-import { SavedWorkbenchChartSpecificationRefusedError } from "../transport/api-trpc/saved-workbench-chart.transport-errors";
+import { SavedWorkbenchChartSpecificationRefusedError } from "./saved-workbench-chart-errors.adapter";
 
 const logger = createLogger("langwatch:dashboard:saved-workbench-chart-policy");
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   aggregateScenarioRoleMetrics,
   type ScenarioRoleSpanInput,
-} from "../scenario-role-metrics.rules";
+} from "../../rules/scenario-role-metrics.rules";
 
 function makeSpan(overrides: Partial<ScenarioRoleSpanInput> = {}): ScenarioRoleSpanInput {
   return {

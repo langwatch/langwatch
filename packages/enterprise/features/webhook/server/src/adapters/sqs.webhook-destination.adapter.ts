@@ -14,7 +14,7 @@ import {
   type WebhookDispatchRequest,
   type WebhookDispatchResult,
 } from "../ports/webhook-destination.port";
-import { parseSqsQueueUrl, sqsHostFor } from "../services/sqs-queue-url.rules";
+import { parseSqsQueueUrl, sqsHostFor } from "../rules/sqs-queue-url.rules";
 
 /**
  * How this process builds an AWS transport — the corporate proxy, the TLS agent, the assumed

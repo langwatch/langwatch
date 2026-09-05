@@ -33,7 +33,7 @@ import {
   experimentInitBadRequestSchema,
   experimentInitForbiddenSchema,
   experimentInitResponseSchema,
-} from "./experiment.schemas";
+} from "../../rules/experiment-schemas.rules";
 
 const logger = createLogger("langwatch:experiment:init");
 

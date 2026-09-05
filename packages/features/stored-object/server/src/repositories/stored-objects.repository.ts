@@ -2,7 +2,7 @@
  * The stored-objects table as its readers see it: seven operations over
  * content-addressed rows, every one scoped to a project first.
  */
-import type { StoredObject } from "./stored-objects.row";
+import type { StoredObject } from "../rules/stored-object-row.rules";
 
 export abstract class StoredObjectsRepository {
   /** Inserts a single stored_objects row. */

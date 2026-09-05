@@ -17,10 +17,9 @@ export type DatasetContentDatabase = Pick<
 >;
 
 /**
- * Max wall-clock a dataset-mutation transaction may run before Prisma aborts it
- * with P2028. Sized for the worst case inside the lock: edit, delete and count
- * recomputation do O(chunkCount) read + rewrite calls, each a round-trip to
- * object storage. Prisma's 5s default P2028s on any non-trivial dataset.
+ * Max wall-clock a dataset-mutation transaction may run before Prisma aborts
+ * it with P2028. Sized for the worst case: O(chunkCount) storage round-trips.
+ * Prisma's 5s default P2028s on any non-trivial dataset.
  */
 export const DATASET_MUTATION_TXN_TIMEOUT_MS = 120_000;
 
@@ -63,16 +62,9 @@ export class PrismaDatasetContentRepository extends DatasetContentRepository {
   }
 
   /**
-   * ADR-032 Decision 9: runs `mutate` under this dataset's advisory lock, inside
-   * one transaction, so a chunk write and the counter update it implies commit
-   * or roll back together (I-COUNT). Without it two concurrent appends both read
-   * `chunkCount=N`, both write `chunk-N`, and one is lost with the offset index
-   * left drifting.
-   *
-   * `mutate` receives a REPOSITORY bound to the transaction, not Prisma's
-   * transaction client: the caller is a service, and a service does not hold a
-   * database client. The advisory key is namespaced per dataset, so mutations of
-   * different datasets never block each other.
+   * ADR-032 Decision 9: runs `mutate` under this dataset's advisory lock inside
+   * one transaction (I-COUNT). Receives a REPOSITORY bound to the transaction,
+   * since the caller is a service and holds no database client.
    */
   async withDatasetLock<T>(
     datasetId: string,
@@ -112,13 +104,9 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   }
 
   /**
-   * Finds a single dataset by id within a project, throwing if absent.
-   *
-   * The s3_jsonl write-mutations re-read the row inside the per-dataset advisory
-   * lock, where its existence is already guaranteed by the lock — a miss there is
-   * an invariant violation, not a not-found to branch on. This is the throwing
-   * counterpart to {@link findOne} so those paths surface it loudly (Prisma's
-   * `NotFoundError`) instead of null-checking a "can't happen".
+   * Finds a single dataset by id within a project, throwing if absent. The
+   * s3_jsonl write-mutations re-read the row inside the advisory lock, where a
+   * miss is an invariant violation — the throwing counterpart to {@link findOne}.
    */
   async findOneOrThrow(input: { id: string; projectId: string }): Promise<DatasetRow> {
     const client = this.prisma;
@@ -159,15 +147,9 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   }
 
   /**
-   * Updates an existing dataset and returns the updated row.
-   *
-   * The `where` pins BOTH id and projectId, so a cross-project update simply
-   * doesn't match any row and Prisma throws `P2025` (NotFoundError) — the tenancy
-   * guard IS the where clause. Prisma's `update` already returns the updated row,
-   * so we return it directly (no redundant re-read — these run under the dataset
-   * advisory lock where every extra round-trip lengthens lock hold).
-   *
-   * @throws {Prisma.PrismaClientKnownRequestError} P2025 if no row matches id+project
+   * Updates an existing dataset and returns the updated row. `where` pins both
+   * id and projectId, so a cross-project update matches nothing and Prisma
+   * throws `P2025` — the tenancy guard IS the where clause.
    */
   async update(input: UpdateDatasetInput): Promise<DatasetRow> {
     const client = this.prisma;
@@ -208,14 +190,8 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
 
   /**
    * Hard-delete a still-pending upload row. Guarded on `status='uploading'`
-   * (a `deleteMany`, not `delete`) so a finalize that raced in between the
-   * caller's status check and this call — flipping the row to `processing` — is
-   * never destroyed: the predicate then matches 0 rows and the now-live dataset
-   * survives. A pending upload never held content (no records, no committed
-   * chunks), so it is detritus to discard, not a dataset to archive; deleting it
-   * frees the slug naturally and leaves no content-less ghost behind. The
-   * id+projectId predicate is the tenancy guard. Returns the count deleted
-   * (0 = already reaped, or no longer pending).
+   * (a `deleteMany`) so a finalize racing to `processing` in between is never
+   * destroyed — the predicate then matches 0 rows. Returns the count deleted.
    */
   async deletePendingUpload(input: { id: string; projectId: string }): Promise<number> {
     const client = this.prisma;
@@ -230,15 +206,9 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   }
 
   /**
-   * Conditionally flip a dataset to `failed` ONLY while it is still
-   * `processing`. The normalize enqueue catch uses this: when the enqueue
-   * rejects synchronously no job is in flight, so the row's `processing` is a
-   * lie — flip it to `failed` so the UI exposes retry. Guarded on
-   * `status='processing'` (an `updateMany`, not `update`) so it never clobbers
-   * the more specific error the inline handler already set on ITS own failure
-   * path (the handler flips to `failed` + rethrows, so by the time this runs the
-   * row is already `failed` and this matches no row). Returns the rows flipped
-   * (0 = the handler — or a concurrent finalize — already moved it).
+   * Conditionally flip a dataset to `failed` ONLY while still `processing`. The
+   * normalize enqueue catch uses this when the enqueue rejects synchronously.
+   * Guarded (`updateMany`) so it never clobbers a more specific handler error.
    */
   async failIfProcessing(input: {
     id: string;
@@ -257,14 +227,9 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   }
 
   /**
-   * Atomically claim a pending upload for normalization: flip `uploading` →
-   * `processing` ONLY if the row is still `uploading` (and non-archived). The
-   * `updateMany` WHERE-clause is the concurrency guard — two finalize calls
-   * racing (double-click / client retry) can't both win, so only one enqueues a
-   * normalize. A read-then-`update` would let both pass the `status==='uploading'`
-   * read and both transition + enqueue, racing two handlers onto the same chunk
-   * keys in inline mode. Returns the rows claimed (1 = won, 0 = a concurrent
-   * finalize already moved it).
+   * Atomically claim a pending upload: flip `uploading` → `processing` only if
+   * still `uploading`. The `updateMany` WHERE-clause is the concurrency guard —
+   * two racing finalize calls can't both win. Returns rows claimed (1 = won).
    */
   async claimForProcessing(input: { id: string; projectId: string }): Promise<number> {
     const { count } = await this.prisma.dataset.updateMany({
@@ -281,12 +246,8 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
 
   /**
    * Records a normalize re-drive on a wedged `processing` row by bumping
-   * `updatedAt` (Prisma's `@updatedAt` fires on any update; the no-op
-   * `statusError: null` write is just the trigger — a processing row already has
-   * a null error). Guarded on `status='processing'` (an `updateMany`) so it can
-   * never resurrect a row that raced to `ready`/`failed` between selection and
-   * re-drive. This stops `findStaleProcessing` from re-selecting the same row on
-   * every subsequent upload within the TTL. Returns the rows touched.
+   * `updatedAt` (a no-op write is just the `@updatedAt` trigger). Guarded so it
+   * never resurrects a row that raced to `ready`/`failed` since selection.
    */
   async markProcessingRedriven(input: { id: string; projectId: string }): Promise<number> {
     const { count } = await this.prisma.dataset.updateMany({
@@ -301,13 +262,9 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   }
 
   /**
-   * Finds datasets wedged mid-normalize: `status='processing'`, non-archived
-   * rows with a bound staging key whose `updatedAt` (the moment they flipped to
-   * `processing`) predates `olderThan`. Drives the poll-triggered re-drive (see
-   * `DatasetService.reapStaleProcessing`) that recovers the *lost-after-send*
-   * normalize window without a scheduler. Keyed on `updatedAt`, not `createdAt`:
-   * a retried row re-enters `processing` long after it was created, so the clock
-   * must start when normalization (re)started.
+   * Finds datasets wedged mid-normalize: `processing` rows whose `updatedAt`
+   * predates `olderThan`. Drives the poll-triggered re-drive (see
+   * `DatasetService.reapStaleProcessing`). Not `createdAt`: a retry re-enters.
    */
   async findStaleProcessing(input: { projectId: string; olderThan: Date }): Promise<DatasetRow[]> {
     return await this.prisma.dataset.findMany({
@@ -322,11 +279,9 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   }
 
   /**
-   * Finds the pending (`status='uploading'`, non-archived) dataset that owns a
-   * given staging key. The direct-upload staging route uses this to refuse a
-   * stream into a `staging/` slot no upload row claims — otherwise an authed
-   * project user could spray orphan objects there. `stagingKey` is server-minted
-   * and bound to the row at presign time.
+   * Finds the pending dataset that owns a given staging key. The direct-upload
+   * route uses this to refuse a stream into a `staging/` slot no row claims.
+   * `stagingKey` is server-minted and bound at presign time.
    */
   async tryFindPendingUploadByStagingKey(input: {
     projectId: string;
@@ -343,12 +298,9 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   }
 
   /**
-   * Finds abandoned pending uploads in a project: `status='uploading'`,
-   * non-archived rows created before `olderThan`. Drives the poll-triggered
-   * reap (see `DatasetService.reapStalePendingUploads`) that bounds the
-   * accumulation of stuck `uploading` rows + their staging objects without a
-   * scheduler. The `olderThan` cutoff is conservative (well beyond the presign
-   * TTL) so a still-in-flight upload is never matched.
+   * Finds abandoned pending uploads: `status='uploading'` rows created before
+   * `olderThan`. Drives the poll-triggered reap (see
+   * `DatasetService.reapStalePendingUploads`) without a scheduler.
    */
   async findStalePendingUploads(input: {
     projectId: string;
@@ -399,24 +351,9 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   }
 
   /**
-   * Attaches the `_count.datasetRecords` shape that dataset lists render,
-   * without Prisma's relation-count `include`.
-   *
-   * Prisma compiles `include: { _count: { select: { datasetRecords: true } } }`
-   * into a subquery with no tenancy predicate at all:
-   *
-   *   LEFT JOIN (SELECT "datasetId", COUNT(*) FROM "DatasetRecord"
-   *              WHERE 1=1 GROUP BY "datasetId") ...
-   *
-   * so every dataset list aggregates the whole `DatasetRecord` table across
-   * every tenant, and one customer's list costs more as the others grow.
-   *
-   * Counting here keeps the read inside the project and inside the datasets
-   * that actually store rows in that table: `s3_jsonl` and legacy `useS3`
-   * datasets keep their content in object storage, so their row count is
-   * already a column on `Dataset` and their `DatasetRecord` count is a
-   * guaranteed zero nobody reads. A project fully on object storage issues no
-   * count query at all.
+   * Attaches the `_count.datasetRecords` shape lists render, WITHOUT Prisma's
+   * relation-count `include` (an untenanted subquery over every tenant).
+   * Skipped entirely for `s3_jsonl`/`useS3` datasets, whose count is a column.
    */
   private async attachRecordCounts<T extends CountableDataset>(
     projectId: string,

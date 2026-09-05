@@ -4,12 +4,12 @@ import {
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { LangyConversationProcessingEvent } from "../../services/langy-conversation.events";
+import type { LangyConversationProcessingEvent } from "../eventing.langy-conversation-events.adapter";
 import {
   LangyConversationHandoffPendingEventSchema,
   LangyConversationMetadataUpdatedEventSchema,
   LangyToolCallSucceededEventSchema,
-} from "../../services/langy-conversation.events";
+} from "../eventing.langy-conversation-events.adapter";
 import { LangyAnalyticsEventMapProjection } from "../../projections/langy-analytics-event.projection";
 
 const base = {

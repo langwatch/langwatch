@@ -33,17 +33,17 @@
       "types": "./src/ports/langy-frame-auth.port.ts",
       "default": "./src/ports/langy-frame-auth.port.ts"
     },
-    "./streaming/langy-capability-progress": {
-      "types": "./src/streaming/langy-capability-progress.ts",
-      "default": "./src/streaming/langy-capability-progress.ts"
+    "./rules/langy-capability-progress": {
+      "types": "./src/rules/langy-capability-progress.rules.ts",
+      "default": "./src/rules/langy-capability-progress.rules.ts"
     },
-    "./streaming/langy-turn-settlement": {
-      "types": "./src/streaming/langy-turn-settlement.ts",
-      "default": "./src/streaming/langy-turn-settlement.ts"
+    "./rules/langy-turn-settlement": {
+      "types": "./src/rules/langy-turn-settlement.rules.ts",
+      "default": "./src/rules/langy-turn-settlement.rules.ts"
     },
-    "./processes/langy-turn-dispatch-retry": {
-      "types": "./src/processes/langy-turn-dispatch-retry.error.ts",
-      "default": "./src/processes/langy-turn-dispatch-retry.error.ts"
+    "./services/langy-turn-dispatch-retry": {
+      "types": "./src/services/langy-turn-dispatch-retry.service.ts",
+      "default": "./src/services/langy-turn-dispatch-retry.service.ts"
     },
     "./langy.ids": {
       "types": "./src/ports/langy-ids.port.ts",

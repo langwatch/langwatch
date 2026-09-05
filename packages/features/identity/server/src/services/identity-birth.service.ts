@@ -7,20 +7,20 @@ import {
   type IdentityFactInput,
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
-import { deriveNewbornUserId } from "../crypto/identifier-identity";
-import { type IdentityGuards } from "../guards";
-import { adoptUserEmailCommandId } from "../identity-command-id";
-import { type IdentityReservationRepository } from "../identity-reservations.repository";
+import { deriveNewbornUserId } from "../adapters/crypto.identifier-identity.adapter";
+import { type IdentityGuards } from "./identity-guards.service";
+import { adoptUserEmailCommandId } from "../rules/identity-command-id.rules";
+import { type IdentityReservationRepository } from "../repositories/identity-reservations.repository";
 import {
   IdentityEngineUnavailableError,
   type IdentityBirthPort,
   type IdentityNewborn,
-} from "../better-auth/identity-birth";
+} from "../adapters/better-auth.identity-birth.adapter";
 import { createLogger } from "@langwatch/observability";
 import type { IdentityEvent } from "../projections/identity-state.projection";
 import { IdentityStateFoldProjection } from "../projections/identity-state.projection";
 import type { IdentityBirthLedgerPort } from "../ports/identity-birth-ledger.port";
-import type { IdentityNewbornRepository } from "../identity-newborn.repository";
+import type { IdentityNewbornRepository } from "../repositories/identity-newborn.repository";
 
 const logger = createLogger("langwatch:identity:birth");
 

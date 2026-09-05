@@ -1,4 +1,4 @@
-import { reportNurturingFailure, tryNurturingSink } from "./nurturing-sink";
+import { reportNurturingFailure, tryNurturingSink } from "../adapters/nurturing-sink.adapter";
 import type { OrganizationIntent } from "@langwatch/prisma-client/generated";
 
 import type { CioPersonTraits } from "@langwatch/enterprise-billing-contract";

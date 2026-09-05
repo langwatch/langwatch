@@ -11,8 +11,11 @@
 import { createLogger } from "@langwatch/observability";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import { projectSchema } from "./scenario.schemas";
-import type { ScenarioTrpcContext, ScenarioTrpcProcedures } from "./scenario.trpc-context";
+import { projectSchema } from "../../rules/scenario-schemas.rules";
+import type {
+  ScenarioTrpcContext,
+  ScenarioTrpcProcedures,
+} from "../../rules/scenario-trpc-context.rules";
 
 const logger = createLogger("langwatch:api:scenarios:cancellation");
 

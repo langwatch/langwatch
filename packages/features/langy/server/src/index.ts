@@ -6,7 +6,7 @@ export {
   LangyTrustedMessagePort,
   type PostgresLangyAdapterOptions,
 } from "./adapters/langy.langy.adapter";
-export type { LangyDatabase } from "./repositories/prisma/langy-database.port";
+export type { LangyDatabase } from "./repositories/prisma/prisma.langy-database.repository";
 export type { LangyTurnTechnicalPorts } from "./services/langy-turn.service";
 export {
   LANGY_CANDIDATE_PERMISSIONS,
@@ -92,8 +92,8 @@ export {
   AGENT_CHAT_TIMEOUT_MS,
   LangyTurnErrors,
   LangyWorkerStoppedError,
-} from "./services/langy-turn-errors.errors";
-export type { LangyConversationProcessingEvent } from "./services/langy-conversation.events";
+} from "./services/langy-turn-errors.service";
+export type { LangyConversationProcessingEvent } from "./adapters/eventing.langy-conversation-events.adapter";
 export {
   computeFrameMac,
   mintRunToken,
@@ -192,27 +192,42 @@ export type {
   LangyGenerateTitleIntent,
   LangyWorkerDispatchIntent,
 } from "./ports/langy-conversation-process.port";
-export { LangyFrameDedupStore } from "./streaming/langy-frame-dedup";
-export type { LangyFrameDedup, LangyFrameDedupRedis } from "./streaming/langy-frame-dedup";
-export { LangyResourceLinksStore } from "./streaming/langy-resource-links";
-export type { LangyLinkRedis, LangyResourceLinkStore } from "./streaming/langy-resource-links";
-export { LangyTurnAccessStore, LANGY_TURN_ACCESS_TTL_SECONDS } from "./streaming/langy-turn-access";
-export type { LangyTurnAccess } from "./streaming/langy-turn-access";
-export { LangyTurnHandoffStore, LANGY_HANDOFF_TTL_SECONDS } from "./streaming/langy-turn-handoff";
-export type { LangyHandoffRedis, LangyTurnHandoff } from "./streaming/langy-turn-handoff";
-export { LangyTokenBuffer } from "./streaming/langy-token-buffer";
-export type { LangyStreamEntry } from "./streaming/langy-token-buffer";
+export { LangyFrameDedupStore } from "./adapters/redis.langy-frame-dedup.adapter";
+export type {
+  LangyFrameDedup,
+  LangyFrameDedupRedis,
+} from "./adapters/redis.langy-frame-dedup.adapter";
+export { LangyResourceLinksStore } from "./adapters/redis.langy-resource-links.adapter";
+export type {
+  LangyLinkRedis,
+  LangyResourceLinkStore,
+} from "./adapters/redis.langy-resource-links.adapter";
+export {
+  LangyTurnAccessStore,
+  LANGY_TURN_ACCESS_TTL_SECONDS,
+} from "./adapters/redis.langy-turn-access.adapter";
+export type { LangyTurnAccess } from "./adapters/redis.langy-turn-access.adapter";
+export {
+  LangyTurnHandoffStore,
+  LANGY_HANDOFF_TTL_SECONDS,
+} from "./adapters/redis.langy-turn-handoff.adapter";
+export type {
+  LangyHandoffRedis,
+  LangyTurnHandoff,
+} from "./adapters/redis.langy-turn-handoff.adapter";
+export { LangyTokenBuffer } from "./adapters/redis.langy-token-buffer.adapter";
+export type { LangyStreamEntry } from "./adapters/redis.langy-token-buffer.adapter";
 export {
   abortableDelay,
   awaitTurnSettlement,
   settlementFromEvents,
-} from "./streaming/langy-turn-settlement-waiter";
-export { decideSyntheticTerminal } from "./streaming/langy-turn-settlement";
+} from "./services/langy-turn-settlement-waiter.service";
+export { decideSyntheticTerminal } from "./rules/langy-turn-settlement.rules";
 export type {
   LangyTurnSettlementReader,
   LangyTurnSettlementRedis,
   TurnSettlement,
-} from "./streaming/langy-turn-settlement-waiter";
+} from "./services/langy-turn-settlement-waiter.service";
 
 // --------------------------------------------------------------------------- The four public and
 // internal REST doors.
@@ -242,8 +257,8 @@ export {
   type LangyRestCeilingPort,
   type LangyRestCredentialPorts,
   type LangyRestCredentialReader,
-} from "./transport/api-rest/langy-rest.credentials";
-export { LANGY_API_KEY_TURNS_FLAG } from "./transport/api-rest/langy-rest.flags";
+} from "./transport/api-rest/langy-rest-credentials.api";
+export { LANGY_API_KEY_TURNS_FLAG } from "./rules/langy-rest-flags.rules";
 export { LangyAccessService, LANGY_RELEASE_FLAG } from "./services/langy-access.service";
 export {
   LangyActorSessionService,

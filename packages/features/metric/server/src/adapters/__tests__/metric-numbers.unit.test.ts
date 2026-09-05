@@ -24,7 +24,7 @@ import {
   MAX_UINT64,
   MIN_INT32,
   MetricNumbers,
-} from "../metric-numbers.rules";
+} from "../metric-numbers.adapter";
 
 const uint64 = (value: unknown) =>
   MetricNumbers.checkedInteger({ value, label: "count", min: 0n, max: MAX_UINT64 });

@@ -12,7 +12,10 @@ import {
 } from "@trpc/server";
 import { on } from "node:events";
 import { z } from "zod";
-import type { ScenarioTrpcContext, ScenarioTrpcProcedures } from "./scenario.trpc-context";
+import type {
+  ScenarioTrpcContext,
+  ScenarioTrpcProcedures,
+} from "../../rules/scenario-trpc-context.rules";
 
 const logger = createLogger("langwatch:api:scenarios:events");
 

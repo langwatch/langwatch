@@ -13,7 +13,7 @@ import {
   splitEnvelope,
   TTL_HELPER_LUA,
 } from "@langwatch/group-queue/operational";
-import { normalizeErrorMessage } from "../../ops.error-normalizer";
+import { normalizeErrorMessage } from "../../rules/ops-error-normalizer.rules";
 import { createLogger } from "@langwatch/observability";
 import type {
   ErrorCluster,

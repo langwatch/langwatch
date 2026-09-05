@@ -19,7 +19,7 @@ import {
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
 } from "@langwatch/api/rest";
-import { optimisticBindingWire } from "./role-binding.read-back";
+import { optimisticBindingWire } from "../../rules/role-binding-read-back.rules";
 
 /** The handler context: the framework's variables plus the family's provider. */
 type RoleBindingsContext = ServiceContext<
@@ -235,6 +235,7 @@ export function createRoleBindingsRestApp(options: {
         customRoleId: input.customRoleId,
         scopeType: input.scopeType,
         scopeId: input.scopeId,
+        now: () => new Date(),
       });
     return {
       ...binding,

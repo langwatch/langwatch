@@ -1,15 +1,7 @@
 /**
  * @vitest-environment node
- *
- * What an uploaded file BECOMES: which rows are parsed out of CSV, JSONL and a
- * JSON array, how their string cells are coerced to the dataset's declared
- * column types, and — for the create-and-upload door — what columns the file's
- * header turns into.
- *
- * Ported from `platform/app/src/app/api/dataset/__tests__/dataset-upload-api.integration.test.ts`,
- * which drove the same adapter through Postgres. The repositories and the
- * object storage are fakes here, so what is asserted is the adapter's own
- * decisions rather than Prisma's.
+ * What an uploaded file BECOMES: rows parsed from CSV/JSONL/JSON array,
+ * coerced to declared column types. Repositories/storage are fakes here.
  */
 import { describe, expect, it } from "vitest";
 import { MAX_FILE_SIZE_BYTES } from "@langwatch/dataset-contract";

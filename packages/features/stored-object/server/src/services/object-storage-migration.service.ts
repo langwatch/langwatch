@@ -9,8 +9,8 @@ import {
   mintS3StoredObjectUri,
   redactStoredObjectStorageUri,
 } from "@langwatch/stored-object-contract";
-import type { StoredObject } from "#repositories/stored-objects.row";
-import type { StoredObjectStorageDriver } from "#adapters/stored-object-storage.registry";
+import type { StoredObject } from "#rules/stored-object-row.rules";
+import type { StoredObjectStorageDriver } from "#adapters/stored-object-storage-registry.adapter";
 
 export type MigrationProvider = "s3" | "azure";
 

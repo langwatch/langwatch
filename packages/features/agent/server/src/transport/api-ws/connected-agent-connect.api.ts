@@ -21,7 +21,7 @@ import { WebSocket, WebSocketServer } from "ws";
 import {
   type InstanceNudge,
   instanceNudgeSchema,
-} from "../../rules/connected-agent-envelope.rules";
+} from "../../services/connected-agent-envelope.service";
 import { instanceChannel, pendingKey } from "../../rules/connected-agent-keys.rules";
 import {
   AgentSessionService,

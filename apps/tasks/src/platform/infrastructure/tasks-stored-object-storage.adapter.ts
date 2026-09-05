@@ -4,7 +4,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   StoredObjectDestinationPolicy,
   StoredObjectProjectS3ConfigPort,
-} from "@langwatch/stored-object-server/storage";
+} from "@langwatch/stored-object-server";
 import type { TasksConfig } from "../config/tasks.config";
 
 /** Matches the worker's own default (`worker.config.ts`); no shared constant exists for it. */

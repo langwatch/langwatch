@@ -5,7 +5,7 @@ import type {
 } from "@langwatch/eventing";
 import type { LangyConversationStateData } from "@langwatch/langy-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
-import type { LangyDatabase } from "./langy-database.port";
+import type { LangyDatabase } from "./prisma.langy-database.repository";
 
 type Row = Prisma.LangyConversationProjectionGetPayload<object>;
 

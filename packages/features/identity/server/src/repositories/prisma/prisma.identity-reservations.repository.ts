@@ -3,7 +3,7 @@ import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   IdentifierReservationHolder,
   IdentityReservationRepository,
-} from "../../identity-reservations.repository";
+} from "../identity-reservations.repository";
 
 /**
  * The lock table plus the raw escape hatch the claim and the sweep are

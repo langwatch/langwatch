@@ -42,8 +42,8 @@ import {
   type WorkflowService,
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
-import { createBlankWorkbenchState } from "../transport/api-rest/experiment.blank-workbench-state";
-import { workbenchActorFrom } from "../transport/api-rest/experiment.workbench-actor";
+import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-state.rules";
+import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules";
 
 /**
  * The project-scoped signal fan-out an editor tab follows. Declared as the two

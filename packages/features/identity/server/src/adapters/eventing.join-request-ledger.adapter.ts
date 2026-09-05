@@ -14,7 +14,7 @@ import {
   REQUEST_JOIN_COMMAND_TYPE,
   WITHDRAW_JOIN_COMMAND_TYPE,
 } from "@langwatch/identity-contract";
-import type { JoinRequestLedger } from "../join-request-ledger";
+import type { JoinRequestLedger } from "../rules/join-request-ledger.rules";
 import { createLogger } from "@langwatch/observability";
 import {
   type AggregateType,

@@ -4,7 +4,7 @@ import {
   mintStoredObjectUri,
   type StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
-import type { StoredObjectStorageRuntime } from "@langwatch/stored-object-server/storage";
+import type { StoredObjectStorageRuntime } from "@langwatch/stored-object-server";
 import {
   TraceSpoolLegacyObjectPort,
   TraceSpoolStoragePort,

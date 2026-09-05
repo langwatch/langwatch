@@ -52,7 +52,7 @@ export { createDashboardsRestApp } from "./transport/api-rest/dashboard.api";
  * The two policies a process used to compose by hand.
  */
 export { AnalyticsSavedWorkbenchChartPolicyAdapter } from "./adapters/saved-workbench-chart-policy.adapter";
-export { mapDashboardSavedWorkbenchChartError } from "./transport/api-trpc/saved-workbench-chart.transport-errors";
+export { mapDashboardSavedWorkbenchChartError } from "./adapters/saved-workbench-chart-errors.adapter";
 export { WorkbenchAwareGraphVisibilityAdapter } from "./adapters/graph-visibility-policy.adapter";
 export { WorkbenchAccessPort } from "./ports/workbench-access.port";
 export {
@@ -61,4 +61,4 @@ export {
   SavedWorkbenchChartDefinitionInvalidError,
   SavedWorkbenchChartNotFoundError,
   SavedWorkbenchChartSpecificationRefusedError,
-} from "./transport/api-trpc/saved-workbench-chart.transport-errors";
+} from "./adapters/saved-workbench-chart-errors.adapter";

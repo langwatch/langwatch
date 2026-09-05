@@ -25,14 +25,14 @@ import {
   resolveAzureCredentials,
   type AzureBlobCredentialsConfig,
   type AzureInjectedIdentity,
-} from "../azure-blob-credentials";
-import { resetAzureTokenCacheForTests } from "../azure-blob-token-provider";
+} from "../azure-blob-credentials.adapter";
+import { resetAzureTokenCacheForTests } from "../azure-blob-token-provider.adapter";
 import {
   StoredObjectAzureDestinationPort,
   StoredObjectDestinationPolicy,
   StoredObjectProjectS3ConfigPort,
-} from "../stored-object-destination.policy";
-import { StoredObjectStorageRegistry } from "../stored-object-storage.registry";
+} from "../stored-object-destination-policy.adapter";
+import { StoredObjectStorageRegistry } from "../stored-object-storage-registry.adapter";
 
 const PROJECT_ID = "proj-1";
 const HISTORICAL_URI = `azure-blob://lwacct/written-long-ago/${PROJECT_ID}/abc123`;

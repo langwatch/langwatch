@@ -8,7 +8,7 @@ import {
 import {
   migrationRunsOnThisInstallation,
   organizationMigrates,
-} from "../ops.system-migration-cohort";
+} from "../rules/ops-system-migration-cohort.rules";
 import { RedisMigrationLeaseRepository } from "../repositories/redis/redis.migration-lease.repository";
 import { PrismaOrganizationTenantSourceRepository } from "../repositories/prisma/prisma.organization-tenant-source.repository";
 import { PrismaSystemMigrationEnrollmentRepository } from "../repositories/prisma/prisma.system-migration-enrollment.repository";

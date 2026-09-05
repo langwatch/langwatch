@@ -12,12 +12,12 @@ import {
 } from "@langwatch/prisma-client/generated";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository";
 import type { RoleService } from "@langwatch/role-contract";
-import { isCustomRole } from "./custom-role-naming";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "./member-role-constraints";
+import { isCustomRole } from "../rules/custom-role-naming.rules";
+import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "./member-role-constraints.service";
 import {
   CustomRoleNotAssignableError,
   MemberSeatLimitReachedError,
-} from "./organization-membership.errors";
+} from "./organization-membership-errors.service";
 import {
   AlreadyOrganizationMemberError,
   DuplicateInviteError,
@@ -25,7 +25,7 @@ import {
   InviteNotReadyError,
   OrganizationNotFoundError,
   TeamNotInOrganizationError,
-} from "./invite.errors";
+} from "./invite-errors.service";
 
 /**
  * The KSUID resource prefix a role binding is minted under, restated the way the membership repository
@@ -64,8 +64,11 @@ import type {
   OrganizationInviteSeatCensusPort,
 } from "../ports/invite.port";
 import { PersonalWorkspaceNotManagedHereError } from "@langwatch/organization-contract";
-import { buildInviteAcceptUrl } from "./invite-link";
-import { resolveInviteDisplayStatus, type InviteDisplayStatus } from "./invite-rules";
+import { buildInviteAcceptUrl } from "../rules/invite-link.rules";
+import {
+  resolveInviteDisplayStatus,
+  type InviteDisplayStatus,
+} from "../rules/invite-display-status.rules";
 import type { InviteSendThrottleService } from "./invite-send-throttle.service";
 
 const logger = createLogger("langwatch:invites");

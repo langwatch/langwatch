@@ -16,7 +16,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   migrationRunsOnThisInstallation,
   organizationMigrates,
-} from "../../ops.system-migration-cohort";
+} from "../../rules/ops-system-migration-cohort.rules";
 
 class InMemoryStateRepository implements SystemMigrationStateRepository {
   private readonly rows = new Map<string, TenantMigrationRecord>();

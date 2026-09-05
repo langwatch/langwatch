@@ -43,7 +43,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { initTRPC } from "@trpc/server";
 import { createSimulationRunnerRouter } from "../simulation-runner.api";
-import type { ScenarioTrpcContext } from "../scenario.trpc-context";
+import type { ScenarioTrpcContext } from "../../../rules/scenario-trpc-context.rules";
 import { ScenarioApp, type ScenarioAppDependencies } from "../../../app/scenario.app";
 
 // The run resolves the scenario's declared parameters before it queues

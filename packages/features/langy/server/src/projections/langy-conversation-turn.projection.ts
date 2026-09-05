@@ -15,7 +15,7 @@ import type {
   LangyToolCallFailedEvent,
   LangyToolCallInitiatedEvent,
   LangyToolCallSucceededEvent,
-} from "../services/langy-conversation.events";
+} from "../adapters/eventing.langy-conversation-events.adapter";
 import {
   LangyAgentRespondedEventSchema,
   LangyAgentResponseFailedEventSchema,
@@ -24,7 +24,7 @@ import {
   LangyToolCallFailedEventSchema,
   LangyToolCallInitiatedEventSchema,
   LangyToolCallSucceededEventSchema,
-} from "../services/langy-conversation.events";
+} from "../adapters/eventing.langy-conversation-events.adapter";
 
 export interface LangyConversationTurn extends Projection<LangyConversationTurnData> {
   data: LangyConversationTurnData;

@@ -3,7 +3,7 @@ import type {
   AggregateDiscoveryRow,
   EventExplorerRepository,
   RawEventRow,
-} from "../../ports/event-explorer.repository";
+} from "../../repositories/event-explorer.repository";
 
 /**
  * The read this repository issues, as it asks for it. Narrower than the driver

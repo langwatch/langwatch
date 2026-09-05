@@ -18,7 +18,7 @@ export {
   TopicServerInstaller,
   type TopicClusteringExecutionDependencies,
   type TopicServerInstallerDependencies,
-} from "./adapters/topic-server.installer";
+} from "./adapters/topic-server-installer.adapter";
 export type { TopicClusteringDatabase } from "./repositories/prisma/prisma.topic-clustering.repository";
 export { EventingTopicClusteringScheduleAdapter } from "./adapters/eventing.topic-clustering-schedule.adapter";
 export {

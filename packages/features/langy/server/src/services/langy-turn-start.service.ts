@@ -15,7 +15,7 @@ import {
   langyTurnIdentity,
   type LangyTurnServiceDependencies,
   type StartConversationTurnInput,
-} from "./langy-turn.shared";
+} from "./langy-turn-shared.service";
 import { LangySessionKeyScopeError } from "../ports/langy-turn-runtime.port";
 
 type ClaimedTurn = {

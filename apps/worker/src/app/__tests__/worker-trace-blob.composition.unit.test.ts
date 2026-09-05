@@ -4,7 +4,7 @@ import type { StoredObjectStorageDestination } from "@langwatch/stored-object-co
 import type {
   StoredObjectStorageProject,
   StoredObjectStorageRuntime,
-} from "@langwatch/stored-object-server/storage";
+} from "@langwatch/stored-object-server";
 import type { TraceClickHouseClient } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
 import {

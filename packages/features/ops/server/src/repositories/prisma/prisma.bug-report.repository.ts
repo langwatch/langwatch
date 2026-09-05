@@ -6,7 +6,7 @@
  */
 import { generate } from "@langwatch/ksuid";
 import type { BugReport, Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import { BugReportRepository } from "../../ports/bug-report.repository";
+import { BugReportRepositoryPort } from "../../ports/bug-report.port";
 
 /**
  * The id prefix every report carries.
@@ -18,7 +18,7 @@ import { BugReportRepository } from "../../ports/bug-report.repository";
  */
 const BUG_REPORT_KSUID_RESOURCE = "bugreport";
 
-export class PrismaBugReportRepository extends BugReportRepository {
+export class PrismaBugReportRepository extends BugReportRepositoryPort {
   static create(options: { prisma: PrismaClient }): PrismaBugReportRepository {
     return new PrismaBugReportRepository(options.prisma);
   }

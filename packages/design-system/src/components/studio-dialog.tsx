@@ -10,23 +10,16 @@ interface DialogContentProps extends ChakraDialog.ContentProps {
   portalRef?: React.RefObject<HTMLElement>;
   backdrop?: boolean;
   /**
-   * Props merged onto the default backdrop (e.g. stronger blur).
-   *
-   * Note: `bg` / `background` / `backgroundColor` are intentionally
-   * stripped. The backdrop must stay transparent so only the blur is
-   * visible. Chakra's default backdrop ships with `blackAlpha.500`
-   * which is the dark grey overlay we never want. If you think you
-   * need a coloured backdrop, you don't — change the dialog surface
-   * instead.
+   * Props merged onto the default backdrop (e.g. stronger blur). Note:
+   * `bg`/`background`/`backgroundColor` are stripped — the backdrop must stay
+   * transparent. Need a coloured backdrop? Change the dialog surface instead.
    */
   backdropProps?: Omit<ChakraDialog.BackdropProps, "bg" | "background" | "backgroundColor">;
   /** Props passed to the positioner (e.g. style for --layer-index). */
   positionerProps?: ChakraDialog.PositionerProps;
   /**
-   * Set to `false` to disable the inline error boundary that wraps
-   * children. By default, a render-time crash inside a dialog body shows
-   * an inline error panel — it does NOT close the dialog or take down the
-   * page. Opt out only if you have a more specific outer boundary already.
+   * Set to `false` to disable the inline error boundary wrapping children. By
+   * default a render-time crash shows an inline panel, not a closed dialog.
    */
   withErrorBoundary?: boolean;
   /** Optional scope label shown by the error fallback. */
@@ -76,12 +69,9 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
             backdropFilter="var(--lw-backdrop-blur, blur(8px))"
             {...safeBackdropProps}
             bg="transparent"
-            // Stable DOM signal that the wrapper's transparency contract is
-            // active. Tests assert on this attribute because Chakra resolves
-            // the `bg` prop through a CSS class which jsdom cannot compute,
-            // so checking computed/inline styles is unreliable. If anyone
-            // removes the `bg="transparent"` line above, this attribute
-            // should be removed too — the test then fails.
+            // Stable DOM signal tests assert on, since jsdom can't compute
+            // Chakra's CSS-class-resolved `bg`. Remove with the
+            // `bg="transparent"` line above — the test then fails.
             data-lw-transparent-backdrop="true"
           />
         )}

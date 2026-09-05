@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EventExplorerService } from "../event-explorer.service";
-import type { EventExplorerRepository, RawEventRow } from "../../ports/event-explorer.repository";
+import type {
+  EventExplorerRepository,
+  RawEventRow,
+} from "../../repositories/event-explorer.repository";
 import {
   OpsEventingIntrospectionPort,
   type OpsDejaViewProjection,

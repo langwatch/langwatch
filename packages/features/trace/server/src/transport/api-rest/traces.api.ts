@@ -21,7 +21,7 @@ import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 
-import { enrichTracesWithEvaluations } from "#services/trace-evaluation-enrichment.rules";
+import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
 import { AmbiguousTraceIdPrefixError } from "#services/trace-legacy-read.service";
 import {
   type CompiledProjection,
@@ -29,8 +29,8 @@ import {
   type ProjectionRequest,
   ProjectionValidationError,
   projectionRequestSchema,
-} from "#services/trace-projection.types";
-import type { TraceDateField } from "#services/trace-legacy-read.types";
+} from "@langwatch/trace-contract";
+import type { TraceDateField } from "@langwatch/trace-contract";
 import {
   traceMetadataUpdateSchema,
   type TraceMetadataUpdate,

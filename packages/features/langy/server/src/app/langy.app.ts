@@ -38,12 +38,15 @@ import {
   type LangyMessageRow,
   type LangyService,
 } from "@langwatch/langy-contract";
-import type { LangyChatMessageInput } from "../services/langy-turn.shared";
-import { LangyTokenBuffer, type LangyStreamEntry } from "../streaming/langy-token-buffer";
-import { LangyTurnAccessStore } from "../streaming/langy-turn-access";
-import { decideSyntheticTerminal } from "../streaming/langy-turn-settlement";
-import { abortableDelay } from "../streaming/langy-turn-settlement-waiter";
-import { SETTLEMENT_CONFIRM_POLLS, SETTLEMENT_POLL_MS } from "../streaming/langy-turn-tail";
+import type { LangyChatMessageInput } from "../services/langy-turn-shared.service";
+import {
+  LangyTokenBuffer,
+  type LangyStreamEntry,
+} from "../adapters/redis.langy-token-buffer.adapter";
+import { LangyTurnAccessStore } from "../adapters/redis.langy-turn-access.adapter";
+import { decideSyntheticTerminal } from "../rules/langy-turn-settlement.rules";
+import { abortableDelay } from "../services/langy-turn-settlement-waiter.service";
+import { SETTLEMENT_CONFIRM_POLLS, SETTLEMENT_POLL_MS } from "../services/langy-turn-tail.service";
 
 /**
  * The Redis surface the live-turn edge needs: the turn-access record a

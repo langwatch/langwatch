@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProjectService } from "@langwatch/project-contract";
 import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
-import { NoopSchedulerWakeService, SchedulerAuditSink, type ScheduledJobRecord } from "../../index";
+import {
+  NoopSchedulerWakeService,
+  SchedulerAuditSinkPort,
+  type ScheduledJobRecord,
+} from "../../index";
 import type { SchedulerOpsRepository } from "../../index";
 import { SchedulerOpsService } from "../scheduler-ops.service";
 
@@ -57,7 +61,7 @@ class SchedulerRepositoryStub implements SchedulerOpsRepository {
     vi.fn<(params: { limit: number }) => Promise<{ rows: ScheduledJobRecord[]; total: number }>>();
 }
 
-class SchedulerAuditSinkStub extends SchedulerAuditSink {
+class SchedulerAuditSinkStub extends SchedulerAuditSinkPort {
   readonly append = vi.fn().mockResolvedValue(void 0);
   readonly listRecent = vi.fn().mockResolvedValue([]);
 }

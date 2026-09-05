@@ -1,7 +1,10 @@
 import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
-import type { IdentityResolution, IdentityResolutionPort } from "../../better-auth/storage-ports";
+import type {
+  IdentityResolution,
+  IdentityResolutionPort,
+} from "../../rules/identity-storage-ports.rules";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../identity-migration-names";
+import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules";
 
 /** Only a proven address signs anyone in. An ATTACHED identifier is one the
  *  user has claimed and not yet verified, and D01's collision guard lets it

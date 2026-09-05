@@ -1,3 +1,4 @@
+import type { Protections } from "@langwatch/trace-contract";
 import { TraceEditOverlayRedactionService } from "./trace-edit-overlay-redaction.service";
 import { ClaudeCodeLogEnrichmentService } from "./claude-code-log-enrichment.service";
 import { TraceEvaluationMappingService } from "./trace-evaluation-mapping.service";
@@ -12,7 +13,7 @@ import {
 } from "./claude-code-log-enrichment.service";
 import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
 import type { Evaluation, Trace } from "@langwatch/trace-contract";
-import type { Protections } from "@langwatch/trace-server";
+
 import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository";
 import { applyOverlayToTrace } from "@langwatch/trace-contract";
 import { TraceEditOverlayService } from "./trace-edit-overlay.service";
@@ -84,7 +85,7 @@ import type {
   AggregationFiltersInput,
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
-} from "./trace-legacy-read.types";
+} from "@langwatch/trace-contract";
 
 /**
  * Optional blob-offload resolution dependencies injected into TraceService

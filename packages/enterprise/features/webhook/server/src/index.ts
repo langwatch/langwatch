@@ -154,7 +154,7 @@ export {
   sqsHostFor,
   type SqsQueueUrlInspection,
   type SqsQueueUrlProblem,
-} from "./services/sqs-queue-url.rules";
+} from "./rules/sqs-queue-url.rules";
 export {
   PrismaWebhookRetentionRepository,
   WEBHOOK_DELIVERY_RETENTION_MS,

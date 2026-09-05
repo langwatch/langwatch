@@ -27,7 +27,7 @@ import {
   ScenarioSecretCipherPort,
   ScenarioTabRegistryService,
   ScenarioTabStorePort,
-  nlpFetchTimeoutsFromEnvironment,
+  NlpFetchAdapter,
   SerializedAgentRegistryAdapter,
   SimulationClickHouseAdapter,
   SimulationWindowedReadPort,
@@ -309,7 +309,7 @@ export function composeScenarioFeature(
     ownership: ApiAgentTestOwnershipAdapter.create(),
     connectedDispatch: ApiAgentTestConnectedDispatchAdapter.create(),
     agentAdapters: SerializedAgentRegistryAdapter.create({
-      nlpTimeouts: nlpFetchTimeoutsFromEnvironment(process.env),
+      nlpTimeouts: NlpFetchAdapter.timeoutsFromEnvironment(process.env),
     }),
     maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
   });

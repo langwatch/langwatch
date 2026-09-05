@@ -1,10 +1,10 @@
 import type { RoutableConnection } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { SignInDomainRoutingPort } from "../signin-router.service";
-import { SsoConnectionGrandfatherService } from "../sso-connection-grandfather.service";
-import { SsoConnectionGuards } from "../sso-connection-guards";
-import type { SsoConnectionLedger } from "../sso-connection-ledger";
-import { SsoConnectionService } from "../sso-connection.service";
+import type { SignInDomainRoutingPort } from "../services/signin-router.service";
+import { SsoConnectionGrandfatherService } from "../services/sso-connection-grandfather.service";
+import { SsoConnectionGuards } from "../services/sso-connection-guards.service";
+import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules";
+import { SsoConnectionService } from "../services/sso-connection.service";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
@@ -126,7 +126,10 @@ describe("the sso connection grandfather migration", () => {
           "acme.com": routable({ connectionId: "ssoc_gf_org_acme" }),
         });
 
-        const outcome = await grandfatherOf({ legacyRouting, connectionRouting }).migrateOrganization({
+        const outcome = await grandfatherOf({
+          legacyRouting,
+          connectionRouting,
+        }).migrateOrganization({
           organizationId: ORG,
         });
         expect(outcome.status).toBe("finalized");

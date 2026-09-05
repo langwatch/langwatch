@@ -47,25 +47,25 @@ export {
   beforeSessionCreate,
   beforeUserCreate,
   type BetterAuthHookCollaborators,
-} from "./transport/better-auth/better-auth-hooks";
+} from "./transport/better-auth/better-auth-hooks.api";
 export {
   BORN_FINALIZED_SIGNUP_FLAG,
   isBornFinalizedSignUp,
-} from "./transport/better-auth/born-finalized-opt-in";
-export { isAllowedAuthOrigin } from "./transport/better-auth/origin-gate";
+} from "./transport/better-auth/born-finalized-opt-in.api";
+export { isAllowedAuthOrigin } from "./transport/better-auth/origin-gate.api";
 export {
   PASSKEY_SIGNUP_EMAIL_INVALID,
   PASSKEY_SIGNUP_EMAIL_TAKEN,
   passkeySignUpRegistration,
   type SignUpVerificationPort,
-} from "./transport/better-auth/passkey-sign-up";
+} from "./transport/better-auth/passkey-sign-up.api";
 export {
   isSignInInitiationPath,
   runSignInRouterShadow,
   SignInRouterShadowPort,
   type ShadowRun,
   type SignInRouterMode,
-} from "./transport/better-auth/sign-in-router-shadow";
+} from "./transport/better-auth/sign-in-router-shadow.api";
 export {
   Auth0ApiError,
   Auth0PasswordService,

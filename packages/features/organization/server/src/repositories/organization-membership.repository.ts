@@ -15,7 +15,7 @@ import type {
   TeamUserRole,
   User,
 } from "@langwatch/prisma-client/generated";
-import type { TeamRoleUpdateOrigin } from "../services/compute-effective-team-role-updates";
+import type { TeamRoleUpdateOrigin } from "../services/compute-effective-team-role-updates.service";
 
 export type TeamWithProjects = Team & {
   projects: Project[];

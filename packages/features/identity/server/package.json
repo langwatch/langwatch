@@ -15,9 +15,9 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./better-auth": {
-      "types": "./src/better-auth.ts",
-      "default": "./src/better-auth.ts"
+    "./adapters/better-auth-identity-birth": {
+      "types": "./src/adapters/better-auth.identity-birth.adapter.ts",
+      "default": "./src/adapters/better-auth.identity-birth.adapter.ts"
     },
     "./testing": {
       "types": "./src/testing.ts",

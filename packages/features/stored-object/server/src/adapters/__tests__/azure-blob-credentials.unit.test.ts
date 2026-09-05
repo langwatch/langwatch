@@ -8,7 +8,7 @@ import {
   resolveAzureCredentials,
   type AzureBlobCredentialsConfig,
   type AzureInjectedIdentity,
-} from "../azure-blob-credentials";
+} from "../azure-blob-credentials.adapter";
 
 function sharedKeyConfig(
   overrides: Partial<AzureBlobCredentialsConfig> = {},

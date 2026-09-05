@@ -34,7 +34,7 @@ import {
 import { TtlCache } from "./trace-ttl-cache.service";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";
 import { parseMediaRefs } from "@langwatch/trace-contract";
-import { PageTooDeepError } from "./trace-read.errors";
+import { PageTooDeepError } from "./trace-read-errors.service";
 import type {
   ExpressionCategoricalDef,
   FacetDefinition,

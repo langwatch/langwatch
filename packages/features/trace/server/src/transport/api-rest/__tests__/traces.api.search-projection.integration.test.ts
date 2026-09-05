@@ -12,8 +12,8 @@ import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import type { CompiledProjection } from "#services/trace-projection.types";
-import { ProjectionValidationError } from "#services/trace-projection.types";
+import type { CompiledProjection } from "@langwatch/trace-contract";
+import { ProjectionValidationError } from "@langwatch/trace-contract";
 import {
   createTracesRestApp,
   traceSearchBodyExtensions,

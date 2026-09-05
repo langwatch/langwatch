@@ -2,11 +2,9 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { redactReportText, redactSessionJsonl } from "@langwatch/redaction";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
-import type { BugReportRepository } from "../ports/bug-report.repository";
-import type {
-  BugReportNotifierPort,
-  BugReportRateLimiterPort,
-} from "../ports/bug-report-intake.ports";
+import type { BugReportRepositoryPort } from "../ports/bug-report.port";
+import type { BugReportNotifierPort } from "../ports/bug-report-notifier.port";
+import type { BugReportRateLimiterPort } from "../ports/bug-report-rate-limiter.port";
 
 const logger = createLogger("langwatch:bug-reports");
 
@@ -47,7 +45,7 @@ export class BugReportIntakeService {
     rateLimiter,
     notifier,
   }: {
-    reports: BugReportRepository;
+    reports: BugReportRepositoryPort;
     rateLimiter: BugReportRateLimiterPort;
     notifier: BugReportNotifierPort;
   }): BugReportIntakeService {
@@ -56,7 +54,7 @@ export class BugReportIntakeService {
 
   private constructor(
     private readonly deps: {
-      reports: BugReportRepository;
+      reports: BugReportRepositoryPort;
       rateLimiter: BugReportRateLimiterPort;
       notifier: BugReportNotifierPort;
     },

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ModelProviderCredentialCipherPort } from "../../ports/model-provider.port";
 import { ModelProviderCredentialsMigrateTask } from "../model-provider-credentials-migrate.task";
-import type { ModelProviderMigrationDatabase } from "../model-provider-migration.shared";
+import type { ModelProviderMigrationDatabase } from "../../rules/model-provider-migration.rules";
 
 /** A cipher with the deployment's shape and none of its cryptography. */
 class ReversingCipher extends ModelProviderCredentialCipherPort {

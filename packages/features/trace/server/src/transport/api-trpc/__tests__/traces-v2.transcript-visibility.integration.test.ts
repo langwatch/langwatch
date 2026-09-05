@@ -1,3 +1,4 @@
+import type { Protections } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  *
@@ -41,7 +42,7 @@ import {
   type DataPrivacyScopeFacts,
   type ResolvedCategory,
 } from "@langwatch/data-privacy-contract";
-import type { Protections } from "../../../services/trace-viewer-protections.service";
+
 import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake";
 import { TracesV2TrpcApi } from "../traces-v2.api";
 import { createTranscriptApp, createTranscriptReadPorts } from "./support/transcript-read.support";

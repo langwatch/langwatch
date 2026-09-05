@@ -13,11 +13,11 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
-import { buildTimeseriesQuery } from "../../../clickhouse/aggregation-builder";
+import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper";
 import { ClickHouseAnalyticsRepository } from "../clickhouse.analytics.repository";
 import type { AnalyticsTimeseriesQuery } from "../../analytics.repository";
 
-vi.mock("../../../clickhouse/aggregation-builder", () => ({
+vi.mock("../clickhouse.aggregation-builder.mapper", () => ({
   buildTimeseriesQuery: vi.fn().mockReturnValue({ sql: "SELECT 1", params: {} }),
   buildFeedbacksQuery: vi.fn(),
   buildTopDocumentsQuery: vi.fn(),

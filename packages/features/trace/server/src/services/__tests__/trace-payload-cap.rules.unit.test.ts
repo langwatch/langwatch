@@ -14,8 +14,8 @@
  * 262144, so they follow it wherever it goes.
  */
 import { describe, expect, it } from "vitest";
-import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../trace-attribute-cap.rules";
-import { capPayloadString } from "../trace-payload-cap.rules";
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../../rules/trace-payload-cap.rules";
+import { capPayloadString } from "../../rules/trace-payload-cap.rules";
 
 const MARKER = /…\[langwatch: truncated.*, \d+ bytes total\]$/u;
 

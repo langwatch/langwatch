@@ -6,9 +6,12 @@
 import { describe, expect, it } from "vitest";
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 
-import { LWQL_VIEW_CATALOG } from "../catalog/lwql-views";
-import { lwqlAllowedTables, lwqlGatedColumns } from "../catalog/types";
-import { describeLangWatchQLSchema } from "../schema";
+import { LWQL_VIEW_CATALOG } from "../../repositories/clickhouse/clickhouse.lwql-view-catalog.mapper";
+import {
+  lwqlAllowedTables,
+  lwqlGatedColumns,
+} from "../../adapters/clickhouse.lwql-catalog-shapes.adapter";
+import { describeLangWatchQLSchema } from "../../services/langwatch-ql-schema.service";
 import { validateLangWatchQL } from "../validation/validate";
 import { GATED_DATASET, GATED_DATASET_QUALIFIED_NAME } from "./gatedDatasetFixture";
 

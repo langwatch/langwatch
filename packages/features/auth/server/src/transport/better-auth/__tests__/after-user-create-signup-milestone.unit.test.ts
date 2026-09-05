@@ -27,7 +27,7 @@ import {
 } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { afterUserCreate } from "../better-auth-hooks";
+import { afterUserCreate } from "../better-auth-hooks.api";
 import type {
   BetterAuthAnnouncementsPort,
   BetterAuthFederationPort,

@@ -15,7 +15,7 @@ import {
   PROPOSE_LINK_COMMAND_TYPE,
   VERIFY_IDENTIFIER_COMMAND_TYPE,
 } from "@langwatch/identity-contract";
-import type { IdentityLedger } from "../identity-ledger";
+import type { IdentityLedger } from "../rules/identity-ledger.rules";
 import { createLogger } from "@langwatch/observability";
 import { IdentityEventingPort } from "../ports/identity-eventing.port";
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
@@ -26,7 +26,7 @@ import { IdentityStateFoldProjection } from "../projections/identity-state.proje
 import {
   identityCommitDurationSeconds,
   identityProjectionConvergenceTimeoutsTotal,
-} from "../identity-ledger.metrics";
+} from "./metrics.identity-ledger.adapter";
 
 const logger = createLogger("langwatch:identity:ledger");
 

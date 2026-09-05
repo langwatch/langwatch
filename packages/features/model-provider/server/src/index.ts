@@ -132,7 +132,7 @@ export { ModelProviderCustomModelsMigrateTask } from "./tasks/model-provider-cus
 export type {
   ModelProviderMigrationDatabase,
   ModelProviderMigrationOutcome,
-} from "./tasks/model-provider-migration.shared";
+} from "./rules/model-provider-migration.rules";
 export {
   ModelRegistrySyncTask,
   syncModelRegistry,

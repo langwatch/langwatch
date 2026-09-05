@@ -7,7 +7,7 @@
  * that would fail on its first query.
  */
 import type { FilterField } from "@langwatch/analytics-contract";
-import type { ClickHouseFilterQueryParams } from "../filters/clickhouse/types";
+import type { ClickHouseFilterQueryParams } from "../repositories/clickhouse/clickhouse.filter-shapes.mapper";
 
 /** One option a filter picker offers, with how many rows carry it. */
 export type FilterOption = {

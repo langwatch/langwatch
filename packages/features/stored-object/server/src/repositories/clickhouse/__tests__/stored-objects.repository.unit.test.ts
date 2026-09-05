@@ -37,7 +37,7 @@ vi.mock("langwatch", () => ({
 // ---------------------------------------------------------------------------
 
 import { StoredObjectsClickHousePort } from "../../../ports/stored-objects-clickhouse.port";
-import type { StoredObject } from "../../stored-objects.row";
+import type { StoredObject } from "../../../rules/stored-object-row.rules";
 import { ClickHouseStoredObjectsRepository } from "../stored-objects.repository";
 
 /** The routed connection, as this suite's one project resolves it. */

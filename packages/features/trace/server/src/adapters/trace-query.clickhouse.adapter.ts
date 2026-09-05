@@ -9,7 +9,7 @@ import {
   type TagToken,
   type UnaryOperatorToken,
 } from "@langwatch/trace-contract";
-import type { TranslationContext } from "./trace-query-evaluation.types";
+import type { TranslationContext } from "@langwatch/trace-contract";
 import { FIELD_DEF_BY_NAME, KNOWN_FIELDS } from "./trace-query-fields.clickhouse.adapter";
 import {
   EVENT_ATTRIBUTE_PREFIX,

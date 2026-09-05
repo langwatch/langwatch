@@ -19,10 +19,8 @@ import {
   BugReportRateLimitedError,
   BugReportIntakeService,
 } from "../../../services/bug-report-intake.service";
-import type {
-  BugReportNotifierPort,
-  BugReportRateLimiterPort,
-} from "../../../ports/bug-report-intake.ports";
+import type { BugReportNotifierPort } from "../../../ports/bug-report-notifier.port";
+import type { BugReportRateLimiterPort } from "../../../ports/bug-report-rate-limiter.port";
 import { PrismaBugReportRepository } from "../../../repositories/prisma/prisma.bug-report.repository";
 import { createBugReportsRestApp } from "../bug-report.api";
 

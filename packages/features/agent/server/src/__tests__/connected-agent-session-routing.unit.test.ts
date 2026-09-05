@@ -5,7 +5,7 @@
  */
 import type { AgentService } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
-import type { StoredCall, StoredResult } from "../rules/connected-agent-envelope.rules";
+import type { StoredCall, StoredResult } from "../services/connected-agent-envelope.service";
 import type { AgentRepository } from "../repositories/agent.repository";
 import type { ConnectCredentialPort } from "../ports/connect-credential.port";
 import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter";

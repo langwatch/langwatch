@@ -1,3 +1,4 @@
+import type { Protections } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  * @integration
@@ -12,10 +13,10 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service";
-import { enrichTracesWithEvaluations } from "../../../services/trace-evaluation-enrichment.rules";
-import type { ProjectableTrace, ProjectionFrom } from "../../../services/trace-projection.types";
-import type { GetAllTracesForProjectInput } from "../../../services/trace-legacy-read.types";
-import type { Protections } from "../../../services/trace-viewer-protections.service";
+import { enrichTracesWithEvaluations } from "../../../rules/trace-evaluation-enrichment.rules";
+import type { ProjectableTrace, ProjectionFrom } from "@langwatch/trace-contract";
+import type { GetAllTracesForProjectInput } from "@langwatch/trace-contract";
+
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository";
 import {
   createTestClickHouseClient,

@@ -15,7 +15,7 @@ import {
   recordMfaVerificationFailureCommandDataSchema,
   regenerateBackupCodesCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { MfaGuards } from "../mfa-guards";
+import type { MfaGuards } from "../services/mfa-guards.service";
 import type { ZodTypeAny, z } from "zod";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import { MfaEnrollmentStateFoldProjection } from "../projections/mfa-enrollment-state.projection";

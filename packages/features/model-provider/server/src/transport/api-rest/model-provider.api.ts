@@ -1,5 +1,5 @@
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import { CustomModelList } from "../../rules/custom-model-list.rules";
+import { toCanonicalCustomModelList } from "../../rules/custom-model-list.rules";
 import { createLogger } from "@langwatch/observability";
 import { type OrganizationService, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { MiddlewareHandler } from "hono";
@@ -17,7 +17,7 @@ import {
 import {
   apiResponseModelProvidersSchema,
   updateModelProviderInputSchema,
-} from "./model-provider.schemas";
+} from "../../rules/model-provider-schemas.rules";
 
 const logger = createLogger("langwatch:api:model-providers");
 
@@ -173,8 +173,8 @@ export function createModelProvidersRestApp(options: {
         provider,
         enabled: data.enabled,
         customKeys: data.customKeys as Record<string, unknown> | undefined,
-        customModels: CustomModelList.toCanonical(data.customModels, "chat"),
-        customEmbeddingsModels: CustomModelList.toCanonical(
+        customModels: toCanonicalCustomModelList(data.customModels, "chat"),
+        customEmbeddingsModels: toCanonicalCustomModelList(
           data.customEmbeddingsModels,
           "embedding",
         ),

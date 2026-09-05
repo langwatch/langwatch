@@ -18,7 +18,7 @@ export type {
   PromptTrpcContext,
   PromptTrpcPorts,
   PromptTrpcProcedures,
-} from "./transport/api-trpc/prompt.trpc-context";
+} from "./rules/prompt-trpc-context.rules";
 export {
   apiResponsePromptWithVersionDataSchema,
   createPromptInputSchema,

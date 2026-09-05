@@ -1,5 +1,5 @@
 import { Prisma } from "@langwatch/prisma-client/generated";
-import type { LangyDatabase, LangyDatabaseTransaction } from "./langy-database.port";
+import type { LangyDatabase, LangyDatabaseTransaction } from "./prisma.langy-database.repository";
 
 import { LangyTurnAdmissionRepository } from "../langy-turn-admission.repository";
 import type { LangyTurnAdmissionClaim } from "../langy-turn-admission.repository";

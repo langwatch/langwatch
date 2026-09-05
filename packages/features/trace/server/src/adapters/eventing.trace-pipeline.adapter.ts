@@ -37,10 +37,7 @@ import {
 import { EventingTraceOriginAdapter } from "./eventing.trace-origin.adapter";
 import { EventingTraceProcessingAdapter } from "./eventing.trace-processing.adapter";
 import { EventingTraceTopicAdapter } from "./eventing.trace-topic.adapter";
-import {
-  clampSpanShardCount,
-  spanCommandGroupKey,
-} from "../services/trace-span-command-shard.rules";
+import { clampSpanShardCount, spanCommandGroupKey } from "../rules/trace-span-command-shard.rules";
 
 export type EventingTracePipelineAdapterOptions = {
   spanStore: AppendStore<NormalizedSpan>;

@@ -7,7 +7,7 @@ import {
   type SsoConnectionState,
 } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
-import { SsoConnectionGuards } from "../sso-connection-guards";
+import { SsoConnectionGuards } from "../services/sso-connection-guards.service";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,

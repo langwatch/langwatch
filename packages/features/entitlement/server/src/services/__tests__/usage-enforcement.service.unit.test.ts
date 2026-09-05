@@ -4,11 +4,11 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import type { PlanInfo } from "@langwatch/entitlement-contract";
+import { UsageOrganizationPort } from "../../ports/usage-organization.port";
 import {
-  UsageOrganizationPort,
   UsageVolumeCounterPort,
   type ProjectUsageCounts,
-} from "../../ports/usage-enforcement.ports";
+} from "../../ports/usage-volume-counter.port";
 import { UsageService } from "../usage-enforcement.service";
 
 function plan(maxMessagesPerMonth: number): PlanInfo {

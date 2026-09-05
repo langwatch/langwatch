@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { langyTurnIdentity } from "../langy-turn.shared";
+import { langyTurnIdentity } from "../langy-turn-shared.service";
 
 describe("langyTurnIdentity", () => {
   const base = {

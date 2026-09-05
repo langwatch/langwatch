@@ -10,8 +10,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 
-import { isBornFinalizedSignUp } from "../better-auth/born-finalized-opt-in";
-import { isAllowedAuthOrigin } from "../better-auth/origin-gate";
+import { isBornFinalizedSignUp } from "../better-auth/born-finalized-opt-in.api";
+import { isAllowedAuthOrigin } from "../better-auth/origin-gate.api";
 
 const logger = createLogger("langwatch:auth");
 

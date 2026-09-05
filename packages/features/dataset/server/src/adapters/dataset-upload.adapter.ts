@@ -33,10 +33,14 @@ import {
   UploadNotPendingError,
   UploadTooLargeError,
   UploadValidationError,
-} from "../services/errors";
-import { exceedsUploadCap, stagingUploadKey, UPLOAD_MAX_BYTES } from "../services/presigned-upload";
+} from "../services/dataset-errors.service";
+import {
+  exceedsUploadCap,
+  stagingUploadKey,
+  UPLOAD_MAX_BYTES,
+} from "../services/presigned-upload.service";
 import { DatasetChunkService } from "../services/dataset-chunk.service";
-import { stripNullBytes } from "../services/sanitize";
+import { stripNullBytes } from "../rules/dataset-sanitize.rules";
 
 /** Owns upload lifecycle behavior; routes only see DatasetService's contract. */
 export class DatasetUploadAdapter implements DatasetUploadPort {

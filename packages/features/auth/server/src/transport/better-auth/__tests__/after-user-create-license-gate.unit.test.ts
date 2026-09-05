@@ -11,7 +11,7 @@ import type {
   BetterAuthFederationPort,
   BetterAuthPendingInvitePort,
 } from "../../../ports/better-auth.port";
-import { afterUserCreate } from "../better-auth-hooks";
+import { afterUserCreate } from "../better-auth-hooks.api";
 
 class StubFederationPort implements BetterAuthFederationPort {
   constructor(private readonly ssoAllowed: boolean) {}

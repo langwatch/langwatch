@@ -1,14 +1,15 @@
 import { createLogger } from "@langwatch/observability";
 import type { PlanInfo, UsageUnit } from "@langwatch/entitlement-contract";
 import { USAGE_UNKNOWN, type UsageCount } from "../ports/usage-counter.port";
+import { NoUsageCache, type UsageCachePort } from "../ports/usage-cache.port";
 import {
-  NoUsageCache,
-  type ProjectUsageCounts,
-  type UsageCachePort,
   type UsageMeterReading,
   type UsageOrganizationPort,
+} from "../ports/usage-organization.port";
+import {
+  type ProjectUsageCounts,
   type UsageVolumeCounterPort,
-} from "../ports/usage-enforcement.ports";
+} from "../ports/usage-volume-counter.port";
 import { UsageMeterPolicyService } from "./usage-meter-policy.service";
 import { UsageLimitMessageService, type UsageDeployment } from "./usage-limit-message.service";
 
@@ -187,7 +188,7 @@ export class UsageService {
     const decision = await this.getCachedUsageMeterReading(organizationId, plan);
     const cacheKey = `${organizationId}:${decision.usageUnit}`;
 
-    const cached = await this.countCache.get<number>(cacheKey);
+    const cached = await this.countCache.tryGet<number>(cacheKey);
     if (cached !== undefined) {
       return cached;
     }
@@ -259,7 +260,7 @@ export class UsageService {
     organizationId: string,
     plan?: PlanInfo,
   ): Promise<UsageMeterReading> {
-    const cached = await this.decisionCache.get<UsageMeterReading>(organizationId);
+    const cached = await this.decisionCache.tryGet<UsageMeterReading>(organizationId);
     if (cached) {
       return cached;
     }

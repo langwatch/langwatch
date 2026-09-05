@@ -1,4 +1,4 @@
-import type { JoinRequestGuards } from "../join-request-guards";
+import type { JoinRequestGuards } from "../services/join-request-guards.service";
 import {
   defineAggregate,
   defineEvents,

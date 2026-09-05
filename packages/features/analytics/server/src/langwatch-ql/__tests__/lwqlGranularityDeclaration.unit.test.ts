@@ -16,8 +16,8 @@ import { describe, expect, it } from "vitest";
 import {
   LangWatchQLGranularityRequiresTimeWindowError,
   LangWatchQLReservedGranularityTypeError,
-} from "../errors";
-import { assertLangWatchQLGranularityDeclaration } from "../resolve-time-window";
+} from "@langwatch/analytics-contract";
+import { assertLangWatchQLGranularityDeclaration } from "../../services/langwatch-ql-time-window.service";
 import type { LangWatchQLParameter } from "../validation/validate";
 import { validateLangWatchQL } from "../validation/validate";
 

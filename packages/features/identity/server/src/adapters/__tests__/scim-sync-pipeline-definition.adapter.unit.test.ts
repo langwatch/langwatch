@@ -1,5 +1,5 @@
 import { emptyScimSync, type ScimSyncState, scimSyncIdFor } from "@langwatch/identity-contract";
-import { ScimSyncGuards } from "../../scim-sync-guards";
+import { ScimSyncGuards } from "../../services/scim-sync-guards.service";
 import { describe, expect, it } from "vitest";
 import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
 import {

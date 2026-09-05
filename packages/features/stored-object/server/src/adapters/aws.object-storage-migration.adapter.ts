@@ -7,9 +7,9 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
-import { ObjectNotFoundError } from "#errors";
-import { parseS3Uri } from "#rules/s3-uri.rules";
-import type { StoredObjectStorageDriver } from "#adapters/stored-object-storage.registry";
+import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
+import { parseS3Uri } from "#adapters/s3-uri.adapter";
+import type { StoredObjectStorageDriver } from "#adapters/stored-object-storage-registry.adapter";
 
 export type MigrationS3Configuration = {
   bucket: string;

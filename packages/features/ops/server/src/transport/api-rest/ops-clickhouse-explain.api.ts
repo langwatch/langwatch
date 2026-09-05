@@ -11,7 +11,7 @@ import {
   buildExplainQuery,
   explainBodySchema,
   redactQueryForAudit,
-} from "../../services/ops-clickhouse-explain.core";
+} from "../../adapters/ops-clickhouse-explain.adapter";
 
 /** What the family needs from the process it is mounted in. */
 export interface OpsClickHouseExplainRestPorts {

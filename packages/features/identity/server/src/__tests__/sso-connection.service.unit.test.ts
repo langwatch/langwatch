@@ -1,8 +1,8 @@
 import type { SsoConnectionCommand, SsoConnectionFactInput } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
-import { SsoConnectionGuards } from "../sso-connection-guards";
-import type { SsoConnectionLedger } from "../sso-connection-ledger";
-import { SsoConnectionService } from "../sso-connection.service";
+import { SsoConnectionGuards } from "../services/sso-connection-guards.service";
+import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules";
+import { SsoConnectionService } from "../services/sso-connection.service";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,

@@ -13,12 +13,12 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
-import { projectSchema } from "./scenario.schemas";
+import { projectSchema } from "../../rules/scenario-schemas.rules";
 import type {
   ScenarioTrpcContext,
   ScenarioTrpcPorts,
   ScenarioTrpcProcedures,
-} from "./scenario.trpc-context";
+} from "../../rules/scenario-trpc-context.rules";
 
 const logger = createLogger("langwatch:api:scenarios:crud");
 

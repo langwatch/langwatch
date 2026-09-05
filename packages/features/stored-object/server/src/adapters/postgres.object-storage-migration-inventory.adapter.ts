@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { StoredObjectsRepository } from "#repositories/stored-objects.repository";
-import type { StoredObject } from "#repositories/stored-objects.row";
+import type { StoredObject } from "#rules/stored-object-row.rules";
 import type {
   MigrationDataset,
   MigrationInventory,

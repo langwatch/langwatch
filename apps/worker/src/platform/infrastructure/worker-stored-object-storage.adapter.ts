@@ -19,7 +19,7 @@ import {
   StoredObjectStorageRuntime,
   type StoredObjectStorageDriver,
   type StoredObjectStorageSelection,
-} from "@langwatch/stored-object-server/storage";
+} from "@langwatch/stored-object-server";
 
 export type WorkerS3Credentials = Readonly<{
   accessKeyId: string;

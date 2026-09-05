@@ -1,18 +1,18 @@
 import {
-  UsageStatsClickHouseRepository,
-  type UsageStatsClickHouseClientResolver,
+  UsageStatsClickHouseRepositoryPort,
+  type UsageStatsClickHouseClientResolverPort,
   type UsageStatsCountInput,
-} from "../../ports/usage-stats-worker.ports";
+} from "../../ports/usage-stats-worker.port";
 import { z } from "zod";
 
 const usageStatsCountRowsSchema = z.array(z.object({ Total: z.string() }));
 
-export class ClickHouseUsageStatsRepository extends UsageStatsClickHouseRepository {
-  private constructor(private readonly clients: UsageStatsClickHouseClientResolver) {
+export class ClickHouseUsageStatsRepository extends UsageStatsClickHouseRepositoryPort {
+  private constructor(private readonly clients: UsageStatsClickHouseClientResolverPort) {
     super();
   }
 
-  static create(clients: UsageStatsClickHouseClientResolver): ClickHouseUsageStatsRepository {
+  static create(clients: UsageStatsClickHouseClientResolverPort): ClickHouseUsageStatsRepository {
     return new ClickHouseUsageStatsRepository(clients);
   }
 

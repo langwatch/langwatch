@@ -20,7 +20,7 @@ import {
   computeOccurredAtRangeForRuns,
   OCCURRED_AT_BUFFER_MS,
   WARN_OLD_RUN_AGE_MS,
-} from "./experiment-run.clickhouse.mapper";
+} from "./clickhouse.experiment-run.mapper";
 
 type QueryResult = { json<T>(): Promise<T[]> };
 type ExperimentClickHouseClient = {

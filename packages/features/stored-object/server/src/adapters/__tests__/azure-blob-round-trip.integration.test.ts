@@ -14,10 +14,10 @@ import {
   StoredObjectAzureDestinationPort,
   StoredObjectDestinationPolicy,
   StoredObjectProjectS3ConfigPort,
-} from "../stored-object-destination.policy";
-import { StoredObjectStorageRegistry } from "../stored-object-storage.registry";
+} from "../stored-object-destination-policy.adapter";
+import { StoredObjectStorageRegistry } from "../stored-object-storage-registry.adapter";
 import { StoredObjectsService } from "../../services/stored-objects.service";
-import type { StoredObject } from "../../repositories/stored-objects.row";
+import type { StoredObject } from "../../rules/stored-object-row.rules";
 import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository";
 import type { StoredObjectsTelemetryPort } from "../../ports/stored-objects-telemetry.port";
 

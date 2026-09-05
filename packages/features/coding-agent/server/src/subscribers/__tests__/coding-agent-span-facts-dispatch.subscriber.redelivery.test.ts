@@ -1,10 +1,6 @@
 /**
- * The span→session dispatcher, driven with RAW OTLP span events — the shape
- * trace-processing actually stores. The raw→normalized boundary lives HERE
- * now (PR #5708 had it inside a trace-keyed fold), and a gate that reads the
- * wrong field on that boundary fails silently: the subscriber runs, nothing
- * throws, and no session ever materializes.
- *
+ * The span→session dispatcher, driven with RAW OTLP span events. A gate
+ * reading the wrong field fails silently — no session ever materializes.
  * @see specs/coding-agent/session-aggregate.feature
  */
 
@@ -105,12 +101,8 @@ function rawSpanEvent({
 
 /**
  * A staged claim-check as the framework hands it to the subscriber.
- *
- * `span_referenced` is a real wire shape — `dedupIdentity` reads it, `handle`
- * parses it, and `staticBuilder` casts `payload.event as E` on the way in — but
- * `TraceProcessingEvent` does not have a member for it, so it does not overlap
- * and a single assertion will not compile. Stating that once here beats ten
- * assertions that each look like a mistake.
+ * `span_referenced` is a real wire shape, but `TraceProcessingEvent` has no
+ * member for it, so a single assertion won't compile. Stated once here.
  */
 function asDispatched(payload: SpanReferencedPayload): TraceProcessingEvent {
   return payload as unknown as TraceProcessingEvent;
@@ -131,19 +123,9 @@ function normalizedFrom(event: SpanReceivedEvent): NormalizedSpan {
 }
 
 /**
- * What the claim-check path actually reads: the normalized span after a full
- * trip through the span store's own columns.
- *
- * Built by projecting the normalized span onto a `stored_spans` row and
- * running the REPOSITORY's `mapChRowToNormalized` over it, not by spreading
- * the original. That mapping is where the two paths can diverge — `name` comes
- * from `SpanName`, `startTimeUnixMs` from `StartTimeMs`, `statusCode` through
- * `validateStatusCode`, the scope name null-coalesces to `""`, and `id` is
- * dropped to `""` — so a fixture that copied those fields verbatim would keep
- * the identical-command assertion green through exactly the regressions it
- * exists to catch. The lossy Map(String, String) deserialize (turning
- * "true"/"1.0"/"90210" back into booleans and numbers) rides along inside the
- * mapper, which is where production does it too.
+ * What the claim-check path reads: the normalized span rebuilt via the
+ * REPOSITORY's `mapChRowToNormalized`, not spread from the original — that
+ * mapping is where the two paths diverge, so a copy would mask regressions.
  */
 function storeReadBackFrom(event: SpanReceivedEvent): NormalizedSpan {
   const span = normalizedFrom(event);
@@ -219,13 +201,9 @@ function liftedPayload({
 }
 
 /**
- * Widens a staged payload to what `handle` accepts.
- *
- * `span_facts_lifted` is a plain job payload, deliberately NOT a member of
- * `TraceProcessingEvent`: the seam stages it in a trace event's place, and it
- * never reaches the event log. So the handler's own parameter type cannot
- * name it, and driving the handler with one needs this cast. Kept in one
- * named place rather than scattered inline, so the reason survives.
+ * Widens a staged payload to what `handle` accepts. `span_facts_lifted` is
+ * deliberately NOT a member of `TraceProcessingEvent`, so driving the handler
+ * with one needs this cast — kept in one named place, not scattered inline.
  */
 function staged(event: unknown): TraceProcessingEvent {
   return event as TraceProcessingEvent;
@@ -1010,11 +988,9 @@ describe("codingAgentSpanFactsDispatch", () => {
 
     describe("when a job arrives in the exact staged wire shape", () => {
       /**
-       * The schema is a plain DTO now, but the bytes on the queue are a
-       * contract — with the producer flip a release later, and with jobs
-       * already staged mid-rollout. This fixture is deliberately ALL
-       * literals, no shared constants, so any drift in the wire strings or
-       * the envelope fields fails here rather than on a live queue.
+       * The schema is a plain DTO, but the bytes on the queue are a contract.
+       * Deliberately ALL literals, no shared constants, so wire drift fails
+       * here rather than on a live queue.
        */
       const pinnedWireJob = () => ({
         id: "evt-wire-pinned",

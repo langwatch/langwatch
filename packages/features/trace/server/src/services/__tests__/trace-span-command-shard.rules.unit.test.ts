@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { MAX_SPAN_SHARD_COUNT, spanCommandGroupKey } from "../trace-span-command-shard.rules";
+import {
+  MAX_SPAN_SHARD_COUNT,
+  spanCommandGroupKey,
+} from "../../rules/trace-span-command-shard.rules";
 
 const TRACE_ID = "534bd8a1bf83e7c58e8aaacefb047cc2";
 

@@ -10,7 +10,7 @@ import {
   type LangyRelayBuffer,
   type LangyRelayConversations,
   LangyTurnRelay,
-} from "../../streaming/langy-turn-relay";
+} from "../../adapters/langy-turn-relay.adapter";
 
 const RUN_TOKEN = mintRunToken();
 const IDENTITY = {

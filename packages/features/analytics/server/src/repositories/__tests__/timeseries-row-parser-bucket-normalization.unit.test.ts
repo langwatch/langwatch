@@ -4,10 +4,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { buildMetricAlias } from "../../clickhouse/metric-translator";
+import { buildMetricAlias } from "../clickhouse/clickhouse.metric-translator.mapper";
 import type { AnalyticsSeries } from "@langwatch/analytics-contract";
 import { buildSeriesName } from "@langwatch/analytics-contract";
-import { parseTimeseriesRows } from "../timeseries-row-parser";
+import { parseTimeseriesRows } from "../clickhouse/clickhouse.timeseries-row-parser.mapper";
 
 const alias = (series: AnalyticsSeries, index: number) =>
   buildMetricAlias(index, series.metric, series.aggregation, series.key);

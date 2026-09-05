@@ -2,20 +2,29 @@ import { type IdentityCommand, normalizeIdentifierValue } from "@langwatch/ident
 import type { BetterAuthOptions } from "better-auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
-import { deriveNewbornUserId } from "../../crypto/identifier-identity";
+import { deriveNewbornUserId } from "../../adapters/crypto.identifier-identity.adapter";
 import {
   birthAwareGate,
   type IdentityBirthPort,
   IdentityEngineUnavailableError,
   runWithIdentityBirth,
-} from "../../better-auth/identity-birth";
-import { bridgeAccountCeremonies, IdentityCeremonies } from "../../better-auth/identity-ceremonies";
-import { createIdentityStorageAdapter } from "../../better-auth/identity-storage-adapter";
-import type { IdentityAccountsPort, IdentityResolutionPort } from "../../better-auth/storage-ports";
-import { IdentityGuards } from "../../guards";
-import { adoptUserEmailCommandId, newIdentityCommandId } from "../../identity-command-id";
-import type { IdentityUsersRepository } from "../../identity-users.repository";
-import { IdentityService } from "../../identity.service";
+} from "../../adapters/better-auth.identity-birth.adapter";
+import {
+  bridgeAccountCeremonies,
+  IdentityCeremonies,
+} from "../../adapters/better-auth.identity-ceremonies.adapter";
+import { createIdentityStorageAdapter } from "../../adapters/better-auth.identity-storage.adapter";
+import type {
+  IdentityAccountsPort,
+  IdentityResolutionPort,
+} from "../../rules/identity-storage-ports.rules";
+import { IdentityGuards } from "../../services/identity-guards.service";
+import {
+  adoptUserEmailCommandId,
+  newIdentityCommandId,
+} from "../../rules/identity-command-id.rules";
+import type { IdentityUsersRepository } from "../../repositories/identity-users.repository";
+import { IdentityService } from "../../services/identity.service";
 import { InMemoryIdentityEventStore, inMemoryIdentityLedger } from "./in-memory-event-store";
 import { InMemoryHeads, T0 } from "./in-memory-heads";
 import { InMemoryReservations } from "./in-memory-reservations";

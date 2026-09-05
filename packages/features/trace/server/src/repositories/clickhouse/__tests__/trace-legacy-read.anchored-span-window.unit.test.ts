@@ -1,10 +1,10 @@
+import type { Protections } from "@langwatch/trace-contract";
 /**
  * @see ADR-087
  * The joined span read must never emit an empty time predicate. fetchTracesWithSpansJoined derived its stored_spans window solely from matched summaries' OccurredAt, keeping only positive values — a page of log-only traces (epoch sentinel) left nothing, so queryWindowed got a null hint + fallback:"none" and BOTH time filters rendered empty, scanning every weekly part (cold S3 included) and dying with MEMORY_LIMIT_EXCEEDED (241). These assert on the SQL itself, since the defect IS the SQL.
  */
 import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import type { Protections } from "@langwatch/trace-server";
 
 const { mockClickHouseQuery } = vi.hoisted(() => ({
   mockClickHouseQuery: vi.fn(),

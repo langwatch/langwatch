@@ -1,5 +1,5 @@
 import { type NormalizedSpan, type TraceSummaryData } from "@langwatch/trace-contract";
-import { isValidTimestamp } from "./span-timing.rules";
+import { isValidTimestamp } from "../rules/span-timing.rules";
 
 const SYNTHETIC_SPAN_NAMES: ReadonlySet<string> = new Set(["langwatch.track_event"]);
 

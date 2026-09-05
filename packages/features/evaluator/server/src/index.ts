@@ -42,4 +42,4 @@ export {
   type ApiResponseEvaluator,
   createEvaluatorInputSchema,
   updateEvaluatorInputSchema,
-} from "./transport/api-rest/evaluator.schemas";
+} from "./rules/evaluator-schemas.rules";

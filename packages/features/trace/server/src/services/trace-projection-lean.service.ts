@@ -10,7 +10,8 @@ import {
   traceEventReferenceKey,
 } from "@langwatch/trace-contract";
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
-import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES, TraceAttributeCap } from "./trace-attribute-cap.rules";
+import { TraceAttributeCap } from "./trace-attribute-cap.service";
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../rules/trace-payload-cap.rules";
 
 /**
  * Preview budget for IO attributes. Covers a complete chat-style Claude completion at

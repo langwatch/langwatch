@@ -1,10 +1,5 @@
 /**
- * Round-trips the session row's git-context and branch-set columns
- * (migrations 00075, 00077) through their real INSERT/SELECT SQL against
- * ClickHouse: the DDL <-> repository column contract the mocked unit tests
- * cannot catch, plus the read that finds a session under a branch it has
- * since left.
- *
+ * Round-trips the session row's git-context columns through real ClickHouse SQL.
  * @see specs/coding-agent/session-git-context.feature
  * @see specs/coding-agent/pull-request-linkage.feature
  */

@@ -19,7 +19,7 @@ export {
   type BugReportTrpcContext,
   type BugReportTrpcPorts,
 } from "./transport/api-trpc/bug-report.api";
-export { BugReportRepository } from "./ports/bug-report.repository";
+export { BugReportRepositoryPort } from "./ports/bug-report.port";
 export { PrismaBugReportRepository } from "./repositories/prisma/prisma.bug-report.repository";
 export { BugReportInboxService, type BugReportListing } from "./services/bug-report-inbox.service";
 export {
@@ -41,20 +41,20 @@ export {
   type SchedulerWakeRedis,
 } from "./adapters/redis.scheduler-wake.adapter";
 export { OpsSnapshotRedisPort } from "./ports/ops-snapshot-redis.port";
-export { NoopSchedulerAuditSink, SchedulerAuditSink } from "./ports/scheduler-audit.sink";
-export {
-  type SchedulerOpsRepository,
-  type ScheduledJobRecord,
-} from "./ports/scheduler-ops.repository";
-export { NoopSchedulerWakeService, SchedulerWakeService } from "./ports/scheduler-wake.service";
+export { NoopSchedulerAuditSink, SchedulerAuditSinkPort } from "./ports/scheduler-audit-sink.port";
+export type {
+  SchedulerOpsRepository,
+  ScheduledJobRecord,
+} from "./repositories/scheduler-ops.repository";
+export { NoopSchedulerWakeService, SchedulerWakeService } from "./services/scheduler-wake.service";
 export {
   type AdminAccess,
   AdminAccessService,
   type AdminAccessServiceOptions,
 } from "./services/admin-access.service";
 export { AdminAuditSink } from "./services/impersonation.service";
-export * from "./ops.error-normalizer";
-export * from "./ops.redis-engine-cpu";
+export * from "./rules/ops-error-normalizer.rules";
+export * from "./rules/ops-redis-engine-cpu.rules";
 export { OpsWorkerAdapter, type OpsWorkerAdapterOptions } from "./adapters/ops-worker.adapter";
 export { AnomalyHardTierAlertPort } from "./ports/anomaly-hard-tier-alert.port";
 export { StorageStatsMetricsPort } from "./ports/storage-stats-metrics.port";
@@ -68,14 +68,14 @@ export {
 } from "./services/storage-stats-collection.service";
 export { QueuePayloadDecoderPort } from "./ports/queue-payload-decoder.port";
 export {
-  UsageStatsErrorReporter,
-  UsageStatsClickHouseClient,
-  UsageStatsClickHouseClientResolver,
-  UsageStatsTelemetryClient,
+  UsageStatsErrorReporterPort,
+  UsageStatsClickHouseClientPort,
+  UsageStatsClickHouseClientResolverPort,
+  UsageStatsTelemetryClientPort,
   type UsageStatsClickHouseQuery,
   type UsageStatsClickHouseQueryResult,
   type UsageStatsWorkerDatabase,
-} from "./ports/usage-stats-worker.ports";
+} from "./ports/usage-stats-worker.port";
 export {
   OpsWorkerPort,
   type OpsWorkerHandle,
@@ -91,7 +91,7 @@ export {
 } from "./services/manager-explorer.service";
 export { LOCK_REFRESH_INTERVAL_MS, ReplayService } from "./services/replay.service";
 export { OpsMetricsCollectorService } from "./services/ops-metrics-collector.service";
-export { totalInFlight, type InFlightCounts } from "./ops.in-flight";
+export { totalInFlight, type InFlightCounts } from "./rules/ops-in-flight.rules";
 export {
   OpsEventingIntrospectionPort,
   type OpsDejaViewProjection,
@@ -100,18 +100,19 @@ export {
 } from "./ports/eventing-introspection.port";
 export { EventingOpsIntrospectionAdapter } from "./adapters/eventing.ops-introspection.adapter";
 export { OpsReplayRuntimePort, type OpsReplayRuntime } from "./ports/replay-runtime.port";
-export {
-  NullEventExplorerRepository,
-  type AggregateDiscoveryRow,
-  type EventExplorerRepository,
-  type RawEventRow,
-} from "./ports/event-explorer.repository";
-export {
-  NullProcessOpsRepository,
-  type ProcessNameCounts,
-  type ProcessOpsRepository,
-} from "./ports/process-ops.repository";
-export { NullReplayRepository, type ReplayRepository } from "./ports/replay.repository";
+export { NullEventExplorerRepository } from "./adapters/null.event-explorer.adapter";
+export type {
+  AggregateDiscoveryRow,
+  EventExplorerRepository,
+  RawEventRow,
+} from "./repositories/event-explorer.repository";
+export { NullProcessOpsRepository } from "./adapters/null.process-ops.adapter";
+export type {
+  ProcessNameCounts,
+  ProcessOpsRepository,
+} from "./repositories/process-ops.repository";
+export { NullReplayRepository } from "./adapters/null.replay.adapter";
+export type { ReplayRepository } from "./repositories/replay.repository";
 export { ProcessOpsPrismaRepository } from "./repositories/prisma/prisma.process-ops.repository";
 export { EventExplorerClickHouseRepository } from "./repositories/clickhouse/clickhouse.event-explorer.repository";
 export { OpsExplainClickHouseRepository } from "./repositories/clickhouse/clickhouse.ops-explain.repository";
@@ -126,11 +127,8 @@ export {
   BugReportRateLimitedError,
   type SubmitBugReportInput,
 } from "./services/bug-report-intake.service";
-export {
-  BugReportNotifierPort,
-  BugReportRateLimiterPort,
-  SilentBugReportNotifier,
-} from "./ports/bug-report-intake.ports";
+export { BugReportNotifierPort, SilentBugReportNotifier } from "./ports/bug-report-notifier.port";
+export { BugReportRateLimiterPort } from "./ports/bug-report-rate-limiter.port";
 export {
   SlackBugReportNotifierAdapter,
   type OpsSlackAlertTransport,
@@ -150,7 +148,7 @@ export {
 export {
   migrationRunsOnThisInstallation,
   organizationMigrates,
-} from "./ops.system-migration-cohort";
+} from "./rules/ops-system-migration-cohort.rules";
 export {
   PostgresSystemMigrationsAdapter,
   type PostgresSystemMigrationsAdapterOptions,
@@ -196,7 +194,7 @@ export {
   parseOpsConnection,
   redactQueryForAudit,
   stripCommentsAndStrings,
-} from "./services/ops-clickhouse-explain.core";
+} from "./adapters/ops-clickhouse-explain.adapter";
 export {
   type OpsExplainOutcome,
   OpsExplainService,

@@ -60,7 +60,7 @@ import { ClickHouseContainer, type StartedClickHouseContainer } from "@testconta
 import { TEST_CLICKHOUSE_IMAGE } from "@langwatch/test-harness";
 import { expect } from "vitest";
 
-import { lwqlTenantCapability } from "../capability";
+import { lwqlTenantCapability } from "../../services/langwatch-ql-capability.service";
 import {
   CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH,
@@ -69,7 +69,7 @@ import {
   type LangWatchQLNames,
   type LangWatchQLTable,
   lwqlClickHouseSetupStatements,
-} from "../provisioning";
+} from "../../adapters/clickhouse.lwql-provisioning.adapter";
 
 /**
  * The administrative identity `@testcontainers/clickhouse` configures.

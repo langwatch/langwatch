@@ -13,7 +13,7 @@ import type {
   BetterAuthStoragePort,
 } from "../../../ports/better-auth.port";
 import { createAuthOptions, type BetterAuthDeploymentConfiguration } from "../better-auth.api";
-import type { SignInRouterShadowPort } from "../sign-in-router-shadow";
+import type { SignInRouterShadowPort } from "../sign-in-router-shadow.api";
 
 const PASSWORD: SignInMethod = { id: "password", kind: "password", connectionId: null };
 const OKTA: SignInMethod = { id: "okta", kind: "federated", connectionId: "org_acme" };
@@ -92,7 +92,8 @@ function buildHook(federation: StubFederationPort) {
   });
   const before = authOptions.hooks?.before;
   if (!before) throw new Error("createAuthOptions did not wire a `before` hook");
-  return (path: string, body: unknown = {}) => before({ request: { url: `https://app.test${path}` }, body } as never);
+  return (path: string, body: unknown = {}) =>
+    before({ request: { url: `https://app.test${path}` }, body } as never);
 }
 
 describe("the SSO license-gate request hook", () => {

@@ -34,25 +34,9 @@ import { SuccessPulse } from "../elements/success-pulse";
 const JOIN_BEFORE_CREATE_PATH = "/auth/join";
 
 /**
- * Sign-up (D13, ADR-117 §6, revised).
- *
- * The same funnel as log-in, entered from the other side: an address, then a
- * password, and the account exists. Confirming the address FOLLOWS somebody in
- * rather than standing in front of them — the link goes out once they are
- * already through the door, because waiting on an inbox is a wall in front of
- * the thing they came to do, and it is a wall that buys nothing. Everything
- * that actually trusts the address is gated on the identifier being verified,
- * not on the account existing; domain auto-join is the one that matters, and
- * it already refuses an unverified address.
- *
- * An abandoned sign-up still leaves nothing: the address step sends no mail
- * and creates no account, so it costs whoever typed it exactly nothing.
- *
- * An address that already has an account is not a wall (epic Q12 lets sign-up
- * acknowledge it). It is a person who came in the wrong door, so the screen
- * becomes the log-in method step with their address already in it: nothing
- * retyped, and the way into a half-created account — reset the password — is
- * on the same card.
+ * Sign-up (D13, ADR-117 §6, revised): address, then password, account exists.
+ * Confirmation FOLLOWS somebody in rather than blocking them. An address with
+ * an account already becomes the log-in step, pre-filled, not a wall.
  */
 export function VerificationFirstSignUp() {
   const query = useSearchParams();

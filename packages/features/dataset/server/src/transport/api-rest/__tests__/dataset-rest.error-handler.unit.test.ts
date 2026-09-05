@@ -1,7 +1,7 @@
-import { DatasetNotReadyError } from "../../../services/errors";
+import { DatasetNotReadyError } from "../../../services/dataset-errors.service";
 import type { Context, ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
-import { createDatasetErrorHandler } from "../dataset.error-handler";
+import { createDatasetErrorHandler } from "../dataset-error-handler.api";
 
 /** The process boundary this family layers over; unreached by these cases. */
 const unreachedBoundary: ErrorHandler = () => {

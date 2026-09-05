@@ -1,5 +1,5 @@
-import type { IdentityGuards } from "../guards";
-import type { MfaGuards } from "../mfa-guards";
+import type { IdentityGuards } from "../services/identity-guards.service";
+import type { MfaGuards } from "../services/mfa-guards.service";
 import {
   defineAggregate,
   defineEvents,

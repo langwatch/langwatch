@@ -7,7 +7,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import type { ScenarioApp } from "#app/scenario.app";
 import { createScenarioCrudRouter } from "../scenario-crud.api";
-import type { ScenarioTrpcContext } from "../scenario.trpc-context";
+import type { ScenarioTrpcContext } from "../../../rules/scenario-trpc-context.rules";
 
 function harness(permitted: boolean) {
   const trpc = initTRPC.context<ScenarioTrpcContext>().create();

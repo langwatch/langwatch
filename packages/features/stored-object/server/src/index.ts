@@ -19,18 +19,18 @@ export {
   type FilesProjectPermissionCheck,
   type FilesRateLimiter,
 } from "./transport/api-rest/stored-object.api";
-export { StoredObjectOwnerLookupRuntime } from "./adapters/stored-object-owner-lookup.runtime";
+export { StoredObjectOwnerLookupRuntime } from "./adapters/stored-object-owner-lookup-runtime.adapter";
 export {
   StoredObjectDestinationPolicy,
   StoredObjectAzureDestinationPort,
   StoredObjectProjectS3ConfigPort,
   type StoredObjectStorageSelection,
-} from "./adapters/stored-object-destination.policy";
+} from "./adapters/stored-object-destination-policy.adapter";
 export {
   StoredObjectStorageRegistry,
   type StoredObjectStorageDriver,
   type StoredObjectStorageDriverFactory,
-} from "./adapters/stored-object-storage.registry";
+} from "./adapters/stored-object-storage-registry.adapter";
 export { AzureBlobStoredObjectDriverAdapter } from "./adapters/azure-blob.stored-object-driver.adapter";
 export {
   ALLOW_INSECURE_TOKEN_ENDPOINT_ENV,
@@ -41,26 +41,26 @@ export {
   type AzureCredentials,
   type AzureInjectedIdentity,
   type AzureTokenAuthMode,
-} from "./adapters/azure-blob-credentials";
+} from "./adapters/azure-blob-credentials.adapter";
 export {
   AzureTokenExchangeError,
   getAzureBlobToken,
   invalidateAzureBlobToken,
   resetAzureTokenCacheForTests,
   type TokenModeCredentials,
-} from "./adapters/azure-blob-token-provider";
+} from "./adapters/azure-blob-token-provider.adapter";
 export {
   StoredObjectProjectDestinationResolverPort,
   StoredObjectStorageRuntime,
   type StoredObjectStorageProject,
   type StoredObjectStorageRuntimeOptions,
-} from "./adapters/stored-object-storage.runtime";
+} from "./adapters/stored-object-storage-runtime.adapter";
 export {
   StoredObjectsPublicApi,
   STORED_OBJECTS_PUBLIC_API_VERSION,
   type StoredObjectsPublicApp,
   type StoredObjectsPublicApiOptions,
-} from "./api/public/stored-object.api";
+} from "./transport/public-rest/stored-object.api";
 export {
   ClickHouseImportStoredObjectMigration,
   STORED_OBJECTS_CLICKHOUSE_IMPORT_MIGRATION_NAME,
@@ -99,7 +99,6 @@ export {
 /**
  * The CONTENT-ADDRESSED store, moved here whole from the platform application.
  */
-export { ObjectNotFoundError, UnsupportedStorageSchemeError } from "./errors";
 export {
   StoredObjectsClickHousePort,
   type StoredObjectsClickHouseClient,
@@ -110,7 +109,7 @@ export {
   type StoredObjectS3Credentials,
   type StoredObjectS3Target,
 } from "./ports/stored-object-s3-target.port";
-export { storedObjectSchema, type StoredObject } from "./repositories/stored-objects.row";
+export { storedObjectSchema, type StoredObject } from "./rules/stored-object-row.rules";
 export { StoredObjectsRepository } from "./repositories/stored-objects.repository";
 export { ClickHouseStoredObjectsRepository } from "./repositories/clickhouse/stored-objects.repository";
 export {

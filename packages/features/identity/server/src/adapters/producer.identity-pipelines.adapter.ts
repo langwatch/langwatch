@@ -1,23 +1,23 @@
 /**
  * The four identity pipelines as a PRODUCER registers them. One definition, two registrations.
  */
-import { IdentityGuards } from "../guards";
-import { JoinRequestGuards } from "../join-request-guards";
-import { MfaGuards } from "../mfa-guards";
-import { ScimSyncGuards } from "../scim-sync-guards";
-import { SsoConnectionGuards } from "../sso-connection-guards";
-import type { IdentityHeadsRepository } from "../identity-heads.repository";
-import type { IdentityReservationRepository } from "../identity-reservations.repository";
-import type { IdentityUsersRepository } from "../identity-users.repository";
-import type { JoinRequestReadRepository } from "../join-request.repository";
-import type { MfaEnrollmentRepository } from "../mfa-enrollment.repository";
-import type { ScimSyncReadRepository } from "../scim-sync.repository";
+import { IdentityGuards } from "../services/identity-guards.service";
+import { JoinRequestGuards } from "../services/join-request-guards.service";
+import { MfaGuards } from "../services/mfa-guards.service";
+import { ScimSyncGuards } from "../services/scim-sync-guards.service";
+import { SsoConnectionGuards } from "../services/sso-connection-guards.service";
+import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository";
+import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository";
+import type { IdentityUsersRepository } from "../repositories/identity-users.repository";
+import type { JoinRequestReadRepository } from "../repositories/join-request.repository";
+import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository";
+import type { ScimSyncReadRepository } from "../repositories/scim-sync.repository";
 import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
   SsoPlatformOperatorRepository,
-} from "../sso-connection.repository";
+} from "../repositories/sso-connection.repository";
 import type { StateProjectionStore, StoredProjection } from "@langwatch/eventing";
 import {
   IdentityPipelineDefinitionAdapter,

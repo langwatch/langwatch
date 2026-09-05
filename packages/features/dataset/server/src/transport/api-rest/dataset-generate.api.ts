@@ -29,7 +29,7 @@ import {
   type UIMessage,
 } from "ai";
 
-import { tools } from "./dataset-generate.tools";
+import { tools } from "../../rules/dataset-generate-tools.rules";
 
 const logger = createLogger("langwatch:api:dataset:generate");
 

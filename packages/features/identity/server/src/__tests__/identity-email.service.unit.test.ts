@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { IdentityEmailService } from "../identity-email.service";
+import { IdentityEmailService } from "../services/identity-email.service";
 import { fact, InMemoryHeads, USER } from "./support/in-memory-heads";
 
 function harness(options?: { onIdentity?: boolean }) {

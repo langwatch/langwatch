@@ -3,7 +3,7 @@ import {
   type CallbackAssertion,
   type CallbackUserMatch,
   SignInCallbackLinkingService,
-} from "../signin-callback-linking.service";
+} from "../services/signin-callback-linking.service";
 
 const ASSERTION: CallbackAssertion = {
   connectionId: "conn_acme",

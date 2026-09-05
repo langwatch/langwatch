@@ -1,3 +1,4 @@
+import type { Protections } from "@langwatch/trace-contract";
 /**
  * The ClickHouse trace READ stack, composed from this process's own graph.
  */
@@ -47,46 +48,7 @@ import {
   type Trace,
   type TraceService as TraceTreeService,
 } from "@langwatch/trace-contract";
-import {
-  TraceBlobStoreService,
-  ClickHouseTraceAdapter,
-  DERIVED_INPUT_ATTR_PREFIX,
-  DERIVED_OUTPUT_ATTR_PREFIX,
-  TraceAiQueryService,
-  LogRecordStorageClickHouseRepository,
-  LogRecordStorageService,
-  NullLogRecordStorageRepository,
-  NullSessionGroupsRepository,
-  NullSpanStorageRepository,
-  NullTraceListAdapter,
-  NullTraceSummaryRepository,
-  SessionGroupsClickHouseRepository,
-  SessionGroupsService,
-  SpanStorageClickHouseRepository,
-  SpanStorageService,
-  TraceCanonicalisationService,
-  ClickHouseTraceLegacyReadAdapter,
-  PrismaTraceEditOverlayRepository,
-  TraceEditOverlayService,
-  TraceIOExtractionService,
-  TraceListClickHouseRepository,
-  TraceListService,
-  TraceLegacyReadService,
-  TraceNotFoundError,
-  TraceFullIoPort,
-  TracePayloadReaderPort,
-  TraceQueryClassificationAdapter,
-  TraceSpanIngestPort,
-  TraceSummaryClickHouseRepository,
-  TraceSummaryService,
-  traceMetadataUpdateSchema,
-  VisibilityWindowService,
-  type ClaudeSpanRef,
-  type Protections,
-  type TraceLegacyFilterConditions,
-  type TracesV2TrpcPorts,
-  type TraceAppDependencies,
-} from "@langwatch/trace-server";
+import { TraceBlobStoreService, ClickHouseTraceAdapter, DERIVED_INPUT_ATTR_PREFIX, DERIVED_OUTPUT_ATTR_PREFIX, TraceAiQueryService, LogRecordStorageClickHouseRepository, LogRecordStorageService, NullLogRecordStorageRepository, NullSessionGroupsRepository, NullSpanStorageRepository, NullTraceListAdapter, NullTraceSummaryRepository, SessionGroupsClickHouseRepository, SessionGroupsService, SpanStorageClickHouseRepository, SpanStorageService, TraceCanonicalisationService, ClickHouseTraceLegacyReadAdapter, PrismaTraceEditOverlayRepository, TraceEditOverlayService, TraceIOExtractionService, TraceListClickHouseRepository, TraceListService, TraceLegacyReadService, TraceNotFoundError, TraceFullIoPort, TracePayloadReaderPort, TraceQueryClassificationAdapter, TraceSpanIngestPort, TraceSummaryClickHouseRepository, TraceSummaryService, traceMetadataUpdateSchema, VisibilityWindowService, type ClaudeSpanRef, type TraceLegacyFilterConditions, type TracesV2TrpcPorts, type TraceAppDependencies } from "@langwatch/trace-server";
 import type { TracesTrpcPorts } from "@langwatch/trace-server";
 import {
   findPromptReferenceInAncestors,

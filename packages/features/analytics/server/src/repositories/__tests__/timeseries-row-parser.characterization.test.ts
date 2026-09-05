@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTimeseriesRows } from "../timeseries-row-parser";
+import { parseTimeseriesRows } from "../clickhouse/clickhouse.timeseries-row-parser.mapper";
 
 describe("Analytics timeseries row compatibility", () => {
   it("keeps current and previous bucket ordering and preserves nullable metrics", () => {

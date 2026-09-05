@@ -10,7 +10,7 @@ import { categorizeRunStatus, type RunStatusCategory } from "@langwatch/scenario
 import {
   serializeRunsToCriteriaCsv,
   serializeRunsToFullCsv,
-} from "./scenario-run-export-csv.rules";
+} from "./scenario-run-export-csv.service";
 import type {
   ScenarioRunExportProgress,
   ScenarioRunExportRequest,

@@ -1,3 +1,4 @@
+import type { CategoryVisibility, Protections } from "@langwatch/trace-contract";
 /**
  * The mapping and redaction layer both trace-view transports share. `tracesV2.*` (authenticated) and `sharedTrace.get` (the one anonymous read ADR-057 allows) render the same trace out of the same rows — every mapper here is applied by BOTH, so a redaction added to one and forgotten in the other can't silently leak to share viewers. Sits under `transport/api-trpc/` beside the gates (see `trace-view-gates.api.ts`) since it is transport-shaped presentation, not a service, and strict layout v0 admits nothing else here. Three capabilities are the APPLICATION'S, not Trace's, and arrive as arguments rather than imports: captured input/output display rendering, the legacy span-protection pass, and the data-privacy vertical's content catalog/markers/chat-turn stripper — each belongs to a vertical this package does not own, so injecting them avoids dragging three other features' modules along.
  */
@@ -24,10 +25,6 @@ import {
 } from "@langwatch/trace-contract";
 import type { CodingAgentService, LogContentCategory } from "@langwatch/coding-agent-contract";
 import { TraceAttributeRedactionService } from "../../services/trace-attribute-redaction.service";
-import type {
-  CategoryVisibility,
-  Protections,
-} from "../../services/trace-viewer-protections.service";
 
 // ---------------------------------------------------------------------------
 // Ports

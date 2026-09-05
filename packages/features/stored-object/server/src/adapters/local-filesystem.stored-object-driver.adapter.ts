@@ -9,8 +9,8 @@ import path from "node:path";
 import type { Readable } from "node:stream";
 import { createLogger } from "@langwatch/observability";
 import { getStoredObjectStorageScheme } from "@langwatch/stored-object-contract";
-import { ObjectNotFoundError } from "../errors";
-import type { StoredObjectStorageDriver } from "./stored-object-storage.registry";
+import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
+import type { StoredObjectStorageDriver } from "./stored-object-storage-registry.adapter";
 
 const logger = createLogger("langwatch:stored-objects:local-filesystem-driver");
 

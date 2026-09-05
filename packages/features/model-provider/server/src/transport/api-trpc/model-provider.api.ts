@@ -2,7 +2,7 @@
  * The Model Provider surface over the process's tRPC transport.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { CustomModelList } from "../../rules/custom-model-list.rules";
+import { toCanonicalCustomModelList } from "../../rules/custom-model-list.rules";
 import {
   modelDefaultConfigDeleteTrpcInputSchema,
   modelDefaultConfigSaveTrpcInputSchema,
@@ -292,8 +292,8 @@ export class ModelProviderTrpcApi {
             name: input.name,
             enabled: input.enabled,
             customKeys: input.customKeys as Record<string, unknown> | null | undefined,
-            customModels: CustomModelList.toCanonical(input.customModels, "chat"),
-            customEmbeddingsModels: CustomModelList.toCanonical(
+            customModels: toCanonicalCustomModelList(input.customModels, "chat"),
+            customEmbeddingsModels: toCanonicalCustomModelList(
               input.customEmbeddingsModels,
               "embedding",
             ),

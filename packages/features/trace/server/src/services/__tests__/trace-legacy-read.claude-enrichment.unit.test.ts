@@ -1,3 +1,4 @@
+import type { Protections } from "@langwatch/trace-contract";
 /**
  * TraceService.getById read-time Claude Code content enrichment, exercised at the real seam: the ClickHouse trace
  * read + the log-record store are mocked boundaries (no Docker), the enrichment adapter + pure join run for real.
@@ -8,7 +9,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceLogRecordReader } from "../claude-code-log-enrichment.service";
 import type { Span, Trace } from "@langwatch/trace-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
-import type { Protections } from "@langwatch/trace-server";
 
 const {
   mockGetTracesWithSpans,

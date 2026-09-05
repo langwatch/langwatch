@@ -1,3 +1,4 @@
+import type { Protections } from "@langwatch/trace-contract";
 /**
  * The trace explorer's reads over the process's tRPC transport — the `tracesV2.*`
  * surface, twenty-nine procedures behind one permission model.
@@ -65,7 +66,7 @@ import {
 } from "@langwatch/trace-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import type { Protections } from "../../services/trace-viewer-protections.service";
+
 import {
   buildContentPrivacy,
   buildSpanContentRedactions,

@@ -1,6 +1,6 @@
-import { IdentityGuards } from "../guards";
-import type { IdentityReservationRepository } from "../identity-reservations.repository";
-import { MfaGuards } from "../mfa-guards";
+import { IdentityGuards } from "../services/identity-guards.service";
+import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository";
+import { MfaGuards } from "../services/mfa-guards.service";
 import {
   PrismaIdentityHeadsRepository,
   type PrismaIdentityHeadsDatabase,

@@ -24,7 +24,7 @@ import {
   testSuiteRunInputSchema,
   testSuiteWireSchema,
   toRunItemsWire,
-} from "./suite-wire-v1";
+} from "../../rules/suite-wire-v1.rules";
 
 const idParamsSchema = z.object({ id: z.string().min(1).describe("The test suite id.") });
 

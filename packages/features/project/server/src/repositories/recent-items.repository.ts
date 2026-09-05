@@ -1,5 +1,5 @@
 import type { AuditLog } from "@langwatch/prisma-client/generated";
-import type { GetRecentItemsParams } from "../services/recent-items.types";
+import type { GetRecentItemsParams } from "../rules/recent-items.rules";
 
 /** The columns the strip needs to render one row and link it. */
 type RecentEntityRow = {

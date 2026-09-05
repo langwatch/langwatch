@@ -2,8 +2,8 @@ import { createLogger } from "@langwatch/observability";
 import { EventEmitter } from "events";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { BroadcasterNotActiveError } from "./broadcast.errors";
-import { TenantRateLimiter } from "./broadcast-tenant-rate-limiter";
+import { BroadcasterNotActiveError } from "@langwatch/presence-contract";
+import { TenantRateLimiter } from "./broadcast-tenant-rate-limiter.adapter";
 
 export type BroadcastEventType =
   | "trace_updated"

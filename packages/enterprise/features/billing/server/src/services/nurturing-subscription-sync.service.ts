@@ -1,4 +1,8 @@
-import { reportNurturingFailure, tryNurturingDatabase, tryNurturingSink } from "./nurturing-sink";
+import {
+  reportNurturingFailure,
+  tryNurturingDatabase,
+  tryNurturingSink,
+} from "../adapters/nurturing-sink.adapter";
 
 async function syncSubscriptionTrait({
   organizationId,

@@ -5,7 +5,7 @@ import {
   type ScimUser,
 } from "@langwatch/enterprise-scim-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ScimWebhookApi } from "../api/scim-webhook/scim-webhook.api";
+import { ScimWebhookApi } from "../transport/api-rest/scim-webhook.api";
 import { ScimDirectoryService } from "../services/scim-directory.service";
 import { ScimGrantsService } from "../services/scim-grants.service";
 import type { ScimDirectoryRepository } from "../services/scim-directory.service";

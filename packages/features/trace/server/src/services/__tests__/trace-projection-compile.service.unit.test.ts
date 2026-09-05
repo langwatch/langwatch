@@ -1,9 +1,10 @@
+import type { Protections } from "@langwatch/trace-contract";
 import { TraceProjectionCompileService } from "../trace-projection-compile.service";
 import { describe, expect, it } from "vitest";
 import type { Trace } from "@langwatch/trace-contract";
-import type { Protections } from "../trace-viewer-protections.service";
-import type { ProjectableTrace } from "../trace-projection.types";
-import { ProjectionValidationError } from "../trace-projection.types";
+
+import type { ProjectableTrace } from "@langwatch/trace-contract";
+import { ProjectionValidationError } from "@langwatch/trace-contract";
 
 const fullAccess: Protections = {
   canSeeCosts: true,

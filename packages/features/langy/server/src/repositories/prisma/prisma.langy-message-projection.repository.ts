@@ -1,7 +1,7 @@
 import type { AppendStore, ProjectionStoreContext } from "@langwatch/eventing";
 import type { LangyMessageProjectionRecord } from "@langwatch/langy-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
-import type { LangyDatabase } from "./langy-database.port";
+import type { LangyDatabase } from "./prisma.langy-database.repository";
 
 /** Append-only Postgres adapter for operational message rows. */
 export class PrismaLangyMessageProjectionRepository implements AppendStore<LangyMessageProjectionRecord> {

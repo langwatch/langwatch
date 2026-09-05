@@ -9,7 +9,7 @@
 import type { ModelProviderCredentialCipherPort } from "@langwatch/model-provider-server";
 import { describe, expect, it } from "vitest";
 import { runModelProviderKeysMigration } from "../model-provider-credentials-migrate.task";
-import type { ModelProviderMigrationDatabase } from "../model-provider-migration.shared";
+import type { ModelProviderMigrationDatabase } from "../../rules/model-provider-migration.rules";
 
 /** A stand-in for AES-GCM with the same three-segment shape the column holds. */
 function cipher(): ModelProviderCredentialCipherPort & { decrypted: string[] } {

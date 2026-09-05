@@ -12,7 +12,7 @@
  * The project-scoped `/api/coding-agent/pull-request-usage` answers the same
  * question but recovers a calling person through their personal workspace's
  * project id, an indirection an organization key already makes unnecessary. It
- * stays, and both doors answer the same wire ({@link pull-request-usage.wire}).
+ * stays, and both doors answer the same wire ({@link pull-request-usage-wire.rules}).
  *
  * `GET /sessions/:sessionId/events` is deliberately NOT here: it reads one
  * project's data and is correctly addressed by a project credential, so it
@@ -44,7 +44,7 @@ import {
   pullRequestUsageParameters,
   pullRequestUsageQuerySchema,
   pullRequestUsageResponseSchema,
-} from "./pull-request-usage.wire";
+} from "../../rules/pull-request-usage-wire.rules";
 
 /** REST for the organization-keyed coding-agent reads, `/api/v1/coding-agent`. */
 export function createCodingAgentV1RestApp(options: {

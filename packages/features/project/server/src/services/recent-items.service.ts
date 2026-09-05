@@ -5,7 +5,7 @@ import {
   type GetRecentItemsParams,
   type RecentItem,
   type RecentItemType,
-} from "./recent-items.types";
+} from "../rules/recent-items.rules";
 
 /**
  * Service for recent items functionality

@@ -202,7 +202,7 @@ export {
   type EmailSuppressionTrpcContext,
   type EmailSuppressionTrpcPorts,
 } from "./transport/api-trpc/email-suppression.api";
-export { buildRetryAfterMessage } from "./transport/api-trpc/retry-after-message";
+export { buildRetryAfterMessage } from "./rules/retry-after-message.rules";
 
 /**
  * The feature's application: the one object all three of its doors call, and

@@ -1,3 +1,4 @@
+import type { Protections } from "@langwatch/trace-contract";
 import type {
   CustomersAndLabelsResult,
   DistinctFieldNamesResult,
@@ -6,12 +7,12 @@ import type {
   Trace,
   TracesForProjectResult,
 } from "@langwatch/trace-contract";
-import type { Protections } from "../services/trace-viewer-protections.service";
+
 import type {
   AggregationFiltersInput,
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
-} from "../services/trace-legacy-read.types";
+} from "@langwatch/trace-contract";
 
 /**
  * Partition-key bound a multi-trace read prunes on: earliest and latest occurrence time (epoch ms) in the requested set. A one-trace caller passes an exact point range (from===to); the store widens it by its own safety margin.

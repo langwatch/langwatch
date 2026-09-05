@@ -38,7 +38,7 @@ import {
 } from "../services/trace-io-accumulation.service";
 import { TraceLogRecordIOService } from "../services/trace-log-record-io.service";
 import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service";
-import { anchorStorageTime } from "../services/trace-storage-anchor.rules";
+import { anchorStorageTime } from "../rules/trace-storage-anchor.rules";
 
 export type { TraceSummaryData };
 

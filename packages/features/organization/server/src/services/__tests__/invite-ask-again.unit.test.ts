@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { InviteNotFoundError, InviteThrottledError } from "../invite.errors";
+import { InviteNotFoundError, InviteThrottledError } from "../invite-errors.service";
 import { InviteService } from "../invite.service";
 import { InviteSendThrottleService } from "../invite-send-throttle.service";
 import type {

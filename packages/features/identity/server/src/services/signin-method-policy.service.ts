@@ -1,5 +1,5 @@
 import type { SignInMethod, SignInMethodPolicy } from "@langwatch/identity-contract";
-import type { SignInMethodPolicyPort } from "../signin-router.service";
+import type { SignInMethodPolicyPort } from "./signin-router.service";
 
 /**
  * The instance's method-set policy (ADR-117 §4) — the module ADR-027's

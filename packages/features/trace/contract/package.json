@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@langwatch/annotation-contract": "workspace:*",
+    "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",

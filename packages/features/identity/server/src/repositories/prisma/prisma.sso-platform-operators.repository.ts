@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PlatformOperatorPort } from "../../ports/platform-operator.port";
-import type { SsoPlatformOperatorRepository } from "../../sso-connection.repository";
+import type { SsoPlatformOperatorRepository } from "../sso-connection.repository";
 
 /** The one model an operator check reads, and no other. */
 export type PrismaSsoPlatformOperatorDatabase = Pick<PrismaClient, "user">;

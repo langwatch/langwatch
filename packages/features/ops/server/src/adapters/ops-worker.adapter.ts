@@ -9,11 +9,11 @@ import {
   type UsageStatsWorkerConfig,
 } from "../ports/ops-worker.port";
 import type {
-  UsageStatsClickHouseClientResolver,
-  UsageStatsErrorReporter,
-  UsageStatsTelemetryClient,
+  UsageStatsClickHouseClientResolverPort,
+  UsageStatsErrorReporterPort,
+  UsageStatsTelemetryClientPort,
   UsageStatsWorkerDatabase,
-} from "../ports/usage-stats-worker.ports";
+} from "../ports/usage-stats-worker.port";
 import { ClickHouseUsageStatsRepository } from "../repositories/clickhouse/clickhouse.usage-stats.repository";
 import { PrismaUsageStatsOrganizationRepository } from "../repositories/prisma/prisma.usage-stats-organization.repository";
 import { PrismaUsageStatsProjectRepository } from "../repositories/prisma/prisma.usage-stats-project.repository";
@@ -23,7 +23,7 @@ import { UsageStatsCollectionService } from "../services/usage-stats-collection.
 import {
   AnomalyWorkerContribution,
   UsageStatsWorkerContribution,
-} from "../workers/ops-worker.contribution";
+} from "./ops-worker-contribution.adapter";
 import { RedisTenantRateTrackerAdapter } from "./redis.tenant-rate-tracker.adapter";
 
 const anomalyLogger = createLogger("langwatch:observability:anomalyWorker");
@@ -36,10 +36,10 @@ export interface OpsWorkerAdapterOptions {
   };
   usageStats: {
     database: UsageStatsWorkerDatabase;
-    clickhouse: UsageStatsClickHouseClientResolver;
+    clickhouse: UsageStatsClickHouseClientResolverPort;
     config: UsageStatsWorkerConfig;
-    telemetry: UsageStatsTelemetryClient;
-    errors: UsageStatsErrorReporter;
+    telemetry: UsageStatsTelemetryClientPort;
+    errors: UsageStatsErrorReporterPort;
     builderChartKind: string;
   };
 }

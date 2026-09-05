@@ -20,9 +20,12 @@
 
 import { describe, expect, it } from "vitest";
 
-import { LWQL_VIEW_CATALOG } from "../catalog/lwql-views";
-import { lwqlPostgresViews } from "../catalog/types";
-import { lwqlApprovedPostgresViewNames, lwqlPostgresApprovedViewStatements } from "../views";
+import { LWQL_VIEW_CATALOG } from "../../repositories/clickhouse/clickhouse.lwql-view-catalog.mapper";
+import { lwqlPostgresViews } from "../../adapters/clickhouse.lwql-catalog-shapes.adapter";
+import {
+  lwqlApprovedPostgresViewNames,
+  lwqlPostgresApprovedViewStatements,
+} from "../../repositories/clickhouse/clickhouse.lwql-views.mapper";
 
 /**
  * The prefix the infrastructure bootstrap's grant predicate matches

@@ -6,7 +6,7 @@ import type {
   ProcessInstanceDetail,
 } from "@langwatch/ops-contract";
 import type { ProcessAuditEntryView } from "@langwatch/ops-contract";
-import type { ProcessAuditSink } from "../ports/process-audit.sink";
+import type { ProcessAuditSinkPort } from "../ports/process-audit-sink.port";
 import type {
   DeadLetterCount,
   DeadOutboxMessageView,
@@ -15,7 +15,7 @@ import type {
   ProcessOutboxMessageView,
   ProcessWakeRow,
 } from "@langwatch/ops-contract";
-import type { ProcessOpsRepository } from "../ports/process-ops.repository";
+import type { ProcessOpsRepository } from "../repositories/process-ops.repository";
 import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port";
 
 /**
@@ -36,14 +36,14 @@ const logger = createLogger("langwatch:ops:manager-explorer");
 export class ManagerExplorerService {
   private readonly store: ProcessStore;
   private readonly fleet: ProcessOpsRepository;
-  private readonly audit: ProcessAuditSink;
+  private readonly audit: ProcessAuditSinkPort;
   /** The live pipeline surface, supplied by the process composition. */
   private readonly introspection: OpsEventingIntrospectionPort;
 
   static create(params: {
     store: ProcessStore;
     fleet: ProcessOpsRepository;
-    audit: ProcessAuditSink;
+    audit: ProcessAuditSinkPort;
     introspection: OpsEventingIntrospectionPort;
   }): ManagerExplorerService {
     return new ManagerExplorerService(params);
@@ -52,7 +52,7 @@ export class ManagerExplorerService {
   private constructor(params: {
     store: ProcessStore;
     fleet: ProcessOpsRepository;
-    audit: ProcessAuditSink;
+    audit: ProcessAuditSinkPort;
     introspection: OpsEventingIntrospectionPort;
   }) {
     this.store = params.store;

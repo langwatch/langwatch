@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
-import { computeEffectiveTeamRoleUpdates } from "../compute-effective-team-role-updates";
+import { computeEffectiveTeamRoleUpdates } from "../compute-effective-team-role-updates.service";
 
 describe("computeEffectiveTeamRoleUpdates()", () => {
   describe("when requested updates are present", () => {

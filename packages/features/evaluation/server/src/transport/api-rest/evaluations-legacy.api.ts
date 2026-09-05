@@ -60,7 +60,7 @@ import {
   evaluatorCatalogueResponseSchema,
   legacySentenceErrorSchema,
   requestBodySchema,
-} from "./evaluations-legacy.schemas";
+} from "../../rules/evaluations-legacy-schemas.rules";
 
 /**
  * What the evaluator runtime is handed, as this family builds it. Two arms, because the two

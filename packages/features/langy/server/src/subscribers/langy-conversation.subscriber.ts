@@ -12,8 +12,8 @@ import {
   type LangyTurnAdmissionCapability,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import type { LangyConversationProcessingEvent } from "../services/langy-conversation.events";
-import { LangyTurnErrors, LangyWorkerStoppedError } from "../services/langy-turn-errors.errors";
+import type { LangyConversationProcessingEvent } from "../adapters/eventing.langy-conversation-events.adapter";
+import { LangyTurnErrors, LangyWorkerStoppedError } from "../services/langy-turn-errors.service";
 
 const livenessLogger = createLogger("langwatch:langy:agent-turn-liveness-subscriber");
 const broadcastLogger = createLogger("langwatch:langy:conversation-update-broadcast-subscriber");

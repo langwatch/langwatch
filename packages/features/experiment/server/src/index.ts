@@ -32,8 +32,8 @@ export {
   type ExperimentTrpcPorts,
 } from "./transport/api-trpc/experiment.api";
 export { createExperimentsRestApp } from "./transport/api-rest/experiment.api";
-export { createBlankWorkbenchState } from "./transport/api-rest/experiment.blank-workbench-state";
-export { workbenchActorFrom } from "./transport/api-rest/experiment.workbench-actor";
+export { createBlankWorkbenchState } from "./rules/experiment-blank-workbench-state.rules";
+export { workbenchActorFrom } from "./rules/experiment-workbench-actor.rules";
 export {
   createExperimentBodySchema,
   createExperimentResponseSchema,
@@ -54,7 +54,7 @@ export {
   workbenchStateResponseSchema,
   workbenchStateSchema,
   workbenchVersionProbeResponseSchema,
-} from "./transport/api-rest/experiment.schemas";
+} from "./rules/experiment-schemas.rules";
 
 /**
  * The run-state fold store, composed for a process. The repository behind it
@@ -65,7 +65,6 @@ export { ExperimentRunStateStoreAdapter } from "./adapters/experiment-run-state-
 /**
  * The workbench run loop, moved WHOLE out of the retired application.
  */
-export { EvaluatorNoInputsResolvedError } from "./experiment-execution.errors";
 export { createSemaphore } from "./processes/experiment-run-semaphore.process";
 export {
   buildStripScoreEvaluatorIds,

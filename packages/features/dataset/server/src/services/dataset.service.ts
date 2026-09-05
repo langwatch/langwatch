@@ -49,8 +49,8 @@ import {
   DatasetNotFoundError,
   DatasetNotReadyError,
   InvalidColumnError,
-} from "./errors";
-import { stripNullBytes } from "./sanitize";
+} from "./dataset-errors.service";
+import { stripNullBytes } from "../rules/dataset-sanitize.rules";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
 import type { DatasetRepository, DatasetUpdateInput } from "../repositories/dataset.repository";
 import type { DatasetRecordRepository } from "../repositories/dataset-record.repository";

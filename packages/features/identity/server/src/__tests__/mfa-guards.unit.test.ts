@@ -6,8 +6,8 @@ import {
   reduceMfaEnrollment,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
-import { MfaGuards } from "../mfa-guards";
-import type { MfaEnrollmentRepository } from "../mfa-enrollment.repository";
+import { MfaGuards } from "../services/mfa-guards.service";
+import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };

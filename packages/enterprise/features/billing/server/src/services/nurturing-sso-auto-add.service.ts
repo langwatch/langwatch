@@ -1,4 +1,4 @@
-import { reportNurturingFailure, tryNurturingSink } from "./nurturing-sink";
+import { reportNurturingFailure, tryNurturingSink } from "../adapters/nurturing-sink.adapter";
 
 export class NurturingSsoAutoAddService {
   static create(): NurturingSsoAutoAddService {

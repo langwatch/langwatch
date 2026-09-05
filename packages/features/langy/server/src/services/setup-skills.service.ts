@@ -2,7 +2,7 @@
  * The skill instructions the "copy a prompt" menu hands to a coding agent.
  * Spec: specs/skills/empty-state-skill-setup.feature
  */
-import { SETUP_SKILL_BODIES } from "./setup-skill-bodies.generated";
+import { SETUP_SKILL_BODIES } from "../rules/setup-skill-bodies.rules";
 
 export type SetupSkillId = keyof typeof SETUP_SKILL_BODIES;
 

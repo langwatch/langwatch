@@ -24,34 +24,37 @@ import {
   type ExtractMessageTextInput,
   TraceCanonicalisationService as TraceCanonicalisationServiceContract,
 } from "@langwatch/trace-contract";
-import { ClaudeCodeCanonicaliser } from "./canonicalisation/claude-code.canonicaliser";
-import { CodexCanonicaliser } from "./canonicalisation/codex.canonicaliser";
-import { CopilotCanonicaliser } from "./canonicalisation/copilot.canonicaliser";
-import { FallbackCanonicaliser } from "./canonicalisation/fallback.canonicaliser";
-import { GenAICanonicaliser } from "./canonicalisation/gen-ai.canonicaliser";
-import { HaystackCanonicaliser } from "./canonicalisation/haystack.canonicaliser";
-import { LangWatchCanonicaliser } from "./canonicalisation/langwatch.canonicaliser";
-import { LegacyOtelCanonicaliser } from "./canonicalisation/legacy-otel.canonicaliser";
-import { LogfireCanonicaliser } from "./canonicalisation/logfire.canonicaliser";
-import { MastraCanonicaliser } from "./canonicalisation/mastra.canonicaliser";
-import { OpenInferenceCanonicaliser } from "./canonicalisation/openinference.canonicaliser";
-import { SpringAICanonicaliser } from "./canonicalisation/spring-ai.canonicaliser";
-import { StrandsCanonicaliser } from "./canonicalisation/strands.canonicaliser";
-import { TraceloopCanonicaliser } from "./canonicalisation/traceloop.canonicaliser";
-import { VercelCanonicaliser } from "./canonicalisation/vercel.canonicaliser";
-import { VertexAdkCanonicaliser } from "./canonicalisation/vertex-adk.canonicaliser";
+import { ClaudeCodeCanonicaliser } from "../adapters/claude-code.canonicaliser.adapter";
+import { CodexCanonicaliser } from "../adapters/codex.canonicaliser.adapter";
+import { CopilotCanonicaliser } from "../adapters/copilot.canonicaliser.adapter";
+import { FallbackCanonicaliser } from "../adapters/fallback.canonicaliser.adapter";
+import { GenAICanonicaliser } from "../adapters/gen-ai.canonicaliser.adapter";
+import { HaystackCanonicaliser } from "../adapters/haystack.canonicaliser.adapter";
+import { LangWatchCanonicaliser } from "../adapters/langwatch.canonicaliser.adapter";
+import { LegacyOtelCanonicaliser } from "../adapters/legacy-otel.canonicaliser.adapter";
+import { LogfireCanonicaliser } from "../adapters/logfire.canonicaliser.adapter";
+import { MastraCanonicaliser } from "../adapters/mastra.canonicaliser.adapter";
+import { OpenInferenceCanonicaliser } from "../adapters/openinference.canonicaliser.adapter";
+import { SpringAICanonicaliser } from "../adapters/spring-ai.canonicaliser.adapter";
+import { StrandsCanonicaliser } from "../adapters/strands.canonicaliser.adapter";
+import { TraceloopCanonicaliser } from "../adapters/traceloop.canonicaliser.adapter";
+import { VercelCanonicaliser } from "../adapters/vercel.canonicaliser.adapter";
+import { VertexAdkCanonicaliser } from "../adapters/vertex-adk.canonicaliser.adapter";
 import type { ExtractorContext, LogExtractorContext } from "../ports/canonical-attributes.port";
 import { CanonicalAttributesPort } from "../ports/canonical-attributes.port";
-import { LogRecordDataBag } from "../stores/canonical-log-record.bag";
-import { SpanDataBag } from "../stores/canonical-span.bag";
-import { parseJsonStringValues } from "./canonical-json.rules";
-import { extractLastUserMessageText, extractMessageContentText } from "./canonical-message.rules";
+import { LogRecordDataBag } from "../stores/canonical-log-record.store";
+import { SpanDataBag } from "../stores/canonical-span.store";
+import { parseJsonStringValues } from "../rules/canonical-json.rules";
+import {
+  extractLastUserMessageText,
+  extractMessageContentText,
+} from "../rules/canonical-message.rules";
 import {
   claudeCacheWritesLongLived,
   isConversationalQuerySource,
-} from "./claude-code-call-policy.rules";
-import { ClaudeCodeRequest } from "./claude-code-request.rules";
-import { ClaudeCodeResponse } from "./claude-code-response.rules";
+} from "../rules/claude-code-call-policy.rules";
+import { ClaudeCodeRequest } from "./claude-code-request.service";
+import { ClaudeCodeResponse } from "./claude-code-response.service";
 
 export class TraceCanonicalisationService extends TraceCanonicalisationServiceContract {
   private readonly extractors: CanonicalAttributesPort[] = [

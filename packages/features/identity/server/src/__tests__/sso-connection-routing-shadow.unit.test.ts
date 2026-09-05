@@ -1,10 +1,10 @@
 import type { RoutableConnection } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
-import type { SignInDomainRoutingPort } from "../signin-router.service";
+import type { SignInDomainRoutingPort } from "../services/signin-router.service";
 import {
   ShadowComparingDomainRoutingRepository,
   type SsoConnectionRoutingShadowRecord,
-} from "../sso-connection-routing-shadow";
+} from "../adapters/sso-connection-routing-shadow.adapter";
 
 function routable(
   overrides: Partial<RoutableConnection> & { connectionId: string },
