@@ -8,7 +8,7 @@ import { observable } from "@trpc/server/observable";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
-import { traceApi } from "../trace-api";
+import { traceApi } from "../../../behavior/trace-api";
 import { TracePeekSummary } from "../trace-peek-summary";
 
 /**

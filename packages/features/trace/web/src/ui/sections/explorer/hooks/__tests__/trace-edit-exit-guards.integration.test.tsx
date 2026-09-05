@@ -31,7 +31,7 @@ vi.mock("../../../../../behavior/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     useUtils: () => ({
       traceEditOverlay: {

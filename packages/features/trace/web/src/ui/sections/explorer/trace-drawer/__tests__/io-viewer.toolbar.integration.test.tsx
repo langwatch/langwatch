@@ -54,7 +54,7 @@ vi.mock("../../../use-field-redaction", () => ({
   }),
 }));
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     useQueries: () => [{ data: mocks.storedComments, isLoading: false, isError: false }],
     useUtils: () => ({

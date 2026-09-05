@@ -12,7 +12,7 @@ import {
   THREAD_MAPPING_LABELS,
   TRACE_MAPPINGS,
 } from "@langwatch/trace-contract";
-import { api } from "../trace-api";
+import { api } from "../../../behavior/trace-api";
 
 /**
  * Thread mappings - simplified set of options for thread-based data

@@ -426,7 +426,7 @@ export type WorkflowApiMap = {
   };
   featureFlag: { isEnabled: UnpublishedQuery };
   httpProxy: { execute: UnpublishedMutation };
-  llmModelCost: { getModelLimits: UnpublishedQuery };
+  llmModelCost: { tryGetModelLimits: UnpublishedQuery };
   modelProvider: {
     getAllForProject: UnpublishedQuery;
     getAllForProjectForFrontend: UnpublishedQuery;

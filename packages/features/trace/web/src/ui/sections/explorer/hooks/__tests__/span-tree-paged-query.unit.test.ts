@@ -12,7 +12,7 @@ import {
   spanTreeQueryKey,
 } from "../span-tree-paged-query";
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     tracesV2: {
       // `getQueryKey` resolves the procedure path via the proxy's `_def()`.

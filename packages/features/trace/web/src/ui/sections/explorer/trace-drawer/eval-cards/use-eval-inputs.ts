@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
-import { api } from "../../../trace-api";
+import { api } from "../../../../../behavior/trace-api";
 import { useIsReadOnlyTrace } from "../../../../elements/explorer/context/trace-viewer-context";
 import type { EvalEntry } from "./utils";
 

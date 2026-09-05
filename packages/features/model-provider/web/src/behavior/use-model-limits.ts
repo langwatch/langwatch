@@ -14,7 +14,7 @@ export function useModelLimits(params: UseModelLimitsParams) {
   const { projectId } = useOrganizationTeamProject();
   const { model } = params;
 
-  const query = api.llmModelCost.getModelLimits.useQuery(
+  const query = api.llmModelCost.tryGetModelLimits.useQuery(
     { model: model ?? "", projectId: projectId ?? "" },
     { enabled: Boolean(model) },
   );

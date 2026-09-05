@@ -33,7 +33,7 @@ const mocks = vi.hoisted(() => ({
   organizationMembers: { members: [{ user: { id: "user-1", name: "Ana" } }] },
 }));
 
-vi.mock("../trace-api", () => ({
+vi.mock("../../../behavior/trace-api", () => ({
   api: {
     useUtils: () => ({
       annotation: {

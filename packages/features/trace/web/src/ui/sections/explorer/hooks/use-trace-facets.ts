@@ -1,7 +1,7 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { SAMPLE_DISCOVER_DESCRIPTORS } from "../onboarding/data/sample-descriptors";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active";
 import { useFilterStore } from "../../../../index";

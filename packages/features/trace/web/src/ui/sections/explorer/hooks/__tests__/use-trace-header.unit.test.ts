@@ -8,7 +8,7 @@ import { useTraceHeader } from "../use-trace-header";
 const headerData: { traceId?: string; timestamp?: number } = {};
 const capturedHeaderInputs: Array<{ full?: boolean }> = [];
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     tracesV2: {
       header: {

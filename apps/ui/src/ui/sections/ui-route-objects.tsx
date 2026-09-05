@@ -2,7 +2,7 @@
  * Turns the route table into React Router route objects.
  */
 
-import type { RouteObject } from "react-router";
+import { Outlet, useMatches, type RouteObject } from "react-router";
 import { lazyRoute } from "../../behavior/lazy-route";
 import { resolveUiPageLoader, type UiPageLoaderRegistry } from "../../behavior/ui-page-loaders";
 import type { UiRouteDescriptor } from "../../model/ui-route-table";
@@ -18,6 +18,19 @@ export function uiMatchedPageKey(matches: ReadonlyArray<{ handle?: unknown }>): 
     if (handle?.page) return handle.page;
   }
   return void 0;
+}
+
+/** The page key of the route this render is inside. */
+export function useUiMatchedPageKey(): string | undefined {
+  return uiMatchedPageKey(useMatches());
+}
+
+/**
+ * Where a layout route draws the page below it. The shell owns the router, so
+ * a feature layout asks for the outlet rather than reaching for one.
+ */
+export function UiRouteOutlet() {
+  return <Outlet />;
 }
 
 export type UiRouteObjectsOptions = {

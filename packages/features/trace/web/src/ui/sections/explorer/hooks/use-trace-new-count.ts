@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { usePageVisibility } from "../../../../behavior/use-page-visibility";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { useFilterStore, useRefreshUIStore, useSseStatusStore } from "../../../../index";
 import { useTraceListRefresh } from "./use-trace-list-refresh";
 

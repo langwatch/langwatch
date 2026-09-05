@@ -12,7 +12,7 @@ const overlayRow = vi.hoisted(() => ({
   current: null as { traceId: string; patch: TraceEditOverlayPatch } | null,
 }));
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     traceEditOverlay: {
       getByTraceId: {

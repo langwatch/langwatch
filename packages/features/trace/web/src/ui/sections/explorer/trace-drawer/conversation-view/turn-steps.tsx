@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
 import type { SpanDetail } from "@langwatch/trace-contract";
-import { api } from "../../../trace-api";
+import { api } from "../../../../../behavior/trace-api";
 import { formatCost, formatDuration, formatTokens } from "../../../../../index";
 
 const LLM_REQUEST_SPAN = "claude_code.llm_request";

@@ -33,7 +33,7 @@ import {
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api } from "../../../../behavior/scenario-api";
 import type { ConnectedAgentView } from "@langwatch/agent-contract";
-import { presenceLabel, scopeOf, sdkLabel } from "./connected-agent-rows";
+import { presenceLabel, scopeOf, sdkLabel } from "@langwatch/agent-web/screens/agent-management";
 
 export type ConnectedAgentDrawerProps = {
   agentId?: string;

@@ -17,7 +17,7 @@ let capturedCodePreviewProps: Record<string, unknown> | null = null;
 
 // ─── Dependency mocks (true boundaries) ─────────────────────────────────────────
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     apiKey: {
       create: {

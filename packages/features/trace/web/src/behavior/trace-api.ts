@@ -31,9 +31,9 @@ import type { ShareLink, ShareResourceType, ShareVisibility } from "@langwatch/s
 import type { CodingAgentTranscript } from "@langwatch/coding-agent-contract";
 import type { CodingAgentSessionDisplay } from "@langwatch/coding-agent-web";
 import { createFeatureApi } from "@langwatch/platform-api-client";
-import type { ConversationTurn } from "./explorer/hooks/use-conversation-context";
-import type { SessionGroupPayloadItem } from "./explorer/utils/map-session-groups-payload";
-import type { ExportProgress, ExportProgressEvent } from "../../model/export-types";
+import type { ConversationTurn } from "../model/explorer/conversation-turn";
+import type { SessionGroupPayloadItem } from "../model/explorer/session-group-payload";
+import type { ExportProgress, ExportProgressEvent } from "../model/export-types";
 import type {
   AiActionResult,
   ChangeTraceNameCommand,

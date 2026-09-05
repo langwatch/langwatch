@@ -44,7 +44,7 @@ vi.mock("../../../behavior/use-organization-team-project", () => ({
 /** What the server answers with: the skill on its own, no credentials. */
 let mockSkillBody: string | undefined;
 const getPromptQueryMock = vi.fn(() => ({ data: mockSkillBody }));
-vi.mock("../trace-api", () => ({
+vi.mock("../../../behavior/trace-api", () => ({
   api: {
     setupSkills: {
       getPrompt: {

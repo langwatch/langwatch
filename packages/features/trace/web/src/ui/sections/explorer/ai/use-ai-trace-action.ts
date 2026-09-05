@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { readHandledError } from "../../errors";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import type { AiActionError, AiActionErrorDetails } from "@langwatch/trace-contract";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { useFilterStore, useViewStore } from "../../../../index";
 
 /**

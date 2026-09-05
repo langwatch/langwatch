@@ -27,7 +27,7 @@ vi.mock("../../../../behavior/use-organization-team-project", () => ({
 
 // tRPC existence probe — always idle (no data) so url-shape players render
 // their <audio> element instead of transitioning to a missing/error badge.
-vi.mock("../../trace-api", () => ({
+vi.mock("../../../../behavior/trace-api", () => ({
   api: {
     storedObjects: {
       headById: {

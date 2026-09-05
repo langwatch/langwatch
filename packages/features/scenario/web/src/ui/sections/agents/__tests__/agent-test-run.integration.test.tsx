@@ -135,7 +135,8 @@ describe("Test agent from the agents page", () => {
     /** @scenario "The connected agent row offers Test agent" */
     it("requests a test run for that agent", async () => {
       const user = userEvent.setup();
-      const { ConnectedAgentsSection } = await import("../connected/connected-agents-section");
+      const { ConnectedAgentsSection } =
+        await import("@langwatch/agent-web/screens/agent-management");
       const onTest = vi.fn();
       render(
         <ConnectedAgentsSection

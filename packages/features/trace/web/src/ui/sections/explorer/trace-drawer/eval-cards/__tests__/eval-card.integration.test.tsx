@@ -9,7 +9,7 @@ import "@testing-library/jest-dom/vitest";
 
 const getEvaluationInputsUseQueryMock = vi.hoisted(() => vi.fn());
 
-vi.mock("../../../../trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api", () => ({
   api: {
     traces: {
       getEvaluationInputs: { useQuery: getEvaluationInputsUseQueryMock },

@@ -36,7 +36,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => harness.router,
 }));
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     useUtils: () => ({
       tracesV2: {

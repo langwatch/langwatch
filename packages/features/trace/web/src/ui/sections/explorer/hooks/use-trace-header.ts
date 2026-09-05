@@ -2,7 +2,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { applyOverlayToTraceHeader } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { LIVE_REFETCH_MS, useDrawerStore, useSseStatusStore } from "../../../../index";
 import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context";
 import { useAppliedTraceEditPatch } from "./use-trace-edit-overlay";

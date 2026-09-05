@@ -36,7 +36,7 @@ vi.mock("../../../../../../behavior/use-drawer", () => ({
   useDrawer: () => ({ openDrawer: mocks.openDrawer }),
 }));
 
-vi.mock("../../../../trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api", () => ({
   api: {
     translate: {
       translate: {

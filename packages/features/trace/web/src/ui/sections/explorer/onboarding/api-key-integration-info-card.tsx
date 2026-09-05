@@ -8,7 +8,7 @@ import { CLOUD_ENDPOINT } from "@langwatch/onboarding-web/features/onboarding/co
 import { InlineCopyButton } from "@langwatch/onboarding-web/features/onboarding/components/sections/shared/InlineCopyButton";
 import { RoleBindingScopeType, TeamUserRole } from "../../../../model/prisma-types";
 import { usePublicEnv } from "../../use-public-env";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { selfHostedEndpoint } from "../../../../model/explorer/onboarding/self-hosted-endpoint";
 
 interface ApiKeyIntegrationInfoCardProps {

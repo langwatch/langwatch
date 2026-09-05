@@ -4,15 +4,10 @@
  */
 
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { Bot, ExternalLink, Laptop, Play, User } from "lucide-react";
-import { LuTrash2 } from "react-icons/lu";
+import { Bot, ExternalLink, Laptop, Play, Trash2, User } from "lucide-react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  AgentCardIcon,
-  AgentCardMenuTrigger,
-  AgentCardShell,
-} from "@langwatch/agent-web/screens/agent-management";
+import { AgentCardIcon, AgentCardMenuTrigger, AgentCardShell } from "./agent-card";
 import type { ConnectedAgentView } from "@langwatch/agent-contract";
 import {
   environmentTone,
@@ -21,7 +16,7 @@ import {
   scopeOf,
   sdkLabel,
   sortConnectedAgents,
-} from "./connected-agent-rows";
+} from "../../../../model/connected-agent-rows";
 
 /**
  * The connected agents as cards.
@@ -171,7 +166,7 @@ function ConnectedAgentMenu({
               onDelete();
             }}
           >
-            <LuTrash2 size={14} />
+            <Trash2 size={14} />
             Delete
           </Menu.Item>
         )}

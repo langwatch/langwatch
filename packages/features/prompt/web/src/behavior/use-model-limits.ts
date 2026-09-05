@@ -15,7 +15,7 @@ export function useModelLimits(params: UseModelLimitsParams) {
   const { projectId } = usePromptProject();
   const { model } = params;
 
-  const query = promptApi.llmModelCost.getModelLimits.useQuery(
+  const query = promptApi.llmModelCost.tryGetModelLimits.useQuery(
     { model: model ?? "", projectId: projectId ?? "" },
     { enabled: Boolean(model) },
   );

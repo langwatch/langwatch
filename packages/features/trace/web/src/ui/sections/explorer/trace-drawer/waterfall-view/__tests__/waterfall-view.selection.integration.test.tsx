@@ -78,7 +78,7 @@ vi.mock("../use-correction-marks", () => ({
   }),
 }));
 
-vi.mock("../../../../trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api", () => ({
   api: {
     useQueries: () => [{ data: [], isLoading: false, isError: false }],
     useUtils: () => ({

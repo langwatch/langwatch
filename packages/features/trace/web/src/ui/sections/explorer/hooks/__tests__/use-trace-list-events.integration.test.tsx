@@ -12,7 +12,7 @@ const harness = vi.hoisted(() => ({
   view: { columnOrder: ["time", "trace", "events"], grouping: "flat" },
 }));
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: { tracesV2: { listEvents: { useQuery: harness.useQuery } } },
 }));
 

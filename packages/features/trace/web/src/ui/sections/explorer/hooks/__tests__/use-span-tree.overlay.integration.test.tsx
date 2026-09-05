@@ -24,7 +24,7 @@ vi.mock("@tanstack/react-query", () => ({
 // The correction arrives the way the drawer receives it, through the query the
 // real `useTraceEditOverlay` reads, so the hook under test runs against the
 // production overlay hooks rather than a stand-in for them.
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     useUtils: () => ({
       tracesV2: { spanTreeDelta: { invalidate: vi.fn() } },

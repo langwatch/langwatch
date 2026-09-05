@@ -1,5 +1,5 @@
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { useFilterStore, useViewStore } from "../../../../index";
 
 export interface VisibleTraceIds {

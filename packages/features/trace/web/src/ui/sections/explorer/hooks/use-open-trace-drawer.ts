@@ -3,7 +3,7 @@ import { useCallback } from "react";
 import { useDrawer } from "../../../../behavior/use-drawer";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import type { TraceHeader } from "@langwatch/trace-contract";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import {
   buildPreviewTraceDetail,
   buildRichArrivalTraceDetail,

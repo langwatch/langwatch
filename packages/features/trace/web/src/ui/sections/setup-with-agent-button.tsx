@@ -9,7 +9,7 @@ import { useCanAskLangy } from "../../behavior/langy/use-can-ask-langy";
 import { useLangyStore } from "@langwatch/langy-web";
 import { withCredentials } from "../../model/skills/setup-prompt";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import { api } from "./trace-api";
+import { api } from "../../behavior/trace-api";
 
 /**
  * The set-up-with-AI control every feature page's empty state carries (spec:

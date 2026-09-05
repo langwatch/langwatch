@@ -1,6 +1,6 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context";
 import type { TraceListItem } from "../types/trace";
 import { useDrawerProjectId } from "./use-drawer-project-id";

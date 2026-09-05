@@ -17,7 +17,7 @@
 import safe from "safe-regex2";
 
 /** Compiles a pattern, and hands it back only if it cannot backtrack catastrophically. */
-export function compileSafeRegex(pattern: string): RegExp | null {
+export function tryCompileSafeRegex(pattern: string): RegExp | null {
   try {
     const expression = new RegExp(pattern);
     return safe(expression) ? expression : null;
@@ -28,7 +28,7 @@ export function compileSafeRegex(pattern: string): RegExp | null {
 
 /** The pass/fail verdict, for call sites that need nothing else. */
 export function isSafeRegex(pattern: string): boolean {
-  return compileSafeRegex(pattern) !== null;
+  return tryCompileSafeRegex(pattern) !== null;
 }
 
 /**

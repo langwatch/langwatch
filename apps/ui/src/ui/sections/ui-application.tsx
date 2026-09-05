@@ -10,6 +10,7 @@ import type {
   UiFeatureApiBinding,
   UiFeatureApiTransport,
 } from "../../behavior/ui-feature-transport";
+import type { UiFeatureInstall } from "../../behavior/ui-feature";
 import type { UiPageLoaderRegistry } from "../../behavior/ui-page-loaders";
 import { createUiRouter, type UiRouter } from "../../behavior/ui-router";
 import type { UiSessionSource } from "../../behavior/ui-session";
@@ -23,29 +24,6 @@ import {
 } from "./ui-outer-providers";
 import { createUiRouteObjects } from "./ui-route-objects";
 import { createUiRootLayout } from "./ui-root-layout";
-
-/**
- * What `apps/ui` serves itself.
- */
-export type UiFeatureInstall = {
-  /**
-   * The pages this package serves, consulted before the host's registry.
-   * Replaces `uiFeatureLoaders` rather than adding to it — one rule, so a
-   * test's registry is the whole answer and never a partial one.
-   */
-  loaders?: UiPageLoaderRegistry;
-  /** One entry per feature package whose hooks this application mounts. */
-  apis?: readonly UiFeatureApiBinding[];
-  /** Capability ports the composing application answers itself. */
-  capabilities?: UiCapabilityInstall;
-  /** The transport those hooks run on. Built same-origin when absent. */
-  transport?: UiFeatureApiTransport;
-  /**
-   * The live session this application reads for itself — pass `useBrowserUiSession` to
-   * serve the reader, the scope and the permissions from the deployment.
-   */
-  session?: UiSessionSource;
-};
 
 export type UiApplicationInstall = {
   providers: UiOuterProviderInstall & UiInnerProviderInstall;

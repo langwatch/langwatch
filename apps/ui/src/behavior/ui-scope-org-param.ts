@@ -12,7 +12,7 @@ import { UI_ORGANIZATIONS_PROCEDURE } from "./ui-organization-facts";
 import { useUiRpc } from "./ui-rpc";
 import { uiOrgQueryParamWrites } from "./ui-scope-resolution";
 import { UI_ORG_QUERY_PARAM, useUiRouteReading } from "./ui-scope-route";
-import { broadcastUiScopeWrite, useUiScopeMemory, writeUiScopeSelection } from "./ui-scope-storage";
+import { rememberUiScopeSelection, useUiScopeMemory } from "./ui-scope-storage";
 
 /** The organization graph, narrowed to what the membership test reads. */
 type UiOrgParamOrganizations = readonly Pick<UiScopeOrganization, "id" | "slug">[];
@@ -48,11 +48,7 @@ export function useUiOrgQueryParamSelection(): void {
     if (!orgParam || graph === void 0) return;
 
     if (writes.length > 0) {
-      writeUiScopeSelection({
-        writes,
-        storage: window.localStorage,
-        broadcast: broadcastUiScopeWrite,
-      });
+      rememberUiScopeSelection({ writes });
     }
 
     setSearchParams(

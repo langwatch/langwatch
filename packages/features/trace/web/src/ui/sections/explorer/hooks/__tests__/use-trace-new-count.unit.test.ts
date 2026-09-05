@@ -53,7 +53,7 @@ const queryResult: {
   errorUpdatedAt: 0,
 };
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     tracesV2: {
       newCount: {

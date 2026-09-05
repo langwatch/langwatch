@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
-import { api } from "../../../trace-api";
-import {
-  type ConversationTurn,
-  useConversationContext,
-} from "../../hooks/use-conversation-context";
+import { api } from "../../../../../behavior/trace-api";
+import type { ConversationTurn } from "../../../../../model/explorer/conversation-turn";
+import { useConversationContext } from "../../hooks/use-conversation-context";
 import {
   CONVERSATION_TURN_CAP,
   type EarlierTotals,

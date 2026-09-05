@@ -10,7 +10,7 @@ import "@testing-library/jest-dom/vitest";
 
 const apiMock = vi.hoisted(() => ({ useQuery: vi.fn() }));
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: { tracesV2: { facetValues: { useQuery: apiMock.useQuery } } },
 }));
 

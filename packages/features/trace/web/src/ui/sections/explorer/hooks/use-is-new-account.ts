@@ -1,4 +1,4 @@
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 
 const NEW_ACCOUNT_WINDOW_MS = 5 * 24 * 60 * 60 * 1000;
 

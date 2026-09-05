@@ -11,7 +11,8 @@ import {
 import { RedactedInline } from "../../redacted-field";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants";
-import { type ConversationTurn, useConversationContext } from "../hooks/use-conversation-context";
+import type { ConversationTurn } from "../../../../model/explorer/conversation-turn";
+import { useConversationContext } from "../hooks/use-conversation-context";
 import { type UseTextTranslationResult, useTextTranslation } from "../hooks/use-text-translation";
 import { useTraceDrawerNavigation } from "../hooks/use-trace-drawer-navigation";
 import {

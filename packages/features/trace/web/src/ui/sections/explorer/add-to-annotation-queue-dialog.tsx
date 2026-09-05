@@ -6,7 +6,7 @@ import { Dialog } from "../dialog";
 import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "../errors";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { api } from "../trace-api";
+import { api } from "../../../behavior/trace-api";
 import { useSession } from "../../../behavior/auth-session";
 import { useRouter } from "@langwatch/ui-host/use-router";
 

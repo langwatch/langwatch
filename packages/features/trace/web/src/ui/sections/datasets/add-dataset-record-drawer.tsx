@@ -16,7 +16,7 @@ import { useOrganizationTeamProject } from "../../../behavior/use-organization-t
 import NextLink from "../../elements/next-link";
 import { Drawer } from "../drawer";
 import { showErrorToast } from "../errors";
-import { api } from "../trace-api";
+import { api } from "../../../behavior/trace-api";
 import { DatasetMappingPreview } from "./dataset-mapping-preview";
 import { DatasetSelector } from "./dataset-selector";
 

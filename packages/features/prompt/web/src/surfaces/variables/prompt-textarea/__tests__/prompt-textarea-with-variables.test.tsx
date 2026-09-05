@@ -6,8 +6,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import userEvent from "@testing-library/user-event";
 import { forwardRef, useReducer } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AvailableSource } from "../../variables/variable-mapping-input";
-import type { Variable } from "../../variables/variables-section";
+import type { AvailableSource } from "../../variable-mapping-input";
+import type { Variable } from "../../variables-section";
 import { PromptTextAreaWithVariables } from "../index";
 
 // Mock rich-textarea since jsdom doesn't support getBoundingClientRect properly

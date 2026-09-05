@@ -6,7 +6,7 @@ import {
   usePresenceStore,
   useTabSessionId,
 } from "@langwatch/presence-web";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const LOCATION_DEBOUNCE_MS = 250;

@@ -11,7 +11,7 @@ import {
 import { TraceViewerProvider } from "../../ui/elements/explorer/context/trace-viewer-context";
 import { useDrawerStore } from "../../index";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { api } from "../../ui/sections/trace-api";
+import { api } from "../../behavior/trace-api";
 
 /** There is no drawer to close on a share page. */
 const noop = () => undefined;

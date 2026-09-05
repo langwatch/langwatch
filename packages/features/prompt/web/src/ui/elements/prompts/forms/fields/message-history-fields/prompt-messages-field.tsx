@@ -13,12 +13,13 @@ import {
 } from "@langwatch/design-system/messages";
 import { VerticalFormControl } from "@langwatch/design-system/vertical-form-control";
 import {
+  type AvailableSource,
   type PromptTextAreaOnAddMention,
   PromptTextAreaWithVariables,
-} from "@langwatch/prompt-web/surfaces/prompt-textarea";
-import type { AvailableSource, Variable } from "@langwatch/prompt-web/surfaces/variables";
+  type Variable,
+} from "@langwatch/prompt-web/surfaces/variables";
 import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
-import { useLayoutMode } from "@langwatch/prompt-web/surfaces/prompt-layout";
+import { useLayoutMode } from "../../../../../../model/layout-mode";
 import {
   EditingModeTitle,
   getDefaultEditingMode,

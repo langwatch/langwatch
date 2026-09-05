@@ -101,4 +101,4 @@ export * from "./ui/sections/trace-peek-summary";
 export * from "./ui/sections/use-trace-header";
 // Exported so the process shell can mount `traceApi.Provider`. Nothing outside
 // this package should call `traceApi.*` directly — the hooks are the surface.
-export { traceApi, type TraceApiMap } from "./ui/sections/trace-api";
+export { traceApi, type TraceApiMap } from "./behavior/trace-api";

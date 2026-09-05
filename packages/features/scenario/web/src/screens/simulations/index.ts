@@ -36,4 +36,3 @@ export {
  * The connected agents' own card grid (ADR-128), for `@langwatch/agent-web`'s agents
  * page to plug into `AgentManagementHostPort.connectedSection()`.
  */
-export { ConnectedAgentsSection } from "../../ui/sections/agents/connected/connected-agents-section";

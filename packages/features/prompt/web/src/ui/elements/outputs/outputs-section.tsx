@@ -14,7 +14,7 @@ import {
   FieldTypeSelect,
   TYPE_LABELS,
   VariableTypeIcon,
-} from "@langwatch/prompt-web/surfaces/variable-type";
+} from "@langwatch/prompt-web/surfaces/variables";
 import { outputsSchema } from "@langwatch/prompt-contract";
 import { generateUniqueIdentifier, normalizeIdentifier } from "@langwatch/prompt-contract";
 

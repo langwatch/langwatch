@@ -3,7 +3,7 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { readHandledError, showErrorToast } from "../../errors";
 import type { ExportProgressEvent } from "../../../../model/export-types";
 import type { ExportFormat, ExportMode, ExportProgress } from "../../../../model/export-types";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 
 interface ExportConfig {
   mode: ExportMode;

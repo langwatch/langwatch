@@ -18,7 +18,7 @@ import {
   TRACE_MAPPING_LABELS,
   TRACE_MAPPINGS,
 } from "@langwatch/trace-contract";
-import { api } from "../trace-api";
+import { api } from "../../../behavior/trace-api";
 import { Switch } from "@langwatch/design-system/switch";
 
 /** Trace field options for the threads sub-field selector, excluding thread sources themselves. */

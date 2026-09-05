@@ -5,16 +5,16 @@
  */
 
 import { ProjectLangyLayout } from "@langwatch/langy-web/screens/langy";
-import { Outlet } from "react-router";
 
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";
+import { UiRouteOutlet } from "../../../../ui/sections/ui-route-objects";
 import { LangyHost } from "./host";
 
 function ProjectLangyLayoutRoute() {
   return (
     <ProjectLangyLayout>
-      <Outlet />
+      <UiRouteOutlet />
     </ProjectLangyLayout>
   );
 }

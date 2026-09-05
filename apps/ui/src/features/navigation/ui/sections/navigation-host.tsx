@@ -23,7 +23,6 @@ import {
 import { LangyMark, LangyMarkGradientDefs, useLangyStore } from "@langwatch/langy-web";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useCallback, useMemo, type ReactNode } from "react";
-import { useMatches } from "react-router";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { isLangyDemoProject } from "../../../../behavior/langy-demo-project";
 import { routePatternOf } from "../../../../behavior/navigation-tracing";
@@ -137,7 +136,7 @@ export function NavigationHostSection({
    */
   commandBar?: boolean;
 }) {
-  const { session, navigation, documentTitle } = useUiCapabilities();
+  const { session, navigation, documentTitle, route } = useUiCapabilities();
   const activeScope = session.activeScope();
   const memory = useUiScopeMemory();
   const facts = useUiOrganizationFacts();
@@ -283,8 +282,7 @@ export function NavigationHostSection({
    * switcher's only way to tell "a trace id lives past this point" without a
    * route table (`use-project-pick-groups.ts`).
    */
-  const matches = useMatches();
-  const routePattern = routePatternOf(pathname, matches[matches.length - 1]?.params ?? {});
+  const routePattern = routePatternOf(pathname, route.reading().params);
 
   const setDocumentTitle = useCallback(
     (title: string) => documentTitle.set(title),

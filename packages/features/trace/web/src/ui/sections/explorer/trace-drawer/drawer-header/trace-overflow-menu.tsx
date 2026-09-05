@@ -21,7 +21,7 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "../../../errors";
 import { useDrawer } from "../../../../../behavior/use-drawer";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
-import { api } from "../../../trace-api";
+import { api } from "../../../../../behavior/trace-api";
 import { useConversationTurns } from "../../hooks/use-conversation-turns";
 import { isPreviewTraceId } from "../../../../../index";
 import { enterTraceEditMode } from "../../utils/trace-edit-mode";

@@ -1,7 +1,7 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import type { ConversationGroup } from "../trace-table/conversation-groups";
 import {
   groupTracesByConversation,

@@ -1,7 +1,7 @@
 /**
  * Hardcoded facet descriptors for the sample-preview view.
  */
-import type { RouterOutputs } from "../../../trace-api";
+import type { RouterOutputs } from "../../../../../behavior/trace-api";
 import { SAMPLE_PREVIEW_TRACES } from "./sample-preview-traces";
 
 type DiscoverDescriptors = RouterOutputs["tracesV2"]["discover"]["facets"];

@@ -9,7 +9,7 @@ vi.mock("../../../../../behavior/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "p1" } }),
 }));
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     useUtils: () => ({
       tracesV2: { header: { prefetch: prefetchMock } },

@@ -11,9 +11,9 @@ import {
 } from "react";
 import type { CaretPosition } from "rich-textarea";
 import { RichTextarea, type RichTextareaHandle } from "rich-textarea";
-import { useLayoutMode } from "../prompt-layout";
-import { VariableInsertMenu } from "../variables/variable-insert-menu";
-import type { AvailableSource } from "../variables/variable-mapping-input";
+import { useLayoutMode } from "../../../model/layout-mode";
+import { VariableInsertMenu } from "../variable-insert-menu";
+import type { AvailableSource } from "../variable-mapping-input";
 import { AddLogicButton } from "./components/add-logic-button";
 import { AddVariableButton } from "./components/add-variable-button";
 import { GripHandles, LineHighlights } from "./components/paragraph-overlay";

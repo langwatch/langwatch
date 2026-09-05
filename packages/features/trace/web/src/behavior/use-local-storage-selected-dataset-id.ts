@@ -5,7 +5,7 @@
 import { createLogger } from "@langwatch/observability";
 import { useCallback, useState } from "react";
 
-import { api } from "../ui/sections/trace-api";
+import { api } from "./trace-api";
 import { useOrganizationTeamProject } from "./use-organization-team-project";
 
 const logger = createLogger("useLocalStorageSelectedDataSetId");

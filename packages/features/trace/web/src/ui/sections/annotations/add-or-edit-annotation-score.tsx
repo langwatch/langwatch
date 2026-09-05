@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { applyHandledErrorToForm, FormServerError, showErrorToast } from "../errors";
 import { AnnotationScoreDataType } from "../../../model/prisma-types";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { api } from "../trace-api";
+import { api } from "../../../behavior/trace-api";
 import { toaster } from "@langwatch/design-system/toaster";
 
 type FormData = {

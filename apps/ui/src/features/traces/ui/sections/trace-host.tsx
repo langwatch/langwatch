@@ -10,7 +10,6 @@ import {
   type TraceHostPort,
 } from "@langwatch/trace-web/screens/traces";
 import { useMemo, type ReactNode } from "react";
-import { useLocation } from "react-router";
 
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
@@ -21,7 +20,6 @@ export function TraceHost({ children }: { children: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
   const scope = session.activeScope();
   const actor = session.currentUser();
-  const location = useLocation();
 
   const organizations = traceApi.organization.getAll.useQuery(
     { isDemo: false },
@@ -105,7 +103,7 @@ export function TraceHost({ children }: { children: ReactNode }) {
         actor ? { id: actor.id, name: actor.name, email: actor.email, image: actor.image } : void 0,
       hasPermission: (permission) => session.hasPermission(permission),
       isLoading: () => !!actor && organizations.isLoading,
-      route: () => ({ ...reading, pathname: location.pathname }),
+      route: () => ({ ...reading, pathname: reading.pathname ?? "" }),
       setQuery: (next, options) =>
         route.setQuery(mergeTraceQuery({ current: reading.query, next }), options),
       navigate: (to, options) =>
@@ -113,17 +111,7 @@ export function TraceHost({ children }: { children: ReactNode }) {
       succeeded: (notice) => feedback.succeeded(notice),
       failed: (failure) => feedback.failed(failure),
     }),
-    [
-      placement,
-      actor,
-      session,
-      organizations.isLoading,
-      reading,
-      location.pathname,
-      route,
-      navigation,
-      feedback,
-    ],
+    [placement, actor, session, organizations.isLoading, reading, route, navigation, feedback],
   );
 
   if (failure.departing) return <UiPageLoading />;

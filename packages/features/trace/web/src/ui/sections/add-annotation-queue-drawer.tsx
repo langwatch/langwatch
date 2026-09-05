@@ -17,7 +17,7 @@ import { useForm } from "react-hook-form";
 import { applyHandledErrorToForm, FormServerError, showErrorToast } from "./errors";
 import { useDrawer } from "../../behavior/use-drawer";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import { api } from "./trace-api";
+import { api } from "../../behavior/trace-api";
 import { slugify } from "../../model/slugify";
 import { Drawer } from "./drawer";
 import { Popover } from "@langwatch/design-system/popover";

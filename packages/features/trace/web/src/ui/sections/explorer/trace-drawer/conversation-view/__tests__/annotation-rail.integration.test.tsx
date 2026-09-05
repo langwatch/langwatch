@@ -50,7 +50,7 @@ vi.mock("../../../../../../behavior/use-drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 
-vi.mock("../../../../trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api", () => ({
   api: {
     useUtils: () => ({
       annotation: {

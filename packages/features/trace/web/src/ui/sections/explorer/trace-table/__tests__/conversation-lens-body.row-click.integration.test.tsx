@@ -11,10 +11,8 @@ import "@testing-library/jest-dom/vitest";
 
 import type { LensConfig } from "../../../../../index";
 import { useDrawerStore } from "../../../../../index";
-import {
-  mapSessionGroupToConversationGroup,
-  type SessionGroupPayloadItem,
-} from "../../utils/map-session-groups-payload";
+import type { SessionGroupPayloadItem } from "../../../../../model/explorer/session-group-payload";
+import { mapSessionGroupToConversationGroup } from "../../utils/map-session-groups-payload";
 import { ConversationLensBody } from "../conversation-lens-body";
 import type { ConversationGroup } from "../conversation-groups";
 import { setTraceTableScrollElement } from "../../../../../behavior/explorer/trace-table/scroll-context";

@@ -1,36 +1,11 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { useSharedTrace } from "../context/shared-trace-context";
 import { isPreviewTraceId } from "../../../../index";
+import type { ConversationTurn } from "../../../../model/explorer/conversation-turn";
 import type { TraceListItem } from "../types/trace";
 import { useDrawerProjectId } from "./use-drawer-project-id";
-
-export interface ConversationTurn {
-  traceId: string;
-  timestamp: number;
-  name: string;
-  rootSpanType: string | null;
-  status: TraceListItem["status"];
-  input: string | null;
-  output: string | null;
-  /**
-   * Set when a restrict privacy rule hid the turn's content from this viewer
-   * (the server nulled `input`/`output`). Lets the strip render a "Redacted"
-   * marker instead of a "(no message)" placeholder that reads as truly absent.
-   */
-  inputRedacted?: boolean | null;
-  outputRedacted?: boolean | null;
-  inputVisibleTo?: string | null;
-  outputVisibleTo?: string | null;
-  /**
-   * The turn's own totals, so the terminal view can count the session's turns above its
-   * loaded window without reading their transcripts. Optional because a cached response
-   * from before the fields existed may not carry them.
-   */
-  totalTokens?: number | null;
-  totalCost?: number | null;
-}
 
 export interface ConversationContextResult {
   conversationId: string | null;

@@ -18,7 +18,7 @@ import {
 import { PromptPlaygroundChatUnavailable } from "../../chat/prompt-playground-chat-unavailable";
 import { usePromptHost } from "../../../../model/prompt-host";
 import { DemonstrationsTabContent } from "./demonstrations-tab-content";
-import type { LayoutMode } from "../../../../surfaces/prompt-layout";
+import type { LayoutMode } from "../../../../model/layout-mode";
 
 /** The default "input" variable is locked - cannot be removed or renamed */
 const LOCKED_VARIABLES = new Set(["input"]);

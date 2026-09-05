@@ -9,10 +9,8 @@ import type React from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { getCapability, truncateId } from "../../../../../index";
-import {
-  mapSessionGroupToConversationGroup,
-  type SessionGroupPayloadItem,
-} from "../../utils/map-session-groups-payload";
+import type { SessionGroupPayloadItem } from "../../../../../model/explorer/session-group-payload";
+import { mapSessionGroupToConversationGroup } from "../../utils/map-session-groups-payload";
 import type { ConversationGroup } from "../conversation-groups";
 import { ConversationSummaryDetail } from "../registry/addons/conversation/conversation-summary";
 import { conversationCells } from "../registry/cells/conversation";

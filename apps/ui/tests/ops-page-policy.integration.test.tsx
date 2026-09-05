@@ -145,6 +145,7 @@ afterEach(cleanup);
 
 describe("given the Ops workspace", () => {
   describe("when an operator opens each of its pages", () => {
+    /** @scenario "An operator sees the Ops workspace" */
     it.each([
       ["pages/ops/index", "dashboard"],
       ["pages/ops/event-sourcing/index", "event-sourcing"],
@@ -159,7 +160,6 @@ describe("given the Ops workspace", () => {
       ["pages/ops/foundry", "foundry"],
       ["pages/ops/migrations", "migrations"],
       ["pages/ops/projections/[runId]", "replay-progress"],
-      /** @scenario "An operator sees the Ops workspace" */
     ])("%s opens on the %s screen", async (key, name) => {
       await openPage(key, ["ops:view"]);
 
@@ -205,12 +205,12 @@ describe("given the Backoffice, which reads every tenant's rows", () => {
    * THE DECOUPLING, PROVED.
    */
   describe("when an operator without the admin grant opens it", () => {
+    /** @scenario "The Back office stays narrower than the workspace" */
     it.each([
       "pages/ops/backoffice/users",
       "pages/ops/backoffice/organizations",
       "pages/ops/backoffice/subscriptions",
       "pages/ops/backoffice/sso-connections",
-      /** @scenario "The Back office stays narrower than the workspace" */
     ])("refuses %s even though the workspace opens for them", async (key) => {
       await openPage(key, ["ops:view"]);
 

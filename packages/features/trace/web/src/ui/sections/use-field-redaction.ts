@@ -1,4 +1,4 @@
-import { api } from "./trace-api";
+import { api } from "../../behavior/trace-api";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 
 export const useFieldRedaction = (field: "input" | "output") => {

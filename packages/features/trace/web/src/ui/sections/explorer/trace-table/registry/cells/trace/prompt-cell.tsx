@@ -2,7 +2,7 @@ import { Badge, Text } from "@chakra-ui/react";
 import type React from "react";
 import { useFilterStore } from "../../../../../../../index";
 import { useOrganizationTeamProject } from "../../../../../../../behavior/use-organization-team-project";
-import { api } from "../../../../../trace-api";
+import { api } from "../../../../../../../behavior/trace-api";
 import type { TraceListItem } from "../../../../types/trace";
 import type { CellDef } from "../../types";
 import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip";

@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { useRequiredSession } from "../../../behavior/auth-session";
-import { api } from "../trace-api";
+import { api } from "../../../behavior/trace-api";
 
 export type PersonalFeatureKey = "evaluations" | "datasets" | "annotations" | "automations";
 

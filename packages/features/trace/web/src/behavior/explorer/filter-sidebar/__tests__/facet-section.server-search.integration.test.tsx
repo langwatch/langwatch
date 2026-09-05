@@ -14,7 +14,7 @@ import "@testing-library/jest-dom/vitest";
 // hook runs against a controllable server response.
 const apiMock = vi.hoisted(() => ({ useQuery: vi.fn() }));
 
-vi.mock("../../../../ui/sections/trace-api", () => ({
+vi.mock("../../../trace-api", () => ({
   api: { tracesV2: { facetValues: { useQuery: apiMock.useQuery } } },
 }));
 

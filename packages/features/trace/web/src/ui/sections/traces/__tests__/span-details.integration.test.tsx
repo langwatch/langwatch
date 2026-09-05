@@ -60,7 +60,7 @@ vi.mock("../../use-field-redaction", () => ({
   }),
 }));
 
-vi.mock("../../trace-api", () => ({
+vi.mock("../../../../behavior/trace-api", () => ({
   api: {
     useUtils: () => ({}),
   },

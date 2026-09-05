@@ -37,7 +37,7 @@ vi.mock("../../../../errors", () => ({
   showErrorToast: vi.fn(),
 }));
 
-vi.mock("../../../../trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api", () => ({
   api: {
     useUtils: () => ({
       pinnedTrace: { getPin: { invalidate: vi.fn() } },

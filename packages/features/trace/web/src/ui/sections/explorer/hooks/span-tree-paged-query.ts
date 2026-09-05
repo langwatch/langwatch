@@ -3,7 +3,7 @@ import { getUntypedClient } from "@trpc/client";
 import { getQueryKey } from "@trpc/react-query";
 import type { SpanTreeCursor } from "@langwatch/trace-contract";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { api, type RouterOutputs } from "../../trace-api";
+import { api, type RouterOutputs } from "../../../../behavior/trace-api";
 
 /*
  * Traces can carry 20k–100k+ spans, so the span tree is never fetched as a single

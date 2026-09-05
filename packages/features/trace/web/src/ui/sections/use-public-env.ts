@@ -4,7 +4,7 @@
 
 import { useMemo } from "react";
 
-import { api } from "./trace-api";
+import { api } from "../../behavior/trace-api";
 
 const PUBLIC_APP_CONFIG_META_NAME = "langwatch-public-config";
 

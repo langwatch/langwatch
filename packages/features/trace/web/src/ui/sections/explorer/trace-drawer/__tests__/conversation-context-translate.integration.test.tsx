@@ -29,7 +29,7 @@ const translateMock = vi.fn(async ({ textToTranslate }: { textToTranslate: strin
   translation: `EN::${textToTranslate}`,
 }));
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     translate: {
       translate: {

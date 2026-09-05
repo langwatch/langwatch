@@ -40,7 +40,7 @@ vi.mock("../../../me/personal-feature-gate-dialog", () => ({
   PersonalFeatureGateDialog: () => null,
 }));
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     useUtils: () => ({
       annotation: {

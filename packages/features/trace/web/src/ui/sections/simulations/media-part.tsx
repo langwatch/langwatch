@@ -4,7 +4,7 @@ import {
   type MediaProbeResult,
 } from "@langwatch/scenario-web";
 import { useEffect, useState } from "react";
-import { api } from "../trace-api";
+import { api } from "../../../behavior/trace-api";
 
 function storedObjectIdForPart(part: MediaPartProps["part"]): string | undefined {
   const url =

@@ -36,7 +36,7 @@ vi.mock("../../../../../../behavior/explorer/onboarding/use-onboarding-active", 
   useOnboardingActive: () => mockTourActive,
 }));
 
-vi.mock("../../../../trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api", () => ({
   api: {
     useUtils: () => ({
       tracesV2: {

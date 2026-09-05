@@ -6,7 +6,7 @@ import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Popover } from "@langwatch/design-system/popover";
 import { useDrawer } from "../../../../../behavior/use-drawer";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
-import { api, type RouterOutputs } from "../../../trace-api";
+import { api, type RouterOutputs } from "../../../../../behavior/trace-api";
 import { isSessionMarked, useAnnotationQueueSessionStore } from "../../../../../index";
 import { openTraceEditorFromConversation, tracePartitionHint } from "../../utils/trace-edit-mode";
 import { AnnotationPopover } from "./annotation-popover";

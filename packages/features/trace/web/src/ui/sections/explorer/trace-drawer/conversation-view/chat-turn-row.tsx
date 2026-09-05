@@ -5,7 +5,7 @@ import { Markdown } from "../../../markdown";
 import { TraceMediaStrip } from "../../../traces/trace-media-strip";
 import { RedactedInline } from "../../../redacted-field";
 import type { MediaPartData } from "../../../../../behavior/shared/traces/media-parts";
-import type { RouterOutputs } from "../../../trace-api";
+import type { RouterOutputs } from "../../../../../behavior/trace-api";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../../model/constants";
 import {
   type UseTextTranslationResult,

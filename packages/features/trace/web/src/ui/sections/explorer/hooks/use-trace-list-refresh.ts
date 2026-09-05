@@ -1,6 +1,6 @@
 import { useIsFetching } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { useRefreshUIStore } from "../../../../index";
 
 /**

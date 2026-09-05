@@ -2,7 +2,7 @@ import type { ShareLink } from "@langwatch/share-contract";
 import { expiryToDate, type CreateShareLinkDraft } from "@langwatch/share-web";
 import { useCallback } from "react";
 import { showErrorToast } from "../../errors";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 
 /**
  * The share-links list query, scoped to a resource. Split out of

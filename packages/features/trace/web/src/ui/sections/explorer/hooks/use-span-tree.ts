@@ -2,7 +2,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { useEffect, useMemo, useRef } from "react";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { applyOverlayToSpanTreeNodes } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { LIVE_REFETCH_MS, useSseStatusStore } from "../../../../index";
 import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context";
 import {

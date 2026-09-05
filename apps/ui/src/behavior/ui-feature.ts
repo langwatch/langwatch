@@ -15,7 +15,29 @@ import type {
 } from "./ui-feature-transport";
 import type { UiPageLoaderRegistry } from "./ui-page-loaders";
 import type { UiSessionSource } from "./ui-session";
-import type { UiFeatureInstall } from "../ui/sections/ui-application";
+
+/**
+ * What `apps/ui` serves itself.
+ */
+export type UiFeatureInstall = {
+  /**
+   * The pages this package serves, consulted before the host's registry.
+   * Replaces `uiFeatureLoaders` rather than adding to it — one rule, so a
+   * test's registry is the whole answer and never a partial one.
+   */
+  loaders?: UiPageLoaderRegistry;
+  /** One entry per feature package whose hooks this application mounts. */
+  apis?: readonly UiFeatureApiBinding[];
+  /** Capability ports the composing application answers itself. */
+  capabilities?: UiCapabilityInstall;
+  /** The transport those hooks run on. Built same-origin when absent. */
+  transport?: UiFeatureApiTransport;
+  /**
+   * The live session this application reads for itself — pass `useBrowserUiSession` to
+   * serve the reader, the scope and the permissions from the deployment.
+   */
+  session?: UiSessionSource;
+};
 
 /** One feature package's whole contribution to the browser application. */
 export type UiFeature = {

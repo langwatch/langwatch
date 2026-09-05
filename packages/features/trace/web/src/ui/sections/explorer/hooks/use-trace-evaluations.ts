@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import type { Evaluation } from "@langwatch/trace-contract";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { useSharedTrace } from "../context/shared-trace-context";
 import { isPreviewTraceId, useDrawerStore } from "../../../../index";
 import type { EvalSummary } from "../types/trace";

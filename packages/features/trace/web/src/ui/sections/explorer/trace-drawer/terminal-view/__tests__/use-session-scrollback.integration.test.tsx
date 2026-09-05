@@ -35,7 +35,7 @@ const { fetchTranscript, fetchSpans, fetchEvents, utils, conversation } = vi.hoi
   };
 });
 
-vi.mock("../../../../trace-api", () => ({ api: { useUtils: () => utils } }));
+vi.mock("../../../../../../behavior/trace-api", () => ({ api: { useUtils: () => utils } }));
 
 vi.mock("../../../hooks/use-conversation-context", () => ({
   useConversationContext: () => ({

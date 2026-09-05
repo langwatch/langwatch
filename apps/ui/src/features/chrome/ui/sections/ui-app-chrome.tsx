@@ -6,12 +6,11 @@
 
 import { NavigationShell, useNavigationTracking } from "@langwatch/navigation-web/chrome";
 import { CurrentDrawer } from "@langwatch/ui-drawer";
-import { Outlet, useMatches } from "react-router";
 import { installedUiDrawers } from "../../../installed-ui-features";
 import { NavigationHostSection } from "../../../navigation";
 import { UiTraceDrawerMount } from "../../../traces";
 import { useUiOrgQueryParamSelection } from "../../../../behavior/ui-scope-org-param";
-import { uiMatchedPageKey } from "../../../../ui/sections/ui-route-objects";
+import { UiRouteOutlet, useUiMatchedPageKey } from "../../../../ui/sections/ui-route-objects";
 
 export default function UiAppChrome() {
   return (
@@ -31,15 +30,14 @@ export default function UiAppChrome() {
 function UiAppChromeBody() {
   useNavigationTracking();
   useUiOrgQueryParamSelection();
-  const matches = useMatches();
-  const page = uiMatchedPageKey(matches);
+  const page = useUiMatchedPageKey();
   const servedHere = page !== void 0;
 
-  if (!servedHere) return <Outlet />;
+  if (!servedHere) return <UiRouteOutlet />;
 
   return (
     <NavigationShell>
-      <Outlet />
+      <UiRouteOutlet />
     </NavigationShell>
   );
 }

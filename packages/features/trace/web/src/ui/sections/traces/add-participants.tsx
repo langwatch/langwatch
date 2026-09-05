@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { Plus, Users } from "react-feather";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
-import { api } from "../trace-api";
+import { api } from "../../../behavior/trace-api";
 import { Select } from "@langwatch/design-system/select";
 import { RandomColorAvatar } from "../../blocks/random-color-avatar";
 

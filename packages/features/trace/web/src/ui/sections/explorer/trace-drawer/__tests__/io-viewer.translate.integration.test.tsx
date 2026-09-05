@@ -24,7 +24,7 @@ const translateMock = vi.fn(async ({ textToTranslate }: { textToTranslate: strin
   translation: `TRANSLATED::${textToTranslate.slice(0, 20)}`,
 }));
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     // The toolbar reads the field's comments to decide whether to offer the
     // comment action; none stored here.

@@ -34,6 +34,7 @@ afterEach(() => cleanup());
 
 describe("Pagination", () => {
   describe("given more pages than the pager can list", () => {
+    /** @scenario "The pager lists page numbers and elides the ones it skips" */
     it("offers the near pages and the last one as numbers, eliding the rest", () => {
       renderPagination({ totalCount: 5000, pageSize: 50 });
 
@@ -44,6 +45,7 @@ describe("Pagination", () => {
       expect(screen.getByText("…")).toBeTruthy();
     });
 
+    /** @scenario "Choosing a page number opens that page" */
     it("asks for the chosen page", async () => {
       const onPageChange = vi.fn<(page: number) => void>();
       renderPagination({ onPageChange });
@@ -66,6 +68,7 @@ describe("Pagination", () => {
       });
     });
 
+    /** @scenario "The page I am on is marked as the current one" */
     it("announces the page in view as the current one", () => {
       renderPagination({ page: 3 });
 
@@ -73,6 +76,7 @@ describe("Pagination", () => {
       expect(screen.getByTestId("pagination-page-2").hasAttribute("aria-current")).toBe(false);
     });
 
+    /** @scenario "Back is unavailable on the first page" */
     it("refuses Back while the first page is in view", () => {
       renderPagination({ page: 1 });
 
@@ -82,6 +86,7 @@ describe("Pagination", () => {
   });
 
   describe("given a page of named rows", () => {
+    /** @scenario "The bar names the total, the range shown and the page size" */
     it("reads the total, the range and the rows per page", () => {
       renderPagination({ totalCount: 7949, unitLabel: "traces" });
 
@@ -89,6 +94,7 @@ describe("Pagination", () => {
       expect((screen.getByTestId("pagination-page-size") as HTMLSelectElement).value).toBe("50");
     });
 
+    /** @scenario "The total is left out when the rows have no name" */
     it("claims no total when the table does not name its rows", () => {
       renderPagination({ totalCount: 120, pageSize: 25 });
 
@@ -122,6 +128,7 @@ describe("Pagination", () => {
     });
 
     describe("when the reader picks a different rows-per-page", () => {
+      /** @scenario "Changing rows per page hands the caller the new size" */
       it("hands the new size to the table", () => {
         const onPageSizeChange = vi.fn<(size: number) => void>();
         renderPagination({ page: 3, onPageSizeChange });
@@ -152,6 +159,7 @@ describe("Pagination", () => {
   });
 
   describe("given a data source whose rows can only be reached in order", () => {
+    /** @scenario "A page the data source cannot open is shown disabled" */
     it("shows the pages beyond the ones reached but refuses to open them", () => {
       renderPagination({ page: 1, isPageReachable: (page) => page <= 2 });
 
@@ -159,6 +167,7 @@ describe("Pagination", () => {
       expect(isDisabled("pagination-page-5")).toBe(true);
     });
 
+    /** @scenario "Next is unavailable once the data source has no further rows" */
     it("refuses Next when the data source reports nothing after this page", () => {
       renderPagination({ page: 2, canGoNext: false });
 
@@ -179,6 +188,7 @@ describe("Pagination", () => {
   });
 
   describe("given there is nothing to page through", () => {
+    /** @scenario "Nothing renders when there are no rows" */
     it("renders no bar at all once the count is known to be zero", () => {
       renderPagination({ totalCount: 0 });
 
@@ -187,6 +197,7 @@ describe("Pagination", () => {
   });
 
   describe("given the first page is still loading", () => {
+    /** @scenario "A placeholder holds the bar's place while the first page loads" */
     it("stands a placeholder in for the description and keeps the bar", () => {
       renderPagination({ totalCount: 0, isLoading: true });
 

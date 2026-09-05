@@ -10,7 +10,6 @@ import {
   type ScenarioHostPort,
 } from "@langwatch/scenario-web/screens/simulations";
 import { useMemo, type ComponentType, type ReactNode } from "react";
-import { useLocation, useParams } from "react-router";
 
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 
@@ -18,8 +17,6 @@ export function ScenarioHost({ children }: { children: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
   const scope = session.activeScope();
   const actor = session.currentUser();
-  const location = useLocation();
-  const params = useParams();
 
   const organizations = scenarioApi.organization.getAll.useQuery(
     { isDemo: false },
@@ -91,9 +88,12 @@ export function ScenarioHost({ children }: { children: ReactNode }) {
        * five addresses, and `params["*"]` is how it knows which.
        */
       route: () => ({
-        params: { ...params, path: (params["*"] ?? "").split("/").filter(Boolean) },
+        params: {
+          ...reading.params,
+          path: (reading.params["*"] ?? "").split("/").filter(Boolean),
+        },
         query: reading.query,
-        pathname: location.pathname,
+        pathname: reading.pathname ?? "",
       }),
       setQuery: (next, options) => route.setQuery({ ...reading.query, ...next }, options),
       navigate: (to, options) =>
@@ -101,18 +101,7 @@ export function ScenarioHost({ children }: { children: ReactNode }) {
       succeeded: (notice) => feedback.succeeded(notice),
       failed: (failure) => feedback.failed(failure),
     }),
-    [
-      placement,
-      actor,
-      session,
-      organizations.isLoading,
-      reading,
-      params,
-      location.pathname,
-      route,
-      navigation,
-      feedback,
-    ],
+    [placement, actor, session, organizations.isLoading, reading, route, navigation, feedback],
   );
 
   return <ScenarioHostProvider value={host}>{children}</ScenarioHostProvider>;

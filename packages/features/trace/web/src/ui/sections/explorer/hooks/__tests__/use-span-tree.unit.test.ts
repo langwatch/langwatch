@@ -65,7 +65,7 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ getQueryData, setQueryData }),
 }));
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     useUtils: () => ({
       tracesV2: { spanTreeDelta: { invalidate: deltaInvalidate } },

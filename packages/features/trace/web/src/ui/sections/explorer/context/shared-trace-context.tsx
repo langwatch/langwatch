@@ -1,5 +1,5 @@
 import { createContext, type ReactNode, useContext } from "react";
-import type { RouterOutputs } from "../../trace-api";
+import type { RouterOutputs } from "../../../../behavior/trace-api";
 
 /**
  * The one payload behind the read-only share page.

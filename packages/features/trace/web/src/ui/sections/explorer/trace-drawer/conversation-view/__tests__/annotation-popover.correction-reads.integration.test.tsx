@@ -26,7 +26,7 @@ vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
 
 vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: vi.fn() } }));
 
-vi.mock("../../../../trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api", () => ({
   api: {
     useUtils: () => ({
       annotation: {

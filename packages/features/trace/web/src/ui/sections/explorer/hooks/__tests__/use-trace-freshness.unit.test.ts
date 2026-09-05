@@ -56,7 +56,7 @@ const mockNewCountInvalidate = vi.fn().mockResolvedValue(undefined);
 const mockDiscoverCancel = vi.fn().mockResolvedValue(undefined);
 const mockDiscoverInvalidate = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     // The hook passes this procedure object to (the mocked)
     // useSSESubscription — it only needs to exist, not function.

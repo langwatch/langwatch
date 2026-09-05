@@ -53,7 +53,7 @@ vi.mock("../../../../behavior/use-local-storage-selected-dataset-id", () => ({
   }),
 }));
 
-vi.mock("../../trace-api", () => ({
+vi.mock("../../../../behavior/trace-api", () => ({
   api: {
     useUtils: () => ({
       dataset: { getAll: { invalidate: vi.fn() } },

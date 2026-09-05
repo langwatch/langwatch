@@ -11,10 +11,10 @@ import { VerticalFormControl } from "../../../ui/elements/vertical-form-control"
 import {
   type PromptTextAreaOnAddMention,
   PromptTextAreaWithVariables,
-} from "../../../surfaces/prompt-textarea";
+} from "../../../surfaces/variables/prompt-textarea";
 import type { AvailableSource, Variable } from "../../../surfaces/variables";
 import type { PromptConfigFormValues } from "../../../surfaces/prompt-form";
-import { useLayoutMode } from "../../../surfaces/prompt-layout";
+import { useLayoutMode } from "../../../model/layout-mode";
 import {
   EditingModeTitle,
   getDefaultEditingMode,

@@ -1,7 +1,7 @@
 import { Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
-import { api } from "../../../trace-api";
+import { api } from "../../../../../behavior/trace-api";
 import {
   deriveSessionBanner,
   indexToolSpansBySpanId,

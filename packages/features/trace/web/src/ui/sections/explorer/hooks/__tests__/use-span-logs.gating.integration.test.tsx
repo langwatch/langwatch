@@ -3,10 +3,10 @@
  */
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../../../trace-api";
+import { api } from "../../../../../behavior/trace-api";
 import { useSpanLogs } from "../use-span-logs";
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     tracesV2: {
       header: { useQuery: vi.fn() },

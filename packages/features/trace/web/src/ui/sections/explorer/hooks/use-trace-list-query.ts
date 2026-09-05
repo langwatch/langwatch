@@ -1,7 +1,7 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { useSamplePreview } from "../onboarding";
 import type { TraceListCursor } from "../../../../index";
 import { DEFAULT_SORT, useFilterStore, useViewStore } from "../../../../index";

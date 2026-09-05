@@ -3,7 +3,7 @@ import { Key } from "lucide-react";
 import { Link } from "../../../blocks/link";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { apiKeySettingsHref } from "../../../../model/api-key-anchor";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context";
 
 /**

@@ -1,7 +1,7 @@
 /**
  * Per-project cache of the last successful `tracesV2.discover` response.
  */
-import type { RouterOutputs } from "../../trace-api";
+import type { RouterOutputs } from "../../../../behavior/trace-api";
 
 const STORAGE_KEY = "langwatch:traces-v2:discoverCache";
 const TTL_MS = 24 * 60 * 60 * 1000;

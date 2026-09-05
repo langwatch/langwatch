@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { showErrorToast } from "../../errors";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { shouldShowGenericTranslateError } from "../../../../behavior/explorer/utils/translation-error";
 
 export interface UseTextTranslationResult {

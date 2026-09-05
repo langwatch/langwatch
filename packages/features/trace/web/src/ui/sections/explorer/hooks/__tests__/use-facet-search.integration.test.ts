@@ -12,7 +12,7 @@ const harness = vi.hoisted(() => ({
   projectId: { value: "proj-1" as string | undefined },
 }));
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: { tracesV2: { facetValues: { useQuery: harness.useQuery } } },
 }));
 
@@ -86,9 +86,7 @@ describe("useFacetSearch", () => {
   // values, it does not search them).
   describe("given useAttributeValues delegates to useFacetSearch", () => {
     it("queries facetValues with the attribute-prefixed key, limit 30, no prefix", () => {
-      renderHook(() =>
-        useAttributeValues({ attrKey: "langwatch.user_id", enabled: true }),
-      );
+      renderHook(() => useAttributeValues({ attrKey: "langwatch.user_id", enabled: true }));
 
       const call = callFor("attribute.langwatch.user_id");
       expect(call).toBeDefined();

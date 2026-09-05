@@ -20,8 +20,8 @@ export const traceDrawerMount: TraceScreenLoader = () =>
     default: module.GlobalTraceV2DrawerMount,
   }));
 
-export { api as traceApi, api as traceApiHooks } from "../../ui/sections/trace-api";
-export type { RouterOutputs as TraceRouterOutputs, TraceApiMap } from "../../ui/sections/trace-api";
+export { api as traceApi, api as traceApiHooks } from "../../behavior/trace-api";
+export type { RouterOutputs as TraceRouterOutputs, TraceApiMap } from "../../behavior/trace-api";
 export {
   TraceHostPort,
   TraceHostProvider,

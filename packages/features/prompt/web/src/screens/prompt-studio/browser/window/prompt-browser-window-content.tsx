@@ -1,5 +1,5 @@
 import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
-import { type LayoutMode, LayoutModeContext } from "../../../../surfaces/prompt-layout";
+import { type LayoutMode, LayoutModeContext } from "../../../../model/layout-mode";
 import { type TabData, useTabId } from "../../studio-internals";
 import { cloneDeep, debounce } from "lodash-es";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

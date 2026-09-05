@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
+import type { SessionGroupPayloadItem } from "../../../../../model/explorer/session-group-payload";
 import {
   mapSessionGroupsPayload,
   mapSessionGroupToConversationGroup,
-  type SessionGroupPayloadItem,
 } from "../map-session-groups-payload";
 
 function payloadItem(overrides: Partial<SessionGroupPayloadItem> = {}): SessionGroupPayloadItem {

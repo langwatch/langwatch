@@ -49,7 +49,12 @@ export {
   type UiFeatureApiProvider,
   type UiFeatureApiTransport,
 } from "./behavior/ui-feature-transport";
-export { installUiFeatures, uiFeature, type UiFeature } from "./behavior/ui-feature";
+export {
+  installUiFeatures,
+  uiFeature,
+  type UiFeature,
+  type UiFeatureInstall,
+} from "./behavior/ui-feature";
 export { createRouterUiNavigation, useRouterUiNavigation } from "./behavior/ui-router-navigation";
 export { useUiOrgQueryParamSelection } from "./behavior/ui-scope-org-param";
 export {
@@ -74,6 +79,7 @@ export {
 export {
   broadcastUiScopeWrite,
   readUiScopeMemory,
+  rememberUiScopeSelection,
   UI_SELECTED_ORGANIZATION_ID_KEY,
   UI_SELECTED_PROJECT_SLUG_KEY,
   UI_SELECTED_TEAM_ID_KEY,
@@ -138,11 +144,7 @@ export {
   type UiRedirectRouteDescriptor,
   type UiRouteDescriptor,
 } from "./model/ui-route-table";
-export type {
-  UiApplication,
-  UiApplicationInstall,
-  UiFeatureInstall,
-} from "./ui/sections/ui-application";
+export type { UiApplication, UiApplicationInstall } from "./ui/sections/ui-application";
 export { createUiApplication } from "./features/installed-ui-features.composition";
 export { installedUiFeatures } from "./features/installed-ui-features";
 export { createUiFeatureShell, type UiFeatureShellInstall } from "./ui/sections/ui-feature-shell";

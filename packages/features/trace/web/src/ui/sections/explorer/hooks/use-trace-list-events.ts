@@ -2,7 +2,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import type { TraceEventRollup } from "@langwatch/trace-contract";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { useFilterStore, useViewStore } from "../../../../index";
 import type { TraceListItem } from "../types/trace";
 import { NO_TRACE_EVENTS } from "../types/trace";

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "./trace-api";
+import { api } from "../../behavior/trace-api";
 import { useSSESubscription } from "../../behavior/use-sse-subscription";
 
 interface UseTraceUpdateListenerOptions {

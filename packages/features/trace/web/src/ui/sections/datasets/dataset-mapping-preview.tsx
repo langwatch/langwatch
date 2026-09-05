@@ -26,7 +26,7 @@ import { useDebouncedCallback } from "../../../behavior/use-debounced-callback";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { ThreadMapping, type ThreadMappingState } from "../traces/thread-mapping";
 import { TracesMapping } from "../traces/traces-mapping";
-import { api } from "../trace-api";
+import { api } from "../../../behavior/trace-api";
 
 interface DatasetMappingPreviewProps {
   traces: Trace[];

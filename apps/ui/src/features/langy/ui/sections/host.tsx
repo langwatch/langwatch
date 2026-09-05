@@ -11,7 +11,6 @@ import {
   type LangyHostPort,
 } from "@langwatch/langy-web/screens/langy";
 import { useEffect, useMemo, type ReactNode } from "react";
-import { useLocation, useParams } from "react-router";
 
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { isLangyDemoProject } from "../../../../behavior/langy-demo-project";
@@ -22,8 +21,6 @@ export function LangyHost({ children }: { children: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
   const scope = session.activeScope();
   const actor = session.currentUser();
-  const location = useLocation();
-  const params = useParams();
   const rpc = useUiRpc();
 
   const organizations = langyApi.organization.getAll.useQuery(
@@ -102,7 +99,11 @@ export function LangyHost({ children }: { children: ReactNode }) {
       hasPermission: (permission) => session.hasPermission(permission),
       featureFlag: (flag) => session.featureFlag(flag),
       isLoading: () => !!actor && organizations.isLoading,
-      route: () => ({ params, query: reading.query, pathname: location.pathname }),
+      route: () => ({
+        params: reading.params,
+        query: reading.query,
+        pathname: reading.pathname ?? "",
+      }),
       planManagementUrl: () => "/settings/subscription",
       setQuery: (next, options) => route.setQuery({ ...reading.query, ...next }, options),
       navigate: (to, options) =>
@@ -117,8 +118,6 @@ export function LangyHost({ children }: { children: ReactNode }) {
       session,
       organizations.isLoading,
       reading,
-      params,
-      location.pathname,
       route,
       navigation,
       feedback,

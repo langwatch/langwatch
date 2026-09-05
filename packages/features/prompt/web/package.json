@@ -60,25 +60,13 @@
       "types": "./src/surfaces/prompt-form/index.ts",
       "default": "./src/surfaces/prompt-form/index.ts"
     },
-    "./surfaces/prompt-layout": {
-      "types": "./src/surfaces/prompt-layout/index.ts",
-      "default": "./src/surfaces/prompt-layout/index.ts"
-    },
     "./surfaces/prompt-reference": {
       "types": "./src/surfaces/prompt-reference/index.ts",
       "default": "./src/surfaces/prompt-reference/index.ts"
     },
-    "./surfaces/prompt-textarea": {
-      "types": "./src/surfaces/prompt-textarea/index.ts",
-      "default": "./src/surfaces/prompt-textarea/index.ts"
-    },
     "./surfaces/prompt-version": {
       "types": "./src/surfaces/prompt-version/index.ts",
       "default": "./src/surfaces/prompt-version/index.ts"
-    },
-    "./surfaces/variable-type": {
-      "types": "./src/surfaces/variable-type/index.ts",
-      "default": "./src/surfaces/variable-type/index.ts"
     },
     "./surfaces/variables": {
       "types": "./src/surfaces/variables/index.ts",

@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import { api } from "./trace-api";
+import { api } from "../../behavior/trace-api";
 
 /**
  * Everything an annotation write on one trace makes stale, in one place.

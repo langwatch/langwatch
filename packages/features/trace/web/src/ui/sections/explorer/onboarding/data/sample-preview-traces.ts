@@ -1,7 +1,7 @@
 import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { previewTraceId } from "../../../../../index";
 import type { EvaluationRunData } from "../../../../../model/evaluation-run-data";
-import type { RouterOutputs } from "../../../trace-api";
+import type { RouterOutputs } from "../../../../../behavior/trace-api";
 import type { TraceEvalResult, TraceListItem } from "../../types/trace";
 import { NO_TRACE_EVENTS } from "../../types/trace";
 

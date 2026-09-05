@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CaretPosition } from "rich-textarea";
-import type { SelectedField } from "../../variables/variable-insert-menu";
-import type { AvailableSource, FieldType } from "../../variables/variable-mapping-input";
-import type { Variable } from "../../variables/variables-section";
+import type { SelectedField } from "../../variable-insert-menu";
+import type { AvailableSource, FieldType } from "../../variable-mapping-input";
+import type { Variable } from "../../variables-section";
 import type { PromptTextAreaOnAddMention } from "../prompt-textarea.types";
 import { getCaretCoordinates, setTextareaValueUndoable } from "../prompt-textarea.utils";
 

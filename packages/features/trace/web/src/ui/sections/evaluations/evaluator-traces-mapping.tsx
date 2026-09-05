@@ -1,5 +1,5 @@
 import { useFilterParams } from "../../../behavior/use-filter-params";
-import { api } from "../trace-api";
+import { api } from "../../../behavior/trace-api";
 import { TracesMapping } from "../traces/traces-mapping";
 
 /**

@@ -55,7 +55,7 @@ vi.mock("../../../../use-annotation-invalidation", () => ({
 
 vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: vi.fn() } }));
 
-vi.mock("../../../../trace-api", () => ({
+vi.mock("../../../../../../behavior/trace-api", () => ({
   api: {
     annotation: {
       getByTraceId: { useQuery: () => ({ data: [] }) },

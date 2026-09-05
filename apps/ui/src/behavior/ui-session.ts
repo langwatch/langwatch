@@ -19,7 +19,7 @@ import type { UiFeatureApiTransport } from "./ui-feature-transport";
 import { readPublicAppConfig } from "./public-config";
 import { resolveUiScope, uiScopeSelectionWrites } from "./ui-scope-resolution";
 import { useUiRouteReading } from "./ui-scope-route";
-import { broadcastUiScopeWrite, useUiScopeMemory, writeUiScopeSelection } from "./ui-scope-storage";
+import { rememberUiScopeSelection, useUiScopeMemory } from "./ui-scope-storage";
 import {
   readUiActor,
   uiAuthClient,
@@ -305,11 +305,7 @@ export function useBrowserUiSession({
 
   useEffect(() => {
     if (writes.length === 0) return;
-    writeUiScopeSelection({
-      writes,
-      storage: window.localStorage,
-      broadcast: broadcastUiScopeWrite,
-    });
+    rememberUiScopeSelection({ writes });
   }, [writes]);
 
   const askFlag = useCallback((flag: string) => flagRequests.ask(flag), [flagRequests]);

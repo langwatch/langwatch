@@ -20,7 +20,7 @@ vi.mock("@langwatch/design-system/toaster", () => ({
 }));
 
 // Mock tRPC api — the subscription is a no-op in tests
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     export: {
       onExportProgress: {

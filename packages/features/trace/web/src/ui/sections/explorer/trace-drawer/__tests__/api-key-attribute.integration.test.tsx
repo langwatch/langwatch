@@ -22,7 +22,7 @@ vi.mock("../../../../elements/next-link", () => ({
 
 const mockNameById = vi.fn();
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     apiKey: { nameById: { useQuery: () => mockNameById() } },
   },

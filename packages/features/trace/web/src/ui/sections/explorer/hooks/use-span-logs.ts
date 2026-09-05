@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { TraceLogRecordDto } from "@langwatch/trace-contract";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { useTraceQueryArgs } from "./use-trace-query-args";
 
 /**

@@ -3,7 +3,7 @@ import { Check, ChevronRight, Database, Type } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ColorfulBlockIcon, ComponentIcon } from "@langwatch/workflow-web";
 import type { ComponentType, Field } from "@langwatch/workflow-contract";
-import { VariableTypeBadge, VariableTypeIcon } from "../variable-type";
+import { VariableTypeBadge, VariableTypeIcon } from "./variable-type";
 
 // ============================================================================
 // Types

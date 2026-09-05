@@ -74,7 +74,7 @@ vi.mock("../../use-annotations-by-trace-ids", () => ({
   useAnnotationsByTraceIds: mocks.annotationsRead,
 }));
 
-vi.mock("../../trace-api", () => ({
+vi.mock("../../../../behavior/trace-api", () => ({
   api: {
     annotationScore: { getAllActive: { useQuery: () => ({ data: [] }) } },
     traces: {

@@ -3,7 +3,7 @@ import { LuCheck, LuX } from "react-icons/lu";
 import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/suite-web";
 import { useDrawer } from "../../../../behavior/use-drawer";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context";
 import type { ChipDef } from "../../../blocks/explorer/trace-drawer/chip-bar";
 

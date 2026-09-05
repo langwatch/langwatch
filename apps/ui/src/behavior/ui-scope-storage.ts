@@ -72,6 +72,23 @@ export function writeUiScopeSelection({
   }
 }
 
+/**
+ * The same writes, against the browser's own storage and broadcast. The one
+ * place `window.localStorage` is named for a scope write, so a feature asks
+ * for the memory rather than reaching for the global.
+ */
+export function rememberUiScopeSelection({
+  writes,
+}: {
+  writes: readonly UiScopeSelectionWrite[];
+}): void {
+  writeUiScopeSelection({
+    writes,
+    storage: window.localStorage,
+    broadcast: broadcastUiScopeWrite,
+  });
+}
+
 /** The browser's own broadcast, in the shape `usehooks-ts` readers listen for. */
 export function broadcastUiScopeWrite(key: string): void {
   window.dispatchEvent(new StorageEvent(SAME_DOCUMENT_STORAGE_EVENT, { key }));

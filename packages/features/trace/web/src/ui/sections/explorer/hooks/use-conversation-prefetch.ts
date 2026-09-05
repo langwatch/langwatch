@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { useConversationContext } from "./use-conversation-context";
 import { useDrawerProjectId } from "./use-drawer-project-id";
 

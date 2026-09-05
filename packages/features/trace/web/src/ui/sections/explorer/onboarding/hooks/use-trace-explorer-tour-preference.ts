@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { api } from "../../../trace-api";
+import { api } from "../../../../../behavior/trace-api";
 
 /**
  * User-scoped persistence for automatic Traces Explorer tours.

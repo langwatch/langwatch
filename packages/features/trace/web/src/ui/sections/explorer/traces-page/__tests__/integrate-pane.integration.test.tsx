@@ -29,7 +29,7 @@ vi.mock("@langwatch/langy-web", async (importOriginal) => ({
     selector({ askLangy: vi.fn() }),
 }));
 
-vi.mock("../../../trace-api", () => ({
+vi.mock("../../../../../behavior/trace-api", () => ({
   api: {
     apiKey: { create: { useMutation: () => ({ mutate: vi.fn() }) } },
     personalAccessToken: {

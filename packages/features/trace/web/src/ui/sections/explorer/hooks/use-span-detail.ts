@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { applyOverlayToSpanDetail } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views";
-import { api } from "../../trace-api";
+import { api } from "../../../../behavior/trace-api";
 import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context";
 import { useDrawerStore } from "../../../../index";
 import { useAppliedTraceEditPatch } from "./use-trace-edit-overlay";
