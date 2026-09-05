@@ -96,6 +96,8 @@ const getImportedModelCosts = () => {
       cacheCreation1hCostPerToken?: number;
       inputAudioCostPerToken?: number;
       outputAudioCostPerToken?: number;
+      inputImageCostPerToken?: number;
+      outputImageCostPerToken?: number;
       inputCostPerCharacter?: number;
       inputCostPerSecond?: number;
     }
@@ -115,7 +117,9 @@ const getImportedModelCosts = () => {
       model.pricing?.outputCostPerToken != null ||
       model.pricing?.inputCostPerCharacter != null ||
       model.pricing?.inputCostPerSecond != null ||
-      model.pricing?.audioCostPerToken != null
+      model.pricing?.audioCostPerToken != null ||
+      model.pricing?.imageCostPerToken != null ||
+      model.pricing?.imageOutputCostPerToken != null
     ) {
       // Make vendor prefix optional in regex (e.g., both "gpt-4o" and "openai/gpt-4o" should match)
       const hasVendorPrefix = modelId.includes("/");
@@ -156,6 +160,8 @@ const getImportedModelCosts = () => {
         ),
         inputAudioCostPerToken: model.pricing.audioCostPerToken,
         outputAudioCostPerToken: resolveAudioOutputRate(modelId, model.pricing),
+        inputImageCostPerToken: model.pricing.imageCostPerToken,
+        outputImageCostPerToken: model.pricing.imageOutputCostPerToken,
         inputCostPerCharacter: model.pricing.inputCostPerCharacter,
         inputCostPerSecond: model.pricing.inputCostPerSecond,
       };
@@ -184,6 +190,8 @@ const getImportedModelCosts = () => {
         cacheCreation1hCostPerToken: model.cacheCreation1hCostPerToken,
         inputAudioCostPerToken: model.inputAudioCostPerToken,
         outputAudioCostPerToken: model.outputAudioCostPerToken,
+        inputImageCostPerToken: model.inputImageCostPerToken,
+        outputImageCostPerToken: model.outputImageCostPerToken,
         inputCostPerCharacter: model.inputCostPerCharacter,
         inputCostPerSecond: model.inputCostPerSecond,
       };
@@ -196,7 +204,9 @@ const getImportedModelCosts = () => {
       model.outputCostPerToken != null ||
       model.inputCostPerCharacter != null ||
       model.inputCostPerSecond != null ||
-      model.inputAudioCostPerToken != null,
+      model.inputAudioCostPerToken != null ||
+      model.inputImageCostPerToken != null ||
+      model.outputImageCostPerToken != null,
   );
 
   // Exclude some vendors (openrouter is already excluded as we're using their API)
@@ -241,6 +251,15 @@ export type MaybeStoredLLMModelCost = {
   // exactly as it billed the flat total.
   inputAudioCostPerToken?: number;
   outputAudioCostPerToken?: number;
+  // Per-token rates for image tokens on the token-billed image models.
+  // OpenAI bills gpt-image output image tokens at $30 to $40 per million
+  // against $5 for text input, so an image priced off a flat token total
+  // comes out a fraction of what it cost. The counts these price are
+  // disjoint from the text token counts and, unlike the audio rates, there
+  // is no text fallback: a model with no image rate prices image tokens at
+  // zero, so a chat model never bills pixels it cannot produce.
+  inputImageCostPerToken?: number;
+  outputImageCostPerToken?: number;
   // Audio rates: characters synthesized (TTS) and seconds transcribed
   // (STT), matched against the gateway's gen_ai.usage.input_chars /
   // gen_ai.usage.audio_seconds span attributes.
@@ -274,6 +293,8 @@ export const getStaticModelCosts = (): MaybeStoredLLMModelCost[] => {
         cacheCreation1hCostPerToken: value.cacheCreation1hCostPerToken,
         inputAudioCostPerToken: value.inputAudioCostPerToken,
         outputAudioCostPerToken: value.outputAudioCostPerToken,
+        inputImageCostPerToken: value.inputImageCostPerToken,
+        outputImageCostPerToken: value.outputImageCostPerToken,
         inputCostPerCharacter: value.inputCostPerCharacter,
         inputCostPerSecond: value.inputCostPerSecond,
       }))

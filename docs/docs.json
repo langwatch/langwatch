@@ -136,6 +136,17 @@
                   "agent-testing/run-from-ci"
                 ]
               },
+              {
+                "group": "Improve your agent",
+                "pages": [
+                  "improve-your-agent/overview",
+                  "improve-your-agent/reduce-turns",
+                  "improve-your-agent/fix-tool-calls",
+                  "improve-your-agent/reduce-cost-and-latency",
+                  "improve-your-agent/optimize-with-dspy",
+                  "improve-your-agent/algorithms"
+                ]
+              },
               "agent-testing/voice-agents",
               "agent-testing/red-teaming"
             ]
@@ -721,6 +732,7 @@
               "ai-gateway/api/messages",
               "ai-gateway/api/embeddings",
               "ai-gateway/api/audio",
+              "ai-gateway/api/images",
               "ai-gateway/api/realtime",
               "ai-gateway/api/models",
               "ai-gateway/api/errors",
@@ -1690,7 +1702,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1788364549",
+      "source": "/ci/cache/busted/1788603077",
       "destination": "/introduction"
     },
     {
