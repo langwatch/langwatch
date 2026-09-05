@@ -102,6 +102,26 @@ Feature: Langy asks how to reach the customer's code, once
       Then Langy makes the change through the connected folder
       And no code access card is rendered
 
+    # The tool answers itself whenever it can: a folder that is already
+    # connected comes back as the workspace facts. Langy calls it once per
+    # stretch of work, so a long turn made three calls and the panel drew a
+    # card for each of them, the last one under the pull request.
+    @unit
+    Scenario: Only the call that asked carries a card
+      Given a conversation whose folder is already connected
+      When Langy calls for code access again and the tool answers itself
+      Then no second card is drawn for that call
+      And the card of the call that asked stays where it was
+
+    # The header chip says it, the card under it says it with the whole path,
+    # and the notice said it a third time, one bubble down.
+    @unit
+    Scenario: The connect notice is not drawn as a message
+      Given the platform wrote the connect notice into the conversation
+      When the transcript renders
+      Then the notice is not on screen as a message from me
+      And a message I wrote with other words is still on screen
+
   Rule: Platform-only work never asks for code access
 
     @e2e
@@ -156,7 +176,9 @@ Feature: Langy asks how to reach the customer's code, once
       Given the code changes skill
       When its branching step is read
       Then it says to list the existing langy branches first
-      And it says to pick a name that is not among them, so one checkout is enough
+      And it says to list the ones on the remote as well
+      And it says to pick a name that is on neither list, so one checkout is enough
+      And it says the remote list reaches the network, so it goes with the fetch
 
     @unit
     Scenario: A pull request body of more than one line goes in a file

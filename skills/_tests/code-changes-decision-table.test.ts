@@ -112,10 +112,13 @@ describe("the code-changes skill", () => {
     });
 
     /** @scenario "A branch name is picked from the names the folder already has" */
-    it("lists the langy branches the folder has before it names a new one", () => {
+    it("lists the langy branches of the folder and of the remote before it names a new one", () => {
       const rendered = codeChangesSkill();
       expect(rendered).toContain('git branch --list "langy/*"');
-      expect(rendered).toContain("pick one that is not among them");
+      expect(rendered).toContain('git ls-remote --heads origin "langy/*"');
+      expect(rendered).toContain("pick one that is in neither");
+      expect(rendered).toContain("non-fast-forward");
+      expect(rendered).toContain("reaches the network");
     });
 
     /** @scenario "A pull request body of more than one line goes in a file" */
