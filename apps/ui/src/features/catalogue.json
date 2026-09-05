@@ -230,7 +230,8 @@
         "surfaces": [
           "@langwatch/enterprise-licensing-web/surfaces/resource-limits",
           "@langwatch/enterprise-licensing-web/surfaces/seat-types",
-          "@langwatch/enterprise-licensing-web/surfaces/global-upgrade-modal"
+          "@langwatch/enterprise-licensing-web/surfaces/global-upgrade-modal",
+          "@langwatch/enterprise-licensing-web/surfaces/license-error-interceptor"
         ]
       }
     },

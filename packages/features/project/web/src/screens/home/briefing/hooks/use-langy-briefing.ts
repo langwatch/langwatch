@@ -11,11 +11,7 @@ import type { RecentItem } from "../../../../behavior/home-api";
 import { homeApi } from "../../../../behavior/home-api";
 import { formatMilliseconds } from "../../../../model/format-milliseconds";
 import { formatMoney } from "../../../../model/format-money";
-import {
-  type AttentionInboxSignals,
-  buildAttentionInbox,
-  type CountedSignal,
-} from "../attention-inbox";
+import { buildAttentionInbox, type CountedSignal } from "../attention-inbox";
 import { getBriefingMock, useBriefingMock } from "../mocks/briefing-mocks";
 import type { BriefingData, ScenarioBar, StatusCell } from "../types";
 import { useProjectHomeHost } from "../../../../model/project-home-host";
@@ -51,10 +47,6 @@ export interface LangyBriefingResult {
   /** A background refetch is in flight while cached data is still on screen. */
   isRefreshing: boolean;
 }
-
-/** Backwards-compatible name for callers/tests of the briefing derivation. */
-export const buildBriefingReceipts = buildAttentionInbox;
-export type ReceiptSignals = AttentionInboxSignals;
 
 /**
  * Reads one series' value back out of a `getTimeseries` `currentPeriod`.
@@ -422,7 +414,7 @@ export function useLangyBriefing(): LangyBriefingResult {
     });
     const errorTraces = sharedTraceNames?.reduce((total, signal) => total + signal.count, 0);
 
-    const receipts = buildBriefingReceipts({
+    const receipts = buildAttentionInbox({
       slug,
       currentErrorShapes: currentErrorShapes.data?.values,
       previousErrorShapes: previousErrorShapes.data?.values,

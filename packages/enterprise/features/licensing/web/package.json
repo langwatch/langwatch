@@ -13,6 +13,14 @@
       "types": "./src/screens/licensing/index.ts",
       "default": "./src/screens/licensing/index.ts"
     },
+    "./surfaces/global-upgrade-modal": {
+      "types": "./src/surfaces/global-upgrade-modal/index.ts",
+      "default": "./src/surfaces/global-upgrade-modal/index.ts"
+    },
+    "./surfaces/license-error-interceptor": {
+      "types": "./src/surfaces/license-error-interceptor/index.ts",
+      "default": "./src/surfaces/license-error-interceptor/index.ts"
+    },
     "./surfaces/resource-limits": {
       "types": "./src/surfaces/resource-limits/index.ts",
       "default": "./src/surfaces/resource-limits/index.ts"
@@ -20,10 +28,6 @@
     "./surfaces/seat-types": {
       "types": "./src/surfaces/seat-types/index.ts",
       "default": "./src/surfaces/seat-types/index.ts"
-    },
-    "./surfaces/global-upgrade-modal": {
-      "types": "./src/surfaces/global-upgrade-modal/index.ts",
-      "default": "./src/surfaces/global-upgrade-modal/index.ts"
     }
   },
   "scripts": {
