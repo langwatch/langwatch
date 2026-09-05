@@ -30,12 +30,12 @@ function ctx(): TourStepContext & {
 describe("tour step tables", () => {
   describe("given the llmops tour", () => {
     /** @scenario the LLM Ops tour has four steps over the navigation */
-    it("targets the sidebar, the Build group, the rail and the project switcher with the prototype's texts", () => {
+    it("targets the sidebar, the Build group, the product switcher and the project switcher with the prototype's texts", () => {
       const steps = TOUR_STEPS.llmops;
       expect(steps.map((s) => s.target)).toEqual([
         "sidebar",
         "nav-group-build",
-        "rail",
+        "product-switcher",
         "project-switcher",
       ]);
       expect(steps.map((s) => s.text)).toEqual([
@@ -47,13 +47,13 @@ describe("tour step tables", () => {
       expect(steps.map((s) => s.placement)).toEqual([
         "right",
         "right",
-        "right",
+        "auto",
         "bottom",
       ]);
     });
 
     /** @scenario Build folds before the first step and is restored at the end */
-    it("folds Build before step 1 and the rail step, and opens it when the cursor lands on it", () => {
+    it("folds Build before step 1 and the product switcher step, and opens it when the cursor lands on it", () => {
       const c = ctx();
       TOUR_STEPS.llmops[0]!.before?.(c);
       expect(c.actions.collapseGroup).toHaveBeenCalledWith(BUILD_GROUP_ID);

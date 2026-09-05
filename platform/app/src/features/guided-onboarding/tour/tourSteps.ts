@@ -13,7 +13,12 @@ import { GOVERNANCE_SOURCES_ROUTE } from "../landing";
 import type { GuidedPath } from "../paths";
 import type { TourActions } from "./tourRegistry";
 
-export type TourPlacement = "right" | "bottom" | "left";
+/**
+ * Where the caption sits relative to the target. "auto" picks bottom for a
+ * wide target and right for a tall one, for a target that is a pill in one
+ * navigation mode and a full-height rail in the other.
+ */
+export type TourPlacement = "right" | "bottom" | "left" | "auto";
 
 export interface TourStepContext {
   navigate: (to: string) => void;
@@ -60,9 +65,9 @@ export const TOUR_STEPS: Record<GuidedPath, readonly TourStep[]> = {
       onArrive: ({ actions }) => actions.expandGroup?.(BUILD_GROUP_ID),
     },
     {
-      target: "rail",
+      target: "product-switcher",
       text: "This is where you switch to different areas of the product, like Gateway, Coding Agent Tracking and Governance.",
-      placement: "right",
+      placement: "auto",
       before: ({ actions }) => actions.collapseGroup?.(BUILD_GROUP_ID),
     },
     {

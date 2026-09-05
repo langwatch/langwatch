@@ -30,7 +30,14 @@ export const TOUR_TRAVEL_MS = 850;
 /** Layout settles (a `before` may have navigated) before the target is measured. */
 export const TOUR_SETTLE_MS = 350;
 /** A step whose target is not on the page moves on after this. */
-export const TOUR_MISSING_TARGET_MS = 400;
+/**
+ * How long a step waits for its target to appear before skipping it. A
+ * target can be a page that is still loading its chunks or a menu group
+ * that opens on arrival, so the wait is generous; a target that never
+ * comes (hidden by a flag or a permission) still does not strand the tour.
+ */
+export const TOUR_MISSING_TARGET_MS = 4000;
+export const TOUR_TARGET_POLL_MS = 100;
 /** The panel stays lit this long before the dim fades. */
 export const TOUR_HANDOFF_HOLD_MS = 4600;
 /** The dim fades out over this long. */
@@ -82,13 +89,19 @@ function cursorPoint(rect: DOMRect): Point {
 }
 
 function captionPoint(rect: DOMRect, step: TourStep): Point {
+  const placement =
+    step.placement === "auto"
+      ? rect.width >= rect.height
+        ? "bottom"
+        : "right"
+      : step.placement;
   let x = rect.right + 18;
   let y = rect.top + Math.min(rect.height / 2, 140) - 40;
-  if (step.placement === "bottom") {
+  if (placement === "bottom") {
     x = rect.left + rect.width / 2 - 170;
     y = rect.bottom + 14;
   }
-  if (step.placement === "left") {
+  if (placement === "left") {
     x = rect.left + 60;
     y = rect.top + 80;
   }
@@ -290,14 +303,7 @@ function TourLayerInner() {
       else goToStep(stepIndex + 1);
     };
 
-    /* measure after layout settles (a before() may have navigated) */
-    later(() => {
-      const rect = targetRect(step.target);
-      if (!rect) {
-        /* target missing: don't strand the tour */
-        later(advance, TOUR_MISSING_TARGET_MS);
-        return;
-      }
+    const land = (rect: DOMRect) => {
       emit("viewed", "tour_step", {
         path,
         step: stepIndex,
@@ -328,7 +334,25 @@ function TourLayerInner() {
           step.onArrive ? 550 : 150,
         );
       }, TOUR_TRAVEL_MS);
-    }, TOUR_SETTLE_MS);
+    };
+
+    /* measure after layout settles (a before() may have navigated), and
+       keep looking for a target that is still mounting */
+    let waited = 0;
+    const measure = () => {
+      const rect = targetRect(step.target);
+      if (rect) {
+        land(rect);
+        return;
+      }
+      if (waited >= TOUR_MISSING_TARGET_MS) {
+        advance();
+        return;
+      }
+      waited += TOUR_TARGET_POLL_MS;
+      later(measure, TOUR_TARGET_POLL_MS);
+    };
+    later(measure, TOUR_SETTLE_MS);
 
     return clear;
     // eslint-disable-next-line react-hooks/exhaustive-deps

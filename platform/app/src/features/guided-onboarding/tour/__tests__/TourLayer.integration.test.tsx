@@ -28,7 +28,7 @@ vi.mock("~/utils/compat/next-router", () => ({
 }));
 
 import { useGuidedTourStore } from "../guidedTourStore";
-import { TourLayer } from "../TourLayer";
+import { TOUR_MISSING_TARGET_MS, TourLayer } from "../TourLayer";
 import { useTourRegistry } from "../tourRegistry";
 import { readMs, TOUR_STEPS } from "../tourSteps";
 
@@ -107,7 +107,7 @@ describe("TourLayer", () => {
     beforeEach(() => {
       mountTarget("sidebar", rect(60, 60, 220, 600));
       mountTarget("nav-group-build", rect(70, 200, 200, 28));
-      mountTarget("rail", rect(0, 0, 54, 700));
+      mountTarget("product-switcher", rect(0, 0, 54, 700));
       mountTarget("project-switcher", rect(300, 12, 140, 32));
       mountTarget("langy-panel", rect(880, 60, 392, 640));
     });
@@ -294,14 +294,27 @@ describe("TourLayer", () => {
 
   describe("given a target that is not on the page", () => {
     /** @scenario a missing target skips its step */
-    it("moves on after 400ms", () => {
+    it("moves on once the wait for the target runs out", () => {
       mountTarget("gw-new-key", rect(500, 80, 120, 32));
       renderLayer();
       act(() => useGuidedTourStore.getState().start("gateway"));
-      act(() => vi.advanceTimersByTime(SETTLE));
+      act(() => vi.advanceTimersByTime(SETTLE + TOUR_MISSING_TARGET_MS - 200));
       expect(screen.queryByTestId("tour-cursor")).toBeNull();
-      act(() => vi.advanceTimersByTime(400));
+      expect(useGuidedTourStore.getState().stepIndex).toBe(0);
+      act(() => vi.advanceTimersByTime(300));
       expect(useGuidedTourStore.getState().stepIndex).toBe(1);
+    });
+
+    /** @scenario a target that is still loading is waited for */
+    it("lands on a target that mounts while the step waits", () => {
+      renderLayer();
+      act(() => useGuidedTourStore.getState().start("llmops"));
+      act(() => vi.advanceTimersByTime(SETTLE + 2000));
+      expect(screen.queryByTestId("tour-cursor")).toBeNull();
+      mountTarget("sidebar", rect(60, 60, 220, 600));
+      act(() => vi.advanceTimersByTime(300));
+      expect(screen.getByTestId("tour-cursor")).toBeInTheDocument();
+      expect(useGuidedTourStore.getState().stepIndex).toBe(0);
     });
 
     /** @scenario a target hidden by a flag or a permission is a missing target */
@@ -311,7 +324,7 @@ describe("TourLayer", () => {
       mountTarget("gw-new-key", rect(500, 80, 120, 32));
       renderLayer();
       act(() => useGuidedTourStore.getState().start("gateway"));
-      act(() => vi.advanceTimersByTime(SETTLE + 400));
+      act(() => vi.advanceTimersByTime(SETTLE + TOUR_MISSING_TARGET_MS + 100));
       landStep(true);
       expect(screen.getByTestId("tour-caption")).toHaveTextContent(
         "Let's create your first one right now.",

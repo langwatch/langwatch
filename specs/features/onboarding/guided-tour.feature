@@ -30,7 +30,8 @@ Feature: Guided onboarding tour
 
   @unit
   Scenario: the LLM Ops tour has four steps over the navigation
-    Then the llmops tour targets, in order, "sidebar", "nav-group-build", "rail" and "project-switcher"
+    Then the llmops tour targets, in order, "sidebar", "nav-group-build", "product-switcher" and "project-switcher"
+    And the product switcher is the icon rail or the product pill in the top bar, whichever the navigation mode shows
     And their texts are:
       | This is the menu: everything you need to fully control your agent lives here.                                     |
       | Here are your prompts, connected agents, evaluators, datasets and all the assets you need to improve your agent. |
@@ -127,7 +128,7 @@ Feature: Guided onboarding tour
     When the llmops tour starts
     Then the Build group is collapsed for the first step
     And it expands when the cursor lands on it
-    And it folds again for the rail step
+    And it folds again for the product switcher step
     When the tour ends
     Then the Build group is back to how it was before the tour
 
@@ -142,7 +143,15 @@ Feature: Guided onboarding tour
     Given the gateway tour is on the "nav-virtual-keys" step
     And no element on the page carries that tour target
     When the step tries to measure its target
-    Then the tour moves on to the next step after 400 milliseconds
+    Then the tour keeps looking for it for four seconds
+    And then moves on to the next step
+
+  @unit
+  Scenario: a target that is still loading is waited for
+    Given the llmops tour is on the "sidebar" step
+    And the sidebar is still loading
+    When the sidebar mounts two seconds later
+    Then the cursor lands on it and the step goes on as usual
 
   @unit
   Scenario: a target hidden by a flag or a permission is a missing target
