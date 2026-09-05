@@ -5,6 +5,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -48,10 +49,40 @@ vi.mock("../../elements/langy-model-pill", () => ({
   LangyModelPill: () => <div data-testid="model-pill" />,
 }));
 
+// The credential form, at its module boundary: the panel's REAL branch
+// (langyNeedsModel ? the inline setup : the empty state) and the real
+// onComplete -> refetch wiring are what this file drives; the form itself is
+// tested where it lives, and dragging its whole hook tree into jsdom would
+// test the model-provider feature instead.
+vi.mock("@langwatch/model-provider-web/surfaces/edit-model-provider-form", () => ({
+  EditModelProviderForm: ({ onSaved }: { onSaved?: () => void }) => (
+    <div data-testid="edit-model-provider-form">
+      <label>
+        Provider API Key
+        <input aria-label="Provider API Key" />
+      </label>
+      <button type="button" onClick={() => onSaved?.()}>
+        Save and continue
+      </button>
+    </div>
+  ),
+}));
+
 /** Drives the gate query the inline model-setup branch reads. */
 const resolvedDefaultRef: {
   current: { data: { model: string | null } | undefined; isLoading: boolean; isError: boolean };
 } = { current: { data: undefined, isLoading: false, isError: false } };
+
+/**
+ * Saving writes the provider key and the project default; the next resolve
+ * returns it. The spy mirrors that so the "save unblocks Langy" case can move
+ * between the two states without remounting — which is the whole claim: no
+ * page reload.
+ */
+const refetchResolvedDefault = vi.fn(() => {
+  resolvedDefaultRef.current = { data: { model: "gpt-5-mini" }, isLoading: false, isError: false };
+  return Promise.resolve({ data: resolvedDefaultRef.current.data });
+});
 
 vi.mock("../../../../../behavior/langy-api", async () => {
   const { createTrpcUtils, idleQuery, withFallback } =
@@ -91,7 +122,7 @@ vi.mock("../../../../../behavior/langy-api", async () => {
           // undefined, so the panel gates on isSuccess rather than !isLoading.
           isSuccess: !resolvedDefaultRef.current.isLoading && !resolvedDefaultRef.current.isError,
           isError: resolvedDefaultRef.current.isError,
-          refetch: () => Promise.resolve(),
+          refetch: refetchResolvedDefault,
         }),
       },
       listAllForProjectForFrontend: {
@@ -177,11 +208,60 @@ function renderPanel() {
 
 beforeEach(() => {
   resolvedDefaultRef.current = { data: undefined, isLoading: false, isError: false };
+  refetchResolvedDefault.mockClear();
   useLangyStore.setState({ isOpen: true, panelMode: "floating" });
 });
 
 afterEach(() => {
   cleanup();
+});
+
+describe("given a project with no model provider configured", () => {
+  describe("when the user opens the Langy panel", () => {
+    /** @scenario "Langy shows an inline model setup when no model is configured" */
+    it("shows the add-a-provider prompt with a key field instead of the empty state", async () => {
+      resolvedDefaultRef.current = { data: { model: null }, isLoading: false, isError: false };
+
+      renderPanel();
+
+      expect(await screen.findByText("Langy needs a model to get started")).toBeInTheDocument();
+
+      // A provider to choose and a key to paste, both in the panel.
+      expect(
+        screen.getByRole("button", { name: /Codex \(OpenAI account\), recommended/ }),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Provider API Key")).toBeInTheDocument();
+
+      // It replaces the ordinary empty state rather than sitting beside it.
+      expect(screen.queryByText(/Just type away/)).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("given the Langy panel is showing the inline model setup", () => {
+  describe("when the user saves a valid key and a default chat model", () => {
+    /** @scenario "Saving a key and default model from Langy unblocks the assistant" */
+    it("re-resolves the model in place and drops the setup prompt without a page reload", async () => {
+      const user = userEvent.setup();
+      resolvedDefaultRef.current = { data: { model: null }, isLoading: false, isError: false };
+
+      const rendered = renderPanel();
+      expect(await screen.findByText("Langy needs a model to get started")).toBeInTheDocument();
+
+      await user.type(screen.getByLabelText("Provider API Key"), "sk-test-key");
+      await user.click(screen.getByRole("button", { name: "Save and continue" }));
+
+      expect(refetchResolvedDefault).toHaveBeenCalledTimes(1);
+      // The real refetch notifies subscribers; this mutable query double needs
+      // an explicit rerender to model that update.
+      rendered.rerender(<LangySidecar />);
+
+      await waitFor(() => {
+        expect(screen.queryByText("Langy needs a model to get started")).not.toBeInTheDocument();
+      });
+      expect(await screen.findByText(/Just type away/)).toBeInTheDocument();
+    });
+  });
 });
 
 describe("given a project that already has a default model configured", () => {

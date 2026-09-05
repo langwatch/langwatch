@@ -96,7 +96,7 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 import { showErrorToast } from "@langwatch/ui-host/errors";
-import { ModelProviderScreen } from "../../../../ui/sections/model-provider-setup-gap";
+import { LangyModelProviderSetup } from "../../../../ui/sections/model-provider-setup";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useFeatureFlag } from "../../../../behavior/use-feature-flag";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
@@ -2385,9 +2385,8 @@ function LangyPanel({
                           {/* The one subtitle under this heading is the provider
                         grid's own description; a second line here read as a
                         double title. */}
-                          <ModelProviderScreen
-                            variant="langy"
-                            {...(reconnectCodex ? { initialProviderKey: "codex" as const } : {})}
+                          <LangyModelProviderSetup
+                            {...(reconnectCodex ? { initialProviderKey: "openai_codex" } : {})}
                             onComplete={() => {
                               void resolvedDefaultQuery.refetch();
                               if (reconnectCodex) {

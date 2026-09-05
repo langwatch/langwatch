@@ -162,6 +162,16 @@ describe("given a stats card comparing readings on one scale", () => {
     },
   };
 
+  /** @scenario "The bar comparison marks the leading reading" */
+  it("draws a bar per reading and marks the leading one", () => {
+    renderMessage(assistantMessage({ parts: [comparison] }));
+
+    const bars = screen.getAllByTestId("derived-stat-bar");
+    expect(bars).toHaveLength(2);
+    expect(bars.filter((bar) => bar.dataset.best === "true")).toHaveLength(1);
+    expect(bars[1]!.dataset.best).toBe("true");
+  });
+
   /** @scenario "The figure row wraps rather than leaving the panel" */
   it("keeps every reading in the card rather than dropping any", () => {
     renderMessage(

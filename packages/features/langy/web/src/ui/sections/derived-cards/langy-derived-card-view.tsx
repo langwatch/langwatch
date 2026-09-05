@@ -14,6 +14,8 @@ import type {
 } from "@langwatch/langy-contract";
 import { ArrowUpRight, BadgeCheck } from "lucide-react";
 import type { ReactNode } from "react";
+import { MeterBar } from "@langwatch/design-system/meter-bar";
+import { formatStatFigure, isComparableSeries } from "../../../model/langy-stat-figure";
 import { StreamingStatCard } from "../streaming-stat-card";
 import { LangyChoicesCard, type ChoicesRefRow } from "./langy-choices-card";
 import { LangyDerivedCardFrame } from "./langy-derived-card-frame";
@@ -182,6 +184,14 @@ function DerivedTableBody({ card }: { card: LangyDerivedTableCard }) {
 }
 
 function DerivedStatsBody({ card }: { card: LangyDerivedStatsCard }) {
+  // Readings on one scale are a comparison, and a comparison reads as bars.
+  // A row of large figures says which numbers exist; bars say which is bigger,
+  // which is the whole question an optimization report answers. Bars also fit
+  // the panel at any item count, where the figure row runs off its edge.
+  if (isComparableSeries(card.items)) {
+    return <DerivedStatsBars card={card} />;
+  }
+
   const numeric = card.items.every((item) => typeof item.value === "number");
   if (numeric) {
     // The measured stat figures, reused — value roll-up and all.
@@ -209,12 +219,69 @@ function DerivedStatsBody({ card }: { card: LangyDerivedStatsCard }) {
             {item.label}
           </Text>
           <Text textStyle="xs" color="fg" wordBreak="break-word">
-            {typeof item.value === "number" ? item.value.toLocaleString() : item.value}
-            {item.unit ? ` ${item.unit}` : ""}
+            {formatStatFigure(
+              item.unit ? { value: item.value, unit: item.unit } : { value: item.value },
+            )}
           </Text>
         </Box>
       ))}
     </Grid>
+  );
+}
+
+/**
+ * One bar per reading, all measured against the largest, so the winner is
+ * visible before a single number is read. The bar is a proportion of the
+ * series, not of a hard 100: a set topping out at 45 still fills the track.
+ */
+function DerivedStatsBars({ card }: { card: LangyDerivedStatsCard }) {
+  const values = card.items.map((item) => Number(item.value));
+  const peak = Math.max(...values, 0);
+  const best = Math.max(...values);
+
+  return (
+    <Box display="flex" flexDirection="column" gap={2.5} width="full">
+      {card.items.map((item, index) => {
+        const value = values[index]!;
+        return (
+          <Box
+            key={`${item.label}-${index}`}
+            width="full"
+            data-testid="derived-stat-bar"
+            data-best={value === best ? "true" : undefined}
+          >
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="baseline"
+              gap={2}
+              marginBottom={1}
+            >
+              <Text textStyle="2xs" color="fg.muted" wordBreak="break-word">
+                {item.label}
+              </Text>
+              <Text
+                textStyle="xs"
+                fontWeight="600"
+                color="fg"
+                fontVariantNumeric="tabular-nums"
+                flexShrink={0}
+              >
+                {formatStatFigure(
+                  item.unit ? { value: item.value, unit: item.unit } : { value: item.value },
+                )}
+              </Text>
+            </Box>
+            <MeterBar
+              fillRatio={peak > 0 ? value / peak : null}
+              width="100%"
+              height="6px"
+              fillColor={value === best ? "green.solid" : "blue.solid"}
+            />
+          </Box>
+        );
+      })}
+    </Box>
   );
 }
 
