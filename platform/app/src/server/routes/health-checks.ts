@@ -552,14 +552,32 @@ secured
 //
 // @see specs/scenarios/scenario-canary-healthcheck.feature
 
+// Neither id is ever this long in practice (both are cuid/nanoid-shaped), so a
+// value past this length is a malformed or hostile request — reject it here,
+// before it ever reaches a DB query, rather than let an oversized param ride
+// all the way down to the multitenancy-scoped `findFirst`.
+const MAX_CANARY_QUERY_PARAM_LENGTH = 128;
+
 // Trims and validates the two required query params in one place so the
 // handler's cognitive complexity stays low; returns the 400 message text
-// unchanged when either is missing/blank.
+// unchanged when either is missing/blank, and a distinct one when either is
+// implausibly long.
 function readCanaryQuery(
   c: Context,
-): { projectId: string; runPlanId: string } | { missing: string[] } {
+):
+  | { projectId: string; runPlanId: string }
+  | { missing: string[] }
+  | { invalid: string } {
   const projectId = c.req.query("projectId")?.trim();
   const runPlanId = c.req.query("runPlanId")?.trim();
+  for (const [name, value] of [
+    ["projectId", projectId],
+    ["runPlanId", runPlanId],
+  ] as const) {
+    if (value && value.length > MAX_CANARY_QUERY_PARAM_LENGTH) {
+      return { invalid: name };
+    }
+  }
   if (projectId && runPlanId) {
     return { projectId, runPlanId };
   }
@@ -629,6 +647,12 @@ secured
     // `runPlanId` names the plan. A missing/blank either is a bad request,
     // distinct from the 503 a plan that does not resolve reports.
     const query = readCanaryQuery(c);
+    if ("invalid" in query) {
+      return c.json(
+        { message: `${query.invalid} query parameter is invalid.` },
+        { status: 400 },
+      );
+    }
     if ("missing" in query) {
       return c.json(
         {

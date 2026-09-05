@@ -240,15 +240,22 @@ async function runCanaryAttempt({
  * A healthy first outcome is never retried, and neither is a first failure once
  * the total wall-time budget is already spent: a retry that could not finish
  * inside the budget is worse than reporting the first failure now.
+ *
+ * `hardDeadline` is optional so every existing direct caller (and the unit
+ * tests) keeps computing a fresh full-budget deadline from `deps.now()`; the
+ * production entrypoint ({@link runScenarioHealthCanary}) passes one it
+ * already computed itself, so the run-plan lookup that precedes this call and
+ * the run phase share ONE 120s budget rather than each getting their own.
  */
 export async function runScenarioCanary(
   deps: ScenarioCanaryDeps,
+  hardDeadline?: number,
 ): Promise<CanaryOutcome> {
   const startedAt = deps.now();
-  const hardDeadline = startedAt + SCENARIO_CANARY_TOTAL_BUDGET_MS;
+  const deadline = hardDeadline ?? startedAt + SCENARIO_CANARY_TOTAL_BUDGET_MS;
 
-  const first = await runCanaryAttempt({ deps, hardDeadline });
-  if (first.verdict.healthy || deps.now() >= hardDeadline) {
+  const first = await runCanaryAttempt({ deps, hardDeadline: deadline });
+  if (first.verdict.healthy || deps.now() >= deadline) {
     return {
       ...first.verdict,
       scenarioRunId: first.scenarioRunId,
@@ -256,7 +263,7 @@ export async function runScenarioCanary(
     };
   }
 
-  const second = await runCanaryAttempt({ deps, hardDeadline });
+  const second = await runCanaryAttempt({ deps, hardDeadline: deadline });
   return {
     ...second.verdict,
     scenarioRunId: second.scenarioRunId,
@@ -273,16 +280,20 @@ export async function runScenarioCanary(
  * every few minutes.
  */
 export function createSingleFlightScenarioCanary(
-  run: (deps: ScenarioCanaryDeps) => Promise<CanaryOutcome>,
+  run: (
+    deps: ScenarioCanaryDeps,
+    hardDeadline?: number,
+  ) => Promise<CanaryOutcome>,
 ): (options: {
   key: string;
   deps: ScenarioCanaryDeps;
+  hardDeadline?: number;
 }) => Promise<CanaryResult> {
   const inFlight = new Map<string, Promise<CanaryOutcome>>();
 
-  return ({ key, deps }) => {
+  return ({ key, deps, hardDeadline }) => {
     if (inFlight.has(key)) return Promise.resolve({ busy: true });
-    const attempt = run(deps).finally(() => {
+    const attempt = run(deps, hardDeadline).finally(() => {
       inFlight.delete(key);
     });
     inFlight.set(key, attempt);
@@ -362,23 +373,36 @@ export function parseRunPlanConfig(
  *
  * The read is also raced against `raceDeadline` (defaulting to
  * {@link raceAgainstRealDeadline}) so a wedged `findFirst` cannot wedge the
- * endpoint forever: this happens before the total budget in
- * {@link runScenarioCanary} would otherwise start, so without this race a
- * hung read never reaches — and never releases — anything. See the module
- * doc.
+ * endpoint forever. `remainingMs` is what is left of the ONE shared total
+ * budget after the caller ({@link runScenarioHealthCanary}) computed its
+ * `hardDeadline` — the lookup and the run phase that follows it share a single
+ * 120s budget, not 120s each, so without this race a hung read never reaches —
+ * and never releases — anything. See the module doc.
+ *
+ * On a throw the caught error is logged here, once, with the error object
+ * attached — the caller does not log again for this path (it gets a distinct
+ * `{ lookupFailed: true }` result instead of `{ invalid }` precisely so it
+ * knows not to).
  */
 async function resolveCanaryConfigFromRunPlan({
   projectId,
   runPlanId,
   raceDeadline = raceAgainstRealDeadline,
+  remainingMs,
 }: {
   projectId: string;
   runPlanId: string;
   raceDeadline?: DeadlineRace;
-}): Promise<CanaryConfig | { invalid: string } | { timedOut: true }> {
+  remainingMs: number;
+}): Promise<
+  | CanaryConfig
+  | { invalid: string }
+  | { timedOut: true }
+  | { lookupFailed: true }
+> {
   try {
     const raced = await raceDeadline({
-      ms: SCENARIO_CANARY_TOTAL_BUDGET_MS,
+      ms: remainingMs,
       // `projectId` scopes the read to a plan the caller's project owns and
       // satisfies the multitenancy guard. `kind: "run_plan"` and
       // `archivedAt: null` are load-bearing too: a 1×1 `test_suite` or an
@@ -402,7 +426,7 @@ async function resolveCanaryConfigFromRunPlan({
       { error, projectId, runPlanId },
       "Scenario canary run plan lookup failed; reporting unhealthy without launching a run",
     );
-    return { invalid: "run plan lookup failed" };
+    return { lookupFailed: true };
   }
 }
 
@@ -458,6 +482,15 @@ const singleFlightCanary = createSingleFlightScenarioCanary(runScenarioCanary);
  * {@link resolveCanaryConfigFromRunPlan}. `raceDeadline` defaults to
  * {@link raceAgainstRealDeadline} and is exposed only so unit tests can fake
  * a wedged lookup deterministically.
+ *
+ * `hardDeadline` is computed exactly once here, from `Date.now()`, and shared
+ * end to end: the lookup below is raced against what remains of it
+ * (`hardDeadline - startedAt`, which on this first read equals the whole
+ * budget), and the same `hardDeadline` is then threaded into
+ * {@link runScenarioCanary} for the run phase. A lookup that eats 30s of the
+ * budget leaves the run phase only 90s, not a fresh 120s — worst-case wall
+ * time for the whole request is the one 120s total, never 120s of lookup on
+ * top of another 120s of run.
  */
 export async function runScenarioHealthCanary({
   projectId,
@@ -476,23 +509,33 @@ export async function runScenarioHealthCanary({
     );
     return { healthy: false, reason: "run_failed", durationMs: 0 };
   }
-  const config = await resolveCanaryConfigFromRunPlan({
+  const startedAt = Date.now();
+  const hardDeadline = startedAt + SCENARIO_CANARY_TOTAL_BUDGET_MS;
+  const resolved = await resolveCanaryConfigFromRunPlan({
     projectId,
     runPlanId,
     raceDeadline,
+    remainingMs: hardDeadline - startedAt,
   });
-  if ("timedOut" in config) {
+  if ("timedOut" in resolved) {
     return { healthy: false, reason: "timeout", durationMs: 0 };
   }
-  if ("invalid" in config) {
+  if ("lookupFailed" in resolved) {
+    // Already logged, with the error object, inside
+    // resolveCanaryConfigFromRunPlan — logging again here would double-log
+    // the same failure.
+    return { healthy: false, reason: "run_failed", durationMs: 0 };
+  }
+  if ("invalid" in resolved) {
     logger.error(
-      { projectId, runPlanId, reason: config.invalid },
+      { projectId, runPlanId, reason: resolved.invalid },
       "Scenario canary run plan invalid; reporting unhealthy without launching a run",
     );
     return { healthy: false, reason: "run_failed", durationMs: 0 };
   }
   return singleFlightCanary({
     key: runPlanId,
-    deps: buildProductionDeps(config),
+    deps: buildProductionDeps(resolved),
+    hardDeadline,
   });
 }

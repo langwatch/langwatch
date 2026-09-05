@@ -20,6 +20,14 @@ import {
 } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioResults } from "~/server/scenarios/schemas/event-schemas";
 
+const { logger } = vi.hoisted(() => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => logger,
+}));
+
 vi.mock("~/server/scenarios/launch-scenario-run.service", () => ({
   launchScenarioRun: vi.fn(),
 }));
@@ -325,6 +333,34 @@ describe("runScenarioCanary", () => {
 
       expect(outcome.healthy).toBe(true);
       expect(queueRunCalls).toBe(1);
+    });
+  });
+
+  describe("given an explicit hardDeadline leaving less than the full budget", () => {
+    /** @scenario "The run phase shares the total budget with a preceding lookup instead of getting its own" */
+    it("times out at the passed deadline, not a fresh full budget", async () => {
+      const clock = fakeClock();
+      // Simulates a caller (runScenarioHealthCanary) that already spent 30s of
+      // the 120s total budget on a run-plan lookup before calling here: only
+      // 90s remain for this run phase, so it must time out at 90s, not run a
+      // fresh 120s of its own.
+      const remainingBudget = SCENARIO_CANARY_TOTAL_BUDGET_MS - 30_000;
+      const hardDeadline = clock.now() + remainingBudget;
+      const deps: ScenarioCanaryDeps = {
+        queueRun: async () => ({ scenarioRunId: "canary-run-1" }),
+        getScenarioRunData: async () => ({
+          status: ScenarioRunStatus.IN_PROGRESS,
+          results: null,
+        }),
+        now: clock.now,
+        sleep: clock.sleep,
+      };
+
+      const outcome = await runScenarioCanary(deps, hardDeadline);
+
+      expect(outcome).toMatchObject({ healthy: false, reason: "timeout" });
+      expect(clock.now()).toBeLessThanOrEqual(remainingBudget);
+      expect(clock.now()).toBeLessThan(SCENARIO_CANARY_TOTAL_BUDGET_MS);
     });
   });
 
@@ -646,6 +682,7 @@ describe("runScenarioHealthCanary", () => {
     vi.mocked(prisma.simulationSuite.findFirst).mockReset();
     vi.mocked(launchScenarioRun).mockReset();
     vi.mocked(getApp).mockReset();
+    logger.error.mockClear();
   });
 
   describe("given a blank runPlanId", () => {
@@ -726,6 +763,28 @@ describe("runScenarioHealthCanary", () => {
 
       expect(result).toMatchObject({ healthy: false, reason: "run_failed" });
       expect(launchScenarioRun).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A run plan lookup failure degrades to run_failed, not a raw error" */
+    it("logs the failure exactly once, not once in the resolver and again at the entrypoint", async () => {
+      vi.mocked(prisma.simulationSuite.findFirst).mockRejectedValue(
+        new Error("database unavailable"),
+      );
+
+      await runScenarioHealthCanary({
+        projectId: "canary-project",
+        runPlanId: "any-plan",
+      });
+
+      expect(logger.error).toHaveBeenCalledTimes(1);
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: expect.any(Error),
+          projectId: "canary-project",
+          runPlanId: "any-plan",
+        }),
+        expect.any(String),
+      );
     });
   });
 

@@ -287,5 +287,24 @@ describe("GET /api/health/scenarios", () => {
       expect(res.status).toBe(400);
       expect(runScenarioHealthCanary).not.toHaveBeenCalled();
     });
+
+    /** @scenario "An implausibly long query parameter is a bad request" */
+    it("responds 400 and queues no run when runPlanId is longer than 128 characters", async () => {
+      const app = await getApp();
+      const tooLong = "p".repeat(129);
+
+      const res = await app.request(
+        `/api/health/scenarios?projectId=proj-1&runPlanId=${tooLong}`,
+        { headers: { authorization: `Bearer ${SECRET}` } },
+      );
+      const body = (await res.json()) as Record<string, unknown>;
+
+      expect(res.status).toBe(400);
+      expect(body).toMatchObject({
+        message: "runPlanId query parameter is invalid.",
+      });
+      // Rejected before any run plan lookup — the entrypoint is never called.
+      expect(runScenarioHealthCanary).not.toHaveBeenCalled();
+    });
   });
 });

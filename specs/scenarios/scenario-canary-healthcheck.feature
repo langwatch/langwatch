@@ -248,3 +248,18 @@ Feature: A scenario canary health check that fires a real run and says what brok
     Then the outcome is unhealthy with reason "timeout"
     And no run is launched
     And a following call for the same run plan is not told the probe is busy
+
+  @unit
+  Scenario: The run phase shares the total budget with a preceding lookup instead of getting its own
+    Given a run plan lookup that already spent 30 of the 120 second total budget
+    When the probe runs the canary
+    Then the run phase has only 90 seconds left, not a fresh 120
+    And total wall time for the whole request never exceeds the 120 second budget
+
+  @integration
+  Scenario: An implausibly long query parameter is a bad request
+    Given a request carrying the correct internal secret and a runPlanId longer than 128 characters
+    When the scenario canary endpoint is called
+    Then the response is 400
+    And no scenario run is queued
+    And no run plan lookup is attempted
