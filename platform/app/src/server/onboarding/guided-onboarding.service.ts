@@ -272,7 +272,8 @@ export class GuidedOnboardingService {
         organizationId,
       );
     }
-    const next = mutate(parseGuidedOnboardingState(organization.signupData));
+    const previous = parseGuidedOnboardingState(organization.signupData);
+    const next = mutate(previous);
     const signupData =
       organization.signupData && typeof organization.signupData === "object"
         ? (organization.signupData as Record<string, unknown>)
@@ -291,6 +292,7 @@ export class GuidedOnboardingService {
       userId,
       event,
       payload,
+      previous,
       state: next,
     });
     return next;

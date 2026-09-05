@@ -1,7 +1,15 @@
 import { getApp } from "../../../../src/server/app-layer/app";
 import { prisma } from "../../../../src/server/db";
+import {
+  parseGuidedOnboardingState,
+  parseOnboardingVariant,
+} from "../../../../src/server/onboarding/guided-onboarding.service";
 import { captureException } from "../../../../src/utils/posthogErrorCapture";
 import type { CioOrgTraits, CioPersonTraits } from "../types";
+import {
+  guidedOnboardingOrgTraits,
+  guidedOnboardingPersonTraits,
+} from "./guidedOnboarding";
 
 /**
  * Tracks which users have had a full CIO profile sync this process lifetime.
@@ -95,6 +103,7 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
 
   const signupData = (org.signupData ?? {}) as Record<string, unknown>;
   const hasTraces = projects.some((p) => p.firstMessage);
+  const guidedOnboarding = readGuidedOnboardingTraits(org.signupData);
 
   const traits: Partial<CioPersonTraits> = {
     ...(user.email ? { email: user.email } : {}),
@@ -103,6 +112,7 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
     ...(signupData.companySize
       ? { company_size: signupData.companySize as string }
       : {}),
+    ...guidedOnboarding.person,
     has_traces: hasTraces,
     has_subscription: !!activeSubscription,
     createdAt: user.createdAt.toISOString(),
@@ -114,6 +124,7 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
     ...(signupData.companySize
       ? { company_size: signupData.companySize as string }
       : {}),
+    ...guidedOnboarding.org,
   };
 
   await Promise.all([
@@ -124,6 +135,24 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
       traits: orgTraits,
     }),
   ]);
+}
+
+/**
+ * The onboarding traits of an organization, for the person and for the
+ * organization group. An organization that recorded no variant predates the
+ * experiment and gets no onboarding trait at all.
+ */
+function readGuidedOnboardingTraits(signupData: unknown): {
+  person: Partial<CioPersonTraits>;
+  org: Partial<CioOrgTraits>;
+} {
+  const variant = parseOnboardingVariant(signupData);
+  if (!variant) return { person: {}, org: {} };
+  const state = parseGuidedOnboardingState(signupData);
+  return {
+    person: guidedOnboardingPersonTraits({ variant, state }),
+    org: guidedOnboardingOrgTraits({ variant, state }),
+  };
 }
 
 /**

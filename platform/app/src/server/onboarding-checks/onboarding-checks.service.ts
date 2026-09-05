@@ -1,6 +1,25 @@
+import type { GuidedPath } from "~/features/guided-onboarding/paths";
 import { getApp } from "~/server/app-layer/app";
+import {
+  parseGuidedOnboardingState,
+  parseOnboardingVariant,
+} from "~/server/onboarding/guided-onboarding.service";
+import type { OnboardingVariant } from "~/server/schemas/sign-up-data.schema";
 import { resolveScopeChain } from "~/server/scopes/resolveScopeChain";
 import { prisma } from "../db";
+
+/**
+ * Where the organization's guided onboarding stands, read next to the
+ * checks so the Home offer and the progress card share one query.
+ */
+export type GuidedOnboardingCheck = {
+  /** Null for an organization that predates the experiment. */
+  variant: OnboardingVariant | null;
+  /** The picks in pick order. */
+  paths: GuidedPath[];
+  currentPath?: GuidedPath;
+  donePaths: GuidedPath[];
+};
 
 export type OnboardingCheckStatus = {
   workflows: number;
@@ -14,7 +33,18 @@ export type OnboardingCheckStatus = {
   teamMembers: number;
   firstMessage: boolean;
   integrated: boolean;
+  guidedOnboarding: GuidedOnboardingCheck;
 };
+
+function readGuidedOnboardingCheck(signupData: unknown): GuidedOnboardingCheck {
+  const state = parseGuidedOnboardingState(signupData);
+  return {
+    variant: parseOnboardingVariant(signupData),
+    paths: state.paths,
+    currentPath: state.currentPath,
+    donePaths: state.donePaths,
+  };
+}
 
 /**
  * Service for checking onboarding status of a project
@@ -58,6 +88,7 @@ export class OnboardingChecksService {
         team: {
           select: {
             organizationId: true,
+            organization: { select: { signupData: true } },
             members: {
               select: { userId: true },
             },
@@ -66,29 +97,13 @@ export class OnboardingChecksService {
       },
     });
 
-    // Project-visible MPs: any enabled MP scoped at PROJECT, the project's
-    // TEAM, or the project's ORG. This mirrors the PROJECT -> TEAM ->
-    // ORGANIZATION cascade that `findAllAccessibleForProject` in
-    // ModelProviderRepository uses for real reads, so an org-wide provider
-    // counts toward every project under that org. Matching only the PROJECT
-    // scope left this step stuck incomplete for org-scoped credentials.
     const modelProviders = project
-      ? await prisma.modelProvider.findFirst({
-          where: {
-            enabled: true,
-            scopes: {
-              some: {
-                OR: resolveScopeChain({
-                  organizationId: project.team.organizationId,
-                  teamId: project.teamId,
-                  projectId,
-                }),
-              },
-            },
-          },
-          select: { id: true },
+      ? await this.getVisibleModelProviderCount({
+          organizationId: project.team.organizationId,
+          teamId: project.teamId,
+          projectId,
         })
-      : null;
+      : 0;
 
     const { workflows, customGraphs, datasets, checks, triggers, team } =
       project ?? {};
@@ -100,18 +115,52 @@ export class OnboardingChecksService {
     const prompts = await this.getPromptsCount(projectId);
 
     return {
+      guidedOnboarding: readGuidedOnboardingCheck(
+        team?.organization?.signupData,
+      ),
       workflows: workflows?.length ?? 0,
       customGraphs: customGraphs?.length ?? 0,
       datasets: datasets?.length ?? 0,
       onlineEvaluations: checks?.length ?? 0,
       triggers: triggers?.length ?? 0,
       simulations,
-      modelProviders: modelProviders ? 1 : 0,
+      modelProviders,
       prompts,
       teamMembers: team?.members?.length ?? 0,
       firstMessage: project?.firstMessage ?? false,
       integrated: project?.integrated ?? false,
     };
+  }
+
+  /**
+   * Project-visible model providers: any enabled provider scoped at PROJECT,
+   * the project's TEAM, or the project's ORG. This mirrors the PROJECT ->
+   * TEAM -> ORGANIZATION cascade that `findAllAccessibleForProject` in
+   * ModelProviderRepository uses for real reads, so an org-wide provider
+   * counts toward every project under that org. Matching only the PROJECT
+   * scope left this step stuck incomplete for org-scoped credentials.
+   */
+  private async getVisibleModelProviderCount({
+    organizationId,
+    teamId,
+    projectId,
+  }: {
+    organizationId: string;
+    teamId: string;
+    projectId: string;
+  }): Promise<number> {
+    const provider = await prisma.modelProvider.findFirst({
+      where: {
+        enabled: true,
+        scopes: {
+          some: {
+            OR: resolveScopeChain({ organizationId, teamId, projectId }),
+          },
+        },
+      },
+      select: { id: true },
+    });
+    return provider ? 1 : 0;
   }
 
   /**

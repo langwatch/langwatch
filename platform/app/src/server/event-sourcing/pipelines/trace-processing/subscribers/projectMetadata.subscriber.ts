@@ -80,7 +80,8 @@ async function trackFirstTraceIntegrated({
   tenantId: string;
   attrs: Record<string, string>;
 }): Promise<void> {
-  const { userId } = await projects.resolveOrgAdmin(tenantId);
+  const { userId, onboardingVariant } =
+    await projects.resolveOrgAdmin(tenantId);
   if (!userId) return;
 
   trackServerEvent({
@@ -89,6 +90,7 @@ async function trackFirstTraceIntegrated({
     properties: {
       sdk_language: attrs["sdk.language"] ?? "unknown",
       sdk_framework: attrs["langwatch.sdk.framework"] ?? "unknown",
+      ...(onboardingVariant ? { onboarding_variant: onboardingVariant } : {}),
     },
     projectId: tenantId,
   });

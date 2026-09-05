@@ -104,11 +104,14 @@ export const WelcomeScreen: React.FC = () => {
             },
       },
       {
-        onSuccess: (response) => {
+        onSuccess: (response, variables) => {
           trackEventOnce("organization_initialized", {
             category: "onboarding",
             label: "organization_onboarding_completed",
             intent: form.intent,
+            ...(variables.onboardingVariant
+              ? { onboarding_variant: variables.onboardingVariant }
+              : {}),
           });
 
           // A pending continuation (CLI device approval) outranks both

@@ -9,6 +9,7 @@ import {
 import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signupIdentification";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { trackOnboardingVariantAssigned } from "~/server/onboarding/guided-onboarding.analytics";
 import {
   onboardingVariantSchema,
   signUpDataSchema,
@@ -182,6 +183,14 @@ export const onboardingRouter = createTRPCRouter({
           signUpData: input.signUpData,
           primaryIntent: input.primaryIntent,
         });
+
+        if (input.onboardingVariant) {
+          trackOnboardingVariantAssigned({
+            userId: ctx.session.user.id,
+            organizationId: orgResult.organization.id,
+            variant: input.onboardingVariant,
+          });
+        }
 
         // Return success response with team and project slugs
         // (projectSlug is null for governance-intent signups)
