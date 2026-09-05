@@ -1,5 +1,5 @@
 import type { SuiteRunParameters, SuiteRunResult, SuiteTarget } from "@langwatch/suite-contract";
-import { getSuiteSetId, targetKeyOf } from "@langwatch/suite-contract";
+import { getSuiteSetId, hasParameterOverrides, targetKeyOf } from "@langwatch/suite-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   generateBatchRunId,
@@ -217,7 +217,8 @@ export class SuiteExecutionService extends SuiteExecutionPort {
     await Promise.allSettled(
       items.map((item) => {
         const secretParameters = secrets.get(item.scenarioId);
-        const targetParameters = parameters.get(targetKeyOf(item.target))?.get(item.scenarioId);
+        const targetKey = targetKeyOf(item.target);
+        const targetParameters = parameters.get(targetKey)?.get(item.scenarioId);
 
         return this.commands.queueSimulationRun({
           tenantId: input.projectId,
@@ -230,6 +231,8 @@ export class SuiteExecutionService extends SuiteExecutionPort {
             langwatch: {
               targetReferenceId: item.target.referenceId,
               targetType: item.target.type,
+              targetKey,
+              ...SuiteExecutionService.withTargetParameters(item.target.runParameters),
               scenarioVersion: input.scenarioVersions.get(item.scenarioId),
               ...withActor(input.actor),
               ...simulationModels,
@@ -245,6 +248,14 @@ export class SuiteExecutionService extends SuiteExecutionPort {
         });
       }),
     );
+  }
+
+  /**
+   * Only the target's OWN overrides. A target with none records the namespace
+   * it always did, so a plain run is not told apart by an empty key.
+   */
+  private static withTargetParameters(runParameters: SuiteTarget["runParameters"]) {
+    return hasParameterOverrides(runParameters) ? { targetParameters: runParameters } : {};
   }
 
   private static withParameters(parameters: Record<string, string | number | boolean> | undefined) {

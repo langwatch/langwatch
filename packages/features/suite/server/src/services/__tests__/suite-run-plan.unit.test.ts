@@ -285,3 +285,53 @@ describe("SuiteService.runPlan", () => {
     });
   });
 });
+
+describe("given a scenario declaring a secret parameter", () => {
+  const declaringSecret = {
+    getRunConfigs: async ({ ids }: { ids: string[] }) =>
+      ids.map((id) => ({
+        id,
+        name: id,
+        version: 1,
+        situation: "",
+        criteria: [],
+        parameters: [
+          { name: "account_tier", defaultValue: "gold" },
+          { name: "api_token", secret: true },
+        ],
+      })),
+  } as unknown as Partial<ScenarioService>;
+
+  describe("when a target carries an override naming that secret", () => {
+    /** @scenario A target override naming a secret parameter is refused */
+    it("refuses against the targets field and schedules nothing", async () => {
+      const executed = vi.fn();
+      const { service, findOrCreatePlanByName } = buildService({
+        scenarios: declaringSecret,
+        execution: { execute: executed } as unknown as SuiteExecutionPort,
+      });
+
+      await expect(
+        service.runPlan({
+          projectId,
+          organizationId: "org-1",
+          name: "Refunds prod-agent",
+          config: {
+            ...config,
+            targets: [
+              { type: "http", referenceId: "agent-1", runParameters: { api_token: "tok-live-1" } },
+            ],
+          },
+          parameters: { api_token: "tok-live-1" },
+          idempotencyKey: "idem-secret-1",
+        }),
+      ).rejects.toMatchObject({
+        code: "validation_error",
+        meta: { fieldErrors: { targets: [expect.any(String)] } },
+      });
+
+      expect(findOrCreatePlanByName).not.toHaveBeenCalled();
+      expect(executed).not.toHaveBeenCalled();
+    });
+  });
+});

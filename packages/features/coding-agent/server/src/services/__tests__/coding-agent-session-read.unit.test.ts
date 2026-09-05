@@ -62,6 +62,7 @@ describe("Coding Agent session reads", () => {
   /**
    * @scenario "reading a session's events prunes to the session's own weeks"
    * @scenario "a session longer than the guessed window still answers in full"
+   * @scenario "a session event read has no explicit time window"
    */
   it("bounds inferred event reads around the session and widens only the upper edge after an empty page", async () => {
     const sessions = new TestSessions();

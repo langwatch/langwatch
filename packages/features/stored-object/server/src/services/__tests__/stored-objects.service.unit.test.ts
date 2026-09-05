@@ -567,18 +567,3 @@ describe("headById", () => {
     });
   });
 });
-
-describe("StoredObjectsService surface", () => {
-  /** @scenario "StoredObjectsService exposes storeFromBytes, tryGetById, headById, deleteOwnedBy" */
-  it("exposes storeFromBytes, tryGetById, deleteOwnedBy", () => {
-    const service = makeService({
-      repository: makeRepository(),
-      registry: makeRegistry(),
-    });
-
-    expect(typeof service.storeFromBytes).toBe("function");
-    expect(typeof service.tryGetById).toBe("function");
-    expect(typeof service.headById).toBe("function");
-    expect(typeof service.deleteOwnedBy).toBe("function");
-  });
-});

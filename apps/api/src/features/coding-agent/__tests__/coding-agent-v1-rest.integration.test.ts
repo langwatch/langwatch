@@ -192,7 +192,7 @@ function mount(overrides: Overrides) {
           getOrganizationPullRequestUsage: overrides.getOrganizationPullRequestUsage,
         }) as never,
       audit: () => ({ auditLog: overrides.auditLog }) as never,
-    }).hono,
+    }),
   );
   return {
     fetch: (path: string, init?: RequestInit) =>
@@ -226,7 +226,9 @@ function passThroughSecurity(credential: {
     authorizeOrganizationPermission: () => noop,
     authorizeRouteTeamPermission: () => noop,
     authorizeRouteProjectPermission: () => noop,
-    authenticateOrganizationThrowing: noop,
+    // The versioned family's door: the same credential, in the mode that
+    // family uses.
+    authenticateOrganizationThrowing: asOrganization,
     authorizeOrganizationPermissionThrowing: () => noop,
   } as never);
 }

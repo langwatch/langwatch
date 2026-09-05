@@ -5,6 +5,7 @@ import path from "node:path";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service";
 import {
   CHILD_PROCESS,
+  ScenarioAgentInstanceSchema,
   type ChildProcessJobData,
   type ScenarioExecutionResult,
 } from "@langwatch/scenario-contract";
@@ -62,6 +63,7 @@ export type ScenarioChildProcessResult = {
   success: boolean;
   error?: string;
   reasoning?: string;
+  agentInstance?: { hostname: string; label: string | null };
 };
 
 export class NodeScenarioChildProcessAdapter extends ScenarioChildBootstrapPort {
@@ -198,7 +200,15 @@ export class NodeScenarioChildProcessAdapter extends ScenarioChildBootstrapPort 
         }
 
         log("info", "Scenario completed successfully", { exitCode: code });
-        resolve({ success: true });
+        // The last JSON line the child wrote is the only place the connected
+        // agent instance that answered the run is named; without reading it
+        // here a finished run records no instance at all.
+        const childResult = parseChildProcessResultValue(stdout);
+        resolve({
+          success: true,
+          ...(childResult?.reasoning ? { reasoning: childResult.reasoning } : {}),
+          ...(childResult?.agentInstance ? { agentInstance: childResult.agentInstance } : {}),
+        });
       });
       child.on("error", (error) => {
         clearTimeout(timeout);
@@ -293,6 +303,8 @@ const scenarioChildProcessResultSchema = z.object({
   success: z.boolean(),
   error: z.string().optional(),
   reasoning: z.string().optional(),
+  /** The connected agent instance that answered the run's turns, when one did. */
+  agentInstance: ScenarioAgentInstanceSchema.optional(),
 });
 
 function buildChildEnvironmentValue(input: {

@@ -174,4 +174,45 @@ describe.skipIf(!DB_URL)("given an organization with a prompt version to tag", (
       ).resolves.toBeNull();
     });
   });
+  describe("when a custom tag is created, assigned, listed and then deleted", () => {
+    /** @scenario Full lifecycle of a custom tag */
+    it("carries the assignment while the tag lives and drops it with the tag", async () => {
+      await tags.create({ organizationId, name: "canary-lifecycle" });
+      await prompts.assignTag({ configId, versionId, tag: "canary-lifecycle", projectId });
+
+      expect((await tags.getAll({ organizationId })).map((tag) => tag.name)).toContain(
+        "canary-lifecycle",
+      );
+
+      await tags.tryDeleteByName({ organizationId, name: "canary-lifecycle" });
+
+      expect((await tags.getAll({ organizationId })).map((tag) => tag.name)).not.toContain(
+        "canary-lifecycle",
+      );
+      await expect(
+        prisma.promptTagAssignment.findFirst({
+          where: { configId, versionId, projectId, promptTag: { name: "canary-lifecycle" } },
+        }),
+      ).resolves.toBeNull();
+    });
+  });
+
+  describe("when a seeded tag is deleted and created again", () => {
+    /** @scenario Delete and recreate a seeded tag */
+    it("lists it again and takes an assignment on the new row", async () => {
+      await tags.tryDeleteByName({ organizationId, name: "production" });
+      const recreated = await tags.create({ organizationId, name: "production" });
+
+      expect((await tags.getAll({ organizationId })).map((tag) => tag.name)).toContain("production");
+
+      const assignment = await prompts.assignTag({
+        configId,
+        versionId,
+        tag: "production",
+        projectId,
+      });
+
+      expect(assignment.promptTag.id).toBe(recreated.id);
+    });
+  });
 });

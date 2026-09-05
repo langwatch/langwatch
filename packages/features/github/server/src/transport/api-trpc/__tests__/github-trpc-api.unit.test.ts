@@ -37,7 +37,7 @@ function harness({
 
   const router = GithubTrpcApi.create(
     trpc,
-    { protected: authenticated, policy: () => (procedure) => procedure },
+    { protected: authenticated, policy: () => (procedure) => procedure, validateOutput: true },
     { tryResolveOrganizationForProject, recordAudit },
   );
 
@@ -58,7 +58,7 @@ describe("GithubTrpcApi", () => {
       const trpc = initTRPC.context<TestContext>().create();
       const router = GithubTrpcApi.create(
         trpc,
-        { protected: trpc.procedure, policy: () => (procedure) => procedure },
+        { protected: trpc.procedure, policy: () => (procedure) => procedure, validateOutput: true },
         {
           tryResolveOrganizationForProject: async () => undefined,
           recordAudit: async () => {},
@@ -94,8 +94,9 @@ describe("GithubTrpcApi", () => {
         trpc,
         {
           protected: trpc.procedure,
+          validateOutput: true,
           policy: (permission) => {
-            asked.push(permission);
+            asked.push(String(permission));
             return (procedure) => procedure;
           },
         },

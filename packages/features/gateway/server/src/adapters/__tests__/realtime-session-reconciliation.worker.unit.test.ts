@@ -54,6 +54,7 @@ function buildWorker(options?: {
 }
 
 describe("GatewayRealtimeSessionReconciliationService", () => {
+  /** @scenario Reconciliation confirms a completed ElevenLabs conversation */
   it("expires stale sessions, reads eligible sessions exactly, and confirms rounded duration", async () => {
     const { worker, repository, conversations } = buildWorker();
     const now = new Date("2026-08-25T12:00:00.000Z");
@@ -82,6 +83,7 @@ describe("GatewayRealtimeSessionReconciliationService", () => {
     });
   });
 
+  /** @scenario A minted credential was never used */
   it("releases a minted but unused credential when the vendor reports no conversation", async () => {
     const { worker, repository } = buildWorker({
       conversation: { readConversation: vi.fn().mockResolvedValue({ notFound: true }) },
@@ -95,6 +97,7 @@ describe("GatewayRealtimeSessionReconciliationService", () => {
     });
   });
 
+  /** @scenario A vendor report is incomplete */
   it("leaves a terminal conversation open when its duration is unusable", async () => {
     const { worker, repository } = buildWorker({
       conversation: {

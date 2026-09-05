@@ -41,6 +41,7 @@ import {
   type SuiteTarget,
 } from "@langwatch/suite-contract";
 import type { AgentService } from "@langwatch/agent-contract";
+import { ValidationError } from "@langwatch/handled-error";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { ScenarioService } from "@langwatch/scenario-contract";
 import {
@@ -52,7 +53,13 @@ import {
 import { ConnectedTargetService, type ConnectedTargetAgent } from "./connected-target.service";
 import type { SuiteExecutionPort } from "../ports/suite-execution.port";
 import type { SuiteServiceOptions } from "./suite.service";
-import { defaultSuiteId, isAgentTarget, suiteSlugOf } from "../rules/suite-target.rules";
+import {
+  defaultSuiteId,
+  isAgentTarget,
+  suiteSlugOf,
+  TARGET_SECRET_REFUSAL,
+  targetsOverrideASecret,
+} from "../rules/suite-target.rules";
 import { SuiteRunScopeService } from "./suite-run-scope.service";
 
 type SuiteRunServiceOptions = {
@@ -118,6 +125,10 @@ export class SuiteRunService {
       ids: scenarioResolution.active,
       projectId: parsed.projectId,
     });
+    SuiteRunService.assertNoSecretOverrides({
+      scenarios: scenarioConfigs,
+      targets: targetResolution.active,
+    });
 
     return this.execute({
       suite,
@@ -163,6 +174,10 @@ export class SuiteRunService {
     await scenarios.resolveRunParametersForScenarios({
       scenarios: scenarioConfigs,
       values: parsed.parameters,
+    });
+    SuiteRunService.assertNoSecretOverrides({
+      scenarios: scenarioConfigs,
+      targets: parsed.config.targets,
     });
 
     const { targets, activeTargets } = this.canonicalPlanTargets({
@@ -275,6 +290,21 @@ export class SuiteRunService {
    * A value equal to a declared default is no override: the key, the sort, the name and the
    * stored targets all read the canonical set.
    */
+  /**
+   * Refuses a target whose overrides name a secret parameter, before the run
+   * is scheduled and before a plan row is written.
+   */
+  private static assertNoSecretOverrides(input: {
+    scenarios: readonly { parameters: unknown }[];
+    targets: readonly SuiteTarget[];
+  }): void {
+    if (!targetsOverrideASecret(input)) return;
+
+    throw new ValidationError(TARGET_SECRET_REFUSAL, {
+      meta: { fieldErrors: { targets: [TARGET_SECRET_REFUSAL] } },
+    });
+  }
+
   private canonicalPlanTargets({
     scenarioConfigs,
     namedTargets,

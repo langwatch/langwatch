@@ -143,7 +143,7 @@ function buildApi(overrides: Record<string, unknown> = {}, options: { refuse?: b
     authorizeDirectUpload: async () => ({ ok: false, status: 401, error: "not exercised" }),
   });
 
-  return { hono: family.hono, stub, chain };
+  return { hono: family, stub, chain };
 }
 
 const jsonHeaders = { "content-type": "application/json" };

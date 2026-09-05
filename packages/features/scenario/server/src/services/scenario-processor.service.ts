@@ -306,7 +306,8 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
     jobLogger?: Logger;
   }): Promise<void> {
     const agentInstance = input.result.agentInstance;
-    if (!agentInstance) return;
+    if (!agentInstance) {return;}
+
     try {
       await this.options.execution.recordAgentInstance({
         projectId: input.jobData.projectId,

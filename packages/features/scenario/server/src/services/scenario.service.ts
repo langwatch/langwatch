@@ -104,11 +104,13 @@ export class ScenarioService extends ScenarioServiceContract {
    */
   private async ensureDefaultTestSuiteId(projectId: string): Promise<string> {
     const existing = await this.options.repository.tryFindDefaultTestSuite({ projectId });
-    if (existing) return existing.id;
+    if (existing) {return existing.id;}
+
     const created = await this.options.repository.createDefaultTestSuite({
       projectId,
       id: this.options.testSuiteIds.next(),
     });
+
     return created.id;
   }
 
@@ -118,7 +120,8 @@ export class ScenarioService extends ScenarioServiceContract {
    * update naming no `testSuiteId` at all is left alone.
    */
   private async withResolvedTestSuite(parsed: ScenarioUpdateInput): Promise<ScenarioUpdateInput> {
-    if (parsed.testSuiteId !== null) return parsed;
+    if (parsed.testSuiteId !== null) {return parsed;}
+
     return {
       ...parsed,
       testSuiteId: await this.ensureDefaultTestSuiteId(parsed.projectId),
