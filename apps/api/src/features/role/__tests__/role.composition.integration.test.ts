@@ -285,6 +285,9 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
         // it asserts against. The slice is the project APPLICATION in
         // production; this suite drives only the directory behind it.
         projects: projects as never,
+        // The organization application the identity half composed: the personal
+        // workspace read and both team calls answer off THIS slice.
+        organizations: organizations as never,
         dataset: dataset.app,
         evaluatorApp: evaluator.app,
         prompts: prompt.app,

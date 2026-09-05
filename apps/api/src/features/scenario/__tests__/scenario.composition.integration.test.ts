@@ -305,9 +305,6 @@ function composeApplication(
     },
     pipelines,
     defaultRetentionDays: 49,
-    demoProjectId: "demo-project",
-    audit: undefined,
-    rateLimit: async () => ({ allowed: true, resetAt: Date.now() + 60_000 }),
     processName: "langwatch-api-test",
     ...(options.report ? { report: options.report } : {}),
   });

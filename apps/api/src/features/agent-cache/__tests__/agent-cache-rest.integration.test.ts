@@ -53,10 +53,12 @@ function testSecurity(caller: Caller): AppRestSecurity {
       ownerUserId: null,
     });
     await next();
+    return undefined;
   };
   const authorizeProjectPermission: MiddlewareHandler = async (c, next) => {
     if (caller === "no-grain") return c.json({ error: "forbidden" }, 403);
     await next();
+    return undefined;
   };
   const ports: RestApiServicePorts = {
     appContext: async (_c, next) => next(),

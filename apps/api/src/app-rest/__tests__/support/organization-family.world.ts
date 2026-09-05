@@ -8,7 +8,7 @@ import type {
   AuthzAccessBreakdownOutput,
   AuthzService,
 } from "@langwatch/authz-contract";
-import { HandledError } from "@langwatch/handled-error";
+import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import {
   organizationSettingsSchema,
   updateOrganizationSettingsInputSchema,
@@ -25,6 +25,7 @@ import {
   MemberNotFoundError,
   type OrganizationRestInviteService,
   type OrganizationRestMemberSummary,
+  type OrganizationRestMemberTeamBinding,
   type OrganizationRestService,
 } from "@langwatch/organization-server";
 import type { MiddlewareHandler } from "hono";
@@ -54,7 +55,11 @@ export type OrganizationMemberSeed = {
   email?: string | null;
   role?: "ADMIN" | "MEMBER" | "EXTERNAL";
   disabled?: boolean;
-  teams?: Array<{ teamId: string; teamName: string; role: string; customRoleId?: string | null }>;
+  teams?: Array<
+    Pick<OrganizationRestMemberTeamBinding, "teamId" | "teamName" | "role"> & {
+      customRoleId?: string | null;
+    }
+  >;
 };
 
 export type OrganizationInviteSeed = {
@@ -99,13 +104,7 @@ export type OrganizationWorld = {
 };
 
 type MemberRow = OrganizationRestMemberSummary & {
-  teams: Array<{
-    teamId: string;
-    teamName: string;
-    role: string;
-    customRoleId: string | null;
-    customRoleName: string | null;
-  }>;
+  teams: OrganizationRestMemberTeamBinding[];
 };
 
 type InviteRow = {
@@ -128,10 +127,7 @@ const inviteUrlFor = (inviteCode: string) =>
 
 /** The licence layer's own overflow code, which the family renames at its seam. */
 const seatOverflow = (current: number, max: number): never => {
-  throw new HandledError("resource_limit_exceeded", "The plan's seats are all in use", {
-    httpStatus: 403,
-    meta: { limitType: "members", current, max },
-  });
+  throw new LimitExceededError("members", current, max);
 };
 
 export function organizationWorld(options: OrganizationWorldOptions = {}): OrganizationWorld {

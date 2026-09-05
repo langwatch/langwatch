@@ -187,7 +187,13 @@ function inMemoryScim(): ScimService {
 function mountScimFamilies() {
   const scim = inMemoryScim();
   return mountRestFamily({
-    packaged: { scim: () => ScimApp.create({ scim }) },
+    packaged: {
+      scim: () =>
+        ScimApp.create({
+          scim,
+          planProvider: { getActivePlan: async () => ({ type: "ENTERPRISE" }) },
+        }),
+    },
     processPorts: {
       scim: {
         scim: () => scim,

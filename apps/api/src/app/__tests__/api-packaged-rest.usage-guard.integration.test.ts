@@ -99,18 +99,14 @@ async function callThroughGuard(options: {
       ? new Response("plan limit", { status: error.httpStatus })
       : new Response("failed", { status: 500 }),
   );
-  app.post(
-    "/",
-    async (c, next) => {
-      if (options.withProject) c.set("project", project);
-      await next();
-    },
-    options.guard,
-    (c) => {
-      reached = true;
-      return c.json({ written: true });
-    },
-  );
+  const setProject: MiddlewareHandler = async (c, next) => {
+    if (options.withProject) c.set("project", project);
+    await next();
+  };
+  app.post("/", setProject, options.guard, (c) => {
+    reached = true;
+    return c.json({ written: true });
+  });
   const response = await app.request("/", { method: "POST" });
   return { status: response.status, reached };
 }

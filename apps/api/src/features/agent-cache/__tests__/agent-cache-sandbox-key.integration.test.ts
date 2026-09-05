@@ -60,6 +60,7 @@ function sandboxKeySecurity(grantedPermissions: readonly string[]): AppRestSecur
         return c.json({ error: "forbidden" }, 403);
       }
       await next();
+      return undefined;
     };
   const ports: RestApiServicePorts = {
     appContext: async (_c, next) => next(),

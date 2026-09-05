@@ -86,7 +86,7 @@ describe("given a process that composed no Better Auth instance of its own", () 
 
 function authWorld() {
   const handler = vi.fn(
-    () =>
+    async (_request: Request) =>
       new Response(JSON.stringify({ handledByBetterAuth: true }), {
         headers: { "content-type": "application/json" },
       }),
@@ -122,7 +122,7 @@ function authWorld() {
     prisma: prisma as never,
     featureFlags: featureFlags as never,
     betterAuth: {
-      transport: { handler, api: { getSession: () => Promise.resolve(null) } },
+      transport: { handler, api: { getSession: async (_input: { headers: Headers }) => null } },
       baseUrl: BASE_URL,
     },
   };
@@ -173,8 +173,8 @@ function mount(
     hono.route("/", app);
   }
 
-  const fetchAt = (path: string, init?: RequestInit) =>
-    hono.fetch(new Request(`http://api.test${path}`, init));
+  const fetchAt = async (path: string, init?: RequestInit): Promise<Response> =>
+    await hono.fetch(new Request(`http://api.test${path}`, init));
 
   return {
     get: (path) => fetchAt(path),

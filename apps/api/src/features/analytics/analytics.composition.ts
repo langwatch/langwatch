@@ -106,10 +106,7 @@ export type ComposedAnalyticsFeature = Readonly<{
   /**
    * `analytics.*` and `graphs.*`, on the process's own root.
    */
-  routers(mount: ApiTrpcFeatureMount): {
-    analytics: ReturnType<ApiTrpcFeatureMount["root"]["mergeRouters"]>;
-    graphs: ReturnType<typeof createGraphTrpcRouter>;
-  };
+  routers(mount: ApiTrpcFeatureMount): ReturnType<typeof analyticsRouters>;
   /** For `ctx.app.analytics`. */
   analytics: AnalyticsApp;
   /** For `ctx.app.dashboard`. */

@@ -189,13 +189,13 @@ export function mountRestFamily(options: {
     hono.route("/", app);
   }
 
-  const send = (
+  const send = async (
     method: string,
     path: string,
     body?: unknown,
     headers: Record<string, string> = {},
-  ) =>
-    hono.fetch(
+  ): Promise<Response> =>
+    await hono.fetch(
       new Request(`http://api.test${path}`, {
         method,
         headers: { "content-type": "application/json", ...headers },
@@ -204,7 +204,7 @@ export function mountRestFamily(options: {
     );
 
   return {
-    fetch: (path, init) => hono.fetch(new Request(`http://api.test${path}`, init)),
+    fetch: async (path, init) => await hono.fetch(new Request(`http://api.test${path}`, init)),
     get: (path, headers) => send("GET", path, undefined, headers),
     post: (path, body, headers) => send("POST", path, body ?? {}, headers),
     patch: (path, body, headers) => send("PATCH", path, body ?? {}, headers),

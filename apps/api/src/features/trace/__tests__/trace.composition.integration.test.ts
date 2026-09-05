@@ -27,6 +27,7 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import {
   ApiApplication,
+  type ApiTrpcFeatureMount,
   MissingAgentService,
   MissingSecretService,
 } from "../../../api.application";
@@ -240,7 +241,7 @@ function testAuthz(): AuthzService {
 function testTraceGroupHalf(broadcast: PresenceEmitterPort): ComposedTraceFeature {
   const ports = testTraceGroupPorts();
   return {
-    routers: (mount) => ({
+    routers: (mount: ApiTrpcFeatureMount) => ({
       traces: createTracesTrpcRouter({ ...mount, ports: ports.traces }),
       tracesV2: createTracesV2TrpcRouter({ ...mount, ports: ports.tracesV2 }),
       spans: createSpansTrpcRouter({ ...mount, ports: ports.spans }),
@@ -1049,7 +1050,7 @@ describe("given the anonymous share read composed on this process", () => {
         http: {
           createContext: async () => ({
             actor: () => ({ id: "user-1" }),
-            tryActor: () => undefined,
+            tryActor: () => null,
             authorize: async () => undefined,
             // No session at all: this is the surface an anonymous viewer hits.
             session: null,

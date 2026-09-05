@@ -20,21 +20,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * The price the ingest seam stamped on the event, controlled by the test
- * rather than a real catalog lookup. A `vi.hoisted` cell so the mock factory
- * below (hoisted above these imports) can close over it.
+ * rather than a real catalog lookup: what this pins is that a consumer repeats
+ * the stamp, and a catalog that cannot be moved would make every assertion
+ * below vacuous.
  */
-const priceState = vi.hoisted(() => ({
+const priceState = {
   costNanoUsd: 21_675,
   rateVersion: "catalog@2026-07-01",
-}));
-
-vi.mock("@langwatch/gateway-server", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@langwatch/gateway-server")>();
-  return {
-    ...original,
-    rateSpendNanoUsd: () => ({ ...priceState }),
-  };
-});
+};
 
 import {
   buildProcessDefinition,
@@ -50,7 +43,8 @@ import {
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_EVENT_VERSION_LATEST,
   GatewaySpendFoldProjection,
-  ModelCatalogGatewaySpendRatingAdapter,
+  GatewaySpendRatingPort,
+  type SpendUsage,
   type ConfirmSpendCommandData as GatewayConfirmSpendCommandData,
   type GatewaySpendConfirmedEvent,
   type GatewaySpendState,
@@ -61,7 +55,6 @@ import {
   GatewayDebitProcess,
   type GatewayBudgetCrossingCandidate,
   type GatewayBudgetDebitRow,
-  type GatewayDebitsState,
   type GatewayResolvedBudget,
   type GatewaySpendProcessingEvent as GovernanceGatewaySpendProcessingEvent,
 } from "@langwatch/enterprise-governance-server";
@@ -73,7 +66,17 @@ import {
   type GatewaySpendProcessingEvent as WebhookGatewaySpendProcessingEvent,
 } from "@langwatch/enterprise-webhook-server";
 
-const spendRating = ModelCatalogGatewaySpendRatingAdapter.create();
+/** The vertical's rating seam, standing in for the static catalog behind it. */
+class TestSpendRating extends GatewaySpendRatingPort {
+  rate(_input: { model: string; usage: SpendUsage; rateVersion?: string }): {
+    costNanoUsd: number;
+    rateVersion: string;
+  } {
+    return { ...priceState };
+  }
+}
+
+const spendRating = new TestSpendRating();
 const TENANT = "proj_price";
 const REQUEST = "01K1PRICEULID";
 const MODEL = "openai/gpt-5";
@@ -190,7 +193,7 @@ function debitPayloadFor(costNanoUsd: number, rateVersion: string) {
       name: GATEWAY_DEBITS_PROCESS_NAME,
       applier: service.processManager(),
     }).config,
-  ) as ProcessDefinition<GatewayDebitsState>;
+  );
 
   const result = def.evolve({
     previousState: def.initialState,
@@ -254,7 +257,7 @@ describe("one price per gateway request", () => {
   it("the ledger, the budget debit, and the webhook envelope agree across a catalog change", () => {
     // The ingest seam prices the outcome once, against the catalog of the
     // moment, and stamps the figure onto the event data below.
-    const priced = spendRating.rateSpendNanoUsd({ model: MODEL, usage: USAGE });
+    const priced = spendRating.rate({ model: MODEL, usage: USAGE });
     expect(priced.costNanoUsd).toBe(21_675);
 
     // A catalog deploy lands before the other consumers run. Rating now
@@ -262,7 +265,7 @@ describe("one price per gateway request", () => {
     // vacuous: a consumer that re-rated would disagree with the stamp.
     priceState.costNanoUsd = 216_750;
     priceState.rateVersion = "catalog@2026-08-01";
-    expect(spendRating.rateSpendNanoUsd({ model: MODEL, usage: USAGE }).costNanoUsd).not.toBe(
+    expect(spendRating.rate({ model: MODEL, usage: USAGE }).costNanoUsd).not.toBe(
       priced.costNanoUsd,
     );
 

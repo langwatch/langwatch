@@ -200,13 +200,22 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
         version: "1",
         commitMessage: "initial",
         authorId,
+        // The persisted DSL is parsed strictly on the way back out, so this is
+        // a whole Studio graph rather than the three nodes the assertion counts.
         dsl: {
+          workflow_id: workflowId,
+          spec_version: "1.4",
+          name,
+          icon: "🤖",
+          description: "Test workflow",
+          version: "1.0",
           nodes: [
-            { id: "entry", type: "entry", data: {} },
-            { id: "llm", type: "signature", data: {} },
-            { id: "end", type: "end", data: {} },
+            { id: "entry", type: "entry", data: {}, position: { x: 0, y: 0 } },
+            { id: "llm", type: "signature", data: {}, position: { x: 200, y: 0 } },
+            { id: "end", type: "end", data: {}, position: { x: 400, y: 0 } },
           ],
           edges: [],
+          state: {},
         },
       },
     });

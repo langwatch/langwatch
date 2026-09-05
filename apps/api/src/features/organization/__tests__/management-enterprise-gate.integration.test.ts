@@ -104,7 +104,12 @@ describe("given a fully-permissioned credential on a plan below Enterprise", () 
     it("refuses the SCIM tokens API with 402", async () => {
       const { plans } = mutablePlans("FREE");
       const api = mountRestFamily({
-        packaged: { scim: () => ScimApp.create({ scim: inMemoryScim() }) },
+        packaged: {
+          scim: () => {
+            const scim = inMemoryScim();
+            return ScimApp.create({ scim, planProvider: scim });
+          },
+        },
         packagedPorts: {
           enterpriseGate: createEnterprisePlanGate({
             organization: (c) => c.get("organization") as { id: string } | undefined,
@@ -152,7 +157,7 @@ describe("given a SCIM token minted while the organization was on Enterprise", (
     it("refuses with 403 in the SCIM error format, and provisions nothing", async () => {
       const scim = inMemoryScim("ENTERPRISE");
       const api = mountRestFamily({
-        packaged: { scim: () => ScimApp.create({ scim }) },
+        packaged: { scim: () => ScimApp.create({ scim, planProvider: scim }) },
         processPorts: { scim: { scim: () => scim, webhookSecret: undefined } },
       });
 
@@ -189,6 +194,11 @@ describe("given a SCIM token minted while the organization was on Enterprise", (
 
 const digest = (token: string) => createHash("sha256").update(token).digest("hex");
 
+/** The plan lookup `ScimApp` takes, stated structurally as the feature declares it. */
+type ScimPlanForOrganization = {
+  getActivePlan(input: { organizationId: string }): Promise<{ type: string }>;
+};
+
 /**
  * The SCIM directory's own entitlement check runs inside `verifyToken`
  * (`ScimService`, production shape): a token names an organization, and the
@@ -196,7 +206,7 @@ const digest = (token: string) => createHash("sha256").update(token).digest("hex
  */
 function inMemoryScim(
   initialPlan: string = "ENTERPRISE",
-): ScimService & { setPlan(plan: string): void } {
+): ScimService & ScimPlanForOrganization & { setPlan(plan: string): void } {
   let plan = initialPlan;
   const tokens = new Map<string, { id: string; hashed: string; connectionId: string | null }>();
 
@@ -204,6 +214,7 @@ function inMemoryScim(
     setPlan: (next: string) => {
       plan = next;
     },
+    getActivePlan: async () => ({ type: plan }),
     generateToken: async (input: { connectionId?: string | null; description?: string }) => {
       const token = `scim_${randomUUID()}`;
       const tokenId = `scimtoken_${tokens.size + 1}`;
@@ -236,5 +247,5 @@ function inMemoryScim(
       itemsPerPage: 100,
       Resources: [],
     }),
-  } as unknown as ScimService & { setPlan(plan: string): void };
+  } as unknown as ScimService & ScimPlanForOrganization & { setPlan(plan: string): void };
 }

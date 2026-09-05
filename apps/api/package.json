@@ -166,6 +166,7 @@
     "zod-validation-error": "^5.0.0"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "@opentelemetry/otlp-transformer": "0.55.0",
     "@opentelemetry/sdk-trace-base": "2.10.0",
     "@opentelemetry/sdk-trace-web": "2.10.0",

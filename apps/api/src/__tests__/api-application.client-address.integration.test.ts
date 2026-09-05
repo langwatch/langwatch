@@ -4,9 +4,16 @@
  */
 import { SecretService, type Secret } from "@langwatch/secret-contract";
 import { AgentService } from "@langwatch/agent-contract";
+import type { TRPCCreateRouterOptions } from "@trpc/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application";
+import {
+  ApiApplication,
+  ApiTrpcFeaturesPort,
+  type ApiTrpcFeatureMount,
+  MissingAgentService,
+  NoApiTrpcFeatures,
+} from "../api.application";
 import { ApiHttpListener } from "../api-http.listener";
 
 const secret: Secret = {
@@ -29,18 +36,21 @@ class TestSecretService extends SecretService {
 }
 
 /** One public procedure that answers with the key the limits would use. */
-class AddressProbeFeatures extends NoApiTrpcFeatures {
-  override build(mount: {
-    root: { router: (record: Record<string, unknown>) => unknown };
-    publicProcedure: { query: (resolve: (options: { ctx: unknown }) => string) => unknown };
-  }) {
+class AddressProbeFeatures extends ApiTrpcFeaturesPort<TRPCCreateRouterOptions> {
+  private readonly none = new NoApiTrpcFeatures();
+
+  readonly authorization = this.none.authorization;
+  readonly denials = this.none.denials;
+  readonly causes = this.none.causes;
+  readonly errorReporting = this.none.errorReporting;
+  readonly application = this.none.application;
+
+  build({ root, publicProcedure }: ApiTrpcFeatureMount): TRPCCreateRouterOptions {
     return {
-      probe: mount.root.router({
-        address: mount.publicProcedure.query(({ ctx }) =>
-          (ctx as { clientIp(): string }).clientIp(),
-        ),
+      probe: root.router({
+        address: publicProcedure.query(({ ctx }) => ctx.clientIp()),
       }),
-    } as never;
+    };
   }
 }
 
