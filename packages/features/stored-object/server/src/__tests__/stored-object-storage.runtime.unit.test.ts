@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   StoredObjectAzureDestinationPort,
-  StoredObjectDestinationPolicy,
+  StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3ConfigPort,
-  StoredObjectStorageRegistry,
+  StoredObjectStorageRegistryAdapter,
 } from "../index";
 
 class ProjectConfig extends StoredObjectProjectS3ConfigPort {
@@ -28,7 +28,7 @@ class AzureDestination extends StoredObjectAzureDestinationPort {
 describe("Stored Object storage infrastructure", () => {
   it("keeps BYOC first and does not resolve inactive Azure configuration", async () => {
     const azure = new AzureDestination();
-    const policy = StoredObjectDestinationPolicy.create({
+    const policy = StoredObjectDestinationPolicyAdapter.create({
       selection: {
         backend: "azure",
         localFilesystemRoot: "/objects",
@@ -54,7 +54,7 @@ describe("Stored Object storage infrastructure", () => {
       delete: async () => undefined,
       exists: async () => false,
     };
-    const registry = new StoredObjectStorageRegistry({
+    const registry = StoredObjectStorageRegistryAdapter.create({
       s3: driver,
       file: driver,
       "azure-blob": () => {

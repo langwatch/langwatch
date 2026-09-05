@@ -11,7 +11,9 @@ import {
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import {
+  GroupBindingNotFoundError,
   GroupNotFoundError,
+  GroupScopeNotInOrganizationError,
   ScimManagedGroupError,
   UserNotInOrganizationError,
   type OrganizationGroup,
@@ -656,6 +658,7 @@ describe("createGroupRestApp", () => {
       });
     });
 
+    /** @scenario DELETE /api/groups/:id/bindings/:bindingId removes a binding */
     it("answers success when a binding is removed, attributed to the caller", async () => {
       const removeGroupBinding = vi.fn(async () => undefined);
       const { send } = buildApi({ organizations: { removeGroupBinding } });
@@ -670,6 +673,44 @@ describe("createGroupRestApp", () => {
         bindingId: "binding-1",
         organizationId: ORGANIZATION_ID,
         actor: LEDGER_ACTOR,
+      });
+    });
+
+    /** @scenario DELETE /api/groups/:id/bindings/:bindingId returns 404 for nonexistent binding */
+    it("reports a binding this group does not hold as not found", async () => {
+      const removeGroupBinding = vi.fn(async () => {
+        throw new GroupBindingNotFoundError("nonexistent");
+      });
+      const { send } = buildApi({ organizations: { removeGroupBinding } });
+
+      const response = await send("/api/groups/group-1/bindings/nonexistent", {
+        method: "DELETE",
+      });
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({ error: "role_binding_not_found" });
+    });
+
+    /**
+     * The scope check is the service's, and its refusal is what the door publishes. The
+     * spec still reads 400 here; this family answers the 422 every unprocessable body
+     * gets, which is the drift to fix in the spec, not in the door.
+     */
+    /** @scenario POST /api/groups/:id/bindings rejects cross-org scope */
+    it("refuses a binding whose scope belongs to another organization", async () => {
+      const addGroupBinding = vi.fn(async () => {
+        throw new GroupScopeNotInOrganizationError("TEAM");
+      });
+      const { send } = buildApi({ organizations: { addGroupBinding } });
+
+      const response = await send("/api/groups/group-1/bindings", {
+        method: "POST",
+        body: { role: "MEMBER", scopeType: "TEAM", scopeId: "team-in-another-org" },
+      });
+
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toMatchObject({
+        error: "scope_not_in_organization",
       });
     });
   });

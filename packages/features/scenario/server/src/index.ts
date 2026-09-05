@@ -170,14 +170,11 @@ export {
 // contract`'s, shared with the drawer that composes the request.
 // ---------------------------------------------------------------------------
 export { ScenarioRunExportService } from "./services/scenario-run-export.service";
-export {
-  serializeRunsToCriteriaCsv,
-  serializeRunsToFullCsv,
-} from "./services/scenario-run-export-csv.service";
+export { ScenarioRunExportCsvService } from "./services/scenario-run-export-csv.service";
 export {
   ScenarioRunExportForbiddenError,
   ScenarioRunExportUnauthenticatedError,
-} from "./services/scenario-run-export-errors.service";
+} from "@langwatch/scenario-contract";
 export {
   SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS,
   SCENARIO_GENERATE_FEATURE_KEY,

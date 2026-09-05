@@ -144,6 +144,7 @@ export class SsoConnectionGuardChecks {
     if (isOperator) {
       return;
     }
+
     throw new SsoConnectionOperatorActRequiredError(
       `actor ${actor.id} is not a platform operator and may not ${act}`,
     );
@@ -153,6 +154,7 @@ export class SsoConnectionGuardChecks {
     if (state.claimedDomains.includes(domain)) {
       return;
     }
+
     throw new SsoConnectionInvalidTransitionError(
       `connection ${state.connectionId}: ${domain} has no claim awaiting a decision`,
     );

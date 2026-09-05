@@ -8,7 +8,11 @@ export function canonicaliseLangWatchIdentity(ctx: ExtractorContext): void {
   const { attrs } = ctx.bag;
 
   const spanType = attrs.get(ATTR_KEYS.SPAN_TYPE);
-  if (typeof spanType === "string" && spanType.length > 0 && ALLOWED_SPAN_TYPES[spanType] === true) {
+  if (
+    typeof spanType === "string" &&
+    spanType.length > 0 &&
+    ALLOWED_SPAN_TYPES[spanType] === true
+  ) {
     ctx.setAttr(ATTR_KEYS.SPAN_TYPE, spanType);
     ctx.recordRule(`${LANGWATCH_RULE_PREFIX}:span.type`);
   }

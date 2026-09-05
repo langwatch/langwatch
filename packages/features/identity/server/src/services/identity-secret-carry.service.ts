@@ -106,12 +106,14 @@ export class IdentitySecretCarryService {
         if (inserted) {
           outcome.carried += 1;
         }
+
         continue;
       }
 
       if (pair.accountUpdatedAtMs <= pair.credentialUpdatedAtMs) {
         continue;
       }
+
       await this.reads.overwriteCredential({
         accountId: pair.accountId,
         secrets: pair.secrets,

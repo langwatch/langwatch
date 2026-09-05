@@ -23,7 +23,7 @@ import {
   CannotRemoveSelfError,
   MemberNotFoundError,
   MemberSeatLimitReachedError,
-} from "./organization-membership-errors.service";
+} from "@langwatch/organization-contract";
 
 import {
   OrganizationGrantCachePort,

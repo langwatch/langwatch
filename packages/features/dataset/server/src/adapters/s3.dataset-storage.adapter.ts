@@ -46,7 +46,7 @@ import {
   ChunkTooLargeError,
   MissingChunkError,
   StagedUploadNotFoundError,
-} from "../services/dataset-errors.service";
+} from "@langwatch/dataset-contract";
 import { stagingUploadKey, UPLOAD_TTL_SECONDS } from "../services/presigned-upload.service";
 
 export class S3DatasetStorageAdapter implements DatasetStorage {

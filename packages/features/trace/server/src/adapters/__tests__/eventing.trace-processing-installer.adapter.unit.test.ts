@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventingTraceOriginAdapter } from "../eventing.trace-origin.adapter";
 import { type TraceDeferredOriginSchedulerPort } from "../eventing.deferred-origin.adapter";
 import { EventingTraceTopicAdapter } from "../eventing.trace-topic.adapter";
-import { TraceProcessingServerInstaller } from "../eventing.trace-processing-installer.adapter";
+import { TraceProcessingServerInstallerAdapter } from "../eventing.trace-processing-installer.adapter";
 import {
   TraceProcessingPipelinePort,
   type TraceProcessingPipelineDefinition,
@@ -58,14 +58,14 @@ class TestTracePipeline extends TraceProcessingPipelinePort {
 }
 
 function createInstaller(): {
-  installer: TraceProcessingServerInstaller;
+  installer: TraceProcessingServerInstallerAdapter;
   datasetNormalization: TestDatasetNormalization;
   pipeline: TestTracePipeline;
 } {
   const datasetNormalization = new TestDatasetNormalization();
   const pipeline = new TestTracePipeline();
   return {
-    installer: TraceProcessingServerInstaller.create({
+    installer: TraceProcessingServerInstallerAdapter.create({
       pipeline,
       datasetNormalization,
     }),
@@ -74,7 +74,7 @@ function createInstaller(): {
   };
 }
 
-describe("TraceProcessingServerInstaller", () => {
+describe("TraceProcessingServerInstallerAdapter", () => {
   afterEach(() => {
     vi.useRealTimers();
   });

@@ -393,7 +393,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     traceCanonicalisation: TraceCanonicalisationService;
   }): TraceLegacyReadClickHouseRepository {
     return new TraceLegacyReadClickHouseRepository({
-        resolveClickHouseClient,
+      resolveClickHouseClient,
       filterConditions,
       resolveTraceSpans,
       resolveTraceSpansBatch,

@@ -15,12 +15,19 @@
  * and dropped by others would repair part of the fleet and silently lose the
  * rest.
  *
- * Raw Hono rather than a secured app, because this app TERMINATES NOTHING. It
- * declares no access policy: the canonical route authenticates the forwarded
- * request exactly as it would a direct one, so the legacy URL answers the same
- * 200, 400, 401 and 403 the canonical URL does, from the same chain.
+ * Raw Hono rather than a secured app, because this app TERMINATES NOTHING: the
+ * canonical route authenticates the forwarded request exactly as it would a
+ * direct one, so the legacy URL answers the same 200, 400, 401 and 403 the
+ * canonical URL does, from the same chain. It still records a policy — the
+ * canonical route's own, copied rather than declared — because a mounted URL
+ * missing from the route registry is indistinguishable from one that bypassed
+ * the builder, and the endpoint-authorization audit reads that registry.
  */
-import type { MountableRestApp } from "@langwatch/api/rest";
+import {
+  getRoutePolicy,
+  registerRoutePolicy,
+  type MountableRestApp,
+} from "@langwatch/api/rest";
 import { Hono } from "hono";
 
 /** The URL every pre-rename SDK release posts a tracked event to. */
@@ -42,6 +49,21 @@ export function mountTrackedEventLegacyPathRest(options: {
 }): MountableRestApp {
   const { canonical } = options;
   const app = new Hono();
+
+  const canonicalRoute = getRoutePolicy("POST", TRACKED_EVENT_CANONICAL_PATH);
+  if (!canonicalRoute) {
+    throw new Error(
+      `${TRACKED_EVENT_LEGACY_PATH} forwards to ${TRACKED_EVENT_CANONICAL_PATH}, which has ` +
+        "declared no access policy; mount the canonical family before the alias",
+    );
+  }
+  registerRoutePolicy({
+    method: "POST",
+    path: TRACKED_EVENT_LEGACY_PATH,
+    policy: canonicalRoute.policy,
+    family: canonicalRoute.family,
+    credentialClass: canonicalRoute.credentialClass,
+  });
 
   app.post(TRACKED_EVENT_LEGACY_PATH, async (c) => {
     const url = new URL(c.req.url);

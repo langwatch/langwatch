@@ -26,7 +26,9 @@ import type {
   TraceSpanTokenEstimationPort,
 } from "../ports/trace-span-preparation.port";
 import type { TraceSpanSpoolPort } from "../ports/trace-span-spool.port";
-import { TraceAttributeCap } from "../services/trace-attribute-cap.service";
+import { TraceAttributeCapService } from "../services/trace-attribute-cap.service";
+
+const traceAttributeCapService = TraceAttributeCapService.create();
 
 const spooledRecordSpanSchema = z.object({
   span: spanSchema,
@@ -253,7 +255,7 @@ export class EventingRecordSpanAdapter implements CommandHandler<
     traceId: string,
     spanId: string,
   ): void {
-    const cappedAttributeCount = TraceAttributeCap.capOversizedAttributes(span, resource);
+    const cappedAttributeCount = traceAttributeCapService.capOversizedAttributes(span, resource);
     if (cappedAttributeCount === 0) {
       return;
     }

@@ -151,6 +151,7 @@ export class JoinRequestGuards {
     if (!state) {
       return [];
     }
+
     return [
       {
         type: JOIN_APPROVED_EVENT_TYPE,
@@ -174,6 +175,7 @@ export class JoinRequestGuards {
     if (!state) {
       return [];
     }
+
     return [
       {
         type: JOIN_REJECTED_EVENT_TYPE,
@@ -196,6 +198,7 @@ export class JoinRequestGuards {
     if (!state) {
       return [];
     }
+
     return [
       {
         type: JOIN_WITHDRAWN_EVENT_TYPE,
@@ -225,6 +228,7 @@ export class JoinRequestGuards {
     if (!state || state.state !== "PENDING") {
       return [];
     }
+
     if (state.expiresAtMs !== null && data.scheduledFor < state.expiresAtMs) {
       return [];
     }
@@ -256,6 +260,7 @@ export class JoinRequestGuards {
     if (!state) {
       return null;
     }
+
     if (!ALLOWED_FROM[verb].includes(state.state)) {
       throw new JoinRequestNotPendingError(
         `${verb} refused: request ${joinRequestId} is ${state.state}`,

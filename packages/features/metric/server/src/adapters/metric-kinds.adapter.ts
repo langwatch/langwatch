@@ -1,5 +1,7 @@
 import type { AggregationTemporality, MetricKind } from "@langwatch/metric-contract";
-import { isRecord, type UnknownRecord } from "./metric-serialization.adapter";
+import { type UnknownRecord } from "./metric-serialization.adapter";
+import { MetricSerializationAdapter } from "./metric-serialization.adapter";
+const { isRecord } = MetricSerializationAdapter;
 
 /** The OTLP field name carrying each kind's data container. */
 export const METRIC_KIND_DATA_KEY: Record<MetricKind, string> = {
@@ -46,4 +48,14 @@ function aggregation({
   return "unspecified";
 }
 
-export { aggregation, candidatePointCount, metricKind };
+export class MetricKindsAdapter {
+  private constructor() {}
+
+  static create(): MetricKindsAdapter {
+    return new MetricKindsAdapter();
+  }
+
+  static aggregation = aggregation;
+  static candidatePointCount = candidatePointCount;
+  static metricKind = metricKind;
+}

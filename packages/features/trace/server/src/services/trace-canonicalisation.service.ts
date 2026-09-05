@@ -24,26 +24,28 @@ import {
   type ExtractMessageTextInput,
   TraceCanonicalisationService as TraceCanonicalisationServiceContract,
 } from "@langwatch/trace-contract";
-import { ClaudeCodeCanonicaliser } from "../adapters/claude-code.canonicaliser.adapter";
-import { CodexCanonicaliser } from "../adapters/codex.canonicaliser.adapter";
-import { CopilotCanonicaliser } from "../adapters/copilot.canonicaliser.adapter";
-import { FallbackCanonicaliser } from "../adapters/fallback.canonicaliser.adapter";
-import { GenAICanonicaliser } from "../adapters/gen-ai.canonicaliser.adapter";
-import { HaystackCanonicaliser } from "../adapters/haystack.canonicaliser.adapter";
-import { LangWatchCanonicaliser } from "../adapters/langwatch.canonicaliser.adapter";
-import { LegacyOtelCanonicaliser } from "../adapters/legacy-otel.canonicaliser.adapter";
-import { LogfireCanonicaliser } from "../adapters/logfire.canonicaliser.adapter";
-import { MastraCanonicaliser } from "../adapters/mastra.canonicaliser.adapter";
-import { OpenInferenceCanonicaliser } from "../adapters/openinference.canonicaliser.adapter";
-import { SpringAICanonicaliser } from "../adapters/spring-ai.canonicaliser.adapter";
-import { StrandsCanonicaliser } from "../adapters/strands.canonicaliser.adapter";
-import { TraceloopCanonicaliser } from "../adapters/traceloop.canonicaliser.adapter";
-import { VercelCanonicaliser } from "../adapters/vercel.canonicaliser.adapter";
-import { VertexAdkCanonicaliser } from "../adapters/vertex-adk.canonicaliser.adapter";
+import { ClaudeCodeCanonicaliserService } from "./claude-code-canonicaliser.service";
+import { CodexCanonicaliserService } from "./codex-canonicaliser.service";
+import { CopilotCanonicaliserService } from "./copilot-canonicaliser.service";
+import { FallbackCanonicaliserService } from "./fallback-canonicaliser.service";
+import { GenAICanonicaliserService } from "./gen-ai-canonicaliser.service";
+import { HaystackCanonicaliserService } from "./haystack-canonicaliser.service";
+import { LangWatchCanonicaliserService } from "./langwatch-canonicaliser.service";
+import { LegacyOtelCanonicaliserService } from "./legacy-otel-canonicaliser.service";
+import { LogfireCanonicaliserService } from "./logfire-canonicaliser.service";
+import { MastraCanonicaliserService } from "./mastra-canonicaliser.service";
+import { OpenInferenceCanonicaliserService } from "./openinference-canonicaliser.service";
+import { SpringAICanonicaliserService } from "./spring-ai-canonicaliser.service";
+import { StrandsCanonicaliserService } from "./strands-canonicaliser.service";
+import { TraceloopCanonicaliserService } from "./traceloop-canonicaliser.service";
+import { VercelCanonicaliserService } from "./vercel-canonicaliser.service";
+import { VertexAdkCanonicaliserService } from "./vertex-adk-canonicaliser.service";
 import type { ExtractorContext, LogExtractorContext } from "../ports/canonical-attributes.port";
-import { CanonicalAttributesPort } from "../ports/canonical-attributes.port";
-import { LogRecordDataBag } from "../stores/canonical-log-record.store";
-import { SpanDataBag } from "../stores/canonical-span.store";
+import {
+  CanonicalAttributesPort,
+  CanonicalLogRecordStore,
+  CanonicalSpanStore,
+} from "../ports/canonical-attributes.port";
 import { parseJsonStringValues } from "../rules/canonical-json.rules";
 import {
   extractLastUserMessageText,
@@ -53,29 +55,33 @@ import {
   claudeCacheWritesLongLived,
   isConversationalQuerySource,
 } from "../rules/claude-code-call-policy.rules";
-import { ClaudeCodeRequest } from "./claude-code-request.service";
-import { ClaudeCodeResponse } from "./claude-code-response.service";
+import { ClaudeCodeRequestService } from "./claude-code-request.service";
+import { ClaudeCodeResponseService } from "./claude-code-response.service";
+
+const claudeCodeResponseService = ClaudeCodeResponseService.create();
+
+const claudeCodeRequestService = ClaudeCodeRequestService.create();
 
 export class TraceCanonicalisationService extends TraceCanonicalisationServiceContract {
   private readonly extractors: CanonicalAttributesPort[] = [
-    new LangWatchCanonicaliser(),
-    new GenAICanonicaliser(),
-    new VertexAdkCanonicaliser(),
-    new MastraCanonicaliser(),
-    new OpenInferenceCanonicaliser(),
-    new TraceloopCanonicaliser(),
-    new VercelCanonicaliser(),
+    LangWatchCanonicaliserService.create(),
+    GenAICanonicaliserService.create(),
+    VertexAdkCanonicaliserService.create(),
+    MastraCanonicaliserService.create(),
+    OpenInferenceCanonicaliserService.create(),
+    TraceloopCanonicaliserService.create(),
+    VercelCanonicaliserService.create(),
     // Native CLI emitters can arrive as spans as well as log records.
-    new ClaudeCodeCanonicaliser(),
-    new CodexCanonicaliser(),
+    ClaudeCodeCanonicaliserService.create(),
+    CodexCanonicaliserService.create(),
     // Copilot adds its extras after GenAI establishes the standard attributes.
-    new CopilotCanonicaliser(),
-    new SpringAICanonicaliser(),
-    new StrandsCanonicaliser(),
-    new LogfireCanonicaliser(),
-    new HaystackCanonicaliser(),
-    new LegacyOtelCanonicaliser(),
-    new FallbackCanonicaliser(),
+    CopilotCanonicaliserService.create(),
+    SpringAICanonicaliserService.create(),
+    StrandsCanonicaliserService.create(),
+    LogfireCanonicaliserService.create(),
+    HaystackCanonicaliserService.create(),
+    LegacyOtelCanonicaliserService.create(),
+    FallbackCanonicaliserService.create(),
   ];
 
   private constructor() {
@@ -90,7 +96,10 @@ export class TraceCanonicalisationService extends TraceCanonicalisationServiceCo
     input: CanonicalizeSpanAttributesInput,
   ): CanonicalizeSpanAttributesResult {
     const parsed = canonicalizeSpanAttributesInputSchema.parse(input);
-    const bag = new SpanDataBag(parseJsonStringValues(parsed.spanAttributes), parsed.events);
+    const bag = CanonicalSpanStore.create({
+      spanAttributes: parseJsonStringValues(parsed.spanAttributes),
+      events: parsed.events,
+    });
     const out: ExtractorContext["out"] = {};
     const appliedRules: string[] = [];
 
@@ -137,11 +146,11 @@ export class TraceCanonicalisationService extends TraceCanonicalisationServiceCo
 
   canonicalizeLogRecord(input: CanonicalizeLogRecordInput): CanonicalizeLogRecordResult {
     const parsed = canonicalizeLogRecordInputSchema.parse(input);
-    const bag = new LogRecordDataBag(
-      parsed.scopeName,
-      parsed.body,
-      parseJsonStringValues(parsed.attributes),
-    );
+    const bag = CanonicalLogRecordStore.create({
+      scopeName: parsed.scopeName,
+      body: parsed.body,
+      attributes: parseJsonStringValues(parsed.attributes),
+    });
     const out: LogExtractorContext["out"] = {};
     const appliedRules: string[] = [];
 
@@ -198,7 +207,7 @@ export class TraceCanonicalisationService extends TraceCanonicalisationServiceCo
     input: DeriveClaudeRequestContentInput,
   ): DeriveClaudeRequestContentResult {
     const { body } = deriveClaudeRequestContentInputSchema.parse(input);
-    const derived = ClaudeCodeRequest.deriveClaudeRequestBody(body);
+    const derived = claudeCodeRequestService.deriveClaudeRequestBody(body);
     const toolResults = [...derived.toolResults].map(([useId, text]) => ({
       useId,
       text,
@@ -216,7 +225,7 @@ export class TraceCanonicalisationService extends TraceCanonicalisationServiceCo
     const { body } = deriveClaudeResponseContentInputSchema.parse(input);
 
     return deriveClaudeResponseContentResultSchema.parse(
-      ClaudeCodeResponse.deriveClaudeResponseBody(body),
+      claudeCodeResponseService.deriveClaudeResponseBody(body),
     );
   }
 

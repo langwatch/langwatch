@@ -15,7 +15,7 @@ export { PresenceStreamService } from "./services/presence-stream.service";
  */
 export { BroadcastAdapter, type BroadcastEventType } from "./adapters/broadcast.adapter";
 export {
-  TenantRateLimiter,
+  BroadcastTenantRateLimiterAdapter,
   type BucketConfig,
   type TierConfig,
 } from "./adapters/broadcast-tenant-rate-limiter.adapter";

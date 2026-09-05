@@ -120,7 +120,7 @@ const unflattenObject = (flatMap: Map<string, unknown>): Record<string, unknown>
  * Into:
  *   "llm.input_messages" => [{message:{content:"hello",role:"user"}},{message:{content:"hi"}}]
  */
-export const reconstructFlattenedArrays = (attrs: NormalizedAttributes): NormalizedAttributes => {
+const reconstructFlattenedArrays = (attrs: NormalizedAttributes): NormalizedAttributes => {
   const { patterns, matchedKeys } = detectArrayPatterns(attrs);
 
   // If no patterns found, return original
@@ -186,7 +186,7 @@ const MAX_JSON_PARSE_SIZE = 2_000_000;
  * from PII redaction tokens like `<US_DRIVER_LICENSE>`.
  */
 /** @internal Exported for unit testing */
-export function sanitizeInvalidJsonEscapes(json: string): string {
+function sanitizeInvalidJsonEscapes(json: string): string {
   return json.replace(/\\([<>])/g, "$1");
 }
 
@@ -197,7 +197,7 @@ export function sanitizeInvalidJsonEscapes(json: string): string {
  * Fast-path: only attempts parse if the trimmed string starts with `{` or `[`.
  */
 /** @internal Exported for unit testing */
-export const parseJsonStringValues = (attrs: NormalizedAttributes): NormalizedAttributes => {
+const parseJsonStringValues = (attrs: NormalizedAttributes): NormalizedAttributes => {
   const result: NormalizedAttributes = {};
 
   for (const [key, value] of Object.entries(attrs)) {
@@ -243,3 +243,16 @@ export const parseJsonStringValues = (attrs: NormalizedAttributes): NormalizedAt
 
   return result;
 };
+
+/** OTLP attribute shaping: flattened-array reconstruction and JSON-string parsing. */
+export class OtlpAttributeFlatteningService {
+  private constructor() {}
+
+  static create(): OtlpAttributeFlatteningService {
+    return new OtlpAttributeFlatteningService();
+  }
+
+  static reconstructFlattenedArrays = reconstructFlattenedArrays;
+  static sanitizeInvalidJsonEscapes = sanitizeInvalidJsonEscapes;
+  static parseJsonStringValues = parseJsonStringValues;
+}

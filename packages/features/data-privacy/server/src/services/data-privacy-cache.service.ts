@@ -25,6 +25,7 @@ export class DataPrivacyPolicyCache {
     if (cached && cached.expiresAt > this.now()) {
       return cached.value;
     }
+
     this.entries.delete(input.projectId);
     const value = resolveDataPrivacy({
       rows: await this.repository.findForProjectChain({

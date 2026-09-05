@@ -29,7 +29,9 @@ import {
 } from "../gateway-internal.api";
 import { testRestSecurity } from "./support/rest-security.support";
 
-import { createVirtualKeyServiceForTest } from "../../../testing";
+import { PostgresVirtualKeyAdapter } from "../../../testing";
+
+const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 import { GatewayConfigAssemblyAdapter } from "../../../adapters/postgres.gateway-config-assembly.adapter";
 import { PrismaGatewayScopeResolutionRepository } from "../../../repositories/prisma/prisma.gateway-scope-resolution.repository";
 import { GatewayScopeResolutionService } from "../../../services/gateway-scope-resolution.service";

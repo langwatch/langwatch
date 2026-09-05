@@ -670,7 +670,9 @@ describe("TraceEditOverlayService", () => {
     it("returns no correction", async () => {
       const { service } = buildService(null);
 
-      expect(await service.tryGetByTraceId({ projectId: "project-1", traceId: "trace-1" })).toBeNull();
+      expect(
+        await service.tryGetByTraceId({ projectId: "project-1", traceId: "trace-1" }),
+      ).toBeNull();
     });
   });
 
@@ -780,7 +782,9 @@ describe("TraceEditOverlayService", () => {
       await service.delete({ projectId: "project-1", traceId: "trace-1" });
 
       expect(deleteRow).toHaveBeenCalledTimes(2);
-      expect(await service.tryGetByTraceId({ projectId: "project-1", traceId: "trace-1" })).toBeNull();
+      expect(
+        await service.tryGetByTraceId({ projectId: "project-1", traceId: "trace-1" }),
+      ).toBeNull();
     });
   });
 

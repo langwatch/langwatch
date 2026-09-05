@@ -19,7 +19,9 @@ import { GatewayVirtualKeyDtoAdapter } from "../adapters/gateway-virtual-key-dto
 import type { ProjectService } from "@langwatch/project-contract";
 import { TestProjectService } from "./support/test-project-service";
 
-import { createVirtualKeyServiceForTest } from "../testing";
+import { PostgresVirtualKeyAdapter } from "../testing";
+
+const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 const virtualKeyDtos = GatewayVirtualKeyDtoAdapter.create();
 /** A trace destination lookup that answers no archived projects, for keys created without one. */
 class NoTraceDestinationsProjectService extends TestProjectService {

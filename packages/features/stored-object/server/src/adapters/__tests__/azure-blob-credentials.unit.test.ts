@@ -5,10 +5,11 @@
 import { describe, expect, it } from "vitest";
 import {
   AzureBackendMisconfiguredError,
-  resolveAzureCredentials,
   type AzureBlobCredentialsConfig,
   type AzureInjectedIdentity,
 } from "../azure-blob-credentials.adapter";
+import { AzureBlobCredentialsAdapter } from "../azure-blob-credentials.adapter";
+const { resolveAzureCredentials } = AzureBlobCredentialsAdapter;
 
 function sharedKeyConfig(
   overrides: Partial<AzureBlobCredentialsConfig> = {},

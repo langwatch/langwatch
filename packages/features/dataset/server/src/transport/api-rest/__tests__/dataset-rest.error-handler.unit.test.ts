@@ -1,4 +1,4 @@
-import { DatasetNotReadyError } from "../../../services/dataset-errors.service";
+import { DatasetNotReadyError } from "@langwatch/dataset-contract";
 import type { Context, ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
 import { createDatasetErrorHandler } from "../dataset-error-handler.api";

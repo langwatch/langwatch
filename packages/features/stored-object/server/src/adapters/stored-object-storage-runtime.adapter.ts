@@ -2,7 +2,7 @@ import type { Readable } from "node:stream";
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
 import {
-  StoredObjectStorageRegistry,
+  StoredObjectStorageRegistryAdapter,
   type StoredObjectStorageDriver,
 } from "./stored-object-storage-registry.adapter";
 
@@ -32,15 +32,15 @@ export type StoredObjectStorageRuntimeOptions = {
 };
 
 /** Creates project-scoped storage views from one canonical registry policy. */
-export class StoredObjectStorageRuntime {
-  static create(options: StoredObjectStorageRuntimeOptions): StoredObjectStorageRuntime {
-    return new StoredObjectStorageRuntime(options);
+export class StoredObjectStorageRuntimeAdapter {
+  static create(options: StoredObjectStorageRuntimeOptions): StoredObjectStorageRuntimeAdapter {
+    return new StoredObjectStorageRuntimeAdapter(options);
   }
 
   private constructor(private readonly options: StoredObjectStorageRuntimeOptions) {}
 
   forProject(projectId: string, aws: AwsClientProcessRuntime): StoredObjectStorageProject {
-    const registry = new StoredObjectStorageRegistry({
+    const registry = StoredObjectStorageRegistryAdapter.create({
       s3: this.options.s3ForProject(projectId, aws),
       file: this.options.fileForProject(projectId, aws),
       ...(this.options.azureForProject

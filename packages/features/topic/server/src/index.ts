@@ -15,7 +15,7 @@ export {
   type TopicClusteringPersistence,
 } from "./adapters/postgres.topic.adapter";
 export {
-  TopicServerInstaller,
+  TopicServerInstallerAdapter,
   type TopicClusteringExecutionDependencies,
   type TopicServerInstallerDependencies,
 } from "./adapters/topic-server-installer.adapter";

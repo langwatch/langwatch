@@ -29,7 +29,7 @@ export {
   NoAdminConfiguredError,
   OrganizationNotFoundForTeamError,
   OrganizationSlugTakenError,
-} from "./services/organization-membership-errors.service";
+} from "@langwatch/organization-contract";
 export { isCustomRole } from "./rules/custom-role-naming.rules";
 export {
   getAutoCorrectedTeamRoleForOrganizationRole,

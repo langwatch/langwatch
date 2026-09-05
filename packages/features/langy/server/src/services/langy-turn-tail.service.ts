@@ -66,6 +66,7 @@ export async function watchForMissedTerminal({
     if (!(await delay(pollMs, signal))) {
       return null;
     }
+
     const next = advanceSettlement({
       health: await readHealth(),
       streaks,
@@ -144,6 +145,7 @@ async function* followLiveEdge({
       if (outcome?.kind === "terminal") {
         synthesized = outcome.entry;
       }
+
       if (outcome) {
         settle.abort();
       } // unblock the follow() below

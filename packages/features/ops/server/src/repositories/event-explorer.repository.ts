@@ -13,14 +13,14 @@ export interface RawEventRow {
   payload: string;
 }
 
-export interface EventExplorerRepository {
-  findAggregates(params: {
+export abstract class EventExplorerRepository {
+  abstract findAggregates(params: {
     aggregateTypes: string[];
     sinceMs: number;
     tenantIds?: string[];
   }): Promise<AggregateDiscoveryRow[]>;
 
-  searchAggregates(params: {
+  abstract searchAggregates(params: {
     query: string;
     tenantIds?: string[];
     // Optional EventOccurredAt lower bound. The ops router supplies a
@@ -30,7 +30,7 @@ export interface EventExplorerRepository {
     sinceMs?: number;
   }): Promise<AggregateSearchResult[]>;
 
-  findEventsByAggregate(params: {
+  abstract findEventsByAggregate(params: {
     aggregateId: string;
     tenantId: string;
     limit: number;

@@ -7,7 +7,7 @@ import type { GatewayBudgetScopeType, GatewayBudgetWindow } from "./gateway.budg
 
 /** A Json column's value, mirroring the generated client's own shape. */
 export type GatewayJsonObject = { [Key in string]?: GatewayJsonValue };
-export interface GatewayJsonArray extends Array<GatewayJsonValue> {}
+export type GatewayJsonArray = GatewayJsonValue[];
 export type GatewayJsonValue =
   | string
   | number

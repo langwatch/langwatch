@@ -3,9 +3,14 @@ import type {
   MetricPiiRedactionLevel,
 } from "@langwatch/metric-contract";
 import { z } from "zod";
-import { buildPoint } from "./metric-point.adapter";
-import { candidatePointCount, METRIC_KIND_DATA_KEY, metricKind } from "./metric-kinds.adapter";
-import { isRecord, type UnknownRecord } from "./metric-serialization.adapter";
+import { MetricPointAdapter } from "./metric-point.adapter";
+const { buildPoint } = MetricPointAdapter;
+import { METRIC_KIND_DATA_KEY } from "./metric-kinds.adapter";
+import { MetricKindsAdapter } from "./metric-kinds.adapter";
+const { candidatePointCount, metricKind } = MetricKindsAdapter;
+import { type UnknownRecord } from "./metric-serialization.adapter";
+import { MetricSerializationAdapter } from "./metric-serialization.adapter";
+const { isRecord } = MetricSerializationAdapter;
 import { MetricRedactionAdapter } from "./metric-redaction.adapter";
 import {
   MetricPreparationPort,

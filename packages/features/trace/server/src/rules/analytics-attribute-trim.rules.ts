@@ -37,12 +37,12 @@ export const PAYLOAD_BLOCKLIST_EXACT: Readonly<Record<string, true>> = {
   "gen_ai.response.choices": true,
   "gen_ai.response.finish_reasons": true,
   // Logfire's raw input/output blobs — payload, not dimension.
-  "raw_input": true,
+  raw_input: true,
   // OpenInference / Mastra / Traceloop input/output value carriers.
   "input.value": true,
   "output.value": true,
-  "input": true,
-  "output": true,
+  input: true,
+  output: true,
   "mastra.output": true,
   "mastra.agent_run.input": true,
   "mastra.agent_run.output": true,

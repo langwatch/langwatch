@@ -212,9 +212,11 @@ export class LangyTurnErrors {
     if (!HandledError.isHandled(error)) {
       return false;
     }
+
     if (error.code === code) {
       return true;
     }
+
     return error.reasons.some((r) => LangyTurnErrors.domainErrorChainHas(r, code));
   }
 
@@ -346,6 +348,7 @@ export class LangyTurnErrors {
     if (HandledError.isHandled(error)) {
       return error.serialize();
     }
+
     // fetch/AbortSignal failures arrive as DOMException/TypeError, never as ours.
     if (LangyTurnErrors.isTimeout(error)) {
       return new LangyTurnTimeoutError(AGENT_CHAT_TIMEOUT_MS).serialize();

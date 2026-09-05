@@ -2,7 +2,7 @@ import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/a
 import { parseDataplaneS3RoutingTable } from "@langwatch/config";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
-  StoredObjectDestinationPolicy,
+  StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3ConfigPort,
 } from "@langwatch/stored-object-server";
 import type { TasksConfig } from "../config/tasks.config";
@@ -80,13 +80,13 @@ class TasksNoOutboundProxy extends OutboundProxyResolverPort {
  * AZURE IS A NAMED ABSENCE: this process composes no Azure driver.
  * `destination.resolve()` still reads the real `STORED_OBJECTS_BACKEND`, so a
  * deployment actually running on Azure gets a clear refusal (thrown by
- * `StoredObjectDestinationPolicy` itself, naming the missing configuration)
+ * `StoredObjectDestinationPolicyAdapter` itself, naming the missing configuration)
  * the moment a project resolves to it — never a silent fall-through to the
  * local filesystem fallback.
  */
 export type TasksObjectStorage = Readonly<{
   aws: AwsClientProcessRuntime;
-  destination: StoredObjectDestinationPolicy;
+  destination: StoredObjectDestinationPolicyAdapter;
   projects: TasksProjectS3SourcePort;
   globalS3?: TasksProjectS3Target;
 }>;
@@ -118,7 +118,7 @@ export function createTasksObjectStorage(options: {
       }
     : undefined;
 
-  const destination = StoredObjectDestinationPolicy.create({
+  const destination = StoredObjectDestinationPolicyAdapter.create({
     selection: {
       backend: storage.backend ?? "s3",
       localFilesystemRoot: storage.localFilesystemRoot ?? DEFAULT_LOCAL_STORAGE_ROOT,

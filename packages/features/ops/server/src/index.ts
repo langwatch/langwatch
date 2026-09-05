@@ -46,7 +46,8 @@ export type {
   SchedulerOpsRepository,
   ScheduledJobRecord,
 } from "./repositories/scheduler-ops.repository";
-export { NoopSchedulerWakeService, SchedulerWakeService } from "./services/scheduler-wake.service";
+export { NoopSchedulerWakeService } from "./services/scheduler-wake.service";
+export { SchedulerWakePort } from "./ports/scheduler-wake.port";
 export {
   type AdminAccess,
   AdminAccessService,
@@ -100,18 +101,18 @@ export {
 } from "./ports/eventing-introspection.port";
 export { EventingOpsIntrospectionAdapter } from "./adapters/eventing.ops-introspection.adapter";
 export { OpsReplayRuntimePort, type OpsReplayRuntime } from "./ports/replay-runtime.port";
-export { NullEventExplorerRepository } from "./adapters/null.event-explorer.adapter";
+export { NullEventExplorerAdapter } from "./adapters/null.event-explorer.adapter";
 export type {
   AggregateDiscoveryRow,
   EventExplorerRepository,
   RawEventRow,
 } from "./repositories/event-explorer.repository";
-export { NullProcessOpsRepository } from "./adapters/null.process-ops.adapter";
+export { NullProcessOpsAdapter } from "./adapters/null.process-ops.adapter";
 export type {
   ProcessNameCounts,
   ProcessOpsRepository,
 } from "./repositories/process-ops.repository";
-export { NullReplayRepository } from "./adapters/null.replay.adapter";
+export { NullReplayAdapter } from "./adapters/null.replay.adapter";
 export type { ReplayRepository } from "./repositories/replay.repository";
 export { ProcessOpsPrismaRepository } from "./repositories/prisma/prisma.process-ops.repository";
 export { EventExplorerClickHouseRepository } from "./repositories/clickhouse/clickhouse.event-explorer.repository";
@@ -187,18 +188,9 @@ export {
 
 // The operator-only ClickHouse EXPLAIN endpoint: the pure query guards and the
 // decision about which client an EXPLAIN is allowed to reach.
-export {
-  ALLOWED_EXPLAIN_TYPES,
-  buildExplainQuery,
-  CLICKHOUSE_GUARDRAILS,
-  explainBodySchema,
-  type ExplainType,
-  OpsClickHouseRuntime,
-  type ParseResult,
-  parseOpsConnection,
-  redactQueryForAudit,
-  stripCommentsAndStrings,
-} from "./adapters/ops-clickhouse-explain.adapter";
+export { CLICKHOUSE_GUARDRAILS } from "./rules/ops-clickhouse-guardrails.rules";
+export { ALLOWED_EXPLAIN_TYPES, explainBodySchema, type ExplainType, OpsClickHouseRuntime, type ParseResult } from "./adapters/ops-clickhouse-explain.adapter";
+export { OpsClickhouseExplainAdapter } from "./adapters/ops-clickhouse-explain.adapter";
 export {
   type OpsExplainOutcome,
   OpsExplainService,

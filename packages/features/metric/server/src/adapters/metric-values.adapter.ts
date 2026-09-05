@@ -1,6 +1,8 @@
 import type { MetricKind } from "@langwatch/metric-contract";
-import { MetricNumbers } from "./metric-numbers.adapter";
-import { isRecord, type UnknownRecord } from "./metric-serialization.adapter";
+import { MetricNumbersAdapter } from "./metric-numbers.adapter";
+import { type UnknownRecord } from "./metric-serialization.adapter";
+import { MetricSerializationAdapter } from "./metric-serialization.adapter";
+const { isRecord } = MetricSerializationAdapter;
 
 /**
  * The canonical view of every value-carrying OTLP field, in the exact form the
@@ -33,8 +35,8 @@ function canonicalQuantiles(value: unknown): CanonicalPointValues["quantileValue
   return value.map((entry) => {
     const quantile = isRecord(entry) ? entry : {};
     return {
-      quantile: MetricNumbers.finiteNumber(quantile.quantile),
-      value: MetricNumbers.finiteNumber(quantile.value),
+      quantile: MetricNumbersAdapter.finiteNumber(quantile.quantile),
+      value: MetricNumbersAdapter.finiteNumber(quantile.value),
     };
   });
 }
@@ -60,23 +62,23 @@ function canonicalPointValues({
 
   return {
     valueType,
-    valueInt: hasInt ? MetricNumbers.integerDecimal(point.asInt, { signed: true }) : null,
-    valueDouble: hasDouble ? MetricNumbers.finiteNumber(point.asDouble) : null,
-    count: isCounted ? MetricNumbers.integerDecimal(point.count) : null,
-    sum: MetricNumbers.finiteNumber(point.sum),
-    min: MetricNumbers.finiteNumber(point.min),
-    max: MetricNumbers.finiteNumber(point.max),
-    explicitBounds: MetricNumbers.finiteNumbers(point.explicitBounds),
-    bucketCounts: MetricNumbers.integerDecimals(point.bucketCounts),
+    valueInt: hasInt ? MetricNumbersAdapter.integerDecimal(point.asInt, { signed: true }) : null,
+    valueDouble: hasDouble ? MetricNumbersAdapter.finiteNumber(point.asDouble) : null,
+    count: isCounted ? MetricNumbersAdapter.integerDecimal(point.count) : null,
+    sum: MetricNumbersAdapter.finiteNumber(point.sum),
+    min: MetricNumbersAdapter.finiteNumber(point.min),
+    max: MetricNumbersAdapter.finiteNumber(point.max),
+    explicitBounds: MetricNumbersAdapter.finiteNumbers(point.explicitBounds),
+    bucketCounts: MetricNumbersAdapter.integerDecimals(point.bucketCounts),
     exponentialScale: isExponential ? Number(point.scale ?? 0) : null,
     exponentialZeroThreshold: isExponential
-      ? MetricNumbers.finiteNumber(point.zeroThreshold ?? 0)
+      ? MetricNumbersAdapter.finiteNumber(point.zeroThreshold ?? 0)
       : null,
-    zeroCount: isExponential ? MetricNumbers.integerDecimal(point.zeroCount) : null,
+    zeroCount: isExponential ? MetricNumbersAdapter.integerDecimal(point.zeroCount) : null,
     positiveOffset: isExponential ? Number(positive.offset ?? 0) : null,
-    positiveBucketCounts: MetricNumbers.integerDecimals(positive.bucketCounts),
+    positiveBucketCounts: MetricNumbersAdapter.integerDecimals(positive.bucketCounts),
     negativeOffset: isExponential ? Number(negative.offset ?? 0) : null,
-    negativeBucketCounts: MetricNumbers.integerDecimals(negative.bucketCounts),
+    negativeBucketCounts: MetricNumbersAdapter.integerDecimals(negative.bucketCounts),
     quantileValues: kind === "summary" ? canonicalQuantiles(point.quantileValues) : [],
   };
 }
@@ -140,4 +142,13 @@ function canonicalValueSection({
   };
 }
 
-export { canonicalPointValues, canonicalValueSection };
+export class MetricValuesAdapter {
+  private constructor() {}
+
+  static create(): MetricValuesAdapter {
+    return new MetricValuesAdapter();
+  }
+
+  static canonicalPointValues = canonicalPointValues;
+  static canonicalValueSection = canonicalValueSection;
+}

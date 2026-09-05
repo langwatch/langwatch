@@ -19,8 +19,16 @@ export type StoredObjectStorageDriverFactory = () => StoredObjectStorageDriver |
 /**
  * Provider-neutral scheme dispatch owned by Stored Objects.
  */
-export class StoredObjectStorageRegistry extends StoredObjectStoragePort {
-  constructor(input: {
+export class StoredObjectStorageRegistryAdapter extends StoredObjectStoragePort {
+  static create(input: {
+    s3: StoredObjectStorageDriver;
+    file: StoredObjectStorageDriver;
+    "azure-blob"?: StoredObjectStorageDriver | StoredObjectStorageDriverFactory;
+  }): StoredObjectStorageRegistryAdapter {
+    return new StoredObjectStorageRegistryAdapter(input);
+  }
+
+  private constructor(input: {
     s3: StoredObjectStorageDriver;
     file: StoredObjectStorageDriver;
     "azure-blob"?: StoredObjectStorageDriver | StoredObjectStorageDriverFactory;

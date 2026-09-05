@@ -39,7 +39,7 @@ import {
   MissingChunkError,
   StagedUploadNotFoundError,
   UploadTooLargeError,
-} from "../services/dataset-errors.service";
+} from "@langwatch/dataset-contract";
 import { localStagingUploadPath, stagingUploadKey } from "../services/presigned-upload.service";
 
 /**

@@ -33,7 +33,7 @@ import {
   UploadNotPendingError,
   UploadTooLargeError,
   UploadValidationError,
-} from "../services/dataset-errors.service";
+} from "@langwatch/dataset-contract";
 import {
   exceedsUploadCap,
   stagingUploadKey,

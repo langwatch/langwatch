@@ -19,15 +19,15 @@ export {
   type FilesProjectPermissionCheck,
   type FilesRateLimiter,
 } from "./transport/api-rest/stored-object.api";
-export { StoredObjectOwnerLookupRuntime } from "./adapters/stored-object-owner-lookup-runtime.adapter";
+export { StoredObjectOwnerLookupRuntimeAdapter } from "./adapters/stored-object-owner-lookup-runtime.adapter";
 export {
-  StoredObjectDestinationPolicy,
+  StoredObjectDestinationPolicyAdapter,
   StoredObjectAzureDestinationPort,
   StoredObjectProjectS3ConfigPort,
   type StoredObjectStorageSelection,
 } from "./adapters/stored-object-destination-policy.adapter";
 export {
-  StoredObjectStorageRegistry,
+  StoredObjectStorageRegistryAdapter,
   type StoredObjectStorageDriver,
   type StoredObjectStorageDriverFactory,
 } from "./adapters/stored-object-storage-registry.adapter";
@@ -35,23 +35,20 @@ export { AzureBlobStoredObjectDriverAdapter } from "./adapters/azure-blob.stored
 export {
   ALLOW_INSECURE_TOKEN_ENDPOINT_ENV,
   AzureBackendMisconfiguredError,
-  assertTokenModeTransportSafety,
-  resolveAzureCredentials,
   type AzureBlobCredentialsConfig,
   type AzureCredentials,
   type AzureInjectedIdentity,
   type AzureTokenAuthMode,
 } from "./adapters/azure-blob-credentials.adapter";
+export { AzureBlobCredentialsAdapter } from "./adapters/azure-blob-credentials.adapter";
 export {
   AzureTokenExchangeError,
-  getAzureBlobToken,
-  invalidateAzureBlobToken,
-  resetAzureTokenCacheForTests,
   type TokenModeCredentials,
 } from "./adapters/azure-blob-token-provider.adapter";
+export { AzureBlobTokenProviderAdapter } from "./adapters/azure-blob-token-provider.adapter";
 export {
   StoredObjectProjectDestinationResolverPort,
-  StoredObjectStorageRuntime,
+  StoredObjectStorageRuntimeAdapter,
   type StoredObjectStorageProject,
   type StoredObjectStorageRuntimeOptions,
 } from "./adapters/stored-object-storage-runtime.adapter";

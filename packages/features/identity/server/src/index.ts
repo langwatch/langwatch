@@ -124,7 +124,7 @@ export type {
 export {
   IdentityJitDisabledError,
   IdentityLinkProposedError,
-} from "./services/signin-callback-errors.service";
+} from "@langwatch/identity-contract";
 export {
   type CallbackAssertion,
   type CallbackAuditRecord,

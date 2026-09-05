@@ -15,7 +15,7 @@ import {
   NlpFetchAdapter,
   type NlpFetchTimeouts,
 } from "./nlp-fetch.adapter";
-import { SerializedAgentAdapter } from "./serialized-agent.adapter";
+import { SerializedAgentPort } from "../ports/serialized-agent.port";
 
 /**
  * How long to wait on the NLP service for one turn.
@@ -30,7 +30,7 @@ function fetchTimeoutMs(timeouts: NlpFetchTimeouts): number {
  * Serialized workflow agent adapter that uses pre-fetched workflow DSL.
  * Sends execute_flow events to the NLP service. No database access required.
  */
-export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
+export class SerializedWorkflowAgentAdapter extends SerializedAgentPort {
   static create(options: {
     config: WorkflowAgentData;
     nlpServiceUrl: string;

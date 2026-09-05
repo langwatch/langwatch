@@ -25,8 +25,8 @@ export interface BackfillAccountRow {
  * `Identifier` projection it proves itself against. Reads only; the one
  * write the pass owns besides its facts is on IdentityUsersRepository.
  */
-export interface IdentityBackfillRepository {
-  tryFindUser(args: { userId: string }): Promise<BackfillUserRow | null>;
-  findAccountRows(args: { userId: string }): Promise<BackfillAccountRow[]>;
-  findIdentifierRows(args: { userId: string }): Promise<BackfillIdentifierRow[]>;
+export abstract class IdentityBackfillRepository {
+  abstract tryFindUser(args: { userId: string }): Promise<BackfillUserRow | null>;
+  abstract findAccountRows(args: { userId: string }): Promise<BackfillAccountRow[]>;
+  abstract findIdentifierRows(args: { userId: string }): Promise<BackfillIdentifierRow[]>;
 }

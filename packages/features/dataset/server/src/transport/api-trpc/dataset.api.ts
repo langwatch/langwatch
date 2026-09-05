@@ -54,7 +54,7 @@ import type { DatasetApp } from "#app/dataset.app";
 import {
   DatasetNameTakenError,
   DatasetStaleColumnsError,
-} from "../../services/dataset-errors.service";
+} from "@langwatch/dataset-contract";
 
 /**
  * The host supplies authentication; authorization arrives as `policy`.

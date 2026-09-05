@@ -2,7 +2,7 @@ import type { ProcessStore } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import { ManagerExplorerService } from "../manager-explorer.service";
 import { NullProcessAuditSink } from "../../ports/process-audit-sink.port";
-import { NullProcessOpsRepository } from "../../adapters/null.process-ops.adapter";
+import { NullProcessOpsAdapter } from "../../adapters/null.process-ops.adapter";
 import type { ProcessNameCounts } from "../../repositories/process-ops.repository";
 import {
   OpsEventingIntrospectionPort,
@@ -36,7 +36,7 @@ function counts(
 }
 
 function serviceWithCounts(rows: ProcessNameCounts[], registryNames: string[] = []) {
-  const fleet = new NullProcessOpsRepository();
+  const fleet = new NullProcessOpsAdapter();
   fleet.countByProcessName = async () => rows;
 
   const registry: OpsProcessManagerMetadata[] = registryNames.map((processName) => ({

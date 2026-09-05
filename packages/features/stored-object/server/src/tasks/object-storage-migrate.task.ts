@@ -5,10 +5,11 @@ import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 import { AzureBlobStoredObjectDriverAdapter } from "#adapters/azure-blob.stored-object-driver.adapter";
 import {
-  assertTokenModeTransportSafety,
   type AzureCredentials,
   type AzureInjectedIdentity,
 } from "#adapters/azure-blob-credentials.adapter";
+import { AzureBlobCredentialsAdapter } from "#adapters/azure-blob-credentials.adapter";
+const { assertTokenModeTransportSafety } = AzureBlobCredentialsAdapter;
 import type { StoredObjectStorageDriver } from "#adapters/stored-object-storage-registry.adapter";
 import { z } from "zod";
 import {

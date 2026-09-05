@@ -23,15 +23,15 @@ import {
   MAX_UINT32,
   MAX_UINT64,
   MIN_INT32,
-  MetricNumbers,
+  MetricNumbersAdapter,
 } from "../metric-numbers.adapter";
 
 const uint64 = (value: unknown) =>
-  MetricNumbers.checkedInteger({ value, label: "count", min: 0n, max: MAX_UINT64 });
+  MetricNumbersAdapter.checkedInteger({ value, label: "count", min: 0n, max: MAX_UINT64 });
 const int32 = (value: unknown) =>
-  MetricNumbers.checkedInteger({ value, label: "scale", min: MIN_INT32, max: MAX_INT32 });
+  MetricNumbersAdapter.checkedInteger({ value, label: "scale", min: MIN_INT32, max: MAX_INT32 });
 
-describe("MetricNumbers.checkedInteger", () => {
+describe("MetricNumbersAdapter.checkedInteger", () => {
   describe("given a value inside the declared range", () => {
     it("answers it as an exact bigint, whether it arrived as a number or a string", () => {
       expect(uint64(42)).toBe(42n);
@@ -66,7 +66,7 @@ describe("MetricNumbers.checkedInteger", () => {
 
     it("names the field, so the refusal says WHICH number was wrong", () => {
       expect(() =>
-        MetricNumbers.checkedInteger({
+        MetricNumbersAdapter.checkedInteger({
           value: "-1",
           label: "bucketCount",
           min: 0n,
@@ -91,57 +91,63 @@ describe("MetricNumbers.checkedInteger", () => {
   });
 });
 
-describe("MetricNumbers.finiteNumber", () => {
+describe("MetricNumbersAdapter.finiteNumber", () => {
   it("reads a number, and a number written as text", () => {
-    expect(MetricNumbers.finiteNumber(1.25)).toBe(1.25);
-    expect(MetricNumbers.finiteNumber("1.25")).toBe(1.25);
+    expect(MetricNumbersAdapter.finiteNumber(1.25)).toBe(1.25);
+    expect(MetricNumbersAdapter.finiteNumber("1.25")).toBe(1.25);
   });
 
   it("answers null rather than propagating a non-finite value", () => {
     // NaN and Infinity survive arithmetic silently and land in a chart as a
     // gap nobody can account for.
-    expect(MetricNumbers.finiteNumber(Number.NaN)).toBeNull();
-    expect(MetricNumbers.finiteNumber(Number.POSITIVE_INFINITY)).toBeNull();
-    expect(MetricNumbers.finiteNumber("not a number")).toBeNull();
-    expect(MetricNumbers.finiteNumber("")).toBeNull();
-    expect(MetricNumbers.finiteNumber(undefined)).toBeNull();
+    expect(MetricNumbersAdapter.finiteNumber(Number.NaN)).toBeNull();
+    expect(MetricNumbersAdapter.finiteNumber(Number.POSITIVE_INFINITY)).toBeNull();
+    expect(MetricNumbersAdapter.finiteNumber("not a number")).toBeNull();
+    expect(MetricNumbersAdapter.finiteNumber("")).toBeNull();
+    expect(MetricNumbersAdapter.finiteNumber(undefined)).toBeNull();
   });
 
   it("keeps zero, which is a measurement and not an absent one", () => {
-    expect(MetricNumbers.finiteNumber(0)).toBe(0);
+    expect(MetricNumbersAdapter.finiteNumber(0)).toBe(0);
   });
 });
 
-describe("MetricNumbers.checkedDouble", () => {
+describe("MetricNumbersAdapter.checkedDouble", () => {
   it("throws where the optional form would answer null", () => {
-    expect(MetricNumbers.checkedOptionalDouble({ value: undefined, label: "sum" })).toBeNull();
-    expect(() => MetricNumbers.checkedDouble({ value: undefined, label: "sum" })).toThrow(/sum/);
+    expect(
+      MetricNumbersAdapter.checkedOptionalDouble({ value: undefined, label: "sum" }),
+    ).toBeNull();
+    expect(() => MetricNumbersAdapter.checkedDouble({ value: undefined, label: "sum" })).toThrow(
+      /sum/,
+    );
   });
 });
 
-describe("MetricNumbers.timestampMs", () => {
+describe("MetricNumbersAdapter.timestampMs", () => {
   it("turns OTLP nanoseconds into milliseconds", () => {
-    expect(MetricNumbers.timestampMs("1787000000000000000")).toBe(1_787_000_000_000);
+    expect(MetricNumbersAdapter.timestampMs("1787000000000000000")).toBe(1_787_000_000_000);
   });
 
   it("refuses a stamp a Date cannot hold, rather than answering an invalid one", () => {
-    expect(() => MetricNumbers.timestampMs("99999999999999999999999")).toThrow(
+    expect(() => MetricNumbersAdapter.timestampMs("99999999999999999999999")).toThrow(
       /outside the supported Date range/,
     );
   });
 
   it("refuses a negative stamp", () => {
-    expect(() => MetricNumbers.timestampMs("-1000000")).toThrow(/outside the supported Date range/);
+    expect(() => MetricNumbersAdapter.timestampMs("-1000000")).toThrow(
+      /outside the supported Date range/,
+    );
   });
 });
 
-describe("MetricNumbers.finiteNumbers", () => {
+describe("MetricNumbersAdapter.finiteNumbers", () => {
   it("drops the unreadable entries rather than the whole list", () => {
-    expect(MetricNumbers.finiteNumbers([1, "2", Number.NaN, "x", 3])).toEqual([1, 2, 3]);
+    expect(MetricNumbersAdapter.finiteNumbers([1, "2", Number.NaN, "x", 3])).toEqual([1, 2, 3]);
   });
 
   it("answers empty for something that is not a list", () => {
-    expect(MetricNumbers.finiteNumbers("nope")).toEqual([]);
+    expect(MetricNumbersAdapter.finiteNumbers("nope")).toEqual([]);
   });
 });
 

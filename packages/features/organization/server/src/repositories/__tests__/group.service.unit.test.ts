@@ -4,6 +4,7 @@ import {
   type AuthzService,
 } from "@langwatch/authz-contract";
 import {
+  GroupRoleNotAssignableError,
   GroupRoleScopeError,
   UserNotInOrganizationError,
   type OrganizationGroup,
@@ -181,6 +182,97 @@ describe("OrganizationService groups", () => {
     ).rejects.toBeInstanceOf(GroupRoleScopeError);
 
     expect(groupRepository.create).not.toHaveBeenCalled();
+  });
+
+  describe("when a member's groups are read on an organization with no Enterprise plan", () => {
+    /**
+     * A group binding grants permissions on every plan — the resolver applies no plan
+     * check — so the member drawer reads them on every plan too. The service is composed
+     * with no plan provider at all, which is what makes that structural rather than a
+     * branch someone can flip.
+     */
+    /** @scenario "Group access is listed on every plan" */
+    it("lists the member's groups with the access each one grants", async () => {
+      const { service, authz, groupRepository } = buildService();
+      groupRepository.listForMember.mockResolvedValue([{ ...group, memberCount: 1 }]);
+      vi.mocked(authz.listOrganizationBindings).mockResolvedValue([
+        {
+          id: "binding_1",
+          organizationId: "org_1",
+          groupId: "group_1",
+          userId: null,
+          apiKeyId: null,
+          role: "VIEWER",
+          customRoleId: null,
+          scopeType: "TEAM",
+          scopeId: "team_1",
+          createdAt: new Date(1),
+          user: null,
+          group: null,
+          apiKey: null,
+          customRole: null,
+        },
+      ]);
+
+      await expect(
+        service.listGroupsForMember({ organizationId: "org_1", userId: "user_1" }),
+      ).resolves.toMatchObject([
+        { id: "group_1", name: "Reviewers", bindings: [{ role: "VIEWER" }] },
+      ]);
+    });
+  });
+
+  describe("when a binding names a role the organization cannot grant", () => {
+    /**
+     * `listUserCreatedRoles` answers only the roles this organization created, so a
+     * foreign role and a role reserved for a service key are the same absence — and both
+     * have to be refused before anything is attached.
+     */
+    /** @scenario "A custom role from another organization cannot be bound to a group" */
+    it("refuses a custom role belonging to another organization and attaches nothing", async () => {
+      const { service, authz, grants } = buildService();
+
+      await expect(
+        service.addGroupBinding({
+          organizationId: "org_1",
+          groupId: "group_1",
+          binding: {
+            role: "CUSTOM",
+            customRoleId: "role_from_another_org",
+            scopeType: "TEAM",
+            scopeId: "team_1",
+          },
+          actor: { type: "user", id: "user_1" },
+        }),
+      ).rejects.toBeInstanceOf(GroupRoleNotAssignableError);
+
+      expect(authz.listUserCreatedRoles).toHaveBeenCalledWith({ organizationId: "org_1" });
+      expect(grants.attachBindings).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "An API key's system role cannot be bound to a group" */
+    it("refuses a role reserved for a service API key and attaches nothing", async () => {
+      const { service, authz, grants } = buildService();
+      // The key's private role exists in this organization; it is not user-created, so
+      // the assignable list never carries it.
+      vi.mocked(authz.listUserCreatedRoles).mockResolvedValue([]);
+
+      await expect(
+        service.addGroupBinding({
+          organizationId: "org_1",
+          groupId: "group_1",
+          binding: {
+            role: "CUSTOM",
+            customRoleId: "api_key_system_role",
+            scopeType: "TEAM",
+            scopeId: "team_1",
+          },
+          actor: { type: "user", id: "user_1" },
+        }),
+      ).rejects.toBeInstanceOf(GroupRoleNotAssignableError);
+
+      expect(grants.attachBindings).not.toHaveBeenCalled();
+    });
   });
 
   it("maps an AuthZ duplicate to the stable group conflict", async () => {

@@ -1,6 +1,6 @@
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import type { Logger } from "@langwatch/observability";
-import type { StoredObjectStorageRuntime } from "@langwatch/stored-object-server";
+import type { StoredObjectStorageRuntimeAdapter } from "@langwatch/stored-object-server";
 import {
   ClickHouseTracePayloadReaderAdapter,
   TraceSpanSpoolAdapter,
@@ -42,7 +42,7 @@ import {
  * the other's dependencies.
  */
 export function createWorkerTraceSpool(options: {
-  runtime: StoredObjectStorageRuntime;
+  runtime: StoredObjectStorageRuntimeAdapter;
   aws: AwsClientProcessRuntime;
   azureRetentionConfirmed: boolean;
   logger?: Logger;

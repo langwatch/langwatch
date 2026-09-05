@@ -58,7 +58,7 @@ export class ReplayService {
      * Resolves per-tenant retention so replay-rebuilt rows honour the tenant's
      * policy instead of the platform default. Optional — when absent, stores
      * fall back to PLATFORM_DEFAULT_RETENTION_DAYS, matching pre-existing
-     * behaviour (and the NullReplayRepository test path).
+     * behaviour (and the NullReplayAdapter test path).
      */
     retentionPolicyResolver?: RetentionPolicyResolver;
   }) {

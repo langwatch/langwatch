@@ -6,7 +6,7 @@
 
 /** A Json column's value, mirroring the generated client's own shape. */
 export type BugReportJsonObject = { [Key in string]?: BugReportJsonValue };
-export interface BugReportJsonArray extends Array<BugReportJsonValue> {}
+export type BugReportJsonArray = BugReportJsonValue[];
 export type BugReportJsonValue =
   | string
   | number

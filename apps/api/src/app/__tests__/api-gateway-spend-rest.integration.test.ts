@@ -246,6 +246,7 @@ describe("given the gateway spend reconciliation REST surface", () => {
   });
 
   describe("when the credential is the wrong class for this surface", () => {
+    /** @scenario "A project key on an organization endpoint is told exactly that" */
     it("names both the class required and the class presented", async () => {
       const { app } = buildApp();
 
@@ -266,6 +267,7 @@ describe("given the gateway spend reconciliation REST surface", () => {
       });
     });
 
+    /** @scenario "A credential that resolves to nothing is not blamed on its class" */
     it("says only that a token matching no key was not accepted", async () => {
       const { app } = buildApp();
 

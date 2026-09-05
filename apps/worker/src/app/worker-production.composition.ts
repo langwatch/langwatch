@@ -81,7 +81,7 @@ import {
 } from "@langwatch/project-server";
 import { ClickHouseSuiteRunProcessingAdapter } from "@langwatch/suite-server";
 import {
-  TopicServerInstaller,
+  TopicServerInstallerAdapter,
   type TopicClusteringDatabase,
   type TopicServerInstallerDependencies,
 } from "@langwatch/topic-server";
@@ -152,7 +152,7 @@ import { ExperimentEventingAdapter } from "@langwatch/experiment-server";
 import {
   ClickHouseTraceExistenceRepository,
   ClickHouseTraceStoredSpanReaderAdapter,
-  TraceProcessingServerInstaller,
+  TraceProcessingServerInstallerAdapter,
 } from "@langwatch/trace-server";
 import { createWorkerAnalytics } from "./worker-analytics.composition";
 import {
@@ -1118,7 +1118,7 @@ export class WorkerProductionComposition {
       consumers: options.eventing.consumers,
     });
     const trace = TraceWorkerFeatureInstaller.create({
-      installer: TraceProcessingServerInstaller.create({
+      installer: TraceProcessingServerInstallerAdapter.create({
         pipeline: WorkerTraceProcessingPipeline.create({
           config: options.config,
           services: traceServices,
@@ -1202,7 +1202,7 @@ export class WorkerProductionComposition {
         ? { absence: WorkerProductionComposition.topicAbsence(options)! }
         : {}),
     });
-    const topicServer = TopicServerInstaller.create({
+    const topicServer = TopicServerInstallerAdapter.create({
       database: topicRuntime.database,
       processStore: eventing.processStore,
       redis: topicRuntime.redis,

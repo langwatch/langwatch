@@ -131,6 +131,7 @@ async function readSettlementFromFold(input: {
         if (error instanceof LangyConversationNotFoundError) {
           return null;
         }
+
         throw error;
       });
     if (!page) {
@@ -141,6 +142,7 @@ async function readSettlementFromFold(input: {
     if (settlement) {
       return settlement;
     }
+
     if (!page.truncated) {
       return null;
     }
@@ -249,6 +251,7 @@ export async function awaitTurnSettlement(input: {
       if (outcome === "abort") {
         return null;
       }
+
       if (outcome === "terminal") {
         terminalSeen = null;
         pollMs = confirmPollMs;

@@ -30,7 +30,7 @@ import {
   DatasetNotReadyError,
   DatasetTooLargeToExportError,
   DuplicateRecordIdError,
-} from "../../services/dataset-errors.service";
+} from "@langwatch/dataset-contract";
 import {
   TRPCError,
   type AnyTRPCRootTypes,

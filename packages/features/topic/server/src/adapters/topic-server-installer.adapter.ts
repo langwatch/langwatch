@@ -50,9 +50,9 @@ export interface TopicServerInstallerDependencies {
 }
 
 /** Builds Topic's read service, pipeline, runner, and boot seeds as one graph. */
-export class TopicServerInstaller {
-  static create(options: TopicServerInstallerDependencies): TopicServerInstaller {
-    return new TopicServerInstaller(options);
+export class TopicServerInstallerAdapter {
+  static create(options: TopicServerInstallerDependencies): TopicServerInstallerAdapter {
+    return new TopicServerInstallerAdapter(options);
   }
 
   readonly service: TopicService;

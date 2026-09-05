@@ -5,7 +5,11 @@ import type {
   RawEventRow,
 } from "../repositories/event-explorer.repository";
 
-export class NullEventExplorerRepository implements EventExplorerRepository {
+export class NullEventExplorerAdapter implements EventExplorerRepository {
+  static create(): NullEventExplorerAdapter {
+    return new NullEventExplorerAdapter();
+  }
+
   async findAggregates(): Promise<AggregateDiscoveryRow[]> {
     return [];
   }

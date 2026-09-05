@@ -8,13 +8,9 @@ const clickHouseMocks = vi.hoisted(() => ({
 vi.mock("@clickhouse/client", () => ({
   createClient: clickHouseMocks.createClient,
 }));
-import {
-  buildExplainQuery,
-  OpsClickHouseRuntime,
-  parseOpsConnection,
-  redactQueryForAudit,
-  stripCommentsAndStrings,
-} from "../ops-clickhouse-explain.adapter";
+import { OpsClickHouseRuntime } from "../ops-clickhouse-explain.adapter";
+import { OpsClickhouseExplainAdapter } from "../ops-clickhouse-explain.adapter";
+const { buildExplainQuery, parseOpsConnection, redactQueryForAudit, stripCommentsAndStrings } = OpsClickhouseExplainAdapter;
 
 const TENANT_OK = "SELECT count() FROM stored_spans WHERE TenantId = 'p_x'";
 

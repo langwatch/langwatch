@@ -17,7 +17,7 @@ import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "./member-role-constraints.service
 import {
   CustomRoleNotAssignableError,
   MemberSeatLimitReachedError,
-} from "./organization-membership-errors.service";
+} from "@langwatch/organization-contract";
 import {
   AlreadyOrganizationMemberError,
   DuplicateInviteError,

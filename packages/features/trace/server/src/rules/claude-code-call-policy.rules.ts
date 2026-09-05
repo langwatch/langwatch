@@ -1,6 +1,6 @@
 const CONVERSATIONAL_QUERY_SOURCES: Readonly<Record<string, true>> = {
-  "repl_main_thread": true,
-  "sdk": true,
+  repl_main_thread: true,
+  sdk: true,
 };
 
 export const isConversationalQuerySource = (querySource: string | null): boolean =>

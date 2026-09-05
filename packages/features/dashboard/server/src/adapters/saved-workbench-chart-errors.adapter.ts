@@ -91,7 +91,7 @@ export class SavedWorkbenchChartDefinitionInvalidError extends HandledError {
 }
 
 /** Keeps existing REST and tRPC handled-error response envelopes stable. */
-export function mapDashboardSavedWorkbenchChartError(error: unknown): never {
+function mapDashboardSavedWorkbenchChartError(error: unknown): never {
   if (error instanceof DashboardSavedWorkbenchChartNotFoundError) {
     throw new SavedWorkbenchChartNotFoundError();
   }
@@ -105,4 +105,14 @@ export function mapDashboardSavedWorkbenchChartError(error: unknown): never {
     throw new SavedWorkbenchChartDefinitionInvalidError(error.chartId);
   }
   throw error;
+}
+
+export class SavedWorkbenchChartErrorsAdapter {
+  private constructor() {}
+
+  static create(): SavedWorkbenchChartErrorsAdapter {
+    return new SavedWorkbenchChartErrorsAdapter();
+  }
+
+  static mapDashboardSavedWorkbenchChartError = mapDashboardSavedWorkbenchChartError;
 }

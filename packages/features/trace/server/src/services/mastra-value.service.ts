@@ -25,12 +25,18 @@ const messageSchema = z.looseObject({
  * that is missing or shaped unexpectedly yields nothing rather than a throw,
  * because a span with an unreadable field is still a span worth keeping.
  */
-export class MastraValues {
+export class MastraValuesService {
+  private constructor() {}
+
+  static create(): MastraValuesService {
+    return new MastraValuesService();
+  }
+
   /**
    * Maps a Mastra span type to a canonical langwatch.span.type.
    * Uses only valid SpanTypes values from the type system.
    */
-  static mastraSpanTypeToCanonical(mastraType: unknown, isOrphan: boolean): string {
+  mastraSpanTypeToCanonical(mastraType: unknown, isOrphan: boolean): string {
     if (isOrphan) {
       return "evaluation";
     }
@@ -76,7 +82,7 @@ export class MastraValues {
    * Works for both model_step output ({text, toolCalls}) and
    * agent_run output ({text, files}).
    */
-  static tryExtractTextFromOutput(output: unknown): string | null {
+  tryExtractTextFromOutput(output: unknown): string | null {
     const parsed = outputSchema.safeParse(output);
 
     return parsed.success && parsed.data.text ? parsed.data.text : null;
@@ -86,7 +92,7 @@ export class MastraValues {
    * Checks whether a model_step body has response_format set.
    * Mastra evals use response_format: {type: "json_schema", ...} for structured output.
    */
-  static hasResponseFormat(body: Record<string, unknown> | null): boolean {
+  hasResponseFormat(body: Record<string, unknown> | null): boolean {
     if (!body) {
       return false;
     }
@@ -100,7 +106,7 @@ export class MastraValues {
    * Extracts the body object from mastra.model_step.input.
    * Input format: {body: {model: string, messages: [...], ...}}
    */
-  static tryExtractBodyFromModelStepInput(input: unknown): Record<string, unknown> | null {
+  tryExtractBodyFromModelStepInput(input: unknown): Record<string, unknown> | null {
     const parsed = modelStepInputSchema.safeParse(input);
 
     return parsed.success ? parsed.data.body : null;
@@ -110,7 +116,7 @@ export class MastraValues {
    * Extracts model name from mastra.metadata.modelMetadata attribute.
    * The attribute is an object: {modelId, modelVersion, modelProvider}
    */
-  static tryExtractModelFromMetadata(attrs: { get: (key: string) => unknown }): string | null {
+  tryExtractModelFromMetadata(attrs: { get: (key: string) => unknown }): string | null {
     const metadata = attrs.get("mastra.metadata.modelMetadata");
     const parsed = modelMetadataSchema.safeParse(metadata);
 
@@ -121,7 +127,7 @@ export class MastraValues {
    * Extracts output from an orphan eval model_step.
    * Prefers structured object output, falls back to text.
    */
-  static extractEvalOutput(output: unknown): unknown {
+  extractEvalOutput(output: unknown): unknown {
     const parsed = outputSchema.safeParse(output);
     if (!parsed.success) {
       return null;
@@ -144,7 +150,7 @@ export class MastraValues {
    * Normalizes message content to a string.
    * Handles string, array of content parts, and object with text/content fields.
    */
-  static tryNormalizeContentToString(content: unknown): string | null {
+  tryNormalizeContentToString(content: unknown): string | null {
     if (typeof content === "string" && content.length > 0) {
       return content;
     }
@@ -192,7 +198,7 @@ export class MastraValues {
   /**
    * Extracts system prompt content from the model_step body messages.
    */
-  static tryExtractSystemPromptFromBody(body: Record<string, unknown> | null): string | null {
+  tryExtractSystemPromptFromBody(body: Record<string, unknown> | null): string | null {
     if (!body || !Array.isArray(body.messages)) {
       return null;
     }
@@ -203,7 +209,7 @@ export class MastraValues {
         continue;
       }
 
-      const text = MastraValues.tryNormalizeContentToString(message.data.content);
+      const text = this.tryNormalizeContentToString(message.data.content);
       if (text) {
         return text;
       }
@@ -215,7 +221,7 @@ export class MastraValues {
   /**
    * Derives a contextual display name for a Mastra span.
    */
-  static tryDeriveDisplayName({
+  tryDeriveDisplayName({
     mastraType,
     modelName,
     isOrphan,
@@ -228,7 +234,7 @@ export class MastraValues {
   }): string | null {
     if (isOrphan) {
       // Try to extract a short description from the system prompt
-      const systemPrompt = MastraValues.tryExtractSystemPromptFromBody(modelStepBody);
+      const systemPrompt = this.tryExtractSystemPromptFromBody(modelStepBody);
       if (systemPrompt) {
         // Take first ~60 chars of the system prompt as description
         const desc = systemPrompt.length > 60 ? systemPrompt.slice(0, 57) + "..." : systemPrompt;

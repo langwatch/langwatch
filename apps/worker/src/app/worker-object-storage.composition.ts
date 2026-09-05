@@ -7,7 +7,7 @@ import {
 } from "@langwatch/stored-object-server";
 import type {
   StoredObjectStorageDriver,
-  StoredObjectStorageRuntime,
+  StoredObjectStorageRuntimeAdapter,
 } from "@langwatch/stored-object-server";
 import {
   WorkerAzureStorageFactoryPort,
@@ -25,7 +25,7 @@ import type {
 export type WorkerProjectStorageDatabase = Pick<PrismaClient, "project">;
 
 export type WorkerObjectStorage = {
-  runtime: StoredObjectStorageRuntime;
+  runtime: StoredObjectStorageRuntimeAdapter;
   aws: AwsClientProcessRuntime;
   /**
    * The BYOC lookup, exposed because two consumers need the tenant's ENDPOINT and CREDENTIALS and

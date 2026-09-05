@@ -27,7 +27,7 @@ import { NullBlobStoreRepository } from "../repositories/blob-store.repository";
 import { PrismaAdminBackofficeRepository } from "../repositories/prisma/prisma.admin-backoffice.repository";
 import { AdminBackofficeService } from "../services/admin-backoffice.service";
 import type { SchedulerOpsRepository } from "../repositories/scheduler-ops.repository";
-import type { SchedulerWakeService } from "../services/scheduler-wake.service";
+import type { SchedulerWakePort } from "../ports/scheduler-wake.port";
 import { SchedulerOpsService } from "../services/scheduler-ops.service";
 import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository";
 import { QueueRedisRepository } from "../repositories/redis/queue.repository";
@@ -51,7 +51,7 @@ export interface PostgresOpsAdapterOptions extends AdminAccessServiceOptions {
   auth: AuthService;
   scheduler: {
     repository: SchedulerOpsRepository;
-    wake: SchedulerWakeService;
+    wake: SchedulerWakePort;
     projects: ProjectService;
   };
 }

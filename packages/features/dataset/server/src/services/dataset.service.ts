@@ -49,7 +49,7 @@ import {
   DatasetNotFoundError,
   DatasetNotReadyError,
   InvalidColumnError,
-} from "./dataset-errors.service";
+} from "@langwatch/dataset-contract";
 import { stripNullBytes } from "../rules/dataset-sanitize.rules";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
 import type { DatasetRepository, DatasetUpdateInput } from "../repositories/dataset.repository";

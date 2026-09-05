@@ -35,13 +35,6 @@ const SYSTEM_SCHEMA_RE = /\bsystem\s*\./i;
 /// ClickHouseSettings is picky: `readonly` / `max_result_bytes` /
 /// `max_memory_usage` are typed `UInt64 = string`, `max_execution_time`
 /// is `Seconds = number`.
-export const CLICKHOUSE_GUARDRAILS = {
-  readonly: "1",
-  max_execution_time: 10,
-  max_result_bytes: "10000000",
-  max_memory_usage: "1073741824",
-} as const;
-
 export const explainBodySchema = z.object({
   query: z.string().trim().min(1, "query is required").max(50_000),
   type: z.enum(ALLOWED_EXPLAIN_TYPES).optional(),
@@ -60,7 +53,7 @@ export interface ParseResult {
 /// comment, or in normal SQL — never two at once — so we walk char-by-char
 /// with one state variable. See the full rationale in the previous
 /// commits' reviewer threads (string-vs-comment bypass, nested comments).
-export function stripCommentsAndStrings(query: string): string {
+function stripCommentsAndStrings(query: string): string {
   let out = "";
   let i = 0;
   const n = query.length;
@@ -148,7 +141,7 @@ export function stripCommentsAndStrings(query: string): string {
   return out;
 }
 
-export function buildExplainQuery(query: string, type: ExplainType = "PLAN"): ParseResult {
+function buildExplainQuery(query: string, type: ExplainType = "PLAN"): ParseResult {
   const trimmed = query.trim();
   if (!trimmed) return { ok: false, reason: "query is empty" };
   if (/^\s*EXPLAIN\b/i.test(trimmed)) {
@@ -191,7 +184,7 @@ export function buildExplainQuery(query: string, type: ExplainType = "PLAN"): Pa
   return { ok: true, wrapped: `${prefix} ${trimmed}`, type };
 }
 
-export function redactQueryForAudit(query: string): {
+function redactQueryForAudit(query: string): {
   shape: string;
   sha256: string;
 } {
@@ -216,7 +209,7 @@ export function redactQueryForAudit(query: string): {
  * and ClickHouse rejects with "Authentication failed". Decoding here
  * means the wire password matches what users.xml hashes.
  */
-export function parseOpsConnection(raw: string): {
+function parseOpsConnection(raw: string): {
   url: string;
   username: string;
   password: string;
@@ -279,4 +272,17 @@ export class OpsClickHouseRuntime {
     this.closeOperation = client === undefined ? Promise.resolve() : client.close();
     return this.closeOperation;
   }
+}
+
+export class OpsClickhouseExplainAdapter {
+  private constructor() {}
+
+  static create(): OpsClickhouseExplainAdapter {
+    return new OpsClickhouseExplainAdapter();
+  }
+
+  static stripCommentsAndStrings = stripCommentsAndStrings;
+  static buildExplainQuery = buildExplainQuery;
+  static redactQueryForAudit = redactQueryForAudit;
+  static parseOpsConnection = parseOpsConnection;
 }

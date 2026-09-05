@@ -47,6 +47,7 @@ export class IdentityEmailService extends IdentityEmailCapability {
       if (!(await this.isOnIdentity({ userId }))) {
         return null;
       }
+
       const heads = await this.heads.findHeads({ userId });
 
       return primaryEmailOf({ heads });
@@ -77,6 +78,7 @@ export class IdentityEmailService extends IdentityEmailCapability {
       if (!(await this.isOnIdentity({ userId }))) {
         return null;
       }
+
       const heads = await this.heads.findHeads({ userId });
 
       return matchableEmailsOf({ heads });

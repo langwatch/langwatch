@@ -6,6 +6,9 @@ import type { ScimSyncState } from "@langwatch/identity-contract";
  * port here is one — the guards run on the calling path AND on the queue's
  * staged re-run, and both legs have to reach the same head.
  */
-export interface ScimSyncReadRepository {
-  tryFindSync(args: { scimSyncId: string; organizationId: string }): Promise<ScimSyncState | null>;
+export abstract class ScimSyncReadRepository {
+  abstract tryFindSync(args: {
+    scimSyncId: string;
+    organizationId: string;
+  }): Promise<ScimSyncState | null>;
 }

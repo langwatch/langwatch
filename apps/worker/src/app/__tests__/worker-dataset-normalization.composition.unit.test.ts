@@ -2,7 +2,7 @@ import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/a
 import { AzureDatasetStorageAdapter, LocalDatasetStorageAdapter } from "@langwatch/dataset-server";
 import {
   StoredObjectProjectDestinationResolverPort,
-  StoredObjectStorageRuntime,
+  StoredObjectStorageRuntimeAdapter,
 } from "@langwatch/stored-object-server";
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
@@ -63,7 +63,7 @@ function storageFor({
   azure: WorkerStorageConfig["azure"];
 }): WorkerDatasetObjectStorage {
   const aws = AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() });
-  const runtime = StoredObjectStorageRuntime.create({
+  const runtime = StoredObjectStorageRuntimeAdapter.create({
     destination: new FixedDestination(destination),
     s3ForProject: () => unusedDriver,
     fileForProject: () => unusedDriver,

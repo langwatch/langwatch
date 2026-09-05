@@ -17,7 +17,7 @@ import { DatasetChunkService } from "../services/dataset-chunk.service";
 import {
   DatasetChunkCountMissingError,
   DatasetNotReadyError,
-} from "../services/dataset-errors.service";
+} from "@langwatch/dataset-contract";
 
 /** Object-backed Dataset content; all storage selection is injected at boot. */
 export class DatasetContentAdapter extends DatasetContentPort {

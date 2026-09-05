@@ -10,9 +10,9 @@ import type { SsoConnectionState } from "@langwatch/identity-contract";
  * FIFO, which serializes them against the fold. Either way a guard reads the
  * folded state first and refuses on what it says.
  */
-export interface SsoConnectionReadRepository {
+export abstract class SsoConnectionReadRepository {
   /** One connection's folded state, or null when it has no history yet. */
-  tryFindConnection(args: { connectionId: string }): Promise<SsoConnectionState | null>;
+  abstract tryFindConnection(args: { connectionId: string }): Promise<SsoConnectionState | null>;
 
   /**
    * The connection that already holds a domain as VERIFIED on an ACTIVE
@@ -21,7 +21,7 @@ export interface SsoConnectionReadRepository {
    * guard states the rule; where the rule reaches is a deployment fact and
    * belongs where the deployment is known.
    */
-  tryFindDomainOwner(args: {
+  abstract tryFindDomainOwner(args: {
     domain: string;
   }): Promise<{ connectionId: string; organizationId: string } | null>;
 }
@@ -36,8 +36,8 @@ export interface SsoConnectionReadRepository {
  * prove — a local method the instance still mounts. When D05 lands, the
  * bindings become this port's answer and every activation is already asking.
  */
-export interface SsoBreakGlassBindingRepository {
-  hasLiveBinding(args: { organizationId: string }): Promise<boolean>;
+export abstract class SsoBreakGlassBindingRepository {
+  abstract hasLiveBinding(args: { organizationId: string }): Promise<boolean>;
 }
 
 /**
@@ -51,8 +51,8 @@ export interface SsoBreakGlassBindingRepository {
  * platform operators too, so the guard asks the same question everywhere and
  * the deployment answers it.
  */
-export interface SsoPlatformOperatorRepository {
-  isPlatformOperator(args: { actorId: string }): Promise<boolean>;
+export abstract class SsoPlatformOperatorRepository {
+  abstract isPlatformOperator(args: { actorId: string }): Promise<boolean>;
 }
 
 /**
@@ -61,6 +61,6 @@ export interface SsoPlatformOperatorRepository {
  * projection D01 built — because that is where "how can this person get in"
  * is answered, and teardown must not invent a second answer.
  */
-export interface SsoConnectionStrandingRepository {
-  findStrandedUserIds(args: { connectionId: string }): Promise<string[]>;
+export abstract class SsoConnectionStrandingRepository {
+  abstract findStrandedUserIds(args: { connectionId: string }): Promise<string[]>;
 }

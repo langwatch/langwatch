@@ -10,11 +10,13 @@ import type {
  */
 
 /** The folded head of one request — the `JoinRequest` projection row. */
-export interface JoinRequestReadRepository {
-  tryFindRequest(args: { joinRequestId: string }): Promise<JoinRequestAggregateState | null>;
+export abstract class JoinRequestReadRepository {
+  abstract tryFindRequest(args: {
+    joinRequestId: string;
+  }): Promise<JoinRequestAggregateState | null>;
 
   /** The one-open-request-per-person-per-organization check. */
-  tryFindPendingRequest(args: {
+  abstract tryFindPendingRequest(args: {
     userId: string;
     organizationId: string;
   }): Promise<JoinRequestAggregateState | null>;
@@ -24,17 +26,20 @@ export interface JoinRequestReadRepository {
  * What the join-request SERVICE reads on top of the guards' two reads: the throttle's last
  * rejection, and the two waiting-list queries the request and inbox surfaces are served from.
  */
-export interface JoinRequestListReadRepository extends JoinRequestReadRepository {
+export abstract class JoinRequestListReadRepository extends JoinRequestReadRepository {
   /** When this person was last rejected by this organization, if ever. */
-  tryFindLastRejectionAt(args: { userId: string; organizationId: string }): Promise<Date | null>;
+  abstract tryFindLastRejectionAt(args: {
+    userId: string;
+    organizationId: string;
+  }): Promise<Date | null>;
 
   /** Everything waiting on one organization, newest ask first. */
-  findPendingForOrganization(args: {
+  abstract findPendingForOrganization(args: {
     organizationId: string;
   }): Promise<JoinRequestAggregateState[]>;
 
   /** Everything one person is waiting on. */
-  findPendingForUser(args: { userId: string }): Promise<JoinRequestAggregateState[]>;
+  abstract findPendingForUser(args: { userId: string }): Promise<JoinRequestAggregateState[]>;
 }
 
 /**
@@ -42,13 +47,15 @@ export interface JoinRequestListReadRepository extends JoinRequestReadRepository
  * holding a VERIFIED identifier on the domain — an unverified address is not evidence, and counting
  * one would let anybody make any organization look like theirs by typing an address at it.
  */
-export interface JoinCandidateRepository {
-  findCandidateOrganizations(args: { domain: string }): Promise<JoinCandidateOrganization[]>;
+export abstract class JoinCandidateRepository {
+  abstract findCandidateOrganizations(args: {
+    domain: string;
+  }): Promise<JoinCandidateOrganization[]>;
 
   /** One organization's own candidacy, for the "you named it directly" path.
    *  Null when it does not exist — which the boundary answers exactly as it
    *  answers an organization that exists and is closed. */
-  tryFindCandidateOrganization(args: {
+  abstract tryFindCandidateOrganization(args: {
     organizationId: string;
     domain: string;
   }): Promise<JoinCandidateOrganization | null>;

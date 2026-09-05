@@ -82,7 +82,7 @@ export type {
 export { MAX_INMEMORY_COLUMN_EDIT_BYTES } from "./services/dataset-chunk.service";
 export * from "./services/presigned-upload.service";
 export * from "./rules/dataset-sanitize.rules";
-export * from "./services/dataset-errors.service";
+export * from "@langwatch/dataset-contract";
 export {
   DATASET_GENERATE_FEATURE_KEY,
   createDatasetGenerateRestApp,

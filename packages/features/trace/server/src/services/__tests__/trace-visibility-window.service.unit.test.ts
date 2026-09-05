@@ -237,7 +237,9 @@ describe("given the visibility window service", () => {
   describe("when the plan has no visibility window", () => {
     it("returns null so nothing is redacted", async () => {
       const service = makeService({ free: false, visibilityDays: null });
-      await expect(service.tryGetVisibilityCutoffMs({ organizationId: "org-1" })).resolves.toBeNull();
+      await expect(
+        service.tryGetVisibilityCutoffMs({ organizationId: "org-1" }),
+      ).resolves.toBeNull();
     });
   });
 

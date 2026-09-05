@@ -19,10 +19,10 @@ import {
   resolveAzureCredentials,
   S3StoredObjectDriverAdapter,
   StoredObjectApp,
-  StoredObjectDestinationPolicy,
+  StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3ConfigPort,
   StoredObjectS3TargetPort,
-  StoredObjectStorageRegistry,
+  StoredObjectStorageRegistryAdapter,
   StoredObjectsClickHousePort,
   ClickHouseStoredObjectsRepository,
   StoredObjectsService,
@@ -158,7 +158,7 @@ function composeStoredObjects(
 
   const aws = AwsClientProcessRuntime.create({ outboundProxy: new ApiNoOutboundProxy() });
   const targets = ApiStoredObjectS3Targets.create(options.prisma, storage);
-  const destinations = StoredObjectDestinationPolicy.create({
+  const destinations = StoredObjectDestinationPolicyAdapter.create({
     selection: {
       // The `azure` selection now has a driver behind it, so a write to an
       // Azure destination reaches Azure Blob rather than refusing at the byte
@@ -177,7 +177,7 @@ function composeStoredObjects(
       ApiStoredObjectsClickHouse.create(options.resolveClickHouseClient),
     ),
     registry: (projectId: string) =>
-      new StoredObjectStorageRegistry({
+      StoredObjectStorageRegistryAdapter.create({
         s3: S3StoredObjectDriverAdapter.create({
           projectId,
           targets,

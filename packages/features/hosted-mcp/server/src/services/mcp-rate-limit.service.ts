@@ -28,6 +28,7 @@ export class McpRateLimitService {
     if (!entry || Date.now() - entry.windowStart > this.windowMs) {
       return false;
     }
+
     return entry.count >= this.maxRequests;
   }
 

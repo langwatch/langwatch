@@ -37,7 +37,8 @@ import {
   MetricSeriesCatalogAppendStore,
   MetricTimeRollupAppendStore,
 } from "../stores/metric-projection/metric-projection.store";
-import { sha256 } from "./metric-serialization.adapter";
+import { MetricSerializationAdapter } from "./metric-serialization.adapter";
+const { sha256 } = MetricSerializationAdapter;
 
 export interface MetricProcessingPipelineDeps {
   metricDataPointAppendStore: AppendStore<CanonicalMetricDataPoint>;

@@ -18,12 +18,14 @@ export interface IdentityVerificationRecord {
   expiresAtMs: number;
 }
 
-export interface IdentityVerificationRepository {
+export abstract class IdentityVerificationRepository {
   /** Minting replaces any prior record for the same identifier — a newer
    *  mint invalidates every older link. */
-  replaceForIdentifier(record: IdentityVerificationRecord): Promise<void>;
-  tryFindByIdentifierId(args: { identifierId: string }): Promise<IdentityVerificationRecord | null>;
+  abstract replaceForIdentifier(record: IdentityVerificationRecord): Promise<void>;
+  abstract tryFindByIdentifierId(args: {
+    identifierId: string;
+  }): Promise<IdentityVerificationRecord | null>;
   /** Deletes the record if and only if it still names this verification;
    *  false means already consumed (or superseded) — single-use enforcement. */
-  consume(args: { identifierId: string; verificationId: string }): Promise<boolean>;
+  abstract consume(args: { identifierId: string; verificationId: string }): Promise<boolean>;
 }

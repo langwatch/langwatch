@@ -1,5 +1,5 @@
 /**
- * FROZEN TWIN of `platform/app/src/server/app-layer/traces/lean-for-projection.ts` (ADR-022) — the application keeps its own copy while both graphs ingest; edit neither without editing the other. The lean is projection-payload POLICY (which attribute keys earn the wide preview budget, how big, how an over-budget value is shaped) and must be the same transform at both call sites — live dispatch (between storeEvents and the router) and replay (at materialization) — or replay rebuilds a projection the live path would never have written. IT LIVES IN THE SERVER, NOT THE CONTRACT: what both offload sides must agree on (the reserved `langwatch.reserved.eventref.` prefix and `{field, eventId}` pointer) is in `@langwatch/trace-contract` (`trace-offload.contract.ts`); the writer's own judgement stands on this package's `TraceAttributeCap` and has one reader (itself), so the contract could not host it without inverting that.
+ * FROZEN TWIN of `platform/app/src/server/app-layer/traces/lean-for-projection.ts` (ADR-022) — the application keeps its own copy while both graphs ingest; edit neither without editing the other. The lean is projection-payload POLICY (which attribute keys earn the wide preview budget, how big, how an over-budget value is shaped) and must be the same transform at both call sites — live dispatch (between storeEvents and the router) and replay (at materialization) — or replay rebuilds a projection the live path would never have written. IT LIVES IN THE SERVER, NOT THE CONTRACT: what both offload sides must agree on (the reserved `langwatch.reserved.eventref.` prefix and `{field, eventId}` pointer) is in `@langwatch/trace-contract` (`trace-offload.contract.ts`); the writer's own judgement stands on this package's `TraceAttributeCapService` and has one reader (itself), so the contract could not host it without inverting that.
  */
 
 import type { Event } from "@langwatch/eventing";
@@ -10,8 +10,10 @@ import {
   traceEventReferenceKey,
 } from "@langwatch/trace-contract";
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
-import { TraceAttributeCap } from "./trace-attribute-cap.service";
+import { TraceAttributeCapService } from "./trace-attribute-cap.service";
 import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../rules/trace-payload-cap.rules";
+
+const traceAttributeCapService = TraceAttributeCapService.create();
 
 /**
  * Preview budget for IO attributes. Covers a complete chat-style Claude completion at
@@ -112,7 +114,7 @@ function leanSpanReceivedEvent(event: Event): Event {
   // (span.attributes, span.events[].attributes, span.links[].attributes, resource.attributes)
   // might need the 256 KB cap. Uses hasOversizedAttribute — the read-only counterpart
   // colocated with capOversizedAttributes — so the gate covers EVERY surface the action covers.
-  const needsNonIoCap = TraceAttributeCap.hasOversizedAttribute(
+  const needsNonIoCap = traceAttributeCapService.hasOversizedAttribute(
     data.span,
     data.resource ?? null,
     DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
@@ -171,7 +173,7 @@ function leanSpanReceivedEvent(event: Event): Event {
 
   // Step 5: Cap non-IO / nested / binary values on the cloned span.
   // IO attrs are already ≤ IO_PREVIEW_BYTES (64 KB) < DEFAULT_MAX (256 KB), so they are untouched.
-  TraceAttributeCap.capOversizedAttributes(clonedSpan, clonedResource);
+  traceAttributeCapService.capOversizedAttributes(clonedSpan, clonedResource);
 
   return {
     ...event,

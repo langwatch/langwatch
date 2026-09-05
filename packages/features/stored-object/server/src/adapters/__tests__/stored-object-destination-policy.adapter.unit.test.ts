@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Unit tests for StoredObjectDestinationPolicy — the BYOC-first destination
+ * Unit tests for StoredObjectDestinationPolicyAdapter — the BYOC-first destination
  * precedence that used to live inside StoredObjectsService's default
  * `mintStorageUri` (issue #6323 backend-flip posture). `mintStoredObjectUri`
  * (from @langwatch/stored-object-contract) turns the resolved destination
@@ -13,12 +13,13 @@ import { describe, expect, it } from "vitest";
 import { mintStoredObjectUri } from "@langwatch/stored-object-contract";
 import {
   AzureBackendMisconfiguredError,
-  resolveAzureCredentials,
   type AzureBlobCredentialsConfig,
 } from "../azure-blob-credentials.adapter";
+import { AzureBlobCredentialsAdapter } from "../azure-blob-credentials.adapter";
+const { resolveAzureCredentials } = AzureBlobCredentialsAdapter;
 import {
   StoredObjectAzureDestinationPort,
-  StoredObjectDestinationPolicy,
+  StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3ConfigPort,
 } from "../stored-object-destination-policy.adapter";
 
@@ -47,7 +48,10 @@ class StubAzureDestination extends StoredObjectAzureDestinationPort {
   }
 }
 
-async function mintFor(policy: StoredObjectDestinationPolicy, projectId: string): Promise<string> {
+async function mintFor(
+  policy: StoredObjectDestinationPolicyAdapter,
+  projectId: string,
+): Promise<string> {
   const destination = await policy.resolve(projectId);
   return mintStoredObjectUri({
     destination,
@@ -55,11 +59,11 @@ async function mintFor(policy: StoredObjectDestinationPolicy, projectId: string)
   });
 }
 
-describe("StoredObjectDestinationPolicy", () => {
+describe("StoredObjectDestinationPolicyAdapter", () => {
   describe("when the project has a private dataplane bucket configured", () => {
     /** @scenario "For a project with a per-project private dataplane bucket, mintStorageUri uses the project bucket, not the global one" */
     it("mints the URI under the project bucket and ignores the global bucket", async () => {
-      const policy = StoredObjectDestinationPolicy.create({
+      const policy = StoredObjectDestinationPolicyAdapter.create({
         selection: {
           backend: "s3",
           globalS3Bucket: "langwatch-storage-prod",
@@ -78,7 +82,7 @@ describe("StoredObjectDestinationPolicy", () => {
   describe("when the project has no private bucket but a global S3 bucket is set", () => {
     /** @scenario "For a project without per-project storage configured, mintStorageUri falls back to the global S3_BUCKET_NAME" */
     it("mints the URI under the global bucket so the storage_uri matches what the read path will use", async () => {
-      const policy = StoredObjectDestinationPolicy.create({
+      const policy = StoredObjectDestinationPolicyAdapter.create({
         selection: {
           backend: "s3",
           globalS3Bucket: "langwatch-storage-prod",
@@ -101,7 +105,7 @@ describe("StoredObjectDestinationPolicy", () => {
      */
     /** @scenario "defaultMintStorageUri and the groupQueue blob store mint azure-blob URIs for an azure destination" */
     it("mints an azure-blob address for a project with no private bucket", async () => {
-      const policy = StoredObjectDestinationPolicy.create({
+      const policy = StoredObjectDestinationPolicyAdapter.create({
         selection: {
           backend: "azure",
           localFilesystemRoot: "/var/lib/langwatch",
@@ -122,7 +126,7 @@ describe("StoredObjectDestinationPolicy", () => {
 
   describe("when the azure backend is selected but no azure destination is configured", () => {
     it("throws rather than silently falling back to another backend", async () => {
-      const policy = StoredObjectDestinationPolicy.create({
+      const policy = StoredObjectDestinationPolicyAdapter.create({
         selection: {
           backend: "azure",
           localFilesystemRoot: "/var/lib/langwatch",
@@ -143,7 +147,7 @@ describe("StoredObjectDestinationPolicy", () => {
  * production. Used below to test the full BYOC -> azure -> global S3 -> local
  * filesystem precedence chain that used to live in one function,
  * `resolveProjectStorageDestination` — now split across
- * `StoredObjectDestinationPolicy` (the precedence) and
+ * `StoredObjectDestinationPolicyAdapter` (the precedence) and
  * `resolveAzureCredentials` (the azure-arm validation).
  */
 class ConfiguredAzureDestination extends StoredObjectAzureDestinationPort {
@@ -173,11 +177,11 @@ function azureConfig(
   };
 }
 
-describe("StoredObjectDestinationPolicy composed with resolveAzureCredentials (BYOC -> azure -> global S3 -> local fs precedence)", () => {
+describe("StoredObjectDestinationPolicyAdapter composed with resolveAzureCredentials (BYOC -> azure -> global S3 -> local fs precedence)", () => {
   describe("given STORED_OBJECTS_BACKEND=azure with complete Azure config and no private bucket", () => {
     /** @scenario "Operator selects Azure Blob as the stored-objects write backend" */
     it("returns an azure destination carrying the account name and container", async () => {
-      const policy = StoredObjectDestinationPolicy.create({
+      const policy = StoredObjectDestinationPolicyAdapter.create({
         selection: {
           backend: "azure",
           localFilesystemRoot: "/data/objects",
@@ -223,7 +227,7 @@ describe("StoredObjectDestinationPolicy composed with resolveAzureCredentials (B
 
       // The fallback destinations are configured too, to prove the resolver
       // does NOT quietly fall through to either when azure is misconfigured.
-      const policy = StoredObjectDestinationPolicy.create({
+      const policy = StoredObjectDestinationPolicyAdapter.create({
         selection: {
           backend: "azure",
           globalS3Bucket: "global-bucket",
@@ -243,7 +247,7 @@ describe("StoredObjectDestinationPolicy composed with resolveAzureCredentials (B
     it("falls back to the global S3 bucket when configured, minting no azure-blob uri", async () => {
       // backend intentionally "s3" — azure env vars configured but never
       // consulted because the backend toggle is not "azure".
-      const policy = StoredObjectDestinationPolicy.create({
+      const policy = StoredObjectDestinationPolicyAdapter.create({
         selection: {
           backend: "s3",
           globalS3Bucket: "global-bucket",
@@ -259,7 +263,7 @@ describe("StoredObjectDestinationPolicy composed with resolveAzureCredentials (B
 
     /** @scenario "Azure env vars alone never flip the write destination" */
     it("falls back to the local filesystem when no global bucket is configured either", async () => {
-      const policy = StoredObjectDestinationPolicy.create({
+      const policy = StoredObjectDestinationPolicyAdapter.create({
         selection: {
           backend: "s3",
           localFilesystemRoot: "/data/objects",
@@ -276,7 +280,7 @@ describe("StoredObjectDestinationPolicy composed with resolveAzureCredentials (B
   describe("given STORED_OBJECTS_BACKEND=azure with complete config AND a global S3 bucket set", () => {
     /** @scenario "The azure toggle beats the global S3 bucket but not a BYOC bucket" */
     it("resolves to azure, not the global S3 bucket", async () => {
-      const policy = StoredObjectDestinationPolicy.create({
+      const policy = StoredObjectDestinationPolicyAdapter.create({
         selection: {
           backend: "azure",
           globalS3Bucket: "global-bucket",
@@ -301,7 +305,7 @@ describe("StoredObjectDestinationPolicy composed with resolveAzureCredentials (B
   describe("given STORED_OBJECTS_BACKEND=azure with complete config AND a per-project private bucket", () => {
     /** @scenario "A per-project private dataplane bucket still beats the Azure backend toggle" */
     it("resolves to the project's private S3 bucket, not azure", async () => {
-      const policy = StoredObjectDestinationPolicy.create({
+      const policy = StoredObjectDestinationPolicyAdapter.create({
         selection: {
           backend: "azure",
           localFilesystemRoot: "/data/objects",
@@ -325,7 +329,7 @@ describe("StoredObjectDestinationPolicy composed with resolveAzureCredentials (B
   describe("given no S3 bucket and no Azure config are present", () => {
     /** @scenario "The legacy S3 selector keeps its existing fallback behavior" */
     it("falls back to a file destination when the legacy s3 selector has no bucket", async () => {
-      const policy = StoredObjectDestinationPolicy.create({
+      const policy = StoredObjectDestinationPolicyAdapter.create({
         selection: {
           backend: "s3",
           localFilesystemRoot: "/data/objects",

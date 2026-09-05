@@ -56,12 +56,15 @@ class RegisteredTraceTopicCommand extends TraceTopicAssignmentCommandPort {
  * jobs. The process root supplies the fully composed definition and Dataset
  * worker capability; the installer owns registration order and queue names.
  */
-export class TraceProcessingServerInstaller extends TraceProcessingInstallerPort {
+export class TraceProcessingServerInstallerAdapter extends TraceProcessingInstallerPort {
   static create(options: {
     pipeline: TraceProcessingPipelinePort;
     datasetNormalization: DatasetNormalizationWorkerPort;
-  }): TraceProcessingServerInstaller {
-    return new TraceProcessingServerInstaller(options.pipeline, options.datasetNormalization);
+  }): TraceProcessingServerInstallerAdapter {
+    return new TraceProcessingServerInstallerAdapter(
+      options.pipeline,
+      options.datasetNormalization,
+    );
   }
 
   private installed = false;

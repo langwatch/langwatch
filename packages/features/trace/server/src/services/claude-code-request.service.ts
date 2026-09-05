@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { contentToText, toolDefinitionsMessage } from "../rules/claude-code-content.rules";
-import { ClaudeCodeTruncatedRequest } from "./claude-code-truncated-request.service";
+import { ClaudeCodeTruncatedRequestService } from "./claude-code-truncated-request.service";
 import { capPayloadString } from "../rules/trace-payload-cap.rules";
+
+const claudeCodeTruncatedRequestService = ClaudeCodeTruncatedRequestService.create();
 
 const requestMessageSchema = z.looseObject({
   role: z.string().optional(),
@@ -25,12 +27,18 @@ type RequestBody = z.infer<typeof requestBodySchema>;
 /**
  * What a Claude Code request body says, for the canonical span.
  *
- * The counterpart to {@link ClaudeCodeResponse}, and total for the same
+ * The counterpart to {@link ClaudeCodeResponseService}, and total for the same
  * reason. A request body arrives truncated often enough that salvaging one is
  * its own module.
  */
-export class ClaudeCodeRequest {
-  private static extractToolResults(parsed: RequestBody): Map<string, string> {
+export class ClaudeCodeRequestService {
+  private constructor() {}
+
+  static create(): ClaudeCodeRequestService {
+    return new ClaudeCodeRequestService();
+  }
+
+  private extractToolResults(parsed: RequestBody): Map<string, string> {
     const out = new Map<string, string>();
     for (const message of parsed.messages) {
       const content = message.content;
@@ -54,9 +62,7 @@ export class ClaudeCodeRequest {
     return out;
   }
 
-  private static buildInputMessages(
-    parsed: RequestBody,
-  ): Array<{ role: string; content: string }> | null {
+  private buildInputMessages(parsed: RequestBody): Array<{ role: string; content: string }> | null {
     const out: Array<{ role: string; content: string }> = [];
 
     if (parsed.system !== void 0) {
@@ -84,7 +90,7 @@ export class ClaudeCodeRequest {
     return out.length > 0 ? out : null;
   }
 
-  private static tryParseRequestBody(raw: unknown): RequestBody | null {
+  private tryParseRequestBody(raw: unknown): RequestBody | null {
     if (raw === null || raw === void 0 || raw === "") {
       return null;
     }
@@ -116,10 +122,10 @@ export class ClaudeCodeRequest {
    *
    * @internal exported for the read-time tool-span enrichment + unit testing
    */
-  static extractToolResultsFromRequestBody(raw: unknown): Map<string, string> {
-    const parsed = ClaudeCodeRequest.tryParseRequestBody(raw);
+  extractToolResultsFromRequestBody(raw: unknown): Map<string, string> {
+    const parsed = this.tryParseRequestBody(raw);
 
-    return parsed === null ? new Map() : ClaudeCodeRequest.extractToolResults(parsed);
+    return parsed === null ? new Map() : this.extractToolResults(parsed);
   }
 
   /**
@@ -136,31 +142,31 @@ export class ClaudeCodeRequest {
    *
    * @internal exported for the ingest-time body derivation + unit testing
    */
-  static tryBuildInputMessagesFromRequestBody(
+  tryBuildInputMessagesFromRequestBody(
     raw: unknown,
   ): Array<{ role: string; content: string }> | null {
-    const parsed = ClaudeCodeRequest.tryParseRequestBody(raw);
+    const parsed = this.tryParseRequestBody(raw);
     if (parsed !== null) {
-      return ClaudeCodeRequest.buildInputMessages(parsed);
+      return this.buildInputMessages(parsed);
     }
 
-    return typeof raw === "string" ? ClaudeCodeTruncatedRequest.trySalvage(raw) : null;
+    return typeof raw === "string" ? claudeCodeTruncatedRequestService.trySalvage(raw) : null;
   }
 
-  static deriveClaudeRequestBody(raw: unknown): {
+  deriveClaudeRequestBody(raw: unknown): {
     messages: Array<{ role: string; content: string }> | null;
     toolResults: Map<string, string>;
   } {
-    const parsed = ClaudeCodeRequest.tryParseRequestBody(raw);
+    const parsed = this.tryParseRequestBody(raw);
     if (parsed !== null) {
       return {
-        messages: ClaudeCodeRequest.buildInputMessages(parsed),
-        toolResults: ClaudeCodeRequest.extractToolResults(parsed),
+        messages: this.buildInputMessages(parsed),
+        toolResults: this.extractToolResults(parsed),
       };
     }
 
     return {
-      messages: typeof raw === "string" ? ClaudeCodeTruncatedRequest.trySalvage(raw) : null,
+      messages: typeof raw === "string" ? claudeCodeTruncatedRequestService.trySalvage(raw) : null,
       toolResults: new Map(),
     };
   }

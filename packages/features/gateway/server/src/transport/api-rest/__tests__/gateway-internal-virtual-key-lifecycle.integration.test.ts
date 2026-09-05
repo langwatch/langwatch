@@ -28,7 +28,9 @@ import {
 } from "../gateway-internal.api";
 import { testRestSecurity } from "./support/rest-security.support";
 
-import { createVirtualKeyServiceForTest } from "../../../testing";
+import { PostgresVirtualKeyAdapter } from "../../../testing";
+
+const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
     return next(context.args);

@@ -11,7 +11,7 @@ export {
   type EventingTracePipelineAdapterOptions,
 } from "./adapters/eventing.trace-pipeline.adapter";
 
-export { TraceProcessingServerInstaller } from "./adapters/eventing.trace-processing-installer.adapter";
+export { TraceProcessingServerInstallerAdapter } from "./adapters/eventing.trace-processing-installer.adapter";
 export { TraceProcessingInstallerPort } from "./ports/trace-processing-installer.port";
 export {
   DEFERRED_ORIGIN_CHECK_DELAY_MS,
@@ -60,8 +60,9 @@ export {
   TRACKED_EVENT_SYNC_DELAY_MS,
   TrackedEventSync,
 } from "./subscribers/tracked-event-sync.subscriber";
-export { parseJsonStringValues } from "./services/otlp-attribute-flattening.service";
-export { SpanRecordIdentity } from "./services/span-record-identity.service";
+export { OtlpAttributeFlatteningService } from "./services/otlp-attribute-flattening.service";
+export { TraceNotFoundError } from "./services/trace-read-errors.service";
+export { SpanRecordIdentityService } from "./services/span-record-identity.service";
 export { TraceListClickHouseRepository } from "./repositories/clickhouse/trace-list.repository";
 export { TraceSummaryClickHouseRepository } from "./repositories/clickhouse/trace-summary.repository";
 export {
@@ -173,7 +174,7 @@ export {
   TraceSpanDedupPort,
   type SpanDedupRef,
 } from "./services/trace-ingestion.service";
-export { TraceAttributeCap } from "./services/trace-attribute-cap.service";
+export { TraceAttributeCapService } from "./services/trace-attribute-cap.service";
 export {
   capPayloadString,
   DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
@@ -409,7 +410,6 @@ export {
 export { TraceIOExtractionService } from "./services/trace-io-extraction.service";
 export { TraceReadableSpanService } from "./services/trace-readable-span.service";
 export { VisibilityWindowService } from "./services/trace-visibility-window.service";
-export { TraceNotFoundError } from "./services/trace-read-errors.service";
 export { TraceWindowedReadService } from "./services/trace-windowed-read.service";
 export { TraceTtlCacheService, type TraceCacheRedis } from "./services/trace-ttl-cache.service";
 export { TraceSpanIngestPort } from "./ports/trace-span-ingest.port";

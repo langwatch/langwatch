@@ -20,7 +20,7 @@ import {
   DatasetNotReadyError,
   DatasetTooLargeToEditColumnsError,
   DuplicateRecordIdError,
-} from "./dataset-errors.service";
+} from "@langwatch/dataset-contract";
 import { stripNullBytes } from "../rules/dataset-sanitize.rules";
 import {
   convertRowsToColumnTypes,

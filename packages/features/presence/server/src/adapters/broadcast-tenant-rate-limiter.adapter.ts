@@ -34,7 +34,11 @@ interface Bucket {
 const CLEANUP_INTERVAL_MS = 60_000;
 const STALE_THRESHOLD_MS = 60_000;
 
-export class TenantRateLimiter {
+export class BroadcastTenantRateLimiterAdapter {
+  static create(): BroadcastTenantRateLimiterAdapter {
+    return new BroadcastTenantRateLimiterAdapter();
+  }
+
   private readonly config: TierConfig;
   private readonly buckets = new Map<string, Bucket>();
   private readonly warnedTenants = new Set<string>();
@@ -77,7 +81,7 @@ export class TenantRateLimiter {
     // Rate-limited — emit a single warning per tenant
     if (!this.warnedTenants.has(tenantId)) {
       this.warnedTenants.add(tenantId);
-      console.warn(`[TenantRateLimiter] Rate limit hit for tenant "${tenantId}" on tier "${tier}"`);
+      console.warn(`[BroadcastTenantRateLimiterAdapter] Rate limit hit for tenant "${tenantId}" on tier "${tier}"`);
     }
 
     return false;

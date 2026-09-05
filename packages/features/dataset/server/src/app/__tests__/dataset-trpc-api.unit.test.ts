@@ -14,7 +14,7 @@
  * while reporting green.
  */
 import { type DatasetService } from "@langwatch/dataset-contract";
-import { DatasetConflictError, DatasetNotFoundError } from "../../services/dataset-errors.service";
+import { DatasetConflictError, DatasetNotFoundError } from "@langwatch/dataset-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 

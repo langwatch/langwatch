@@ -9,7 +9,7 @@ import type { IdentityLinkProposalWrites } from "../rules/identity-writes.rules"
 import {
   IdentityJitDisabledError,
   IdentityLinkProposedError,
-} from "./signin-callback-errors.service";
+} from "@langwatch/identity-contract";
 
 /**
  * What happens when an SSO callback comes back (ADR-117 §3), in one place and
@@ -197,6 +197,7 @@ export class SignInCallbackLinkingService {
     if (!target) {
       return this.provision(assertion, normalizedEmail);
     }
+
     return this.link({ assertion, normalizedEmail, userId: target.userId });
   }
 
@@ -231,10 +232,12 @@ export class SignInCallbackLinkingService {
     if (candidates.length > 1) {
       return "ambiguous_candidates";
     }
+
     const target = candidates[0];
     if (!target) {
       return "ambiguous_candidates";
     }
+
     // One side of the evidence is the IdP's assertion, the other is the
     // user's own. An unverified orphan row fails the second and is never
     // auto-linked, which is the anti-hijack invariant, kept.

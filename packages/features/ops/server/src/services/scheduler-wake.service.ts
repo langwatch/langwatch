@@ -1,9 +1,6 @@
-/** Wakes the scheduler loop after an operator makes work due. */
-export abstract class SchedulerWakeService {
-  abstract wake(): void;
-}
+import { SchedulerWakePort } from "../ports/scheduler-wake.port";
 
-export class NoopSchedulerWakeService extends SchedulerWakeService {
+export class NoopSchedulerWakeService extends SchedulerWakePort {
   private constructor() {
     super();
   }

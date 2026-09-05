@@ -1,12 +1,12 @@
 import type { EventSourcing } from "@langwatch/eventing";
 import type { TopicService } from "@langwatch/topic-contract";
-import { TopicServerInstaller } from "@langwatch/topic-server";
+import { TopicServerInstallerAdapter } from "@langwatch/topic-server";
 import type { TraceTopicAssignmentPort } from "@langwatch/trace-contract";
 
 /** API-process producer wiring for Topic's single server installer. */
 export class TopicApiFeature {
   static create(options: {
-    installer: TopicServerInstaller;
+    installer: TopicServerInstallerAdapter;
     eventSourcing: EventSourcing;
     traceAssignments: TraceTopicAssignmentPort;
   }): TopicApiFeature {
@@ -16,7 +16,7 @@ export class TopicApiFeature {
   private installed = false;
 
   private constructor(
-    private readonly installer: TopicServerInstaller,
+    private readonly installer: TopicServerInstallerAdapter,
     private readonly eventSourcing: EventSourcing,
     private readonly traceAssignments: TraceTopicAssignmentPort,
   ) {}

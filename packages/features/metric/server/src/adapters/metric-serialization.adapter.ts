@@ -37,4 +37,14 @@ function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-export { isRecord, sha256, stableStringify };
+export class MetricSerializationAdapter {
+  private constructor() {}
+
+  static create(): MetricSerializationAdapter {
+    return new MetricSerializationAdapter();
+  }
+
+  static isRecord = isRecord;
+  static sha256 = sha256;
+  static stableStringify = stableStringify;
+}

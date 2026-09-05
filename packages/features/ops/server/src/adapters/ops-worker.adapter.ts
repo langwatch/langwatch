@@ -21,8 +21,8 @@ import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly
 import { AnomalyDetectorService } from "../services/anomaly-detector.service";
 import { UsageStatsCollectionService } from "../services/usage-stats-collection.service";
 import {
-  AnomalyWorkerContribution,
-  UsageStatsWorkerContribution,
+  AnomalyWorkerContributionAdapter,
+  UsageStatsWorkerContributionAdapter,
 } from "./ops-worker-contribution.adapter";
 import { RedisTenantRateTrackerAdapter } from "./redis.tenant-rate-tracker.adapter";
 
@@ -71,7 +71,7 @@ export class OpsWorkerAdapter extends OpsWorkerPort {
       hardTierAlerts: this.options.anomaly.hardTierAlerts,
     });
 
-    return AnomalyWorkerContribution.create({ detector }).start();
+    return AnomalyWorkerContributionAdapter.create({ detector }).start();
   }
 
   tryStartUsageStatsWorker(): OpsWorkerHandle | undefined {
@@ -83,7 +83,7 @@ export class OpsWorkerAdapter extends OpsWorkerPort {
       now: usageStats.config.now,
     });
 
-    return UsageStatsWorkerContribution.create({
+    return UsageStatsWorkerContributionAdapter.create({
       config: usageStats.config,
       organizations: PrismaUsageStatsOrganizationRepository.create(usageStats.database),
       usageStats: collector,

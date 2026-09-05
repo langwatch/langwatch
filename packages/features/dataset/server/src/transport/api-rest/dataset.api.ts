@@ -43,7 +43,7 @@ import {
 import {
   type DatasetNotReadyError,
   UploadValidationError,
-} from "../../services/dataset-errors.service";
+} from "@langwatch/dataset-contract";
 import type { Context } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";

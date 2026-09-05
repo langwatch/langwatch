@@ -7,10 +7,8 @@ import { createLogger } from "@langwatch/observability";
 import { traced } from "@langwatch/observability/node";
 import type { SimulationExportRun, SimulationService } from "@langwatch/scenario-contract";
 import { categorizeRunStatus, type RunStatusCategory } from "@langwatch/scenario-contract";
-import {
-  serializeRunsToCriteriaCsv,
-  serializeRunsToFullCsv,
-} from "./scenario-run-export-csv.service";
+import { ScenarioRunExportCsvService } from "./scenario-run-export-csv.service";
+const { serializeRunsToCriteriaCsv, serializeRunsToFullCsv } = ScenarioRunExportCsvService;
 import type {
   ScenarioRunExportProgress,
   ScenarioRunExportRequest,

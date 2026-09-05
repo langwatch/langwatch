@@ -51,9 +51,11 @@ export function turnOrderFromStream(entries: readonly LangyStreamEntry[]): Langy
     if (entry.type !== "tool") {
       continue;
     }
+
     if (placed.has(entry.id)) {
       continue;
     }
+
     placed.add(entry.id);
     order.push({ kind: "tool", id: entry.id });
   }

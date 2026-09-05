@@ -154,6 +154,7 @@ export class VerificationCeremonyService {
     if (!record) {
       refuse("no ceremony in flight for this identifier");
     }
+
     if (
       record.verificationId !== verificationId ||
       record.identifierId !== identifierId ||

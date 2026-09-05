@@ -3,7 +3,7 @@ import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
 import type {
   StoredObjectStorageProject,
-  StoredObjectStorageRuntime,
+  StoredObjectStorageRuntimeAdapter,
 } from "@langwatch/stored-object-server";
 import type { TraceClickHouseClient } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
@@ -31,7 +31,7 @@ import {
 const AWS = {} as AwsClientProcessRuntime;
 
 function storageRuntime(options: { destination: StoredObjectStorageDestination; body?: Buffer }): {
-  runtime: StoredObjectStorageRuntime;
+  runtime: StoredObjectStorageRuntimeAdapter;
   gets: string[];
   deletes: string[];
   projects: string[];
@@ -58,7 +58,7 @@ function storageRuntime(options: { destination: StoredObjectStorageDestination; 
         projects.push(projectId);
         return project;
       },
-    } as unknown as StoredObjectStorageRuntime,
+    } as unknown as StoredObjectStorageRuntimeAdapter,
     gets,
     deletes,
     projects,

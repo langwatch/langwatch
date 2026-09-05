@@ -7,7 +7,7 @@ import { mintAzureBlobStoredObjectUri } from "@langwatch/stored-object-contract"
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
-import { StoredObjectStorageRegistry } from "../stored-object-storage-registry.adapter";
+import { StoredObjectStorageRegistryAdapter } from "../stored-object-storage-registry.adapter";
 
 const ACCOUNT_NAME = process.env.LANGWATCH_TEST_AZURE_ACCOUNT_NAME;
 const ACCOUNT_KEY = process.env.LANGWATCH_TEST_AZURE_ACCOUNT_KEY;
@@ -148,7 +148,7 @@ describeRealAzure(
         const uri = uriFor(bytes);
         await driver.put(uri, bytes, "text/plain");
 
-        const registry = new StoredObjectStorageRegistry({
+        const registry = StoredObjectStorageRegistryAdapter.create({
           // s3/file are mandatory on the registry but unused here — any
           // StoredObjectStorageDriver satisfies the type; azure-blob does the
           // real work.

@@ -54,14 +54,10 @@ describe("TraceAttributeAccumulationService", () => {
       });
 
       expect(
-        JSON.parse(
-          state.attributes[ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS]!,
-        ),
+        JSON.parse(state.attributes[ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS]!),
       ).toEqual(["span-1"]);
       expect(
-        JSON.parse(
-          state.attributes[ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS]!,
-        ),
+        JSON.parse(state.attributes[ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS]!),
       ).toEqual(["span-2"]);
     });
   });

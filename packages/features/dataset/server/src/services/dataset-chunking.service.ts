@@ -95,6 +95,7 @@ export const toJsonlChunks = (
     if (lines.length === 0) {
       return;
     }
+
     const jsonl = lines.join("\n") + "\n";
     chunks.push({
       index: chunks.length,

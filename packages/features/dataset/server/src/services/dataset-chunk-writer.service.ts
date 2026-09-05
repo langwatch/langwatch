@@ -82,6 +82,7 @@ export class StreamingChunkWriter {
     if (this.buffer.length === 0) {
       return;
     }
+
     const written = await this.deps.storage.writeChunks({
       projectId: this.deps.projectId,
       datasetId: this.deps.datasetId,

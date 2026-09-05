@@ -1,4 +1,6 @@
-import { isRecord, type UnknownRecord } from "./metric-serialization.adapter";
+import { type UnknownRecord } from "./metric-serialization.adapter";
+import { MetricSerializationAdapter } from "./metric-serialization.adapter";
+const { isRecord } = MetricSerializationAdapter;
 
 export const MAX_UINT32 = (1n << 32n) - 1n;
 export const MAX_UINT64 = (1n << 64n) - 1n;
@@ -22,7 +24,13 @@ const MAX_DATE_MS = 8_640_000_000_000_000;
  * caller's job is to drop it — silently clamping would store a number nobody
  * measured, and throwing would lose the whole batch for one bad point.
  */
-export class MetricNumbers {
+export class MetricNumbersAdapter {
+  private constructor() {}
+
+  static create(): MetricNumbersAdapter {
+    return new MetricNumbersAdapter();
+  }
+
   private static longBitsToBigInt({
     value,
     signed,
@@ -47,7 +55,7 @@ export class MetricNumbers {
       return BigInt(Math.trunc(value)).toString();
     }
     if (isRecord(value) && "low" in value && "high" in value) {
-      return MetricNumbers.longBitsToBigInt({ value, signed }).toString();
+      return MetricNumbersAdapter.longBitsToBigInt({ value, signed }).toString();
     }
     return fallback;
   }
@@ -66,7 +74,7 @@ export class MetricNumbers {
     if (typeof value === "number" && (!Number.isSafeInteger(value) || !Number.isInteger(value))) {
       throw new Error(`${label} is not a safely represented integer`);
     }
-    const decimal = MetricNumbers.integerDecimal(value, {
+    const decimal = MetricNumbersAdapter.integerDecimal(value, {
       signed: min < 0n,
       fallback: "invalid",
     });
@@ -80,7 +88,7 @@ export class MetricNumbers {
 
   static timestampDecimal(value: unknown): string | null {
     if (value === undefined || value === null) return null;
-    const decimal = MetricNumbers.integerDecimal(value);
+    const decimal = MetricNumbersAdapter.integerDecimal(value);
     return /^\d+$/.test(decimal) ? decimal : null;
   }
 
@@ -109,25 +117,27 @@ export class MetricNumbers {
    */
   static checkedOptionalDouble({ value, label }: { value: unknown; label: string }): number | null {
     if (value === undefined || value === null) return null;
-    const parsed = MetricNumbers.finiteNumber(value);
+    const parsed = MetricNumbersAdapter.finiteNumber(value);
     if (parsed === null) throw new Error(`${label} must be a finite number`);
     return parsed;
   }
 
   static checkedDouble({ value, label }: { value: unknown; label: string }): number {
-    const parsed = MetricNumbers.checkedOptionalDouble({ value, label });
+    const parsed = MetricNumbersAdapter.checkedOptionalDouble({ value, label });
     if (parsed === null) throw new Error(`${label} must be a finite number`);
     return parsed;
   }
 
   static integerDecimals(values: unknown): string[] {
-    return Array.isArray(values) ? values.map((value) => MetricNumbers.integerDecimal(value)) : [];
+    return Array.isArray(values)
+      ? values.map((value) => MetricNumbersAdapter.integerDecimal(value))
+      : [];
   }
 
   static finiteNumbers(values: unknown): number[] {
     return Array.isArray(values)
       ? values
-          .map((value) => MetricNumbers.finiteNumber(value))
+          .map((value) => MetricNumbersAdapter.finiteNumber(value))
           .filter((value): value is number => value !== null)
       : [];
   }

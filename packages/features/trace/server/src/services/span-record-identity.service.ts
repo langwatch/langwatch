@@ -2,7 +2,7 @@ import { EventUtils } from "@langwatch/eventing";
 import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { createHash } from "crypto";
 import type { SpanReceivedEvent } from "@langwatch/trace-contract";
-import { TraceRequestUtils } from "./otlp-trace-request.service";
+import { OtlpTraceRequestService } from "./otlp-trace-request.service";
 
 /**
  * KSUID resource prefixes for the two identifiers this module mints — the
@@ -22,12 +22,18 @@ const TRACE_SUMMARY_KSUID_RESOURCE = "tracesummary";
  * of landing beside it. The identity is a KSUID whose timestamp is the span's
  * own, so ids sort chronologically without a separate ordering column.
  */
-export class SpanRecordIdentity {
+export class SpanRecordIdentityService {
+  private constructor() {}
+
+  static create(): SpanRecordIdentityService {
+    return new SpanRecordIdentityService();
+  }
+
   /**
    * Creates a deterministic KSUID from a hash key and timestamp.
    * Same inputs always produce the same ID, maintaining K-sortability.
    */
-  private static makeDeterministicKsuid({
+  private makeDeterministicKsuid({
     hashKey,
     resource,
     timestampMs,
@@ -60,13 +66,13 @@ export class SpanRecordIdentity {
     return ksuid.toString();
   }
 
-  static generateDeterministicSpanRecordId(event: SpanReceivedEvent): string {
-    const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(event.data.span);
-    const startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
-      TraceRequestUtils.normalizeOtlpUnixNano(event.data.span.startTimeUnixNano),
+  generateDeterministicSpanRecordId(event: SpanReceivedEvent): string {
+    const { traceId, spanId } = OtlpTraceRequestService.normalizeOtlpSpanIds(event.data.span);
+    const startTimeUnixMs = OtlpTraceRequestService.convertUnixNanoToUnixMs(
+      OtlpTraceRequestService.normalizeOtlpUnixNano(event.data.span.startTimeUnixNano),
     );
 
-    return SpanRecordIdentity.generateDeterministicSpanRecordIdFromData(
+    return this.generateDeterministicSpanRecordIdFromData(
       String(event.tenantId),
       traceId,
       spanId,
@@ -74,7 +80,7 @@ export class SpanRecordIdentity {
     );
   }
 
-  static generateDeterministicSpanRecordIdFromData(
+  generateDeterministicSpanRecordIdFromData(
     tenantId: string,
     traceId: string,
     spanId: string,
@@ -82,34 +88,34 @@ export class SpanRecordIdentity {
   ): string {
     EventUtils.validateTenantId({ tenantId }, "generateDeterministicSpanRecordIdFromData");
 
-    return SpanRecordIdentity.makeDeterministicKsuid({
+    return this.makeDeterministicKsuid({
       hashKey: `${tenantId}:${traceId}:${spanId}`,
       resource: SPAN_KSUID_RESOURCE,
       timestampMs: startTimeUnixMs,
     });
   }
 
-  static generateDeterministicTraceSummaryId(event: SpanReceivedEvent): string {
-    const { traceId } = TraceRequestUtils.normalizeOtlpSpanIds(event.data.span);
-    const startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
-      TraceRequestUtils.normalizeOtlpUnixNano(event.data.span.startTimeUnixNano),
+  generateDeterministicTraceSummaryId(event: SpanReceivedEvent): string {
+    const { traceId } = OtlpTraceRequestService.normalizeOtlpSpanIds(event.data.span);
+    const startTimeUnixMs = OtlpTraceRequestService.convertUnixNanoToUnixMs(
+      OtlpTraceRequestService.normalizeOtlpUnixNano(event.data.span.startTimeUnixNano),
     );
 
-    return SpanRecordIdentity.generateDeterministicTraceSummaryIdFromData(
+    return this.generateDeterministicTraceSummaryIdFromData(
       String(event.tenantId),
       traceId,
       startTimeUnixMs,
     );
   }
 
-  static generateDeterministicTraceSummaryIdFromData(
+  generateDeterministicTraceSummaryIdFromData(
     tenantId: string,
     traceId: string,
     startTimeUnixMs: number,
   ): string {
     EventUtils.validateTenantId({ tenantId }, "generateDeterministicTraceSummaryIdFromData");
 
-    return SpanRecordIdentity.makeDeterministicKsuid({
+    return this.makeDeterministicKsuid({
       hashKey: `${tenantId}:${traceId}`,
       resource: TRACE_SUMMARY_KSUID_RESOURCE,
       timestampMs: startTimeUnixMs,

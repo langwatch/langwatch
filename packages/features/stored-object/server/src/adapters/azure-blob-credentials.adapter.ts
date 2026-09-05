@@ -263,7 +263,7 @@ function assertRequiredVariablesPresent({
  * a non-public-cloud endpoint must name the identity authority its tokens come from. The migration task builds its credentials from its own OBJECT_STORAGE_MIGRATION_* namespace rather
  * than through `resolveAzureCredentials`, and bypassing these guards there would let a migration run leak bearer tokens the app itself refuses to.
  */
-export function assertTokenModeTransportSafety({
+function assertTokenModeTransportSafety({
   endpointBaseUrl,
   authorityHost,
   allowInsecureTokenEndpointForTests = false,
@@ -280,7 +280,7 @@ export function assertTokenModeTransportSafety({
  * Resolves Azure Blob credentials for whichever auth mode is configured, or
  * throws `AzureBackendMisconfiguredError` naming exactly what's wrong.
  */
-export function resolveAzureCredentials({
+function resolveAzureCredentials({
   config,
   purpose = "write",
   identity = {},
@@ -356,4 +356,15 @@ export function resolveAzureCredentials({
       );
     }
   }
+}
+
+export class AzureBlobCredentialsAdapter {
+  private constructor() {}
+
+  static create(): AzureBlobCredentialsAdapter {
+    return new AzureBlobCredentialsAdapter();
+  }
+
+  static assertTokenModeTransportSafety = assertTokenModeTransportSafety;
+  static resolveAzureCredentials = resolveAzureCredentials;
 }

@@ -10,7 +10,7 @@ import {
   redactStoredObjectStorageUri,
 } from "@langwatch/stored-object-contract";
 import type { AzureCredentials } from "./azure-blob-credentials.adapter";
-import { getAzureBlobToken, invalidateAzureBlobToken } from "./azure-blob-token-provider.adapter";
+import { AzureBlobTokenProviderAdapter } from "./azure-blob-token-provider.adapter";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import type { StoredObjectStorageDriver } from "./stored-object-storage-registry.adapter";
 
@@ -460,7 +460,7 @@ export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDr
       };
     }
 
-    const token = await getAzureBlobToken(this.credentials);
+    const token = await AzureBlobTokenProviderAdapter.getAzureBlobToken(this.credentials);
     return {
       "x-ms-date": date,
       "x-ms-version": xMsVersion,
@@ -526,7 +526,7 @@ export class AzureBlobStoredObjectDriverAdapter implements StoredObjectStorageDr
     }
 
     if (response.status === 401) {
-      invalidateAzureBlobToken(this.credentials);
+      AzureBlobTokenProviderAdapter.invalidateAzureBlobToken(this.credentials);
       const retryHeaders = await buildHeaders();
       return fetch(url, {
         method,

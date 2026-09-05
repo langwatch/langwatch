@@ -31,11 +31,11 @@ export interface AnomalyWorkerContributionOptions {
  * Process-owned scheduling contribution for the tenant rate anomaly service.
  * Construction has no effects; the worker process explicitly calls start.
  */
-export class AnomalyWorkerContribution {
+export class AnomalyWorkerContributionAdapter {
   private constructor(private readonly detector: AnomalyTickPort) {}
 
-  static create(options: AnomalyWorkerContributionOptions): AnomalyWorkerContribution {
-    return new AnomalyWorkerContribution(options.detector);
+  static create(options: AnomalyWorkerContributionOptions): AnomalyWorkerContributionAdapter {
+    return new AnomalyWorkerContributionAdapter(options.detector);
   }
 
   start(): OpsWorkerHandle {
@@ -92,11 +92,11 @@ export interface UsageStatsWorkerContributionOptions {
  * Process-owned scheduling contribution for daily self-hosted telemetry.
  * The worker is disabled by typed composition config, never environment reads.
  */
-export class UsageStatsWorkerContribution {
+export class UsageStatsWorkerContributionAdapter {
   private constructor(private readonly options: UsageStatsWorkerContributionOptions) {}
 
-  static create(options: UsageStatsWorkerContributionOptions): UsageStatsWorkerContribution {
-    return new UsageStatsWorkerContribution(options);
+  static create(options: UsageStatsWorkerContributionOptions): UsageStatsWorkerContributionAdapter {
+    return new UsageStatsWorkerContributionAdapter(options);
   }
 
   start(): OpsWorkerHandle | undefined {

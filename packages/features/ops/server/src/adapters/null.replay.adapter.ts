@@ -3,7 +3,11 @@
 import { IDLE_STATUS, type ReplayHistoryEntry, type ReplayStatus } from "@langwatch/ops-contract";
 import type { ReplayRepository } from "../repositories/replay.repository";
 
-export class NullReplayRepository implements ReplayRepository {
+export class NullReplayAdapter implements ReplayRepository {
+  static create(): NullReplayAdapter {
+    return new NullReplayAdapter();
+  }
+
   async getStatus(): Promise<ReplayStatus> {
     return { ...IDLE_STATUS };
   }

@@ -11,3 +11,4 @@ export * from "./team";
 export * from "./team.trpc-schemas";
 export * from "./team.errors";
 export * from "./organization.rows";
+export * from "./organization-membership.errors";

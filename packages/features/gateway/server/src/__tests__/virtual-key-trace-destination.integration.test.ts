@@ -18,7 +18,9 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { GatewayVirtualKeyDtoAdapter } from "../adapters/gateway-virtual-key-dto.adapter";
 import { TraceDestinationProjectService } from "./support/trace-destination-project-service";
 
-import { createVirtualKeyServiceForTest } from "../testing";
+import { PostgresVirtualKeyAdapter } from "../testing";
+
+const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 const virtualKeyDtos = GatewayVirtualKeyDtoAdapter.create();
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

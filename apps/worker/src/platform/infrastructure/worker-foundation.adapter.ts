@@ -11,7 +11,7 @@ import {
   type RedisConfigResolution,
   type RedisLogger,
 } from "@langwatch/redis-client";
-import { StoredObjectStorageRuntime } from "@langwatch/stored-object-server";
+import { StoredObjectStorageRuntimeAdapter } from "@langwatch/stored-object-server";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { WorkerStoredObjectStorageRuntimeFactory } from "./worker-stored-object-storage.adapter";
 
@@ -28,12 +28,12 @@ export abstract class WorkerStorageFactoryPort {
 /** Adapts the canonical Stored Object project view to Group Queue's port. */
 export class WorkerStoredObjectStorageFactory extends WorkerStorageFactoryPort {
   static create(options: {
-    runtime: StoredObjectStorageRuntime;
+    runtime: StoredObjectStorageRuntimeAdapter;
   }): WorkerStoredObjectStorageFactory {
     return new WorkerStoredObjectStorageFactory(options.runtime);
   }
 
-  private constructor(private readonly runtime: StoredObjectStorageRuntime) {
+  private constructor(private readonly runtime: StoredObjectStorageRuntimeAdapter) {
     super();
   }
 
@@ -56,7 +56,7 @@ export type WorkerInfrastructureAdapterOptions = {
   queuePolicy?: GroupQueuePolicy;
   outboundProxy: OutboundProxyResolverPort;
   storage?: WorkerStorageFactoryPort;
-  storageRuntime?: StoredObjectStorageRuntime;
+  storageRuntime?: StoredObjectStorageRuntimeAdapter;
   storedObjectStorage?: WorkerStoredObjectStorageRuntimeFactory;
 };
 

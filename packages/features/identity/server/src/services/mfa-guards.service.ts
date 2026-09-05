@@ -50,6 +50,7 @@ export class MfaGuards {
     if (enrollment.enrollmentId === enrollmentId) {
       return [];
     }
+
     if (enrollment.state === "PENDING") {
       throw new IdentityMfaCodeInvalidError(
         `enroll_mfa: ${userId} already has a pending enrollment ${enrollment.enrollmentId}`,
@@ -80,6 +81,7 @@ export class MfaGuards {
     if (enrollment.state === "ENABLED") {
       return [];
     }
+
     if (enrollment.state === "EXPIRED") {
       throw new IdentityMfaEnrollmentExpiredError(
         `confirm_mfa: enrollment ${enrollmentId} for ${userId} expired before it was confirmed`,
@@ -224,6 +226,7 @@ export class MfaGuards {
     if (enrollment.enrollmentId === null) {
       return [];
     }
+
     return [
       {
         type: MFA_VERIFICATION_FAILED_EVENT_TYPE,

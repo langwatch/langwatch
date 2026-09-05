@@ -15,7 +15,13 @@ import {
   type CanonicalLift,
 } from "../rules/codex-canonical-value.rules";
 
-export class CodexSpanCanonicaliser {
+export class CodexSpanCanonicaliserService {
+  private constructor() {}
+
+  static create(): CodexSpanCanonicaliserService {
+    return new CodexSpanCanonicaliserService();
+  }
+
   apply(ctx: ExtractorContext): void {
     this.markCodexProviderBundled(ctx);
 

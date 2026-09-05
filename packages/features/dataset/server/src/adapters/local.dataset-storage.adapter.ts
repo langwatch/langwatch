@@ -44,7 +44,7 @@ import {
   StagedUploadNotFoundError,
   StorageNotWritableError,
   UploadTooLargeError,
-} from "../services/dataset-errors.service";
+} from "@langwatch/dataset-contract";
 import { localStagingUploadPath, stagingUploadKey } from "../services/presigned-upload.service";
 
 const logger = createLogger("langwatch:datasets:local-storage");

@@ -2,7 +2,13 @@ import { ATTR_KEYS } from "@langwatch/trace-contract";
 import type { LogExtractorContext } from "../ports/canonical-attributes.port";
 import { asNumber, asString, CODEX_EVENT_NAME_PREFIX } from "../rules/codex-canonical-value.rules";
 
-export class CodexLogCanonicaliser {
+export class CodexLogCanonicaliserService {
+  private constructor() {}
+
+  static create(): CodexLogCanonicaliserService {
+    return new CodexLogCanonicaliserService();
+  }
+
   apply(ctx: LogExtractorContext): void {
     const eventName = ctx.bag.attrs.get("event.name");
     if (typeof eventName !== "string") {

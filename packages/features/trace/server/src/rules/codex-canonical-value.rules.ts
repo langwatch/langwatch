@@ -13,7 +13,7 @@ export const CODEX_SCOPE_NAMES: Readonly<Record<string, true>> = {
   [CODEX_EXEC_SCOPE_NAME]: true,
 };
 export const CODEX_REDUNDANT_USAGE_SPAN_NAMES: Readonly<Record<string, true>> = {
-  "handle_responses": true,
+  handle_responses: true,
 };
 
 export const asNumber = (raw: unknown): number | null => {

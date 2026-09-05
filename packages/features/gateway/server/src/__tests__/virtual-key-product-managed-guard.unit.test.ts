@@ -9,7 +9,9 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { TestProjectService } from "./support/test-project-service";
 
-import { createVirtualKeyServiceForTest } from "../testing";
+import { PostgresVirtualKeyAdapter } from "../testing";
+
+const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 const REACHED_TRANSACTION = "REACHED_TRANSACTION";
 
 function vkRow(purpose: "USER" | "LANGY") {

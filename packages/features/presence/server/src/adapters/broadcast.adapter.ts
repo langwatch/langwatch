@@ -3,7 +3,7 @@ import { EventEmitter } from "events";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { BroadcasterNotActiveError } from "@langwatch/presence-contract";
-import { TenantRateLimiter } from "./broadcast-tenant-rate-limiter.adapter";
+import { BroadcastTenantRateLimiterAdapter } from "./broadcast-tenant-rate-limiter.adapter";
 
 export type BroadcastEventType =
   | "trace_updated"
@@ -59,8 +59,8 @@ export class BroadcastAdapter {
   private readonly EMITTER_CLEANUP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
   private emitterEmptyTimes = new Map<string, number>(); // tenantId -> timestamp when emitter became empty
   private active = false;
-  private readonly senderRateLimiter = new TenantRateLimiter();
-  private readonly subscriberRateLimiter = new TenantRateLimiter();
+  private readonly senderRateLimiter = new BroadcastTenantRateLimiterAdapter();
+  private readonly subscriberRateLimiter = new BroadcastTenantRateLimiterAdapter();
 
   static create(redis: Cluster | IORedis | null): BroadcastAdapter {
     return new BroadcastAdapter(redis);

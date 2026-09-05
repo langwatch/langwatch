@@ -19,12 +19,14 @@ import {
 const getAzureBlobTokenMock = vi.fn();
 const invalidateAzureBlobTokenMock = vi.fn();
 vi.mock("../azure-blob-token-provider.adapter", () => ({
-  getAzureBlobToken: (...args: unknown[]) => getAzureBlobTokenMock(...args),
-  invalidateAzureBlobToken: (...args: unknown[]) => invalidateAzureBlobTokenMock(...args),
+  AzureBlobTokenProviderAdapter: {
+    getAzureBlobToken: (...args: unknown[]) => getAzureBlobTokenMock(...args),
+    invalidateAzureBlobToken: (...args: unknown[]) => invalidateAzureBlobTokenMock(...args),
+  },
 }));
 
 import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter";
-import { StoredObjectStorageRegistry } from "../stored-object-storage-registry.adapter";
+import { StoredObjectStorageRegistryAdapter } from "../stored-object-storage-registry.adapter";
 import type { StoredObjectStorageDriver } from "../stored-object-storage-registry.adapter";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 
@@ -119,7 +121,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
       // GET — same bytes come back.
       fetchSpy.mockResolvedValueOnce(new Response(payload, { status: 200 }));
 
-      const registry = new StoredObjectStorageRegistry({
+      const registry = StoredObjectStorageRegistryAdapter.create({
         s3: new NeverCalledDriver(),
         file: new NeverCalledDriver(),
         "azure-blob": azure,

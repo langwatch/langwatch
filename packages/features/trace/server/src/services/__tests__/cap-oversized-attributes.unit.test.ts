@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
-import { TraceAttributeCap } from "../trace-attribute-cap.service";
+import { TraceAttributeCapService } from "../trace-attribute-cap.service";
 import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../../rules/trace-payload-cap.rules";
+
+const traceAttributeCapService = TraceAttributeCapService.create();
 
 function makeSpan(attributes: OtlpSpan["attributes"]): OtlpSpan {
   return {
@@ -32,7 +34,7 @@ describe("capOversizedAttributes", () => {
     const url = oversizedDataUrl();
     const span = makeSpan([{ key: "langwatch.input", value: { stringValue: url } }]);
 
-    const cappedCount = TraceAttributeCap.capOversizedAttributes(span, null);
+    const cappedCount = traceAttributeCapService.capOversizedAttributes(span, null);
 
     expect(cappedCount).toBe(1);
     const value = span.attributes[0]!.value.stringValue!;
@@ -54,7 +56,7 @@ describe("capOversizedAttributes", () => {
     ]);
     const before = structuredClone(span.attributes);
 
-    const cappedCount = TraceAttributeCap.capOversizedAttributes(span, null);
+    const cappedCount = traceAttributeCapService.capOversizedAttributes(span, null);
 
     expect(cappedCount).toBe(0);
     expect(span.attributes).toEqual(before);
@@ -84,7 +86,7 @@ describe("capOversizedAttributes", () => {
       },
     ]);
 
-    const cappedCount = TraceAttributeCap.capOversizedAttributes(span, null);
+    const cappedCount = traceAttributeCapService.capOversizedAttributes(span, null);
 
     expect(cappedCount).toBe(2);
     const kv = span.attributes[0]!.value.kvlistValue!.values;
@@ -105,7 +107,7 @@ describe("capOversizedAttributes", () => {
       },
     ]);
 
-    const cappedCount = TraceAttributeCap.capOversizedAttributes(span, null);
+    const cappedCount = traceAttributeCapService.capOversizedAttributes(span, null);
 
     expect(cappedCount).toBe(1);
     expect(span.attributes[0]!.value.bytesValue).toBeNull();
@@ -134,7 +136,7 @@ describe("capOversizedAttributes", () => {
       attributes: [{ key: "big", value: { stringValue: big } }],
     };
 
-    const cappedCount = TraceAttributeCap.capOversizedAttributes(span, resource as never);
+    const cappedCount = traceAttributeCapService.capOversizedAttributes(span, resource as never);
 
     expect(cappedCount).toBe(3);
   });
@@ -142,7 +144,7 @@ describe("capOversizedAttributes", () => {
   it("does not throw on malformed attribute shapes", () => {
     const span = makeSpan([{ key: "weird", value: null as never }, undefined as never]);
 
-    expect(() => TraceAttributeCap.capOversizedAttributes(span, null)).not.toThrow();
+    expect(() => traceAttributeCapService.capOversizedAttributes(span, null)).not.toThrow();
   });
 });
 
@@ -167,7 +169,7 @@ describe("capOversizedAttributes with copilot content-capture payloads", () => {
       },
     ];
 
-    const cappedCount = TraceAttributeCap.capOversizedAttributes(span, null);
+    const cappedCount = traceAttributeCapService.capOversizedAttributes(span, null);
 
     expect(cappedCount).toBe(1);
     const eventAttr = (
@@ -196,7 +198,7 @@ describe("capOversizedAttributes with copilot content-capture payloads", () => {
 
     let totalCapped = 0;
     for (const span of spans) {
-      totalCapped += TraceAttributeCap.capOversizedAttributes(span, null);
+      totalCapped += traceAttributeCapService.capOversizedAttributes(span, null);
     }
 
     expect(totalCapped).toBe(100);
@@ -214,7 +216,9 @@ describe("valueExceeds", () => {
         const value = {
           stringValue: "a".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1),
         };
-        expect(TraceAttributeCap.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(true);
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(true);
       });
     });
 
@@ -223,18 +227,18 @@ describe("valueExceeds", () => {
         const value = {
           stringValue: "a".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
         };
-        expect(TraceAttributeCap.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
-          false,
-        );
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(false);
       });
     });
 
     describe("when the string is small", () => {
       it("returns false", () => {
         const value = { stringValue: "hello" };
-        expect(TraceAttributeCap.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
-          false,
-        );
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(false);
       });
     });
   });
@@ -245,7 +249,9 @@ describe("valueExceeds", () => {
         const value = {
           bytesValue: new Uint8Array(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1),
         };
-        expect(TraceAttributeCap.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(true);
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(true);
       });
     });
 
@@ -254,9 +260,9 @@ describe("valueExceeds", () => {
         const value = {
           bytesValue: new Uint8Array(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
         };
-        expect(TraceAttributeCap.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
-          false,
-        );
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(false);
       });
     });
   });
@@ -274,7 +280,9 @@ describe("valueExceeds", () => {
             ],
           },
         };
-        expect(TraceAttributeCap.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(true);
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(true);
       });
     });
 
@@ -285,9 +293,9 @@ describe("valueExceeds", () => {
             values: [{ stringValue: "a" }, { stringValue: "b" }],
           },
         };
-        expect(TraceAttributeCap.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
-          false,
-        );
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(false);
       });
     });
   });
@@ -308,7 +316,9 @@ describe("valueExceeds", () => {
             ],
           },
         };
-        expect(TraceAttributeCap.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(true);
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(true);
       });
     });
 
@@ -322,22 +332,24 @@ describe("valueExceeds", () => {
             ],
           },
         };
-        expect(TraceAttributeCap.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
-          false,
-        );
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(false);
       });
     });
   });
 
   describe("given null or undefined", () => {
     it("returns false for null", () => {
-      expect(TraceAttributeCap.valueExceeds(null, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(false);
+      expect(traceAttributeCapService.valueExceeds(null, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
+        false,
+      );
     });
 
     it("returns false for undefined", () => {
-      expect(TraceAttributeCap.valueExceeds(undefined, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
-        false,
-      );
+      expect(
+        traceAttributeCapService.valueExceeds(undefined, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+      ).toBe(false);
     });
   });
 });
@@ -354,7 +366,7 @@ describe("hasOversizedAttribute", () => {
     describe("when hasOversizedAttribute is called", () => {
       it("returns false", () => {
         const span = makeSpan([{ key: "custom.attr", value: { stringValue: small } }]);
-        expect(TraceAttributeCap.hasOversizedAttribute(span, null)).toBe(false);
+        expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(false);
       });
     });
   });
@@ -363,7 +375,7 @@ describe("hasOversizedAttribute", () => {
     describe("when hasOversizedAttribute is called", () => {
       it("returns true", () => {
         const span = makeSpan([{ key: "custom.attr", value: { stringValue: big } }]);
-        expect(TraceAttributeCap.hasOversizedAttribute(span, null)).toBe(true);
+        expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(true);
       });
     });
   });
@@ -380,7 +392,7 @@ describe("hasOversizedAttribute", () => {
           },
         ] as unknown as OtlpSpan["events"];
 
-        expect(TraceAttributeCap.hasOversizedAttribute(span, null)).toBe(true);
+        expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(true);
       });
     });
   });
@@ -398,7 +410,7 @@ describe("hasOversizedAttribute", () => {
           },
         ] as unknown as OtlpSpan["links"];
 
-        expect(TraceAttributeCap.hasOversizedAttribute(span, null)).toBe(true);
+        expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(true);
       });
     });
   });
@@ -411,7 +423,7 @@ describe("hasOversizedAttribute", () => {
           attributes: [{ key: "service.name", value: { stringValue: big } }],
         } as unknown as OtlpResource;
 
-        expect(TraceAttributeCap.hasOversizedAttribute(span, resource)).toBe(true);
+        expect(traceAttributeCapService.hasOversizedAttribute(span, resource)).toBe(true);
       });
     });
   });
@@ -430,7 +442,7 @@ describe("hasOversizedAttribute", () => {
           },
         ]);
 
-        expect(TraceAttributeCap.hasOversizedAttribute(span, null)).toBe(true);
+        expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(true);
       });
     });
   });
@@ -456,7 +468,7 @@ describe("hasOversizedAttribute", () => {
           },
         ] as unknown as OtlpSpan["events"];
 
-        expect(TraceAttributeCap.hasOversizedAttribute(span, null)).toBe(true);
+        expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(true);
       });
     });
   });
@@ -465,8 +477,8 @@ describe("hasOversizedAttribute", () => {
     describe("when hasOversizedAttribute is called with all-small span", () => {
       it("returns false without throwing", () => {
         const span = makeSpan([{ key: "a", value: { stringValue: "x" } }]);
-        expect(() => TraceAttributeCap.hasOversizedAttribute(span, null)).not.toThrow();
-        expect(TraceAttributeCap.hasOversizedAttribute(span, null)).toBe(false);
+        expect(() => traceAttributeCapService.hasOversizedAttribute(span, null)).not.toThrow();
+        expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(false);
       });
     });
   });

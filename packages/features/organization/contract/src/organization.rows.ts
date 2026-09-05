@@ -7,7 +7,7 @@ import type { OrganizationIntent } from "./organization";
 
 /** A Json column's value, mirroring the generated client's own shape. */
 export type OrganizationJsonObject = { [Key in string]?: OrganizationJsonValue };
-export interface OrganizationJsonArray extends Array<OrganizationJsonValue> {}
+export type OrganizationJsonArray = OrganizationJsonValue[];
 export type OrganizationJsonValue =
   | string
   | number

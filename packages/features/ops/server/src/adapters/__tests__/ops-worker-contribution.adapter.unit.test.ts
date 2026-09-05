@@ -7,8 +7,8 @@ import {
   type UsageStatsReport,
 } from "../../ports/usage-stats-worker.port";
 import {
-  AnomalyWorkerContribution,
-  UsageStatsWorkerContribution,
+  AnomalyWorkerContributionAdapter,
+  UsageStatsWorkerContributionAdapter,
 } from "../ops-worker-contribution.adapter";
 
 const logger = vi.hoisted(() => ({
@@ -82,7 +82,7 @@ const createUsageStatsWorker = (disabled = false) => {
   const usageStats = new UsageStatsStub();
   const telemetry = new TelemetryStub();
   const errors = new ErrorReporterStub();
-  const worker = UsageStatsWorkerContribution.create({
+  const worker = UsageStatsWorkerContributionAdapter.create({
     config: {
       disabled,
       installMethod: "self-hosted",
@@ -111,7 +111,7 @@ describe("Ops worker contributions", () => {
 
   it("starts anomaly detection after the existing five-second settling delay", async () => {
     const detector = { tick: vi.fn(async () => ({ surfaced: 0, cleared: 0 })) };
-    const handle = AnomalyWorkerContribution.create({ detector }).start();
+    const handle = AnomalyWorkerContributionAdapter.create({ detector }).start();
 
     await vi.advanceTimersByTimeAsync(4_999);
     expect(detector.tick).not.toHaveBeenCalled();
@@ -128,7 +128,7 @@ describe("Ops worker contributions", () => {
         .mockRejectedValueOnce(new Error("redis unavailable"))
         .mockResolvedValue({ surfaced: 0, cleared: 0 }),
     };
-    const handle = AnomalyWorkerContribution.create({ detector }).start();
+    const handle = AnomalyWorkerContributionAdapter.create({ detector }).start();
 
     await vi.advanceTimersByTimeAsync(5_000 + 60_000);
     await handle.stop();

@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import {
-  StoredObjectStorageRegistry,
+  StoredObjectStorageRegistryAdapter,
   type StoredObject,
   type StoredObjectStorageDriver,
 } from "@langwatch/stored-object-server";
@@ -497,7 +497,7 @@ describe("Feature: Object storage provider parity and migration", () => {
       }
 
       const result = await state.migration.finalize();
-      const activeRegistry = new StoredObjectStorageRegistry({
+      const activeRegistry = StoredObjectStorageRegistryAdapter.create({
         s3: destinationProvider === "s3" ? state.destinationDriver : state.sourceDriver,
         file: new MemoryDriver(),
         "azure-blob":

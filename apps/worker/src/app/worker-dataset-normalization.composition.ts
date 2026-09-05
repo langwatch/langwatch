@@ -22,7 +22,7 @@ import {
   type DatasetStorage,
 } from "@langwatch/dataset-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { StoredObjectStorageRuntime } from "@langwatch/stored-object-server";
+import type { StoredObjectStorageRuntimeAdapter } from "@langwatch/stored-object-server";
 import { createWorkerAzureBlobDriver } from "./worker-object-storage.composition";
 import type { WorkerStorageConfig } from "../platform/config/worker.config";
 import type {
@@ -49,7 +49,7 @@ export function createWorkerDatasetNormalization(options: {
 
 /** The object storage a dataset's chunked content is read and written through. */
 export type WorkerDatasetObjectStorage = {
-  runtime: StoredObjectStorageRuntime;
+  runtime: StoredObjectStorageRuntimeAdapter;
   aws: AwsClientProcessRuntime;
   projects: WorkerProjectS3SourcePort;
   globalS3?: WorkerProjectS3Target;

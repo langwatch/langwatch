@@ -18,7 +18,7 @@ import type {
   SchedulerOpsRepository,
   ScheduledJobRecord,
 } from "../repositories/scheduler-ops.repository";
-import { SchedulerWakeService } from "../services/scheduler-wake.service";
+import { SchedulerWakePort } from "../ports/scheduler-wake.port";
 
 const logger = createLogger("langwatch:ops:scheduler");
 
@@ -27,14 +27,14 @@ export class SchedulerOpsService {
   private constructor(
     private readonly repository: SchedulerOpsRepository,
     private readonly audit: SchedulerAuditSinkPort,
-    private readonly wake: SchedulerWakeService,
+    private readonly wake: SchedulerWakePort,
     private readonly projects: ProjectService,
   ) {}
 
   static create(input: {
     repository: SchedulerOpsRepository;
     audit: SchedulerAuditSinkPort;
-    wake: SchedulerWakeService;
+    wake: SchedulerWakePort;
     projects: ProjectService;
   }): SchedulerOpsService {
     return new SchedulerOpsService(input.repository, input.audit, input.wake, input.projects);

@@ -5,10 +5,9 @@ import {
   type EStatusCode,
 } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
 import { match } from "ts-pattern";
-import {
-  parseJsonStringValues,
-  reconstructFlattenedArrays,
-} from "./otlp-attribute-flattening.service";
+import { OtlpAttributeFlatteningService } from "./otlp-attribute-flattening.service";
+
+const { parseJsonStringValues, reconstructFlattenedArrays } = OtlpAttributeFlatteningService;
 import type { OtlpAnyValue, OtlpKeyValue, OtlpSpan } from "@langwatch/trace-contract";
 import {
   type NormalizedAttributes,
@@ -200,6 +199,7 @@ const normalizeOtlpAnyValue = (root: OtlpAnyValue, rootKey?: string): FlattenRes
     if (!k) {
       return;
     }
+
     out[k] = v; // last write wins
   };
 
@@ -248,6 +248,7 @@ const normalizeOtlpAnyValue = (root: OtlpAnyValue, rootKey?: string): FlattenRes
     if (rootKey) {
       set(rootKey, rootScalar);
     }
+
     return out;
   }
 
@@ -382,18 +383,23 @@ const parseTraceState = (traceState: string | null | undefined): TraceStateInfo 
   };
 };
 
-export const TraceRequestUtils = {
-  normalizeOtlpId,
-  normalizeOtlpSpanIds,
-  normalizeOtlpUnixNano,
-  normalizeOtlpParentAndTraceContext,
-  normalizeOtlpSpanKind,
-  normalizeOtlpStatusCode,
-  normalizeOtlpAnyValue,
-  normalizeOtlpAttributes,
-  convertUnixNanoToUnixMs,
-  parseTraceFlags,
-  parseTraceState,
-  /** @internal Exported for unit testing */
-  reconstructFlattenedArrays,
-};
+export class OtlpTraceRequestService {
+  private constructor() {}
+
+  static create(): OtlpTraceRequestService {
+    return new OtlpTraceRequestService();
+  }
+
+  static normalizeOtlpId = normalizeOtlpId;
+  static normalizeOtlpSpanIds = normalizeOtlpSpanIds;
+  static normalizeOtlpUnixNano = normalizeOtlpUnixNano;
+  static normalizeOtlpParentAndTraceContext = normalizeOtlpParentAndTraceContext;
+  static normalizeOtlpSpanKind = normalizeOtlpSpanKind;
+  static normalizeOtlpStatusCode = normalizeOtlpStatusCode;
+  static normalizeOtlpAnyValue = normalizeOtlpAnyValue;
+  static normalizeOtlpAttributes = normalizeOtlpAttributes;
+  static convertUnixNanoToUnixMs = convertUnixNanoToUnixMs;
+  static parseTraceFlags = parseTraceFlags;
+  static parseTraceState = parseTraceState;
+  static reconstructFlattenedArrays = reconstructFlattenedArrays;
+}

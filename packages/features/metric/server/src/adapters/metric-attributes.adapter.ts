@@ -2,8 +2,10 @@ import { compareOrdinal } from "@langwatch/eventing";
 import { otlpAnyValueSchema, type OtlpAnyValue } from "@langwatch/otlp";
 
 type OtlpKeyValue = { key: string; value: OtlpAnyValue };
-import { MetricNumbers } from "./metric-numbers.adapter";
-import { isRecord, stableStringify, type UnknownRecord } from "./metric-serialization.adapter";
+import { MetricNumbersAdapter } from "./metric-numbers.adapter";
+import { type UnknownRecord } from "./metric-serialization.adapter";
+import { MetricSerializationAdapter } from "./metric-serialization.adapter";
+const { isRecord, stableStringify } = MetricSerializationAdapter;
 
 function canonicalAnyValue(value: OtlpAnyValue | UnknownRecord | undefined): unknown {
   const parsed = otlpAnyValueSchema.safeParse(value);
@@ -24,7 +26,7 @@ function canonicalAnyValue(value: OtlpAnyValue | UnknownRecord | undefined): unk
   if (typed.intValue !== undefined && typed.intValue !== null) {
     return {
       type: "int",
-      value: MetricNumbers.integerDecimal(typed.intValue, { signed: true }),
+      value: MetricNumbersAdapter.integerDecimal(typed.intValue, { signed: true }),
     };
   }
   if (typed.doubleValue !== undefined && typed.doubleValue !== null) {
@@ -78,4 +80,13 @@ function canonicalAttributes(attributes: unknown): Array<{ key: string; value: u
     );
 }
 
-export { canonicalAnyValue, canonicalAttributes };
+export class MetricAttributesAdapter {
+  private constructor() {}
+
+  static create(): MetricAttributesAdapter {
+    return new MetricAttributesAdapter();
+  }
+
+  static canonicalAnyValue = canonicalAnyValue;
+  static canonicalAttributes = canonicalAttributes;
+}

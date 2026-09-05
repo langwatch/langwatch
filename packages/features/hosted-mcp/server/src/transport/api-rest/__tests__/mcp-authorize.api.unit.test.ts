@@ -88,18 +88,32 @@ function ports(options: { held: readonly string[] }): {
   };
 }
 
-async function approve(app: ReturnType<typeof createMcpAuthorizeRestApp>) {
+async function approve(
+  app: ReturnType<typeof createMcpAuthorizeRestApp>,
+  overrides: Record<string, unknown> = {},
+) {
+  const body: Record<string, unknown> = {
+    projectId: PROJECT_ID,
+    redirect_uri: REDIRECT_URI,
+    client_id: CLIENT_ID,
+    code_challenge: "a".repeat(43),
+    code_challenge_method: "S256",
+    state: "xyz",
+    ...overrides,
+  };
+  for (const [key, value] of Object.entries(body)) {
+    if (value === undefined) delete body[key];
+  }
   return await app.request("/api/mcp/authorize", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      projectId: PROJECT_ID,
-      redirect_uri: REDIRECT_URI,
-      client_id: CLIENT_ID,
-      code_challenge: "a".repeat(43),
-      code_challenge_method: "S256",
-    }),
+    body: JSON.stringify(body),
   });
+}
+
+/** The auth-code keys the flow wrote, which is what "minted nothing" means. */
+function mintedCodes(stored: Map<string, string>): string[] {
+  return [...stored.keys()].filter((key) => key.startsWith("mcp:auth_code:"));
 }
 
 describe("given the hosted MCP approval step", () => {
@@ -160,6 +174,187 @@ describe("given the hosted MCP approval step", () => {
         redirectUri: REDIRECT_URI,
         userId: "user-1",
       });
+    });
+  });
+});
+
+/**
+ * RFC 6749 §10.6. The authorize step used to accept ANY redirect_uri regardless of what the
+ * client registered, so whoever crafted the authorization request — not necessarily the person
+ * who clicks Allow — could have the approved code delivered to a domain they control. PKCE
+ * does not defend against it: the same attacker authored the challenge.
+ */
+describe("given an authorization request naming a client and a redirect URI", () => {
+  const mount = (harness: ReturnType<typeof ports>) =>
+    createMcpAuthorizeRestApp({ security: passThroughSecurity(), ports: harness.ports });
+
+  describe("when the redirect URI is exactly one the client registered", () => {
+    /** @scenario "Authorization succeeds when redirect_uri exactly matches the registered client" */
+    it("issues an authorization code", async () => {
+      const harness = ports({ held: ["project:update"] });
+
+      const response = await approve(mount(harness));
+
+      expect(response.status).toBe(200);
+      expect(((await response.json()) as { redirect: string }).redirect).toContain("code=");
+    });
+  });
+
+  describe("when the redirect URI is not one the client registered", () => {
+    /** @scenario "Authorization is rejected when redirect_uri does not match the registered client" */
+    it("refuses it and never mints a code", async () => {
+      const harness = ports({ held: ["project:update"] });
+
+      const response = await approve(mount(harness), {
+        redirect_uri: "https://attacker.invalid/callback",
+      });
+
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as { error: string; redirect?: string };
+      expect(body.error).toContain("does not match");
+      // Nothing is ever sent to an unverified redirect URI: that URI is
+      // exactly what an attacker would have supplied.
+      expect(body.redirect).toBeUndefined();
+      expect(mintedCodes(harness.stored)).toEqual([]);
+    });
+  });
+
+  describe.each([
+    "javascript:alert(1)",
+    "vbscript:msgbox(1)",
+    "data:text/html,<script>alert(1)</script>",
+    "blob:https://app.langwatch.ai/00000000-0000-4000-8000-000000000000",
+    "filesystem:https://app.langwatch.ai/temporary/x",
+  ])("when the redirect URI is %s", (redirect_uri) => {
+    /** @scenario "Authorization is rejected when redirect_uri uses a scheme the browser executes" */
+    it("refuses it before the client registry is consulted", async () => {
+      const harness = ports({ held: ["project:update"] });
+
+      const response = await approve(mount(harness), { redirect_uri });
+
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as { error: string; redirect?: string };
+      expect(body.error).toContain("disallowed scheme");
+      expect(body.redirect).toBeUndefined();
+      expect(mintedCodes(harness.stored)).toEqual([]);
+    });
+  });
+
+  describe("when the client was never registered", () => {
+    /** @scenario "Authorization is rejected for an unregistered client_id" */
+    it("refuses it and never mints a code", async () => {
+      const harness = ports({ held: ["project:update"] });
+
+      const response = await approve(mount(harness), { client_id: "mcp_never_registered" });
+
+      expect(response.status).toBe(400);
+      expect(((await response.json()) as { error: string }).error).toBe(
+        "Unknown or unregistered client_id",
+      );
+      expect(mintedCodes(harness.stored)).toEqual([]);
+    });
+  });
+
+  describe("when the request names no client at all", () => {
+    /** @scenario "Authorization is rejected when client_id is missing" */
+    it("refuses it before any registration is looked up", async () => {
+      const harness = ports({ held: ["project:update"] });
+
+      const response = await approve(mount(harness), { client_id: undefined });
+
+      expect(response.status).toBe(400);
+      expect(((await response.json()) as { error: string }).error).toContain("client_id");
+      expect(mintedCodes(harness.stored)).toEqual([]);
+    });
+  });
+});
+
+/**
+ * RFC 6749 §4.1.2.1: once the client is verified and the presented redirect URI is one it
+ * registered, a failure belongs back at that URI as an OAuth error. The advertised authorize
+ * endpoint is a page in this application, so a failure rendered only here leaves the client's
+ * popup waiting forever with nothing to report.
+ */
+describe("given a verified client whose approval then fails", () => {
+  const mount = (harness: ReturnType<typeof ports>) =>
+    createMcpAuthorizeRestApp({ security: passThroughSecurity(), ports: harness.ports });
+
+  describe("when the request carries no code challenge", () => {
+    /** @scenario "A consent failure a client can be told about is redirected back to the client" */
+    it("sends the browser back to the registered redirect URI with the OAuth error", async () => {
+      const harness = ports({ held: ["project:update"] });
+
+      const response = await approve(mount(harness), { code_challenge: undefined });
+
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as { error: string; redirect: string };
+      expect(body.error).toBe("invalid_request");
+      const redirect = new URL(body.redirect);
+      expect(redirect.origin + redirect.pathname).toBe(REDIRECT_URI);
+      expect(redirect.searchParams.get("error")).toBe("invalid_request");
+      expect(redirect.searchParams.get("error_description")).toContain("code_challenge");
+      expect(redirect.searchParams.get("state")).toBe("xyz");
+      expect(redirect.searchParams.get("code")).toBeNull();
+      expect(mintedCodes(harness.stored)).toEqual([]);
+    });
+  });
+
+  describe("when the request asks for a code challenge method other than S256", () => {
+    /**
+     * The token endpoint verifies every code as S256 whatever was requested, so accepting
+     * another method here would mint a code that can never be redeemed.
+     */
+    /** @scenario "A code challenge method other than S256 is refused at the authorization request" */
+    it("refuses it now rather than at the exchange", async () => {
+      const harness = ports({ held: ["project:update"] });
+
+      const response = await approve(mount(harness), { code_challenge_method: "plain" });
+
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as { error: string; redirect: string };
+      expect(body.error).toBe("invalid_request");
+      expect(new URL(body.redirect).searchParams.get("error_description")).toContain(
+        "code_challenge_method",
+      );
+      expect(mintedCodes(harness.stored)).toEqual([]);
+    });
+  });
+
+  describe("when the approving person cannot reach the project", () => {
+    /** @scenario "A project the user cannot reach is reported to the client as access denied" */
+    it("answers access_denied and carries it back to the client", async () => {
+      const harness = ports({ held: [] });
+
+      const response = await approve(mount(harness));
+
+      expect(response.status).toBe(403);
+      const body = (await response.json()) as { error: string; redirect: string };
+      expect(body.error).toBe("access_denied");
+      expect(new URL(body.redirect).searchParams.get("error")).toBe("access_denied");
+      expect(mintedCodes(harness.stored)).toEqual([]);
+    });
+  });
+});
+
+describe("given a failure the client cannot be told about", () => {
+  describe("when the redirect URI was never verified against a registration", () => {
+    /** @scenario "A consent failure that cannot be attributed to a client stays on the LangWatch page" */
+    it("carries no redirect for the browser to follow", async () => {
+      const harness = ports({ held: ["project:update"] });
+      const app = createMcpAuthorizeRestApp({
+        security: passThroughSecurity(),
+        ports: harness.ports,
+      });
+
+      const unregisteredClient = await approve(app, { client_id: "mcp_never_registered" });
+      const foreignRedirect = await approve(app, {
+        redirect_uri: "https://attacker.invalid/callback",
+      });
+
+      for (const response of [unregisteredClient, foreignRedirect]) {
+        expect((await response.json()) as { redirect?: string }).not.toHaveProperty("redirect");
+      }
+      expect(mintedCodes(harness.stored)).toEqual([]);
     });
   });
 });

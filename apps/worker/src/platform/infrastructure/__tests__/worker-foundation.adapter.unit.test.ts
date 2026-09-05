@@ -31,9 +31,9 @@ import { OutboundProxyResolverPort } from "@langwatch/aws-client";
 import type { GroupQueueStoragePort } from "@langwatch/group-queue";
 import type { RedisConfigResolution } from "@langwatch/redis-client";
 import {
-  StoredObjectDestinationPolicy,
+  StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3ConfigPort,
-  StoredObjectStorageRuntime,
+  StoredObjectStorageRuntimeAdapter,
 } from "@langwatch/stored-object-server";
 
 class NoProxy extends OutboundProxyResolverPort {
@@ -150,8 +150,8 @@ describe("WorkerInfrastructureAdapter", () => {
       exists: async () => false,
     };
     let receivedAws: unknown;
-    const runtime = StoredObjectStorageRuntime.create({
-      destination: StoredObjectDestinationPolicy.create({
+    const runtime = StoredObjectStorageRuntimeAdapter.create({
+      destination: StoredObjectDestinationPolicyAdapter.create({
         selection: { backend: "file", localFilesystemRoot: "/tmp/langwatch" },
         projects: new NoPrivateS3Config(),
       }),

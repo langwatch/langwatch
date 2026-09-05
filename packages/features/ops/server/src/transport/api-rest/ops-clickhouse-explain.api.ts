@@ -7,11 +7,9 @@ import { handlerManagedAuth } from "@langwatch/api";
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 
 import type { OpsExplainService } from "../../services/ops-clickhouse-explain.service";
-import {
-  buildExplainQuery,
-  explainBodySchema,
-  redactQueryForAudit,
-} from "../../adapters/ops-clickhouse-explain.adapter";
+import { explainBodySchema } from "../../adapters/ops-clickhouse-explain.adapter";
+import { OpsClickhouseExplainAdapter } from "../../adapters/ops-clickhouse-explain.adapter";
+const { buildExplainQuery, redactQueryForAudit } = OpsClickhouseExplainAdapter;
 
 /** What the family needs from the process it is mounted in. */
 export interface OpsClickHouseExplainRestPorts {

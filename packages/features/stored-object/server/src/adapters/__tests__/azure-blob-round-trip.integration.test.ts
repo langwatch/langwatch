@@ -12,10 +12,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter";
 import {
   StoredObjectAzureDestinationPort,
-  StoredObjectDestinationPolicy,
+  StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3ConfigPort,
 } from "../stored-object-destination-policy.adapter";
-import { StoredObjectStorageRegistry } from "../stored-object-storage-registry.adapter";
+import { StoredObjectStorageRegistryAdapter } from "../stored-object-storage-registry.adapter";
 import { StoredObjectsService } from "../../services/stored-objects.service";
 import type { StoredObject } from "../../rules/stored-object-row.rules";
 import type { StoredObjectsRepository } from "../../repositories/stored-objects.repository";
@@ -63,7 +63,7 @@ function azureDriver(): AzureBlobStoredObjectDriverAdapter {
 }
 
 /** Only the Azure arm can serve a request: an S3 or file dispatch is a failure. */
-function azureOnlyRegistry(): StoredObjectStorageRegistry {
+function azureOnlyRegistry(): StoredObjectStorageRegistryAdapter {
   const driver = azureDriver();
   const refuse = {
     get: async () => {
@@ -79,7 +79,11 @@ function azureOnlyRegistry(): StoredObjectStorageRegistry {
       throw new Error("no S3 or filesystem provider exists on this install");
     },
   };
-  return new StoredObjectStorageRegistry({ s3: refuse, file: refuse, "azure-blob": driver });
+  return StoredObjectStorageRegistryAdapter.create({
+    s3: refuse,
+    file: refuse,
+    "azure-blob": driver,
+  });
 }
 
 class NoPrivateBucket extends StoredObjectProjectS3ConfigPort {
@@ -95,8 +99,8 @@ class ConfiguredAzure extends StoredObjectAzureDestinationPort {
 }
 
 /** The one deployment both cases run on: azure selected, no S3 anywhere. */
-function azureOnlyPolicy(): StoredObjectDestinationPolicy {
-  return StoredObjectDestinationPolicy.create({
+function azureOnlyPolicy(): StoredObjectDestinationPolicyAdapter {
+  return StoredObjectDestinationPolicyAdapter.create({
     selection: {
       backend: "azure",
       localFilesystemRoot: "/var/lib/langwatch/objects",

@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
-  parseJsonStringValues,
-  sanitizeInvalidJsonEscapes,
-} from "../otlp-attribute-flattening.service";
+import { OtlpAttributeFlatteningService } from "../otlp-attribute-flattening.service";
+
+const { parseJsonStringValues, sanitizeInvalidJsonEscapes } = OtlpAttributeFlatteningService;
 
 describe("parseJsonStringValues", () => {
   describe("when given JSON object strings", () => {

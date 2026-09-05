@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { OtlpAnyValue } from "@langwatch/trace-contract";
-import { TraceRequestUtils } from "../otlp-trace-request.service";
+import { OtlpTraceRequestService } from "../otlp-trace-request.service";
 
 describe("traceRequest.utils", () => {
   describe("normalizeOtlpAttributes", () => {
@@ -25,7 +25,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("llm.input_messages");
         expect(result["llm.input_messages"]).toEqual([
@@ -51,7 +51,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("messages");
         expect(result.messages).toEqual([{ content: "Hello", role: "user" }]);
@@ -77,7 +77,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("data");
         expect(result.data).toEqual([
@@ -106,7 +106,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         expect(result["llm.model"]).toBe("gpt-4");
         expect(result["other.key"]).toBe(69);
@@ -128,7 +128,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         // Should NOT be reconstructed - indices don't start at 0
         expect(result).not.toHaveProperty("items");
@@ -150,7 +150,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         // Should NOT be reconstructed - indices are not consecutive (missing 1)
         expect(result).not.toHaveProperty("items");
@@ -177,7 +177,7 @@ describe("traceRequest.utils", () => {
           // Note: items.1 is missing 'value' - inconsistent shape
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         // Should NOT be reconstructed - shapes are inconsistent
         expect(result).not.toHaveProperty("items");
@@ -200,7 +200,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         expect(result["simple.key"]).toBe("value");
         expect(result["another.key"]).toBe(123);
@@ -228,7 +228,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("metrics");
         expect(result.metrics).toEqual([
@@ -260,7 +260,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("flags");
         expect(result.flags).toEqual([
@@ -272,12 +272,12 @@ describe("traceRequest.utils", () => {
 
     describe("when input is empty or null", () => {
       it("handles empty array", () => {
-        const result = TraceRequestUtils.normalizeOtlpAttributes([]);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes([]);
         expect(result).toEqual({});
       });
 
       it("handles null-ish input", () => {
-        const result = TraceRequestUtils.normalizeOtlpAttributes(null as unknown as []);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(null as unknown as []);
         expect(result).toEqual({});
       });
     });
@@ -295,7 +295,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         expect(result["langwatch.labels"]).toEqual(["label1", "label2"]);
       });
@@ -312,7 +312,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         expect(result["mixed.values"]).toEqual(["hello", 69, true]);
       });
@@ -339,7 +339,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("input");
         expect(result).toHaveProperty("output");
@@ -360,7 +360,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("tags");
         expect(result.tags).toEqual([{ value: "tag1" }, { value: "tag2" }]);
@@ -371,26 +371,29 @@ describe("traceRequest.utils", () => {
   describe("normalizeOtlpAnyValue", () => {
     describe("when value is a scalar", () => {
       it("flattens stringValue with rootKey", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue({ stringValue: "hello" }, "my.key");
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
+          { stringValue: "hello" },
+          "my.key",
+        );
 
         expect(result).toEqual({ "my.key": "hello" });
       });
 
       it("flattens intValue as number", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue({ intValue: 69 }, "count");
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({ intValue: 69 }, "count");
 
         expect(result).toEqual({ count: 69 });
       });
 
       it("flattens intValue from string form", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue({ intValue: "999" }, "count");
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({ intValue: "999" }, "count");
 
         expect(result).toEqual({ count: 999 });
       });
 
       it("flattens intValue from high/low bigint form", () => {
         // high=0, low=100 => BigInt(0) << 32n | BigInt(100) = 100
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
           { intValue: { high: 0, low: 100 } },
           "ts",
         );
@@ -399,19 +402,19 @@ describe("traceRequest.utils", () => {
       });
 
       it("flattens doubleValue", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue({ doubleValue: 3.14 }, "pi");
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({ doubleValue: 3.14 }, "pi");
 
         expect(result).toEqual({ pi: 3.14 });
       });
 
       it("flattens doubleValue from string form", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue({ doubleValue: "2.718" }, "e");
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({ doubleValue: "2.718" }, "e");
 
         expect(result).toEqual({ e: 2.718 });
       });
 
       it("flattens boolValue true", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue({ boolValue: true }, "flag");
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({ boolValue: true }, "flag");
 
         expect(result).toEqual({ flag: true });
       });
@@ -419,13 +422,13 @@ describe("traceRequest.utils", () => {
       it("preserves boolValue false via !== null check", () => {
         // NOTE: The boolValue check uses `v.boolValue !== null` (not a truthy
         // check), so false IS correctly returned -- unlike intValue/doubleValue.
-        const result = TraceRequestUtils.normalizeOtlpAnyValue({ boolValue: false }, "flag");
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({ boolValue: false }, "flag");
 
         expect(result).toEqual({ flag: false });
       });
 
       it("coerces boolValue string 'true' to boolean", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
           { boolValue: "true" } as OtlpAnyValue,
           "flag",
         );
@@ -434,7 +437,7 @@ describe("traceRequest.utils", () => {
       });
 
       it("coerces boolValue string 'false' to boolean false", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
           { boolValue: "false" } as OtlpAnyValue,
           "flag",
         );
@@ -445,7 +448,7 @@ describe("traceRequest.utils", () => {
       it("drops intValue 0 due to falsy check", () => {
         // BUG: scalar() checks `v.intValue` which is falsy for 0,
         // so intValue: 0 is never captured and returns undefined.
-        const result = TraceRequestUtils.normalizeOtlpAnyValue({ intValue: 0 }, "count");
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({ intValue: 0 }, "count");
 
         expect(result).toEqual({});
       });
@@ -453,20 +456,20 @@ describe("traceRequest.utils", () => {
       it("drops doubleValue 0 due to falsy check", () => {
         // BUG: scalar() checks `v.doubleValue` which is falsy for 0,
         // so doubleValue: 0 is never captured and returns undefined.
-        const result = TraceRequestUtils.normalizeOtlpAnyValue({ doubleValue: 0 }, "value");
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({ doubleValue: 0 }, "value");
 
         expect(result).toEqual({});
       });
 
       it("drops doubleValue 0.0 due to falsy check", () => {
         // BUG: 0.0 === 0 in JavaScript, still falsy.
-        const result = TraceRequestUtils.normalizeOtlpAnyValue({ doubleValue: 0.0 }, "value");
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({ doubleValue: 0.0 }, "value");
 
         expect(result).toEqual({});
       });
 
       it("returns empty object when scalar root has no rootKey", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue({
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({
           stringValue: "orphan",
         });
 
@@ -476,7 +479,7 @@ describe("traceRequest.utils", () => {
 
     describe("when value is a kvlistValue", () => {
       it("flattens single-level kvlist to dot-separated keys", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
           {
             kvlistValue: {
               values: [
@@ -492,7 +495,7 @@ describe("traceRequest.utils", () => {
       });
 
       it("flattens multi-level nested kvlist", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
           {
             kvlistValue: {
               values: [
@@ -520,7 +523,7 @@ describe("traceRequest.utils", () => {
       });
 
       it("handles empty kvlist", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
           { kvlistValue: { values: [] } },
           "meta",
         );
@@ -529,7 +532,7 @@ describe("traceRequest.utils", () => {
       });
 
       it("uses rootKey as prefix for kvlist keys", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
           {
             kvlistValue: {
               values: [{ key: "x", value: { stringValue: "1" } }],
@@ -542,7 +545,7 @@ describe("traceRequest.utils", () => {
       });
 
       it("flattens kvlist without rootKey using bare keys", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue({
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue({
           kvlistValue: {
             values: [
               { key: "a", value: { stringValue: "1" } },
@@ -559,7 +562,7 @@ describe("traceRequest.utils", () => {
       it("JSON.stringifies scalar string arrays via scalar()", () => {
         // NOTE: scalar() intercepts arrayValue before walk() can handle it.
         // The result is a JSON string stored under the rootKey, not a native array.
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
           {
             arrayValue: {
               values: [{ stringValue: "a" }, { stringValue: "b" }, { stringValue: "c" }],
@@ -572,7 +575,7 @@ describe("traceRequest.utils", () => {
       });
 
       it("JSON.stringifies mixed scalar arrays via scalar()", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
           {
             arrayValue: {
               values: [{ stringValue: "hello" }, { intValue: 69 }, { boolValue: true }],
@@ -591,7 +594,7 @@ describe("traceRequest.utils", () => {
         // scalar() calls itself recursively on each item. For kvlistValue items,
         // scalar() returns undefined, so the fallback `?? item` returns the raw
         // OtlpAnyValue object. The whole array is then JSON.stringified.
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
           {
             arrayValue: {
               values: [
@@ -632,7 +635,7 @@ describe("traceRequest.utils", () => {
         // When a kvlist has a key whose value is an arrayValue,
         // walk() recurses into the kvlist keys, then hits the array value.
         // scalar() catches the arrayValue and JSON.stringifies it.
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+        const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
           {
             kvlistValue: {
               values: [
@@ -688,7 +691,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         // NOT reconstructed because item 0 has {role, content} and item 1 has
         // {role, content, tool_calls} -- different key signatures.
@@ -717,7 +720,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         // These keys pass through unchanged -- no reconstruction
         expect(result).not.toHaveProperty("items");
@@ -751,7 +754,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         // The regex /^(.+?)\.(\d+)\.(.+)$/ captures "choices" as prefix,
         // "0" / "1" as index, and "tool_calls.0.name" / "tool_calls.0.args" as remainder.
@@ -800,7 +803,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("llm.input_messages");
         expect(result["llm.input_messages"]).toEqual([
@@ -839,7 +842,7 @@ describe("traceRequest.utils", () => {
           // Note: item 1 has no tool_calls -- heterogeneous shapes
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         // NOT reconstructed due to heterogeneous key signatures
         expect(result).not.toHaveProperty("llm.output_messages");
@@ -880,7 +883,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         expect(result["gen_ai.metadata.model"]).toBe("gpt-4");
         expect(result["gen_ai.metadata.params.temperature"]).toBe(0.7);
@@ -905,7 +908,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         expect(result["langwatch.labels"]).toEqual(["production", "v2", "critical"]);
       });
@@ -939,7 +942,7 @@ describe("traceRequest.utils", () => {
           },
         ];
 
-        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(attributes);
 
         // arrayValue of kvlistValue items: stored as array of raw OTLP structures
         expect(result["llm.messages"]).toEqual([

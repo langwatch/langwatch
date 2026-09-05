@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { TraceRequestUtils } from "../otlp-trace-request.service";
+import { OtlpTraceRequestService } from "../otlp-trace-request.service";
 
-const { reconstructFlattenedArrays } = TraceRequestUtils;
+const { reconstructFlattenedArrays } = OtlpTraceRequestService;
 
 describe("reconstructFlattenedArrays", () => {
   describe("when given valid consecutive array patterns", () => {

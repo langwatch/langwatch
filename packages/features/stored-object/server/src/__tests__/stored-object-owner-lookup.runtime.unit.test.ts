@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  StoredObjectOwnerLookupRuntime,
+  StoredObjectOwnerLookupRuntimeAdapter,
   StoredObjectOwnerInstanceDirectoryPort,
   StoredObjectOwnerLookupTelemetryPort,
   type StoredObjectOwnerLookupSpan,
@@ -46,7 +46,7 @@ function makeFailingClient(error: Error) {
 
 function service(telemetry = new RecordingTelemetry()) {
   return {
-    service: StoredObjectOwnerLookupRuntime.create({
+    service: StoredObjectOwnerLookupRuntimeAdapter.create({
       instanceDirectory: new TestInstanceDirectory(),
       telemetry,
     }).resolver,
@@ -54,7 +54,7 @@ function service(telemetry = new RecordingTelemetry()) {
   };
 }
 
-describe("StoredObjectOwnerLookupRuntime", () => {
+describe("StoredObjectOwnerLookupRuntimeAdapter", () => {
   beforeEach(() => {
     resolveInstances.mockReset();
   });
@@ -93,7 +93,9 @@ describe("StoredObjectOwnerLookupRuntime", () => {
 
     const { service: resolver } = service();
 
-    await expect(resolver.tryResolve({ id: "obj-byoc" })).resolves.toEqual({ projectId: "proj_byoc" });
+    await expect(resolver.tryResolve({ id: "obj-byoc" })).resolves.toEqual({
+      projectId: "proj_byoc",
+    });
   });
 
   it("returns null after every healthy instance misses", async () => {
@@ -123,7 +125,9 @@ describe("StoredObjectOwnerLookupRuntime", () => {
 
     const { service: resolver, telemetry } = service();
 
-    await expect(resolver.tryResolve({ id: "obj-x" })).resolves.toEqual({ projectId: "proj_shared" });
+    await expect(resolver.tryResolve({ id: "obj-x" })).resolves.toEqual({
+      projectId: "proj_shared",
+    });
     expect(telemetry.attributes.get("clickhouse.instances_failed")).toBe(1);
     expect(telemetry.attributes.get("result.degraded")).toBeUndefined();
   });
@@ -162,6 +166,8 @@ describe("StoredObjectOwnerLookupRuntime", () => {
 
     const { service: resolver } = service();
 
-    await expect(resolver.tryResolve({ id: "obj-1" })).rejects.toThrow(/ClickHouse is not configured/);
+    await expect(resolver.tryResolve({ id: "obj-1" })).rejects.toThrow(
+      /ClickHouse is not configured/,
+    );
   });
 });

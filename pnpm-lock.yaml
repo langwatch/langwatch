@@ -4539,6 +4539,9 @@ importers:
 
   packages/features/dataset/contract:
     dependencies:
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../handled-error
       papaparse:
         specifier: ^5.5.3
         version: 5.5.4

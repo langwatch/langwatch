@@ -1,4 +1,6 @@
-import { isRecord, type UnknownRecord } from "./metric-serialization.adapter";
+import { type UnknownRecord } from "./metric-serialization.adapter";
+import { MetricSerializationAdapter } from "./metric-serialization.adapter";
+const { isRecord } = MetricSerializationAdapter;
 
 import type { MetricPiiRedactionLevel } from "@langwatch/metric-contract";
 import type { MetricRedactionPort } from "../ports/metric-redaction.port";

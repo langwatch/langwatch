@@ -186,6 +186,7 @@ export class IdentityBackfillService {
     if (!emailPlan || !emailVerified) {
       return;
     }
+
     await tolerateRefusal(() =>
       this.identity.verifyIdentifier({
         tenantId: userId,

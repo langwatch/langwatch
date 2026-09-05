@@ -182,7 +182,7 @@ function startExchange(key: string, credentials: TokenModeCredentials): CacheEnt
  * synchronously (no `await` in between), so N callers dispatched together
  * always observe exactly one exchange, never one per caller.
  */
-export async function getAzureBlobToken(credentials: TokenModeCredentials): Promise<string> {
+async function getAzureBlobToken(credentials: TokenModeCredentials): Promise<string> {
   const key = cacheKey(credentials);
   let entry = tokenCache.get(key);
 
@@ -203,11 +203,23 @@ export async function getAzureBlobToken(credentials: TokenModeCredentials): Prom
  * 401 so the retry acquires a fresh token instead of replaying the one that
  * was just rejected.
  */
-export function invalidateAzureBlobToken(credentials: TokenModeCredentials): void {
+function invalidateAzureBlobToken(credentials: TokenModeCredentials): void {
   tokenCache.delete(cacheKey(credentials));
 }
 
 /** Test-only: clears every cached token so suites don't leak state across tests. */
-export function resetAzureTokenCacheForTests(): void {
+function resetAzureTokenCacheForTests(): void {
   tokenCache.clear();
+}
+
+export class AzureBlobTokenProviderAdapter {
+  private constructor() {}
+
+  static create(): AzureBlobTokenProviderAdapter {
+    return new AzureBlobTokenProviderAdapter();
+  }
+
+  static getAzureBlobToken = getAzureBlobToken;
+  static invalidateAzureBlobToken = invalidateAzureBlobToken;
+  static resetAzureTokenCacheForTests = resetAzureTokenCacheForTests;
 }

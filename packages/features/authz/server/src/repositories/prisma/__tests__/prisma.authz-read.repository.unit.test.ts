@@ -249,6 +249,7 @@ describe("PrismaAuthzReadRepository", () => {
 
   describe("findCustomRolePermissions", () => {
     describe("when the principal is a user", () => {
+      /** @scenario "A poisoned cross-organization binding does not grant access" */
       it("fences on the organization and excludes every API-key system role", async () => {
         const findMany = vi.fn().mockResolvedValue([]);
         const prisma = {
@@ -273,6 +274,7 @@ describe("PrismaAuthzReadRepository", () => {
     });
 
     describe("when the principal is an API key", () => {
+      /** @scenario "A poisoned cross-key binding does not inherit the other key's permissions" */
       it("allows the key's OWN system role and excludes every other key's", async () => {
         const findMany = vi.fn().mockResolvedValue([]);
         const prisma = {

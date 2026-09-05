@@ -76,17 +76,17 @@ export const AI_TOOL_ORIGIN_VALUE = "ai_tool" as const;
  * AI tool.
  */
 const CODING_AGENT_SOURCE_TYPES: Readonly<Record<string, true>> = {
-  "claude_code": true,
-  "codex": true,
-  "gemini": true,
-  "opencode": true,
-  "cursor": true,
+  claude_code: true,
+  codex: true,
+  gemini: true,
+  opencode: true,
+  cursor: true,
   // The three copilot capture surfaces (ADR-039): CLI wrapper, standalone
   // app login agent, VS Code Copilot Chat. Without these, copilot traces
   // surface as origin=ai_tool and drop out of coding-agent filters.
-  "copilot_cli": true,
-  "copilot_app": true,
-  "copilot_vscode": true,
+  copilot_cli: true,
+  copilot_app: true,
+  copilot_vscode: true,
 };
 
 /**

@@ -9,16 +9,16 @@ import type { MfaEnrollmentState } from "@langwatch/identity-contract";
  * calling path, the queue's per-user FIFO on the staged path — so a guard
  * reads the enrollment first and states only what it does not carry.
  */
-export interface MfaEnrollmentRepository {
+export abstract class MfaEnrollmentRepository {
   /** This person's enrollment as the projection knows it. Never null: a
    *  person who never started one reads as `NONE`, so every caller answers
    *  the question the same way. */
-  findEnrollment(args: { userId: string }): Promise<MfaEnrollmentState>;
+  abstract findEnrollment(args: { userId: string }): Promise<MfaEnrollmentState>;
   /**
    * Slugs of the organizations this person belongs to that require a second
    * factor. Read rather than trusted from the caller: the disable guard has
    * to name WHICH organization is asking, and a caller that computed it
    * itself could be working from a stale membership list.
    */
-  findRequiringOrganizationSlugs(args: { userId: string }): Promise<readonly string[]>;
+  abstract findRequiringOrganizationSlugs(args: { userId: string }): Promise<readonly string[]>;
 }

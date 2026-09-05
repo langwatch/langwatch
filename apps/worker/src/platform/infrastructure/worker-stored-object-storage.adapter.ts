@@ -14,9 +14,9 @@ import { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import { getStoredObjectStorageScheme } from "@langwatch/stored-object-contract";
 import {
   StoredObjectAzureDestinationPort,
-  StoredObjectDestinationPolicy,
+  StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3ConfigPort,
-  StoredObjectStorageRuntime,
+  StoredObjectStorageRuntimeAdapter,
   type StoredObjectStorageDriver,
   type StoredObjectStorageSelection,
 } from "@langwatch/stored-object-server";
@@ -74,7 +74,7 @@ export class WorkerStoredObjectStorageRuntimeFactory {
     private readonly projects: WorkerProjectS3SourcePort,
   ) {}
 
-  createRuntime(): StoredObjectStorageRuntime {
+  createRuntime(): StoredObjectStorageRuntimeAdapter {
     const selection: StoredObjectStorageSelection = {
       backend: this.config.backend,
       globalS3Bucket: this.config.globalS3?.bucket,
@@ -82,8 +82,8 @@ export class WorkerStoredObjectStorageRuntimeFactory {
       ...(this.config.azure ? { azure: this.config.azure } : {}),
     };
 
-    return StoredObjectStorageRuntime.create({
-      destination: StoredObjectDestinationPolicy.create({
+    return StoredObjectStorageRuntimeAdapter.create({
+      destination: StoredObjectDestinationPolicyAdapter.create({
         selection,
         projects: this.projects,
       }),

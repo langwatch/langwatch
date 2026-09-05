@@ -505,3 +505,4 @@ export {
   SSO_CONNECTION_AGGREGATE_TYPE,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "./sso-connection-events";
+export * from "./signin-callback.errors";

@@ -107,6 +107,7 @@ export class IdentityService
     if (facts.length === 0) {
       return [];
     }
+
     return this.ledger.commit({ command, facts });
   }
 }

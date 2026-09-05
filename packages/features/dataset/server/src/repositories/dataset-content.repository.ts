@@ -2,7 +2,7 @@ import type { DatasetRow } from "../ports/dataset.port";
 
 /** A Json column's value, mirroring the generated client's own shape. */
 export type DatasetJsonObject = { [Key in string]?: DatasetJsonValue };
-export interface DatasetJsonArray extends Array<DatasetJsonValue> {}
+export type DatasetJsonArray = DatasetJsonValue[];
 export type DatasetJsonValue =
   | string
   | number

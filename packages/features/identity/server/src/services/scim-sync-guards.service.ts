@@ -73,6 +73,7 @@ export class ScimSyncGuards {
     if (state && state.state !== "REVOKED") {
       return [];
     }
+
     return [
       {
         type: SCIM_TOKEN_ISSUED_EVENT_TYPE,
@@ -92,6 +93,7 @@ export class ScimSyncGuards {
     if (state?.state === "REVOKED") {
       return [];
     }
+
     return [
       {
         type: SCIM_USER_PUSHED_EVENT_TYPE,
@@ -115,6 +117,7 @@ export class ScimSyncGuards {
     if (state?.state === "REVOKED") {
       return [];
     }
+
     return [
       {
         type: SCIM_GROUP_MAPPED_EVENT_TYPE,
@@ -184,6 +187,7 @@ export class ScimSyncGuards {
     if (state?.state === "REVOKED") {
       return [];
     }
+
     return [
       {
         type: SCIM_TOKEN_REVOKED_EVENT_TYPE,
@@ -213,6 +217,7 @@ export class ScimSyncGuards {
     if (!state || state.state !== "ERROR" || !state.lastFailure) {
       return [];
     }
+
     return [
       {
         type: SCIM_APPLY_RECOVERED_EVENT_TYPE,

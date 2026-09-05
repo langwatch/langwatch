@@ -24,8 +24,14 @@ const GEN_AI_RULE_PREFIX = "genai";
  * and the token counts in their own way, and this is the whole of that
  * translation. One entry point; the four steps below are how it is done.
  */
-export class GenAiSpan {
-  private static canonicaliseIdentity(ctx: ExtractorContext): void {
+export class GenAiSpanService {
+  private constructor() {}
+
+  static create(): GenAiSpanService {
+    return new GenAiSpanService();
+  }
+
+  private canonicaliseIdentity(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
 
     if (!attrs.has(ATTR_KEYS.GEN_AI_OPERATION_NAME)) {
@@ -60,7 +66,7 @@ export class GenAiSpan {
     });
   }
 
-  private static canonicaliseMessages(ctx: ExtractorContext): void {
+  private canonicaliseMessages(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
     const inputExtracted = extractInputMessages(
       ctx,
@@ -142,7 +148,7 @@ export class GenAiSpan {
     }
   }
 
-  private static canonicaliseUsage(ctx: ExtractorContext): void {
+  private canonicaliseUsage(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
     extractUsageTokens(
       ctx,
@@ -190,7 +196,7 @@ export class GenAiSpan {
     }
   }
 
-  private static canonicaliseRequest(ctx: ExtractorContext): void {
+  private canonicaliseRequest(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
     const stream = asBoolean(attrs.get(ATTR_KEYS.GEN_AI_REQUEST_STREAM));
     if (stream !== null) {
@@ -261,10 +267,10 @@ export class GenAiSpan {
     }
   }
 
-  static canonicalise(ctx: ExtractorContext): void {
-    GenAiSpan.canonicaliseIdentity(ctx);
-    GenAiSpan.canonicaliseMessages(ctx);
-    GenAiSpan.canonicaliseUsage(ctx);
-    GenAiSpan.canonicaliseRequest(ctx);
+  canonicalise(ctx: ExtractorContext): void {
+    this.canonicaliseIdentity(ctx);
+    this.canonicaliseMessages(ctx);
+    this.canonicaliseUsage(ctx);
+    this.canonicaliseRequest(ctx);
   }
 }

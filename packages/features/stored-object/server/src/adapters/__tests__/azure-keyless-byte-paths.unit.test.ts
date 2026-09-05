@@ -22,17 +22,19 @@ vi.mock("@azure/identity", () => ({
 import { AzureBlobStoredObjectDriverAdapter } from "../azure-blob.stored-object-driver.adapter";
 import {
   AzureBackendMisconfiguredError,
-  resolveAzureCredentials,
   type AzureBlobCredentialsConfig,
   type AzureInjectedIdentity,
 } from "../azure-blob-credentials.adapter";
-import { resetAzureTokenCacheForTests } from "../azure-blob-token-provider.adapter";
+import { AzureBlobCredentialsAdapter } from "../azure-blob-credentials.adapter";
+const { resolveAzureCredentials } = AzureBlobCredentialsAdapter;
+import { AzureBlobTokenProviderAdapter } from "../azure-blob-token-provider.adapter";
+const { resetAzureTokenCacheForTests } = AzureBlobTokenProviderAdapter;
 import {
   StoredObjectAzureDestinationPort,
-  StoredObjectDestinationPolicy,
+  StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3ConfigPort,
 } from "../stored-object-destination-policy.adapter";
-import { StoredObjectStorageRegistry } from "../stored-object-storage-registry.adapter";
+import { StoredObjectStorageRegistryAdapter } from "../stored-object-storage-registry.adapter";
 
 const PROJECT_ID = "proj-1";
 const HISTORICAL_URI = `azure-blob://lwacct/written-long-ago/${PROJECT_ID}/abc123`;
@@ -97,8 +99,8 @@ class ResolvedAzureDestination extends StoredObjectAzureDestinationPort {
 function policyFor(
   config: AzureBlobCredentialsConfig,
   identity: AzureInjectedIdentity,
-): StoredObjectDestinationPolicy {
-  return StoredObjectDestinationPolicy.create({
+): StoredObjectDestinationPolicyAdapter {
+  return StoredObjectDestinationPolicyAdapter.create({
     selection: {
       backend: "azure",
       localFilesystemRoot: "/var/lib/langwatch/objects",
@@ -131,8 +133,8 @@ const dispatchedElsewhere = {
 function registryFor(
   config: AzureBlobCredentialsConfig,
   identity: AzureInjectedIdentity = {},
-): StoredObjectStorageRegistry {
-  return new StoredObjectStorageRegistry({
+): StoredObjectStorageRegistryAdapter {
+  return StoredObjectStorageRegistryAdapter.create({
     s3: dispatchedElsewhere,
     file: dispatchedElsewhere,
     "azure-blob": () =>

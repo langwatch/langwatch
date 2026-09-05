@@ -40,13 +40,13 @@ function canonicaliseMetadataBlob(ctx: ExtractorContext): void {
     }
 
     const RESERVED_METADATA_KEYS: Readonly<Record<string, true>> = {
-      "labels": true,
-      "user_id": true,
-      "userId": true,
-      "thread_id": true,
-      "threadId": true,
-      "customer_id": true,
-      "customerId": true,
+      labels: true,
+      user_id: true,
+      userId: true,
+      thread_id: true,
+      threadId: true,
+      customer_id: true,
+      customerId: true,
     };
     for (const [key, value] of Object.entries(metadata)) {
       if (RESERVED_METADATA_KEYS[key] === true) {

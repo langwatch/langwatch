@@ -20,7 +20,7 @@ import {
   DatasetNotReadyError,
   DatasetTooLargeToExportError,
   DuplicateRecordIdError,
-} from "../../services/dataset-errors.service";
+} from "@langwatch/dataset-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 

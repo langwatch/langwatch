@@ -14,7 +14,7 @@ import {
   type PIIRedactionLevel,
   type RecordSpanCommandData,
 } from "@langwatch/trace-contract";
-import { TraceRequestUtils } from "./otlp-trace-request.service";
+import { OtlpTraceRequestService } from "./otlp-trace-request.service";
 
 export type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";
 
@@ -249,8 +249,8 @@ export class TraceIngestionService {
 
     let startTimeUnixMs: number;
     try {
-      startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
-        TraceRequestUtils.normalizeOtlpUnixNano(spanParseResult.data.startTimeUnixNano),
+      startTimeUnixMs = OtlpTraceRequestService.convertUnixNanoToUnixMs(
+        OtlpTraceRequestService.normalizeOtlpUnixNano(spanParseResult.data.startTimeUnixNano),
       );
     } catch {
       return { status: "dropped", error: "span start time is invalid" };
@@ -283,7 +283,7 @@ export class TraceIngestionService {
 
   /** Ids arrive as raw bytes over protobuf and as hex over JSON; dedup and the pipeline want one of them. */
   private withHexIds(span: OtlpSpan): OtlpSpan {
-    const hex = TraceRequestUtils.normalizeOtlpId;
+    const hex = OtlpTraceRequestService.normalizeOtlpId;
 
     return {
       ...span,

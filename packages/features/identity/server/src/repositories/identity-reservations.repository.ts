@@ -25,7 +25,7 @@ export interface IdentifierReservationHolder {
   commandId: string;
 }
 
-export interface IdentityReservationRepository {
+export abstract class IdentityReservationRepository {
   /**
    * Take the claim, atomically, and answer whoever holds the value once the
    * attempt has settled — this caller when they won or already held it,
@@ -35,7 +35,7 @@ export interface IdentityReservationRepository {
    * words, and the backfill treats a collision as a parity fact rather than a
    * failure.
    */
-  claim(args: {
+  abstract claim(args: {
     normalizedValue: string;
     userId: string;
     identifierId: string;
@@ -47,12 +47,15 @@ export interface IdentityReservationRepository {
    * any more — detached, dead-ended, or erased out of its value. Called by the
    * fold, which is the one place that knows a user's whole identifier state.
    */
-  release(args: { userId: string; holdingIdentifierIds: readonly string[] }): Promise<number>;
+  abstract release(args: {
+    userId: string;
+    holdingIdentifierIds: readonly string[];
+  }): Promise<number>;
 
   /**
    * Claims older than the horizon that no live identifier backs at all: the
    * residue of a ceremony that claimed and then never landed its fact. Bounded
    * per pass, like every other sweep.
    */
-  reapOrphans(args: { olderThan: Date; limit: number }): Promise<number>;
+  abstract reapOrphans(args: { olderThan: Date; limit: number }): Promise<number>;
 }

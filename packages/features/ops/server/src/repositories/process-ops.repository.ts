@@ -28,14 +28,14 @@ export interface ProcessNameCounts {
   deadMessages: number;
 }
 
-export interface ProcessOpsRepository {
-  countByProcessName(params: {
+export abstract class ProcessOpsRepository {
+  abstract countByProcessName(params: {
     now: number;
     overdueWakeMs: number;
     overduePendingMs: number;
   }): Promise<ProcessNameCounts[]>;
 
-  findInstances(params: {
+  abstract findInstances(params: {
     /** Omit to list instances across EVERY process manager. */
     processName?: string;
     page: number;
@@ -45,9 +45,9 @@ export interface ProcessOpsRepository {
   }): Promise<{ instances: ProcessInstanceRow[]; total: number }>;
 
   /** The soonest-due instance wakes across every process, for the dashboard. */
-  findUpcomingWakes(params: { limit: number }): Promise<ProcessWakeRow[]>;
+  abstract findUpcomingWakes(params: { limit: number }): Promise<ProcessWakeRow[]>;
 
-  findOutboxMessages(params: {
+  abstract findOutboxMessages(params: {
     ref: ProcessRef;
     page: number;
     pageSize: number;
@@ -57,20 +57,20 @@ export interface ProcessOpsRepository {
    * Every retired message across the fleet, newest retirement first.
    * `processName` narrows to one process; omit it for everything.
    */
-  findDeadMessages(params: {
+  abstract findDeadMessages(params: {
     processName?: string;
     page: number;
     pageSize: number;
   }): Promise<{ messages: DeadOutboxMessageView[]; total: number }>;
 
   /** Dead totals per process, for the summary and the navigation badge. */
-  countDeadByProcessName(): Promise<DeadLetterCount[]>;
+  abstract countDeadByProcessName(): Promise<DeadLetterCount[]>;
 
   /**
    * Set the instance's next wake to now. Returns the previous wake time (for
    * the audit trail) or null when the instance does not exist.
    */
-  wakeInstanceNow(params: {
+  abstract wakeInstanceNow(params: {
     ref: ProcessRef;
     now: number;
   }): Promise<{ woke: boolean; previousWakeAt: number | null }>;
@@ -81,7 +81,7 @@ export interface ProcessOpsRepository {
    * (tenancy carried on every mutation); returns the message key for the
    * audit trail, or null when it was not dead (or not that instance's).
    */
-  tryRedriveDeadMessage(params: {
+  abstract tryRedriveDeadMessage(params: {
     ref: ProcessRef;
     messageId: string;
     now: number;
@@ -93,7 +93,7 @@ export interface ProcessOpsRepository {
    * discarded row. Returns the message key for the audit trail, or null when
    * the message was not dead (or not that instance's).
    */
-  tryDiscardDeadMessage(params: {
+  abstract tryDiscardDeadMessage(params: {
     ref: ProcessRef;
     messageId: string;
     now: number;
@@ -113,15 +113,18 @@ export interface ProcessOpsRepository {
    * thousands of intents all due now hands the dispatcher one batch the size
    * of the backlog.
    */
-  redriveAllDeadMessages(params: { processName?: string; now: number }): Promise<number>;
+  abstract redriveAllDeadMessages(params: { processName?: string; now: number }): Promise<number>;
 
   /**
    * Dead messages marked discarded; same scoping, and bounded the same way.
    */
-  discardAllDeadMessages(params: { processName?: string; now: number }): Promise<number>;
+  abstract discardAllDeadMessages(params: { processName?: string; now: number }): Promise<number>;
 
   /** The message's failed attempts, oldest first. */
-  findAttempts(params: { outboxId: string; projectId: string }): Promise<OutboxAttemptView[]>;
+  abstract findAttempts(params: {
+    outboxId: string;
+    projectId: string;
+  }): Promise<OutboxAttemptView[]>;
 
   /**
    * Clear a LAPSED lease so the dispatcher can pick the message up now
@@ -130,7 +133,7 @@ export interface ProcessOpsRepository {
    * delivery's lease can never be released from under it. Returns the
    * message key for the audit trail, or null when nothing matched.
    */
-  tryReleaseLapsedLease(params: {
+  abstract tryReleaseLapsedLease(params: {
     ref: ProcessRef;
     messageId: string;
     now: number;

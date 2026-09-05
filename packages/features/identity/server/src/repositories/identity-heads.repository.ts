@@ -11,19 +11,22 @@ import type { IdentifierFact, IdentityHeads } from "@langwatch/identity-contract
  * which serializes them against the fold. Either way a guard reads the
  * heads first and states only what they do not carry (PR #7429).
  */
-export interface IdentityHeadsRepository {
+export abstract class IdentityHeadsRepository {
   /** The per-user HMAC key (`User.userHashKey`); null when not yet minted —
    *  the attach then records a null hash rather than failing the ceremony. */
-  tryFindUserHashKey(args: { userId: string }): Promise<string | null>;
+  abstract tryFindUserHashKey(args: { userId: string }): Promise<string | null>;
   /** The user's current identifier heads, as the projection knows them. */
-  findHeads(args: { userId: string }): Promise<IdentityHeads>;
+  abstract findHeads(args: { userId: string }): Promise<IdentityHeads>;
   /** An ACTIVE (VERIFIED or PRIMARY) identifier holding this normalized
    *  value, whoever holds it — the cross-user uniqueness guard's read. */
-  tryFindActiveIdentifierByValue(args: {
+  abstract tryFindActiveIdentifierByValue(args: {
     normalizedValue: string;
   }): Promise<{ userId: string; identifierId: string } | null>;
   /** One head of this user's, or null — the verification mint's guard. */
-  tryFindIdentifier(args: { userId: string; identifierId: string }): Promise<IdentifierFact | null>;
+  abstract tryFindIdentifier(args: {
+    userId: string;
+    identifierId: string;
+  }): Promise<IdentifierFact | null>;
   /**
    * The identifier a protocol `Account` row mirrors: by accountId first. A
    * row adopted before the projection carried accountIds falls back to the
@@ -40,7 +43,7 @@ export interface IdentityHeadsRepository {
    * backfill adopted carries it, so the historical rows this exists for are
    * still found.
    */
-  tryFindIdentifierIdForAccount(args: {
+  abstract tryFindIdentifierIdForAccount(args: {
     userId: string;
     accountId: string;
     providerId: string;

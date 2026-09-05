@@ -11,19 +11,19 @@ export interface SsoConnectionBackofficePage {
  * deliberately: the `SsoConnection` row is a projection of the log, so a write here would be
  * overwritten by the next fold.
  */
-export interface SsoConnectionBackofficeRepository {
+export abstract class SsoConnectionBackofficeRepository {
   /**
    * One page, newest first. `search` matches the identifiers and domains an
    * operator would have to hand: a connection id from a log line, an
    * organization id from a support thread, or the customer's domain.
    */
-  findPage(args: {
+  abstract findPage(args: {
     page: number;
     pageSize: number;
     search?: string;
   }): Promise<SsoConnectionBackofficePage>;
   /** One connection's state, or null when no row carries that id. */
-  tryFindById(args: { connectionId: string }): Promise<SsoConnectionState | null>;
+  abstract tryFindById(args: { connectionId: string }): Promise<SsoConnectionState | null>;
   /** The display names of the organizations a page names, by id. */
-  findOrganizationNames(args: { organizationIds: string[] }): Promise<Map<string, string>>;
+  abstract findOrganizationNames(args: { organizationIds: string[] }): Promise<Map<string, string>>;
 }

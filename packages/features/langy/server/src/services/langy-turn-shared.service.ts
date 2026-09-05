@@ -126,6 +126,7 @@ export function composeLangyTurnPrompt({
   if (preamble.length === 0) {
     return { prompt: userText, labelled: false };
   }
+
   return {
     prompt: [...preamble, `${LANGY_USER_MESSAGE_LABEL}\n${userText}`].join("\n\n"),
     labelled: true,

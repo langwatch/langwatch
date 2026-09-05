@@ -68,11 +68,11 @@ const MESSAGE_COLUMNS = [
 // Public API — one function per mode
 // ---------------------------------------------------------------------------
 
-export function criteriaHeaders(): string[] {
+function criteriaHeaders(): string[] {
   return [...CORE_COLUMNS, ...CRITERIA_COLUMNS, ...TAIL_COLUMNS];
 }
 
-export function fullHeaders(): string[] {
+function fullHeaders(): string[] {
   return [
     ...CORE_COLUMNS.map((c) => `run_${c}`),
     ...CRITERIA_LIST_COLUMNS.map((c) => `run_${c}`),
@@ -86,7 +86,7 @@ export function fullHeaders(): string[] {
  * "which criterion fails most often" is a spreadsheet group-by rather than a
  * script. A run judged against no criteria contributes no rows.
  */
-export function serializeRunsToCriteriaCsv({
+function serializeRunsToCriteriaCsv({
   runs,
   includeHeader,
 }: {
@@ -103,6 +103,7 @@ export function serializeRunsToCriteriaCsv({
     for (const criterion of run.results?.metCriteria ?? []) {
       push(criterion, true);
     }
+
     for (const criterion of run.results?.unmetCriteria ?? []) {
       push(criterion, false);
     }
@@ -116,7 +117,7 @@ export function serializeRunsToCriteriaCsv({
  * file stays self-describing. A run with no messages still emits one row with
  * empty message columns, so an errored run never silently vanishes.
  */
-export function serializeRunsToFullCsv({
+function serializeRunsToFullCsv({
   runs,
   includeHeader,
 }: {
@@ -213,12 +214,15 @@ function extractParameters(metadata: Record<string, unknown> | null | undefined)
   if (parameters == null || typeof parameters !== "object") {
     return "";
   }
+
   if (Array.isArray(parameters)) {
     return "";
   }
+
   if (Object.keys(parameters).length === 0) {
     return "";
   }
+
   return text(JSON.stringify(parameters));
 }
 
@@ -280,6 +284,7 @@ function jsonArray(values: string[] | undefined): string {
   if (!values || values.length === 0) {
     return "";
   }
+
   return text(JSON.stringify(values));
 }
 
@@ -291,6 +296,7 @@ function isoTimestamp(ms: number | null | undefined): string {
   if (ms == null || !Number.isFinite(ms) || ms <= 0) {
     return "";
   }
+
   return new Date(ms).toISOString();
 }
 
@@ -298,6 +304,7 @@ function nullableNumber(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) {
     return "";
   }
+
   return String(value);
 }
 
@@ -323,9 +330,11 @@ function messageContent(content: unknown): string {
   if (content == null) {
     return "";
   }
+
   if (typeof content === "string") {
     return content;
   }
+
   return JSON.stringify(content);
 }
 
@@ -363,4 +372,17 @@ function stripHeader(csv: string): string {
   const firstBreak = csv.indexOf(NEWLINE);
 
   return firstBreak === -1 ? "" : csv.slice(firstBreak + NEWLINE.length);
+}
+
+export class ScenarioRunExportCsvService {
+  private constructor() {}
+
+  static create(): ScenarioRunExportCsvService {
+    return new ScenarioRunExportCsvService();
+  }
+
+  static criteriaHeaders = criteriaHeaders;
+  static fullHeaders = fullHeaders;
+  static serializeRunsToCriteriaCsv = serializeRunsToCriteriaCsv;
+  static serializeRunsToFullCsv = serializeRunsToFullCsv;
 }

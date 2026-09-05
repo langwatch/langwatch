@@ -359,7 +359,10 @@ export class GatewayUsageService {
 
 /** Descending-friendly comparison of two nano-USD integers. */
 function compareBigInt(left: bigint, right: bigint): number {
-  if (left === right) return 0;
+  if (left === right) {
+    return 0;
+  }
+
   return left > right ? 1 : -1;
 }
 
@@ -368,6 +371,7 @@ function roundedQuotient(value: bigint, divisor: bigint): bigint {
   const negative = value < 0n;
   const magnitude = negative ? -value : value;
   const rounded = (magnitude * 2n + divisor) / (2n * divisor);
+
   return negative ? -rounded : rounded;
 }
 
@@ -376,6 +380,7 @@ function microUsdToFixed6(micro: bigint): string {
   const negative = micro < 0n;
   const magnitude = negative ? -micro : micro;
   const fraction = (magnitude % 1_000_000n).toString().padStart(6, "0");
+
   return `${negative ? "-" : ""}${magnitude / 1_000_000n}.${fraction}`;
 }
 

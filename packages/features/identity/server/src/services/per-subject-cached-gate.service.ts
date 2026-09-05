@@ -78,6 +78,7 @@ export function perSubjectCachedFlag({
       for (const pending of state.inFlight.values()) {
         pending.isStale = true;
       }
+
       state.inFlight.clear();
     },
   };
@@ -97,6 +98,7 @@ async function get({
     if (Date.now() < entry.expiresAt) {
       return entry.isOn;
     }
+
     state.cached.delete(subject);
   }
 
@@ -156,9 +158,11 @@ async function settle({
   if (flight.isStale) {
     return isOn;
   }
+
   if (state.cached.size >= state.maxEntries) {
     evictUntilUnderCap({ state });
   }
+
   state.cached.set(subject, { isOn, expiresAt: Date.now() + state.ttlMs });
 
   return isOn;
@@ -182,6 +186,7 @@ function evictUntilUnderCap({ state }: { state: GateState }): void {
     if (oldestKey === undefined) {
       break;
     }
+
     state.cached.delete(oldestKey);
   }
 }

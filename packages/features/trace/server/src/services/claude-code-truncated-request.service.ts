@@ -98,9 +98,15 @@ class JsonScan {
  * one. Everything here is a step of that walk; only the entry point is
  * anybody else's business.
  */
-export class ClaudeCodeTruncatedRequest {
+export class ClaudeCodeTruncatedRequestService {
+  private constructor() {}
+
+  static create(): ClaudeCodeTruncatedRequestService {
+    return new ClaudeCodeTruncatedRequestService();
+  }
+
   /** The `system` value, marked when the cut landed inside it. */
-  private static salvagedSystemMessage(
+  private salvagedSystemMessage(
     system: SalvagedValue | null,
   ): { role: string; content: string } | null {
     if (system === null) {
@@ -108,8 +114,8 @@ export class ClaudeCodeTruncatedRequest {
     }
 
     const text = system.isComplete
-      ? contentToText(ClaudeCodeTruncatedRequest.safeParse(system.slice) ?? system.slice)
-      : ClaudeCodeTruncatedRequest.salvagePartialText(system.slice);
+      ? contentToText(this.safeParse(system.slice) ?? system.slice)
+      : this.salvagePartialText(system.slice);
     if (!text || text.length === 0) {
       return null;
     }
@@ -123,10 +129,10 @@ export class ClaudeCodeTruncatedRequest {
   }
 
   /** Every message that closed before the cut, in order. */
-  private static salvagedHistoryMessages(
+  private salvagedHistoryMessages(
     messages: SalvagedValue | null,
   ): Array<{ role: string; content: string }> {
-    const parsed = ClaudeCodeTruncatedRequest.salvagedArray(messages);
+    const parsed = this.salvagedArray(messages);
     if (!Array.isArray(parsed)) {
       return [];
     }
@@ -150,17 +156,17 @@ export class ClaudeCodeTruncatedRequest {
   }
 
   /** A salvaged array value, parsed whole when it closed and element-wise when not. */
-  private static salvagedArray(value: SalvagedValue | null): unknown {
+  private salvagedArray(value: SalvagedValue | null): unknown {
     if (value === null) {
       return null;
     }
 
     return value.isComplete
-      ? ClaudeCodeTruncatedRequest.safeParse(value.slice)
-      : ClaudeCodeTruncatedRequest.salvageCompleteArrayElements(value.slice);
+      ? this.safeParse(value.slice)
+      : this.salvageCompleteArrayElements(value.slice);
   }
 
-  private static safeParse(slice: string): unknown {
+  private safeParse(slice: string): unknown {
     try {
       return JSON.parse(slice);
     } catch {
@@ -169,7 +175,7 @@ export class ClaudeCodeTruncatedRequest {
   }
 
   /** Single-pass scan for a top-level key's value span in (possibly cut) JSON. */
-  private static salvageTopLevelValue(raw: string, key: string): SalvagedValue | null {
+  private salvageTopLevelValue(raw: string, key: string): SalvagedValue | null {
     const needle = `"${key}":`;
     const scan = new JsonScan();
     for (let i = 0; i < raw.length; i++) {
@@ -177,7 +183,7 @@ export class ClaudeCodeTruncatedRequest {
       // happen before the step consumes the quote into string state.
       const atTopLevelKey = scan.depth === 1 && raw.startsWith(needle, i);
       if (scan.step(raw[i]) === "string-open" && atTopLevelKey) {
-        return ClaudeCodeTruncatedRequest.scanValueSpan(raw, i + needle.length);
+        return this.scanValueSpan(raw, i + needle.length);
       }
     }
 
@@ -190,7 +196,7 @@ export class ClaudeCodeTruncatedRequest {
    * salvage asks for always are; a bare scalar owns no delimiter to close on and
    * so reads as running to the end of the input.
    */
-  private static scanValueSpan(raw: string, start: number): SalvagedValue {
+  private scanValueSpan(raw: string, start: number): SalvagedValue {
     const scan = new JsonScan();
     for (let i = start; i < raw.length; i++) {
       const event = scan.step(raw[i]);
@@ -208,7 +214,7 @@ export class ClaudeCodeTruncatedRequest {
    * closed before the truncation point parse individually; the cut one is
    * dropped.
    */
-  private static salvageCompleteArrayElements(slice: string): unknown[] {
+  private salvageCompleteArrayElements(slice: string): unknown[] {
     const elements: unknown[] = [];
     const scan = new JsonScan();
     let elementStart = -1;
@@ -217,7 +223,7 @@ export class ClaudeCodeTruncatedRequest {
       if (event === "depth-in" && scan.depth === 2 && elementStart === -1) {
         elementStart = i;
       } else if (event === "depth-out" && scan.depth === 1 && elementStart >= 0) {
-        const parsed = ClaudeCodeTruncatedRequest.safeParse(slice.slice(elementStart, i + 1));
+        const parsed = this.safeParse(slice.slice(elementStart, i + 1));
         if (parsed !== null) {
           elements.push(parsed);
         }
@@ -235,16 +241,16 @@ export class ClaudeCodeTruncatedRequest {
    * for an array of blocks the complete blocks' text plus the cut block's
    * partial `"text"` string.
    */
-  private static salvagePartialText(slice: string): string | null {
+  private salvagePartialText(slice: string): string | null {
     const fragment = slice.trimStart();
     if (fragment.startsWith('"')) {
-      return ClaudeCodeTruncatedRequest.decodePartialJsonString(fragment.slice(1));
+      return this.decodePartialJsonString(fragment.slice(1));
     }
 
     if (fragment.startsWith("[")) {
       const parts = [
-        contentToText(ClaudeCodeTruncatedRequest.salvageCompleteArrayElements(fragment)),
-        ClaudeCodeTruncatedRequest.cutBlockText(fragment) ?? "",
+        contentToText(this.salvageCompleteArrayElements(fragment)),
+        this.cutBlockText(fragment) ?? "",
       ].filter((part) => part.length > 0);
 
       return parts.length > 0 ? parts.join("\n\n") : null;
@@ -254,7 +260,7 @@ export class ClaudeCodeTruncatedRequest {
   }
 
   /** The last block's partial `"text"` value, when the cut landed inside it. */
-  private static cutBlockText(fragment: string): string | null {
+  private cutBlockText(fragment: string): string | null {
     const key = '"text":';
     const lastTextKey = fragment.lastIndexOf(key);
     if (lastTextKey === -1) {
@@ -262,15 +268,15 @@ export class ClaudeCodeTruncatedRequest {
     }
 
     const afterKey = fragment.slice(lastTextKey + key.length).trimStart();
-    if (!afterKey.startsWith('"') || ClaudeCodeTruncatedRequest.isClosedString(afterKey)) {
+    if (!afterKey.startsWith('"') || this.isClosedString(afterKey)) {
       return null;
     }
 
-    return ClaudeCodeTruncatedRequest.decodePartialJsonString(afterKey.slice(1));
+    return this.decodePartialJsonString(afterKey.slice(1));
   }
 
   /** Whether a fragment starting at a quote closes its string. */
-  private static isClosedString(fragment: string): boolean {
+  private isClosedString(fragment: string): boolean {
     let escaped = false;
     for (let i = 1; i < fragment.length; i++) {
       if (escaped) {
@@ -293,10 +299,10 @@ export class ClaudeCodeTruncatedRequest {
    * Decode the content of a JSON string cut before its closing quote: drop a
    * dangling escape (`\` or incomplete `\uXX`), close the quote, parse.
    */
-  private static decodePartialJsonString(content: string): string | null {
+  private decodePartialJsonString(content: string): string | null {
     let body = content;
     // An unescaped closing quote means the string actually completed.
-    const closed = ClaudeCodeTruncatedRequest.isClosedString(`"${body}`);
+    const closed = this.isClosedString(`"${body}`);
     if (closed) {
       const end = `"${body}`.indexOf('"', 1);
       body = `"${body}`.slice(1, end);
@@ -313,7 +319,7 @@ export class ClaudeCodeTruncatedRequest {
       body = body.slice(0, -1);
     }
 
-    const parsed = ClaudeCodeTruncatedRequest.safeParse(`"${body}"`);
+    const parsed = this.safeParse(`"${body}"`);
 
     return typeof parsed === "string" && parsed.length > 0 ? parsed : null;
   }
@@ -328,17 +334,17 @@ export class ClaudeCodeTruncatedRequest {
    *
    * @internal exported for unit testing
    */
-  static trySalvage(raw: string): Array<{ role: string; content: string }> | null {
+  trySalvage(raw: string): Array<{ role: string; content: string }> | null {
     const trimmed = raw.replace(CLAUDE_TRUNCATION_MARKER, "");
 
-    const system = ClaudeCodeTruncatedRequest.salvageTopLevelValue(trimmed, "system");
-    const tools = ClaudeCodeTruncatedRequest.salvageTopLevelValue(trimmed, "tools");
-    const messages = ClaudeCodeTruncatedRequest.salvageTopLevelValue(trimmed, "messages");
+    const system = this.salvageTopLevelValue(trimmed, "system");
+    const tools = this.salvageTopLevelValue(trimmed, "tools");
+    const messages = this.salvageTopLevelValue(trimmed, "messages");
 
     const out = [
-      ClaudeCodeTruncatedRequest.salvagedSystemMessage(system),
-      toolDefinitionsMessage(ClaudeCodeTruncatedRequest.salvagedArray(tools)),
-      ...ClaudeCodeTruncatedRequest.salvagedHistoryMessages(messages),
+      this.salvagedSystemMessage(system),
+      toolDefinitionsMessage(this.salvagedArray(tools)),
+      ...this.salvagedHistoryMessages(messages),
     ].filter((m): m is { role: string; content: string } => m !== null);
 
     if (out.length === 0) {

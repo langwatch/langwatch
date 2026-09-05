@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it, vi } from "vitest";
-import { InvalidColumnError } from "../dataset-errors.service";
+import { InvalidColumnError } from "@langwatch/dataset-contract";
 import type { DatasetRepository } from "../../repositories/dataset.repository";
 import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository";
 import { DatasetService } from "../dataset.service";

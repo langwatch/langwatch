@@ -8,7 +8,7 @@ import {
   DatasetConflictError,
   DatasetNotFoundError,
   DatasetNotReadyError,
-} from "../../../services/dataset-errors.service";
+} from "@langwatch/dataset-contract";
 import { datasetErrorHandler } from "../dataset.api";
 
 /**

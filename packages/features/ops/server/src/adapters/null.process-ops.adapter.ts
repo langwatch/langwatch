@@ -12,7 +12,11 @@ import type {
 } from "../repositories/process-ops.repository";
 
 /** For app presets that run without Postgres. */
-export class NullProcessOpsRepository implements ProcessOpsRepository {
+export class NullProcessOpsAdapter implements ProcessOpsRepository {
+  static create(): NullProcessOpsAdapter {
+    return new NullProcessOpsAdapter();
+  }
+
   async countByProcessName(): Promise<ProcessNameCounts[]> {
     return [];
   }

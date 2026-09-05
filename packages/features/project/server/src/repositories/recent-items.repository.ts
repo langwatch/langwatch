@@ -2,7 +2,7 @@ import type { GetRecentItemsParams } from "../rules/recent-items.rules";
 
 /** A Json column's value, mirroring the generated client's own shape. */
 export type AuditLogJsonObject = { [Key in string]?: AuditLogJsonValue };
-export interface AuditLogJsonArray extends Array<AuditLogJsonValue> {}
+export type AuditLogJsonArray = AuditLogJsonValue[];
 export type AuditLogJsonValue =
   | string
   | number

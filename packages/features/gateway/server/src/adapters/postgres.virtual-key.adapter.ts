@@ -15,7 +15,7 @@ import { PrismaGatewayTransactionAdapter } from "./postgres.gateway-transaction.
  * test pepper. Characterization suites assert against real rows, so they
  * compose the concrete repositories the way a process does.
  */
-export function createVirtualKeyServiceForTest(
+function createVirtualKeyServiceForTest(
   prisma: PrismaClient,
   projects: ProjectService,
 ): VirtualKeyService {
@@ -31,4 +31,14 @@ export function createVirtualKeyServiceForTest(
     auditLog: PrismaGatewayAuditRepository.create(prisma),
     crypto: VirtualKeyCryptoAdapter.create({ pepper: "test-virtual-key-pepper" }),
   });
+}
+
+export class PostgresVirtualKeyAdapter {
+  private constructor() {}
+
+  static create(): PostgresVirtualKeyAdapter {
+    return new PostgresVirtualKeyAdapter();
+  }
+
+  static createVirtualKeyServiceForTest = createVirtualKeyServiceForTest;
 }

@@ -43,8 +43,14 @@ const MAX_SESSION_TITLE_CHARS = 512;
  * nothing. A throw would lose the span, and a span is still worth storing when
  * only its text could not be read.
  */
-export class ClaudeCodeResponse {
-  private static extractAssistantText(parsed: ResponseBody): string | null {
+export class ClaudeCodeResponseService {
+  private constructor() {}
+
+  static create(): ClaudeCodeResponseService {
+    return new ClaudeCodeResponseService();
+  }
+
+  private extractAssistantText(parsed: ResponseBody): string | null {
     const parts: string[] = [];
     for (const block of parsed.content ?? []) {
       if (block.type !== "text") {
@@ -72,7 +78,7 @@ export class ClaudeCodeResponse {
    * raw string OR a pre-parsed object — accept both. Returns null when absent or
    * unparseable (claude truncates large bodies inline, making them invalid JSON).
    */
-  private static parseJsonBody(raw: unknown): ResponseBody | null {
+  private parseJsonBody(raw: unknown): ResponseBody | null {
     if (raw === null || raw === void 0) {
       return null;
     }
@@ -95,7 +101,7 @@ export class ClaudeCodeResponse {
     return result.success ? result.data : null;
   }
 
-  private static extractAssistantOutput(parsed: ResponseBody): string | null {
+  private extractAssistantOutput(parsed: ResponseBody): string | null {
     const parts: string[] = [];
     for (const block of parsed.content ?? []) {
       if (block.type === "text") {
@@ -104,9 +110,7 @@ export class ClaudeCodeResponse {
         }
       } else if (block.type === "tool_use" && block.name) {
         const args =
-          block.input !== void 0 && block.input !== null
-            ? ClaudeCodeResponse.safeStringify(block.input)
-            : "";
+          block.input !== void 0 && block.input !== null ? this.safeStringify(block.input) : "";
         parts.push(args ? `[tool_use: ${block.name}]\n${args}` : `[tool_use: ${block.name}]`);
       }
     }
@@ -118,8 +122,8 @@ export class ClaudeCodeResponse {
     return capPayloadString(parts.join("\n\n"), void 0, "assistant_output");
   }
 
-  private static extractSessionTitle(text: string): string | null {
-    const parsed = ClaudeCodeResponse.tryParseJson(text, sessionTitleSchema);
+  private extractSessionTitle(text: string): string | null {
+    const parsed = this.tryParseJson(text, sessionTitleSchema);
     if (parsed === null) {
       return null;
     }
@@ -129,7 +133,7 @@ export class ClaudeCodeResponse {
     return title.length > 0 ? title.slice(0, MAX_SESSION_TITLE_CHARS) : null;
   }
 
-  private static tryParseJson<T>(raw: string, schema: z.ZodType<T>): T | null {
+  private tryParseJson<T>(raw: string, schema: z.ZodType<T>): T | null {
     try {
       const result = schema.safeParse(JSON.parse(raw));
 
@@ -140,7 +144,7 @@ export class ClaudeCodeResponse {
   }
 
   /** JSON.stringify that never throws on a circular/odd value. */
-  private static safeStringify(value: unknown): string {
+  private safeStringify(value: unknown): string {
     try {
       return typeof value === "string" ? value : JSON.stringify(value);
     } catch {
@@ -171,13 +175,13 @@ export class ClaudeCodeResponse {
    *
    * @internal exported for unit testing only
    */
-  static tryExtractAssistantTextFromResponseBody(raw: unknown): string | null {
-    const parsed = ClaudeCodeResponse.parseJsonBody(raw);
+  tryExtractAssistantTextFromResponseBody(raw: unknown): string | null {
+    const parsed = this.parseJsonBody(raw);
     if (parsed === null) {
       return null;
     }
 
-    return ClaudeCodeResponse.extractAssistantText(parsed);
+    return this.extractAssistantText(parsed);
   }
 
   /**
@@ -192,13 +196,13 @@ export class ClaudeCodeResponse {
    * The CALLER decides which bodies are titles (the `query_source` gate); this
    * only reads the shape.
    */
-  static tryExtractSessionTitleFromResponseBody(raw: string): string | null {
-    const text = ClaudeCodeResponse.tryExtractAssistantTextFromResponseBody(raw);
+  tryExtractSessionTitleFromResponseBody(raw: string): string | null {
+    const text = this.tryExtractAssistantTextFromResponseBody(raw);
     if (text === null) {
       return null;
     }
 
-    const title = ClaudeCodeResponse.tryParseJson(text, sessionTitleSchema);
+    const title = this.tryParseJson(text, sessionTitleSchema);
     if (title === null) {
       return null;
     }
@@ -219,11 +223,11 @@ export class ClaudeCodeResponse {
    *
    * @internal exported for unit testing
    */
-  static tryExtractCacheCreationTtlSplit(raw: unknown): {
+  tryExtractCacheCreationTtlSplit(raw: unknown): {
     ephemeral5mInputTokens: number;
     ephemeral1hInputTokens: number;
   } | null {
-    const parsed = ClaudeCodeResponse.parseJsonBody(raw);
+    const parsed = this.parseJsonBody(raw);
     const split = parsed?.usage?.cache_creation;
     if (split === void 0) {
       return null;
@@ -254,34 +258,34 @@ export class ClaudeCodeResponse {
    *
    * @internal exported for unit testing
    */
-  static tryExtractAssistantOutputFromResponseBody(raw: unknown): string | null {
-    const parsed = ClaudeCodeResponse.parseJsonBody(raw);
+  tryExtractAssistantOutputFromResponseBody(raw: unknown): string | null {
+    const parsed = this.parseJsonBody(raw);
     if (parsed === null) {
       return null;
     }
 
-    return ClaudeCodeResponse.extractAssistantOutput(parsed);
+    return this.extractAssistantOutput(parsed);
   }
 
-  static deriveClaudeResponseBody(raw: unknown): {
+  deriveClaudeResponseBody(raw: unknown): {
     assistantText: string | null;
     assistantOutput: string | null;
     sessionTitle: string | null;
   } {
-    const parsed = ClaudeCodeResponse.parseJsonBody(raw);
+    const parsed = this.parseJsonBody(raw);
     if (parsed === null) {
       return { assistantText: null, assistantOutput: null, sessionTitle: null };
     }
 
-    const assistantText = ClaudeCodeResponse.extractAssistantText(parsed);
+    const assistantText = this.extractAssistantText(parsed);
     const sessionTitle =
       typeof raw === "string" && assistantText !== null
-        ? ClaudeCodeResponse.extractSessionTitle(assistantText)
+        ? this.extractSessionTitle(assistantText)
         : null;
 
     return {
       assistantText,
-      assistantOutput: ClaudeCodeResponse.extractAssistantOutput(parsed),
+      assistantOutput: this.extractAssistantOutput(parsed),
       sessionTitle,
     };
   }

@@ -16,7 +16,7 @@ import { traceNameChangedEventDataSchema } from "@langwatch/trace-contract";
  * resilient against later root-span arrivals overwriting the user's
  * edit.
  */
-export const changeTraceNameCommand = defineCommand({
+const changeTraceNameDefinition = defineCommand({
   commandType: CHANGE_TRACE_NAME_COMMAND_TYPE,
   eventType: TRACE_NAME_CHANGED_EVENT_TYPE,
   eventVersion: TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,
@@ -31,3 +31,11 @@ export const changeTraceNameCommand = defineCommand({
   }),
   makeJobId: (d) => `${d.tenantId}:${d.traceId}:change_trace_name`,
 });
+
+export class EventingChangeTraceNameAdapter extends changeTraceNameDefinition {
+  static create(): EventingChangeTraceNameAdapter {
+    return new EventingChangeTraceNameAdapter();
+  }
+}
+
+export const changeTraceNameCommand = EventingChangeTraceNameAdapter;

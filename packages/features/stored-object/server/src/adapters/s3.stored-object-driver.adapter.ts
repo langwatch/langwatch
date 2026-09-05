@@ -12,7 +12,8 @@ import {
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
-import { parseS3Uri } from "./s3-uri.adapter";
+import { S3UriAdapter } from "./s3-uri.adapter";
+const { parseS3Uri } = S3UriAdapter;
 import type {
   StoredObjectS3Target,
   StoredObjectS3TargetPort,

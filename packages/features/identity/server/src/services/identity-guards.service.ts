@@ -110,6 +110,7 @@ export class IdentityGuards {
     if (normalizedValue === null) {
       return;
     }
+
     const held = await this.holdsAddressLock({
       userId,
       identifierId,
@@ -119,6 +120,7 @@ export class IdentityGuards {
     if (held) {
       return;
     }
+
     throw new IdentityEmailInUseError(`${verb}: another user holds the lock on this address`);
   }
 
@@ -150,10 +152,12 @@ export class IdentityGuards {
     if (normalizedValue === null) {
       return;
     }
+
     const holder = await this.users.tryFindUserIdByEmail({ normalizedValue });
     if (holder === null || holder === userId) {
       return;
     }
+
     throw new IdentityEmailInUseError(
       `${verb}: a user outside the identity population already holds this address as their User.email`,
     );
@@ -187,6 +191,7 @@ export class IdentityGuards {
     if (heads.identifiers[identifierId]) {
       return [];
     }
+
     const userHashKey = await this.heads.tryFindUserHashKey({ userId });
     // Non-email providers arrive VERIFIED with no verify ceremony to
     // re-check them, so the attach itself is where a cross-user race
@@ -253,6 +258,7 @@ export class IdentityGuards {
     if (head.state === "VERIFIED" || head.state === "PRIMARY") {
       return [];
     }
+
     if (head.state !== "ATTACHED") {
       throw new IdentityIdentifierNotVerifiableError(
         `verify_identifier: identifier is ${head.state}, only ATTACHED verifies`,
@@ -314,6 +320,7 @@ export class IdentityGuards {
     if (head.state === "PRIMARY") {
       return [];
     }
+
     if (head.state !== "VERIFIED") {
       throw new IdentityPrimaryRequiresVerifiedError(
         `mark_primary: identifier is ${head.state}, only VERIFIED takes PRIMARY`,
@@ -359,6 +366,7 @@ export class IdentityGuards {
     if (head.state === "DETACHED") {
       return [];
     }
+
     // Removing a way IN is refused when it is the last one, or the last one
     // anybody could be recovered through (D07). Scoped to identifiers that
     // are actually usable: detaching an unverified address strands nobody,

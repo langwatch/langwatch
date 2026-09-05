@@ -30,14 +30,14 @@ import {
   type TeamRoleValue,
 } from "../../services/member-role-constraints.service";
 import { isCustomRole } from "../../rules/custom-role-naming.rules";
-import { CustomRoleNotAssignableError } from "../../services/organization-membership-errors.service";
+import { CustomRoleNotAssignableError } from "@langwatch/organization-contract";
 import {
   CannotDemoteLastAdminError,
   CannotDisableLastAdminError,
   CannotRemoveLastAdminError,
   MemberNotFoundError,
   OrganizationSlugTakenError,
-} from "../../services/organization-membership-errors.service";
+} from "@langwatch/organization-contract";
 import type {
   AuditLogFilters,
   CreateAndAssignInput,

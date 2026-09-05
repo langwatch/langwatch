@@ -82,6 +82,7 @@ export class SsoConnectionGuards {
     if (existing) {
       return [];
     }
+
     return [
       {
         type: CONNECTION_REGISTERED_EVENT_TYPE,
@@ -162,6 +163,7 @@ export class SsoConnectionGuards {
     if (state.approvedDomains.includes(domain)) {
       return [];
     }
+
     await this.checks.assertPlatformOperator({
       actor: data.actor,
       act: `approve the claim on ${domain}`,
@@ -284,6 +286,7 @@ export class SsoConnectionGuards {
     if (state.verifiedDomains.includes(domain)) {
       return [];
     }
+
     await this.checks.assertPlatformOperator({
       actor: data.actor,
       act: `attest ${domain}`,
@@ -323,6 +326,7 @@ export class SsoConnectionGuards {
     if (state.verifiedDomains.includes(domain)) {
       return [];
     }
+
     const pending = state.pendingVerification;
     if (!pending || pending.domain !== domain) {
       throw new SsoConnectionInvalidTransitionError(

@@ -1,4 +1,4 @@
-import type { CategoryVisibility, Protections } from "@langwatch/trace-contract";
+import type { Protections } from "@langwatch/trace-contract";
 
 export class TraceViewerProtectionsService {
   static create(): TraceViewerProtectionsService {

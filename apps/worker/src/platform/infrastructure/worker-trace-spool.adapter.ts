@@ -4,7 +4,7 @@ import {
   mintStoredObjectUri,
   type StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
-import type { StoredObjectStorageRuntime } from "@langwatch/stored-object-server";
+import type { StoredObjectStorageRuntimeAdapter } from "@langwatch/stored-object-server";
 import {
   TraceSpoolLegacyObjectPort,
   TraceSpoolStoragePort,
@@ -12,7 +12,7 @@ import {
 } from "@langwatch/trace-server";
 
 export type WorkerTraceSpoolStorageOptions = {
-  runtime: StoredObjectStorageRuntime;
+  runtime: StoredObjectStorageRuntimeAdapter;
   aws: AwsClientProcessRuntime;
   /**
    * The operator's assertion that the Azure container has the orphan-reaping
@@ -72,14 +72,14 @@ export class WorkerTraceSpoolStorageAdapter extends TraceSpoolStoragePort {
  */
 export class WorkerTraceSpoolLegacyObjectAdapter extends TraceSpoolLegacyObjectPort {
   static create(options: {
-    runtime: StoredObjectStorageRuntime;
+    runtime: StoredObjectStorageRuntimeAdapter;
     aws: AwsClientProcessRuntime;
   }): WorkerTraceSpoolLegacyObjectAdapter {
     return new WorkerTraceSpoolLegacyObjectAdapter(options.runtime, options.aws);
   }
 
   private constructor(
-    private readonly runtime: StoredObjectStorageRuntime,
+    private readonly runtime: StoredObjectStorageRuntimeAdapter,
     private readonly aws: AwsClientProcessRuntime,
   ) {
     super();

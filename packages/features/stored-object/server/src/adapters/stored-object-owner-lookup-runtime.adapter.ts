@@ -5,17 +5,17 @@ import { StoredObjectOwnerInstanceDirectoryPort } from "../ports/stored-object-o
 import type { StoredObjectOwnerResolver } from "@langwatch/stored-object-contract";
 
 /** Process-composed compatibility graph for legacy id-only stored-object URLs. */
-export class StoredObjectOwnerLookupRuntime {
+export class StoredObjectOwnerLookupRuntimeAdapter {
   static create(input: {
     instanceDirectory: StoredObjectOwnerInstanceDirectoryPort;
     telemetry: StoredObjectOwnerLookupTelemetryPort;
-  }): StoredObjectOwnerLookupRuntime {
+  }): StoredObjectOwnerLookupRuntimeAdapter {
     const repository = ClickHouseStoredObjectOwnerRepository.create(input.instanceDirectory);
     const resolver = StoredObjectOwnerLookupService.create({
       repository,
       telemetry: input.telemetry,
     });
-    return new StoredObjectOwnerLookupRuntime(resolver);
+    return new StoredObjectOwnerLookupRuntimeAdapter(resolver);
   }
 
   private constructor(readonly resolver: StoredObjectOwnerResolver) {}

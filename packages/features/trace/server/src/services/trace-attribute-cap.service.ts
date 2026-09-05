@@ -60,9 +60,15 @@ type AttributeList = OtlpSpan["attributes"];
  * replaces the value with a placeholder that SAYS it was truncated, because a
  * silently shortened value is indistinguishable from what the customer sent.
  */
-export class TraceAttributeCap {
+export class TraceAttributeCapService {
+  private constructor() {}
+
+  static create(): TraceAttributeCapService {
+    return new TraceAttributeCapService();
+  }
+
   /** UTF-8 byte length of a string, without allocating a Buffer copy. */
-  private static utf8ByteLength(value: string): number {
+  private utf8ByteLength(value: string): number {
     return Buffer.byteLength(value, "utf8");
   }
 
@@ -70,14 +76,16 @@ export class TraceAttributeCap {
    * Pulls a mime type out of a `data:<mime>;base64,...` URL so the placeholder
    * can name what was cut. Returns null for non-data-url strings.
    */
-  private static dataUrlMimeType(value: string): string | null {
+  private dataUrlMimeType(value: string): string | null {
     if (!value.startsWith("data:")) {
       return null;
     }
+
     const commaIdx = value.indexOf(",");
     if (commaIdx === -1) {
       return null;
     }
+
     const header = value.slice(5, commaIdx); // strip "data:"
     const semiIdx = header.indexOf(";");
     const mimeType = semiIdx === -1 ? header : header.slice(0, semiIdx);
@@ -85,7 +93,7 @@ export class TraceAttributeCap {
     return mimeType || null;
   }
 
-  private static truncationPlaceholder(byteSize: number, mimeType: string | null): string {
+  private truncationPlaceholder(byteSize: number, mimeType: string | null): string {
     return mimeType
       ? `[truncated: ${byteSize} bytes, ${mimeType}]`
       : `[truncated: ${byteSize} bytes]`;
@@ -96,7 +104,7 @@ export class TraceAttributeCap {
    * replaced (used only for bookkeeping / tests). Recurses into arrays and
    * kvlists so blobs nested inside structured params are caught too.
    */
-  private static capAnyValue(value: OtlpAnyValue, maxBytes: number): boolean {
+  private capAnyValue(value: OtlpAnyValue, maxBytes: number): boolean {
     if (value == null || typeof value !== "object") {
       return false;
     }
@@ -104,11 +112,11 @@ export class TraceAttributeCap {
     let capped = false;
 
     if (typeof value.stringValue === "string") {
-      const byteSize = TraceAttributeCap.utf8ByteLength(value.stringValue);
+      const byteSize = this.utf8ByteLength(value.stringValue);
       if (byteSize > maxBytes) {
-        value.stringValue = TraceAttributeCap.truncationPlaceholder(
+        value.stringValue = this.truncationPlaceholder(
           byteSize,
-          TraceAttributeCap.dataUrlMimeType(value.stringValue),
+          this.dataUrlMimeType(value.stringValue),
         );
         capped = true;
       }
@@ -119,20 +127,20 @@ export class TraceAttributeCap {
         value.bytesValue instanceof Uint8Array
           ? value.bytesValue.byteLength
           : // JSON-serialized bytes ({"0":1,...}) or unexpected shape: best-effort size.
-            TraceAttributeCap.utf8ByteLength(String(value.bytesValue));
+            this.utf8ByteLength(String(value.bytesValue));
       if (byteSize > maxBytes) {
         // Replace the binary payload with a text placeholder. Downstream
         // consumers read this attribute as a value type, so a stringValue
         // placeholder is the safe, readable substitute.
         value.bytesValue = null;
-        value.stringValue = TraceAttributeCap.truncationPlaceholder(byteSize, null);
+        value.stringValue = this.truncationPlaceholder(byteSize, null);
         capped = true;
       }
     }
 
     if (value.arrayValue && Array.isArray(value.arrayValue.values)) {
       for (const item of value.arrayValue.values) {
-        if (TraceAttributeCap.capAnyValue(item, maxBytes)) {
+        if (this.capAnyValue(item, maxBytes)) {
           capped = true;
         }
       }
@@ -140,7 +148,7 @@ export class TraceAttributeCap {
 
     if (value.kvlistValue && Array.isArray(value.kvlistValue.values)) {
       for (const entry of value.kvlistValue.values) {
-        if (entry?.value && TraceAttributeCap.capAnyValue(entry.value, maxBytes)) {
+        if (entry?.value && this.capAnyValue(entry.value, maxBytes)) {
           capped = true;
         }
       }
@@ -150,13 +158,14 @@ export class TraceAttributeCap {
   }
 
   /** Caps every value in an attribute list in place. */
-  private static capAttributeList(attributes: AttributeList, maxBytes: number): number {
+  private capAttributeList(attributes: AttributeList, maxBytes: number): number {
     if (!Array.isArray(attributes)) {
       return 0;
     }
+
     let count = 0;
     for (const attr of attributes) {
-      if (attr?.value && TraceAttributeCap.capAnyValue(attr.value, maxBytes)) {
+      if (attr?.value && this.capAnyValue(attr.value, maxBytes)) {
         count++;
       }
     }
@@ -172,14 +181,14 @@ export class TraceAttributeCap {
    *
    * Mirrors the traversal shape of `capAnyValue` exactly.
    */
-  static valueExceeds(value: OtlpAnyValue | null | undefined, maxBytes: number): boolean {
+  valueExceeds(value: OtlpAnyValue | null | undefined, maxBytes: number): boolean {
     if (value == null || typeof value !== "object") {
       return false;
     }
 
     if (
       typeof value.stringValue === "string" &&
-      TraceAttributeCap.utf8ByteLength(value.stringValue) > maxBytes
+      this.utf8ByteLength(value.stringValue) > maxBytes
     ) {
       return true;
     }
@@ -196,7 +205,7 @@ export class TraceAttributeCap {
 
     if (value.arrayValue && Array.isArray(value.arrayValue.values)) {
       for (const item of value.arrayValue.values) {
-        if (TraceAttributeCap.valueExceeds(item, maxBytes)) {
+        if (this.valueExceeds(item, maxBytes)) {
           return true;
         }
       }
@@ -204,7 +213,7 @@ export class TraceAttributeCap {
 
     if (value.kvlistValue && Array.isArray(value.kvlistValue.values)) {
       for (const entry of value.kvlistValue.values) {
-        if (entry?.value && TraceAttributeCap.valueExceeds(entry.value, maxBytes)) {
+        if (entry?.value && this.valueExceeds(entry.value, maxBytes)) {
           return true;
         }
       }
@@ -223,7 +232,7 @@ export class TraceAttributeCap {
    * Never throws (mirrors `capOversizedAttributes`' defensive try/catch).
    * Short-circuits on the first over-limit value.
    */
-  static hasOversizedAttribute(
+  hasOversizedAttribute(
     span: OtlpSpan,
     resource: OtlpResource | null,
     maxBytes: number = DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
@@ -231,7 +240,7 @@ export class TraceAttributeCap {
     try {
       if (Array.isArray(span.attributes)) {
         for (const attr of span.attributes) {
-          if (attr?.value && TraceAttributeCap.valueExceeds(attr.value, maxBytes)) {
+          if (attr?.value && this.valueExceeds(attr.value, maxBytes)) {
             return true;
           }
         }
@@ -240,7 +249,7 @@ export class TraceAttributeCap {
       for (const event of span.events ?? []) {
         if (Array.isArray(event.attributes)) {
           for (const attr of event.attributes) {
-            if (attr?.value && TraceAttributeCap.valueExceeds(attr.value, maxBytes)) {
+            if (attr?.value && this.valueExceeds(attr.value, maxBytes)) {
               return true;
             }
           }
@@ -250,7 +259,7 @@ export class TraceAttributeCap {
       for (const link of span.links ?? []) {
         if (Array.isArray(link.attributes)) {
           for (const attr of link.attributes) {
-            if (attr?.value && TraceAttributeCap.valueExceeds(attr.value, maxBytes)) {
+            if (attr?.value && this.valueExceeds(attr.value, maxBytes)) {
               return true;
             }
           }
@@ -259,7 +268,7 @@ export class TraceAttributeCap {
 
       if (resource && Array.isArray(resource.attributes)) {
         for (const attr of resource.attributes) {
-          if (attr?.value && TraceAttributeCap.valueExceeds(attr.value, maxBytes)) {
+          if (attr?.value && this.valueExceeds(attr.value, maxBytes)) {
             return true;
           }
         }
@@ -280,24 +289,24 @@ export class TraceAttributeCap {
    *
    * Returns the number of values capped (for logging / tests).
    */
-  static capOversizedAttributes(
+  capOversizedAttributes(
     span: OtlpSpan,
     resource: OtlpResource | null,
     maxBytes: number = DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
   ): number {
     let count = 0;
     try {
-      count += TraceAttributeCap.capAttributeList(span.attributes, maxBytes);
+      count += this.capAttributeList(span.attributes, maxBytes);
       for (const event of span.events ?? []) {
-        count += TraceAttributeCap.capAttributeList(event.attributes, maxBytes);
+        count += this.capAttributeList(event.attributes, maxBytes);
       }
 
       for (const link of span.links ?? []) {
-        count += TraceAttributeCap.capAttributeList(link.attributes, maxBytes);
+        count += this.capAttributeList(link.attributes, maxBytes);
       }
 
       if (resource) {
-        count += TraceAttributeCap.capAttributeList(resource.attributes, maxBytes);
+        count += this.capAttributeList(resource.attributes, maxBytes);
       }
     } catch {
       // Degraded, not broken: never block ingestion on a malformed value.
