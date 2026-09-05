@@ -20,7 +20,6 @@ export {
   type ProjectAppDependencies,
   type ProjectCaller,
   type TopicClusteringCommands,
-  type TopicClusteringRequest,
   type UpdateProjectSettings,
 } from "./app/project.app";
 export {
@@ -39,7 +38,6 @@ export {
   HomeTrpcApi,
   type HomeTrpcContext,
   type HomeTrpcPorts,
-  type RecentItem,
 } from "./transport/api-trpc/home.api";
 export {
   IntegrationsChecksTrpcApi,

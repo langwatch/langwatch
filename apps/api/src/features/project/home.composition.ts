@@ -3,11 +3,8 @@
  * one read: the entities this person last opened, across every vertical that records one.
  */
 import { HandledError } from "@langwatch/handled-error";
-import {
-  PostgresRecentItemsAdapter,
-  type HomeTrpcPorts,
-  type RecentItem,
-} from "@langwatch/project-server";
+import type { RecentItem } from "@langwatch/project-contract";
+import { PostgresRecentItemsAdapter, type HomeTrpcPorts } from "@langwatch/project-server";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure";

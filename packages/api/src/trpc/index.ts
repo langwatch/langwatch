@@ -77,5 +77,15 @@ export type {
   TrpcResponseLike,
   TrpcTranslatedCause,
 } from "./trpc-policy-ports.js";
+export {
+  createTrpcService,
+  type TrpcDeclaredAbsent,
+  type TrpcPolicyDecorator,
+  type TrpcProcedureChain,
+  type TrpcService,
+  type TrpcServiceConfig,
+  type TrpcServiceProcedures,
+  type TrpcUndeclared,
+} from "./trpc-service-builder.js";
 export { createTrpcRuntimePolicy, type TrpcRuntimePolicyPorts } from "./trpc-runtime-policy.js";
 export { createScopeLineageGuard } from "./trpc-scope-lineage.js";

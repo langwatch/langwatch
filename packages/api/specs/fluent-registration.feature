@@ -145,3 +145,43 @@ Feature: Fluent endpoint registration
     And the service was created without a rate limiter port
     When the service is built
     Then the build fails naming the endpoint and the missing port
+
+  @unit
+  Scenario: A versioned family authenticates at its own scope
+    Given a family is created at project scope
+    When a request reaches one of its routes
+    Then the project door runs, then the permission check at project scope
+    And the route registry records the credential a project family takes
+
+  @unit
+  Scenario: A route is checked at the scope its path names, not the family's
+    Given a route declares its permission on the team or project named in its path
+    When a request reaches it
+    Then the check runs at that scope
+    And the family's own organization-wide check never runs
+
+  @unit
+  Scenario: A route declares the API-key ceiling rather than a role check
+    Given a project-scoped route declares the API-key ceiling for a permission
+    When a request reaches it
+    Then the ceiling is what authorizes it
+    And the registry records the declaration as it was written
+
+  @unit
+  Scenario: A route accepts any credential its family's door admits
+    Given a route declares that authentication alone is enough
+    When a request reaches it
+    Then the family's door runs and no permission is checked
+
+  @unit
+  Scenario: A service family stands behind its own secret, not a role check
+    Given a family authenticates with a shared secret
+    When one route declares the secret and another declares itself public
+    Then the secret guards the first and the second is reachable without it
+    And a handler-managed route authenticates inside its own handler
+
+  @unit
+  Scenario: A service family cannot declare a check its door cannot run
+    Given a family authenticates with a shared secret
+    When a route declares a role permission
+    Then the family refuses to build it, naming what a service family may declare

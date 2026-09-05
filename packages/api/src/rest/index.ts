@@ -98,7 +98,9 @@ export {
   type RestApiVersionedFamily,
   SecuredApp,
   type SecuredVerbs,
+  type VersionedAppOptions,
   type VersionedEndpointMeta,
+  type VersionedFamilyScope,
 } from "./security/rest-api-service.js";
 
 // The REST kit an application's route families are built from. Everything here was previously `apps/api/src/app-rest`, which a package may not import: a REST family that lives in `packages/features/<f>/server` needs the

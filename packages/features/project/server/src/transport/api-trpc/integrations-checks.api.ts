@@ -19,7 +19,8 @@
  *
  * Transport only: the gate, the input parser, and delegation to that port.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
@@ -42,14 +43,13 @@ type IntegrationsChecksTrpcProcedures<
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   /**
    * The process's tracing, logging, error, scope-lineage, authorization and
-   * audit policy for one declared permission.
-   *
-   * Applied AFTER this feature's own input parser rather than composed ahead
-   * of it, because the authorization check reads its scope id from the
-   * validated input: tRPC runs middlewares in the order they were added, so a
-   * check installed before `.input()` would see no input at all.
+   * audit policy for one access declaration. The chain applies it AFTER this
+   * feature's input parser, which is the ordering the authorization check
+   * depends on: a check installed before `.input()` reads no scope id.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /** The process capability this transport needs that is not the project's own. */
@@ -84,15 +84,29 @@ export class IntegrationsChecksTrpcApi {
   ) {
     const { protected: procedure, policy } = procedures;
 
-    return trpc.router({
-      /**
-       * `project:update` rather than `project:view`: the answer drives the
-       * setup checklist, and a reader who cannot change the project cannot act
-       * on a single step it lists. The gate this surface has always carried.
-       */
-      getCheckStatus: policy("project:update")(procedure.input(getCheckStatusInputSchema)).query(
-        ({ ctx, input }) => ports.getCheckStatus(ctx, { projectId: input.projectId }),
-      ),
-    });
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput: procedures.validateOutput,
+      })
+        /**
+         * `project:update` rather than `project:view`: the answer drives the
+         * setup checklist, and a reader who cannot change the project cannot act
+         * on a single step it lists. The gate this surface has always carried.
+         */
+        .query("getCheckStatus", (p) =>
+          p
+            .withInput(getCheckStatusInputSchema)
+            // The rollup's shape is the process's, not the project's: it is
+            // generic in this surface, so there is no schema here to state it.
+            .withoutOutput(
+              "the process owns the checklist's shape, and this surface is generic in it",
+            )
+            .withPermission("project:update")
+            .handle(({ ctx, input }) => ports.getCheckStatus(ctx, { projectId: input.projectId })),
+        )
+        .build()
+    );
   }
 }

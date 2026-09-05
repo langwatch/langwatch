@@ -83,6 +83,7 @@ export function createProjectTrpcRouter<
     {
       protected: service.protected,
       policy: service.policy,
+      validateOutput: service.validateOutput,
       createPolicy: service.custom(mount.checks.create),
       updatePolicy: <TProcedure>(procedure: TProcedure): TProcedure =>
         (service.policy("project:update")(procedure) as unknown as ChainableProcedure).use(

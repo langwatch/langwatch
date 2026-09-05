@@ -29,6 +29,7 @@ import {
   ProjectNotFoundError,
   type Project,
   type ProjectService,
+  type TopicClusteringRequest,
   type UpdateProjectInput,
 } from "@langwatch/project-contract";
 import type { ShareService } from "@langwatch/share-contract";
@@ -80,11 +81,6 @@ export type UpdateProjectSettings = Readonly<{
   s3SecretAccessKey?: string | null | undefined;
   s3Bucket?: string | undefined;
 }>;
-
-/** What a manual clustering request did, which is not always "started a run". */
-export type TopicClusteringRequest =
-  | Readonly<{ started: true }>
-  | Readonly<{ started: false; reason: "already_running" }>;
 
 export class ProjectApp {
   static create(dependencies: ProjectAppDependencies): ProjectApp {

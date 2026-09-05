@@ -1,6 +1,7 @@
 import { relative, resolve } from "node:path";
 import { lintApplicationBoundaries } from "./application-boundaries";
 import { lintApiTransportBoundaries } from "./api-transport-boundaries";
+import { lintApiTransportFramework } from "./api-transport-framework";
 import { lintArchitectureRecords } from "./architecture-records";
 import { lintCycles } from "./cycles";
 import { changedSourceFiles, lintCommentBlocks } from "./comment-blocks";
@@ -47,6 +48,11 @@ export type {
   BoundaryEdgeKind,
 } from "./boundary-edge-baseline";
 export { lintApiTransportBoundaries } from "./api-transport-boundaries";
+export {
+  apiTransportFrameworkFindings,
+  lintApiTransportFramework,
+  readApiTransportFrameworkAllowlist,
+} from "./api-transport-framework";
 export {
   changedSourceFiles,
   compareCommentBlockRoots,
@@ -155,6 +161,7 @@ export function lintWorkspace(
       legacyMigration: options.legacyApplicationMigration !== false,
     }),
     ...lintApiTransportBoundaries(root, discovery.packages),
+    ...lintApiTransportFramework(root, discovery.packages),
     ...lintPrismaBoundaries(discovery.packages),
     ...lintTypedPrismaSeam(root, discovery.packages),
     ...lintServiceResultContracts(discovery.packages),

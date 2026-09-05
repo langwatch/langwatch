@@ -439,12 +439,28 @@ export interface VersionedEndpointMeta {
   policy: AccessPolicy;
 }
 
+/** The scope a versioned family's own door authenticates at. */
+export type VersionedFamilyScope = "project" | "organization" | "service";
+
 /**
  * One versioned family: the service builder and the policy every route wears.
+ *
+ * `policy` takes a whole {@link AccessPolicy} — `requires(...)`,
+ * `requiresOnProject(...)`, `requiresOnTeam(...)`, `apiKeyPermission(...)`,
+ * `anyAuthenticated()`, `publicEndpoint(reason)`, `internalSecret(reason)`,
+ * `handlerManagedAuth({ … })` — and installs the check that declaration
+ * actually names. A bare permission is the `requires(...)` shorthand.
+ *
+ * Taking only a permission was the defect this replaced: a family whose routes
+ * are scoped to the team or project named IN THE PATH would have had its
+ * declaration widened to the family's own scope, so one organization-wide
+ * grant would have reached every team in the organization.
  */
 export interface RestApiVersionedFamily {
   service: ServiceBuilder<unknown, EndpointVariables, unknown>;
-  policy: (permission: AuthzPermission) => <TChain extends RouteChain>(b: TChain) => TChain;
+  policy: (
+    access: AuthzPermission | AccessPolicy,
+  ) => <TChain extends RouteChain>(b: TChain) => TChain;
 }
 
 /**
@@ -452,7 +468,15 @@ export interface RestApiVersionedFamily {
  * policy. Every mount the framework creates arrives here: each dated version, `latest`, withdrawn 410
  * tombstones (their inherited config carries the meta), and the two version-namespace guards.
  */
-function registerMountedRoute({ route, family }: { route: MountedRoute; family: string }): void {
+function registerMountedRoute({
+  route,
+  family,
+  scope,
+}: {
+  route: MountedRoute;
+  family: string;
+  scope: VersionedFamilyScope;
+}): void {
   if (route.isNamespaceGuard) {
     const policy = publicEndpoint(
       "version-namespace guard: answers 404 for unknown version segments " +
@@ -465,7 +489,7 @@ function registerMountedRoute({ route, family }: { route: MountedRoute; family: 
       ...(route.canonicalPath ? { canonicalPath: route.canonicalPath } : {}),
       policy,
       family,
-      credentialClass: credentialClassFor({ scope: "organization", policy }),
+      credentialClass: credentialClassFor({ scope, policy }),
       isNamespaceGuard: true,
     });
     return;
@@ -493,12 +517,9 @@ function registerMountedRoute({ route, family }: { route: MountedRoute; family: 
     ...(route.canonicalPath ? { canonicalPath: route.canonicalPath } : {}),
     policy: meta.policy,
     family,
-    // The whole family authenticates with an organization-scoped key, so the
-    // class is the one a SecuredApp on the organization scope derives.
-    credentialClass: credentialClassFor({
-      scope: "organization",
-      policy: meta.policy,
-    }),
+    // The class a SecuredApp on the same scope would derive: the family's own
+    // door decides what credential reaches the route.
+    credentialClass: credentialClassFor({ scope, policy: meta.policy }),
     ...(route.withdrawn ? { withdrawn: true as const } : {}),
   });
 }
@@ -522,6 +543,37 @@ interface SecuredAppArgs {
    * exactly what their consumers already parse.
    */
   errorEnvelope?: ApiErrorEnvelope;
+}
+
+/** What every versioned-family factory takes. */
+export interface VersionedAppOptions {
+  name: string;
+  /** Spelled out at the call site so the route-coverage gate can read it. */
+  basePath: string;
+  /**
+   * Per-route middleware applied AFTER authentication and the access check, to
+   * every route the family declares.
+   */
+  routeMiddleware?: readonly MiddlewareHandler[];
+  /**
+   * The error shape this family publishes, and the shape its own door answers
+   * a refusal in. Defaults to `canonical`, which is what every family already
+   * on this framework publishes; a family MOVING onto it passes the envelope
+   * it publishes today, because converting a family must not change the body
+   * an existing integrator parses.
+   */
+  errorEnvelope?: ApiErrorEnvelope;
+  /**
+   * The family's own `onError`, layered over the envelope's boundary handler —
+   * `createFamilyErrorHandler({ loggerName, label, boundary })`. Families with
+   * a domain refusal to log below error level install one; the rest do not.
+   */
+  errorHandler?: (boundary: ErrorHandler) => ErrorHandler;
+  /**
+   * Set `false` to keep the family off `/api/v1`. Reserved for the surfaces
+   * that are not the published product API.
+   */
+  v1Alias?: boolean;
 }
 
 /**
@@ -571,16 +623,34 @@ export interface RestApiService<
    * An organization-scoped family on the dated-contract framework: versioned
    * paths, declarative input/output schemas and generated OpenAPI.
    */
-  createVersionedApp(options: {
-    name: string;
-    /** Spelled out at the call site so the route-coverage gate can read it. */
-    basePath: string;
-    /**
-     * Per-route middleware applied AFTER authentication and the RBAC check, to
-     * every route the family declares.
-     */
-    routeMiddleware?: readonly MiddlewareHandler[];
-  }): RestApiVersionedFamily;
+  createVersionedApp(options: VersionedAppOptions): RestApiVersionedFamily;
+
+  /**
+   * The same family, authenticated at PROJECT scope: the process's unified
+   * project door (project API key, legacy project key, or browser session),
+   * with `requires(...)` resolved against the caller's project role bindings
+   * and `apiKeyPermission(...)` against the API-key ceiling.
+   */
+  createProjectVersionedApp(options: VersionedAppOptions): RestApiVersionedFamily;
+
+  /**
+   * The same family for a service-to-service surface: `verifySecret` is the
+   * whole door, so the only declarations that make sense are
+   * `internalSecret(reason)`, `publicEndpoint(reason)` and
+   * `handlerManagedAuth({ … })`.
+   */
+  createServiceVersionedApp(
+    options: VersionedAppOptions & {
+      /** The shared-secret or signature check every route authenticates with. */
+      verifySecret?: MiddlewareHandler;
+      /**
+       * Overrides the credential class the family publishes. Set it only when
+       * the secret is one an API client holds and the document declares a
+       * scheme for it.
+       */
+      credentialClass?: CredentialClass;
+    },
+  ): RestApiVersionedFamily;
 
   /**
    * The process's `onError` for the flat legacy body.
@@ -589,6 +659,152 @@ export interface RestApiService<
   /** The process's `onError` for the canonical envelope. @see legacyErrorHandler */
   readonly canonicalErrorHandler: ErrorHandler;
 }
+
+/**
+ * One versioned family, at whichever scope its own door authenticates.
+ *
+ * The three factories differ in exactly two things: the door
+ * (`authenticateProject` / `authenticateOrganizationThrowing` / the family's
+ * own `verifySecret`) and which access declarations that door can enforce.
+ * Everything else — the dated namespaces, the `/api/v1` twin, the app context,
+ * the error envelope, the route registry — is the same, so it is written once.
+ */
+function versionedFamily({
+  ports,
+  options,
+  scope,
+  verifySecret,
+}: {
+  ports: RestApiServicePorts;
+  options: VersionedAppOptions;
+  scope: VersionedFamilyScope;
+  verifySecret?: MiddlewareHandler;
+}): RestApiVersionedFamily {
+  const { name, basePath, routeMiddleware = [] } = options;
+  const family = familyFromBasePath(basePath);
+  const envelope: ApiErrorEnvelope = options.errorEnvelope ?? "canonical";
+  const boundary = envelope === "legacy" ? ports.legacyErrorHandler : ports.canonicalErrorHandler;
+  const onError = options.errorHandler ? options.errorHandler(boundary) : boundary;
+
+  const auth =
+    scope === "project"
+      ? ports.authenticateProject(envelope)
+      : scope === "organization"
+        ? ports.authenticateOrganizationThrowing
+        : verifySecret;
+
+  const service = createService({
+    name,
+    basePath,
+    middleware: [ports.appContext],
+    ...(auth ? { auth } : {}),
+    onError,
+    ...(options.v1Alias === false ? { v1Alias: false } : {}),
+    permissionEnforcer: (permission) =>
+      scope === "project"
+        ? ports.authorizeProjectPermission({ permission, envelope })
+        : ports.authorizeOrganizationPermissionThrowing(permission),
+    onRouteMounted: (route) => registerMountedRoute({ route, family, scope }),
+  });
+
+  const refuse = (message: string): never => {
+    throw new Error(`REST family "${name}" (${scope} scope) ${message}`);
+  };
+
+  /**
+   * The middlewares one declaration asks for, beyond the family's own door.
+   * `permission` is the only kind the service's own enforcer handles, because
+   * it is the only one whose scope IS the family's.
+   */
+  const checksFor = (policy: AccessPolicy): MiddlewareHandler[] => {
+    switch (policy.kind) {
+      case "permission":
+        return [];
+      case "apiKeyPermission":
+        return scope === "project"
+          ? [ports.authorizeApiKeyCeiling({ permission: policy.permission, envelope })]
+          : refuse("declares an API-key ceiling, which only a project-scoped family can enforce");
+      case "projectPermission":
+        return [
+          ports.authorizeRouteProjectPermission({
+            permission: policy.permission,
+            param: policy.param,
+            envelope,
+          }),
+        ];
+      case "teamPermission":
+        return [
+          ports.authorizeRouteTeamPermission({
+            permission: policy.permission,
+            param: policy.param,
+            envelope,
+          }),
+        ];
+      case "anyAuthenticated":
+      case "public":
+      case "internal":
+      case "handlerManaged":
+        return [];
+    }
+  };
+
+  /** The reason `withoutPermission` records for a non-permission declaration. */
+  const optOutReason = (policy: AccessPolicy): string => {
+    switch (policy.kind) {
+      case "apiKeyPermission":
+        return `enforced by the API-key ceiling for ${policy.permission}`;
+      case "projectPermission":
+        return `enforced at the project named in :${policy.param}, not the family's own scope`;
+      case "teamPermission":
+        return `enforced at the team named in :${policy.param}, not the family's own scope`;
+      case "anyAuthenticated":
+        return "any credential the family's door accepts; the route takes no privileged action beyond authentication";
+      case "public":
+      case "internal":
+      case "handlerManaged":
+        return policy.reason;
+      case "permission":
+        return refuse("cannot opt a plain permission out of enforcement");
+    }
+  };
+
+  const policy = (access: AuthzPermission | AccessPolicy) => {
+    const declaration: AccessPolicy = typeof access === "string" ? requires(access) : access;
+    if (scope === "service" && !SERVICE_SCOPE_POLICIES.has(declaration.kind)) {
+      refuse(
+        `declares ${declaration.kind}, which no shared-secret door can enforce; ` +
+          "a service family declares internalSecret, publicEndpoint or handlerManagedAuth",
+      );
+    }
+    const checks = checksFor(declaration);
+    return <TChain extends RouteChain>(b: TChain): TChain => {
+      const declared =
+        declaration.kind === "permission"
+          ? b.withPermission(declaration.permission)
+          : b.withoutPermission(optOutReason(declaration));
+      // A route the family's own door must not run on: `public` is
+      // deliberately reachable without a credential, and `handlerManaged`
+      // authenticates inside the handler.
+      const doored =
+        declaration.kind === "public" || declaration.kind === "handlerManaged"
+          ? declared.withAuth("none")
+          : declared;
+      return doored
+        .withMeta({ policy: declaration } satisfies VersionedEndpointMeta)
+        .withMiddleware(...checks, ...routeMiddleware);
+    };
+  };
+
+  return { service, policy };
+}
+
+/** The declarations a shared-secret door can actually stand behind. */
+const SERVICE_SCOPE_POLICIES = new Set<AccessPolicy["kind"]>([
+  "internal",
+  "public",
+  "handlerManaged",
+  "anyAuthenticated",
+]);
 
 /**
  * Bind every REST family factory to one process's authentication, logging,
@@ -646,36 +862,26 @@ export function createRestApiService<
       });
     },
 
-    createVersionedApp({
-      name,
-      basePath,
-      routeMiddleware = [],
-    }: {
-      name: string;
-      basePath: string;
-      routeMiddleware?: readonly MiddlewareHandler[];
-    }): RestApiVersionedFamily {
-      const family = familyFromBasePath(basePath);
+    createVersionedApp(options: VersionedAppOptions): RestApiVersionedFamily {
+      return versionedFamily({ ports, options, scope: "organization" });
+    },
 
-      const service = createService({
-        name,
-        basePath,
-        middleware: [ports.appContext],
-        auth: ports.authenticateOrganizationThrowing,
-        permissionEnforcer: (permission) =>
-          ports.authorizeOrganizationPermissionThrowing(permission),
-        onRouteMounted: (route) => registerMountedRoute({ route, family }),
+    createProjectVersionedApp(options: VersionedAppOptions): RestApiVersionedFamily {
+      return versionedFamily({ ports, options, scope: "project" });
+    },
+
+    createServiceVersionedApp(
+      options: VersionedAppOptions & {
+        verifySecret?: MiddlewareHandler;
+        credentialClass?: CredentialClass;
+      },
+    ): RestApiVersionedFamily {
+      return versionedFamily({
+        ports,
+        options,
+        scope: "service",
+        ...(options.verifySecret ? { verifySecret: options.verifySecret } : {}),
       });
-
-      const policy =
-        (permission: AuthzPermission) =>
-        <TChain extends RouteChain>(b: TChain): TChain =>
-          b
-            .withPermission(permission)
-            .withMeta({ policy: requires(permission) } satisfies VersionedEndpointMeta)
-            .withMiddleware(...routeMiddleware);
-
-      return { service, policy };
     },
 
     legacyErrorHandler: ports.legacyErrorHandler,

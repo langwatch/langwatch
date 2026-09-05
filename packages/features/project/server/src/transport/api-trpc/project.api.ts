@@ -29,11 +29,24 @@
  *
  * Spec: packages/features/project/specs/project-service.feature.
  */
-import { ProjectPermissionDeniedError, type AuthzPermission } from "@langwatch/authz-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import {
+  ProjectPermissionDeniedError,
+  type AuthzDeclaration,
+  type AuthzPermission,
+} from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   CannotArchiveCurrentProjectError,
   ProjectNotFoundError,
+  projectApiKeyRotationSchema,
+  projectArchivedSchema,
+  projectFieldRedactionStatusSchema,
+  projectFirstMessageSchema,
+  projectProvisionedSchema,
+  projectSchema,
+  projectSettingsSavedSchema,
+  topicClusteringRequestSchema,
 } from "@langwatch/project-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
@@ -72,15 +85,16 @@ type ProjectTrpcProcedures<
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   /**
    * The process's tracing, logging, error, scope-lineage, authorization and
-   * audit policy for one declared permission.
+   * audit policy for one access declaration.
    *
-   * Applied by this feature AFTER its own input parser rather than composed
-   * ahead of it, because the authorization check reads its scope id from the
-   * validated input: tRPC runs middlewares in the order they were added, so a
-   * check installed before `.input()` would see no input at all. The same
-   * holds for the two decorators below.
+   * The chain applies it AFTER this feature's own input parser, which is the
+   * ordering the authorization check depends on: tRPC runs middlewares in the
+   * order they were added, so a check installed before `.input()` would see no
+   * input at all and would read no scope id.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
   /**
    * `create`'s own declaration, because it is the one procedure here whose
    * authorized target depends on what was asked for: creating INTO a team
@@ -88,14 +102,14 @@ type ProjectTrpcProcedures<
    * the organization for `organization:manage`. Neither fixed tier could
    * express it, so the process declares the custom check.
    */
-  createPolicy<TProcedure>(procedure: TProcedure): TProcedure;
+  createPolicy: TrpcPolicyDecorator;
   /**
    * `update`'s declared `project:update` plus the process's trace-sharing
    * gate: flipping `traceSharingEnabled` additionally requires
    * `project:manage`, because it changes who outside the project can read its
    * traces. Every other field on the form stays at `project:update`.
    */
-  updatePolicy<TProcedure>(procedure: TProcedure): TProcedure;
+  updatePolicy: TrpcPolicyDecorator;
 }>;
 
 /**
@@ -205,173 +219,215 @@ export class ProjectTrpcApi {
   ) {
     const { protected: procedure, policy, createPolicy, updatePolicy } = procedures;
 
-    return trpc.router({
-      /**
-       * The owner is ADMIN of their own personal team, so `project:create`
-       * passes there. A personal workspace holds only the project provisioned
-       * with it, which is what `PersonalWorkspaceBoundaryError` refuses.
-       */
-      create: createPolicy(procedure.input(createInputSchema)).mutation(async ({ input, ctx }) => {
-        const actor = ctx.actor();
-        const project = await ctx.app.projects.create(
-          {
-            organizationId: input.organizationId,
-            teamId: input.teamId,
-            newTeamName: input.newTeamName,
-            name: input.name,
-            language: input.language,
-            framework: input.framework,
-          },
-          actor,
-        );
+    return (
+      createTrpcService({
+        root: trpc,
+        procedures: { protected: procedure, policy },
+        validateOutput: procedures.validateOutput,
+      })
+        /**
+         * The owner is ADMIN of their own personal team, so `project:create`
+         * passes there. A personal workspace holds only the project provisioned
+         * with it, which is what `PersonalWorkspaceBoundaryError` refuses.
+         */
+        .mutation("create", (p) =>
+          p
+            .withInput(createInputSchema)
+            .withOutput(projectProvisionedSchema)
+            .withCustomPermission(
+              createPolicy,
+              "creating INTO a team asks that team for project:create; creating a team alongside asks the organization for organization:manage",
+            )
+            .handle(async ({ input, ctx }) => {
+              const actor = ctx.actor();
+              const project = await ctx.app.projects.create(
+                {
+                  organizationId: input.organizationId,
+                  teamId: input.teamId,
+                  newTeamName: input.newTeamName,
+                  name: input.name,
+                  language: input.language,
+                  framework: input.framework,
+                },
+                actor,
+              );
 
-        // (The eager per-project Langy service key that used to be minted
-        // here is gone — Langy now mints a per-turn, per-user session key
-        // scoped to exactly what the caller holds; no long-lived project key
-        // is provisioned.)
-        await ports.provisionLangyVirtualKey(ctx, {
-          projectId: project.id,
-          organizationId: input.organizationId,
-          actorUserId: actor.id,
-        });
+              // (The eager per-project Langy service key that used to be minted
+              // here is gone — Langy now mints a per-turn, per-user session key
+              // scoped to exactly what the caller holds; no long-lived project
+              // key is provisioned.)
+              await ports.provisionLangyVirtualKey(ctx, {
+                projectId: project.id,
+                organizationId: input.organizationId,
+                actorUserId: actor.id,
+              });
 
-        return { success: true, projectSlug: project.slug };
-      }),
+              return { success: true, projectSlug: project.slug };
+            }),
+        )
+        /**
+         * The base key is a project-level write credential, so reading it is
+         * gated with `project:update` to match the access it grants. Rotation
+         * stays at `project:manage`.
+         */
+        .query("getProjectAPIKey", (p) =>
+          p
+            .withInput(projectScopeSchema)
+            .withOutput(projectSchema)
+            .withPermission("project:update")
+            .handle(async ({ input, ctx }) => {
+              const project = await ctx.app.projects.tryGetById(input.projectId);
 
-      /**
-       * The base key is a project-level write credential, so reading it is
-       * gated with `project:update` to match the access it grants. Rotation
-       * stays at `project:manage`.
-       */
-      getProjectAPIKey: policy("project:update")(procedure.input(projectScopeSchema)).query(
-        async ({ input, ctx }) => {
-          const project = await ctx.app.projects.tryGetById(input.projectId);
+              if (!project) throw new ProjectNotFoundError();
 
-          if (!project) throw new ProjectNotFoundError();
+              return project;
+            }),
+        )
+        .query("getHasFirstMessage", (p) =>
+          p
+            .withInput(projectScopeSchema)
+            .withOutput(projectFirstMessageSchema)
+            .withPermission("project:view")
+            .handle(async ({ input, ctx }) => {
+              const project = await ctx.app.projects.tryGetById(input.projectId);
 
-          return project;
-        },
-      ),
+              return { firstMessage: project?.firstMessage ?? false };
+            }),
+        )
+        .mutation("regenerateApiKey", (p) =>
+          p
+            .withInput(projectScopeSchema)
+            .withOutput(projectApiKeyRotationSchema)
+            .withPermission("project:manage")
+            .handle(async ({ input, ctx }) => {
+              const apiKey = await ctx.app.projects.regenerateLegacyProjectKey({
+                projectId: input.projectId,
+              });
 
-      getHasFirstMessage: policy("project:view")(procedure.input(projectScopeSchema)).query(
-        async ({ input, ctx }) => {
-          const project = await ctx.app.projects.tryGetById(input.projectId);
+              // Audit log the security-critical action; non-fatal so an audit
+              // failure cannot prevent returning the new key to the user.
+              await ports.recordApiKeyRegenerated({
+                userId: ctx.actor().id,
+                projectId: input.projectId,
+              });
 
-          return { firstMessage: project?.firstMessage ?? false };
-        },
-      ),
+              return { apiKey };
+            }),
+        )
+        .mutation("update", (p) =>
+          p
+            .withInput(updateInputSchema)
+            .withOutput(projectSettingsSavedSchema)
+            .withCustomPermission(
+              updatePolicy,
+              "project:update, plus project:manage when the form flips traceSharingEnabled",
+            )
+            .handle(async ({ input, ctx }) => {
+              const updatedProject = await ctx.app.projects.updateSettings({
+                projectId: input.projectId,
+                name: input.name,
+                language: input.language,
+                framework: input.framework,
+                teamId: input.teamId,
+                traceSharingEnabled: input.traceSharingEnabled,
+                presenceEnabled: input.presenceEnabled,
+                userLinkTemplate: input.userLinkTemplate,
+                s3Endpoint: input.s3Endpoint ? ports.encryptProjectSecret(input.s3Endpoint) : null,
+                s3AccessKeyId: input.s3AccessKeyId
+                  ? ports.encryptProjectSecret(input.s3AccessKeyId)
+                  : null,
+                s3SecretAccessKey: input.s3SecretAccessKey
+                  ? ports.encryptProjectSecret(input.s3SecretAccessKey)
+                  : null,
+                s3Bucket: input.s3Bucket,
+              });
 
-      regenerateApiKey: policy("project:manage")(procedure.input(projectScopeSchema)).mutation(
-        async ({ input, ctx }) => {
-          const apiKey = await ctx.app.projects.regenerateLegacyProjectKey({
-            projectId: input.projectId,
-          });
+              return { success: true, projectSlug: updatedProject.slug };
+            }),
+        )
+        // Legacy default-model mutations have been removed alongside the
+        // Organization/Team/Project scalar columns they wrote to. Defaults
+        // now live in ModelDefaultConfig; the canonical mutation surface is
+        // modelProvider.{saveDefaultModelsConfig,deleteDefaultModelsConfig,
+        // setRoleAssignmentForScope,setFeatureOverrideForScope}.
+        .query("getFieldRedactionStatus", (p) =>
+          p
+            .withInput(projectScopeSchema)
+            .withOutput(projectFieldRedactionStatusSchema)
+            .withPermission("project:view")
+            .handle(async ({ input, ctx }) => {
+              const protections = await ports.getFieldProtections(ctx, {
+                projectId: input.projectId,
+              });
 
-          // Audit log the security-critical action; non-fatal so an audit
-          // failure cannot prevent returning the new key to the user.
-          await ports.recordApiKeyRegenerated({
-            userId: ctx.actor().id,
-            projectId: input.projectId,
-          });
+              return {
+                isRedacted: {
+                  input: !protections.canSeeCapturedInput,
+                  output: !protections.canSeeCapturedOutput,
+                },
+                // Human label of who CAN see a restricted field (e.g. "Admins,
+                // Security" or "no one"), so the redaction placeholder can
+                // explain why content is hidden and who to ask. Null when the
+                // field is visible.
+                visibleTo: {
+                  input: protections.capturedInputVisibleTo ?? null,
+                  output: protections.capturedOutputVisibleTo ?? null,
+                },
+              };
+            }),
+        )
+        .mutation("archiveById", (p) =>
+          p
+            .withInput(archiveByIdInputSchema)
+            .withOutput(projectArchivedSchema)
+            .withPermission("project:delete")
+            .handle(async ({ input, ctx }) => {
+              if (input.projectToArchiveId === input.projectId) {
+                throw new CannotArchiveCurrentProjectError();
+              }
+              // The declared check covered `projectId`, the project the caller
+              // is in. The project actually archived is the other one, so it is
+              // probed on its own before anything is read or written.
+              const canDeleteTarget = await ports.probeProjectPermission(
+                ctx,
+                input.projectToArchiveId,
+                "project:delete",
+              );
+              if (!canDeleteTarget) throw new ProjectPermissionDeniedError("project:delete");
 
-          return { apiKey };
-        },
-      ),
-
-      update: updatePolicy(procedure.input(updateInputSchema)).mutation(async ({ input, ctx }) => {
-        const updatedProject = await ctx.app.projects.updateSettings({
-          projectId: input.projectId,
-          name: input.name,
-          language: input.language,
-          framework: input.framework,
-          teamId: input.teamId,
-          traceSharingEnabled: input.traceSharingEnabled,
-          presenceEnabled: input.presenceEnabled,
-          userLinkTemplate: input.userLinkTemplate,
-          s3Endpoint: input.s3Endpoint ? ports.encryptProjectSecret(input.s3Endpoint) : null,
-          s3AccessKeyId: input.s3AccessKeyId
-            ? ports.encryptProjectSecret(input.s3AccessKeyId)
-            : null,
-          s3SecretAccessKey: input.s3SecretAccessKey
-            ? ports.encryptProjectSecret(input.s3SecretAccessKey)
-            : null,
-          s3Bucket: input.s3Bucket,
-        });
-
-        return { success: true, projectSlug: updatedProject.slug };
-      }),
-
-      // Legacy default-model mutations have been removed alongside the
-      // Organization/Team/Project scalar columns they wrote to. Defaults
-      // now live in ModelDefaultConfig; the canonical mutation surface is
-      // modelProvider.{saveDefaultModelsConfig,deleteDefaultModelsConfig,setRoleAssignmentForScope,
-      // setFeatureOverrideForScope}.
-      getFieldRedactionStatus: policy("project:view")(procedure.input(projectScopeSchema)).query(
-        async ({ input, ctx }) => {
-          const protections = await ports.getFieldProtections(ctx, {
-            projectId: input.projectId,
-          });
-
-          return {
-            isRedacted: {
-              input: !protections.canSeeCapturedInput,
-              output: !protections.canSeeCapturedOutput,
-            },
-            // Human label of who CAN see a restricted field (e.g. "Admins,
-            // Security" or "no one"), so the redaction placeholder can explain
-            // why content is hidden and who to ask. Null when the field is
-            // visible.
-            visibleTo: {
-              input: protections.capturedInputVisibleTo ?? null,
-              output: protections.capturedOutputVisibleTo ?? null,
-            },
-          };
-        },
-      ),
-
-      archiveById: policy("project:delete")(procedure.input(archiveByIdInputSchema)).mutation(
-        async ({ input, ctx }) => {
-          if (input.projectToArchiveId === input.projectId) {
-            throw new CannotArchiveCurrentProjectError();
-          }
-          // The declared check covered `projectId`, the project the caller is
-          // in. The project actually archived is the other one, so it is
-          // probed on its own before anything is read or written.
-          const canDeleteTarget = await ports.probeProjectPermission(
-            ctx,
-            input.projectToArchiveId,
-            "project:delete",
-          );
-          if (!canDeleteTarget) throw new ProjectPermissionDeniedError("project:delete");
-
-          const { alreadyArchived } = await ctx.app.projects.archive({
-            projectId: input.projectToArchiveId,
-          });
-          return { success: true, alreadyArchived };
-        },
-      ),
-
-      triggerTopicClustering: policy("project:update")(
-        procedure.input(projectScopeSchema),
-      ).mutation(async ({ ctx, input }) => {
-        try {
-          return await ctx.app.projects.requestTopicClustering(input, ctx.actor());
-        } catch (error) {
-          ports.reportTopicClusteringFailure(error, { projectId: input.projectId });
-          // A refusal the process already named — a deployment that composes
-          // no clustering scheduler is the one that reaches here — is
-          // re-raised untouched. Its cause is known and its caller can act on
-          // it, so wrapping it would spend a name the boundary would then
-          // report as a trace id.
-          if (HandledError.isHandled(error)) throw error;
-          // Everything else behind this is event-store and projection
-          // internals — Prisma detail, hostnames — which is a cause we cannot
-          // name and the caller cannot act on. It stays an ordinary error so
-          // the boundary degrades it to an unknown failure carrying a trace id
-          // rather than dressing an infrastructure fault up as handled.
-          throw new Error("Failed to trigger topic clustering", { cause: error });
-        }
-      }),
-    });
+              const { alreadyArchived } = await ctx.app.projects.archive({
+                projectId: input.projectToArchiveId,
+              });
+              return { success: true, alreadyArchived };
+            }),
+        )
+        .mutation("triggerTopicClustering", (p) =>
+          p
+            .withInput(projectScopeSchema)
+            .withOutput(topicClusteringRequestSchema)
+            .withPermission("project:update")
+            .handle(async ({ ctx, input }) => {
+              try {
+                return await ctx.app.projects.requestTopicClustering(input, ctx.actor());
+              } catch (error) {
+                ports.reportTopicClusteringFailure(error, { projectId: input.projectId });
+                // A refusal the process already named — a deployment that
+                // composes no clustering scheduler is the one that reaches here
+                // — is re-raised untouched. Its cause is known and its caller
+                // can act on it, so wrapping it would spend a name the boundary
+                // would then report as a trace id.
+                if (HandledError.isHandled(error)) throw error;
+                // Everything else behind this is event-store and projection
+                // internals — Prisma detail, hostnames — which is a cause we
+                // cannot name and the caller cannot act on. It stays an ordinary
+                // error so the boundary degrades it to an unknown failure
+                // carrying a trace id rather than dressing an infrastructure
+                // fault up as handled.
+                throw new Error("Failed to trigger topic clustering", { cause: error });
+              }
+            }),
+        )
+        .build()
+    );
   }
 }

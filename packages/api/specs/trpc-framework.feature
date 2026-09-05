@@ -28,3 +28,23 @@ Feature: tRPC framework boundary
     When it is recorded
     Then it is warned about at most once per interval per path
     And the next warning reports how many calls went unwarned
+
+  @unit
+  Scenario: A chain-defined procedure runs the process policy around its parsed input
+    Given a procedure is defined through the fluent chain with an input, an output and an access declaration
+    When a caller invokes it
+    Then the input is parsed before the process policy runs
+    And the policy is the one the process declared for that access decision
+
+  @unit
+  Scenario: An answer that its declared output schema refuses is raised where it is cheap to find
+    Given a procedure declares the shape of its answer
+    When the process asks for answers to be checked
+    Then an answer the shape refuses is raised, naming the procedure and the field
+    And an answer it accepts reaches the caller unchanged
+
+  @unit @typecheck
+  Scenario: A chain-built router is the same type the client already sees
+    Given a router is built through the fluent chain
+    When it is compared with the same router written by hand
+    Then the two are the same type, not merely assignable

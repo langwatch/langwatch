@@ -86,6 +86,10 @@ function harness({
     {
       protected: authenticated,
       policy: () => (procedure) => procedure,
+      // Every answer this suite asserts on is checked against the output
+      // schema the procedure declares, which is what makes those declarations
+      // load-bearing rather than documentation.
+      validateOutput: true,
       createPolicy: (procedure) => procedure,
       updatePolicy: (procedure) => procedure,
     },
@@ -146,6 +150,7 @@ describe("ProjectTrpcApi", () => {
         {
           protected: trpc.procedure,
           policy: recordingPolicy,
+          validateOutput: true,
           createPolicy: recordingPolicy(),
           updatePolicy: recordingPolicy(),
         },

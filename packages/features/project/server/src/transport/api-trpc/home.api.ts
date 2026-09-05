@@ -13,8 +13,13 @@
  * Transport only: the gate, the input parser and delegation to the process's
  * recent-items reader, which walks the audit trail and hydrates each entity.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
-import { ProjectCallerUnauthenticatedError } from "@langwatch/project-contract";
+import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
+import {
+  ProjectCallerUnauthenticatedError,
+  recentItemSchema,
+  type RecentItem,
+} from "@langwatch/project-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
@@ -32,23 +37,13 @@ type HomeTrpcProcedures<
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   /**
    * The process's tracing, logging, error, scope-lineage, authorization and
-   * audit policy for one declared permission.
-   *
-   * Applied by this feature AFTER its own input parser rather than composed
-   * ahead of it, because the authorization check reads its scope id from the
-   * validated input: tRPC runs middlewares in the order they were added, so a
-   * check installed before `.input()` would see no input at all.
+   * audit policy for one access declaration. The chain applies it AFTER this
+   * feature's input parser, which is the ordering the authorization check
+   * depends on: a check installed before `.input()` reads no scope id.
    */
-  policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
-}>;
-
-/** One entity the caller touched recently, as the strip renders it. */
-export type RecentItem = Readonly<{
-  id: string;
-  type: "prompt" | "workflow" | "dataset" | "evaluation" | "annotation" | "simulation";
-  name: string;
-  href: string;
-  updatedAt: Date;
+  policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /** The process capability this transport needs that is not the project's own. */
@@ -81,21 +76,29 @@ export class HomeTrpcApi {
   ) {
     const { protected: procedure, policy } = procedures;
 
-    return trpc.router({
-      getRecentItems: policy("project:view")(procedure.input(getRecentItemsInputSchema)).query(
-        async ({ ctx, input }) => {
-          const user = ctx.session?.user;
-          // `protectedProcedure` has already refused an anonymous caller; this
-          // only narrows the type. A blank user id here would widen the read to
-          // somebody else's trail rather than refusing it.
-          if (!user) throw new ProjectCallerUnauthenticatedError();
-          return ports.getRecentItems(ctx, {
-            userId: user.id,
-            projectId: input.projectId,
-            limit: input.limit,
-          });
-        },
-      ),
-    });
+    return createTrpcService({
+      root: trpc,
+      procedures: { protected: procedure, policy },
+      validateOutput: procedures.validateOutput,
+    })
+      .query("getRecentItems", (p) =>
+        p
+          .withInput(getRecentItemsInputSchema)
+          .withOutput(recentItemSchema.array())
+          .withPermission("project:view")
+          .handle(async ({ ctx, input }) => {
+            const user = ctx.session?.user;
+            // `protectedProcedure` has already refused an anonymous caller;
+            // this only narrows the type. A blank user id here would widen the
+            // read to somebody else's trail rather than refusing it.
+            if (!user) throw new ProjectCallerUnauthenticatedError();
+            return ports.getRecentItems(ctx, {
+              userId: user.id,
+              projectId: input.projectId,
+              limit: input.limit,
+            });
+          }),
+      )
+      .build();
   }
 }

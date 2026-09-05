@@ -76,3 +76,16 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
     Given withRateLimit on the service builder
     When one endpoint re-declares it and another declares withoutRateLimit
     Then the default applies to the remaining endpoints only
+
+  @unit
+  Scenario: A converted family keeps the error body its integrators parse
+    Given a family declares the error envelope it publishes
+    When one of its routes fails
+    Then the body is that envelope's shape, not the framework's default
+
+  @unit
+  Scenario: A family layers its own error handler over the envelope
+    Given a family installs an error handler of its own
+    When it is built
+    Then it is handed the envelope's boundary handler to delegate to
+    And a refusal the boundary can render still reaches it

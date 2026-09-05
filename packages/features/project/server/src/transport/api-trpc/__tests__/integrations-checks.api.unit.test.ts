@@ -12,7 +12,7 @@
  * that the port's answer reaches the caller as its own shape rather than a
  * copy the transport rebuilt.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -37,7 +37,7 @@ function harness({
     return next({ ctx: { session: { user: ctx.session.user } } });
   });
 
-  const declared: AuthzPermission[] = [];
+  const declared: (AuthzPermission | AuthzDeclaration)[] = [];
   const parsedInputs: unknown[] = [];
   const port =
     vi.fn<(ctx: object, input: Readonly<{ projectId: string }>) => Promise<CheckStatus>>(
@@ -48,8 +48,9 @@ function harness({
     trpc,
     {
       protected: authenticated,
-      policy: (permission) => {
-        declared.push(permission);
+      validateOutput: true,
+      policy: (access) => {
+        declared.push(access);
         return (procedure) =>
           (procedure as { use(m: unknown): typeof procedure }).use(
             ({ input, next }: { input: unknown; next: () => Promise<unknown> }) => {

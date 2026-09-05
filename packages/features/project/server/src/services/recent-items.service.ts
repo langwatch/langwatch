@@ -92,6 +92,25 @@ export class RecentItemsService {
     timestamp: Date,
     projectId: string,
   ): Promise<RecentItem | null> {
+    const resolved = await this.tryResolveEntity(type, id, projectId);
+    if (!resolved) {
+      return null;
+    }
+
+    return {
+      id: resolved.id,
+      type,
+      name: resolved.name,
+      href: resolved.href,
+      updatedAt: timestamp,
+    };
+  }
+
+  private async tryResolveEntity(
+    type: RecentItemType,
+    id: string,
+    projectId: string,
+  ): Promise<{ id: string; name: string; href: string } | null> {
     switch (type) {
       case "prompt": {
         const prompt = await this.repository.tryGetPromptById(id, projectId);
@@ -99,13 +118,8 @@ export class RecentItemsService {
           return null;
         }
 
-        return {
-          id: prompt.id,
-          type: "prompt",
-          name: prompt.name,
-          href: `/${prompt.project.slug}/prompts?prompt=${prompt.id}`,
-          updatedAt: timestamp,
-        };
+        const href = `/${prompt.project.slug}/prompts?prompt=${prompt.id}`;
+        return { id: prompt.id, name: prompt.name, href };
       }
       case "workflow": {
         const workflow = await this.repository.tryGetWorkflowById(id, projectId);
@@ -113,13 +127,8 @@ export class RecentItemsService {
           return null;
         }
 
-        return {
-          id: workflow.id,
-          type: "workflow",
-          name: workflow.name,
-          href: `/${workflow.project.slug}/studio/${workflow.id}`,
-          updatedAt: timestamp,
-        };
+        const href = `/${workflow.project.slug}/studio/${workflow.id}`;
+        return { id: workflow.id, name: workflow.name, href };
       }
       case "dataset": {
         const dataset = await this.repository.tryGetDatasetById(id, projectId);
@@ -127,13 +136,8 @@ export class RecentItemsService {
           return null;
         }
 
-        return {
-          id: dataset.id,
-          type: "dataset",
-          name: dataset.name,
-          href: `/${dataset.project.slug}/datasets/${dataset.id}`,
-          updatedAt: timestamp,
-        };
+        const href = `/${dataset.project.slug}/datasets/${dataset.id}`;
+        return { id: dataset.id, name: dataset.name, href };
       }
       case "evaluation": {
         const monitor = await this.repository.tryGetMonitorById(id, projectId);
@@ -141,13 +145,8 @@ export class RecentItemsService {
           return null;
         }
 
-        return {
-          id: monitor.id,
-          type: "evaluation",
-          name: monitor.name,
-          href: `/${monitor.project.slug}/online-evaluations`,
-          updatedAt: timestamp,
-        };
+        const href = `/${monitor.project.slug}/online-evaluations`;
+        return { id: monitor.id, name: monitor.name, href };
       }
       case "annotation": {
         const queue = await this.repository.tryGetAnnotationQueueById(id, projectId);
@@ -155,18 +154,8 @@ export class RecentItemsService {
           return null;
         }
 
-        return {
-          id: queue.id,
-          type: "annotation",
-          name: queue.name,
-          href: `/${queue.project.slug}/annotations/${queue.slug}`,
-          updatedAt: timestamp,
-        };
-      }
-      case "simulation": {
-        // Simulations are stored in ClickHouse, not Prisma
-        // For now, we don't hydrate them but return a placeholder
-        return null; // TODO: Implement when scenario set details are needed
+        const href = `/${queue.project.slug}/annotations/${queue.slug}`;
+        return { id: queue.id, name: queue.name, href };
       }
       default:
         return null;

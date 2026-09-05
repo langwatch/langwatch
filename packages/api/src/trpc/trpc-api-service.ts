@@ -207,6 +207,12 @@ export type TrpcApiMount<
   root: TRPCRootObject<TContext, object, TOptions, TRoot>;
   protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   middlewares: AppTrpcPolicyMiddlewares;
+  /**
+   * Check each answer against the output schema its procedure declared. The
+   * process decides — this package reads no environment — and production
+   * leaves it off: a declared shape documents the answer, it does not gate it.
+   */
+  validateOutput?: boolean;
 }>;
 
 /**
@@ -274,6 +280,8 @@ export type TrpcApiService<
   }): TrpcApiPolicyDecorator;
   /** The same chain around a check the feature hands over already built. */
   custom(check: unknown): TrpcApiPolicyDecorator;
+  /** @see the mount field of the same name. */
+  validateOutput: boolean;
 }>;
 
 /**
@@ -329,6 +337,7 @@ export function createTrpcApiService<
 
   return {
     protected: mount.protectedProcedure,
+    validateOutput: mount.validateOutput ?? false,
     // Spread rather than set to undefined: a mount with no signed-out surface
     // must not hand a feature a `public` key at all.
     ...(mount.publicProcedure === undefined ? {} : { public: mount.publicProcedure }),
