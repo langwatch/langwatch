@@ -1,0 +1,109 @@
+{
+  "input": "../../../../.claude/tmp/video/raw/experiments/page@cffd8b98fc233a0673c14b8b82c6e966.webm",
+  "output": "../../../media/videos/experiments-workbench.webm",
+  "fps": 30,
+  "page": { "width": 1440, "height": 900 },
+  "size": { "width": 1664, "height": 1040 },
+  "frame": { "background": "backgrounds/default.webp", "fit": "native" },
+  "quality": { "crf": 38, "cpuUsed": 2 },
+
+  "cut": { "speed": 2, "segments": [[16.0, 99.3]] },
+
+  "cursor": { "start": { "x": 700, "y": 480 } },
+
+  "beats": [
+    {
+      "tRaw": 20.464, "x": 300, "y": 240, "zoom": 1, "click": false, "arc": 0,
+      "note": "read the question the dataset asks"
+    },
+    {
+      "tRaw": 22.387, "x": 660, "y": 258, "zoom": 1, "click": false, "arc": 0,
+      "note": "carriage return to the expected answer"
+    },
+    {
+      "tRaw": 23.708, "x": 985, "y": 258, "zoom": 1, "click": false, "arc": 0,
+      "note": "sweep along the expected answer"
+    },
+    {
+      "tRaw": 26.547, "x": 1092, "y": 257,
+      "zoom": 1.8, "zoomAt": { "x": 1140, "y": 340 }, "hold": 0.5,
+      "note": "open the evaluator on the row"
+    },
+    {
+      "tRaw": 29.741, "x": 1121, "y": 364,
+      "zoom": 1.8, "zoomAt": { "x": 1140, "y": 340 }, "hold": 0.4,
+      "note": "Edit Configuration, the camera holds on the menu"
+    },
+    {
+      "tRaw": 34.398, "x": 880, "y": 512,
+      "zoom": 1.7, "zoomAt": { "x": 1110, "y": 500 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "the camera pans onto the drawer, the cursor starts the output mapping"
+    },
+    {
+      "tRaw": 35.608, "x": 1150, "y": 512,
+      "zoom": 1.7, "zoomAt": { "x": 1110, "y": 500 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "output comes from the prompt under test"
+    },
+    {
+      "tRaw": 37.333, "x": 880, "y": 553,
+      "zoom": 1.7, "zoomAt": { "x": 1110, "y": 500 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "carriage return to the second mapping"
+    },
+    {
+      "tRaw": 38.458, "x": 1310, "y": 553,
+      "zoom": 1.7, "zoomAt": { "x": 1110, "y": 500 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "expected_output comes from the dataset column"
+    },
+    {
+      "tRaw": 41.935, "x": 1407, "y": 33, "zoom": 1,
+      "note": "close the drawer, a close X earns no zoom"
+    },
+    {
+      "tRaw": 47.578, "x": 1382, "y": 93,
+      "zoom": 1.9, "zoomAt": { "x": 1230, "y": 130 }, "hold": 0.6,
+      "pause": { "before": 0.9, "after": 0.8 },
+      "note": "Run, a corner, so it earns the zoom. The hold after it lets the camera reach the filling rows"
+    },
+    {
+      "tRaw": 67.016, "x": 1060, "y": 240,
+      "zoom": 1.7, "zoomAt": { "x": 1240, "y": 280 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "read the answer the agent wrote"
+    },
+    {
+      "tRaw": 68.485, "x": 1400, "y": 240,
+      "zoom": 1.7, "zoomAt": { "x": 1240, "y": 280 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "sweep along it"
+    },
+    {
+      "tRaw": 70.098, "x": 1092, "y": 296,
+      "zoom": 1.7, "zoomAt": { "x": 1240, "y": 280 }, "hold": 0.3,
+      "click": false, "arc": 0,
+      "note": "down to the verdict the judge gave that row"
+    },
+    {
+      "tRaw": 73.33, "x": 1350, "y": 191,
+      "zoom": 1.8, "zoomAt": { "x": 1280, "y": 290 }, "hold": 4.0,
+      "click": false,
+      "note": "the score summary, the payoff: pass rate, latency and cost for the whole run"
+    },
+    {
+      "tRaw": 81.27, "x": 1194, "y": 93, "zoom": 1,
+      "note": "open the run results"
+    },
+    {
+      "tRaw": 90.5, "x": 700, "y": 300, "zoom": 1, "click": false, "arc": 0,
+      "note": "read down the results table"
+    },
+    {
+      "tRaw": 95.5, "x": 700, "y": 520, "zoom": 1, "click": false, "arc": 0,
+      "note": "keep reading while the table scrolls"
+    },
+    { "tRaw": 98.3, "hide": true }
+  ]
+}
