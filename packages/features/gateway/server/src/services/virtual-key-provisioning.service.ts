@@ -30,12 +30,10 @@ import {
   assertProvidersAllowedShape,
   diffGuardrailAttachments,
   resolveRoutingMode,
-  ROTATION_GRACE_MS,
   serialiseForAudit,
   VirtualKeyValidationService,
   type CreatedVirtualKey,
   type CreateVirtualKeyInput,
-  type RotateVirtualKeyInput,
   type UpdateVirtualKeyInput,
 } from "./virtual-key-validation.service";
 

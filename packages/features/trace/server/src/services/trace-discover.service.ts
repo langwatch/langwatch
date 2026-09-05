@@ -7,13 +7,9 @@
 import { createLogger } from "@langwatch/observability";
 import type {
   BatchedFacetResult,
-  CategoricalFacetResult,
-  CategoricalFacetDescriptor,
   DiscoverResult,
   DiscreteFacetResult,
-  DynamicKeysFacetDescriptor,
   FacetDescriptor,
-  RangeFacetDescriptor,
   TraceListReadPort,
 } from "@langwatch/trace-contract";
 import type {

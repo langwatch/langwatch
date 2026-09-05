@@ -4,7 +4,6 @@
  * source of truth on cloud, and the organization's own claim still refuses a concurrent pass.
  */
 
-import { createLogger } from "@langwatch/observability";
 import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import {
   MigrationEnrollmentOrganizationNotFoundError,
@@ -17,8 +16,6 @@ import {
   statusOfMemberSummary,
   type SystemMigrationsServiceDependencies,
 } from "./system-migration-support.service";
-
-const logger = createLogger("langwatch:ops:system-migrations");
 
 export class SystemMigrationRunService {
   static create(deps: SystemMigrationsServiceDependencies): SystemMigrationRunService {

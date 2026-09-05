@@ -8,7 +8,6 @@
 
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import {
-  GUID,
   MS_THRESHOLD,
   ROLE_AGENT,
   ROLE_USER,

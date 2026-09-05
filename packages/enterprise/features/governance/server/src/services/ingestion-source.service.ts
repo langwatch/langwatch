@@ -5,7 +5,6 @@ import {
   IngestionSourceCapReachedError,
   IngestionSourceNotFoundError,
   NON_ENTERPRISE_INGESTION_SOURCE_CAP,
-  pullScheduleSchema,
   unsupportedValue,
   type CreatedGovernanceIngestionSource,
   type CreateGovernanceIngestionSourceCommand,

@@ -2,20 +2,16 @@
  * Shared data loading utilities for Evaluations V3 execution.
  */
 
-import { createLogger } from "@langwatch/observability";
-import { AgentNotFoundError, type Agent, type AgentService } from "@langwatch/agent-contract";
+import type { Agent, AgentService } from "@langwatch/agent-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { Evaluator, EvaluatorService } from "@langwatch/evaluator-contract";
 import {
-  parseStudioWorkflow,
   transposeColumnsFirstToRowsFirstWithId,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 import type { PromptService, VersionedPrompt } from "@langwatch/prompt-contract";
 import type { ExperimentWorkflowDslPort } from "../ports/experiment-workflow-dsl.port";
 import { ExperimentTargetLoadingService } from "./experiment-target-loading.service";
-
-const logger = createLogger("langwatch:experiment:execution-data");
 
 // Column types that store JSON and need parsing
 const JSON_COLUMN_TYPES = ["chat_messages", "json", "list", "spans", "rag_contexts"] as const;

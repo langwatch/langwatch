@@ -3,7 +3,6 @@
  * ADR-092 §9 caps a CLI key at what its owner may still do, read at request
  * time: the project door refuses, the listing narrows instead of refusing.
  */
-import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 

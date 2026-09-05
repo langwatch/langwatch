@@ -21,7 +21,6 @@ import { DERIVED_ATTRS } from "./trace-log-content-derivation.service";
 import type { SpanSummaryRow } from "@langwatch/trace-contract";
 import {
   CLAUDE_SPAN_NAME_PREFIX,
-  INTERACTION_SPAN_NAME,
   isInteractionSpan,
   nonEmptyOrNull,
   parseBoolAttr,
@@ -29,8 +28,6 @@ import {
   readStringParam,
   SPAN_QUERY_SOURCE_KEY,
   SPAN_REQUEST_ID_KEY,
-  SPAN_TOOL_CALL_ID_KEY,
-  SPAN_TOOL_USE_ID_KEY,
   SPAN_USER_PROMPT_KEY,
   spanToolUseId,
 } from "../rules/claude-code-span-keys.rules";

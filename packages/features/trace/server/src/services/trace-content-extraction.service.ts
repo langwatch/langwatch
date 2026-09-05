@@ -4,22 +4,14 @@
  * rich-content shape, mints URLs carrying the owning projectId, and passes the rest through.
  */
 
-import { z } from "zod";
 import { TraceContentArrayService } from "./trace-content-array.service";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { resolveRawPcmFormat, wrapRawPcmToWav } from "@langwatch/trace-contract";
-import {
-  isInlineDataCarrier,
-  parseBase64DataUri,
-  visitContentPartAsync,
-} from "@langwatch/trace-contract";
-import { isReadbackSafe } from "@langwatch/stored-object-contract";
+import { visitContentPartAsync } from "@langwatch/trace-contract";
 
 import type { TraceMediaStorePort } from "../ports/trace-media-store.port";
 import {
-  binaryInputPartSchema,
   extractBareImagePart,
   extractBinaryPart,
   extractImageUrlPart,

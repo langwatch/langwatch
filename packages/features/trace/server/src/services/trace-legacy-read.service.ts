@@ -1,21 +1,15 @@
 import type { Protections } from "@langwatch/trace-contract";
-import { TraceEditOverlayRedactionService } from "./trace-edit-overlay-redaction.service";
-import { ClaudeCodeLogEnrichmentService } from "./claude-code-log-enrichment.service";
 import { TraceEvaluationMappingService } from "./trace-evaluation-mapping.service";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 import type { TraceBlobStoreService } from "./trace-blob-store.service";
-import {
-  CODING_AGENT_ORIGIN,
-  type TraceLogRecordReader,
-} from "./claude-code-log-enrichment.service";
+import { type TraceLogRecordReader } from "./claude-code-log-enrichment.service";
 import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
 import type { Evaluation, Trace } from "@langwatch/trace-contract";
 
 import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository";
-import { applyOverlayToTrace } from "@langwatch/trace-contract";
 import { TraceEditOverlayService } from "./trace-edit-overlay.service";
 import { TraceReadEnrichmentService } from "./trace-read-enrichment.service";
 

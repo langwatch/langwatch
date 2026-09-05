@@ -9,7 +9,6 @@ import {
   MigrationDrainProofRequiresMigratedError,
   MigrationStateNotFoundError,
 } from "@langwatch/ops-contract";
-import type { MigrationPassSummary, TenantMigrationRecord } from "@langwatch/system-migrations";
 import { SystemMigrationEnrollmentService } from "./system-migration-enrollment.service";
 import { SystemMigrationRollbackService } from "./system-migration-rollback.service";
 import { SystemMigrationRunService } from "./system-migration-run.service";

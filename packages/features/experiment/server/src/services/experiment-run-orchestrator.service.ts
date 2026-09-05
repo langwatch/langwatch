@@ -1,46 +1,22 @@
 /** Manages evaluation execution across multiple cells: builds and dispatches workflows, maps events to SSE, and coordinates parallel, abortable runs. */
 
-import { createLogger } from "@langwatch/observability";
 import {
-  type CarriedOverCell,
   type ESBatchEvaluationTarget,
   type EvaluationsV3State,
   type EvaluationV3Event,
   type EvaluatorConfig,
   type ExecutionCell,
   type ExecutionScope,
-  type ExecutionSummary,
-  type ExperimentService,
-  generateHumanReadableId,
   type RecordEvaluatorResultCommandData,
   type RecordTargetResultCommandData,
   type TargetConfig,
 } from "@langwatch/experiment-contract";
 import type { ExecutionState, StudioWorkflow, WorkflowService } from "@langwatch/workflow-contract";
-import type { Agent as TypedAgent } from "@langwatch/agent-contract";
-import { type SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import type { ExperimentEvaluationReportingPort } from "../ports/experiment-evaluation-reporting.port";
 import type { ExperimentModelCostPort } from "../ports/experiment-model-cost.port";
 import type { ExperimentRunAbortPort } from "../ports/experiment-run-abort.port";
-import type { ExperimentSandboxCredentialPort } from "../ports/experiment-sandbox-credential.port";
-import type { ExperimentConnectedDispatchPort } from "../ports/experiment-connected-dispatch.port";
-import type { ExperimentConnectedAgentOwnershipPort } from "../ports/experiment-connected-agent-ownership.port";
-import type { ExperimentStudioDispatchPort } from "../ports/experiment-studio-dispatch.port";
-import { buildStripScoreEvaluatorIds } from "../processes/experiment-evaluator-score-filter.process";
-// The connected-agent relay of ADR-128. Its dispatcher, runtime and refusal
-// live in the Agent and Suite feature packages; a build without them
-// cannot run a connected column.
-import type { CallOutcome, DispatchAgent, DispatchCall } from "@langwatch/agent-contract";
-import type { RunActor } from "@langwatch/scenario-contract";
 import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process";
-import { createSemaphore } from "../processes/experiment-run-semaphore.process";
-import { createEventStream } from "../processes/experiment-run-event-stream.process";
-import {
-  ExperimentExecutionDataService,
-  type LoadedEvaluators,
-  type LoadedWorkflow,
-} from "./experiment-execution-data.service";
+import { type LoadedEvaluators } from "./experiment-execution-data.service";
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service";
 import { ExperimentCarriedBoardService } from "./experiment-carried-board.service";
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service";
@@ -55,9 +31,7 @@ import {
 } from "./experiment-cell-execution.service";
 import { ExperimentWorkflowCellService } from "./experiment-workflow-cell.service";
 import { ExperimentConnectedCellService } from "./experiment-connected-cell.service";
-import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service";
 import { ExperimentRunStorageService } from "./experiment-run-storage.service";
-import { ExperimentRunLoopService, type PhaseTwoPlan } from "./experiment-run-loop.service";
 import {
   comparisonSkipMessage as processComparisonSkipMessage,
   formatList as processFormatList,
@@ -69,8 +43,6 @@ import type {
   OrchestratorInput,
 } from "../rules/experiment-run-input.rules";
 import { ExperimentRunDriverService } from "./experiment-run-driver.service";
-
-const logger = createLogger("langwatch:experiment:run-orchestrator");
 
 const cellPlan = ExperimentCellPlanService.create();
 
@@ -84,28 +56,6 @@ const comparisonPlan = ({
 
 /** Re-exported so it moved with its owner without duplicating the type. */
 export type { ComparisonSkipReason } from "../processes/experiment-comparison-skip.process";
-
-const sandboxKey = ExperimentRunSandboxKeyService.create();
-
-/** Mints the run's sandbox credential, when a target executes code. Delegates to {@link ExperimentRunSandboxKeyService}. */
-async function tryMintRunSandboxApiKey({
-  sandboxCredentials,
-  projectId,
-  loadedAgents,
-  loadedWorkflows,
-}: {
-  sandboxCredentials: ExperimentSandboxCredentialPort;
-  projectId: string;
-  loadedAgents: Map<string, TypedAgent>;
-  loadedWorkflows?: Map<string, LoadedWorkflow>;
-}): Promise<string | undefined> {
-  return sandboxKey.tryMintRunSandboxApiKey({
-    sandboxCredentials,
-    projectId,
-    loadedAgents,
-    loadedWorkflows,
-  });
-}
 
 const cellExecution = (ports: ExperimentRunPorts, workflows: WorkflowService) =>
   ExperimentCellExecutionService.create({ ports, workflows });

@@ -1,15 +1,11 @@
 import { TraceStreamBufferService } from "./trace-stream-buffer.service";
-import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
 import { DeleteObjectCommand, GetObjectCommand, type S3Client } from "@aws-sdk/client-s3";
 import type { Logger } from "@langwatch/observability";
-import { z } from "zod";
 import {
   assertLegacySpoolKeyBelongsTo,
   buildSpoolObjectPath,
   isLegacySpoolRef,
-  projectIdFromLegacySpoolKey,
-  SPOOL_KEY_PREFIX,
   SPOOL_REF_V2,
 } from "../rules/trace-spool-location.rules";
 import {

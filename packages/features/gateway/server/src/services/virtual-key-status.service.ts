@@ -5,13 +5,6 @@
  */
 
 import { TRPCError } from "@trpc/server";
-import {
-  defaultVirtualKeyConfig,
-  identityPatchData,
-  parseVirtualKeyConfig,
-  virtualKeyConfigSchema,
-  translateExternalIdConflict,
-} from "@langwatch/gateway-contract";
 import { GatewayAuditPort } from "../ports/gateway-audit.port";
 import { GatewayChangeEventsPort } from "../ports/gateway-change-events.port";
 import type { GatewayTransactionPort } from "../ports/gateway-transaction.port";
@@ -22,17 +15,9 @@ import type {
 } from "../ports/gateway-virtual-key.port";
 import { VirtualKeyBudgetService } from "./virtual-key-budget.service";
 import {
-  assertExpiryInFuture,
-  assertProvidersAllowedShape,
-  diffGuardrailAttachments,
-  resolveRoutingMode,
-  ROTATION_GRACE_MS,
   serialiseForAudit,
   VirtualKeyValidationService,
-  type CreatedVirtualKey,
-  type CreateVirtualKeyInput,
   type RevokeVirtualKeyInput,
-  type UpdateVirtualKeyInput,
 } from "./virtual-key-validation.service";
 
 export class VirtualKeyStatusService {

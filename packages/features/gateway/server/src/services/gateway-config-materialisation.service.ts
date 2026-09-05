@@ -3,23 +3,16 @@
  * model provider absorbed the old gateway credential's fields, and a key's eligible-provider set
  * computes from its scope graph plus the optional routing policy's ordering.
  */
-import type { GatewayBudget, ModelProvider, VirtualKey } from "@langwatch/gateway-contract";
+import type { ModelProvider } from "@langwatch/gateway-contract";
 
 import { GatewayConfigAssemblyPort } from "../ports/gateway-config-assembly.port";
 import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port";
-import { resolveLangyMirrorTier, type LangyMirrorTier } from "@langwatch/langy-contract";
-import { modelProviders } from "@langwatch/model-provider-contract";
+import { resolveLangyMirrorTier } from "@langwatch/langy-contract";
 import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
 import type { ProjectService } from "@langwatch/project-contract";
 import {
   budgetPeriodFloorMs,
-  effectiveBudgetPeriod,
   parseVirtualKeyConfig,
-  type GatewayBudgetResource,
-  type GatewayCacheRuleResource,
-  type GatewayConfigGuardrailAttachment,
-  type GatewayGuardrailBundleEntry,
-  type GatewayMoney,
   type GatewayResolvedBudget,
   type GatewayService,
 } from "@langwatch/gateway-contract";

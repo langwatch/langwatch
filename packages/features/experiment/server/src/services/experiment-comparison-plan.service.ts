@@ -2,8 +2,6 @@
 
 import {
   COMPARISON_EVALUATOR_TYPE,
-  isGoldenFieldSatisfied,
-  isRowEmpty,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
   toComparisonConfig,
   type ComparisonEvaluatorConfig,
@@ -17,14 +15,8 @@ import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import {
   buildVariantDisplayNames,
   buildVariantIdentifiers,
-  evaluatorScoresBlock,
-  pickOutputPath,
-  toCandidateText,
 } from "../processes/experiment-comparison-candidates.process";
-import {
-  type ComparisonSetupSkip,
-  type ComparisonSkipReason,
-} from "../processes/experiment-comparison-skip.process";
+import { type ComparisonSkipReason } from "../processes/experiment-comparison-skip.process";
 import type { LoadedEvaluators } from "./experiment-execution-data.service";
 import { ExperimentComparisonVariantService } from "./experiment-comparison-variant.service";
 

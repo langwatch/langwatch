@@ -5,8 +5,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { TenantMigrationRecord, TenantMigrationStatus } from "@langwatch/system-migrations";
-import { MigrationStateNotFoundError } from "@langwatch/ops-contract";
+import type { TenantMigrationRecord } from "@langwatch/system-migrations";
 import {
   requireRegisteredMigration,
   ROLLBACK_EFFECT_STATUSES,

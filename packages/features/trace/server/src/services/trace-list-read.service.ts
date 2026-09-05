@@ -8,50 +8,22 @@ import {
   mapToTraceListItem,
   SORT_COLUMN_MAP,
 } from "../rules/trace-list-row.rules";
-import { createLogger } from "@langwatch/observability";
 import type { TopicService } from "@langwatch/topic-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
-import { resolveNonBilledCost } from "@langwatch/trace-contract";
 import {
-  deriveTraceOrigin,
-  deriveTraceStatus,
-  deriveTraceTimestamp,
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
   TRACE_STATUS_CLICKHOUSE_EXPRESSION,
 } from "@langwatch/trace-contract";
-import {
-  RESERVED_INPUT_MEDIA_REFS,
-  RESERVED_OUTPUT_MEDIA_REFS,
-  type BatchedFacetResult,
-  type CategoricalFacetDescriptor,
-  type CategoricalFacetResult,
-  type DiscoverResult,
-  type DiscreteFacetResult,
-  type DynamicKeysFacetDescriptor,
-  type FacetDescriptor,
-  type FacetValuesResult,
-  type RangeFacetDescriptor,
-  type TraceListCursor,
-  type TraceListFacetCounts,
-  type TraceListItem,
-  type TraceListPage,
-  type TraceListReadPort,
-  type TraceListSort,
-  type TraceListSortColumn,
-  type TraceMediaRef,
-} from "@langwatch/trace-contract";
-import { TtlCache } from "./trace-ttl-cache.service";
-import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";
-import { parseMediaRefs } from "@langwatch/trace-contract";
-import { PageTooDeepError } from "@langwatch/trace-contract";
 import type {
-  ExpressionCategoricalDef,
-  FacetDefinition,
-  FacetTable,
-  RangeFacetDef,
-} from "@langwatch/trace-server";
-import { ClickHouseFacetRegistryAdapter } from "@langwatch/trace-server";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
+  DiscoverResult,
+  FacetValuesResult,
+  TraceListCursor,
+  TraceListFacetCounts,
+  TraceListPage,
+  TraceListReadPort,
+} from "@langwatch/trace-contract";
+import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";
+import { PageTooDeepError } from "@langwatch/trace-contract";
 
 interface ListParams {
   tenantId: string;

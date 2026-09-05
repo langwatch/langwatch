@@ -42,9 +42,7 @@ import {
   type ConversationRoutingProfile,
   type ConversationSeeds,
   ConversationTraceAssemblyService,
-  type OtlpJsonAttr,
   type OtlpJsonSpan,
-  type RoutingOrigin,
 } from "./conversation-trace-assembly.service";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { GenieSpanAttributesService } from "./genie-span-attributes.service";

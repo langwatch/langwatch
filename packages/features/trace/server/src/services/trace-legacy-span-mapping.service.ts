@@ -1,14 +1,9 @@
 import { TraceSpanCostMatchingService } from "./trace-span-cost-matching.service";
 import { TraceNumberCoercionService } from "./trace-number-coercion.service";
 import type { NormalizedAttributes, NormalizedSpan } from "@langwatch/trace-contract";
-import { NormalizedStatusCode } from "@langwatch/trace-contract";
 import type {
   BaseSpan,
-  ChatMessage,
-  ErrorCapture,
-  RAGChunk,
   Span,
-  SpanInputOutput,
   SpanMetrics,
   SpanTimestamps,
   SpanTypes,

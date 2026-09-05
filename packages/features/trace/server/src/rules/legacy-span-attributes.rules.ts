@@ -4,7 +4,7 @@
  * so the value-envelope unwrapping is stated once.
  */
 
-import type { NormalizedAttributes, NormalizedSpan } from "@langwatch/trace-contract";
+import type { NormalizedAttributes } from "@langwatch/trace-contract";
 import { NormalizedStatusCode } from "@langwatch/trace-contract";
 import type {
   ChatMessage,

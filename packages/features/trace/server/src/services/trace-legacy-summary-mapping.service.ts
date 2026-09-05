@@ -10,15 +10,7 @@ import {
   tryParseJsonArray,
 } from "../rules/legacy-summary-attributes.rules";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import type {
-  ErrorCapture,
-  Event,
-  Span,
-  Trace,
-  TraceInput,
-  TraceMetadata,
-  TraceOutput,
-} from "@langwatch/trace-contract";
+import type { Event, Span, Trace, TraceMetadata } from "@langwatch/trace-contract";
 
 export class TraceLegacySummaryMappingService {
   static create(): TraceLegacySummaryMappingService {

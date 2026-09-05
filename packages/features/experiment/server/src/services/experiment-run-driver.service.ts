@@ -5,9 +5,6 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { Agent as TypedAgent } from "@langwatch/agent-contract";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import type { TargetConfig } from "@langwatch/experiment-contract";
 import type {
   EvaluationV3Event,
   ExecutionCell,
@@ -111,7 +108,7 @@ export class ExperimentRunDriverService {
    * executes Python needs. The run is marked running here, so every dispatch path has it.
    */
   private static async prepareRun(input: OrchestratorInput): Promise<PreparedRun> {
-    const { projectId, experimentId, scope, state, datasetRows, ports } = input;
+    const { projectId, scope, state, datasetRows, ports } = input;
     const runId = input.runId ?? generateHumanReadableId();
     const cells = ExperimentRunOrchestratorService.generateCells(state, datasetRows, scope, {
       seedTargetOutputs: input.seedTargetOutputs,

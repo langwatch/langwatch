@@ -9,7 +9,6 @@ import {
   MigrationEnrolledAutomaticallyError,
   MigrationEnrollmentCloudOnlyError,
   MigrationEnrollmentOrganizationNotFoundError,
-  MigrationNotAvailableOnInstallationError,
 } from "@langwatch/ops-contract";
 import {
   requireRegisteredMigration,

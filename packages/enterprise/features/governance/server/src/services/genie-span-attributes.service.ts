@@ -21,12 +21,7 @@ import {
   type GenieMessageFrame,
   type GenieThought,
 } from "../rules/genie-message.rules";
-import {
-  GENIE_AGENT_MODEL,
-  GENIE_PROVENANCE_SOURCE,
-  GENIE_QUERY_ACTION,
-  GENIE_QUERY_SPAN_NAME,
-} from "./genie-trace-mapper.service";
+import { GENIE_QUERY_SPAN_NAME } from "./genie-trace-mapper.service";
 
 export class GenieSpanAttributesService {
   private constructor() {}

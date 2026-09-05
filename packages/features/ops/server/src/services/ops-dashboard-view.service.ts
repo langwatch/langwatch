@@ -163,8 +163,6 @@ export class OpsDashboardViewService {
 
     const queues: QueueSummaryInfo[] = fullQueues.map(({ groups: _groups, ...summary }) => summary);
 
-    const mem = process.memoryUsage();
-
     return {
       totalGroups,
       blockedGroups,

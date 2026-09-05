@@ -15,7 +15,6 @@ import {
   shouldExcludeSpan,
   type SpanTreeNode,
   stringifyForText,
-  tryUnwrapJsonTextBlock,
 } from "../rules/trace-io-text.rules";
 
 /**

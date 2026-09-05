@@ -48,10 +48,6 @@ import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contr
 import { CopilotTranscriptGroupingService } from "./copilot-transcript-grouping.service";
 import { CopilotTurnAssemblyService } from "./copilot-turn-assembly.service";
 import {
-  MS_THRESHOLD,
-  ROLE_AGENT,
-  ROLE_USER,
-  type Activity,
   type BotFacts,
   type ConversationGroup,
   type ToolCall,

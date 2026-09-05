@@ -17,7 +17,7 @@ import {
   parseVirtualKeyConfig,
   type GatewayBudgetResource,
 } from "@langwatch/gateway-contract";
-import { resolveLangyMirrorTier, type LangyMirrorTier } from "@langwatch/langy-contract";
+import type { LangyMirrorTier } from "@langwatch/langy-contract";
 import { modelProviders } from "@langwatch/model-provider-contract";
 import type { GatewayConfigAssemblyPort } from "../ports/gateway-config-assembly.port";
 import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port";
